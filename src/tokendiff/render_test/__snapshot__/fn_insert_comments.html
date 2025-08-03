@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  /* 自定义删除线样式 */
+  del {
+    background-color: #ffe6e6;
+    color: #c00;
+    text-decoration: line-through;
+  }
+
+  /* 自定义下划线样式 */
+  ins {
+    background-color: #e6ffe6;
+    color: #008000;
+    text-decoration: none;
+  }
+
+  /* 应用于代码块的样式 */
+  pre {
+    background-color: #f4f4f4;
+    padding: 1em;
+    border-radius: 5px;
+    white-space: pre-wrap;
+  }
+  code {
+    font-family: 'Courier New', Courier, monospace;
+  }
+</style>
+</head>
+<body>
+<pre>
+<code>
+fn main {
+  println("Hello, world!")
+  // insert comment should not visible
+  // even more than one line
+  println(5 + 6)
+}
+</code>
+</pre>
+</body>
+</html>

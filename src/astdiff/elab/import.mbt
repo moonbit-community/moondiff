@@ -1,0 +1,2 @@
+///|
+typealias @span.(LineWidths, SingleLineSpan)

@@ -1,0 +1,12 @@
+{
+    "import": [
+        "moonbitlang/parser/tokens",
+        "moonbitlang/parser/basic",
+        "myfreess/moondiff/span"
+    ],
+    "test-import": [
+        "moonbitlang/x/fs",
+        "moonbitlang/parser/lexer",
+        "myfreess/moondiff/span"
+    ]
+}

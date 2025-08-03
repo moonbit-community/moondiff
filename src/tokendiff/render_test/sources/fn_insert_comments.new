@@ -1,0 +1,6 @@
+fn main {
+  println("Hello, world!")
+  // insert comment should not visible
+  // even more than one line
+  println(5 + 6)
+}

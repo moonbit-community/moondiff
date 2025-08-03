@@ -1,0 +1,12 @@
+{
+    "import": [
+      "myfreess/moondiff/tokendiff/edit",
+      "myfreess/moondiff/tokendiff/mbttoken",
+      { "alias": "chalk", "path": "Lampese/moonbit-chalk" }
+    ],
+    "test-import": [
+      "moonbitlang/parser/lexer",
+      "myfreess/moondiff/span",
+      "myfreess/moondiff/tokendiff/myers"
+    ]
+}
