@@ -175,17 +175,14 @@ fn[T : Eq] find_path(
 // end findpath definition
 
 ///|
-pub fn[T : Eq] diff(
-  old~ : ArrayView[T],
-  new~ : ArrayView[T],
-) -> Array[Edit[T]]? {
+pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> Array[Edit[T]] {
   let initial_box = Box::{
     left: 0,
     top: 0,
     right: old.length(),
     bottom: new.length(),
   }
-  guard initial_box.find_path(old~, new~) is Some(path) else { return None }
+  guard initial_box.find_path(old~, new~) is Some(path) else { return [] }
   // path length >= 2
   let xy = path.take(1).collect()[0] // (0, 0)
   let mut x1 = xy.0
@@ -217,5 +214,5 @@ pub fn[T : Eq] diff(
     x1 = x2
     y1 = y2
   })
-  return Some(edits)
+  return edits
 }

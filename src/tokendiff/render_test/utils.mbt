@@ -15,12 +15,12 @@ pub fn test_cli_rendering(t : @test.T, name : String) -> Unit raise {
     @lexer.tokens_from_string(comment=true, new).tokens,
     new_linewidths,
   )
+  let (prefix, suffix, old, new) = @preopt.separate_common_prefix_and_suffix(
+    old~,
+    new~,
+  )
   let edits = @myers.diff(old~, new~)
-  if edits is Some(edits) {
-    let str = @render.web_rendering(edits)
-    t.writeln(str)
-    t.snapshot(filename="\{name}.html")
-  } else {
-    fail("Diff failed")
-  }
+  let str = @render.web_rendering(prefix~, edits, suffix~)
+  t.writeln(str)
+  t.snapshot(filename="\{name}.html")
 }
