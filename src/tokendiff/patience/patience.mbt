@@ -10,18 +10,12 @@ pub fn[T : Eq + Hash] patience_diff(
   for pair in split_points.iter() {
     let (old_i, new_i) = pair
     let subedits = @myers.diff(old=old[old_base:old_i], new=new[new_base:new_i])
-    match subedits {
-      None => ()
-      Some(subedits) => edits.append(subedits)
-    }
+    edits.append(subedits)
     old_base = old_i
     new_base = new_i
   } else {
     let subedits = @myers.diff(old=old[old_base:], new=new[new_base:])
-    match subedits {
-      None => ()
-      Some(subedits) => edits.append(subedits)
-    }
+    edits.append(subedits)
   }
   return edits
 }
