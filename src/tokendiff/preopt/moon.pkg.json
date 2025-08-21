@@ -1,0 +1,6 @@
+{
+    "import": [
+      "myfreess/moondiff/tokendiff/mbttoken",
+      "myfreess/moondiff/tokendiff/edit"
+    ]
+}
