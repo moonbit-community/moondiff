@@ -1,0 +1,4 @@
+pub fn View::from_array(chars : Array[Char]) -> View {
+  let s = String::from_array(chars)
+  View::make_view(s, 0, s.length())
+}

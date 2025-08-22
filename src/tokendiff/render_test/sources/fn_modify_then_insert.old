@@ -1,0 +1,4 @@
+pub fn View::from_array(chars : Array[Char]) -> View {
+  // todo: remove .view() in new version
+  String::from_array(chars).view()
+}
