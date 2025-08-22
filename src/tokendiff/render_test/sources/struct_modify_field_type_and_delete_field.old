@@ -1,0 +1,10 @@
+struct Set[K] {
+  mut entries : FixedArray[SEntry[K]?]
+  mut list : FixedArray[SListNode[K]]
+  mut size : Int
+  mut capacity : Int
+  mut capacity_mask : Int
+  mut grow_at : Int
+  mut head : SEntry[K]?
+  mut tail : SEntry[K]?
+}
