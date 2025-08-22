@@ -32,14 +32,14 @@
 <pre>
 <code>
 struct Set[K] {
-  mut entries : FixedArray[<del>SEntry</del><ins>Entry</ins>[K]?<del>]
-  mut list : FixedArray[SListNode[K]</del>]
+  mut entries : FixedArray[<del>SEntry</del><ins>Entry</ins>[K]?]<del>
+  mut list : FixedArray[SListNode[K]]</del>
   mut size : Int // active keys count
   mut capacity : Int // current capacity
   mut capacity_mask : Int // capacity_mask = capacity - 1, used to find idx
   mut grow_at : Int // threshold that triggers grow
   mut head : <del>SEntry</del><ins>Entry</ins>[K]? // head of linked list
-  mut tail :<del> SEntry[</del> <del>K]?</del><ins>Int</ins> // tail of linked list
+  mut tail : <del>SEntry[ </del><del>K]?</del><ins>Int</ins> // tail of linked list
 }
 </code>
 </pre>
