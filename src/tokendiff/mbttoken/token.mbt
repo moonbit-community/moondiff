@@ -1,15 +1,23 @@
 ///|
 pub enum MbtToken {
-  Visible(String)
-  Invisible(String)
+  Visible(Array[Char])
+  Invisible(Array[Char])
   Barrier
-} derive(Hash)
+} derive(Show)
 
 ///|
-pub impl Show for MbtToken with output(self, logger) {
+pub fn MbtToken::to_text(self : MbtToken) -> String {
   match self {
-    Visible(s) | Invisible(s) => logger.write_string(s)
-    Barrier => ()
+    Visible(s) | Invisible(s) => String::from_array(s)
+    Barrier => ""
+  }
+}
+
+///|
+pub fn MbtToken::get_unicodes(self : MbtToken) -> Array[Char] {
+  match self {
+    Visible(s) | Invisible(s) => s
+    Barrier => []
   }
 }
 
@@ -79,7 +87,7 @@ pub fn MbtToken::from_triples(
       SEMI(false) => continue
       NEWLINE => {
         prev_pos = triple.2
-        mbt_tokens.add_token(Invisible("\n"))
+        mbt_tokens.add_token(Invisible(['\n']))
       }
       _ => {
         let tok = triple.0
@@ -96,7 +104,7 @@ pub fn MbtToken::from_triples(
             mbt_tokens.add_token(Barrier)
           } else {
             let width = whitespace_width(prev_pos, tok_start)
-            mbt_tokens.add_token(Invisible(String::make(width, ' ')))
+            mbt_tokens.add_token(Invisible(Array::make(width, ' ')))
           }
         }
         prev_pos = tok_end
@@ -117,7 +125,7 @@ pub fn mbttokens_to_string(tokens : Array[MbtToken]) -> String {
   let buf = StringBuilder::new(size_hint=tokens.length() * 5)
   for token in tokens {
     match token {
-      Visible(s) | Invisible(s) => buf.write_string(s)
+      Visible(s) | Invisible(s) => buf.write_iter(s.iter())
       Barrier => ()
     }
   }
