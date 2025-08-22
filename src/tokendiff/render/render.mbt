@@ -1,6 +1,6 @@
 ///|
 pub fn cli_rendering(edits : ArrayView[Edit[MbtToken]]) -> String {
-  let edits = compress_edits(edits)
+  let edits = compress_edits(edits) |> @postopt.align_edit_boundaries
   let red = @chalk.chalk().color(Red).modifier(Bold)
   let green = @chalk.chalk().color(Green).modifier(Bold)
   let buf = StringBuilder::new(size_hint=edits.length() * 20)
@@ -83,7 +83,7 @@ pub fn web_rendering_to_buf(
   buf : StringBuilder,
   edits : ArrayView[Edit[MbtToken]],
 ) -> Unit {
-  let edits = compress_edits(edits)
+  let edits = compress_edits(edits) |> @postopt.align_edit_boundaries
   for edit in edits {
     match edit {
       Delete(old~) => buf.write_with_del(old)
