@@ -8,7 +8,7 @@ pub fn cli_rendering(edits : ArrayView[Edit[MbtToken]]) -> String {
     match edit {
       Delete(old~) => buf.write_string(red.render(old))
       Insert(new~) => buf.write_string(green.render(new))
-      Equal(new~, ..) => buf.write_string(new)
+      Equal(new~, ..) => buf.write_iter(new.iter())
     }
   } else {
     buf.to_string()
@@ -59,7 +59,7 @@ pub let html_footer =
   #|</html>
 
 ///|
-fn write_with_del(self : StringBuilder, str : @string.View) -> Unit {
+fn write_with_del(self : StringBuilder, str : Array[Char]) -> Unit {
   if str.is_empty() {
     return
   }
@@ -69,7 +69,7 @@ fn write_with_del(self : StringBuilder, str : @string.View) -> Unit {
 }
 
 ///|
-fn write_with_ins(self : StringBuilder, str : @string.View) -> Unit {
+fn write_with_ins(self : StringBuilder, str : Array[Char]) -> Unit {
   if str.is_empty() {
     return
   }
@@ -92,7 +92,7 @@ pub fn web_rendering_to_buf(
         if new.is_empty() {
           continue
         }
-        buf.write_string(new)
+        buf.write_string(String::from_array(new))
       }
     }
   }
