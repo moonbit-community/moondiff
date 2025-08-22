@@ -1,5 +1,8 @@
 {
     "import": [
         "myfreess/moondiff/tokendiff/edit"
+    ],
+    "test-import": [
+        "myfreess/moondiff/tokendiff/edit"
     ]
 }
