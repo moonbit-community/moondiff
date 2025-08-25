@@ -42,3 +42,17 @@ test "single delete move backward" {
     ["Equal", [], ["h", "e", "l", "l", "o", " ", "W", "o", "r", "l", "d"]],
   ])
 }
+
+///|
+test "fn insert errorpoly" {
+  let edits : Array[Edit[Array[Char]]] = [
+    Equal(new=[')', ' ', '-', '>', ' ', 'U'], old=[]),
+    Insert(new=['?', ' ', 'r', 'a', 'i', 's', 'e']),
+    Equal(new=['?', ' ', '{'], old=[]),
+  ]
+  @json.inspect(align_edit_boundaries(edits), content=[
+    ["Equal", [], ["-", ">", " ", "U", "?"]],
+    ["Insert", [" ", "r", "a", "i", "s", "e", "?"]],
+    ["Equal", [], [" ", "{"]],
+  ])
+}
