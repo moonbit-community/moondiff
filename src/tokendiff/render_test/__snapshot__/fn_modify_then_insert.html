@@ -32,8 +32,8 @@
 <pre>
 <code>
 pub fn View::from_array(chars : Array[Char]) -> View {
-  <ins>let s = </ins>String::from_array(chars)
-  <del>.view</del><ins>View::make_view(s, 0</ins><ins>, s.length</ins>(<ins>)</ins>)
+ <ins> let s =</ins> String::from_array(chars)
+  <del>.view</del><ins>View::make_view(s, 0</ins><ins>, s.length</ins>()<ins>)</ins>
 }
 </code>
 </pre>
