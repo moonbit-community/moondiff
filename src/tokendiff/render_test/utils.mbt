@@ -15,12 +15,8 @@ pub fn test_web_rendering(t : @test.T, name : String) -> Unit raise {
     @lexer.tokens_from_string(comment=true, new).tokens,
     new_linewidths,
   )
-  let (prefix, suffix, old, new) = @preopt.separate_common_prefix_and_suffix(
-    old~,
-    new~,
-  )
-  let edits = @myers.diff(old~, new~)
-  let str = @render.web_rendering(prefix~, edits, suffix~)
+  let edits = @diff.diff_with_opt(old~, new~)
+  let str = @render.web_rendering(edits)
   t.writeln(str)
   t.snapshot(filename="\{name}.html")
 }
