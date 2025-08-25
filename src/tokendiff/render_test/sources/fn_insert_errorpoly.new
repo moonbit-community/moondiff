@@ -1,0 +1,6 @@
+pub fn[T, U] map(self : T?, f : (T) -> U raise?) -> U? raise? {
+  match self {
+    Some(t) => Some(f(t))
+    None => None
+  }
+}
