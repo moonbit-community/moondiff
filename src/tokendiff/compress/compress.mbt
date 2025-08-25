@@ -6,7 +6,7 @@ priv enum EditKind {
 } derive(Eq)
 
 ///|
-fn compress_edits(
+pub fn compress_edits(
   edits : ArrayView[Edit[MbtToken]],
 ) -> Array[Edit[Array[Char]]] {
   fn kind_of(edit : Edit[MbtToken]) -> EditKind {
