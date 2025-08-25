@@ -17,29 +17,9 @@ pub fn align_edit_boundaries(
       let prev_scoreboard = Array::make(prev_suffix_length, 0)
       let next_scoreboard = Array::make(next_prefix_length, 0)
       // fullfill next_scoreboard
-      if next_prefix_length == next.length() {
-        next_scoreboard[next_prefix_length - 1] = 4 // max score
-      }
-      for i in 0..<next_prefix_length {
-        match next[i + 1:] {
-          [] => ()
-          ['\n', ..] => next_scoreboard[i] = 3
-          [' ', ..] | ['\t', ..] => next_scoreboard[i] = 2
-          [ch, ..] => if ch is ('0'..='9') { next_scoreboard[i] = 1 }
-        }
-      }
+      fullfill_next_scoreboard(next_scoreboard, next_prefix_length, next)
       // fullfill prev_scoreboard
-      if prev_suffix_length == prev.length() {
-        prev_scoreboard[prev_suffix_length - 1] = 4 // max score
-      }
-      for i in 0..<prev_suffix_length {
-        match prev[:prev.length() - i] {
-          [] => ()
-          [.., '\n'] => prev_scoreboard[i] = 3
-          [.., ' '] | [.., '\t'] => prev_scoreboard[i] = 2
-          [.., ch] => if ch is ('0'..='9') { prev_scoreboard[i] = 1 }
-        }
-      }
+      fullfill_prev_scoreboard(prev_scoreboard, prev_suffix_length, prev)
       // try to find max score from next_scoreboard
       let mut max_score_for_next = 0
       let mut index_for_max_score_next = -1
@@ -89,6 +69,44 @@ pub fn align_edit_boundaries(
     [edit, .. rest] => {
       result.push(edit)
       continue rest
+    }
+  }
+}
+
+///|
+fn fullfill_next_scoreboard(
+  next_scoreboard : Array[Int],
+  next_prefix_length : Int,
+  next : Array[Char],
+) -> Unit {
+  if next_prefix_length == next.length() {
+    next_scoreboard[next_prefix_length - 1] = 4 // max score
+  }
+  for i in 0..<next_prefix_length {
+    match next[i + 1:] {
+      [] => ()
+      ['\n', ..] => next_scoreboard[i] = 3
+      [' ', ..] | ['\t', ..] => next_scoreboard[i] = 2
+      [ch, ..] => if ch is ('0'..='9') { next_scoreboard[i] = 1 }
+    }
+  }
+}
+
+///|
+fn fullfill_prev_scoreboard(
+  prev_scoreboard : Array[Int],
+  prev_suffix_length : Int,
+  prev : Array[Char],
+) -> Unit {
+  if prev_suffix_length == prev.length() {
+    prev_scoreboard[prev_suffix_length - 1] = 4 // max score
+  }
+  for i in 0..<prev_suffix_length {
+    match prev[:prev.length() - i] {
+      [] => ()
+      [.., '\n'] => prev_scoreboard[i] = 3
+      [.., ' '] | [.., '\t'] => prev_scoreboard[i] = 2
+      [.., ch] => if ch is ('0'..='9') { prev_scoreboard[i] = 1 }
     }
   }
 }
