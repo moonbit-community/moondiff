@@ -9,9 +9,9 @@ test "single delete move forward" {
     Equal(new=['a', 't', ' ', 'c', 'a', 'r', 't', 'o', 'o', 'n'], old=[]),
   ]
   @json.inspect(align_edit_boundaries(edits), content=[
-    ["Equal", [], ["T", "h", "a", "t"]],
-    ["Delete", [" ", "c", "a", "t"]],
-    ["Equal", [], [" ", "c", "a", "r", "t", "o", "o", "n"]],
+    ["Equal", { "old": [], "new": ["T", "h", "a", "t"] }],
+    ["Delete", { "old": [" ", "c", "a", "t"] }],
+    ["Equal", { "old": [], "new": [" ", "c", "a", "r", "t", "o", "o", "n"] }],
   ])
 }
 
@@ -23,9 +23,9 @@ test "single insert move forward" {
     Equal(new=['a', 't', ' ', 'c', 'a', 'r', 't', 'o', 'o', 'n'], old=[]),
   ]
   @json.inspect(align_edit_boundaries(edits), content=[
-    ["Equal", [], ["T", "h", "a", "t"]],
-    ["Insert", [" ", "c", "a", "t"]],
-    ["Equal", [], [" ", "c", "a", "r", "t", "o", "o", "n"]],
+    ["Equal", { "old": [], "new": ["T", "h", "a", "t"] }],
+    ["Insert", { "new": [" ", "c", "a", "t"] }],
+    ["Equal", { "old": [], "new": [" ", "c", "a", "r", "t", "o", "o", "n"] }],
   ])
 }
 
@@ -37,9 +37,15 @@ test "single delete move backward" {
     Equal(new=['l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd'], old=[]),
   ]
   @json.inspect(align_edit_boundaries(edits), content=[
-    ["Equal", [], []],
-    ["Delete", ["h", "e", "l", "l", "o", " "]],
-    ["Equal", [], ["h", "e", "l", "l", "o", " ", "W", "o", "r", "l", "d"]],
+    ["Equal", { "old": [], "new": [] }],
+    ["Delete", { "old": ["h", "e", "l", "l", "o", " "] }],
+    [
+      "Equal",
+      {
+        "old": [],
+        "new": ["h", "e", "l", "l", "o", " ", "W", "o", "r", "l", "d"],
+      },
+    ],
   ])
 }
 
@@ -53,10 +59,13 @@ test "fn insert errorpoly" {
     Equal(new=['?', ' ', '{'], old=[]),
   ]
   @json.inspect(align_edit_boundaries(edits), content=[
-    ["Equal", [], ["(", "T", ")", " ", "-", ">", " ", "U", " "]],
-    ["Insert", ["r", "a", "i", "s", "e", "?"]],
-    ["Equal", [], [")", " ", "-", ">", " ", "U", "?"]],
-    ["Insert", [" ", "r", "a", "i", "s", "e", "?"]],
-    ["Equal", [], [" ", "{"]],
+    [
+      "Equal",
+      { "old": [], "new": ["(", "T", ")", " ", "-", ">", " ", "U", " "] },
+    ],
+    ["Insert", { "new": ["r", "a", "i", "s", "e", "?"] }],
+    ["Equal", { "old": [], "new": [")", " ", "-", ">", " ", "U", "?"] }],
+    ["Insert", { "new": [" ", "r", "a", "i", "s", "e", "?"] }],
+    ["Equal", { "old": [], "new": [" ", "{"] }],
   ])
 }
