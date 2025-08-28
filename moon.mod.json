@@ -2,8 +2,8 @@
   "name": "myfreess/moondiff",
   "version": "0.1.0",
   "deps": {
-    "Yoorkin/prettyprinter": "0.4.3",
-    "moonbitlang/parser": "0.1.2",
+    "Yoorkin/prettyprinter": "0.4.4",
+    "moonbitlang/parser": "0.1.3",
     "moonbitlang/x": "0.4.32",
     "Lampese/moonbit-chalk": "0.4.0"
   },
