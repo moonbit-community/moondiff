@@ -41,30 +41,37 @@ test "range_pattern.mbt_" {
   lexing_then_recover("range_pattern.mbt_")
 }
 
+///|
 test "string_escape.mbt_" {
   lexing_then_recover("string_escape.mbt_")
 }
 
+///|
 test "string_literal.mbt_" {
   lexing_then_recover("string_literal.mbt_")
 }
 
+///|
 test "super_trait3.mbt_" {
   lexing_then_recover("super_trait3.mbt_")
 }
 
+///|
 test "trait_labelled.mbt_" {
   lexing_then_recover("trait_labelled.mbt_")
 }
 
+///|
 test "try.mbt_" {
   lexing_then_recover("try.mbt_")
 }
 
+///|
 test "unicode_test.mbt_" {
   lexing_then_recover("unicode_test.mbt_")
 }
 
+///|
 test "utf16_escape.mbt_" {
   lexing_then_recover("utf16_escape.mbt_")
 }
