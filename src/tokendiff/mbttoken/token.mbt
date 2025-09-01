@@ -22,7 +22,7 @@ pub fn MbtToken::get_unicodes(self : MbtToken) -> Array[Char] {
 }
 
 ///|
-pub impl Eq for MbtToken with op_equal(self, other) {
+pub impl Eq for MbtToken with equal(self, other) {
   match (self, other) {
     (Invisible(_), Invisible(_))
     | (Barrier, Barrier)
@@ -71,7 +71,7 @@ fn Array::add_token(self : Array[MbtToken], token : MbtToken) -> Unit {
 
 ///|
 pub fn MbtToken::from_triples(
-  triples : Array[(@tokens.Token, @basic.Position, @basic.Position)],
+  triples : ArrayView[(@tokens.Token, @basic.Position, @basic.Position)],
   line_widths : @span.LineWidths,
 ) -> Array[MbtToken] {
   let mbt_tokens = Array::new(capacity=triples.length())
