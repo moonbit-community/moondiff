@@ -8,7 +8,7 @@ test "single delete move forward" {
     Delete(old=['a', 't', ' ', 'c']),
     Equal(new=['a', 't', ' ', 'c', 'a', 'r', 't', 'o', 'o', 'n'], old=[]),
   ]
-  @json.inspect(align_edit_boundaries(edits), content=[
+  @json.inspect(@postopt.align_edit_boundaries(edits), content=[
     ["Equal", { "old": [], "new": ["T", "h", "a", "t"] }],
     ["Delete", { "old": [" ", "c", "a", "t"] }],
     ["Equal", { "old": [], "new": [" ", "c", "a", "r", "t", "o", "o", "n"] }],
@@ -22,7 +22,7 @@ test "single insert move forward" {
     Insert(new=['a', 't', ' ', 'c']),
     Equal(new=['a', 't', ' ', 'c', 'a', 'r', 't', 'o', 'o', 'n'], old=[]),
   ]
-  @json.inspect(align_edit_boundaries(edits), content=[
+  @json.inspect(@postopt.align_edit_boundaries(edits), content=[
     ["Equal", { "old": [], "new": ["T", "h", "a", "t"] }],
     ["Insert", { "new": [" ", "c", "a", "t"] }],
     ["Equal", { "old": [], "new": [" ", "c", "a", "r", "t", "o", "o", "n"] }],
@@ -36,7 +36,7 @@ test "single delete move backward" {
     Delete(old=['l', 'l', 'o', ' ', 'h', 'e']),
     Equal(new=['l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd'], old=[]),
   ]
-  @json.inspect(align_edit_boundaries(edits), content=[
+  @json.inspect(@postopt.align_edit_boundaries(edits), content=[
     ["Equal", { "old": [], "new": [] }],
     ["Delete", { "old": ["h", "e", "l", "l", "o", " "] }],
     [
@@ -58,7 +58,7 @@ test "fn insert errorpoly" {
     Insert(new=['?', ' ', 'r', 'a', 'i', 's', 'e']),
     Equal(new=['?', ' ', '{'], old=[]),
   ]
-  @json.inspect(align_edit_boundaries(edits), content=[
+  @json.inspect(@postopt.align_edit_boundaries(edits), content=[
     [
       "Equal",
       { "old": [], "new": ["(", "T", ")", " ", "-", ">", " ", "U", " "] },
