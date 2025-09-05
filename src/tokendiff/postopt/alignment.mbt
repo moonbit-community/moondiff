@@ -4,8 +4,25 @@ pub fn align_edit_boundaries(
 ) -> Array[Edit[Array[Char]]] {
   let result = []
   for edit in input {
-    result.push(edit)
+    result.push_edit(edit)
     match result {
+      [.., Delete(old=prev), Insert(new=current), Equal(new=next, ..)] => {
+        let next_length = next.length()
+        if next_length < current.length() / 3 || next_length < prev.length() / 3 {
+          result.truncate(result.length() - 3)
+          let prefix = Array::new(capacity=next_length)
+          let mut rest = next[:]
+          while rest != [] && not_trailing_endmark(rest) {
+            prefix.push(rest[0])
+            rest = rest[1:]
+          }
+          result.push_edit(Delete(old=prev + prefix))
+          result.push_edit(Insert(new=current + prefix))
+          if rest != [] {
+            result.push_edit(Equal(new=rest.to_array(), old=[]))
+          }
+        }
+      }
       [
         ..,
         Equal(new=prev, ..),
@@ -46,26 +63,26 @@ pub fn align_edit_boundaries(
           let new_next = current[current.length() - index_for_max_score_prev - 1:].to_array() +
             next
           let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_array()
-          result.push(Equal(new=new_prev, old=[]))
+          result.push_edit(Equal(new=new_prev, old=[]))
           if middle is Delete(..) {
-            result.push(Delete(old=new_current))
+            result.push_edit(Delete(old=new_current))
           } else {
-            result.push(Insert(new=new_current))
+            result.push_edit(Insert(new=new_current))
           }
-          result.push(Equal(new=new_next, old=[]))
+          result.push_edit(Equal(new=new_next, old=[]))
         } else {
           let new_current = current[index_for_max_score_next + 1:].to_array() +
             next[:index_for_max_score_next + 1].to_array()
           let new_prev = prev +
             current[:index_for_max_score_next + 1].to_array()
           let new_next = next[index_for_max_score_next + 1:].to_array()
-          result.push(Equal(new=new_prev, old=[]))
+          result.push_edit(Equal(new=new_prev, old=[]))
           if middle is Delete(..) {
-            result.push(Delete(old=new_current))
+            result.push_edit(Delete(old=new_current))
           } else {
-            result.push(Insert(new=new_current))
+            result.push_edit(Insert(new=new_current))
           }
-          result.push(Equal(new=new_next, old=[]))
+          result.push_edit(Equal(new=new_next, old=[]))
         }
       }
       _ => continue
@@ -73,6 +90,14 @@ pub fn align_edit_boundaries(
   } else {
     return result
   }
+}
+
+///|
+fn not_trailing_endmark(input : ArrayView[Char]) -> Bool {
+  not(
+    input is [.., '}'] &&
+    (input is ['\n', ..] || input is ['\r', ..] || input is ['\r', '\n', ..]),
+  )
 }
 
 ///|
@@ -168,6 +193,32 @@ fn compute_common_suffix_length(
         continue (x_rest, y_rest)
       } else {
         return suffix_length
+      }
+  }
+}
+
+///|
+fn Array::push_edit(
+  self : Array[Edit[Array[Char]]],
+  edit : Edit[Array[Char]],
+) -> Unit {
+  match self {
+    [] => self.push(edit)
+    [.., last] =>
+      match (last, edit) {
+        (Delete(old=hd), Delete(old=tl)) => {
+          self.truncate(self.length() - 1)
+          self.push(Delete(old=hd + tl))
+        }
+        (Insert(new=hd), Insert(new=tl)) => {
+          self.truncate(self.length() - 1)
+          self.push(Insert(new=hd + tl))
+        }
+        (Equal(new=hd, ..), Equal(new=tl, ..)) => {
+          self.truncate(self.length() - 1)
+          self.push(Equal(new=hd + tl, old=[]))
+        }
+        _ => self.push(edit)
       }
   }
 }
