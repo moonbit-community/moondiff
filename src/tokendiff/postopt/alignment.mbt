@@ -3,16 +3,17 @@ pub fn align_edit_boundaries(
   input : ArrayView[Edit[Array[Char]]],
 ) -> Array[Edit[Array[Char]]] {
   let result = []
-  loop input {
-    [] => return result
-    [
-      Delete(old=current)
-      | Insert(new=current) as middle,
-      Equal(new=next, ..),
-      .. rest,
-    ] => {
-      let last_element = result.pop()
-      if last_element is Some(Equal(new=prev, ..)) {
+  for edit in input {
+    result.push(edit)
+    match result {
+      [
+        ..,
+        Equal(new=prev, ..),
+        Delete(old=current)
+        | Insert(new=current) as middle,
+        Equal(new=next, ..),
+      ] => {
+        result.truncate(result.length() - 3)
         let prev_suffix_length = compute_common_suffix_length(current, prev)
         let next_prefix_length = compute_common_prefix_length(current, next)
         let prev_scoreboard = Array::make(prev_suffix_length, 0)
@@ -66,19 +67,11 @@ pub fn align_edit_boundaries(
           }
           result.push(Equal(new=new_next, old=[]))
         }
-      } else {
-        if last_element is Some(edit) {
-          result.push(edit)
-        }
-        result.push(middle)
-        result.push(Equal(new=next, old=[]))
       }
-      continue rest
+      _ => continue
     }
-    [edit, .. rest] => {
-      result.push(edit)
-      continue rest
-    }
+  } else {
+    return result
   }
 }
 
