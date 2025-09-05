@@ -8,6 +8,6 @@ pub fn get_block_uuid(blk : Block) -> String raise BlockProcessingError {
   } else if blk is [head, ..] {
     raise BlockProcessingError::UUIDNotFound("bad delimiter: \{head}")
   } else {
-    raise BlockProcessingError::UUIDNotFound("empty block")
+    raise BlockProcessingError::EmptyBlock
   }
 }
