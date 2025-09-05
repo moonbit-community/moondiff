@@ -47,15 +47,20 @@ pub let html_header =
   #|</style>
   #|</head>
   #|<body>
-  #|<pre>
-  #|<code>
 
 ///|
 pub let html_footer =
-  #|</code>
-  #|</pre>
   #|</body>
   #|</html>
+  
+
+pub let code_header =
+  #|<pre>
+  #|<code>
+
+pub let code_footer =
+  #|</code>
+  #|</pre>
 
 ///|
 fn write_with_del(self : StringBuilder, str : Array[Char]) -> Unit {
@@ -101,7 +106,11 @@ pub fn web_rendering(edits : Array[Edit[Array[Char]]]) -> String {
   let buf = StringBuilder::new(size_hint=edits.length() * 20)
   buf.write_string(html_header)
   buf.write_char('\n')
+  buf.write_string(code_header)
+  buf.write_char('\n')
   web_rendering_to_buf(buf, edits)
+  buf.write_char('\n')
+  buf.write_string(code_footer)
   buf.write_char('\n')
   buf.write_string(html_footer)
   buf.to_string()
