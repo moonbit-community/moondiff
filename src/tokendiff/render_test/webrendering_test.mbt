@@ -24,3 +24,8 @@ test "fn_insert_errorpoly" (t : @test.T) {
   // TODO: fix this on postopt
   test_web_rendering(t, "fn_insert_errorpoly")
 }
+
+///|
+test "fn_insert_argument_and_stmt" (t : @test.T) {
+  test_web_rendering(t, "fn_insert_argument_and_stmt")
+}
