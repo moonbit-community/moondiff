@@ -52,12 +52,13 @@ pub let html_header =
 pub let html_footer =
   #|</body>
   #|</html>
-  
 
+///|
 pub let code_header =
   #|<pre>
   #|<code>
 
+///|
 pub let code_footer =
   #|</code>
   #|</pre>
