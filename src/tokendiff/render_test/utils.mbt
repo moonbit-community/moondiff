@@ -16,7 +16,10 @@ pub fn test_web_rendering(t : @test.T, name : String) -> Unit raise {
     new_linewidths,
   )
   let edits = @diff.diff_with_opt(old~, new~)
-  let str = @render.web_rendering(edits)
+  let buf = StringBuilder::new(size_hint=edits.length() * 20)
+  buf.write_string(@render.html_header)
+  let str = @render.web_rendering(buf, edits)
+  buf.write_string(@render.html_footer)
   t.writeln(str)
   t.snapshot(filename="\{name}.html")
 }

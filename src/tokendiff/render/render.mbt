@@ -54,18 +54,26 @@ pub let html_footer =
   #|</html>
 
 ///|
-pub let code_header =
-  #|<pre>
-  #|<code>
+let code_header = "<pre><code>"
 
 ///|
-pub let code_footer =
-  #|</code>
-  #|</pre>
+let code_footer = "</code></pre>"
 
 ///|
-fn write_with_del(self : StringBuilder, str : Array[Char]) -> Unit {
-  if str.is_empty() {
+let table_header = "<table border=\"1\">"
+
+///|
+let table_footer = "</table>"
+
+///|
+let data_cell_header = "<tr><td>"
+
+///|
+let data_cell_footer = "</td></tr>"
+
+///|
+fn write_with_del(self : StringBuilder, str : ArrayView[Char]) -> Unit {
+  if str.length() == 0 {
     return
   }
   self.write_string("<del>")
@@ -74,8 +82,8 @@ fn write_with_del(self : StringBuilder, str : Array[Char]) -> Unit {
 }
 
 ///|
-fn write_with_ins(self : StringBuilder, str : Array[Char]) -> Unit {
-  if str.is_empty() {
+fn write_with_ins(self : StringBuilder, str : ArrayView[Char]) -> Unit {
+  if str.length() == 0 {
     return
   }
   self.write_string("<ins>")
@@ -84,37 +92,84 @@ fn write_with_ins(self : StringBuilder, str : Array[Char]) -> Unit {
 }
 
 ///|
-pub fn web_rendering_to_buf(
-  buf : StringBuilder,
-  edits : ArrayView[Edit[Array[Char]]],
+fn multiple_write_with_del(
+  self : StringBuilder,
+  lines : ArrayView[ArrayView[Char]],
 ) -> Unit {
-  for edit in edits {
-    match edit {
-      Delete(old~) => buf.write_with_del(old)
-      Insert(new~) => buf.write_with_ins(new)
-      Equal(new~, ..) => {
-        if new.is_empty() {
-          continue
-        }
-        buf.write_string(String::from_array(new))
-      }
+  let mut first = true
+  for line in lines {
+    if !first {
+      self.write_string(code_footer)
+      self.write_string(data_cell_footer)
+      self.write_char('\n')
+      self.write_string(data_cell_header)
+      self.write_string(code_header)
     }
+    first = false
+    self.write_with_del(line)
   }
 }
 
 ///|
-pub fn web_rendering(edits : Array[Edit[Array[Char]]]) -> String {
-  let buf = StringBuilder::new(size_hint=edits.length() * 20)
-  buf.write_string(html_header)
+fn multiple_write_with_ins(
+  self : StringBuilder,
+  lines : ArrayView[ArrayView[Char]],
+) -> Unit {
+  let mut first = true
+  for line in lines {
+    if !first {
+      self.write_string(code_footer)
+      self.write_string(data_cell_footer)
+      self.write_char('\n')
+      self.write_string(data_cell_header)
+      self.write_string(code_header)
+    }
+    first = false
+    self.write_with_ins(line)
+  }
+}
+
+///|
+fn multiple_write_with_eqn(
+  self : StringBuilder,
+  lines : ArrayView[ArrayView[Char]],
+) -> Unit {
+  let mut first = true
+  for line in lines {
+    if !first {
+      self.write_string(code_footer)
+      self.write_string(data_cell_footer)
+      self.write_char('\n')
+      self.write_string(data_cell_header)
+      self.write_string(code_header)
+    }
+    first = false
+    self.write_iter(line.iter())
+  }
+}
+
+///|
+pub fn web_rendering(
+  buf : StringBuilder,
+  edits : Array[Edit[Array[Char]]],
+) -> String {
+  buf.write_string(table_header)
   buf.write_char('\n')
+  buf.write_string(data_cell_header)
   buf.write_string(code_header)
-  buf.write_char('\n')
-  web_rendering_to_buf(buf, edits)
-  buf.write_char('\n')
-  buf.write_string(code_footer)
-  buf.write_char('\n')
-  buf.write_string(html_footer)
-  buf.to_string()
+  for edit in edits {
+    match edit {
+      Delete(old~) => buf.multiple_write_with_del(old.split_by_newline())
+      Insert(new~) => buf.multiple_write_with_ins(new.split_by_newline())
+      Equal(new~, ..) => buf.multiple_write_with_eqn(new.split_by_newline())
+    }
+  } else {
+    buf.write_string(code_footer)
+    buf.write_string(data_cell_footer)
+    buf.write_char('\n')
+    buf.write_string(table_footer)
+    buf.to_string()
+  }
 }
 
 ///|
