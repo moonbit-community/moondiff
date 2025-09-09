@@ -28,20 +28,15 @@
   }
 </style>
 </head>
-<body>
-<pre>
-<code>
-struct Set[K] {
-  mut entries : FixedArray[<del>SEntry</del><ins>Entry</ins>[K]?]<del>
-  mut list : FixedArray[SListNode[K]]</del>
-  mut size : Int // active keys count
-  mut capacity : Int // current capacity
-  mut capacity_mask : Int // capacity_mask = capacity - 1, used to find idx
-  mut grow_at : Int // threshold that triggers grow
-  mut head : <del>SEntry</del><ins>Entry</ins>[K]? // head of linked list
-  mut tail : <del>SEntry[ </del><del>K]?</del><ins>Int</ins> // tail of linked list
-}
-</code>
-</pre>
-</body>
-</html>
+<body><table border="1">
+<tr><td><pre><code>struct Set[K] {</code></pre></td></tr>
+<tr><td><pre><code>  mut entries : FixedArray[<del>SEntry</del><ins>Entry</ins>[K]?]</code></pre></td></tr>
+<tr><td><pre><code><del>  mut list : FixedArray[SListNode[K]]</del></code></pre></td></tr>
+<tr><td><pre><code>  mut size : Int // active keys count</code></pre></td></tr>
+<tr><td><pre><code>  mut capacity : Int // current capacity</code></pre></td></tr>
+<tr><td><pre><code>  mut capacity_mask : Int // capacity_mask = capacity - 1, used to find idx</code></pre></td></tr>
+<tr><td><pre><code>  mut grow_at : Int // threshold that triggers grow</code></pre></td></tr>
+<tr><td><pre><code>  mut head : <del>SEntry</del><ins>Entry</ins>[K]? // head of linked list</code></pre></td></tr>
+<tr><td><pre><code>  mut tail : <del>SEntry[ </del><del>K]?</del><ins>Int</ins> // tail of linked list</code></pre></td></tr>
+<tr><td><pre><code>}</code></pre></td></tr>
+</table>
