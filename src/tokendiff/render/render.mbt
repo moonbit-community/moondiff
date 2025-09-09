@@ -119,14 +119,15 @@ pub fn web_rendering(edits : Array[Edit[Array[Char]]]) -> String {
 
 ///|
 fn Array::split_by_newline(self : Array[Char]) -> Array[ArrayView[Char]] {
+  if self.is_empty() {
+    return [self[:]]
+  }
   let res = Array::new(capacity=self.length() / 8)
   let mut prev = 0
   let mut curr = 0
   loop self[:] {
     [] => {
-      if prev != curr {
-        res.push(self[prev:curr])
-      }
+      res.push(self[prev:curr])
       return res
     }
     ['\r', '\n', .. rest] => {
@@ -161,5 +162,13 @@ test {
   inspect(
     ['a', 'b', 'c', '\r', '\n', 'd'].split_by_newline(),
     content="[['a', 'b', 'c'], ['d']]",
+  )
+  inspect(
+    ['a', 'b', 'c', '\n'].split_by_newline(),
+    content="[['a', 'b', 'c'], []]",
+  )
+  inspect(
+    ['\n', 'a', 'b', 'c'].split_by_newline(),
+    content="[[], ['a', 'b', 'c']]",
   )
 }
