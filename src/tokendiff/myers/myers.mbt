@@ -1,4 +1,5 @@
 ///|
+#valtype
 priv struct Box {
   left : Int
   right : Int
@@ -7,6 +8,7 @@ priv struct Box {
 } derive(Show)
 
 ///|
+#valtype
 priv struct Snake {
   start : (Int, Int)
   end : (Int, Int)
