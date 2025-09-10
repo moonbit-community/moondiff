@@ -172,6 +172,38 @@ pub fn web_rendering(
 }
 
 ///|
+pub fn web_rendering_delete_block(
+  buf : StringBuilder,
+  old~ : Array[Char],
+) -> Unit {
+  buf.write_string(table_header)
+  buf.write_char('\n')
+  buf.write_string(data_cell_header)
+  buf.write_string(code_header)
+  buf.multiple_write_with_del(old.split_by_newline())
+  buf.write_string(code_footer)
+  buf.write_string(data_cell_footer)
+  buf.write_char('\n')
+  buf.write_string(table_footer)
+}
+
+///|
+pub fn web_rendering_insert_block(
+  buf : StringBuilder,
+  new~ : Array[Char],
+) -> Unit {
+  buf.write_string(table_header)
+  buf.write_char('\n')
+  buf.write_string(data_cell_header)
+  buf.write_string(code_header)
+  buf.multiple_write_with_ins(new.split_by_newline())
+  buf.write_string(code_footer)
+  buf.write_string(data_cell_footer)
+  buf.write_char('\n')
+  buf.write_string(table_footer)
+}
+
+///|
 fn Array::split_by_newline(self : Array[Char]) -> Array[ArrayView[Char]] {
   if self.is_empty() {
     return [self[:]]

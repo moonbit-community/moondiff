@@ -19,7 +19,28 @@ pub fn web_multiple_block_diff(
     buf.reset()
     @render.web_rendering(buf, edits)
     block_edits.push(buf.to_string())
-  } else {
-    return block_edits
   }
+  for blk in deleted {
+    let (start_pos, end_pos) = if blk.length() == 0 {
+      continue
+    } else {
+      (blk[0].1, blk[blk.length() - 1].2)
+    }
+    let old = old_linewidths.text_of_loc(start_pos, end_pos)
+    buf.reset()
+    @render.web_rendering_delete_block(buf, old~)
+    block_edits.push(buf.to_string())
+  }
+  for blk in inserted {
+    let (start_pos, end_pos) = if blk.length() == 0 {
+      continue
+    } else {
+      (blk[0].1, blk[blk.length() - 1].2)
+    }
+    let new = new_linewidths.text_of_loc(start_pos, end_pos)
+    buf.reset()
+    @render.web_rendering_insert_block(buf, new~)
+    block_edits.push(buf.to_string())
+  }
+  return block_edits
 }
