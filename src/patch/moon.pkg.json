@@ -1,0 +1,7 @@
+{
+    "import": [
+        "myfreess/moondiff/block",
+        "myfreess/moondiff/span",
+        "moonbitlang/parser/lexer"
+    ]
+}
