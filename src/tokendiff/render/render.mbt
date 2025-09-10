@@ -152,7 +152,7 @@ fn multiple_write_with_eqn(
 pub fn web_rendering(
   buf : StringBuilder,
   edits : Array[Edit[Array[Char]]],
-) -> String {
+) -> Unit {
   buf.write_string(table_header)
   buf.write_char('\n')
   buf.write_string(data_cell_header)
@@ -168,7 +168,6 @@ pub fn web_rendering(
     buf.write_string(data_cell_footer)
     buf.write_char('\n')
     buf.write_string(table_footer)
-    buf.to_string()
   }
 }
 
