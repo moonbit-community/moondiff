@@ -33,7 +33,7 @@ fn Places::delete(self : Places, original_idx : Int) -> Unit raise {
     if p.original_idx == original_idx {
       let p_width = p.end_line - p.start_line
       ignore(self.0.drain(i, i + 1))
-      for i in i ..< self.0.length() {
+      for i in i..<self.0.length() {
         self.0[i].start_line -= p_width
         self.0[i].end_line -= p_width
       }
