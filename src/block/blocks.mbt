@@ -47,3 +47,29 @@ test {
     ],
   )
 }
+
+///|
+test "empty block" {
+  let text =
+    #|///|
+    #|///|
+    #|///|
+  let tokens = @lexer.tokens_from_string(comment=true, text).tokens
+  @json.inspect(
+    create_blocks(tokens).map(triples => triples.map(triple => triple.0.to_string())),
+    content=[
+      [
+        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
+        "NEWLINE",
+      ],
+      [
+        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
+        "NEWLINE",
+      ],
+      [
+        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
+        "EOF",
+      ],
+    ],
+  )
+}
