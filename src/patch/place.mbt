@@ -12,11 +12,11 @@ priv struct Places(Array[Place])
 fn create_places(blocks : Blocks) -> Places raise {
   let places = Array::new(capacity=blocks.length())
   for i, blk in blocks.iter2() {
-    if blk.length() == 0 {
+    if blk.content.length() == 0 {
       fail("idx = \{i}, empty block") // impossible
     } else {
-      let start_line = blk[0].1.lnum
-      let end_line = blk[blk.length() - 1].2.lnum
+      let start_line = blk.content[0].1.lnum
+      let end_line = blk.content[blk.content.length() - 1].2.lnum
       places.push(Place::{ original_idx: i, start_line, end_line })
     }
   }

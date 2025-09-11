@@ -1,22 +1,25 @@
 ///|
-pub fn create_blocks(
-  input : ArrayView[(Token, Position, Position)],
-) -> Array[ArrayView[(Token, Position, Position)]] {
+pub typealias Array[Block] as Blocks
+
+///|
+pub fn create_blocks(input : ArrayView[(Token, Position, Position)]) -> Blocks {
   // assume input contains comment
   let res = Array::new(capacity=input.length() / 8)
   let mut prev = 0
   let mut curr = 0
+  let mut current_idx = 0
   while curr < input.length() {
     if input[curr].0 is COMMENT(comment) && comment.content == "///|" {
       if curr != 0 {
-        res.push(input[prev:curr])
+        res.push(Block::{ original_idx: current_idx, content: input[prev:curr] })
+        current_idx += 1
       }
       prev = curr
     }
     curr += 1
   }
   if prev != curr {
-    res.push(input[prev:curr])
+    res.push(Block::{ original_idx: current_idx, content: input[prev:curr] })
   }
   return res
 }
@@ -32,7 +35,7 @@ test {
     #|  // another comment here
   let tokens = @lexer.tokens_from_string(comment=true, text).tokens
   @json.inspect(
-    create_blocks(tokens).map(triples => triples.map(triple => triple.0.to_string())),
+    create_blocks(tokens).map(block => block.content.map(triple => triple.0.to_string())),
     content=[
       [
         "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
@@ -56,7 +59,7 @@ test "empty block" {
     #|///|
   let tokens = @lexer.tokens_from_string(comment=true, text).tokens
   @json.inspect(
-    create_blocks(tokens).map(triples => triples.map(triple => triple.0.to_string())),
+    create_blocks(tokens).map(block => block.content.map(triple => triple.0.to_string())),
     content=[
       [
         "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
