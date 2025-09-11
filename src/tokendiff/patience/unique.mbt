@@ -1,5 +1,5 @@
 ///|
-fn[T : Eq + Hash] find_unique(
+pub fn[T : Eq + Hash] find_unique(
   old~ : ArrayView[T],
   new~ : ArrayView[T],
 ) -> Array[(Int, Int)] {

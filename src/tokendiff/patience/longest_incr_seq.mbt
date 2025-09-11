@@ -1,5 +1,5 @@
 ///|
-fn longest_increasing_subsequence(
+pub fn longest_increasing_subsequence(
   matchs : Array[(Int, Int)],
 ) -> Array[(Int, Int)] {
   let piles : Piles[BackPointer[(Int, Int)]] = Array::new(
