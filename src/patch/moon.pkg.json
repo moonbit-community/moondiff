@@ -2,7 +2,6 @@
     "import": [
         "myfreess/moondiff/block",
         "myfreess/moondiff/span",
-        "myfreess/moondiff/tokendiff/patience",
         "moonbitlang/parser/lexer",
         "moonbitlang/parser/basic"
     ]
