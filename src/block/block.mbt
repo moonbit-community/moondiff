@@ -1,5 +1,2 @@
 ///|
-pub struct Block {
-  original_idx : Int
-  content : ArrayView[(Token, Position, Position)]
-}
+pub typealias ArrayView[(Token, Position, Position)] as Block
