@@ -2,6 +2,7 @@
     "import": [
       "moonbitlang/parser/tokens",
       "moonbitlang/parser/basic",
-      "moonbitlang/parser/lexer"
+      "moonbitlang/parser/lexer",
+      "myfreess/lums"
     ]
 }

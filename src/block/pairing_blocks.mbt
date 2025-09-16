@@ -2,32 +2,75 @@
 pub fn pairing_blocks_by_uuid(
   old~ : ArrayView[Block],
   new~ : ArrayView[Block],
-) -> (Array[Block], Array[(Block, Block)], Array[Block]) raise BlockProcessingError {
-  let deleted = Array::new()
-  let matched = Array::new()
-  let inserted = Array::new()
-  let old_table = @hashmap.new(capacity=old.length() * 2)
-  for block in old {
-    let uuid = get_block_uuid(block)
-    old_table[uuid] = block
-  }
-  let new_table = @hashmap.new(capacity=new.length() * 2)
-  let new_uuid_set = @hashset.new(capacity=new.length() * 2)
-  for block in new {
-    let uuid = get_block_uuid(block)
-    new_table[uuid] = block
-    new_uuid_set.add(uuid)
-  }
-  for uuid, block in old_table {
-    if new_uuid_set.contains(uuid) {
-      matched.push((block, new_table[uuid]))
-      new_uuid_set.remove(uuid)
-    } else {
-      deleted.push(block)
+) -> Array[(Block, Block)] raise BlockProcessingError {
+  let res : Array[(Block, Block)] = Array::new(
+    capacity=old.length() + new.length(),
+  )
+  let old_uuid = old.map(blk => get_block_uuid(blk))
+  let new_uuid = new.map(blk => get_block_uuid(blk))
+  let mut old_base = 0
+  let mut new_base = 0
+  let matched_idx = @lums.longest_unique_matching_subsequence(
+    old=old_uuid,
+    new=new_uuid,
+  )
+  println("matched: \{matched_idx}")
+  for pair in matched_idx {
+    let delete = old[old_base:pair.0]
+    let insert = new[new_base:pair.1]
+    for del in delete {
+      res.push((del, []))
+    }
+    for ins in insert {
+      res.push(([], ins))
+    }
+    res.push((old[pair.0], new[pair.1]))
+    old_base = pair.0 + 1
+    new_base = pair.1 + 1
+  } else {
+    let delete = old[old_base:]
+    let insert = new[new_base:]
+    for del in delete {
+      res.push((del, []))
+    }
+    for ins in insert {
+      res.push(([], ins))
     }
   }
-  for uuid in new_uuid_set {
-    inserted.push(new_table[uuid])
-  }
-  return (deleted, matched, inserted)
+  res
+}
+
+///|
+test {
+  let old =
+    #|///|UUID(1)
+    #|///|UUID(2)
+    #|///|UUID(3)
+    #|///|UUID(4)
+    #|///|UUID(5)
+  let new =
+    #|///|UUID(3)
+    #|///|UUID(4)
+    #|///|UUID(5)
+    #|///|UUID(6)
+    #|///|UUID(7)
+  let old = create_blocks(@lexer.tokens_from_string(comment=true, old).tokens)
+  let new = create_blocks(@lexer.tokens_from_string(comment=true, new).tokens)
+  let pairs = pairing_blocks_by_uuid(old~, new~)
+  @json.inspect(
+    pairs.map(pair => (
+      pair.0.map(triple => triple.0.to_str()),
+      pair.1.map(triple => triple.0.to_str()),
+    )),
+    content=[
+      [["///|UUID(1)", "NEWLINE"], []],
+      [["///|UUID(2)", "NEWLINE"], []],
+      [["///|UUID(3)", "NEWLINE"], ["///|UUID(3)", "NEWLINE"]],
+      [["///|UUID(4)", "NEWLINE"], ["///|UUID(4)", "NEWLINE"]],
+      [["///|UUID(5)", "EOF"], []],
+      [[], ["///|UUID(5)", "NEWLINE"]],
+      [[], ["///|UUID(6)", "NEWLINE"]],
+      [[], ["///|UUID(7)", "EOF"]],
+    ],
+  )
 }

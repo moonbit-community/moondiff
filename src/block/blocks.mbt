@@ -8,7 +8,7 @@ pub fn create_blocks(input : ArrayView[(Token, Position, Position)]) -> Blocks {
   let mut prev = 0
   let mut curr = 0
   while curr < input.length() {
-    if input[curr].0 is COMMENT(comment) && comment.content == "///|" {
+    if input[curr].0 is COMMENT(comment) && comment.content.has_prefix("///|") {
       if curr != 0 {
         res.push(input[prev:curr])
       }
@@ -23,6 +23,14 @@ pub fn create_blocks(input : ArrayView[(Token, Position, Position)]) -> Blocks {
 }
 
 ///|
+fn Token::to_str(self : Token) -> String {
+  match self {
+    COMMENT(comment) => comment.content
+    other => other.to_string()
+  }
+}
+
+///|
 test {
   let text =
     #|///|
@@ -33,16 +41,14 @@ test {
     #|  // another comment here
   let tokens = @lexer.tokens_from_string(comment=true, text).tokens
   @json.inspect(
-    create_blocks(tokens).map(block => block.map(triple => triple.0.to_string())),
+    create_blocks(tokens).map(block => block.map(triple => triple.0.to_str())),
     content=[
       [
-        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
-        "NEWLINE", "FN", "LIDENT(\"foo\")", "SEMI(false)", "NEWLINE", "COMMENT({content: \"// comment here\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
+        "///|", "NEWLINE", "FN", "LIDENT(\"foo\")", "SEMI(false)", "NEWLINE", "// comment here",
         "NEWLINE",
       ],
       [
-        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
-        "NEWLINE", "FN", "LIDENT(\"bar\")", "SEMI(false)", "NEWLINE", "COMMENT({content: \"// another comment here\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
+        "///|", "NEWLINE", "FN", "LIDENT(\"bar\")", "SEMI(false)", "NEWLINE", "// another comment here",
         "EOF",
       ],
     ],
@@ -57,20 +63,24 @@ test "empty block" {
     #|///|
   let tokens = @lexer.tokens_from_string(comment=true, text).tokens
   @json.inspect(
-    create_blocks(tokens).map(block => block.map(triple => triple.0.to_string())),
+    create_blocks(tokens).map(block => block.map(triple => triple.0.to_str())),
+    content=[["///|", "NEWLINE"], ["///|", "NEWLINE"], ["///|", "EOF"]],
+  )
+  let text =
+    #|///|UUID(1)
+    #|///|UUID(2)
+    #|///|UUID(3)
+    #|///|UUID(4)
+    #|///|UUID(5)
+  let tokens = @lexer.tokens_from_string(comment=true, text).tokens
+  @json.inspect(
+    create_blocks(tokens).map(block => block.map(triple => triple.0.to_str())),
     content=[
-      [
-        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
-        "NEWLINE",
-      ],
-      [
-        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
-        "NEWLINE",
-      ],
-      [
-        "COMMENT({content: \"///|\", kind: Ownline(leading_blank_line=false, trailing_blank_line=false), consumed_by_docstring: false})",
-        "EOF",
-      ],
+      ["///|UUID(1)", "NEWLINE"],
+      ["///|UUID(2)", "NEWLINE"],
+      ["///|UUID(3)", "NEWLINE"],
+      ["///|UUID(4)", "NEWLINE"],
+      ["///|UUID(5)", "EOF"],
     ],
   )
 }
