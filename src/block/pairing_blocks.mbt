@@ -14,7 +14,6 @@ pub fn pairing_blocks_by_uuid(
     old=old_uuid,
     new=new_uuid,
   )
-  println("matched: \{matched_idx}")
   for pair in matched_idx {
     let delete = old[old_base:pair.0]
     let insert = new[new_base:pair.1]
@@ -67,8 +66,7 @@ test {
       [["///|UUID(2)", "NEWLINE"], []],
       [["///|UUID(3)", "NEWLINE"], ["///|UUID(3)", "NEWLINE"]],
       [["///|UUID(4)", "NEWLINE"], ["///|UUID(4)", "NEWLINE"]],
-      [["///|UUID(5)", "EOF"], []],
-      [[], ["///|UUID(5)", "NEWLINE"]],
+      [["///|UUID(5)", "EOF"], ["///|UUID(5)", "NEWLINE"]],
       [[], ["///|UUID(6)", "NEWLINE"]],
       [[], ["///|UUID(7)", "EOF"]],
     ],
