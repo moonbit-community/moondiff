@@ -248,13 +248,13 @@ impl Elab for @syntax.TypeVarBinder with elab(type_var_binder, line_widths) {
   if type_var_binder.constraints.is_empty() {
     Syntax::atom(
       content=type_var_binder.name,
-      position=line_widths.loc_to_spans(type_var_binder.loc),
+      position=line_widths.loc_to_spans(panic()),
       kind=Normal,
     )
   } else {
     let tvar_name = Syntax::atom(
       content=type_var_binder.name,
-      position=line_widths.loc_to_spans(type_var_binder.loc),
+      position=line_widths.loc_to_spans(panic()),
       kind=Normal,
     )
     if type_var_binder.constraints.is_empty() {
@@ -273,9 +273,9 @@ impl Elab for @syntax.TypeVarBinder with elab(type_var_binder, line_widths) {
       close_position=[constraint_close_pos],
     )
     Syntax::simple_list(
-      open_position=[type_var_binder.loc.start_to_span()],
+      open_position=[panic()],
       children=[tvar_name, constraints],
-      close_position=[type_var_binder.loc.end_to_span()],
+      close_position=[panic()],
     )
   }
 }

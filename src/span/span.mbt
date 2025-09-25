@@ -132,6 +132,9 @@ pub fn LineWidths::forward_search(
   symbol : Char,
   start_pos : @basic.Position,
 ) -> SingleLineSpan {
+  ignore(self)
+  ignore(symbol)
+  ignore(start_pos)
   ...
 }
 
@@ -141,6 +144,9 @@ pub fn LineWidths::backward_search(
   symbol : Char,
   start_pos : @basic.Position,
 ) -> SingleLineSpan {
+  ignore(self)
+  ignore(symbol)
+  ignore(start_pos)
   ...
 }
 
