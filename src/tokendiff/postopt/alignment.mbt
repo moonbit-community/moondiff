@@ -7,8 +7,9 @@ pub fn align_edit_boundaries(
     result.push_edit(edit)
     match result {
       [.., Delete(old=prev), Insert(new=current), Equal(new=next, ..)] => {
-        let next_length = next.length()
-        if next_length < current.length() / 3 || next_length < prev.length() / 3 {
+        let next_length = next.content_length()
+        if next_length < current.content_length() / 3 ||
+          next_length < prev.content_length() / 3 {
           result.truncate(result.length() - 3)
           let prefix = Array::new(capacity=next_length)
           let mut rest = next[:]
@@ -90,6 +91,19 @@ pub fn align_edit_boundaries(
   } else {
     return result
   }
+}
+
+///|
+fn Array::content_length(self : Array[MbtToken]) -> Int {
+  let mut length = 0
+  for token in self {
+    match token {
+      Visible(repr~, ..) => length += repr.length()
+      Invisible(repr~, ..) => length += repr.length()
+      _ => ()
+    }
+  }
+  return length
 }
 
 ///|
