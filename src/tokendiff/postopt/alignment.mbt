@@ -111,7 +111,7 @@ fn not_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
   not(
     input is [Invisible(repr~, ..), ..] &&
     repr.contains('\n') &&
-    input is [.., Visible(kind=TK_RBRACKET, ..)],
+    input is [.., Visible(kind=TK_RBRACE | TK_RBRACKET, ..)],
   )
 }
 
