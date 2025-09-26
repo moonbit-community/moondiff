@@ -4,6 +4,7 @@
       {
         "alias": "chalk",
         "path": "Lampese/moonbit-chalk"
-      }
+      },
+      "myfreess/moondiff/tokendiff/mbttoken"
     ]
 }
