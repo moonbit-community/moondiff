@@ -1,8 +1,11 @@
 {
     "import": [
-        "myfreess/moondiff/tokendiff/edit"
+        "moonbitlang/parser/tokens",
+        "myfreess/moondiff/tokendiff/edit",
+        "myfreess/moondiff/tokendiff/mbttoken"
     ],
-    "test-import": [
+    "wbtest-import": [
+        "moonbitlang/parser/basic",
         "myfreess/moondiff/tokendiff/edit"
     ]
 }

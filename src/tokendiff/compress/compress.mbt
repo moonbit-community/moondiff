@@ -1,27 +1,14 @@
 ///|
-priv enum EditKind {
-  Ins
-  Del
-  Eql
-} derive(Eq)
 
 ///|
 pub fn compress_edits(
   edits : ArrayView[Edit[MbtToken]],
 ) -> Array[Edit[Array[MbtToken]]] {
-  fn kind_of(edit : Edit[MbtToken]) -> EditKind {
-    match edit {
-      Edit::Insert(_) => Ins
-      Edit::Delete(_) => Del
-      Edit::Equal(_) => Eql
-    }
-  }
-
   let mut buf = []
   let result = Array::new(capacity=edits.length())
-  let mut prev_kind = Eql
+  let mut prev_kind = EditKind::Eql
   for edit in edits {
-    let kind = kind_of(edit)
+    let kind = edit.kind()
     if kind != prev_kind {
       if !buf.is_empty() {
         match prev_kind {
