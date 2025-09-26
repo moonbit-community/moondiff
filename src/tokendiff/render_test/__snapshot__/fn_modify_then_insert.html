@@ -29,10 +29,9 @@
 <body>
 <pre><code>
 pub fn View::from_array(chars : Array[Char]) -> View {
-  <del>// todo: remove .view() in new version</del><ins>let</ins><ins> s =</ins> String::from_array(chars)
-  <del>.view()
-}</del><ins>View::make_view(s, 0, s.length())
-}</ins>
+  <del>// todo: remove .view() in new version </del><ins>let s = </ins>String::from_array(chars)
+  <del>.view()</del><ins>View::make_view(s, 0, s.length())</ins>
+}
 </code></pre>
 </body>
 </html>
