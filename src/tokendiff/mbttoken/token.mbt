@@ -1,5 +1,5 @@
 ///|
-pub enum MbtToken {
+pub(all) enum MbtToken {
   Visible(
     kind~ : @tokens.TokenKind,
     loc~ : @basic.Location,

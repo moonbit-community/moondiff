@@ -1,7 +1,7 @@
 ///|
 pub fn align_edit_boundaries(
-  input : ArrayView[Edit[Array[Char]]],
-) -> Array[Edit[Array[Char]]] {
+  input : ArrayView[Edit[Array[MbtToken]]],
+) -> Array[Edit[Array[MbtToken]]] {
   let result = []
   for edit in input {
     result.push_edit(edit)
@@ -93,10 +93,11 @@ pub fn align_edit_boundaries(
 }
 
 ///|
-fn not_trailing_endmark(input : ArrayView[Char]) -> Bool {
+fn not_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
   not(
-    input is [.., '}'] &&
-    (input is ['\n', ..] || input is ['\r', ..] || input is ['\r', '\n', ..]),
+    input is [Invisible(repr~, ..), ..] &&
+    repr.contains('\n') &&
+    input is [.., Visible(kind=TK_RBRACKET, ..)],
   )
 }
 
@@ -104,17 +105,21 @@ fn not_trailing_endmark(input : ArrayView[Char]) -> Bool {
 fn fullfill_next_scoreboard(
   next_scoreboard : Array[Int],
   next_prefix_length : Int,
-  next : Array[Char],
+  next : Array[MbtToken],
 ) -> Unit {
   if next_prefix_length == next.length() {
     next_scoreboard[next_prefix_length - 1] = 4 // max score
   }
   for i in 0..<next_prefix_length {
-    match next[i + 1:] {
-      [] => ()
-      ['\n', ..] => next_scoreboard[i] = 3
-      [' ', ..] | ['\t', ..] => next_scoreboard[i] = 2
-      [ch, ..] => if ch is ('0'..='9') { next_scoreboard[i] = 1 }
+    match next[i] {
+      Invisible(repr~, ..) =>
+        if repr.contains('\n') {
+          next_scoreboard[i] = 3
+        } else {
+          next_scoreboard[i] = 2
+        }
+      Visible(kind~, ..) => if kind is TK_INT { next_scoreboard[i] = 1 }
+      _ => ()
     }
   }
 }
@@ -123,26 +128,31 @@ fn fullfill_next_scoreboard(
 fn fullfill_prev_scoreboard(
   prev_scoreboard : Array[Int],
   prev_suffix_length : Int,
-  prev : Array[Char],
+  prev : Array[MbtToken],
 ) -> Unit {
   if prev_suffix_length == prev.length() {
     prev_scoreboard[prev_suffix_length - 1] = 4 // max score
   }
   for i in 0..<prev_suffix_length {
-    match prev[:prev.length() - i] {
-      [] => ()
-      [.., '\n'] => prev_scoreboard[i] = 3
-      [.., ' '] | [.., '\t'] => prev_scoreboard[i] = 2
-      [.., ch] => if ch is ('0'..='9') { prev_scoreboard[i] = 1 }
+    match prev[prev.length() - i - 1] {
+      Invisible(repr~, ..) =>
+        if repr.contains('\n') {
+          prev_scoreboard[i] = 3
+        } else {
+          prev_scoreboard[i] = 2
+        }
+      Visible(kind~, ..) => if kind is TK_INT { prev_scoreboard[i] = 1 }
+      _ => ()
     }
   }
 }
 
 ///|
 fn compute_common_prefix_length(
-  x : ArrayView[Char],
-  y : ArrayView[Char],
+  x : ArrayView[MbtToken],
+  y : ArrayView[MbtToken],
 ) -> Int {
+  // assume multiple invisible tokens are merged before call this function
   let mut prefix_length = 0
   loop (x, y) {
     ([], []) => return prefix_length
@@ -159,29 +169,11 @@ fn compute_common_prefix_length(
 }
 
 ///|
-test "compute_common_prefix_length" {
-  inspect(
-    compute_common_prefix_length(['a', 'b', 'c'], ['a', 'b', 'd']),
-    content="2",
-  )
-  inspect(
-    compute_common_prefix_length(['a', 'b', 'c'], ['a', 'b', 'c']),
-    content="3",
-  )
-  inspect(
-    compute_common_prefix_length(['a', 'b', 'c'], ['x', 'y', 'z']),
-    content="0",
-  )
-  inspect(compute_common_prefix_length([], ['a', 'b', 'c']), content="0")
-  inspect(compute_common_prefix_length(['a', 'b', 'c'], []), content="0")
-  inspect(compute_common_prefix_length([], []), content="0")
-}
-
-///|
 fn compute_common_suffix_length(
-  x : ArrayView[Char],
-  y : ArrayView[Char],
+  x : ArrayView[MbtToken],
+  y : ArrayView[MbtToken],
 ) -> Int {
+  // assume multiple invisible tokens are merged before call this function
   let mut suffix_length = 0
   loop (x, y) {
     ([], []) => return suffix_length
@@ -199,8 +191,8 @@ fn compute_common_suffix_length(
 
 ///|
 fn Array::push_edit(
-  self : Array[Edit[Array[Char]]],
-  edit : Edit[Array[Char]],
+  self : Array[Edit[Array[MbtToken]]],
+  edit : Edit[Array[MbtToken]],
 ) -> Unit {
   match self {
     [] => self.push(edit)

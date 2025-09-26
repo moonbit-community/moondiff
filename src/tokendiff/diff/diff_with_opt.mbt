@@ -2,7 +2,7 @@
 pub fn diff_with_opt(
   old~ : ArrayView[MbtToken],
   new~ : ArrayView[MbtToken],
-) -> Array[Edit[Array[Char]]] {
+) -> Array[Edit[Array[MbtToken]]] {
   let (prefix, suffix, old, new) = @preopt.separate_common_prefix_and_suffix(
     old~,
     new~,
