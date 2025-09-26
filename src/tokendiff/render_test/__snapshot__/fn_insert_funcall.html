@@ -2,21 +2,19 @@
 <html>
 <head>
 <style>
-  /* 自定义删除线样式 */
+
   del {
     background-color: #ffe6e6;
     color: #c00;
     text-decoration: line-through;
   }
 
-  /* 自定义下划线样式 */
   ins {
     background-color: #e6ffe6;
     color: #008000;
     text-decoration: none;
   }
 
-  /* 应用于代码块的样式 */
   pre {
     background-color: #f4f4f4;
     padding: 1em;
@@ -28,10 +26,12 @@
   }
 </style>
 </head>
-<body><table border="1">
-<tr><td><pre><code>fn main() {</code></pre></td></tr>
-<tr><td><pre><code>  println("Hello, world!")</code></pre></td></tr>
-<tr><td><pre><code>  <ins>println(5 + 6)</ins></code></pre></td></tr>
-<tr><td><pre><code>}</code></pre></td></tr>
-</table></body>
+<body>
+<pre><code>
+fn main() {
+  println("Hello, world!")<ins>
+  println(5 + 6)</ins>
+}
+</code></pre>
+</body>
 </html>
