@@ -1,10 +1,10 @@
 {
     "import": [
       "myfreess/moondiff/tokendiff/diff",
-      "myfreess/moondiff/tokendiff/render",
       "myfreess/moondiff/tokendiff/mbttoken",
       "myfreess/moondiff/block",
       "myfreess/moondiff/span",
-      "moonbitlang/parser/lexer"
+      "moonbitlang/parser/lexer",
+      "myfreess/moondiff/tokendiff/edit"
     ]
 }
