@@ -2,21 +2,19 @@
 <html>
 <head>
 <style>
-  /* 自定义删除线样式 */
+
   del {
     background-color: #ffe6e6;
     color: #c00;
     text-decoration: line-through;
   }
 
-  /* 自定义下划线样式 */
   ins {
     background-color: #e6ffe6;
     color: #008000;
     text-decoration: none;
   }
 
-  /* 应用于代码块的样式 */
   pre {
     background-color: #f4f4f4;
     padding: 1em;
@@ -28,16 +26,18 @@
   }
 </style>
 </head>
-<body><table border="1">
-<tr><td><pre><code>struct Set[K] {</code></pre></td></tr>
-<tr><td><pre><code>  mut entries : FixedArray[<del>SEntry</del><ins>Entry</ins>[K]?]</code></pre></td></tr>
-<tr><td><pre><code><del>  mut list : FixedArray[SListNode[K]]</del></code></pre></td></tr>
-<tr><td><pre><code>  mut size : Int // active keys count</code></pre></td></tr>
-<tr><td><pre><code>  mut capacity : Int // current capacity</code></pre></td></tr>
-<tr><td><pre><code>  mut capacity_mask : Int // capacity_mask = capacity - 1, used to find idx</code></pre></td></tr>
-<tr><td><pre><code>  mut grow_at : Int // threshold that triggers grow</code></pre></td></tr>
-<tr><td><pre><code>  mut head : <del>SEntry</del><ins>Entry</ins>[K]? // head of linked list</code></pre></td></tr>
-<tr><td><pre><code>  mut tail : <del>SEntry[ </del><del>K]?</del><ins>Int</ins> // tail of linked list</code></pre></td></tr>
-<tr><td><pre><code>}</code></pre></td></tr>
-</table></body>
+<body>
+<pre><code>
+struct Set[K] {
+  mut entries : FixedArray[<del>SEntry</del><ins>Entry</ins>[K]?]
+  <del>mut list : FixedArray[SListNode[K]]
+  </del>mut size : Int <ins>// active keys count
+  </ins>mut capacity : Int<ins> // current capacity</ins>
+  mut capacity_mask : Int <ins>// capacity_mask = capacity - 1, used to find idx
+  </ins>mut grow_at : Int <ins>// threshold that triggers grow
+  </ins>mut head : <del>SEntry</del><ins>Entry</ins>[K]?<ins> // head of linked list</ins>
+  mut tail : <del>SEntry[K] </del><ins>Int </ins><del>?</del><ins>// tail of linked list</ins>
+}
+</code></pre>
+</body>
 </html>

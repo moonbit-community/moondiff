@@ -2,21 +2,19 @@
 <html>
 <head>
 <style>
-  /* 自定义删除线样式 */
+
   del {
     background-color: #ffe6e6;
     color: #c00;
     text-decoration: line-through;
   }
 
-  /* 自定义下划线样式 */
   ins {
     background-color: #e6ffe6;
     color: #008000;
     text-decoration: none;
   }
 
-  /* 应用于代码块的样式 */
   pre {
     background-color: #f4f4f4;
     padding: 1em;
@@ -28,20 +26,22 @@
   }
 </style>
 </head>
-<body><table border="1">
-<tr><td><pre><code>pub fn decode(</code></pre></td></tr>
-<tr><td><pre><code>  bytes : @bytes.View<ins>,</ins></code></pre></td></tr>
-<tr><td><pre><code><ins>  ignore_bom? : Bool = false,</ins></code></pre></td></tr>
-<tr><td><pre><code>) -> String raise Malformed {</code></pre></td></tr>
-<tr><td><pre><code><ins>  let bytes = if ignore_bom && bytes is [.. "\xef\xbb\xbf", .. rest] {</ins></code></pre></td></tr>
-<tr><td><pre><code><ins>    rest</ins></code></pre></td></tr>
-<tr><td><pre><code><ins>  } else {</ins></code></pre></td></tr>
-<tr><td><pre><code><ins>    bytes</ins></code></pre></td></tr>
-<tr><td><pre><code><ins>  }</ins></code></pre></td></tr>
-<tr><td><pre><code>  let builder = StringBuilder::new(size_hint=bytes.length())</code></pre></td></tr>
-<tr><td><pre><code>  loop bytes {</code></pre></td></tr>
-<tr><td><pre><code>    ...</code></pre></td></tr>
-<tr><td><pre><code>  }</code></pre></td></tr>
-<tr><td><pre><code>}</code></pre></td></tr>
-</table></body>
+<body>
+<pre><code>
+pub fn decode(
+  bytes : @bytes.View<ins>,
+  ignore_bom? : Bool = false,
+</ins>) -> String raise Malformed {
+  <ins>let bytes = if ignore_bom && bytes is [.. "\xef\xbb\xbf", .. rest] {
+    rest
+  } else {
+    bytes
+  }
+  </ins>let builder = StringBuilder::new(size_hint=bytes.length())
+  loop bytes {
+    ...
+  }
+}
+</code></pre>
+</body>
 </html>
