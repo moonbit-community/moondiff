@@ -1,22 +1,26 @@
 ///|
 pub enum MbtToken {
-  Visible(Array[Char])
-  Invisible(Array[Char])
+  Visible(
+    kind~ : @tokens.TokenKind,
+    loc~ : @basic.Location,
+    repr~ : Array[Char]
+  )
+  Invisible(loc~ : @basic.Location, repr~ : Array[Char])
   Barrier
 } derive(Show)
 
 ///|
-pub fn MbtToken::to_text(self : MbtToken) -> String {
+pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
   match self {
-    Visible(s) | Invisible(s) => String::from_array(s)
-    Barrier => ""
+    Visible(repr~, ..) | Invisible(repr~, ..) => repr
+    Barrier => []
   }
 }
 
 ///|
 pub fn MbtToken::get_unicodes(self : MbtToken) -> Array[Char] {
   match self {
-    Visible(s) | Invisible(s) => s
+    Visible(repr~, ..) | Invisible(repr~, ..) => repr
     Barrier => []
   }
 }
@@ -28,7 +32,10 @@ pub impl Eq for MbtToken with equal(self, other) {
     | (Barrier, Barrier)
     | (Barrier, Invisible(_))
     | (Invisible(_), Barrier) => true
-    (Visible(x), Visible(y)) => x == y
+    (
+      Visible(kind=l_kind, repr=l_repr, ..),
+      Visible(kind=r_kind, repr=r_repr, ..),
+    ) => l_kind == r_kind && l_repr == r_repr
     _ => false
   }
 }
@@ -49,6 +56,18 @@ fn whitespace_width(prev : @basic.Position, next : @basic.Position) -> Int {
 }
 
 ///|
+fn whitespace_loc(
+  prev : @basic.Position,
+  next : @basic.Position,
+) -> @basic.Location {
+  if prev.lnum == next.lnum {
+    @basic.Location::{ start: prev, end: next }
+  } else {
+    @basic.Location::{ start: { ..next, cnum: next.bol }, end: next }
+  }
+}
+
+///|
 fn is_dot_token(token : @tokens.Token) -> Bool {
   token is DOT_INT(_) ||
   token is DOT_LIDENT(_) ||
@@ -58,9 +77,12 @@ fn is_dot_token(token : @tokens.Token) -> Bool {
 
 ///|
 fn Array::add_token(self : Array[MbtToken], token : MbtToken) -> Unit {
-  if token is Invisible(s) {
-    if self is [.., last] && last is Invisible(prev_s) {
-      self[self.length() - 1] = Invisible(prev_s + s)
+  if token is Invisible(repr=s, loc~) {
+    if self is [.., last] && last is Invisible(repr=prev_s, loc=prev_loc) {
+      self[self.length() - 1] = Invisible(
+        repr=prev_s + s,
+        loc=loc.merge(prev_loc),
+      )
     } else {
       self.push(token)
     }
@@ -87,7 +109,12 @@ pub fn MbtToken::from_triples(
       SEMI(false) => continue
       NEWLINE => {
         prev_pos = triple.2
-        mbt_tokens.add_token(Invisible(['\n']))
+        mbt_tokens.add_token(
+          Invisible(repr=['\n'], loc=@basic.Location::{
+            start: triple.1,
+            end: triple.2,
+          }),
+        )
       }
       _ => {
         let tok = triple.0
@@ -104,16 +131,22 @@ pub fn MbtToken::from_triples(
             mbt_tokens.add_token(Barrier)
           } else {
             let width = whitespace_width(prev_pos, tok_start)
-            mbt_tokens.add_token(Invisible(Array::make(width, ' ')))
+            mbt_tokens.add_token(
+              Invisible(
+                repr=Array::make(width, ' '),
+                loc=whitespace_loc(prev_pos, tok_start),
+              ),
+            )
           }
         }
         prev_pos = tok_end
         let text = line_widths.text_of_loc(tok_start, tok_end)
-        if tok is COMMENT(_) {
-          mbt_tokens.add_token(Invisible(text))
-        } else {
-          mbt_tokens.add_token(Visible(text))
-        }
+        mbt_tokens.add_token(
+          Visible(repr=text, kind=tok.kind(), loc=@basic.Location::{
+            start: tok_start,
+            end: tok_end,
+          }),
+        )
       }
     }
   }
@@ -121,11 +154,11 @@ pub fn MbtToken::from_triples(
 }
 
 ///|
-pub fn mbttokens_to_string(tokens : Array[MbtToken]) -> String {
+pub fn mbttokens_to_string(tokens : ArrayView[MbtToken]) -> String {
   let buf = StringBuilder::new(size_hint=tokens.length() * 5)
   for token in tokens {
     match token {
-      Visible(s) | Invisible(s) => buf.write_iter(s.iter())
+      Visible(repr~, ..) | Invisible(repr~, ..) => buf.write_iter(repr.iter())
       Barrier => ()
     }
   }
