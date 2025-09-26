@@ -8,7 +8,7 @@ priv enum EditKind {
 ///|
 pub fn compress_edits(
   edits : ArrayView[Edit[MbtToken]],
-) -> Array[Edit[Array[Char]]] {
+) -> Array[Edit[Array[MbtToken]]] {
   fn kind_of(edit : Edit[MbtToken]) -> EditKind {
     match edit {
       Edit::Insert(_) => Ins
@@ -38,7 +38,7 @@ pub fn compress_edits(
       Edit::Delete(old~) => old
       Edit::Equal(new~, ..) => new
     }
-    buf.append(tok.get_unicodes())
+    buf.push(tok)
   } else {
     if !buf.is_empty() {
       match prev_kind {
