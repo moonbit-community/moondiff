@@ -4,36 +4,43 @@
 pub fn compress_edits(
   edits : ArrayView[Edit[MbtToken]],
 ) -> Array[Edit[Array[MbtToken]]] {
-  let mut buf = []
-  let result = Array::new(capacity=edits.length())
-  let mut prev_kind = EditKind::Eql
+  let compressed : Array[Edit[Array[MbtToken]]] = []
   for edit in edits {
-    let kind = edit.kind()
-    if kind != prev_kind {
-      if !buf.is_empty() {
-        match prev_kind {
-          Ins => result.push(Edit::Insert(new=buf))
-          Del => result.push(Edit::Delete(old=buf))
-          Eql => result.push(Edit::Equal(new=buf, old=[]))
-        }
-        buf = []
-      }
-      prev_kind = kind
-    }
-    let tok = match edit {
-      Edit::Insert(new~) => new
-      Edit::Delete(old~) => old
-      Edit::Equal(new~, ..) => new
-    }
-    buf.push(tok)
-  } else {
-    if !buf.is_empty() {
-      match prev_kind {
-        Ins => result.push(Edit::Insert(new=buf))
-        Del => result.push(Edit::Delete(old=buf))
-        Eql => result.push(Edit::Equal(new=buf, old=[]))
-      }
-    }
-    result
+    compressed.push_edit(edit)
   }
+  compressed
+}
+
+///|
+fn Array::push_edit(
+  self : Array[Edit[Array[MbtToken]]],
+  edit : Edit[MbtToken],
+) -> Unit {
+  match self {
+    [] =>
+      match edit {
+        Delete(old~) => self.push(Delete(old=[old]))
+        Insert(new~) => self.push(Insert(new=[new]))
+        Equal(new~, old~) => self.push(Equal(new=[new], old=[old]))
+      }
+    [.., last] =>
+      match (last, edit) {
+        (Delete(old=hd), Delete(old=tl)) => {
+          self.truncate(self.length() - 1)
+          self.push(Delete(old=hd + [tl]))
+        }
+        (Insert(new=hd), Insert(new=tl)) => {
+          self.truncate(self.length() - 1)
+          self.push(Insert(new=hd + [tl]))
+        }
+        (Equal(new=hd, old=old_hd), Equal(new=tl, old=old_tl)) => {
+          self.truncate(self.length() - 1)
+          self.push(Equal(new=hd + [tl], old=old_hd + [old_tl]))
+        }
+        (_, Delete(old~)) => self.push(Delete(old=[old]))
+        (_, Insert(new~)) => self.push(Insert(new=[new]))
+        (_, Equal(new~, old~)) => self.push(Equal(new=[new], old=[old]))
+      }
+  }
+  // 
 }
