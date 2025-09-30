@@ -99,7 +99,7 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
   for token in self {
     match token {
       Visible(repr~, ..) => length += repr.length()
-      Invisible(repr~, ..) => length += repr.length()
+      Invisible(repr) => length += repr.length()
       _ => ()
     }
   }
@@ -109,7 +109,7 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
 ///|
 fn not_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
   not(
-    input is [Invisible(repr~, ..), ..] &&
+    input is [Invisible(repr), ..] &&
     repr.contains('\n') &&
     input is [.., Visible(kind=TK_RBRACE | TK_RBRACKET, ..)],
   )
@@ -126,7 +126,7 @@ fn fullfill_next_scoreboard(
   }
   for i in 0..<next_prefix_length {
     match next[i] {
-      Invisible(repr~, ..) =>
+      Invisible(repr) =>
         if repr.contains('\n') {
           next_scoreboard[i] = 3
         } else {
@@ -149,7 +149,7 @@ fn fullfill_prev_scoreboard(
   }
   for i in 0..<prev_suffix_length {
     match prev[prev.length() - i - 1] {
-      Invisible(repr~, ..) =>
+      Invisible(repr) =>
         if repr.contains('\n') {
           prev_scoreboard[i] = 3
         } else {
