@@ -28,6 +28,15 @@
 </head>
 <body>
 <pre><code>
+pub fn[T, U] map(self : T?, f : (T) -> U) -> U? {
+  match self {
+    Some(t) => Some(f(t))
+    None => None
+  }
+}
+</code></pre>
+
+<pre><code>
 pub fn[T, U] map(self : T?, f : (T) -> U<ins> raise?</ins>) -> U? <ins>raise? </ins>{
   match self {
     Some(t) => Some(f(t))
