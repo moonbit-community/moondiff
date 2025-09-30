@@ -28,6 +28,15 @@
 </head>
 <body>
 <pre><code>
+pub fn decode(bytes : @bytes.View) -> String raise Malformed {
+  let builder = StringBuilder::new(size_hint=bytes.length())
+  loop bytes {
+    ...
+  }
+}
+</code></pre>
+
+<pre><code>
 pub fn decode(
   bytes : @bytes.View<ins>,
   ignore_bom? : Bool = false,
