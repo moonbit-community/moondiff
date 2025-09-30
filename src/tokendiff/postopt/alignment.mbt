@@ -220,9 +220,9 @@ fn Array::push_edit(
           self.truncate(self.length() - 1)
           self.push(Insert(new=hd + tl))
         }
-        (Equal(new=hd, ..), Equal(new=tl, ..)) => {
+        (Equal(new=hd, old=old_hd), Equal(new=tl, old=old_tl)) => {
           self.truncate(self.length() - 1)
-          self.push(Equal(new=hd + tl, old=[]))
+          self.push(Equal(new=hd + tl, old=old_hd + old_tl))
         }
         _ => self.push(edit)
       }
