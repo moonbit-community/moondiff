@@ -83,7 +83,21 @@ pub fn web_rendering(
   for edit in edits {
     match edit {
       Delete(old~) => buf.write_with_del(old)
+      Insert(..) => ()
+      Equal(old~, ..) => buf.write_with_eqn(old)
+    }
+  } else {
+    buf.write_char('\n')
+    buf.write_string(code_footer)
+    buf.write_char('\n')
+  }
+  buf.write_char('\n')
+  buf.write_string(code_header)
+  buf.write_char('\n')
+  for edit in edits {
+    match edit {
       Insert(new~) => buf.write_with_ins(new)
+      Delete(..) => ()
       Equal(new~, ..) => buf.write_with_eqn(new)
     }
   } else {
