@@ -6,7 +6,7 @@ pub fn align_edit_boundaries(
   for edit in input {
     result.push_edit(edit)
     match result {
-      [.., Delete(old=prev), Insert(new=current), Equal(new=next, ..)] => {
+      [.., Delete(old=prev), Insert(new=current), Equal(new=next, old~)] => {
         let next_length = next.content_length()
         if next_length < current.content_length() / 3 ||
           next_length < prev.content_length() / 3 {
@@ -20,16 +20,21 @@ pub fn align_edit_boundaries(
           result.push_edit(Delete(old=prev + prefix))
           result.push_edit(Insert(new=current + prefix))
           if rest != [] {
-            result.push_edit(Equal(new=rest.to_array(), old=[]))
+            result.push_edit(
+              Equal(
+                new=rest.to_array(),
+                old=old[old.length() - rest.length():].to_array(),
+              ),
+            )
           }
         }
       }
       [
         ..,
-        Equal(new=prev, ..),
+        Equal(new=prev, old=prev_old),
         Delete(old=current)
         | Insert(new=current) as middle,
-        Equal(new=next, ..),
+        Equal(new=next, old=next_old),
       ] => {
         result.truncate(result.length() - 3)
         let prev_suffix_length = compute_common_suffix_length(current, prev)
@@ -64,26 +69,47 @@ pub fn align_edit_boundaries(
           let new_next = current[current.length() - index_for_max_score_prev - 1:].to_array() +
             next
           let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_array()
-          result.push_edit(Equal(new=new_prev, old=[]))
+          result.push_edit(
+            Equal(
+              new=new_prev,
+              old=prev_old[:prev_old.length() - index_for_max_score_prev - 1].to_array(),
+            ),
+          )
           if middle is Delete(..) {
             result.push_edit(Delete(old=new_current))
           } else {
             result.push_edit(Insert(new=new_current))
           }
-          result.push_edit(Equal(new=new_next, old=[]))
+          result.push_edit(
+            Equal(
+              new=new_next,
+              old=current[current.length() - index_for_max_score_prev - 1:].to_array() +
+                next_old,
+            ),
+          )
         } else {
           let new_current = current[index_for_max_score_next + 1:].to_array() +
             next[:index_for_max_score_next + 1].to_array()
           let new_prev = prev +
             current[:index_for_max_score_next + 1].to_array()
           let new_next = next[index_for_max_score_next + 1:].to_array()
-          result.push_edit(Equal(new=new_prev, old=[]))
+          result.push_edit(
+            Equal(
+              new=new_prev,
+              old=prev_old + current[:index_for_max_score_next + 1].to_array(),
+            ),
+          )
           if middle is Delete(..) {
             result.push_edit(Delete(old=new_current))
           } else {
             result.push_edit(Insert(new=new_current))
           }
-          result.push_edit(Equal(new=new_next, old=[]))
+          result.push_edit(
+            Equal(
+              new=new_next,
+              old=next_old[index_for_max_score_next + 1:].to_array(),
+            ),
+          )
         }
       }
       _ => continue
