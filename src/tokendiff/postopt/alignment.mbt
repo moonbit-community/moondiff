@@ -125,16 +125,7 @@ fn fullfill_next_scoreboard(
     next_scoreboard[next_prefix_length - 1] = 4 // max score
   }
   for i in 0..<next_prefix_length {
-    match next[i] {
-      Invisible(repr) =>
-        if repr.contains('\n') {
-          next_scoreboard[i] = 3
-        } else {
-          next_scoreboard[i] = 2
-        }
-      Visible(kind~, ..) => if kind is TK_INT { next_scoreboard[i] = 1 }
-      _ => ()
-    }
+    calc_score(next_scoreboard, next[i], i)
   }
 }
 
@@ -148,16 +139,16 @@ fn fullfill_prev_scoreboard(
     prev_scoreboard[prev_suffix_length - 1] = 4 // max score
   }
   for i in 0..<prev_suffix_length {
-    match prev[prev.length() - i - 1] {
-      Invisible(repr) =>
-        if repr.contains('\n') {
-          prev_scoreboard[i] = 3
-        } else {
-          prev_scoreboard[i] = 2
-        }
-      Visible(kind~, ..) => if kind is TK_INT { prev_scoreboard[i] = 1 }
-      _ => ()
-    }
+    calc_score(prev_scoreboard, prev[prev.length() - 1 - i], i)
+  }
+}
+
+///|
+fn calc_score(scoreboard : Array[Int], tok : MbtToken, i : Int) -> Unit {
+  match tok {
+    Invisible(_) => scoreboard[i] = 2
+    Visible(kind=TK_INT, ..) => scoreboard[i] = 1
+    _ => ()
   }
 }
 
