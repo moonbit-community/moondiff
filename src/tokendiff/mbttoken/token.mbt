@@ -7,7 +7,28 @@ pub(all) enum MbtToken {
   )
   Invisible(Array[Char])
   Barrier
-} derive(Show)
+}
+
+///|
+pub impl Show for MbtToken with output(self, logger) {
+  match self {
+    Visible(kind~, loc~, repr~) => {
+      logger.write_string("Visible(")
+      logger.write_string(kind.to_string())
+      logger.write_string(", ")
+      logger.write_string(loc.to_string())
+      logger.write_string(", \"")
+      logger.write_string(String::from_iter(repr.iter()).escape())
+      logger.write_string("\")")
+    }
+    Invisible(repr) => {
+      logger.write_string("Invisible(\"")
+      logger.write_string(String::from_iter(repr.iter()).escape())
+      logger.write_string("\")")
+    }
+    Barrier => logger.write_string("Barrier")
+  }
+}
 
 ///|
 pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
