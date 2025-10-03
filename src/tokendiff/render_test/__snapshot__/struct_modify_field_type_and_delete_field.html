@@ -31,8 +31,11 @@
 struct Set[K] {
   mut entries : FixedArray[<del>SEntry</del>[K]?]
   <del>mut list : FixedArray[SListNode[K]]
-  </del>mut size : Int mut capacity : Int
-  mut capacity_mask : Int mut grow_at : Int mut head : <del>SEntry</del>[K]?
+  </del>mut size : Int
+  mut capacity : Int
+  mut capacity_mask : Int
+  mut grow_at : Int
+  mut head : <del>SEntry</del>[K]?
   mut tail : <del>SEntry[K] </del><del>?</del>
 }
 </code></pre>
