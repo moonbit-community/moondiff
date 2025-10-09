@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/tokendiff/mbttoken"
+
+import(
+  "moonbitlang/parser/basic"
+  "moonbitlang/parser/tokens"
+  "myfreess/moondiff/span"
+)
+
+// Values
+fn mbttokens_to_string(ArrayView[MbtToken]) -> String
+
+// Errors
+
+// Types and methods
+pub(all) enum MbtToken {
+  Visible(kind~ : @tokens.TokenKind, loc~ : @basic.Location, repr~ : Array[Char])
+  Invisible(Array[Char])
+  Barrier
+}
+fn MbtToken::from_triples(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)], @span.LineWidths) -> Array[Self]
+fn MbtToken::get_unicodes(Self) -> Array[Char]
+fn MbtToken::to_text(Self) -> Array[Char]
+impl Eq for MbtToken
+impl Show for MbtToken
+impl ToJson for MbtToken
+
+// Type aliases
+
+// Traits
+

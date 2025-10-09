@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/tokendiff/diff_with_opt"
+
+import(
+  "myfreess/moondiff/tokendiff/edit"
+  "myfreess/moondiff/tokendiff/mbttoken"
+)
+
+// Values
+fn diff_with_opt(old~ : ArrayView[@mbttoken.MbtToken], new~ : ArrayView[@mbttoken.MbtToken]) -> Array[@edit.Edit[Array[@mbttoken.MbtToken]]]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

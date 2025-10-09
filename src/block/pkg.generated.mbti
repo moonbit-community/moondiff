@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/block"
+
+import(
+  "moonbitlang/parser/basic"
+  "moonbitlang/parser/tokens"
+)
+
+// Values
+fn create_blocks(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]) -> Array[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]]
+
+fn get_block_uuid(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]) -> String raise BlockProcessingError
+
+fn pairing_blocks_by_uuid(old~ : ArrayView[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]], new~ : ArrayView[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]]) -> Array[(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)], ArrayView[(@tokens.Token, @basic.Position, @basic.Position)])] raise BlockProcessingError
+
+// Errors
+pub suberror BlockProcessingError {
+  UUIDNotFound(String)
+  EmptyBlock
+}
+
+// Types and methods
+
+// Type aliases
+pub typealias ArrayView[(@tokens.Token, @basic.Position, @basic.Position)] as Block
+
+pub typealias Array[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]] as Blocks
+
+// Traits
+

@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/tokendiff/postopt"
+
+import(
+  "myfreess/moondiff/tokendiff/edit"
+  "myfreess/moondiff/tokendiff/mbttoken"
+)
+
+// Values
+fn align_edit_boundaries(ArrayView[@edit.Edit[Array[@mbttoken.MbtToken]]]) -> Array[@edit.Edit[Array[@mbttoken.MbtToken]]]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+
