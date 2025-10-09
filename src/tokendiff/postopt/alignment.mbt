@@ -6,13 +6,18 @@ pub fn align_edit_boundaries(
   for edit in input {
     result.push_edit(edit)
     match result {
-      [.., Delete(old=prev), Insert(new=current), Equal(new=next, old~)] => {
-        let next_length = next.content_length()
+      [
+        ..,
+        Delete(old=prev),
+        Insert(new=current),
+        Equal(new=next_new, old=next_old),
+      ] => {
+        let next_length = next_new.content_length()
         if next_length < current.content_length() / 3 ||
           next_length < prev.content_length() / 3 {
           result.truncate(result.length() - 3)
           let prefix = Array::new(capacity=next_length)
-          let mut rest = next[:]
+          let mut rest = next_new[:]
           while rest != [] && not_trailing_endmark(rest) {
             prefix.push(rest[0])
             rest = rest[1:]
@@ -23,7 +28,7 @@ pub fn align_edit_boundaries(
             result.push_edit(
               Equal(
                 new=rest.to_array(),
-                old=old[old.length() - rest.length():].to_array(),
+                old=next_old[next_old.length() - rest.length():].to_array(),
               ),
             )
           }
