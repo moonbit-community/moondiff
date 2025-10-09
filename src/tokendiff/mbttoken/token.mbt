@@ -31,6 +31,16 @@ pub impl Show for MbtToken with output(self, logger) {
 }
 
 ///|
+pub impl ToJson for MbtToken with to_json(self) {
+  match self {
+    Invisible(text) => String::from_array(text).to_json()
+    Visible(kind~, loc~, repr~) =>
+      { "kind": kind.to_string(), "loc": loc, "repr": String::from_array(repr) }
+    Barrier => "<|Barrier|>"
+  }
+}
+
+///|
 pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
   match self {
     Visible(repr~, ..) | Invisible(repr) => repr
