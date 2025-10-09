@@ -37,6 +37,11 @@ jobs:
           moon fmt
           git diff --exit-code
 
+      - name: info check
+        run: |
+          moon info
+          git diff --exit-code
+
       - name: Set ulimit
         run: |
           ulimit -s 8176
