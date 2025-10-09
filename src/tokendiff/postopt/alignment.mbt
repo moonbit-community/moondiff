@@ -76,23 +76,25 @@ pub fn align_edit_boundaries(
           }
         }
         if max_score_for_prev > max_score_for_next {
-          let new_current = prev[prev.length() - index_for_max_score_prev - 1:].to_array() +
-            current[:current.length() - index_for_max_score_prev - 1].to_array()
-          let new_next = current[current.length() - index_for_max_score_prev - 1:].to_array() +
-            next
-          let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_array()
-          result.push_edit(Equal(new=new_prev, old=prev_old))
-          result.push_edit(Insert(new=new_current))
-          result.push_edit(Equal(new=new_next, old=next_old))
+          let (prev, current, next) = slide_to_prev(
+            prev~,
+            current~,
+            next~,
+            index_for_max_score_prev~,
+          )
+          result.push_edit(Equal(new=prev, old=prev_old))
+          result.push_edit(Insert(new=current))
+          result.push_edit(Equal(new=next, old=next_old))
         } else {
-          let new_current = current[index_for_max_score_next + 1:].to_array() +
-            next[:index_for_max_score_next + 1].to_array()
-          let new_prev = prev +
-            current[:index_for_max_score_next + 1].to_array()
-          let new_next = next[index_for_max_score_next + 1:].to_array()
-          result.push_edit(Equal(new=new_prev, old=prev_old))
-          result.push_edit(Insert(new=new_current))
-          result.push_edit(Equal(new=new_next, old=next_old))
+          let (prev, current, next) = slide_to_next(
+            prev~,
+            current~,
+            next~,
+            index_for_max_score_next~,
+          )
+          result.push_edit(Equal(new=prev, old=prev_old))
+          result.push_edit(Insert(new=current))
+          result.push_edit(Equal(new=next, old=next_old))
         }
       }
       [
@@ -129,23 +131,25 @@ pub fn align_edit_boundaries(
           }
         }
         if max_score_for_prev > max_score_for_next {
-          let new_current = prev[prev.length() - index_for_max_score_prev - 1:].to_array() +
-            current[:current.length() - index_for_max_score_prev - 1].to_array()
-          let new_next = current[current.length() - index_for_max_score_prev - 1:].to_array() +
-            next
-          let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_array()
-          result.push_edit(Equal(new=prev_new, old=new_prev))
-          result.push_edit(Delete(old=new_current))
-          result.push_edit(Equal(new=next_new, old=new_next))
+          let (prev, current, next) = slide_to_prev(
+            prev~,
+            current~,
+            next~,
+            index_for_max_score_prev~,
+          )
+          result.push_edit(Equal(new=prev_new, old=prev))
+          result.push_edit(Delete(old=current))
+          result.push_edit(Equal(new=next_new, old=next))
         } else {
-          let new_current = current[index_for_max_score_next + 1:].to_array() +
-            next[:index_for_max_score_next + 1].to_array()
-          let new_prev = prev +
-            current[:index_for_max_score_next + 1].to_array()
-          let new_next = next[index_for_max_score_next + 1:].to_array()
-          result.push_edit(Equal(new=prev_new, old=new_prev))
-          result.push_edit(Delete(old=new_current))
-          result.push_edit(Equal(new=next_new, old=new_next))
+          let (prev, current, next) = slide_to_next(
+            prev~,
+            current~,
+            next~,
+            index_for_max_score_next~,
+          )
+          result.push_edit(Equal(new=prev_new, old=prev))
+          result.push_edit(Delete(old=current))
+          result.push_edit(Equal(new=next_new, old=next))
         }
       }
       _ => continue
@@ -180,6 +184,35 @@ fn not_a_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
     repr.contains('\n') &&
     input is [.., Visible(kind=TK_RBRACE | TK_RBRACKET, ..)],
   )
+}
+
+///|
+fn slide_to_prev(
+  prev~ : Array[MbtToken],
+  current~ : Array[MbtToken],
+  next~ : Array[MbtToken],
+  index_for_max_score_prev~ : Int,
+) -> (Array[MbtToken], Array[MbtToken], Array[MbtToken]) {
+  let new_current = prev[prev.length() - index_for_max_score_prev - 1:].to_array() +
+    current[:current.length() - index_for_max_score_prev - 1].to_array()
+  let new_next = current[current.length() - index_for_max_score_prev - 1:].to_array() +
+    next
+  let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_array()
+  (new_prev, new_current, new_next)
+}
+
+///|
+fn slide_to_next(
+  prev~ : Array[MbtToken],
+  current~ : Array[MbtToken],
+  next~ : Array[MbtToken],
+  index_for_max_score_next~ : Int,
+) -> (Array[MbtToken], Array[MbtToken], Array[MbtToken]) {
+  let new_current = current[index_for_max_score_next + 1:].to_array() +
+    next[:index_for_max_score_next + 1].to_array()
+  let new_prev = prev + current[:index_for_max_score_next + 1].to_array()
+  let new_next = next[index_for_max_score_next + 1:].to_array()
+  (new_prev, new_current, new_next)
 }
 
 ///|
