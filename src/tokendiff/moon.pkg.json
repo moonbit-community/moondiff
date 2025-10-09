@@ -1,6 +1,6 @@
 {
     "import": [
-      "myfreess/moondiff/tokendiff/diff",
+      "myfreess/moondiff/tokendiff/diff_with_opt",
       "myfreess/moondiff/tokendiff/mbttoken",
       "myfreess/moondiff/block",
       "myfreess/moondiff/span",
