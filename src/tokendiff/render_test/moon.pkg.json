@@ -3,7 +3,7 @@
       "myfreess/moondiff/tokendiff/mbttoken",
       "moonbitlang/parser/lexer",
       "myfreess/moondiff/span",
-      "myfreess/moondiff/tokendiff/diff",
+      "myfreess/moondiff/tokendiff/diff_with_opt",
       "myfreess/moondiff/tokendiff/render",
       "moonbitlang/x/fs"
     ]

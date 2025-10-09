@@ -15,7 +15,7 @@ pub fn test_web_rendering(t : @test.T, name : String) -> Unit raise {
     @lexer.tokens_from_string(comment=true, new).tokens,
     new_linewidths,
   )
-  let edits = @diff.diff_with_opt(old~, new~)
+  let edits = @diff_with_opt.diff_with_opt(old~, new~)
   let buf = StringBuilder::new(size_hint=edits.length() * 20)
   buf.write_string(@render.html_header)
   @render.web_rendering(buf, edits)

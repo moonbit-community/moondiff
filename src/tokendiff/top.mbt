@@ -46,7 +46,7 @@ pub fn web_multiple_block_diff(
       (old, new) => {
         let old = @mbttoken.MbtToken::from_triples(old, old_linewidths)
         let new = @mbttoken.MbtToken::from_triples(new, new_linewidths)
-        let edits = @diff.diff_with_opt(old~, new~)
+        let edits = @diff_with_opt.diff_with_opt(old~, new~)
         matching_blocks.push(edits)
       }
     }
