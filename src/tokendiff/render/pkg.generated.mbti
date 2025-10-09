@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/tokendiff/render"
+
+import(
+  "myfreess/moondiff/tokendiff/edit"
+  "myfreess/moondiff/tokendiff/mbttoken"
+)
+
+// Values
+fn cli_rendering(ArrayView[@edit.Edit[Array[@mbttoken.MbtToken]]]) -> String
+
+let html_footer : String
+
+let html_header : String
+
+fn web_rendering(StringBuilder, Array[@edit.Edit[Array[@mbttoken.MbtToken]]]) -> Unit
+
+fn web_rendering_delete_block(StringBuilder, old~ : Array[Char]) -> Unit
+
+fn web_rendering_insert_block(StringBuilder, new~ : Array[Char]) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

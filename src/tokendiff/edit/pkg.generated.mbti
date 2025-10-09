@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/tokendiff/edit"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum Edit[T] {
+  Insert(new~ : T)
+  Delete(old~ : T)
+  Equal(old~ : T, new~ : T)
+}
+impl[T : Show] Show for Edit[T]
+impl[T : ToJson] ToJson for Edit[T]
+
+// Type aliases
+
+// Traits
+

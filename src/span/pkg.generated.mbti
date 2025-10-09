@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/span"
+
+import(
+  "moonbitlang/parser/basic"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct LineWidths {
+  contents : Array[Char]
+  lines : Array[(Int, Int)]
+}
+fn LineWidths::backward_search(Self, Char, @basic.Position) -> SingleLineSpan
+fn LineWidths::forward_search(Self, Char, @basic.Position) -> SingleLineSpan
+fn LineWidths::from_str(StringView) -> Self
+fn LineWidths::get_line_width(Self, Int) -> Int
+fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]
+fn LineWidths::op_get(Self, Int) -> ArrayView[Char]
+fn LineWidths::text_of_loc(Self, @basic.Position, @basic.Position) -> Array[Char]
+impl Show for LineWidths
+impl ToJson for LineWidths
+
+pub(all) struct SingleLineSpan {
+  line : Int
+  start_col : Int
+  end_col : Int
+}
+impl ToJson for SingleLineSpan
+
+// Type aliases
+
+// Traits
+
