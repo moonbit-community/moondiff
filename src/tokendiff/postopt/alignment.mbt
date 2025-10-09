@@ -12,25 +12,33 @@ pub fn align_edit_boundaries(
         Insert(new=current),
         Equal(new=next_new, old=next_old),
       ] => {
-        let next_length = next_new.content_length()
-        if next_length < current.content_length() / 3 ||
-          next_length < prev.content_length() / 3 {
+        /// +++ 
+        let next_new_length = next_new.content_length()
+        let next_old_length = next_old.content_length()
+        if next_new_length < current.content_length() / 3 ||
+          next_old_length < prev.content_length() / 3 {
           result.truncate(result.length() - 3)
-          let prefix = Array::new(capacity=next_length)
-          let mut rest = next_new[:]
-          while rest != [] && not_trailing_endmark(rest) {
-            prefix.push(rest[0])
-            rest = rest[1:]
+          let new_prefix = Array::new(capacity=next_new_length)
+          let old_prefix = Array::new(capacity=next_old_length)
+          let mut new_rest = next_new[:]
+          let mut old_rest = next_old[:]
+          while new_rest != [] &&
+                old_rest != [] &&
+                not_trailing_endmark(new_rest) &&
+                not_trailing_endmark(old_rest) {
+            new_prefix.push(new_rest[0])
+            old_prefix.push(old_rest[0])
+            new_rest = new_rest[1:]
+            old_rest = old_rest[1:]
           }
-          result.push_edit(Delete(old=prev + prefix))
-          result.push_edit(Insert(new=current + prefix))
-          if rest != [] {
-            result.push_edit(
-              Equal(
-                new=rest.to_array(),
-                old=next_old[next_old.length() - rest.length():].to_array(),
-              ),
-            )
+          result.push_edit(Delete(old=prev + old_prefix))
+          result.push_edit(Insert(new=current + new_prefix))
+          match (old_rest, new_rest) {
+            ([], []) => ()
+            (old_rest, new_rest) =>
+              result.push_edit(
+                Equal(new=new_rest.to_array(), old=old_rest.to_array()),
+              )
           }
         }
       }
