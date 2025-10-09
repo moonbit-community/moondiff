@@ -24,8 +24,8 @@ pub fn align_edit_boundaries(
           let mut old_rest = next_old[:]
           while new_rest != [] &&
                 old_rest != [] &&
-                not_trailing_endmark(new_rest) &&
-                not_trailing_endmark(old_rest) {
+                not_a_trailing_endmark(new_rest) &&
+                not_a_trailing_endmark(old_rest) {
             new_prefix.push(new_rest[0])
             old_prefix.push(old_rest[0])
             new_rest = new_rest[1:]
@@ -169,7 +169,12 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
 }
 
 ///|
-fn not_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
+/// avoid some anti pattern in Equal:
+/// ```pesudo mbt
+///    <newline>
+/// <consecutive space> <tokens> <'}' or ']'>
+/// ```
+fn not_a_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
   not(
     input is [Invisible(repr), ..] &&
     repr.contains('\n') &&

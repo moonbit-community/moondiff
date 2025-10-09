@@ -7,5 +7,9 @@
     "wbtest-import": [
         "moonbitlang/parser/basic",
         "myfreess/moondiff/tokendiff/edit"
+    ],
+    "test-import": [
+        "moonbitlang/parser/basic",
+        "myfreess/moondiff/tokendiff/edit"
     ]
 }
