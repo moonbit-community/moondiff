@@ -20,7 +20,7 @@ fn ids(strs : Array[String]) -> Array[@mbttoken.MbtToken] {
 }
 
 ///|
-fn[T] Array::flatten(
+fn[T] Array::flatten_edits(
   self : Array[@edit.Edit[Array[T]]],
 ) -> Array[@edit.Edit[Array[T]]] {
   let result : Array[@edit.Edit[Array[T]]] = []
@@ -47,7 +47,7 @@ test {
       Delete(old=ids(["xyz", "wuv"])),
       Insert(new=ids(["aaa", "bbb", "ccc"])),
       Equal(old=[Invisible([' '])], new=[Invisible([' ', '\n'])]),
-    ]).flatten(),
+    ]).flatten_edits(),
     content=[
       "--- [(LIDENT xyz)]", "--- [(LIDENT wuv)]", "--- [<| |>]", "+++ [(LIDENT aaa)]",
       "+++ [(LIDENT bbb)]", "+++ [(LIDENT ccc)]", "+++ [<| \n|>]",
