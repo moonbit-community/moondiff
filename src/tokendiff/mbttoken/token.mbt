@@ -12,31 +12,19 @@ pub(all) enum MbtToken {
 ///|
 pub impl Show for MbtToken with output(self, logger) {
   match self {
-    Visible(kind~, loc~, repr~) => {
-      logger.write_string("Visible(")
+    Visible(kind~, repr~, ..) => {
+      logger.write_string("(")
       logger.write_string(kind.to_string())
-      logger.write_string(", ")
-      logger.write_string(loc.to_string())
-      logger.write_string(", \"")
-      logger.write_string(String::from_iter(repr.iter()).escape())
-      logger.write_string("\")")
+      logger.write_char(' ')
+      logger.write_string(String::from_iter(repr.iter()))
+      logger.write_char(')')
     }
     Invisible(repr) => {
-      logger.write_string("Invisible(\"")
-      logger.write_string(String::from_iter(repr.iter()).escape())
-      logger.write_string("\")")
+      logger.write_string("<|")
+      logger.write_string(String::from_iter(repr.iter()))
+      logger.write_string("|>")
     }
-    Barrier => logger.write_string("Barrier")
-  }
-}
-
-///|
-pub impl ToJson for MbtToken with to_json(self) {
-  match self {
-    Invisible(text) => String::from_array(text).to_json()
-    Visible(kind~, repr~, ..) =>
-      { "kind": kind.to_string(), "repr": String::from_array(repr) }
-    Barrier => "<|Barrier|>"
+    Barrier => logger.write_string("%%")
   }
 }
 

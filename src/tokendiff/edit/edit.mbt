@@ -6,10 +6,10 @@ pub(all) enum Edit[T] {
 } derive(Show)
 
 ///|
-pub impl[T : ToJson] ToJson for Edit[T] with to_json(self) {
+pub impl[T : Show] ToJson for Edit[T] with to_json(self) {
   match self {
-    Delete(old~) => ["---", old]
-    Insert(new~) => ["+++", new]
-    Equal(old~, new~) => { "old": old, "new": new }
+    Delete(old~) => "--- \{old}"
+    Insert(new~) => "+++ \{new}"
+    Equal(old~, new~) => "%%% \{old}\n%%% \{new}"
   }
 }

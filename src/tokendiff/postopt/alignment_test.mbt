@@ -20,31 +20,37 @@ fn ids(strs : Array[String]) -> Array[@mbttoken.MbtToken] {
 }
 
 ///|
+fn[T] Array::flatten(
+  self : Array[@edit.Edit[Array[T]]],
+) -> Array[@edit.Edit[Array[T]]] {
+  let result : Array[@edit.Edit[Array[T]]] = []
+  for edit in self {
+    match edit {
+      Delete(old~) =>
+        for old in old {
+          result.push(Delete(old=[old]))
+        }
+      Insert(new~) =>
+        for new in new {
+          result.push(Insert(new=[new]))
+        }
+      Equal(_) as edit => result.push(edit)
+    }
+  }
+  return result
+}
+
+///|
 test {
   @json.inspect(
     @postopt.align_edit_boundaries([
       Delete(old=ids(["xyz", "wuv"])),
       Insert(new=ids(["aaa", "bbb", "ccc"])),
       Equal(old=[Invisible([' '])], new=[Invisible([' ', '\n'])]),
-    ]),
+    ]).flatten(),
     content=[
-      [
-        "---",
-        [
-          { "kind": "LIDENT", "repr": "xyz" },
-          { "kind": "LIDENT", "repr": "wuv" },
-          " ",
-        ],
-      ],
-      [
-        "+++",
-        [
-          { "kind": "LIDENT", "repr": "aaa" },
-          { "kind": "LIDENT", "repr": "bbb" },
-          { "kind": "LIDENT", "repr": "ccc" },
-          " \n",
-        ],
-      ],
+      "--- [(LIDENT xyz)]", "--- [(LIDENT wuv)]", "--- [<| |>]", "+++ [(LIDENT aaa)]",
+      "+++ [(LIDENT bbb)]", "+++ [(LIDENT ccc)]", "+++ [<| \n|>]",
     ],
   )
 }
