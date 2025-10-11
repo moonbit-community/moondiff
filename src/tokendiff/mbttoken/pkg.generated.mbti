@@ -23,7 +23,6 @@ fn MbtToken::get_unicodes(Self) -> Array[Char]
 fn MbtToken::to_text(Self) -> Array[Char]
 impl Eq for MbtToken
 impl Show for MbtToken
-impl ToJson for MbtToken
 
 // Type aliases
 

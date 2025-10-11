@@ -12,7 +12,7 @@ pub(all) enum Edit[T] {
   Equal(old~ : T, new~ : T)
 }
 impl[T : Show] Show for Edit[T]
-impl[T : ToJson] ToJson for Edit[T]
+impl[T : Show] ToJson for Edit[T]
 
 // Type aliases
 
