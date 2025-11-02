@@ -31,7 +31,7 @@ pub fn LineWidths::get_line_width(self : Self, line : Int) -> Int {
 }
 
 ///|
-pub fn LineWidths::from_str(str : @string.View) -> Self {
+pub fn LineWidths::from_str(str : StringView) -> Self {
   let contents = str.to_array()
   let lines = Array::new()
   lines.push((0, 0)) // dummy for line 0

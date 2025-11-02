@@ -6,7 +6,7 @@ import(
 )
 
 // Values
-fn test_web_rendering(@test.T, String) -> Unit raise
+fn test_web_rendering(@test.Test, String) -> Unit raise
 
 // Errors
 

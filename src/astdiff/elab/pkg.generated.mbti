@@ -2,6 +2,7 @@
 package "myfreess/moondiff/astdiff/elab"
 
 import(
+  "Yoorkin/prettyprinter"
   "myfreess/moondiff/span"
 )
 
@@ -37,8 +38,9 @@ fn Syntax::list(open_content~ : String, open_position~ : Array[@span.SingleLineS
 fn Syntax::next_sibling(Self) -> Self?
 fn Syntax::num_ancestors(Self) -> UInt
 fn Syntax::parent(Self) -> Self?
+fn Syntax::pretty(Self) -> @prettyprinter.Document // from trait `@prettyprinter.Pretty`
 fn Syntax::simple_list(open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_position~ : Array[@span.SingleLineSpan]) -> Self
-impl @Yoorkin/prettyprinter.Pretty for Syntax
+impl @prettyprinter.Pretty for Syntax
 
 pub struct SyntaxInfo {
   previous_sibling : Syntax?
@@ -51,6 +53,7 @@ pub struct SyntaxInfo {
   content_id : UInt
   content_is_unique : Bool
 }
+fn SyntaxInfo::default() -> Self // from trait `Default`
 fn SyntaxInfo::new() -> Self
 impl Default for SyntaxInfo
 

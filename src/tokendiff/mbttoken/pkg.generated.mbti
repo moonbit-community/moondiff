@@ -18,8 +18,13 @@ pub(all) enum MbtToken {
   Invisible(Array[Char])
   Barrier
 }
+fn MbtToken::equal(Self, Self) -> Bool // from trait `Eq`
 fn MbtToken::from_triples(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)], @span.LineWidths) -> Array[Self]
 fn MbtToken::get_unicodes(Self) -> Array[Char]
+#deprecated
+fn MbtToken::op_equal(Self, Self) -> Bool // from trait `Eq`
+fn MbtToken::output(Self, &Logger) -> Unit // from trait `Show`
+fn MbtToken::to_string(Self) -> String // from trait `Show`
 fn MbtToken::to_text(Self) -> Array[Char]
 impl Eq for MbtToken
 impl Show for MbtToken

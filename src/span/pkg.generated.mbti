@@ -20,7 +20,10 @@ fn LineWidths::from_str(StringView) -> Self
 fn LineWidths::get_line_width(Self, Int) -> Int
 fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]
 fn LineWidths::op_get(Self, Int) -> ArrayView[Char]
+fn LineWidths::output(Self, &Logger) -> Unit // from trait `Show`
 fn LineWidths::text_of_loc(Self, @basic.Position, @basic.Position) -> Array[Char]
+fn LineWidths::to_json(Self) -> Json // from trait `ToJson`
+fn LineWidths::to_string(Self) -> String // from trait `Show`
 impl Show for LineWidths
 impl ToJson for LineWidths
 
@@ -29,6 +32,7 @@ pub(all) struct SingleLineSpan {
   start_col : Int
   end_col : Int
 }
+fn SingleLineSpan::to_json(Self) -> Json // from trait `ToJson`
 impl ToJson for SingleLineSpan
 
 // Type aliases
