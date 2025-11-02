@@ -1,0 +1,18 @@
+{
+  "import": [
+    {
+      "path": "Lampese/moonbit-chalk",
+      "alias": "chalk"
+    },
+    "myfreess/moondiff/tokendiff/diff_with_opt",
+    "myfreess/moondiff/tokendiff/mbttoken",
+    "myfreess/moondiff/block",
+    "myfreess/moondiff/span",
+    "myfreess/moondiff/config",
+    "moonbitlang/parser/lexer",
+    "myfreess/moondiff/tokendiff/edit",
+    "moonbitlang/x/sys",
+    "moonbitlang/x/fs"
+  ],
+  "is-main": true
+}
