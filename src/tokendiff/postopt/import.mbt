@@ -1,5 +1,5 @@
 ///|
-typealias @edit.Edit
+using @edit {type Edit}
 
 ///|
-typealias @mbttoken.MbtToken
+using @mbttoken {type MbtToken}

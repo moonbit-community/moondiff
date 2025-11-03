@@ -1,2 +1,2 @@
 ///|
-typealias @edit.Edit
+using @edit {type Edit}

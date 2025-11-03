@@ -15,22 +15,22 @@ priv struct Snake {
 } derive(Show)
 
 ///|
-fn width(self : Box) -> Int {
+fn Box::width(self : Box) -> Int {
   self.right - self.left
 }
 
 ///|
-fn height(self : Box) -> Int {
+fn Box::height(self : Box) -> Int {
   self.bottom - self.top
 }
 
 ///|
-fn size(self : Box) -> Int {
+fn Box::size(self : Box) -> Int {
   self.width() + self.height()
 }
 
 ///|
-fn delta(self : Box) -> Int {
+fn Box::delta(self : Box) -> Int {
   self.width() - self.height()
 }
 
@@ -45,7 +45,7 @@ fn is_even(n : Int) -> Bool {
 }
 
 ///|
-fn[T : Eq] forward(
+fn[T : Eq] Box::forward(
   self : Box,
   forward~ : BPArray[Int],
   backward~ : BPArray[Int],
@@ -81,7 +81,7 @@ fn[T : Eq] forward(
 }
 
 ///|
-fn[T : Eq] backward(
+fn[T : Eq] Box::backward(
   self : Box,
   forward~ : BPArray[Int],
   backward~ : BPArray[Int],
@@ -115,7 +115,7 @@ fn[T : Eq] backward(
 }
 
 ///|
-fn[T : Eq] midpoint(
+fn[T : Eq] Box::midpoint(
   self : Box,
   old~ : ArrayView[T],
   new~ : ArrayView[T],
@@ -150,7 +150,7 @@ fn[T : Eq] midpoint(
 }
 
 ///|
-fn[T : Eq] find_path(
+fn[T : Eq] Box::find_path(
   self : Box,
   old~ : ArrayView[T],
   new~ : ArrayView[T],

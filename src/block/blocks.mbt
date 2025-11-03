@@ -1,5 +1,5 @@
 ///|
-pub typealias Array[Block] as Blocks
+pub type Blocks = Array[Block]
 
 ///|
 pub fn create_blocks(input : ArrayView[(Token, Position, Position)]) -> Blocks {

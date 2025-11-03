@@ -1,5 +1,5 @@
 ///|
-typealias @edit.Edit
+using @edit {type Edit}
 
 ///|
 let source_dir = "src/tokendiff/render_test/sources"
@@ -72,7 +72,7 @@ let code_header = "<pre><code>"
 let code_footer = "</code></pre>"
 
 ///|
-fn write_with_del(
+fn StringBuilder::write_with_del(
   self : StringBuilder,
   tokens : ArrayView[@mbttoken.MbtToken],
 ) -> Unit {
@@ -82,7 +82,7 @@ fn write_with_del(
 }
 
 ///|
-fn write_with_ins(
+fn StringBuilder::write_with_ins(
   self : StringBuilder,
   tokens : ArrayView[@mbttoken.MbtToken],
 ) -> Unit {
@@ -92,7 +92,7 @@ fn write_with_ins(
 }
 
 ///|
-fn write_with_eqn(
+fn StringBuilder::write_with_eqn(
   self : StringBuilder,
   tokens : ArrayView[@mbttoken.MbtToken],
 ) -> Unit {

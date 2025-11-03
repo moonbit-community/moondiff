@@ -1,5 +1,5 @@
 ///|
-typealias @tokens.Token
+using @tokens {type Token}
 
 ///|
-typealias @basic.Position
+using @basic {type Position}
