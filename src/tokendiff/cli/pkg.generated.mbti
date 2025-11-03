@@ -1,12 +1,14 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "myfreess/moondiff/config"
+package "myfreess/moondiff/tokendiff/cli"
 
 // Values
-let max_line_width : Ref[Int]
 
 // Errors
 
 // Types and methods
+type Direction
+
+type OutputBuf
 
 // Type aliases
 

@@ -1,2 +1,2 @@
 ///|
-pub typealias ArrayView[(Token, Position, Position)] as Block
+pub type Block = ArrayView[(Token, Position, Position)]

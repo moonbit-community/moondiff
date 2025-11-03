@@ -1,2 +1,2 @@
 ///|
-typealias @span.(LineWidths, SingleLineSpan)
+using @span {type LineWidths, type SingleLineSpan}

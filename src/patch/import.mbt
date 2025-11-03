@@ -1,2 +1,2 @@
 ///|
-typealias @block.(Blocks, Block)
+using @block {type Blocks, type Block}

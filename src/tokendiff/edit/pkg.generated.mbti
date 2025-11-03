@@ -11,9 +11,6 @@ pub(all) enum Edit[T] {
   Delete(old~ : T)
   Equal(old~ : T, new~ : T)
 }
-fn[T : Show] Edit::output(Self[T], &Logger) -> Unit // from trait `Show`
-fn[T : Show] Edit::to_json(Self[T]) -> Json // from trait `ToJson`
-fn[T : Show] Edit::to_string(Self[T]) -> String // from trait `Show`
 impl[T : Show] Show for Edit[T]
 impl[T : Show] ToJson for Edit[T]
 

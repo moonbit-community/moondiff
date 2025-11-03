@@ -22,9 +22,9 @@ pub suberror BlockProcessingError {
 // Types and methods
 
 // Type aliases
-pub typealias ArrayView[(@tokens.Token, @basic.Position, @basic.Position)] as Block
+pub type Block = ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]
 
-pub typealias Array[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]] as Blocks
+pub type Blocks = Array[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]]
 
 // Traits
 

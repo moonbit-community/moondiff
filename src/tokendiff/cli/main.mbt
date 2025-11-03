@@ -1,8 +1,8 @@
 ///|
-typealias @edit.Edit
+using @edit {type Edit}
 
 ///|
-typealias @mbttoken.MbtToken
+using @mbttoken {type MbtToken}
 
 ///|
 fn multiple_block_diff(
