@@ -155,7 +155,7 @@ pub fn align_edit_boundaries(
       _ => continue
     }
   } else {
-    return result
+    return result.remove_leading_trailing_blank()
   }
 }
 
