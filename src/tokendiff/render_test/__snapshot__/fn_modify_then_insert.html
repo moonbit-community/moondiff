@@ -29,14 +29,14 @@
 <body>
 <pre><code>
 pub fn View::from_array(chars : Array[Char]) -> View {
-  <del>// todo: remove .view() in new version
-  </del>String::from_array(chars)<del>.view()</del>
+  <del>// todo: remove .view() in new version</del>
+  String::from_array(chars)<del>.view()</del>
 }
 </code></pre>
 
 <pre><code>
 pub fn View::from_array(chars : Array[Char]) -> View {
-  <ins>let s = </ins>String::from_array(chars)
+  <ins>let s =</ins> String::from_array(chars)
   <ins>View::make_view(s, 0, s.length())</ins>
 }
 </code></pre>

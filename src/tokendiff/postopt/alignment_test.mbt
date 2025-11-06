@@ -49,7 +49,7 @@ test {
       Equal(old=[Invisible([' '])], new=[Invisible([' ', '\n'])]),
     ]).flatten_edits(),
     content=[
-      "--- [(LIDENT xyz)]", "--- [(LIDENT wuv)]", "--- [<| |>]", "+++ [(LIDENT aaa)]",
+      "--- [(LIDENT xyz)]", "--- [(LIDENT wuv)]", "%%% [<| |>]\n%%% []", "+++ [(LIDENT aaa)]",
       "+++ [(LIDENT bbb)]", "+++ [(LIDENT ccc)]", "+++ [<| \n|>]",
     ],
   )
