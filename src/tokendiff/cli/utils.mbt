@@ -8,13 +8,8 @@ fn Array::split_by_newline(self : Array[Char]) -> Array[ArrayView[Char]] {
       result.push(self[prev:])
       return result
     }
-    ['\r', '\n', .. rest] => {
-      result.push(self[prev:current])
-      prev = current + 2
-      current = current + 2
-      continue rest
-    }
-    ['\r', .. rest] | ['\n', .. rest] => {
+    // moonfmt use '\n', no '\r' && '\r\n' cases
+    ['\n', .. rest] => {
       result.push(self[prev:current])
       prev = current + 1
       current = current + 1
