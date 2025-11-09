@@ -165,7 +165,17 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
   for token in self {
     match token {
       Visible(repr~, ..) => length += repr.length()
-      Invisible(repr) => length += repr.length()
+      Invisible(repr) => {
+        let mut width = 0
+        for w in repr {
+          if w == 0 {
+            width += 1 // newline
+          } else {
+            width += w
+          }
+        }
+        length += width
+      }
       _ => ()
     }
   }
@@ -181,7 +191,7 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
 fn not_a_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
   not(
     input is [Invisible(repr), ..] &&
-    repr.contains('\n') &&
+    repr.contains(0) &&
     input is [.., Visible(kind=TK_RBRACE | TK_RBRACKET, ..)],
   )
 }

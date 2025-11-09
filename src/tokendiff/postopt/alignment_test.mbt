@@ -46,11 +46,16 @@ test {
     @postopt.align_edit_boundaries([
       Delete(old=ids(["xyz", "wuv"])),
       Insert(new=ids(["aaa", "bbb", "ccc"])),
-      Equal(old=[Invisible([' '])], new=[Invisible([' ', '\n'])]),
+      Equal(old=[Invisible([1])], new=[Invisible([1, 0])]),
     ]).flatten_edits(),
     content=[
-      "--- [(LIDENT xyz)]", "--- [(LIDENT wuv)]", "%%% [<| |>]\n%%% []", "+++ [(LIDENT aaa)]",
-      "+++ [(LIDENT bbb)]", "+++ [(LIDENT ccc)]", "+++ [<| \n|>]",
+      "--- [(LIDENT xyz)]",
+      "--- [(LIDENT wuv)]",
+      ["%%% [<| |>]", "%%% []"],
+      "+++ [(LIDENT aaa)]",
+      "+++ [(LIDENT bbb)]",
+      "+++ [(LIDENT ccc)]",
+      "+++ [<| \n|>]",
     ],
   )
 }

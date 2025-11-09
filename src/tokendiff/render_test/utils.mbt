@@ -97,8 +97,12 @@ fn StringBuilder::write_with_eqn(
   tokens : ArrayView[@mbttoken.MbtToken],
 ) -> Unit {
   for token in tokens {
-    let token = token.to_text()
-    self.write_iter(token.iter())
+    self.write_iter(token.to_text().iter())
+    // match token {
+    //   Visible(repr~, ..) => ...
+    //   Invisible(widths) => ...
+    //   Barrier => ()
+    // }
   }
 }
 

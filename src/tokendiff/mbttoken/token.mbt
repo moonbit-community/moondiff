@@ -5,7 +5,7 @@ pub(all) enum MbtToken {
     loc~ : @basic.Location,
     repr~ : Array[Char]
   )
-  Invisible(Array[Char])
+  Invisible(Array[Int]) // whitespace widths, 0 for newline
   Barrier
 }
 
@@ -21,26 +21,18 @@ pub impl Show for MbtToken with output(self, logger) {
     }
     Invisible(repr) => {
       logger.write_string("<|")
-      logger.write_string(String::from_iter(repr.iter()))
+      for width in repr {
+        if width == 0 {
+          logger.write_char('\n')
+        } else {
+          for _ in 0..<width {
+            logger.write_char(' ')
+          }
+        }
+      }
       logger.write_string("|>")
     }
     Barrier => logger.write_string("%%")
-  }
-}
-
-///|
-pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
-  match self {
-    Visible(repr~, ..) | Invisible(repr) => repr
-    Barrier => []
-  }
-}
-
-///|
-pub fn MbtToken::get_unicodes(self : MbtToken) -> Array[Char] {
-  match self {
-    Visible(repr~, ..) | Invisible(repr) => repr
-    Barrier => []
   }
 }
 
@@ -56,6 +48,27 @@ pub impl Eq for MbtToken with equal(self, other) {
       Visible(kind=r_kind, repr=r_repr, ..),
     ) => l_kind == r_kind && l_repr == r_repr
     _ => false
+  }
+}
+
+///|
+pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
+  match self {
+    Visible(repr~, ..) => repr
+    Invisible(repr) => {
+      let output = Array::new()
+      for width in repr {
+        if width == 0 {
+          output.push('\n')
+        } else {
+          for _ in 0..<width {
+            output.push(' ')
+          }
+        }
+      }
+      output
+    }
+    Barrier => Array::new()
   }
 }
 
@@ -84,12 +97,8 @@ fn is_dot_token(token : @tokens.Token) -> Bool {
 
 ///|
 fn Array::add_token(self : Array[MbtToken], token : MbtToken) -> Unit {
-  if token is Invisible(s) {
-    if self is [.., last] && last is Invisible(prev_s) {
-      self[self.length() - 1] = Invisible(prev_s + s)
-    } else {
-      self.push(token)
-    }
+  if token is Invisible([w]) && self is [.., last] && last is Invisible(widths) {
+    widths.push(w)
   } else {
     self.push(token)
   }
@@ -113,7 +122,7 @@ pub fn MbtToken::from_triples(
       SEMI(false) => continue
       NEWLINE => {
         prev_pos = triple.2
-        mbt_tokens.add_token(Invisible(['\n']))
+        mbt_tokens.add_token(Invisible([0]))
       }
       _ => {
         let tok = triple.0
@@ -130,7 +139,7 @@ pub fn MbtToken::from_triples(
             mbt_tokens.add_token(Barrier)
           } else {
             let width = whitespace_width(prev_pos, tok_start)
-            mbt_tokens.add_token(Invisible(Array::make(width, ' ')))
+            mbt_tokens.add_token(Invisible([width]))
           }
         }
         prev_pos = tok_end
@@ -152,7 +161,17 @@ pub fn mbttokens_to_string(tokens : ArrayView[MbtToken]) -> String {
   let buf = StringBuilder::new(size_hint=tokens.length() * 5)
   for token in tokens {
     match token {
-      Visible(repr~, ..) | Invisible(repr) => buf.write_iter(repr.iter())
+      Visible(repr~, ..) => buf.write_iter(repr.iter())
+      Invisible(repr) =>
+        for width in repr {
+          if width == 0 {
+            buf.write_char('\n')
+          } else {
+            for _ in 0..<width {
+              buf.write_char(' ')
+            }
+          }
+        }
       Barrier => ()
     }
   }

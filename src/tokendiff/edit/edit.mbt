@@ -10,6 +10,6 @@ pub impl[T : Show] ToJson for Edit[T] with to_json(self) {
   match self {
     Delete(old~) => "--- \{old}"
     Insert(new~) => "+++ \{new}"
-    Equal(old~, new~) => "%%% \{old}\n%%% \{new}"
+    Equal(old~, new~) => ["%%% \{old}", "%%% \{new}"]
   }
 }
