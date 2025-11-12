@@ -10,10 +10,7 @@ pub fn pairing_blocks_by_uuid(
   let new_uuid = new.map(blk => get_block_uuid(blk))
   let mut old_base = 0
   let mut new_base = 0
-  let matched_idx = @lums.longest_unique_matching_subsequence(
-    old=old_uuid,
-    new=new_uuid,
-  )
+  let matched_idx = @unique_lcs.unique_lcs(old=old_uuid, new=new_uuid)
   for pair in matched_idx {
     let delete = old[old_base:pair.0]
     let insert = new[new_base:pair.1]
