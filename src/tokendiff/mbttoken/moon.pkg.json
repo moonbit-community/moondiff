@@ -4,8 +4,7 @@
         "moonbitlang/parser/basic",
         "myfreess/moondiff/span"
     ],
-    "test-import": [
-        "moonbitlang/x/fs",
+    "wbtest-import": [
         "moonbitlang/parser/lexer",
         "myfreess/moondiff/span"
     ]
