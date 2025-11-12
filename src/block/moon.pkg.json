@@ -3,6 +3,6 @@
       "moonbitlang/parser/tokens",
       "moonbitlang/parser/basic",
       "moonbitlang/parser/lexer",
-      "myfreess/lums"
+      "myfreess/piediff/unique_lcs"
     ]
 }
