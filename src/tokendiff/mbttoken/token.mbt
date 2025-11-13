@@ -73,6 +73,24 @@ pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
 }
 
 ///|
+pub fn MbtToken::emit_text_to(self : MbtToken, buf : Array[Char]) -> Unit {
+  match self {
+    Visible(repr~, ..) => buf.append(repr)
+    Invisible(repr) =>
+      for width in repr {
+        if width == 0 {
+          buf.push('\n')
+        } else {
+          for _ in 0..<width {
+            buf.push(' ')
+          }
+        }
+      }
+    Barrier => ()
+  }
+}
+
+///|
 fn is_continuum(prev : @basic.Position, next : @basic.Position) -> Bool {
   (prev.lnum == next.lnum && prev.column() == next.column()) ||
   (prev.lnum + 1 == next.lnum && next.column() == 1)

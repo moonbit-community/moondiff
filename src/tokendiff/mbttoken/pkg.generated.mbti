@@ -18,6 +18,7 @@ pub(all) enum MbtToken {
   Invisible(Array[Int])
   Barrier
 }
+fn MbtToken::emit_text_to(Self, Array[Char]) -> Unit
 fn MbtToken::from_triples(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)], @span.LineWidths) -> Array[Self]
 fn MbtToken::to_text(Self) -> Array[Char]
 impl Eq for MbtToken
