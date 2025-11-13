@@ -346,7 +346,12 @@ fn main {
   let usage =
     #| usage: 
     #|   tokendiff <old file> <new file>
-  @ArgParser.parse(spec, filename => filenames.push(filename), usage, args)
+  @ArgParser.parse(
+    spec,
+    filename => filenames.push(filename),
+    usage,
+    args[1:].to_array(),
+  )
   if filenames is [old, new] {
     try {
       let old = @fs.read_file_to_string(old)
