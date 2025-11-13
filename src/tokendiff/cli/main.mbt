@@ -112,9 +112,9 @@ fn split_matching_block(
                 }
               }
             } else {
-              tok_buf.append(token.to_text())
+              token.emit_text_to(tok_buf)
             }
-          _ => tok_buf.append(token.to_text())
+          _ => token.emit_text_to(tok_buf)
         }
       } else {
         if tok_buf.length() > 0 {
