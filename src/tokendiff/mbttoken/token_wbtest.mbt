@@ -1,5 +1,5 @@
 ///|
-fn lexing_then_recover(source : String) -> String raise {
+fn lexing_then_recover(source : String) -> String {
   let lex_result = @lexer.tokens_from_string(comment=true, source)
   let triples = lex_result.tokens
   let line_widths = @span.LineWidths::from_str(source)
