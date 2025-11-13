@@ -5,7 +5,7 @@ using @edit {type Edit}
 let source_dir = "src/tokendiff/render_test/sources"
 
 ///|
-pub fn test_web_rendering(t : @test.T, name : String) -> Unit raise {
+pub fn test_web_rendering(t : @test.Test, name : String) -> Unit raise {
   let old = @fs.read_file_to_string("\{source_dir}/\{name}.old")
   let new = @fs.read_file_to_string("\{source_dir}/\{name}.new")
   let old_linewidths = @span.LineWidths::from_str(old)
