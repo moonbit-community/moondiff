@@ -15,11 +15,10 @@ fn mbttokens_to_string(ArrayView[MbtToken]) -> String
 // Types and methods
 pub(all) enum MbtToken {
   Visible(kind~ : @tokens.TokenKind, loc~ : @basic.Location, repr~ : Array[Char])
-  Invisible(Array[Char])
+  Invisible(Array[Int])
   Barrier
 }
 fn MbtToken::from_triples(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)], @span.LineWidths) -> Array[Self]
-fn MbtToken::get_unicodes(Self) -> Array[Char]
 fn MbtToken::to_text(Self) -> Array[Char]
 impl Eq for MbtToken
 impl Show for MbtToken

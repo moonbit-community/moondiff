@@ -6,9 +6,6 @@ package "myfreess/moondiff/tokendiff/cli"
 // Errors
 
 // Types and methods
-type Direction
-
-type OutputBuf
 
 // Type aliases
 
