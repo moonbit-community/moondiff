@@ -12,7 +12,8 @@
     "moonbitlang/parser/lexer",
     "myfreess/moondiff/tokendiff/edit",
     "moonbitlang/x/sys",
-    "moonbitlang/x/fs"
+    "moonbitlang/x/fs",
+    "Yoorkin/ArgParser"
   ],
   "is-main": true
 }
