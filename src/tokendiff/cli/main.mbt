@@ -341,13 +341,26 @@ fn do_all(old~ : String, new~ : String) -> Unit raise {
 ///|
 fn main {
   let args = @sys.get_cli_args()
-  if args is [_, old, new] {
+  let spec : Array[(String, String, @ArgParser.Spec, String)] = []
+  let filenames = []
+  let usage =
+    #| usage: 
+    #|   tokendiff <old file> <new file>
+  @ArgParser.parse(spec, filename => filenames.push(filename), usage, args)
+  if filenames is [old, new] {
     try {
       let old = @fs.read_file_to_string(old)
       let new = @fs.read_file_to_string(new)
       do_all(old~, new~)
     } catch {
-      e => println("Error: " + e.to_string())
+      e => {
+        println("Error: " + e.to_string())
+        panic()
+      }
     }
+  } else {
+    println("unexpected filenames: \{filenames}")
+    println(usage)
+    panic()
   }
 }
