@@ -25,27 +25,27 @@ pub fn web_multiple_block_diff(
   let matching_blocks = []
   for pair in pairs {
     match pair {
-      (blk, []) => {
-        let (start_pos, end_pos) = if blk.length() == 0 {
+      Delete(blk) => {
+        let (start_pos, end_pos) = if blk.contents.length() == 0 {
           continue
         } else {
-          (blk[0].1, blk[blk.length() - 1].2)
+          (blk.contents[0].1, blk.contents[blk.contents.length() - 1].2)
         }
         let old = old_linewidths.text_of_loc(start_pos, end_pos)
         del_blocks.push(old)
       }
-      ([], blk) => {
-        let (start_pos, end_pos) = if blk.length() == 0 {
+      Insert(blk) => {
+        let (start_pos, end_pos) = if blk.contents.length() == 0 {
           continue
         } else {
-          (blk[0].1, blk[blk.length() - 1].2)
+          (blk.contents[0].1, blk.contents[blk.contents.length() - 1].2)
         }
         let new = new_linewidths.text_of_loc(start_pos, end_pos)
         ins_blocks.push(new)
       }
-      (old, new) => {
-        let old = @mbttoken.MbtToken::from_triples(old, old_linewidths)
-        let new = @mbttoken.MbtToken::from_triples(new, new_linewidths)
+      Replace(old~, new~) => {
+        let old = @mbttoken.MbtToken::from_triples(old.contents, old_linewidths)
+        let new = @mbttoken.MbtToken::from_triples(new.contents, new_linewidths)
         let edits = @diff_with_opt.diff_with_opt(old~, new~)
         matching_blocks.push(edits)
       }

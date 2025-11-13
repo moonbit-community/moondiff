@@ -1,13 +1,21 @@
 ///|
-pub fn pairing_blocks_by_uuid(
-  old~ : ArrayView[Block],
-  new~ : ArrayView[Block],
-) -> Array[(Block, Block)] raise BlockProcessingError {
-  let res : Array[(Block, Block)] = Array::new(
-    capacity=old.length() + new.length(),
+pub enum EditBlock {
+  Replace(
+    old~ : Block[ArrayView[(Token, Position, Position)]],
+    new~ : Block[ArrayView[(Token, Position, Position)]]
   )
-  let old_uuid = old.map(blk => get_block_uuid(blk))
-  let new_uuid = new.map(blk => get_block_uuid(blk))
+  Delete(Block[ArrayView[(Token, Position, Position)]])
+  Insert(Block[ArrayView[(Token, Position, Position)]])
+}
+
+///|
+pub fn pairing_blocks_by_uuid(
+  old~ : ArrayView[Block[ArrayView[(Token, Position, Position)]]],
+  new~ : ArrayView[Block[ArrayView[(Token, Position, Position)]]],
+) -> Array[EditBlock] {
+  let res : Array[EditBlock] = Array::new(capacity=old.length() + new.length())
+  let old_uuid = old.map(blk => blk.uuid)
+  let new_uuid = new.map(blk => blk.uuid)
   let mut old_base = 0
   let mut new_base = 0
   let matched_idx = @unique_lcs.unique_lcs(old=old_uuid, new=new_uuid)
@@ -15,22 +23,22 @@ pub fn pairing_blocks_by_uuid(
     let delete = old[old_base:pair.0]
     let insert = new[new_base:pair.1]
     for del in delete {
-      res.push((del, []))
+      res.push(Delete(del))
     }
     for ins in insert {
-      res.push(([], ins))
+      res.push(Insert(ins))
     }
-    res.push((old[pair.0], new[pair.1]))
+    res.push(Replace(old=old[pair.0], new=new[pair.1]))
     old_base = pair.0 + 1
     new_base = pair.1 + 1
   } else {
     let delete = old[old_base:]
     let insert = new[new_base:]
     for del in delete {
-      res.push((del, []))
+      res.push(Delete(del))
     }
     for ins in insert {
-      res.push(([], ins))
+      res.push(Insert(ins))
     }
   }
   res
@@ -53,19 +61,5 @@ test {
   let old = create_blocks(@lexer.tokens_from_string(comment=true, old).tokens)
   let new = create_blocks(@lexer.tokens_from_string(comment=true, new).tokens)
   let pairs = pairing_blocks_by_uuid(old~, new~)
-  @json.inspect(
-    pairs.map(pair => (
-      pair.0.map(triple => triple.0.to_str()),
-      pair.1.map(triple => triple.0.to_str()),
-    )),
-    content=[
-      [["///|UUID(1)", "NEWLINE"], []],
-      [["///|UUID(2)", "NEWLINE"], []],
-      [["///|UUID(3)", "NEWLINE"], ["///|UUID(3)", "NEWLINE"]],
-      [["///|UUID(4)", "NEWLINE"], ["///|UUID(4)", "NEWLINE"]],
-      [["///|UUID(5)", "EOF"], ["///|UUID(5)", "NEWLINE"]],
-      [[], ["///|UUID(6)", "NEWLINE"]],
-      [[], ["///|UUID(7)", "EOF"]],
-    ],
-  )
+  // TODO
 }

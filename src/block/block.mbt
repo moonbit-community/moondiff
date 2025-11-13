@@ -1,2 +1,6 @@
 ///|
-pub type Block = ArrayView[(Token, Position, Position)]
+pub struct Block[T] {
+  start_line : Int
+  uuid : String
+  contents : T
+}
