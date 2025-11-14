@@ -5,7 +5,7 @@ using @edit {type Edit}
 using @mbttoken {type MbtToken}
 
 ///|
-enum BlockEdit {
+priv enum BlockEdit {
   Replace(
     old_start_line~ : Int,
     new_start_line~ : Int,
