@@ -13,35 +13,23 @@ pub fn pairing_blocks_by_uuid(
   old~ : ArrayView[Block[ArrayView[(Token, Position, Position)]]],
   new~ : ArrayView[Block[ArrayView[(Token, Position, Position)]]],
 ) -> Array[EditBlock] {
-  let res : Array[EditBlock] = Array::new(capacity=old.length() + new.length())
-  let old_uuid = old.map(blk => blk.uuid)
-  let new_uuid = new.map(blk => blk.uuid)
-  let mut old_base = 0
-  let mut new_base = 0
-  let matched_idx = @unique_lcs.unique_lcs(old=old_uuid, new=new_uuid)
-  for pair in matched_idx {
-    let delete = old[old_base:pair.0]
-    let insert = new[new_base:pair.1]
-    for del in delete {
-      res.push(Delete(del))
-    }
-    for ins in insert {
-      res.push(Insert(ins))
-    }
-    res.push(Replace(old=old[pair.0], new=new[pair.1]))
-    old_base = pair.0 + 1
-    new_base = pair.1 + 1
-  } else {
-    let delete = old[old_base:]
-    let insert = new[new_base:]
-    for del in delete {
-      res.push(Delete(del))
-    }
-    for ins in insert {
-      res.push(Insert(ins))
+  let result = []
+  let new_map = @hashmap.new(capacity=new.length())
+  for blk in new {
+    new_map[blk.uuid] = blk
+  }
+  for old_blk in old {
+    if new_map.get(old_blk.uuid) is Some(new_blk) {
+      new_map.remove(old_blk.uuid)
+      result.push(Replace(old=old_blk, new=new_blk))
+    } else {
+      result.push(Delete(old_blk))
     }
   }
-  res
+  for _, new_blk in new_map {
+    result.push(Insert(new_blk))
+  }
+  result
 }
 
 ///|
