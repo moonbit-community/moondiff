@@ -8,7 +8,6 @@
     "myfreess/moondiff/tokendiff/mbttoken",
     "myfreess/moondiff/block",
     "myfreess/moondiff/span",
-    "myfreess/moondiff/config",
     "moonbitlang/parser/lexer",
     "myfreess/moondiff/tokendiff/edit",
     "moonbitlang/x/sys",
