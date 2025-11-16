@@ -174,8 +174,8 @@ fn soft_wrap(
     let mut first = true
     for edit in line {
       let (is_modification, text) = edit
-      if current_width + text.length() >= @config.max_line_width.val {
-        let cut = @config.max_line_width.val - current_width
+      if current_width + text.length() >= max_line_width.val {
+        let cut = max_line_width.val - current_width
         current_visual_line.push((is_modification, text[:cut]))
         result.push((first, current_visual_line))
         current_visual_line = []
@@ -188,11 +188,9 @@ fn soft_wrap(
         // - remaining part still longer than max_line_width
         // - small enough to fit in one line
         let mut rest = text[cut:]
-        while rest.length() > @config.max_line_width.val {
-          result.push(
-            (first, [(is_modification, rest[:@config.max_line_width.val])]),
-          )
-          rest = rest[@config.max_line_width.val:]
+        while rest.length() > max_line_width.val {
+          result.push((first, [(is_modification, rest[:max_line_width.val])]))
+          rest = rest[max_line_width.val:]
         } else {
           if rest.length() > 0 {
             current_visual_line.push((is_modification, rest))
@@ -222,7 +220,7 @@ test "soft wrap" {
     ],
     [(true, ['1', '2', '3', '4', '5'])],
   ]
-  @config.max_line_width.val = 5
+  max_line_width.val = 5
   let wrapped = soft_wrap(lines)
   @json.inspect(wrapped, content=[
     [true, [[false, ["a", "b", "c", "d", "e"]]]],
@@ -230,7 +228,7 @@ test "soft wrap" {
     [false, [[true, ["k", "l", "m"]]]],
     [true, [[true, ["1", "2", "3", "4", "5"]]]],
   ])
-  @config.max_line_width.val = 4
+  max_line_width.val = 4
   let wrapped = soft_wrap(lines)
   @json.inspect(wrapped, content=[
     [true, [[false, ["a", "b", "c", "d"]]]],
@@ -278,7 +276,7 @@ fn combine_two_line(
 ) -> String {
   global_line_buffer.reset()
   if left_line.is_empty() {
-    for _ in 0..<@config.max_line_width.val {
+    for _ in 0..<max_line_width.val {
       global_line_buffer.write_char(' ')
     }
   } else {
@@ -294,8 +292,8 @@ fn combine_two_line(
         global_line_buffer.write_iter(text.iter())
       }
     }
-    if width != @config.max_line_width.val {
-      for _ in 0..<(@config.max_line_width.val - width) {
+    if width != max_line_width.val {
+      for _ in 0..<(max_line_width.val - width) {
         global_line_buffer.write_char(' ')
       }
     }
@@ -317,9 +315,10 @@ fn combine_two_line(
 }
 
 ///|
-fn rendering_matching_block(
+fn rendering_matching_block_side_by_side(
   matching_block : Array[Edit[Array[MbtToken]]],
-) -> Unit {
+) -> String {
+  let buf = StringBuilder::new()
   let (left_lines, right_lines) = split_matching_block(matching_block)
   let left_lines = soft_wrap(left_lines)
   let right_lines = soft_wrap(right_lines)
@@ -332,8 +331,66 @@ fn rendering_matching_block(
       []
     }
     let rendered_line = combine_two_line(left_line~, right_line~)
-    println(rendered_line)
+    buf.write_string(rendered_line)
+    buf.write_char('\n')
   }
+  return buf.to_string()
+}
+
+///|
+fn rendering_matching_block(
+  matching_block : Array[Edit[Array[MbtToken]]],
+) -> String {
+  let buf = StringBuilder::new()
+  for edit in matching_block {
+    match edit {
+      Delete(old~) =>
+        for token in old {
+          buf.write_string(
+            @chalk.chalk()
+            .color(Red)
+            .render(String::from_array(token.to_text())),
+          )
+        }
+      Insert(new~) =>
+        for token in new {
+          buf.write_string(
+            @chalk.chalk()
+            .color(Green)
+            .render(String::from_array(token.to_text())),
+          )
+        }
+      Equal(old~, new~) =>
+        if old.length() == new.length() {
+          for i in 0..<old.length() {
+            match (old[i], new[i]) {
+              (Barrier, Barrier) => ()
+              (Invisible(_) as tok, Barrier) =>
+                buf.write_string(String::from_array(tok.to_text()))
+              (Barrier, Invisible(_) as tok) =>
+                buf.write_string(String::from_array(tok.to_text()))
+              (Invisible(old) as old_tok, Invisible(new) as new_tok) =>
+                if old.length() > new.length() {
+                  // choose old
+                  buf.write_string(String::from_array(old_tok.to_text()))
+                } else {
+                  buf.write_string(String::from_array(new_tok.to_text()))
+                }
+              _ => buf.write_string(String::from_array(old[i].to_text()))
+            }
+          }
+        } else if old.length() >= new.length() {
+          for token in old {
+            buf.write_string(String::from_array(token.to_text()))
+          }
+        } else {
+          for token in new {
+            buf.write_string(String::from_array(token.to_text()))
+          }
+        }
+    }
+  }
+  return buf.to_string()
 }
 
 ///|
@@ -357,7 +414,12 @@ fn do_all(old~ : String, new~ : String) -> Unit raise {
       }
       Replace(old_start_line~, uuid~, new_start_line~, edits~) => {
         println("%%%   modified block \{uuid}   %%%")
-        rendering_matching_block(edits)
+        let edits = if display_side_by_side.val {
+          rendering_matching_block_side_by_side(edits)
+        } else {
+          rendering_matching_block(edits)
+        }
+        println(edits)
       }
     }
   }
@@ -366,7 +428,14 @@ fn do_all(old~ : String, new~ : String) -> Unit raise {
 ///|
 fn main {
   let args = @sys.get_cli_args()
-  let spec : Array[(String, String, @ArgParser.Spec, String)] = []
+  let spec : Array[(String, String, @ArgParser.Spec, String)] = [
+    (
+      "--display-side-by-side",
+      "-ss",
+      @ArgParser.Spec::Set(display_side_by_side),
+      "Display diff side by side",
+    ),
+  ]
   let filenames = []
   let usage =
     #| usage: 
@@ -388,6 +457,9 @@ fn main {
         panic()
       }
     }
+  } else if filenames is [] {
+    // peaceful exit
+    println("No input files provided.")
   } else {
     println("unexpected filenames: \{filenames}")
     println(usage)
