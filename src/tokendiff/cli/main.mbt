@@ -9,7 +9,6 @@ priv enum BlockEdit {
   Replace(
     old_start_line~ : Int,
     new_start_line~ : Int,
-    uuid~ : String,
     edits~ : Array[Edit[Array[MbtToken]]]
   )
   Delete(uuid~ : String, content~ : Array[Char])
@@ -62,7 +61,6 @@ fn multiple_block_diff(
         result.push(
           Replace(
             old_start_line=old.start_line,
-            uuid=old.uuid,
             new_start_line=new.start_line,
             edits~,
           ),
@@ -394,7 +392,9 @@ fn rendering_matching_block(
 }
 
 ///|
-fn do_all(old~ : String, new~ : String) -> Unit raise {
+fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
+  let old = @fs.read_file_to_string(old_filename)
+  let new = @fs.read_file_to_string(new_filename)
   let block_edits = multiple_block_diff(old~, new~)
   for edit in block_edits {
     match edit {
@@ -412,8 +412,9 @@ fn do_all(old~ : String, new~ : String) -> Unit raise {
         println(@chalk.chalk().color(Green).render(String::from_array(content)))
         println("")
       }
-      Replace(old_start_line~, uuid~, new_start_line~, edits~) => {
-        println("%%%   modified block \{uuid}   %%%")
+      Replace(old_start_line~, new_start_line~, edits~) => {
+        println("--- \{old_filename}: line \{old_start_line}")
+        println("+++ \{new_filename}: line \{new_start_line}")
         let edits = if display_side_by_side.val {
           rendering_matching_block_side_by_side(edits)
         } else {
@@ -446,12 +447,8 @@ fn main {
     usage,
     args[1:].to_array(),
   )
-  if filenames is [old, new] {
-    try {
-      let old = @fs.read_file_to_string(old)
-      let new = @fs.read_file_to_string(new)
-      do_all(old~, new~)
-    } catch {
+  if filenames is [old_filename, new_filename] {
+    do_all(old_filename~, new_filename~) catch {
       e => {
         println("Error: " + e.to_string())
         panic()
