@@ -20,19 +20,11 @@ pub impl Show for MbtToken with output(self, logger) {
       logger.write_char(')')
     }
     Invisible(repr) => {
-      logger.write_string("<|")
-      for width in repr {
-        if width == 0 {
-          logger.write_char('\n')
-        } else {
-          for _ in 0..<width {
-            logger.write_char(' ')
-          }
-        }
-      }
-      logger.write_string("|>")
+      logger.write_string("|")
+      logger.write_object(repr)
+      logger.write_string("|")
     }
-    Barrier => logger.write_string("%%")
+    Barrier => logger.write_string("_")
   }
 }
 
