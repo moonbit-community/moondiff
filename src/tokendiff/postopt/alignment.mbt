@@ -186,13 +186,22 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
 /// avoid some anti pattern in Equal:
 /// ```pesudo mbt
 ///    <newline>
-/// <consecutive space> <tokens> <'}' or ']'>
+/// <consecutive space> <tokens> <'}' or ']'> <consecutive space>
 /// ```
 fn not_a_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
+  fn find_first_ocuurence(input : ArrayView[MbtToken]) -> ArrayView[MbtToken]? {
+    match input {
+      [] => None
+      [Visible(kind=TK_RBRACE | TK_RBRACKET, ..), .. rest] => Some(rest)
+      [_, .. rest] => find_first_ocuurence(rest)
+    }
+  }
+
   not(
-    input is [Invisible(repr), ..] &&
+    input is [Invisible(repr), .. rest] &&
     repr.contains(0) &&
-    input is [.., Visible(kind=TK_RBRACE | TK_RBRACKET, ..)],
+    find_first_ocuurence(rest) is Some(maybe_invisible) &&
+    (maybe_invisible is [] || maybe_invisible is [Invisible(_)]),
   )
 }
 
