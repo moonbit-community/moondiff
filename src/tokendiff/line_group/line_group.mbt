@@ -7,8 +7,14 @@ pub enum REdit {
 ///|
 pub fn line_group(old : String, new : String) -> Array[REdit] {
   let groups = Array::new()
-  let old = old.split("\n").collect()[:]
-  let new = new.split("\n").collect()[:]
+  let mut old = old.split("\n").collect()[:]
+  while old is [.. rest, ""] {
+    old = rest
+  }
+  let mut new = new.split("\n").collect()[:]
+  while new is [.. rest, ""] {
+    new = rest
+  }
   let mut edits = @compress.compress_edits(@myers.diff(old~, new~))[:]
   if edits
     is ([Delete(old~), Insert(new~), .. rest]

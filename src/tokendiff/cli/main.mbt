@@ -227,7 +227,10 @@ fn combine_two_line(
       width += text.length()
       if is_modification {
         global_line_buffer.write_string(
-          @chalk.chalk().color(Red).render(String::from_array(text)),
+          @chalk.chalk()
+          .color(Red)
+          .modifier(Bold)
+          .render(String::from_array(text)),
         )
       } else {
         global_line_buffer.write_iter(text.iter())
@@ -245,7 +248,10 @@ fn combine_two_line(
       let (is_modification, text) = edit
       if is_modification {
         global_line_buffer.write_string(
-          @chalk.chalk().color(Green).render(String::from_array(text)),
+          @chalk.chalk()
+          .color(Green)
+          .modifier(Bold)
+          .render(String::from_array(text)),
         )
       } else {
         global_line_buffer.write_iter(text.iter())
@@ -279,55 +285,88 @@ fn rendering_matching_block_side_by_side(
 }
 
 ///|
-fn rendering_matching_block(
-  matching_block : Array[Edit[Array[MbtToken]]],
-) -> String {
+using @line_group {type REdit}
+
+///|
+fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String {
   let buf = StringBuilder::new()
-  for edit in matching_block {
-    match edit {
-      Delete(old~) =>
-        for token in old {
-          buf.write_string(
-            @chalk.chalk()
-            .color(Red)
-            .render(String::from_array(token.to_text())),
-          )
+  let red = @chalk.chalk().color(Red).modifier(Bold)
+  let green = @chalk.chalk().color(Green).modifier(Bold)
+  let blue = @chalk.chalk().color(Blue).modifier(Bold)
+  let gray = @chalk.chalk().color(BlackBright)
+  for line_group in matching_block_line_group {
+    match line_group {
+      Replace(old~, new~) => {
+        let old = old.join("\n")
+        let new = new.join("\n")
+        let old_linewidth = @span.LineWidths::from_str(old)
+        let new_linewidth = @span.LineWidths::from_str(new)
+        let old_triples = @lexer.tokens_from_string(comment=true, old).tokens
+        let new_triples = @lexer.tokens_from_string(comment=true, new).tokens
+        let old_toks = @mbttoken.MbtToken::from_triples(
+          old_triples, old_linewidth,
+        )
+        let new_toks = @mbttoken.MbtToken::from_triples(
+          new_triples, new_linewidth,
+        )
+        let edits = @diff_with_opt.diff_with_opt(old=old_toks, new=new_toks)
+        if edits is [Equal(..)] {
+          buf.write_string(new)
+          buf.write_char('\n')
+          continue
         }
-      Insert(new~) =>
-        for token in new {
-          buf.write_string(
-            @chalk.chalk()
-            .color(Green)
-            .render(String::from_array(token.to_text())),
-          )
-        }
-      Equal(old~, new~) =>
-        if old.length() == new.length() {
-          for i in 0..<old.length() {
-            match (old[i], new[i]) {
-              (Barrier, Barrier) => ()
-              (Invisible(_) as tok, Barrier) =>
-                buf.write_string(String::from_array(tok.to_text()))
-              (Barrier, Invisible(_) as tok) =>
-                buf.write_string(String::from_array(tok.to_text()))
-              (Invisible(old) as old_tok, Invisible(new) as new_tok) =>
-                if old.length() > new.length() {
-                  // choose old
-                  buf.write_string(String::from_array(old_tok.to_text()))
-                } else {
-                  buf.write_string(String::from_array(new_tok.to_text()))
-                }
-              _ => buf.write_string(String::from_array(old[i].to_text()))
+        let (old_lines, new_lines) = split_matching_block(edits)
+        for old_line in old_lines {
+          if old_line.is_empty() {
+            continue
+          }
+          buf.write_string(red.render("-|") + "  ")
+          for edit in old_line {
+            let (is_modification, text) = edit
+            if is_modification {
+              buf.write_string(red.render(String::from_array(text)))
+            } else {
+              buf.write_iter(text.iter())
             }
           }
-        } else if old.length() >= new.length() {
-          for token in old {
-            buf.write_string(String::from_array(token.to_text()))
+          buf.write_char('\n')
+        }
+        for new_line in new_lines {
+          if new_line.is_empty() {
+            continue
           }
-        } else {
-          for token in new {
-            buf.write_string(String::from_array(token.to_text()))
+          buf.write_string(green.render("+|") + "  ")
+          for edit in new_line {
+            let (is_modification, text) = edit
+            if is_modification {
+              buf.write_string(green.render(String::from_array(text)))
+            } else {
+              buf.write_iter(text.iter())
+            }
           }
+          buf.write_char('\n')
+        }
+      }
+      Normal(edit) =>
+        match edit {
+          Delete(old~) =>
+            for line in old {
+              buf.write_string(red.render("-|") + "  ")
+              buf.write_stringview(red.render(line))
+              buf.write_char('\n')
+            }
+          Insert(new~) =>
+            for line in new {
+              buf.write_string(green.render("+|") + "  ")
+              buf.write_stringview(green.render(line))
+              buf.write_char('\n')
+            }
+          Equal(old~, ..) =>
+            for line in old {
+              buf.write_string(blue.render("=|") + "  ")
+              buf.write_stringview(gray.render(line))
+              buf.write_char('\n')
+            }
         }
     }
   }
@@ -370,13 +409,7 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
           let edits = @diff_with_opt.diff_with_opt(old~, new~)
           rendering_matching_block_side_by_side(edits)
         } else {
-          let old_linewidths = @span.LineWidths::from_str(old.contents)
-          let new_linewidths = @span.LineWidths::from_str(new.contents)
-          let old = @lexer.tokens_from_string(comment=true, old.contents).tokens
-          let new = @lexer.tokens_from_string(comment=true, new.contents).tokens
-          let old = @mbttoken.MbtToken::from_triples(old, old_linewidths)
-          let new = @mbttoken.MbtToken::from_triples(new, new_linewidths)
-          let edits = @diff_with_opt.diff_with_opt(old~, new~)
+          let edits = @line_group.line_group(old.contents, new.contents)
           rendering_matching_block(edits)
         }
         println(edits)

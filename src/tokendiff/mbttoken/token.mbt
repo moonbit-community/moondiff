@@ -121,10 +121,10 @@ pub fn MbtToken::from_triples(
 ) -> Array[MbtToken] {
   let mbt_tokens = Array::new(capacity=triples.length())
   let mut prev_pos = @basic.Position::{
-    lnum: -1,
+    lnum: 1,
     fname: "dummy",
-    bol: -1,
-    cnum: -1,
+    bol: 0,
+    cnum: 0,
   }
   for triple in triples {
     match triple.0 {
@@ -143,14 +143,12 @@ pub fn MbtToken::from_triples(
         if is_dot_token(tok) {
           tok_start = { ..tok_start, cnum: tok_start.cnum - 1 }
         }
-        if prev_pos.lnum != -1 {
-          if is_continuum(prev_pos, tok_start) {
-            // insert Barrier
-            mbt_tokens.add_token(Barrier)
-          } else {
-            let width = whitespace_width(prev_pos, tok_start)
-            mbt_tokens.add_token(Invisible([width]))
-          }
+        if is_continuum(prev_pos, tok_start) {
+          // insert Barrier
+          mbt_tokens.add_token(Barrier)
+        } else {
+          let width = whitespace_width(prev_pos, tok_start)
+          mbt_tokens.add_token(Invisible([width]))
         }
         prev_pos = tok_end
         let text = line_widths.text_of_loc(tok_start, tok_end)
