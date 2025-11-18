@@ -7,9 +7,9 @@ import(
 )
 
 // Values
-fn create_blocks(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]) -> Array[Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]]] raise BlockProcessingError
+fn create_blocks(StringView) -> Array[Block[String]] raise BlockProcessingError
 
-fn pairing_blocks_by_uuid(old~ : ArrayView[Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]]], new~ : ArrayView[Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]]]) -> Array[EditBlock]
+fn pairing_blocks_by_uuid(old~ : ArrayView[Block[String]], new~ : ArrayView[Block[String]]) -> Array[EditBlock]
 
 // Errors
 pub suberror BlockProcessingError {
@@ -24,12 +24,16 @@ pub struct Block[T] {
   contents : T
 }
 fn Block::get_block_uuid(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]) -> String raise BlockProcessingError
+impl[T : Show] Show for Block[T]
+impl[T : ToJson] ToJson for Block[T]
 
 pub enum EditBlock {
-  Replace(old~ : Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]], new~ : Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]])
-  Delete(Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]])
-  Insert(Block[ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]])
+  Replace(old~ : Block[String], new~ : Block[String])
+  Delete(Block[String])
+  Insert(Block[String])
 }
+impl Show for EditBlock
+impl ToJson for EditBlock
 
 // Type aliases
 pub type Blocks[T] = Array[Block[T]]

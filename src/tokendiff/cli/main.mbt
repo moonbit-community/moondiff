@@ -5,70 +5,13 @@ using @edit {type Edit}
 using @mbttoken {type MbtToken}
 
 ///|
-priv enum BlockEdit {
-  Replace(
-    old_start_line~ : Int,
-    new_start_line~ : Int,
-    edits~ : Array[Edit[Array[MbtToken]]]
-  )
-  Delete(uuid~ : String, content~ : Array[Char])
-  Insert(uuid~ : String, content~ : Array[Char])
-}
-
-///|
-fn multiple_block_diff(
+fn pairing_blocks(
   old~ : String,
   new~ : String,
-) -> Array[BlockEdit] raise Error {
-  let old_linewidths = @span.LineWidths::from_str(old)
-  let new_linewidths = @span.LineWidths::from_str(new)
-  let old = @lexer.tokens_from_string(comment=true, old).tokens
-    |> @block.create_blocks
-  let new = @lexer.tokens_from_string(comment=true, new).tokens
-    |> @block.create_blocks
-  let pairs = @block.pairing_blocks_by_uuid(old~, new~)
-  let result = []
-  for pair in pairs {
-    match pair {
-      Delete(blk) => {
-        let (start_pos, end_pos) = if blk.contents.length() == 0 {
-          continue
-        } else {
-          (blk.contents[0].1, blk.contents[blk.contents.length() - 1].2)
-        }
-        let old = old_linewidths.text_of_loc(start_pos, end_pos)
-        result.push(Delete(uuid=blk.uuid, content=old))
-      }
-      Insert(blk) => {
-        let (start_pos, end_pos) = if blk.contents.length() == 0 {
-          continue
-        } else {
-          (blk.contents[0].1, blk.contents[blk.contents.length() - 1].2)
-        }
-        let new = new_linewidths.text_of_loc(start_pos, end_pos)
-        result.push(Insert(uuid=blk.uuid, content=new))
-      }
-      Replace(old~, new~) => {
-        let old_tokens = @mbttoken.MbtToken::from_triples(
-          old.contents,
-          old_linewidths,
-        )
-        let new_tokens = @mbttoken.MbtToken::from_triples(
-          new.contents,
-          new_linewidths,
-        )
-        let edits = @diff_with_opt.diff_with_opt(old=old_tokens, new=new_tokens)
-        result.push(
-          Replace(
-            old_start_line=old.start_line,
-            new_start_line=new.start_line,
-            edits~,
-          ),
-        )
-      }
-    }
-  }
-  result
+) -> Array[@block.EditBlock] raise Error {
+  let old = @block.create_blocks(old)
+  let new = @block.create_blocks(new)
+  @block.pairing_blocks_by_uuid(old~, new~)
 }
 
 ///|
@@ -395,29 +338,45 @@ fn rendering_matching_block(
 fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
   let old = @fs.read_file_to_string(old_filename)
   let new = @fs.read_file_to_string(new_filename)
-  let block_edits = multiple_block_diff(old~, new~)
-  for edit in block_edits {
-    match edit {
-      Delete(uuid~, content~) => {
+  let blocks = pairing_blocks(old~, new~)
+  for blk in blocks {
+    match blk {
+      Delete(blk) =>
         println(
-          @chalk.chalk().color(Red).render("--- deleted block \{uuid} \n\n"),
+          @chalk.chalk()
+          .color(Red)
+          .render(
+            "--- \{old_filename}: line \{blk.start_line}, deleted block \{blk.uuid} \n\n",
+          ),
         )
-        println(@chalk.chalk().color(Red).render(String::from_array(content)))
-        println("")
-      }
-      Insert(uuid~, content~) => {
+      Insert(blk) =>
         println(
-          @chalk.chalk().color(Green).render("+++ inserted block \{uuid} \n\n"),
+          @chalk.chalk()
+          .color(Green)
+          .render(
+            "+++ \{new_filename}: line \{blk.start_line} inserted block \{blk.uuid} \n\n",
+          ),
         )
-        println(@chalk.chalk().color(Green).render(String::from_array(content)))
-        println("")
-      }
-      Replace(old_start_line~, new_start_line~, edits~) => {
-        println("--- \{old_filename}: line \{old_start_line}")
-        println("+++ \{new_filename}: line \{new_start_line}")
+      Replace(old~, new~) => {
+        println("--- \{old_filename}: line \{old.start_line}")
+        println("+++ \{new_filename}: line \{new.start_line}")
         let edits = if display_side_by_side.val {
+          let old_linewidths = @span.LineWidths::from_str(old.contents)
+          let new_linewidths = @span.LineWidths::from_str(new.contents)
+          let old = @lexer.tokens_from_string(comment=true, old.contents).tokens
+          let new = @lexer.tokens_from_string(comment=true, new.contents).tokens
+          let old = @mbttoken.MbtToken::from_triples(old, old_linewidths)
+          let new = @mbttoken.MbtToken::from_triples(new, new_linewidths)
+          let edits = @diff_with_opt.diff_with_opt(old~, new~)
           rendering_matching_block_side_by_side(edits)
         } else {
+          let old_linewidths = @span.LineWidths::from_str(old.contents)
+          let new_linewidths = @span.LineWidths::from_str(new.contents)
+          let old = @lexer.tokens_from_string(comment=true, old.contents).tokens
+          let new = @lexer.tokens_from_string(comment=true, new.contents).tokens
+          let old = @mbttoken.MbtToken::from_triples(old, old_linewidths)
+          let new = @mbttoken.MbtToken::from_triples(new, new_linewidths)
+          let edits = @diff_with_opt.diff_with_opt(old~, new~)
           rendering_matching_block(edits)
         }
         println(edits)
