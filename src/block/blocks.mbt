@@ -3,31 +3,44 @@ pub type Blocks[T] = Array[Block[T]]
 
 ///|
 pub fn create_blocks(
-  input : ArrayView[(Token, Position, Position)],
-) -> Blocks[ArrayView[(Token, Position, Position)]] raise BlockProcessingError {
-  // assume input contains comment
-  let res = Array::new(capacity=input.length() / 8)
-  let mut prev = 0
-  let mut curr = 0
-  while curr < input.length() {
-    if input[curr].0 is COMMENT(comment) && comment.content.has_prefix("///|") {
-      if curr != 0 {
-        let contents = input[prev:curr]
-        let start_line = contents[0].1.lnum
-        let uuid = Block::get_block_uuid(contents)
-        res.push(Block::{ start_line, uuid, contents })
+  input : StringView,
+) -> Blocks[String] raise BlockProcessingError {
+  let buf = StringBuilder::new()
+  let res = Array::new()
+  let lines = input.split("\n").collect()
+  let mut current_uuid = ""
+  let mut current_start_line = 1
+  for i in 0..<lines.length() {
+    let line = lines[i]
+    if line lexmatch? ("///\|UUID\(", rest) {
+      if rest lexmatch? ("[0-9a-z\-]+" as next_uuid, _) {
+        if current_uuid != "" {
+          res.push(Block::{
+            start_line: current_start_line,
+            uuid: current_uuid,
+            contents: buf.to_string(),
+          })
+          buf.reset()
+        }
+        current_uuid = next_uuid.to_string()
+        current_start_line = i + 1
+      } else {
+        raise UUIDNotFound(line.to_string())
       }
-      prev = curr
+    } else {
+      buf.write_stringview(line)
+      buf.write_char('\n')
     }
-    curr += 1
+  } else {
+    if !buf.is_empty() {
+      res.push(Block::{
+        start_line: current_start_line,
+        uuid: current_uuid,
+        contents: buf.to_string(),
+      })
+    }
   }
-  if prev != curr {
-    let contents = input[prev:curr]
-    let start_line = contents[0].1.lnum
-    let uuid = Block::get_block_uuid(contents)
-    res.push(Block::{ start_line, uuid, contents })
-  }
-  return res
+  res
 }
 
 ///|
@@ -39,8 +52,14 @@ test {
     #|///|UUID(2)
     #|fn bar
     #|  // another comment here
-  let tokens = @lexer.tokens_from_string(comment=true, text).tokens
-  // TODO
+  @json.inspect(create_blocks(text), content=[
+    { "start_line": 1, "uuid": "1", "contents": "fn foo\n  // comment here\n" },
+    {
+      "start_line": 4,
+      "uuid": "2",
+      "contents": "fn bar\n  // another comment here\n",
+    },
+  ])
 }
 
 ///|
@@ -49,14 +68,20 @@ test "empty block" {
     #|///|UUID(1)
     #|///|UUID(2)
     #|///|UUID(3)
-  let tokens = @lexer.tokens_from_string(comment=true, text).tokens
-  // TODO
+  @json.inspect(create_blocks(text), content=[
+    { "start_line": 1, "uuid": "1", "contents": "" },
+    { "start_line": 2, "uuid": "2", "contents": "" },
+  ])
   let text =
     #|///|UUID(1)
     #|///|UUID(2)
     #|///|UUID(3)
     #|///|UUID(4)
     #|///|UUID(5)
-  let tokens = @lexer.tokens_from_string(comment=true, text).tokens
-  // TODO
+  @json.inspect(create_blocks(text), content=[
+    { "start_line": 1, "uuid": "1", "contents": "" },
+    { "start_line": 2, "uuid": "2", "contents": "" },
+    { "start_line": 3, "uuid": "3", "contents": "" },
+    { "start_line": 4, "uuid": "4", "contents": "" },
+  ])
 }
