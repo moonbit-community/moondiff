@@ -1,0 +1,7 @@
+{
+  "import": [
+    "myfreess/moondiff/tokendiff/edit",
+    "myfreess/moondiff/tokendiff/compress",
+    "myfreess/moondiff/tokendiff/myers"
+  ]
+}

@@ -3,11 +3,10 @@ package "myfreess/moondiff/tokendiff/compress"
 
 import(
   "myfreess/moondiff/tokendiff/edit"
-  "myfreess/moondiff/tokendiff/mbttoken"
 )
 
 // Values
-fn compress_edits(ArrayView[@edit.Edit[@mbttoken.MbtToken]]) -> Array[@edit.Edit[Array[@mbttoken.MbtToken]]]
+fn[T] compress_edits(ArrayView[@edit.Edit[T]]) -> Array[@edit.Edit[Array[T]]]
 
 // Errors
 

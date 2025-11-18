@@ -1,10 +1,8 @@
 ///|
 
 ///|
-pub fn compress_edits(
-  edits : ArrayView[Edit[MbtToken]],
-) -> Array[Edit[Array[MbtToken]]] {
-  let compressed : Array[Edit[Array[MbtToken]]] = []
+pub fn[T] compress_edits(edits : ArrayView[Edit[T]]) -> Array[Edit[Array[T]]] {
+  let compressed : Array[Edit[Array[T]]] = []
   for edit in edits {
     compressed.push_edit(edit)
   }
@@ -12,10 +10,7 @@ pub fn compress_edits(
 }
 
 ///|
-fn Array::push_edit(
-  self : Array[Edit[Array[MbtToken]]],
-  edit : Edit[MbtToken],
-) -> Unit {
+fn[T] Array::push_edit(self : Array[Edit[Array[T]]], edit : Edit[T]) -> Unit {
   match self {
     [] =>
       match edit {
