@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/tokendiff/line_group"
+
+import(
+  "myfreess/moondiff/tokendiff/edit"
+)
+
+// Values
+fn line_group(String, String) -> Array[REdit]
+
+// Errors
+
+// Types and methods
+pub enum REdit {
+  Normal(@edit.Edit[Array[StringView]])
+  Replace(old~ : Array[StringView], new~ : Array[StringView])
+}
+impl ToJson for REdit
+
+// Type aliases
+
+// Traits
+
