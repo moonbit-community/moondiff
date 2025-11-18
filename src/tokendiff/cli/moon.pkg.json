@@ -12,7 +12,8 @@
     "myfreess/moondiff/tokendiff/edit",
     "moonbitlang/x/sys",
     "moonbitlang/x/fs",
-    "Yoorkin/ArgParser"
+    "Yoorkin/ArgParser",
+    "myfreess/moondiff/tokendiff/line_group"
   ],
   "is-main": true
 }
