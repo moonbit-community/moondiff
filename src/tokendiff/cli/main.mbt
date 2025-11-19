@@ -292,7 +292,7 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
   let buf = StringBuilder::new()
   let red = @chalk.chalk().color(Red).modifier(Bold)
   let green = @chalk.chalk().color(Green).modifier(Bold)
-  let blue = @chalk.chalk().color(Blue).modifier(Bold)
+  // let blue = @chalk.chalk().color(Blue).modifier(Bold)
   let gray = @chalk.chalk().color(BlackBright)
   for line_group in matching_block_line_group {
     match line_group {
@@ -363,7 +363,7 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
             }
           Equal(old~, ..) =>
             for line in old {
-              buf.write_string(blue.render("=|") + "  ")
+              buf.write_string(gray.render("=|") + "  ")
               buf.write_stringview(gray.render(line))
               buf.write_char('\n')
             }
