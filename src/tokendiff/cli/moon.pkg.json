@@ -11,7 +11,9 @@
     "moonbitlang/x/sys",
     "moonbitlang/x/fs",
     "Yoorkin/ArgParser",
-    "myfreess/moondiff/tokendiff/line_group"
+    "myfreess/moondiff/tokendiff/line_group",
+    "myfreess/piediff/line_diff",
+    { "path": "myfreess/piediff/edit", "alias": "piedit" }
   ],
   "is-main": true
 }
