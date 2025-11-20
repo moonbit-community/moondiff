@@ -369,6 +369,15 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
 fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
   let old = @fs.read_file_to_string(old_filename)
   let new = @fs.read_file_to_string(new_filename)
+  if !(old_filename.has_suffix(".mbt") && new_filename.has_suffix(".mbt")) {
+    // fallback to line diff
+    let bold = @chalk.chalk().modifier(Bold)
+    println(bold.render("--- \{old_filename}"))
+    println(bold.render("+++ \{new_filename}"))
+    let diff = fallback_to_linediff(old~, new~)
+    println(diff)
+    return
+  }
   let blocks = pairing_blocks(old~, new~)
   for blk in blocks {
     match blk {
