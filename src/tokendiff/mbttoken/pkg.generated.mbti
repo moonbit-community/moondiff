@@ -4,7 +4,6 @@ package "myfreess/moondiff/tokendiff/mbttoken"
 import(
   "moonbitlang/parser/basic"
   "moonbitlang/parser/tokens"
-  "myfreess/moondiff/span"
 )
 
 // Values
@@ -19,7 +18,7 @@ pub(all) enum MbtToken {
   Barrier
 }
 fn MbtToken::emit_text_to(Self, Array[Char]) -> Unit
-fn MbtToken::from_triples(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)], @span.LineWidths) -> Array[Self]
+fn MbtToken::from_str(String) -> Array[Self]
 fn MbtToken::to_text(Self) -> Array[Char]
 impl Eq for MbtToken
 impl Show for MbtToken

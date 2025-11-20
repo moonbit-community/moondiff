@@ -6,6 +6,10 @@
       "myfreess/moondiff/tokendiff/preopt",
       "myfreess/moondiff/tokendiff/postopt",
       "myfreess/moondiff/tokendiff/myers"
+    ],
+
+    "test-import" : [
+      "moonbitlang/x/fs"
     ]
 
 }
