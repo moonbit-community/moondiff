@@ -286,3 +286,119 @@ test "both empty" {
     ),
   )
 }
+
+///|
+test "insert at end" {
+  let old =
+    #|foo
+    #|bar
+  let new =
+    #|foo
+    #|bar
+    #|baz
+  let old = old.split("\n").collect()
+  let new = new.split("\n").collect()
+  inspect(
+    print_edits(diff(old~, new~)),
+    content=(
+      #|  foo
+      #|  bar
+      #|+ baz
+      #|
+    ),
+  )
+}
+
+///|
+test "delete at end" {
+  let old =
+    #|foo
+    #|bar
+    #|baz
+  let new =
+    #|foo
+    #|bar
+  let old = old.split("\n").collect()
+  let new = new.split("\n").collect()
+  inspect(
+    print_edits(diff(old~, new~)),
+    content=(
+      #|  foo
+      #|  bar
+      #|- baz
+      #|
+    ),
+  )
+}
+
+///|
+test "insert at beginning" {
+  let old =
+    #|bar
+    #|baz
+  let new =
+    #|foo
+    #|bar
+    #|baz
+  let old = old.split("\n").collect()
+  let new = new.split("\n").collect()
+  inspect(
+    print_edits(diff(old~, new~)),
+    content=(
+      #|+ foo
+      #|  bar
+      #|  baz
+      #|
+    ),
+  )
+}
+
+///|
+test "delete at beginning" {
+  let old =
+    #|foo
+    #|bar
+    #|baz
+  let new =
+    #|bar
+    #|baz
+  let old = old.split("\n").collect()
+  let new = new.split("\n").collect()
+  inspect(
+    print_edits(diff(old~, new~)),
+    content=(
+      #|- foo
+      #|  bar
+      #|  baz
+      #|
+    ),
+  )
+}
+
+///|
+test "consecutive inserts and deletes" {
+  let old =
+    #|foo
+    #|bar
+    #|baz
+    #|qux
+  let new =
+    #|foo
+    #|corge
+    #|grault
+    #|qux
+  let old = old.split("\n").collect()
+  let new = new.split("\n").collect()
+  inspect(
+    print_edits(diff(old~, new~)),
+    content=(
+      #|  foo
+      #|- bar
+      #|- baz
+      #|+ corge
+      #|+ grault
+      #|  qux
+      #|
+    ),
+  )
+}
