@@ -299,16 +299,8 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
       Replace(old~, new~) => {
         let old = old.join("\n")
         let new = new.join("\n")
-        let old_linewidth = @span.LineWidths::from_str(old)
-        let new_linewidth = @span.LineWidths::from_str(new)
-        let old_triples = @lexer.tokens_from_string(comment=true, old).tokens
-        let new_triples = @lexer.tokens_from_string(comment=true, new).tokens
-        let old_toks = @mbttoken.MbtToken::from_triples(
-          old_triples, old_linewidth,
-        )
-        let new_toks = @mbttoken.MbtToken::from_triples(
-          new_triples, new_linewidth,
-        )
+        let old_toks = @mbttoken.MbtToken::from_str(old)
+        let new_toks = @mbttoken.MbtToken::from_str(new)
         let edits = @diff_with_opt.diff_with_opt(old=old_toks, new=new_toks)
         if edits is [Equal(..)] {
           buf.write_string(new)
@@ -400,12 +392,8 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
         println("--- \{old_filename}: line \{old.start_line}")
         println("+++ \{new_filename}: line \{new.start_line}")
         let edits = if display_side_by_side.val {
-          let old_linewidths = @span.LineWidths::from_str(old.contents)
-          let new_linewidths = @span.LineWidths::from_str(new.contents)
-          let old = @lexer.tokens_from_string(comment=true, old.contents).tokens
-          let new = @lexer.tokens_from_string(comment=true, new.contents).tokens
-          let old = @mbttoken.MbtToken::from_triples(old, old_linewidths)
-          let new = @mbttoken.MbtToken::from_triples(new, new_linewidths)
+          let old = @mbttoken.MbtToken::from_str(old.contents)
+          let new = @mbttoken.MbtToken::from_str(new.contents)
           let edits = @diff_with_opt.diff_with_opt(old~, new~)
           rendering_matching_block_side_by_side(edits)
         } else {

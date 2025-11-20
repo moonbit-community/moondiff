@@ -1,9 +1,6 @@
 ///|
 fn lexing_then_recover(source : String) -> String {
-  let lex_result = @lexer.tokens_from_string(comment=true, source)
-  let triples = lex_result.tokens
-  let line_widths = @span.LineWidths::from_str(source)
-  let texts = MbtToken::from_triples(triples, line_widths)
+  let texts = MbtToken::from_str(source)
   mbttokens_to_string(texts)
 }
 

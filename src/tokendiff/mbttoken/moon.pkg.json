@@ -2,7 +2,8 @@
     "import": [
         "moonbitlang/parser/tokens",
         "moonbitlang/parser/basic",
-        "myfreess/moondiff/span"
+        "myfreess/moondiff/span",
+        "moonbitlang/parser/lexer"
     ],
     "wbtest-import": [
         "moonbitlang/parser/lexer",
