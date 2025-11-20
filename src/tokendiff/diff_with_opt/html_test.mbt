@@ -1,11 +1,38 @@
 ///|
-using @edit {type Edit}
+test "fn_insert_funcall" (t : @test.Test) {
+  test_web_rendering(t, "fn_insert_funcall")
+}
 
 ///|
-let source_dir = "src/tokendiff/render_test/sources"
+test "fn_insert_comments" (t : @test.Test) {
+  test_web_rendering(t, "fn_insert_comments")
+}
 
 ///|
-pub fn test_web_rendering(t : @test.Test, name : String) -> Unit raise {
+test "fn_modify_then_insert" (t : @test.Test) {
+  test_web_rendering(t, "fn_modify_then_insert")
+}
+
+///|
+test "struct_modify_field_type_and_delete_field" (t : @test.Test) {
+  test_web_rendering(t, "struct_modify_field_type_and_delete_field")
+}
+
+///|
+test "fn_insert_errorpoly" (t : @test.Test) {
+  test_web_rendering(t, "fn_insert_errorpoly")
+}
+
+///|
+test "fn_insert_argument_and_stmt" (t : @test.Test) {
+  test_web_rendering(t, "fn_insert_argument_and_stmt")
+}
+
+///|
+let source_dir = "src/tokendiff/diff_with_opt/sources"
+
+///|
+fn test_web_rendering(t : @test.Test, name : String) -> Unit raise {
   let old = @fs.read_file_to_string("\{source_dir}/\{name}.old")
   let new = @fs.read_file_to_string("\{source_dir}/\{name}.new")
   let old = @mbttoken.MbtToken::from_str(old)
@@ -101,7 +128,7 @@ fn StringBuilder::write_with_eqn(
 ///|
 fn web_rendering(
   buf : StringBuilder,
-  edits : Array[Edit[Array[@mbttoken.MbtToken]]],
+  edits : Array[@edit.Edit[Array[@mbttoken.MbtToken]]],
 ) -> Unit {
   buf.write_char('\n')
   buf.write_string(code_header)
