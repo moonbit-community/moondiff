@@ -115,7 +115,14 @@ fn Array::add_token(self : Array[MbtToken], token : MbtToken) -> Unit {
 }
 
 ///|
-pub fn MbtToken::from_triples(
+pub fn MbtToken::from_str(source : String) -> Array[MbtToken] {
+  let line_widths = @span.LineWidths::from_str(source)
+  let triples = @lexer.tokens_from_string(comment=true, source).tokens
+  MbtToken::from_triples(triples, line_widths)
+}
+
+///|
+fn MbtToken::from_triples(
   triples : ArrayView[(@tokens.Token, @basic.Position, @basic.Position)],
   line_widths : @span.LineWidths,
 ) -> Array[MbtToken] {
