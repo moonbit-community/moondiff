@@ -73,12 +73,9 @@ test {
     #|quux
   let groups = line_group(old, new)
   @json.inspect(groups, content=[
-    [
-      "Normal",
-      { "equal": { "old": "[\"foo\", \"bar\"]", "new": "[\"foo\", \"bar\"]" } },
-    ],
+    ["Normal", { "equal": { "old": ["foo", "bar"], "new": ["foo", "bar"] } }],
     ["Replace", { "old": ["baz", "qux"], "new": ["BAZ", "QUX"] }],
-    ["Normal", { "equal": { "old": "[\"quux\"]", "new": "[\"quux\"]" } }],
+    ["Normal", { "equal": { "old": ["quux"], "new": ["quux"] } }],
   ])
   let old =
     #|alpha
@@ -94,9 +91,9 @@ test {
   let groups = line_group(old, new)
   @json.inspect(groups, content=[
     ["Replace", { "old": ["alpha"], "new": ["ALPHA"] }],
-    ["Normal", { "equal": { "old": "[\"beta\"]", "new": "[\"beta\"]" } }],
-    ["Normal", { "insert": "[\"epsilon\"]" }],
-    ["Normal", { "equal": { "old": "[\"gamma\"]", "new": "[\"gamma\"]" } }],
+    ["Normal", { "equal": { "old": ["beta"], "new": ["beta"] } }],
+    ["Normal", { "insert": ["epsilon"] }],
+    ["Normal", { "equal": { "old": ["gamma"], "new": ["gamma"] } }],
     ["Replace", { "old": ["delta"], "new": ["DELTA"] }],
   ])
 }

@@ -28,6 +28,11 @@ pub impl Show for MbtToken with output(self, logger) {
   }
 }
 
+///|UUID(ec039c5a-1378-43a6-87c5-18a01829b4d1)
+pub impl ToJson for MbtToken with to_json(self) {
+  self.to_string().to_json()
+}
+
 ///|UUID(6af7c0c1-526f-47b5-a84d-94c0cc97ebf7)
 pub impl Eq for MbtToken with equal(self, other) {
   match (self, other) {
