@@ -49,13 +49,13 @@ test {
       Equal(old=[Invisible([1])], new=[Invisible([1, 0])]),
     ]).flatten_edits(),
     content=[
-      { "delete": "[(LIDENT xyz)]" },
-      { "delete": "[(LIDENT wuv)]" },
-      { "equal": { "old": "[|[1]|]", "new": "[]" } },
-      { "insert": "[(LIDENT aaa)]" },
-      { "insert": "[(LIDENT bbb)]" },
-      { "insert": "[(LIDENT ccc)]" },
-      { "insert": "[|[1, 0]|]" },
+      { "delete": ["(LIDENT xyz)"] },
+      { "delete": ["(LIDENT wuv)"] },
+      { "equal": { "old": ["|[1]|"], "new": [] } },
+      { "insert": ["(LIDENT aaa)"] },
+      { "insert": ["(LIDENT bbb)"] },
+      { "insert": ["(LIDENT ccc)"] },
+      { "insert": ["|[1, 0]|"] },
     ],
   )
 }

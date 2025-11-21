@@ -6,11 +6,11 @@ pub(all) enum Edit[T] {
 } derive(Show)
 
 ///|UUID(fc200a4e-5f2b-4ded-be2d-908e26dabbae)
-pub impl[T : Show] ToJson for Edit[T] with to_json(self) {
+pub impl[T : ToJson] ToJson for Edit[T] with to_json(self) {
   match self {
-    Delete(old~) => { "delete": old.to_string() }
-    Insert(new~) => { "insert": new.to_string() }
+    Delete(old~) => { "delete": old.to_json() }
+    Insert(new~) => { "insert": new.to_json() }
     Equal(old~, new~) =>
-      { "equal": { "old": old.to_string(), "new": new.to_string() } }
+      { "equal": { "old": old.to_json(), "new": new.to_json() } }
   }
 }
