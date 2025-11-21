@@ -34,7 +34,7 @@ jobs:
 
       - name: format diff
         run: |
-          moon fmt
+          moon fmt -- -add-uuid
           git diff --exit-code
 
       - name: info check
