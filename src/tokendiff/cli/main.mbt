@@ -297,14 +297,15 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
   for line_group in matching_block_line_group {
     match line_group {
       Replace(old~, new~) => {
-        let old = old.join("\n")
-        let new = new.join("\n")
-        let old_toks = @mbttoken.MbtToken::from_str(old)
-        let new_toks = @mbttoken.MbtToken::from_str(new)
+        let old_toks = @mbttoken.MbtToken::from_str(old.join("\n"))
+        let new_toks = @mbttoken.MbtToken::from_str(new.join("\n"))
         let edits = @diff_with_opt.diff_with_opt(old=old_toks, new=new_toks)
         if edits is [Equal(..)] {
-          buf.write_string(new)
-          buf.write_char('\n')
+          for line in new {
+            buf.write_string(gray.render("=|") + "  ")
+            buf.write_stringview(line)
+            buf.write_char('\n')
+          }
           continue
         }
         let (old_lines, new_lines) = split_matching_block(edits)
