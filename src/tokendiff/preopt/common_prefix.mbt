@@ -1,8 +1,8 @@
 ///|UUID(78e6e490-9634-4f13-9756-2a31b9369189)
-fn separate_common_prefix(
-  old~ : ArrayView[MbtToken],
-  new~ : ArrayView[MbtToken],
-) -> (Array[Edit[MbtToken]], ArrayView[MbtToken], ArrayView[MbtToken]) {
+fn[T : Eq] separate_common_prefix(
+  old~ : ArrayView[T],
+  new~ : ArrayView[T],
+) -> (Array[Edit[T]], ArrayView[T], ArrayView[T]) {
   let prefix = Array::new(capacity=40)
   loop (old, new) {
     ([] as old_without_prefix, [] as new_without_prefix)

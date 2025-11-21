@@ -381,14 +381,11 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
   let blocks = pairing_blocks(old~, new~)
   for blk in blocks {
     match blk {
-      Delete(blk) =>
-        println(
-          @chalk.chalk()
-          .color(Red)
-          .render(
-            "--- block \{blk.uuid} in \{old_filename}: line \{blk.start_line}  \n\n",
-          ),
-        )
+      Delete(blk) => {
+        let red = @chalk.chalk().color(Red)
+        println(red.render("--- block \{blk.uuid} \n\n"))
+        println(red.render(blk.contents))
+      }
       Insert(blk) =>
         println(
           @chalk.chalk()
@@ -407,14 +404,13 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
           rendering_matching_block_side_by_side(edits)
         } else {
           let edits = @line_group.line_group(old.contents, new.contents)
-          if edits is [Normal(Equal(..))] {
-            // no changes
-            // TODO: refactor myers to reduce cost of processing unchanged block
+          if edits is Some(edits) {
+            println("--- \{old_filename}: line \{old.start_line}")
+            println("+++ \{new_filename}: line \{new.start_line}")
+            rendering_matching_block(edits)
+          } else {
             continue
           }
-          println("--- \{old_filename}: line \{old.start_line}")
-          println("+++ \{new_filename}: line \{new.start_line}")
-          rendering_matching_block(edits)
         }
         println(edits)
       }
