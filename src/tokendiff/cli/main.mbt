@@ -386,7 +386,7 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
           @chalk.chalk()
           .color(Red)
           .render(
-            "--- \{old_filename}: line \{blk.start_line}, deleted block \{blk.uuid} \n\n",
+            "--- block \{blk.uuid} in \{old_filename}: line \{blk.start_line}  \n\n",
           ),
         )
       Insert(blk) =>
@@ -394,19 +394,26 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
           @chalk.chalk()
           .color(Green)
           .render(
-            "+++ \{new_filename}: line \{blk.start_line} inserted block \{blk.uuid} \n\n",
+            "+++ block \{blk.uuid} in \{new_filename}: line \{blk.start_line}  \n\n",
           ),
         )
       Replace(old~, new~) => {
-        println("--- \{old_filename}: line \{old.start_line}")
-        println("+++ \{new_filename}: line \{new.start_line}")
         let edits = if display_side_by_side.val {
+          println("--- \{old_filename}: line \{old.start_line}")
+          println("+++ \{new_filename}: line \{new.start_line}")
           let old = @mbttoken.MbtToken::from_str(old.contents)
           let new = @mbttoken.MbtToken::from_str(new.contents)
           let edits = @diff_with_opt.diff_with_opt(old~, new~)
           rendering_matching_block_side_by_side(edits)
         } else {
           let edits = @line_group.line_group(old.contents, new.contents)
+          if edits is [Normal(Equal(..))] {
+            // no changes
+            // TODO: refactor myers to reduce cost of processing unchanged block
+            continue
+          }
+          println("--- \{old_filename}: line \{old.start_line}")
+          println("+++ \{new_filename}: line \{new.start_line}")
           rendering_matching_block(edits)
         }
         println(edits)
