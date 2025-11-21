@@ -22,6 +22,7 @@ fn MbtToken::from_str(String) -> Array[Self]
 fn MbtToken::to_text(Self) -> Array[Char]
 impl Eq for MbtToken
 impl Show for MbtToken
+impl ToJson for MbtToken
 
 // Type aliases
 

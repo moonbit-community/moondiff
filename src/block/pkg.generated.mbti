@@ -8,8 +8,7 @@ fn pairing_blocks_by_uuid(old~ : ArrayView[Block[String]], new~ : ArrayView[Bloc
 
 // Errors
 pub suberror BlockProcessingError {
-  UUIDNotFound(String)
-  NotWellFormattedSourceCode(completely_no_uuid~ : Bool)
+  NotWellFormattedSourceCode(completely_no_uuid~ : Bool, line_number~ : Int)
 }
 impl Show for BlockProcessingError
 
