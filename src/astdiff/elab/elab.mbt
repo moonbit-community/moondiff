@@ -1,9 +1,9 @@
-///|
+///|UUID(fa2b5574-96b6-4ce1-8b90-bcd47f964912)
 trait Elab {
   elab(Self, LineWidths) -> Syntax
 }
 
-///|
+///|UUID(f96c7f83-bb89-40d6-a381-207a439e55bc)
 impl Elab for @syntax.Impl with elab(impl_, line_widths) {
   match impl_ {
     TopView(
@@ -62,7 +62,7 @@ impl Elab for @syntax.Impl with elab(impl_, line_widths) {
   }
 }
 
-///|
+///|UUID(3bbd61ea-dc5c-4a31-8e76-613eea9cb735)
 impl Elab for @syntax.Parameter with elab(parameter, line_widths) {
   match parameter {
     DiscardPositional(loc~, ty=None) =>
@@ -96,7 +96,7 @@ impl Elab for @syntax.Parameter with elab(parameter, line_widths) {
   }
 }
 
-///|
+///|UUID(0d168fa0-9045-4e78-9969-198db7c1262c)
 impl Elab for @syntax.Type with elab(ty, line_widths) {
   match ty {
     Option(question_loc~, ty~, loc~) => {
@@ -215,7 +215,7 @@ impl Elab for @syntax.Type with elab(ty, line_widths) {
   }
 }
 
-///|
+///|UUID(51f4f469-a70f-4cc7-9dd3-9dbd161f34a0)
 impl Elab for @syntax.ErrorType with elab(err_ty, line_widths) {
   match err_ty {
     Noraise(loc~) =>
@@ -243,7 +243,7 @@ impl Elab for @syntax.ErrorType with elab(err_ty, line_widths) {
   }
 }
 
-///|
+///|UUID(32668d2f-36ce-41fc-ac16-0a3f2591688e)
 impl Elab for @syntax.TypeVarBinder with elab(type_var_binder, line_widths) {
   if type_var_binder.constraints.is_empty() {
     Syntax::atom(
@@ -280,7 +280,7 @@ impl Elab for @syntax.TypeVarBinder with elab(type_var_binder, line_widths) {
   }
 }
 
-///|
+///|UUID(9d9ff842-4591-4899-af1c-e3cb54904fd6)
 impl Elab for @syntax.TypeVarConstraint with elab(
   type_var_constraint,
   line_widths,
@@ -293,7 +293,7 @@ impl Elab for @syntax.TypeVarConstraint with elab(
   )
 }
 
-///|
+///|UUID(b88e443d-f756-4d80-ac2d-3bbe0f7139c9)
 impl Elab for @syntax.TypeName with elab(type_name, line_widths) {
   let content = type_name.name.to_str()
   Syntax::atom(
@@ -303,7 +303,7 @@ impl Elab for @syntax.TypeName with elab(type_name, line_widths) {
   )
 }
 
-///|
+///|UUID(c84cd166-ffb3-4f80-8a49-8d847325b0cd)
 impl Elab for @syntax.Binder with elab(binder, line_widths) {
   Syntax::atom(
     content=binder.name,
@@ -312,7 +312,7 @@ impl Elab for @syntax.Binder with elab(binder, line_widths) {
   )
 }
 
-///|
+///|UUID(e5353011-96cb-478e-8b55-cf94a79e79ea)
 impl Elab for @syntax.Visibility with elab(vis, line_widths) {
   match vis {
     Default => Syntax::default()
@@ -335,7 +335,7 @@ impl Elab for @syntax.Visibility with elab(vis, line_widths) {
   }
 }
 
-///|
+///|UUID(9e198c75-34c9-4e8d-a5f5-a2e1f40e4cd5)
 impl Elab for @syntax.Label with elab(label, line_widths) {
   Syntax::atom(
     content=label.name,
@@ -344,64 +344,64 @@ impl Elab for @syntax.Label with elab(label, line_widths) {
   )
 }
 
-///|
+///|UUID(44982c64-3161-4383-accb-210da09e0c8d)
 impl Elab for @syntax.ConstrName with elab(constr_name, line_widths) {
   ...
 }
 
-///|
+///|UUID(9044046c-5ee9-4954-afd2-26a708fe22cf)
 impl Elab for @syntax.ConstrId with elab(constr_id, line_widths) {
   ...
 }
 
-///|
+///|UUID(c92f9164-be44-44f3-8c7b-00963498c23d)
 impl Elab for @syntax.ConstrParam with elab(constr_param, line_widths) {
   ...
 }
 
-///|
+///|UUID(4c6a311a-5008-47d5-87f1-7650ec9e98f1)
 impl Elab for @syntax.ConstrDecl with elab(constr_decl, line_widths) {
   ...
 }
 
-///|
+///|UUID(11164498-31a1-4e7d-89ee-d0843aa58706)
 impl Elab for @syntax.FieldName with elab(field_name, line_widths) {
   ...
 }
 
-///|
+///|UUID(9f6fc8ca-81dd-4c93-8274-2cb2f5e137a2)
 impl Elab for @syntax.FieldDecl with elab(field_decl, line_widths) {
   ...
 }
 
-///|
+///|UUID(309c5900-e05a-4b28-bb31-4517dff0ce75)
 impl Elab for @syntax.TypeDeclBinder with elab(type_decl_binder, line_widths) {
   ...
 }
 
-///|
+///|UUID(0b486a42-84bc-4779-ae46-fbfbc1a18c47)
 impl Elab for @syntax.Var with elab(var, line_widths) {
   ...
 }
 
-///|
+///|UUID(e575c1cb-a587-4cfc-881d-630461802b5b)
 impl Elab for @syntax.Constructor with elab(constructor, line_widths) {
   ...
 }
 
-///|
+///|UUID(8f6362f9-1ecb-433d-92c2-0c119381149a)
 impl Elab for @syntax.AliasTarget with elab(alias_target, line_widths) {
   ...
 }
 
-///|
+///|UUID(07b3a3e3-01d8-4748-85f5-190bb6f9ff09)
 impl Elab for @syntax.Argument with elab(argument, line_widths) {
   let value = Elab::elab(argument.value, line_widths)
   let kind = Elab::elab(argument.kind, line_widths)
   Syntax::simple_list(open_position=[], children=[kind, value], close_position=[])
 }
 
-///|
+///|UUID(b810afd8-dc0e-4df6-9a1c-61ee0fc08331)
 impl Elab for @syntax.Case with elab(case, line_widths) {
   let pattern = Elab::elab(case.pattern, line_widths)
   let guard_expr = if case.guard_ is Some(g) {
@@ -413,7 +413,7 @@ impl Elab for @syntax.Case with elab(case, line_widths) {
   Syntax::simple_list(open_position=[], children=[pattern, guard_expr, body], close_position=[])
 }
 
-///|
+///|UUID(bd1e0759-a851-4378-89b6-76d2a17d0e4a)
 impl Elab for @syntax.MultiArgCase with elab(multi_arg_case, line_widths) {
   let patterns = multi_arg_case.patterns
     .map(Elab::elab(_, line_widths))
@@ -431,7 +431,7 @@ impl Elab for @syntax.MultiArgCase with elab(multi_arg_case, line_widths) {
   )
 }
 
-///|
+///|UUID(8dff00f8-bba0-437e-9422-49cfb877c513)
 impl Elab for @syntax.MapExprElem with elab(map_expr_elem, line_widths) {
   let key = Elab::elab(map_expr_elem.key, line_widths)
   let expr = Elab::elab(map_expr_elem.expr, line_widths)
@@ -442,7 +442,7 @@ impl Elab for @syntax.MapExprElem with elab(map_expr_elem, line_widths) {
   )
 }
 
-///|
+///|UUID(0db33baa-c09a-4bd8-ba3c-29b50f4bc41c)
 impl Elab for @syntax.StaticAssertion with elab(static_assertion, line_widths) {
   let ty = Elab::elab(static_assertion.ty, line_widths)
   let trait_name = Elab::elab(static_assertion.trait_, line_widths)
@@ -458,7 +458,7 @@ impl Elab for @syntax.StaticAssertion with elab(static_assertion, line_widths) {
   )
 }
 
-///|
+///|UUID(49935d27-c98b-4f97-8957-7e573d8bf758)
 impl Elab for @syntax.FieldDef with elab(field_def, line_widths) {
   let label = Elab::elab(field_def.label, line_widths)
   let expr = if field_def.is_pun {
@@ -473,7 +473,7 @@ impl Elab for @syntax.FieldDef with elab(field_def, line_widths) {
   )
 }
 
-///|
+///|UUID(31f528c8-e801-4018-8510-4f764ae9d513)
 impl Elab for @syntax.FieldPat with elab(field_pat, line_widths) {
   let label = Elab::elab(field_pat.label, line_widths)
   let pattern = if field_pat.is_pun {
@@ -488,14 +488,14 @@ impl Elab for @syntax.FieldPat with elab(field_pat, line_widths) {
   )
 }
 
-///|
+///|UUID(d52c4f73-3155-45ad-9751-979c74633803)
 impl Elab for @syntax.ConstrPatArg with elab(constr_pat_arg, line_widths) {
   let pat = Elab::elab(constr_pat_arg.pat, line_widths)
   let kind = Elab::elab(constr_pat_arg.kind, line_widths)
   Syntax::simple_list(open_position=[], children=[kind, pat], close_position=[])
 }
 
-///|
+///|UUID(e657da9e-0d50-445d-8d0d-e8cef4e1082d)
 impl Elab for @syntax.MapPatElem with elab(map_pat_elem, line_widths) {
   let key = Elab::elab(map_pat_elem.key, line_widths)
   let pat = Elab::elab(map_pat_elem.pat, line_widths)
@@ -511,7 +511,7 @@ impl Elab for @syntax.MapPatElem with elab(map_pat_elem, line_widths) {
   )
 }
 
-///|
+///|UUID(b7c38a70-1b2e-4e02-aaa8-f7bbdfed2be1)
 impl Elab for @syntax.LocalTypeDecl with elab(local_type_decl, line_widths) {
   let tycon = Syntax::atom(
     content=local_type_decl.tycon,
@@ -529,7 +529,7 @@ impl Elab for @syntax.LocalTypeDecl with elab(local_type_decl, line_widths) {
   )
 }
 
-///|
+///|UUID(b6e9dfa3-51eb-4e09-8e27-c8214da40cd4)
 impl Elab for @syntax.DerivingDirective with elab(
   deriving_directive,
   line_widths,
@@ -543,7 +543,7 @@ impl Elab for @syntax.DerivingDirective with elab(
   )
 }
 
-///|
+///|UUID(e8d67dc0-ecbe-4876-a50f-f646cd2c914e)
 impl Elab for @syntax.TypeDecl with elab(type_decl, line_widths) {
   let tycon = Syntax::atom(
     content=type_decl.tycon,
@@ -563,7 +563,7 @@ impl Elab for @syntax.TypeDecl with elab(type_decl, line_widths) {
   )
 }
 
-///|
+///|UUID(787bad0e-e8f9-4cb6-94d5-a19e619803d8)
 impl Elab for @syntax.TraitMethodDecl with elab(trait_method_decl, line_widths) {
   let name = Elab::elab(trait_method_decl.name, line_widths)
   let quantifiers = trait_method_decl.quantifiers
@@ -612,7 +612,7 @@ impl Elab for @syntax.TraitMethodDecl with elab(trait_method_decl, line_widths) 
   )
 }
 
-///|
+///|UUID(35399407-1818-4a1e-baef-d8ea929c098f)
 impl Elab for @syntax.TraitDecl with elab(trait_decl, line_widths) {
   let name = Elab::elab(trait_decl.name, line_widths)
   let vis = Elab::elab(trait_decl.vis, line_widths)
@@ -625,7 +625,7 @@ impl Elab for @syntax.TraitDecl with elab(trait_decl, line_widths) {
   )
 }
 
-///|
+///|UUID(9855d0da-6032-400e-9441-3ef97eb76e66)
 impl Elab for @syntax.Constant with elab(constant, line_widths) {
   match constant {
     Bool(_) => ...
@@ -643,7 +643,7 @@ impl Elab for @syntax.Constant with elab(constant, line_widths) {
   }
 }
 
-///|
+///|UUID(1f59952f-dc40-4c71-8b1e-db38258a40cd)
 impl Elab for @syntax.LongIdent with elab(long_ident, line_widths) {
   match long_ident {
     Ident(name~) => ...
@@ -651,7 +651,7 @@ impl Elab for @syntax.LongIdent with elab(long_ident, line_widths) {
   }
 }
 
-///|
+///|UUID(0596083d-cf74-4325-89be-db6b4fc16adc)
 impl Elab for @syntax.ExceptionDecl with elab(exception_decl, line_widths) {
   match exception_decl {
     NoPayload => Syntax::default()
@@ -663,7 +663,7 @@ impl Elab for @syntax.ExceptionDecl with elab(exception_decl, line_widths) {
   }
 }
 
-///|
+///|UUID(95b70692-2a9b-47a9-9294-2adb817adbbc)
 impl Elab for @syntax.TypeDesc with elab(type_desc, line_widths) {
   match type_desc {
     Abstract => Syntax::atom(content="abstract", position=[], kind=Keyword)
@@ -725,7 +725,7 @@ impl Elab for @syntax.TypeDesc with elab(type_desc, line_widths) {
   }
 }
 
-///|
+///|UUID(7bbf881e-52de-4ee1-9a3f-ce0b4f1e9c74)
 impl Elab for @syntax.Hole with elab(hole, line_widths) {
   match hole {
     Synthesized => Syntax::atom(content="_", position=[], kind=Normal)
@@ -734,7 +734,7 @@ impl Elab for @syntax.Hole with elab(hole, line_widths) {
   }
 }
 
-///|
+///|UUID(679214c9-425f-4c06-b78d-044b824d37eb)
 impl Elab for @syntax.ArgumentKind with elab(argument_kind, line_widths) {
   match argument_kind {
     Positional => Syntax::default()
@@ -761,7 +761,7 @@ impl Elab for @syntax.ArgumentKind with elab(argument_kind, line_widths) {
   }
 }
 
-///|
+///|UUID(1a1d3d08-bd23-4430-b6e0-0b7d8ed5c45c)
 impl Elab for @syntax.FnKind with elab(fn_kind, line_widths) {
   match fn_kind {
     Lambda => Syntax::atom(content="fn", position=[], kind=Normal)
@@ -770,7 +770,7 @@ impl Elab for @syntax.FnKind with elab(fn_kind, line_widths) {
   }
 }
 
-///|
+///|UUID(8f98eb4d-fdb4-4cbb-8afa-862a0e1907a0)
 impl Elab for @syntax.Group with elab(group, line_widths) {
   match group {
     Brace => Syntax::atom(content="{}", position=[], kind=Normal)
@@ -778,7 +778,7 @@ impl Elab for @syntax.Group with elab(group, line_widths) {
   }
 }
 
-///|
+///|UUID(c143fafe-e727-4058-babf-1d4f9748e97f)
 impl Elab for @syntax.TrailingMark with elab(trailing_mark, line_widths) {
   match trailing_mark {
     Comma => Syntax::atom(content=",", position=[], kind=Normal)
@@ -787,7 +787,7 @@ impl Elab for @syntax.TrailingMark with elab(trailing_mark, line_widths) {
   }
 }
 
-///|
+///|UUID(ae173649-9724-4db6-81cc-30a188e10591)
 impl Elab for @syntax.ApplyAttr with elab(apply_attr, line_widths) {
   match apply_attr {
     NoAttr => Syntax::default()
@@ -796,7 +796,7 @@ impl Elab for @syntax.ApplyAttr with elab(apply_attr, line_widths) {
   }
 }
 
-///|
+///|UUID(18347e8d-6e22-4701-93ec-46a9b973a75c)
 impl Elab for @syntax.ConstructorExtraInfo with elab(
   constructor_extra_info,
   line_widths,
@@ -809,7 +809,7 @@ impl Elab for @syntax.ConstructorExtraInfo with elab(
   }
 }
 
-///|
+///|UUID(660796ff-72b6-45ac-8b67-a92ee9611001)
 impl Elab for @syntax.Accessor with elab(accessor, line_widths) {
   match accessor {
     Label(label) => Elab::elab(label, line_widths)
@@ -828,7 +828,7 @@ impl Elab for @syntax.Accessor with elab(accessor, line_widths) {
   }
 }
 
-///|
+///|UUID(00905172-ccac-45c3-8a1c-0f9cfbb11043)
 impl Elab for @syntax.SpreadableElem with elab(spreadable_elem, line_widths) {
   match spreadable_elem {
     Regular(expr) => Elab::elab(expr, line_widths)
@@ -848,7 +848,7 @@ impl Elab for @syntax.SpreadableElem with elab(spreadable_elem, line_widths) {
   }
 }
 
-///|
+///|UUID(6e514b82-8ad7-4e26-ae14-574ff53c54bd)
 impl Elab for @syntax.Func with elab(func, line_widths) {
   match func {
     Lambda(
@@ -925,7 +925,7 @@ impl Elab for @syntax.Func with elab(func, line_widths) {
   }
 }
 
-///|
+///|UUID(d9abc245-b9c0-49c6-b540-3ba19c8e06eb)
 impl Elab for @syntax.InterpElem with elab(interp_elem, line_widths) {
   match interp_elem {
     Literal(repr~, loc~) => {
@@ -949,7 +949,7 @@ impl Elab for @syntax.InterpElem with elab(interp_elem, line_widths) {
   }
 }
 
-///|
+///|UUID(a62c255a-7319-4720-a7f8-42a90d07f811)
 impl Elab for @syntax.MultilineStringElem with elab(
   multiline_string_elem,
   line_widths,
@@ -964,7 +964,7 @@ impl Elab for @syntax.MultilineStringElem with elab(
   }
 }
 
-///|
+///|UUID(edd88f9e-ac48-4f45-8364-445e80735914)
 impl Elab for @syntax.Expr with elab(expr, line_widths) {
   match expr {
     Apply(func~, args~, attr~, loc~) => ...
@@ -1033,7 +1033,7 @@ impl Elab for @syntax.Expr with elab(expr, line_widths) {
   }
 }
 
-///|
+///|UUID(cb8ad5f0-99a1-4fd0-bb16-cbde546ecf9f)
 impl Elab for @syntax.TryOperatorKind with elab(try_operator_kind, line_widths) {
   match try_operator_kind {
     Question => Syntax::atom(content="?", position=[], kind=Normal)
@@ -1041,7 +1041,7 @@ impl Elab for @syntax.TryOperatorKind with elab(try_operator_kind, line_widths) 
   }
 }
 
-///|
+///|UUID(76929962-4a06-41c6-8d61-819765605f75)
 impl Elab for @syntax.DotDotBinder with elab(dot_dot_binder, line_widths) {
   match dot_dot_binder {
     Underscore => Syntax::atom(content="_", position=[], kind=Normal)
@@ -1055,7 +1055,7 @@ impl Elab for @syntax.DotDotBinder with elab(dot_dot_binder, line_widths) {
   }
 }
 
-///|
+///|UUID(1a179177-ca2d-4cc6-a990-8f9b40acec1d)
 impl Elab for @syntax.ArrayPattern with elab(array_pattern, line_widths) {
   match array_pattern {
     Pattern(pattern) => Elab::elab(pattern, line_widths)
@@ -1096,7 +1096,7 @@ impl Elab for @syntax.ArrayPattern with elab(array_pattern, line_widths) {
   }
 }
 
-///|
+///|UUID(46c99b8a-e6a5-419f-b080-385286bdd597)
 impl Elab for @syntax.ArrayPatterns with elab(array_patterns, line_widths) {
   match array_patterns {
     Closed(patterns) => {
@@ -1116,7 +1116,7 @@ impl Elab for @syntax.ArrayPatterns with elab(array_patterns, line_widths) {
   }
 }
 
-///|
+///|UUID(7f856730-62a0-484c-b73b-a3ba2ff3013f)
 impl Elab for @syntax.Pattern with elab(pattern, line_widths) {
   match pattern {
     Alias(pat~, alias_~, loc~) => {

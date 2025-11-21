@@ -1,4 +1,4 @@
-///|
+///|UUID(f70cf036-fb4e-42ac-bada-7bf996d42200)
 fn loc_of_type(ty : @syntax.Type) -> @basic.Location {
   match ty {
     Option(loc~, ..) => loc
@@ -10,14 +10,14 @@ fn loc_of_type(ty : @syntax.Type) -> @basic.Location {
   }
 }
 
-///|
+///|UUID(fbca3974-da89-46a2-b8fe-f42a0db286a8)
 fn @basic.Location::sub(self : @basic.Location, width : Int) -> @basic.Location {
   let start = self.start
   let end = { ..start, cnum: start.cnum + width }
   @basic.Location::{ start, end }
 }
 
-///|
+///|UUID(04ed92c7-34fc-4508-bf9c-e284eebc8296)
 fn @basic.Location::rev_sub(
   self : @basic.Location,
   width : Int,
@@ -27,7 +27,7 @@ fn @basic.Location::rev_sub(
   @basic.Location::{ start, end }
 }
 
-///|
+///|UUID(7799ee00-da1b-4516-bb4a-7a3fbd66d92d)
 fn @basic.Position::to_span(self : @basic.Position) -> SingleLineSpan {
   SingleLineSpan::{
     line: self.lnum,
@@ -36,17 +36,17 @@ fn @basic.Position::to_span(self : @basic.Position) -> SingleLineSpan {
   }
 }
 
-///|
+///|UUID(16e23595-14a0-4ba8-83ed-1e802be4b1ba)
 fn @basic.Location::start_to_span(self : @basic.Location) -> SingleLineSpan {
   self.start.to_span()
 }
 
-///|
+///|UUID(7c19d495-072f-4c5c-81d5-83002238be2a)
 fn @basic.Location::end_to_span(self : @basic.Location) -> SingleLineSpan {
   self.end.to_span()
 }
 
-///|
+///|UUID(dd853c7f-2436-4ce5-b293-c647d16c37cc)
 fn @syntax.LongIdent::to_str(self : @syntax.LongIdent) -> String {
   match self {
     Ident(name~) => name
@@ -54,7 +54,7 @@ fn @syntax.LongIdent::to_str(self : @syntax.LongIdent) -> String {
   }
 }
 
-///|
+///|UUID(3c5653b2-3801-4d55-8927-5bc94b5666a5)
 fn[T] lst_pos_pair(
   lst : @list.List[T],
   loc_of~ : (T) -> @basic.Location,
@@ -69,7 +69,7 @@ fn[T] lst_pos_pair(
   }
 }
 
-///|
+///|UUID(400d7eac-4a44-4e8c-ad4f-5bbd1bb4a376)
 fn[T] lst_search_symmetric(
   line_widths : LineWidths,
   lst : @list.List[T],
@@ -93,7 +93,7 @@ fn[T] lst_search_symmetric(
   }
 }
 
-///|
+///|UUID(580f8c7d-a9c8-4cc1-b9a8-39f3175d9243)
 fn last_pos_of_fun_decl(fun_decl : @syntax.FunDecl) -> @basic.Position {
   match fun_decl.error_type {
     Noraise(loc~) | DefaultErrorType(loc~) => loc.end

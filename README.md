@@ -8,6 +8,8 @@ Difftool that aware MoonBit language syntax.
 
 ### install
 
++ native binary
+
 ```shell
 moon build --target native
 # add `~/.local/bin` to your `PATH`
@@ -15,5 +17,16 @@ cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
 ```
 ### use
 
-> require `moon fmt -- -add-uuid`
+moondiff relies on the features of `moonfmt`: `-block-style`(which is now the default behavior) and `-add-uuid`(which is not the default behavior)to function. If you wish to use moondiff in a MoonBit repository, please first execute the following command:
 
+```shell
+moon fmt -- -add-uuid
+```
+
+Then, configure git to use the installed binary as an optional diff tool within that repository:
+
+```shell
+git config diff.tool tokendiff
+git config difftool.tokendiff.cmd '~/.local/bin/tokendiff $LOCAL $REMOTE'
+git config difftool.prompt false
+```

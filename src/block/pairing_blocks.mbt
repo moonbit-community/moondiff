@@ -1,11 +1,11 @@
-///|
+///|UUID(4ec55ff6-d1d6-4057-9910-40ed34aa5bf7)
 pub enum EditBlock {
   Replace(old~ : Block[String], new~ : Block[String])
   Delete(Block[String])
   Insert(Block[String])
 } derive(Show, ToJson)
 
-///|
+///|UUID(072067d5-282d-45fb-b233-b0a9895c0a8c)
 pub fn pairing_blocks_by_uuid(
   old~ : ArrayView[Block[String]],
   new~ : ArrayView[Block[String]],
@@ -29,7 +29,7 @@ pub fn pairing_blocks_by_uuid(
   result
 }
 
-///|
+///|UUID(5faaf9bc-bdec-442a-b960-ba981cc4f99e)
 test {
   let old =
     #|///|UUID(1)

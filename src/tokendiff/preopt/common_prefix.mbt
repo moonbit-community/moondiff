@@ -1,4 +1,4 @@
-///|
+///|UUID(78e6e490-9634-4f13-9756-2a31b9369189)
 fn separate_common_prefix(
   old~ : ArrayView[MbtToken],
   new~ : ArrayView[MbtToken],

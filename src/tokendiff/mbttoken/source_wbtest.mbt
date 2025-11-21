@@ -1,4 +1,4 @@
-///|
+///|UUID(c2626d40-0306-4df4-8226-d295f4c2c790)
 let mbt_001 : String =
   #|fn init {
   #|  printX()
@@ -32,7 +32,7 @@ let mbt_001 : String =
   #|}
   #|
 
-///|
+///|UUID(ff0b00fb-6828-4dc2-9999-bf034c98b869)
 let mbt_attribute_name =
   #|
   #|
@@ -52,7 +52,7 @@ let mbt_attribute_name =
   #|}
   #|
 
-///|
+///|UUID(68b7cf40-8888-46a3-b89f-a8d1bcb5e868)
 let mbt_double_to_string : String =
   #|fn ieee_parts_to_double(sign : Bool, ieeeExponent : Int, ieeeMantissa : Int64) ->
   #|     Double {
@@ -254,7 +254,7 @@ let mbt_double_to_string : String =
   #|}
   #|
 
-///|
+///|UUID(93b0081f-210e-4761-8b4d-0400fe532112)
 let mbt_multiline_string_interp : String =
   #|//!build: -w -27
   #|///|
@@ -375,7 +375,7 @@ let mbt_multiline_string_interp : String =
   #|}
   #|
 
-///|
+///|UUID(4c65089c-30e4-4865-b0b6-6c2bda52a879)
 let mbt_pattern_guard : String =
   #|fn f(x: Int) -> Unit {
   #|  match x {
@@ -429,7 +429,7 @@ let mbt_pattern_guard : String =
   #|}
   #|
 
-///|
+///|UUID(a0d40523-f227-41ad-b575-2f2fdbaa1e4e)
 let mbt_range_pattern : String =
   #|fn sign(x : Int) -> Int {
   #|  match x {
@@ -503,7 +503,7 @@ let mbt_range_pattern : String =
   #|  println(is_positive_unsigned_int(0))
   #|}
 
-///|
+///|UUID(bee96743-d1a2-48eb-9a64-c6b7cb229e14)
 let mbt_string_escape =
   #|fn init {
   #|  println('\u6211')
@@ -514,7 +514,7 @@ let mbt_string_escape =
   #|  println("\u{20BB7}")
   #|}
 
-///|
+///|UUID(03ea0ffa-3b1e-47e7-a029-b75351dcc18a)
 let mbt_string_literal =
   #|fn init {
   #|  let  x = "hello你好\u{0000}\x00"
@@ -529,7 +529,7 @@ let mbt_string_literal =
   #|  // }
   #|}
 
-///|
+///|UUID(0bf5acf9-f2a9-48fb-b817-ef4f30b6613c)
 let mbt_super_trait3 =
   #|pub(all) type Requirement Int derive(Show)
   #|
@@ -560,7 +560,7 @@ let mbt_super_trait3 =
   #|}
   #|
 
-///|
+///|UUID(869853c9-a4e5-40e6-bd77-af42a5b26f32)
 let mbt_trait_labelled =
   #|trait I {
   #|  f(Self, x~ : Int, Int, y~ : Int) -> Unit
@@ -585,13 +585,13 @@ let mbt_trait_labelled =
   #|}
   #|
 
-///|
+///|UUID(0561d8d0-755b-44a2-92f7-178fa2a26ace)
 let mbt_try =
   #|try
   #|try!
   #|try?
 
-///|
+///|UUID(8b88f250-5575-440e-80df-dd03bfb96f0a)
 let mbt_unicode_test =
   #|
   #|enum 类型 {
@@ -649,7 +649,7 @@ let mbt_unicode_test =
   #|}
   #|
 
-///|
+///|UUID(70b7a426-ad02-430f-a668-32643347aa46)
 let mbt_utf16_escape =
   #|fn init {
   #|  // let s = "\uD835\uDD04"

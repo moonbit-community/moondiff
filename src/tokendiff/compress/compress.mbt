@@ -1,6 +1,6 @@
 ///|
 
-///|
+///|UUID(8ca9d984-857a-42bf-8152-eee4d851c8b8)
 pub fn[T] compress_edits(edits : ArrayView[Edit[T]]) -> Array[Edit[Array[T]]] {
   let compressed : Array[Edit[Array[T]]] = []
   for edit in edits {
@@ -9,7 +9,7 @@ pub fn[T] compress_edits(edits : ArrayView[Edit[T]]) -> Array[Edit[Array[T]]] {
   compressed
 }
 
-///|
+///|UUID(a2e41142-b501-4691-9c28-d0c774fdc022)
 fn[T] Array::push_edit(self : Array[Edit[Array[T]]], edit : Edit[T]) -> Unit {
   match self {
     [] =>
