@@ -29,23 +29,10 @@ pub fn line_group(old : String, new : String) -> Array[REdit] {
         groups.push(REdit::Replace(old~, new~))
         break
       }
-      [
-        Equal(..) as prev,
-        Insert(new~),
-        Delete(old~),
-        Equal(..) as next,
-        .. rest,
-      ]
-      | [
-        Equal(..) as prev,
-        Delete(old~),
-        Insert(new~),
-        Equal(..) as next,
-        .. rest,
-      ] => {
+      [Equal(..) as prev, Insert(new~), Delete(old~), .. rest]
+      | [Equal(..) as prev, Delete(old~), Insert(new~), .. rest] => {
         groups.push(REdit::Normal(prev))
         groups.push(REdit::Replace(old~, new~))
-        groups.push(REdit::Normal(next))
         edits = rest
       }
       [edit, .. rest] => {
