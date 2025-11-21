@@ -54,9 +54,9 @@ pub fn align_edit_boundaries(
         let prev_scoreboard = Array::make(prev_suffix_length, 0)
         let next_scoreboard = Array::make(next_prefix_length, 0)
         // fullfill next_scoreboard
-        fullfill_next_scoreboard(next_scoreboard, next_prefix_length, next)
+        fullfill_next_scoreboard(next_scoreboard, next)
         // fullfill prev_scoreboard
-        fullfill_prev_scoreboard(prev_scoreboard, prev_suffix_length, prev)
+        fullfill_prev_scoreboard(prev_scoreboard, prev)
         // try to find max score from next_scoreboard
         let mut max_score_for_next = 0
         let mut index_for_max_score_next = -1
@@ -109,9 +109,9 @@ pub fn align_edit_boundaries(
         let prev_scoreboard = Array::make(prev_suffix_length, 0)
         let next_scoreboard = Array::make(next_prefix_length, 0)
         // fullfill next_scoreboard
-        fullfill_next_scoreboard(next_scoreboard, next_prefix_length, next)
+        fullfill_next_scoreboard(next_scoreboard, next)
         // fullfill prev_scoreboard
-        fullfill_prev_scoreboard(prev_scoreboard, prev_suffix_length, prev)
+        fullfill_prev_scoreboard(prev_scoreboard, prev)
         // try to find max score from next_scoreboard
         let mut max_score_for_next = 0
         let mut index_for_max_score_next = -1
@@ -237,10 +237,10 @@ fn slide_to_next(
 ///|UUID(583eb74c-6801-4447-9018-8db845a54a09)
 fn fullfill_next_scoreboard(
   next_scoreboard : Array[Int],
-  next_prefix_length : Int,
   next : Array[MbtToken],
 ) -> Unit {
-  if next_prefix_length == next.length() {
+  let next_prefix_length = next_scoreboard.length()
+  if !next.is_empty() && next_prefix_length == next.length() {
     next_scoreboard[next_prefix_length - 1] = 4 // max score
   }
   for i in 0..<next_prefix_length {
@@ -251,10 +251,10 @@ fn fullfill_next_scoreboard(
 ///|UUID(78973f79-c00c-4734-8749-f772ac5f64db)
 fn fullfill_prev_scoreboard(
   prev_scoreboard : Array[Int],
-  prev_suffix_length : Int,
   prev : Array[MbtToken],
 ) -> Unit {
-  if prev_suffix_length == prev.length() {
+  let prev_suffix_length = prev_scoreboard.length()
+  if !prev.is_empty() && prev_suffix_length == prev.length() {
     prev_scoreboard[prev_suffix_length - 1] = 4 // max score
   }
   for i in 0..<prev_suffix_length {
