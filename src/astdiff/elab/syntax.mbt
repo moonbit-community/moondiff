@@ -1,7 +1,7 @@
-///|
+///|UUID(36f67f34-7466-4f61-8b3d-4216a8be8dee)
 typealias UInt as SyntaxId // must non-zero
 
-///|
+///|UUID(d2ebef10-67f2-4bb6-ba40-9cb123ae7006)
 pub struct SyntaxInfo {
   /// The previous node with the same parent as this one.
   previous_sibling : Syntax?
@@ -28,7 +28,7 @@ pub struct SyntaxInfo {
   content_is_unique : Bool
 }
 
-///|
+///|UUID(2204ecdf-1b80-4a4d-b16d-f52f9c7f4a08)
 pub fn SyntaxInfo::new() -> Self {
   SyntaxInfo::{
     previous_sibling: None,
@@ -43,12 +43,12 @@ pub fn SyntaxInfo::new() -> Self {
   }
 }
 
-///|
+///|UUID(525b78cc-a805-4f38-9a3f-ac7213295ac4)
 pub impl Default for SyntaxInfo with default() {
   SyntaxInfo::new()
 }
 
-///|
+///|UUID(f227a0b2-d44e-4afd-9d4b-ddbdb0f533d5)
 pub enum Syntax {
   Atom(
     info~ : SyntaxInfo,
@@ -68,7 +68,7 @@ pub enum Syntax {
   )
 }
 
-///|
+///|UUID(bec402de-e38b-45ca-9ae4-48b52e8ac3c7)
 let default_syntax_atom : Syntax = Syntax::Atom(
   info=SyntaxInfo::default(),
   content="",
@@ -76,13 +76,13 @@ let default_syntax_atom : Syntax = Syntax::Atom(
   kind=Normal,
 )
 
-///|
+///|UUID(1bc380e9-1250-41bf-8703-71257c729027)
 impl Default for Syntax with default() {
   // will be optimized by Syntax::list() constructor
   return default_syntax_atom
 }
 
-///|
+///|UUID(c58acc73-ea64-47b3-99e9-b20192be0386)
 pub impl @pp.Pretty for Syntax with pretty(syntax : Syntax) {
   match syntax {
     Atom(content~, ..) => @pp.text(content)
@@ -97,7 +97,7 @@ pub impl @pp.Pretty for Syntax with pretty(syntax : Syntax) {
   }
 }
 
-///|
+///|UUID(434529a4-abd1-4b42-aebc-b2312b92f78d)
 pub fn Syntax::list(
   open_content~ : String,
   open_position~ : Array[SingleLineSpan],
@@ -139,7 +139,7 @@ pub fn Syntax::list(
   )
 }
 
-///|
+///|UUID(06de1333-a230-4628-a342-85e995108456)
 pub fn Syntax::simple_list(
   open_position~ : Array[SingleLineSpan],
   children~ : Array[Syntax],
@@ -158,7 +158,7 @@ pub fn Syntax::simple_list(
   )
 }
 
-///|
+///|UUID(bfca4574-c7ee-49ba-856d-5ae9151f2ec8)
 pub fn Syntax::atom(
   content~ : String,
   position~ : Array[SingleLineSpan],
@@ -167,7 +167,7 @@ pub fn Syntax::atom(
   Syntax::Atom(info=SyntaxInfo::default(), position~, content~, kind~)
 }
 
-///|
+///|UUID(d98843b3-75e9-4a9a-8a4c-9f21308b9dca)
 pub fn Syntax::info(self : Self) -> SyntaxInfo {
   match self {
     Atom(info~, ..) => info
@@ -175,37 +175,37 @@ pub fn Syntax::info(self : Self) -> SyntaxInfo {
   }
 }
 
-///|
+///|UUID(63faddb5-ec57-421e-8d80-2160c468f15a)
 pub fn Syntax::parent(self : Self) -> Syntax? {
   self.info().parent
 }
 
-///|
+///|UUID(f4599ca6-61ca-4410-a414-792ba1f82156)
 pub fn Syntax::next_sibling(self : Self) -> Syntax? {
   self.info().next_sibling
 }
 
-///|
+///|UUID(81d457d8-2c84-4076-b781-bf24684aac2b)
 pub fn Syntax::id(self : Self) -> SyntaxId {
   self.info().unique_id
 }
 
-///|
+///|UUID(1c5505ee-407a-4d91-8da0-f0c51d55de76)
 pub fn Syntax::content_id(self : Self) -> UInt {
   self.info().content_id
 }
 
-///|
+///|UUID(dfdebc9c-a7ff-4a48-bfd6-36120e4820dc)
 pub fn Syntax::content_is_unique(self : Self) -> Bool {
   self.info().content_is_unique
 }
 
-///|
+///|UUID(bead19e5-664b-4f68-8928-0fe34ed94f36)
 pub fn Syntax::num_ancestors(self : Self) -> UInt {
   self.info().num_ancestors
 }
 
-///|
+///|UUID(689e4a0f-bb8d-4bad-bcb0-d0f7bcea711e)
 pub fn Syntax::comment_positions(
   nodes : ArrayView[Syntax],
 ) -> Array[SingleLineSpan] {
@@ -233,13 +233,13 @@ pub fn Syntax::comment_positions(
   }
 }
 
-///|
+///|UUID(3d751dbd-a05e-46c7-aa9c-f7d1bfb5f5a9)
 pub enum StringKind {
   StringLiteral
   Text
 }
 
-///|
+///|UUID(557e87f3-ee91-4143-9426-2a2cbaa54578)
 pub enum AtomKind {
   Normal
   String(StringKind)

@@ -1,4 +1,4 @@
-///|
+///|UUID(16eae731-0207-49c1-ae1b-7a4928772592)
 fn fallback_to_linediff(old~ : String, new~ : String) -> String {
   let buf = StringBuilder::new(size_hint=new.length() + old.length())
   let blue = @chalk.chalk().color(Blue).modifier(Bold)

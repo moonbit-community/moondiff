@@ -1,4 +1,4 @@
-///|
+///|UUID(285446bc-2679-409e-8ea8-306d65e4836f)
 #valtype
 priv struct Box {
   left : Int
@@ -7,44 +7,44 @@ priv struct Box {
   bottom : Int
 } derive(Show)
 
-///|
+///|UUID(713424ee-be92-4fe8-a01c-678274ec4429)
 #valtype
 priv struct Snake {
   start : (Int, Int)
   end : (Int, Int)
 } derive(Show)
 
-///|
+///|UUID(f40ae742-71a5-4901-92a6-6be6b5179979)
 fn Box::width(self : Box) -> Int {
   self.right - self.left
 }
 
-///|
+///|UUID(02ce178b-e792-49d2-a50b-fa3a4ea5b032)
 fn Box::height(self : Box) -> Int {
   self.bottom - self.top
 }
 
-///|
+///|UUID(7ba668ef-7c1c-4408-900d-3eea8e095ad4)
 fn Box::size(self : Box) -> Int {
   self.width() + self.height()
 }
 
-///|
+///|UUID(66d1197f-3031-4858-bb6e-b66cd202b653)
 fn Box::delta(self : Box) -> Int {
   self.width() - self.height()
 }
 
-///|
+///|UUID(71280799-758e-4147-bb22-d8d560e807b0)
 fn is_odd(n : Int) -> Bool {
   (n & 1) == 1
 }
 
-///|
+///|UUID(2be37187-7289-45cc-9613-3b83dc507ccf)
 fn is_even(n : Int) -> Bool {
   (n & 1) == 0
 }
 
-///|
+///|UUID(99e6092b-4981-4b26-9f04-0fa809d5a1d7)
 fn[T : Eq] Box::forward(
   self : Box,
   forward~ : BPArray[Int],
@@ -80,7 +80,7 @@ fn[T : Eq] Box::forward(
   return None
 }
 
-///|
+///|UUID(b0b6d2c5-1158-4186-bca2-1d2a207bf579)
 fn[T : Eq] Box::backward(
   self : Box,
   forward~ : BPArray[Int],
@@ -114,7 +114,7 @@ fn[T : Eq] Box::backward(
   return None
 }
 
-///|
+///|UUID(8bd20af2-aedc-450b-99e1-eb916e5379c6)
 fn[T : Eq] Box::midpoint(
   self : Box,
   old~ : ArrayView[T],
@@ -149,7 +149,7 @@ fn[T : Eq] Box::midpoint(
   }
 }
 
-///|
+///|UUID(9bfec3f7-0b9c-4d68-948d-05932dbaea66)
 fn[T : Eq] Box::find_path(
   self : Box,
   old~ : ArrayView[T],
@@ -176,7 +176,7 @@ fn[T : Eq] Box::find_path(
 }
 // end findpath definition
 
-///|
+///|UUID(866e4570-9ef1-4d1e-b095-203eb6b95f46)
 pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> Array[Edit[T]] {
   let initial_box = Box::{
     left: 0,

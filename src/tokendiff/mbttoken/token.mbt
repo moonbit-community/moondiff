@@ -1,4 +1,4 @@
-///|
+///|UUID(c67f68f3-145d-4eff-ad80-961857bf0ca1)
 pub(all) enum MbtToken {
   Visible(
     kind~ : @tokens.TokenKind,
@@ -9,7 +9,7 @@ pub(all) enum MbtToken {
   Barrier
 }
 
-///|
+///|UUID(3b275564-69e2-4725-a6a8-fe6f05a3d97c)
 pub impl Show for MbtToken with output(self, logger) {
   match self {
     Visible(kind~, repr~, ..) => {
@@ -28,7 +28,7 @@ pub impl Show for MbtToken with output(self, logger) {
   }
 }
 
-///|
+///|UUID(6af7c0c1-526f-47b5-a84d-94c0cc97ebf7)
 pub impl Eq for MbtToken with equal(self, other) {
   match (self, other) {
     (Invisible(_), Invisible(_))
@@ -43,7 +43,7 @@ pub impl Eq for MbtToken with equal(self, other) {
   }
 }
 
-///|
+///|UUID(fc6fdb12-ac6b-407f-a046-ee9faaf0a0d2)
 pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
   match self {
     Visible(repr~, ..) => repr
@@ -64,7 +64,7 @@ pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
   }
 }
 
-///|
+///|UUID(ba2af0be-f23f-4bed-b1c6-358bc0f5899f)
 pub fn MbtToken::emit_text_to(self : MbtToken, buf : Array[Char]) -> Unit {
   match self {
     Visible(repr~, ..) => buf.append(repr)
@@ -82,13 +82,13 @@ pub fn MbtToken::emit_text_to(self : MbtToken, buf : Array[Char]) -> Unit {
   }
 }
 
-///|
+///|UUID(8ef01a12-3cd7-4525-88c3-1e6c34eebc4c)
 fn is_continuum(prev : @basic.Position, next : @basic.Position) -> Bool {
   (prev.lnum == next.lnum && prev.column() == next.column()) ||
   (prev.lnum + 1 == next.lnum && next.column() == 1)
 }
 
-///|
+///|UUID(103524ed-755a-4bee-b4d5-b5be457c82bd)
 fn whitespace_width(prev : @basic.Position, next : @basic.Position) -> Int {
   if prev.lnum == next.lnum {
     next.column() - prev.column()
@@ -97,7 +97,7 @@ fn whitespace_width(prev : @basic.Position, next : @basic.Position) -> Int {
   }
 }
 
-///|
+///|UUID(3cd4a9dc-722f-4b47-afec-bc6cae032df2)
 fn is_dot_token(token : @tokens.Token) -> Bool {
   token is DOT_INT(_) ||
   token is DOT_LIDENT(_) ||
@@ -105,7 +105,7 @@ fn is_dot_token(token : @tokens.Token) -> Bool {
   token is DOT_UIDENT(_)
 }
 
-///|
+///|UUID(23a285d2-4db9-4716-b246-a87b911c7717)
 fn Array::add_token(self : Array[MbtToken], token : MbtToken) -> Unit {
   if token is Invisible([w]) && self is [.., last] && last is Invisible(widths) {
     widths.push(w)
@@ -114,14 +114,14 @@ fn Array::add_token(self : Array[MbtToken], token : MbtToken) -> Unit {
   }
 }
 
-///|
+///|UUID(02220a38-7942-4c3f-9901-56ae920d40a4)
 pub fn MbtToken::from_str(source : String) -> Array[MbtToken] {
   let line_widths = @span.LineWidths::from_str(source)
   let triples = @lexer.tokens_from_string(comment=true, source).tokens
   MbtToken::from_triples(triples, line_widths)
 }
 
-///|
+///|UUID(a17b85aa-1988-4b89-91f9-7f9846f8b020)
 fn MbtToken::from_triples(
   triples : ArrayView[(@tokens.Token, @basic.Position, @basic.Position)],
   line_widths : @span.LineWidths,
@@ -171,7 +171,7 @@ fn MbtToken::from_triples(
   return mbt_tokens
 }
 
-///|
+///|UUID(09346902-5684-481d-9bff-1e62964a37c9)
 pub fn mbttokens_to_string(tokens : ArrayView[MbtToken]) -> String {
   let buf = StringBuilder::new(size_hint=tokens.length() * 5)
   for token in tokens {

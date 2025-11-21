@@ -1,7 +1,7 @@
-///|
+///|UUID(a947c838-4439-498c-8adc-8ab70d8e6913)
 pub type Blocks[T] = Array[Block[T]]
 
-///|
+///|UUID(00741b24-3154-45e7-bfa3-db9d3d75fdd6)
 pub fn create_blocks(
   input : StringView,
 ) -> Blocks[String] raise BlockProcessingError {
@@ -13,7 +13,8 @@ pub fn create_blocks(
   for i in 0..<lines.length() {
     let line = lines[i]
     if line lexmatch? ("///\|", rest) {
-      if rest lexmatch? ("UUID\(", rest) && rest lexmatch? ("[0-9a-z\-]+" as next_uuid, _) {
+      if rest lexmatch? ("UUID\(", rest) &&
+        rest lexmatch? ("[0-9a-z\-]+" as next_uuid, _) {
         if current_uuid != "dummy_uuid_if_ocuur_then_need_fix" {
           res.push(Block::{
             start_line: current_start_line,
@@ -23,12 +24,18 @@ pub fn create_blocks(
           buf.reset()
         } else if !buf.is_empty() {
           // there is content before the first UUID
-          raise NotWellFormattedSourceCode(completely_no_uuid=false, line_number=current_start_line)
+          raise NotWellFormattedSourceCode(
+            completely_no_uuid=false,
+            line_number=current_start_line,
+          )
         }
         current_uuid = next_uuid.to_string()
         current_start_line = i + 1
       } else {
-        raise NotWellFormattedSourceCode(completely_no_uuid=false, line_number=i+1)
+        raise NotWellFormattedSourceCode(
+          completely_no_uuid=false,
+          line_number=i + 1,
+        )
       }
     } else {
       buf.write_stringview(line)
@@ -37,7 +44,10 @@ pub fn create_blocks(
   } else {
     if !buf.is_empty() {
       if current_uuid == "dummy_uuid_if_ocuur_then_need_fix" {
-        raise NotWellFormattedSourceCode(completely_no_uuid=true, line_number=current_start_line)
+        raise NotWellFormattedSourceCode(
+          completely_no_uuid=true,
+          line_number=current_start_line,
+        )
       }
       res.push(Block::{
         start_line: current_start_line,
@@ -49,7 +59,7 @@ pub fn create_blocks(
   res
 }
 
-///|
+///|UUID(495f5a2d-51b7-4908-95a0-419bbbd6ffc1)
 test {
   let text =
     #|///|UUID(1)
@@ -68,7 +78,7 @@ test {
   ])
 }
 
-///|
+///|UUID(34e9056e-a322-4d07-9d58-3f6a29e00770)
 test "empty block" {
   let text =
     #|///|UUID(1)
@@ -92,7 +102,7 @@ test "empty block" {
   ])
 }
 
-///|
+///|UUID(44365bb5-b769-444e-8478-00646f3dbc8a)
 test "not well formatted source code" {
   let text =
     #|fn foo

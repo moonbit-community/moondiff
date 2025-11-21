@@ -1,10 +1,10 @@
-///|
+///|UUID(e26e3e2e-00ec-4951-9e80-39212b2a23b8)
 using @edit {type Edit}
 
-///|
+///|UUID(71a17c7d-273d-4031-85e5-a809e6159618)
 using @mbttoken {type MbtToken}
 
-///|
+///|UUID(5f681320-71af-4158-86af-23dd55ec0457)
 fn pairing_blocks(
   old~ : String,
   new~ : String,
@@ -14,7 +14,7 @@ fn pairing_blocks(
   @block.pairing_blocks_by_uuid(old~, new~)
 }
 
-///|
+///|UUID(a9efe061-d048-4052-a7c1-9f2024ce1193)
 fn split_matching_block(
   matching_block : Array[Edit[Array[MbtToken]]],
 ) -> (Array[Array[(Bool, Array[Char])]], Array[Array[(Bool, Array[Char])]]) {
@@ -104,7 +104,7 @@ fn split_matching_block(
   return (left, right)
 }
 
-///|
+///|UUID(88f4c8f1-40f9-4b0f-b316-aa6424bf0d67)
 fn soft_wrap(
   lines : Array[Array[(Bool, Array[Char])]],
 ) -> Array[(Bool, Array[(Bool, ArrayView[Char])])] {
@@ -152,7 +152,7 @@ fn soft_wrap(
   }
 }
 
-///|
+///|UUID(be742222-3081-471c-a807-2daa57a040a7)
 test "soft wrap" {
   let lines = [
     [
@@ -181,7 +181,7 @@ test "soft wrap" {
   ])
 }
 
-///|
+///|UUID(07b34f2d-f127-4ad9-b811-ad76d227f5bb)
 fn ArrayView::split(
   self : ArrayView[Int],
   delimiter : Int,
@@ -198,7 +198,7 @@ fn ArrayView::split(
   return result
 }
 
-///|
+///|UUID(429b0e77-edb4-40ef-8625-d2cd62e18698)
 test "split arrayview" {
   let widths = [0, 0, 4][:]
   @json.inspect(widths.split(0), content=[[], [], [4]])
@@ -207,10 +207,10 @@ test "split arrayview" {
   @json.inspect(widths.split(0), content=[[], [], []])
 }
 
-///|
+///|UUID(e1136f23-beb4-46f9-828d-e35e49dc0bc0)
 let global_line_buffer : StringBuilder = StringBuilder::new()
 
-///|
+///|UUID(f9fef063-a351-4b21-9c11-55f06002a376)
 fn combine_two_line(
   left_line~ : Array[(Bool, ArrayView[Char])],
   right_line~ : Array[(Bool, ArrayView[Char])],
@@ -261,7 +261,7 @@ fn combine_two_line(
   return global_line_buffer.to_string()
 }
 
-///|
+///|UUID(1bf5670b-3bf7-42af-9a89-ba858090c204)
 fn rendering_matching_block_side_by_side(
   matching_block : Array[Edit[Array[MbtToken]]],
 ) -> String {
@@ -284,10 +284,10 @@ fn rendering_matching_block_side_by_side(
   return buf.to_string()
 }
 
-///|
+///|UUID(9f5f63ec-3728-40e4-a4ee-69070618f673)
 using @line_group {type REdit}
 
-///|
+///|UUID(ca3b1041-ce43-44d9-bf42-6f28b63b324c)
 fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String {
   let buf = StringBuilder::new()
   let red = @chalk.chalk().color(Red).modifier(Bold)
@@ -365,7 +365,7 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
   return buf.to_string()
 }
 
-///|
+///|UUID(a47f436d-ecfd-4c75-bf76-1191bf927f77)
 fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
   let old = @fs.read_file_to_string(old_filename)
   let new = @fs.read_file_to_string(new_filename)
@@ -415,7 +415,7 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
   }
 }
 
-///|
+///|UUID(3b04e28e-7b7a-4b4e-b04b-cb4c57577167)
 fn main {
   let args = @sys.get_cli_args()
   let spec : Array[(String, String, @ArgParser.Spec, String)] = [

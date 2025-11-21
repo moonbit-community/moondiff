@@ -1,4 +1,4 @@
-///|
+///|UUID(039bd8a9-e2b3-4cda-a45b-3c4695e9d062)
 pub fn align_edit_boundaries(
   input : ArrayView[Edit[Array[MbtToken]]],
 ) -> Array[Edit[Array[MbtToken]]] {
@@ -159,7 +159,7 @@ pub fn align_edit_boundaries(
   }
 }
 
-///|
+///|UUID(876a3bed-bf21-41bb-82b7-6407ba84dd24)
 fn Array::content_length(self : Array[MbtToken]) -> Int {
   let mut length = 0
   for token in self {
@@ -182,7 +182,7 @@ fn Array::content_length(self : Array[MbtToken]) -> Int {
   return length
 }
 
-///|
+///|UUID(1e014ef8-949d-4260-83ab-5dfd70240f35)
 /// avoid some anti pattern in Equal:
 /// ```pesudo mbt
 ///    <newline>
@@ -205,7 +205,7 @@ fn not_a_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
   )
 }
 
-///|
+///|UUID(c4c6b52c-9397-43d8-82b0-1c3c08193c10)
 fn slide_to_prev(
   prev~ : Array[MbtToken],
   current~ : Array[MbtToken],
@@ -220,7 +220,7 @@ fn slide_to_prev(
   (new_prev, new_current, new_next)
 }
 
-///|
+///|UUID(ccdd0800-803c-4285-8b26-d7360aafdb4d)
 fn slide_to_next(
   prev~ : Array[MbtToken],
   current~ : Array[MbtToken],
@@ -234,7 +234,7 @@ fn slide_to_next(
   (new_prev, new_current, new_next)
 }
 
-///|
+///|UUID(583eb74c-6801-4447-9018-8db845a54a09)
 fn fullfill_next_scoreboard(
   next_scoreboard : Array[Int],
   next_prefix_length : Int,
@@ -248,7 +248,7 @@ fn fullfill_next_scoreboard(
   }
 }
 
-///|
+///|UUID(78973f79-c00c-4734-8749-f772ac5f64db)
 fn fullfill_prev_scoreboard(
   prev_scoreboard : Array[Int],
   prev_suffix_length : Int,
@@ -262,7 +262,7 @@ fn fullfill_prev_scoreboard(
   }
 }
 
-///|
+///|UUID(0bf50b49-ac94-49bf-bb84-5a987c4796a0)
 fn calc_score(scoreboard : Array[Int], tok : MbtToken, i : Int) -> Unit {
   match tok {
     Invisible(_) => scoreboard[i] = 2
@@ -271,7 +271,7 @@ fn calc_score(scoreboard : Array[Int], tok : MbtToken, i : Int) -> Unit {
   }
 }
 
-///|
+///|UUID(ff085fa1-3df1-453f-b413-278d19e0eb1b)
 fn compute_common_prefix_length(
   x : ArrayView[MbtToken],
   y : ArrayView[MbtToken],
@@ -292,7 +292,7 @@ fn compute_common_prefix_length(
   }
 }
 
-///|
+///|UUID(0fd7bcd1-4444-41c5-a295-9fc755bff135)
 fn compute_common_suffix_length(
   x : ArrayView[MbtToken],
   y : ArrayView[MbtToken],
@@ -313,7 +313,7 @@ fn compute_common_suffix_length(
   }
 }
 
-///|
+///|UUID(1f3040b0-eecf-477e-8004-d33d9b834fdd)
 fn Array::push_edit(
   self : Array[Edit[Array[MbtToken]]],
   edit : Edit[Array[MbtToken]],

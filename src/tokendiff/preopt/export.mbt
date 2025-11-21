@@ -1,4 +1,4 @@
-///|
+///|UUID(984694cc-a0d3-4fbe-bf35-cba07d6f5408)
 pub fn separate_common_prefix_and_suffix(
   old~ : ArrayView[MbtToken],
   new~ : ArrayView[MbtToken],

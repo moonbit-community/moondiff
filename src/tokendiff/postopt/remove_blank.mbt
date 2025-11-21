@@ -1,4 +1,4 @@
-///|
+///|UUID(77ca16eb-ac6d-458a-b884-5d83e14a10b6)
 fn Array::remove_leading_trailing_blank(
   self : Array[Edit[Array[MbtToken]]],
 ) -> Array[Edit[Array[MbtToken]]] {

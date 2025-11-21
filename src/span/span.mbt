@@ -1,17 +1,17 @@
-///|
+///|UUID(c6a0f8cd-be12-4d84-9af8-0d7654356da3)
 pub(all) struct SingleLineSpan {
   line : Int
   start_col : Int
   end_col : Int
 } derive(ToJson)
 
-///|
+///|UUID(3694ba0a-e674-4b26-8d99-bd54c2c546bd)
 pub struct LineWidths {
   contents : Array[Char]
   lines : Array[(Int, Int)]
 } derive(Show)
 
-///|
+///|UUID(78b34971-d0db-4321-bf4e-3f7a874a1519)
 pub impl ToJson for LineWidths with to_json(self) {
   let views = Array::new()
   for line in self.lines {
@@ -20,17 +20,17 @@ pub impl ToJson for LineWidths with to_json(self) {
   return views.to_json()
 }
 
-///|
+///|UUID(c2453f0a-a480-4e28-bb5c-4ca37c519b2c)
 pub fn LineWidths::op_get(self : Self, line : Int) -> ArrayView[Char] {
   self.contents[self.lines[line].1:self.lines[line].0]
 }
 
-///|
+///|UUID(5fde8c1c-43d9-41aa-9876-b54f660d01d9)
 pub fn LineWidths::get_line_width(self : Self, line : Int) -> Int {
   self.lines[line].1 - self.lines[line].0
 }
 
-///|
+///|UUID(5c80b453-f09d-4200-8831-7c4175671747)
 pub fn LineWidths::from_str(str : StringView) -> Self {
   let contents = str.to_array()
   let lines = Array::new()
@@ -62,7 +62,7 @@ pub fn LineWidths::from_str(str : StringView) -> Self {
   }
 }
 
-///|
+///|UUID(cdc5902a-c0ce-4f74-be09-cdac4c10613b)
 test "line widths" {
   let str =
     #|Hello,
@@ -84,7 +84,7 @@ test "line widths" {
   ])
 }
 
-///|
+///|UUID(bc4a523c-cabd-455a-af99-eea962898b64)
 pub fn LineWidths::text_of_loc(
   self : Self,
   start_pos : @basic.Position,
@@ -95,7 +95,7 @@ pub fn LineWidths::text_of_loc(
   self.contents[start:end].to_array()
 }
 
-///|
+///|UUID(b1be2268-a2f5-4aea-aacb-b462e246b523)
 pub fn LineWidths::loc_to_spans(
   self : Self,
   loc : @basic.Location,
@@ -126,7 +126,7 @@ pub fn LineWidths::loc_to_spans(
   }
 }
 
-///|
+///|UUID(54567056-0200-4948-8995-939241694b9b)
 pub fn LineWidths::forward_search(
   self : Self,
   symbol : Char,
@@ -138,7 +138,7 @@ pub fn LineWidths::forward_search(
   ...
 }
 
-///|
+///|UUID(06ec6f3b-3681-474a-b190-fd6c0622f207)
 pub fn LineWidths::backward_search(
   self : Self,
   symbol : Char,
