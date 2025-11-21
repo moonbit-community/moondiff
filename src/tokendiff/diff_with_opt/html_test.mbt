@@ -28,6 +28,11 @@ test "fn_insert_argument_and_stmt" (t : @test.Test) {
   test_web_rendering(t, "fn_insert_argument_and_stmt")
 }
 
+///|UUID(1ba8a816-d4f8-41bc-bf2a-21635ef2bae9)
+test "line_group" (t : @test.Test) {
+  test_web_rendering(t, "line_group")
+}
+
 ///|UUID(fd14d3ff-7025-40b8-9a0e-7f2f3b6736be)
 let source_dir = "src/tokendiff/diff_with_opt/sources"
 
