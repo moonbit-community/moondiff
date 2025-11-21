@@ -1,0 +1,76 @@
+--- cli_test/source/20251114.old.mbt: line 1
++++ cli_test/source/20251114.new.mbt: line 1
+[31m[1m-|[22m[39m  pub fn decode(bytes : @bytes.View) -> String raise Malformed {
+[32m[1m+|[22m[39m  pub fn decode(
+[32m[1m+|[22m[39m    bytes : @bytes.View[32m[1m,[22m[39m
+[32m[1m+|[22m[39m  [32m[1m  [22m[39m[32m[1mignore_bom? : Bool = false,[22m[39m
+[32m[1m+|[22m[39m  [32m[1m[22m[39m) -> String raise Malformed {
+[32m[1m+|[22m[39m    [32m[1mlet bytes = if ignore_bom && bytes is [.. "\xef\xbb\xbf", .. rest] {[22m[39m
+[32m[1m+|[22m[39m  [32m[1m    [22m[39m[32m[1mrest[22m[39m
+[32m[1m+|[22m[39m  [32m[1m  [22m[39m[32m[1m} else {[22m[39m
+[32m[1m+|[22m[39m  [32m[1m    [22m[39m[32m[1mbytes[22m[39m
+[32m[1m+|[22m[39m  [32m[1m  [22m[39m[32m[1m}[22m[39m
+[90m=|[39m  [90m  let builder = StringBuilder::new(size_hint=bytes.length())[39m
+[90m=|[39m  [90m  loop bytes {[39m
+[90m=|[39m  [90m    ...[39m
+[90m=|[39m  [90m  }[39m
+[90m=|[39m  [90m}[39m
+
+--- cli_test/source/20251114.old.mbt: line 9
++++ cli_test/source/20251114.new.mbt: line 39
+[90m=|[39m  [90mpub fn View::from_array(chars : Array[Char]) -> View {[39m
+[31m[1m-|[22m[39m    [31m[1m// todo: remove .view() in new version[22m[39m
+[31m[1m-|[22m[39m    String::from_array(chars)[31m[1m.view()[22m[39m
+[32m[1m+|[22m[39m    [32m[1mlet s =[22m[39m String::from_array(chars)
+[32m[1m+|[22m[39m    [32m[1mView::make_view(s, 0, s.length())[22m[39m
+[90m=|[39m  [90m}[39m
+
+--- cli_test/source/20251114.old.mbt: line 15
++++ cli_test/source/20251114.new.mbt: line 45
+[90m=|[39m  [90mstruct Set[K] {[39m
+[31m[1m-|[22m[39m    mut entries : FixedArray[[31m[1mSEntry[22m[39m[K]?]
+[31m[1m-|[22m[39m    [31m[1mmut list : FixedArray[SListNode[K]][22m[39m
+[31m[1m-|[22m[39m    mut size : Int
+[31m[1m-|[22m[39m    mut capacity : Int
+[31m[1m-|[22m[39m    mut capacity_mask : Int
+[31m[1m-|[22m[39m    mut grow_at : Int
+[31m[1m-|[22m[39m    mut head : [31m[1mSEntry[22m[39m[K]?
+[31m[1m-|[22m[39m    mut tail : [31m[1mSEntry[K][22m[39m[31m[1m?[22m[39m
+[32m[1m+|[22m[39m    mut entries : FixedArray[[32m[1mEntry[22m[39m[K]?]
+[32m[1m+|[22m[39m    mut size : Int [32m[1m// active keys count[22m[39m
+[32m[1m+|[22m[39m    mut capacity : Int [32m[1m// current capacity[22m[39m
+[32m[1m+|[22m[39m    mut capacity_mask : Int [32m[1m// capacity_mask = capacity - 1, used to find idx[22m[39m
+[32m[1m+|[22m[39m    mut grow_at : Int [32m[1m// threshold that triggers grow[22m[39m
+[32m[1m+|[22m[39m    mut head : [32m[1mEntry[22m[39m[K]? [32m[1m// head of linked list[22m[39m
+[32m[1m+|[22m[39m    mut tail : [32m[1mInt[22m[39m [32m[1m// tail of linked list[22m[39m
+[90m=|[39m  [90m}[39m
+
+--- cli_test/source/20251114.old.mbt: line 27
++++ cli_test/source/20251114.new.mbt: line 17
+[90m=|[39m  [90mfn main {[39m
+[90m=|[39m  [90m  println("Hello, world!")[39m
+[32m[1m+|[22m[39m  [32m[1m  // insert comment[22m[39m
+[32m[1m+|[22m[39m  [32m[1m  // more than one line[22m[39m
+[90m=|[39m  [90m  println(5 + 6)[39m
+[90m=|[39m  [90m}[39m
+
+--- cli_test/source/20251114.old.mbt: line 33
++++ cli_test/source/20251114.new.mbt: line 25
+[31m[1m-|[22m[39m  pub fn[T, U] map(self : T?, f : (T) -> U) -> U? {
+[32m[1m+|[22m[39m  pub fn[T, U] map(self : T?, f : (T) -> U [32m[1mraise?[22m[39m) -> U? [32m[1mraise?[22m[39m {
+[90m=|[39m  [90m  match self {[39m
+[90m=|[39m  [90m    Some(t) => Some(f(t))[39m
+[90m=|[39m  [90m    None => None[39m
+[90m=|[39m  [90m  }[39m
+[90m=|[39m  [90m}[39m
+
+--- cli_test/source/20251114.old.mbt: line 41
++++ cli_test/source/20251114.new.mbt: line 33
+[90m=|[39m  [90mfn main() {[39m
+[31m[1m-|[22m[39m    println(
+[31m[1m-|[22m[39m      "Hello, world!"
+[31m[1m-|[22m[39m    )
+[32m[1m+|[22m[39m    println("Hello, world!")
+[32m[1m+|[22m[39m    [32m[1mprintln(5 + 6)[22m[39m
+[90m=|[39m  [90m}[39m
+
