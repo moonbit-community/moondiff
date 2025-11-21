@@ -1,0 +1,52 @@
+///|UUID(e9c1b971-0da7-425d-87f6-520910e5a22b)
+pub fn line_group(old : String, new : String) -> Array[REdit] {
+  let groups = Array::new()
+  let mut old = old.split("\n").collect()[:]
+  while old is [.. rest, ""] {
+    old = rest
+  }
+  let mut new = new.split("\n").collect()[:]
+  while new is [.. rest, ""] {
+    new = rest
+  }
+  let mut edits = @compress.compress_edits(@myers.diff(old~, new~))[:]
+  if edits
+    is ([Delete(old~), Insert(new~), .. rest]
+    | [Insert(new~), Delete(old~), .. rest]) {
+    groups.push(REdit::Replace(old~, new~))
+    edits = rest
+  }
+  while true {
+    match edits {
+      [] => break
+      [Delete(old~), Insert(new~)] | [Insert(new~), Delete(old~)] => {
+        groups.push(REdit::Replace(old~, new~))
+        break
+      }
+      [
+        Equal(..) as prev,
+        Insert(new~),
+        Delete(old~),
+        Equal(..) as next,
+        .. rest,
+      ]
+      | [
+        Equal(..) as prev,
+        Delete(old~),
+        Insert(new~),
+        Equal(..) as next,
+        .. rest,
+      ] => {
+        groups.push(REdit::Normal(prev))
+        groups.push(REdit::Replace(old~, new~))
+        groups.push(REdit::Normal(next))
+        edits = rest
+      }
+      [edit, .. rest] => {
+        groups.push(REdit::Normal(edit))
+        edits = rest
+      }
+    }
+  }
+  return groups
+}
