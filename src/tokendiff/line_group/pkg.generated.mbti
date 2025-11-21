@@ -6,7 +6,7 @@ import(
 )
 
 // Values
-fn line_group(String, String) -> Array[REdit]
+fn line_group(String, String) -> Array[REdit]?
 
 // Errors
 

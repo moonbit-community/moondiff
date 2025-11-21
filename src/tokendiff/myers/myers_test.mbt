@@ -36,8 +36,10 @@ test "single inserttion" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|  bar
@@ -62,8 +64,10 @@ test "single deletion" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|- bar
@@ -88,8 +92,10 @@ test "insert and delete" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|- bar
@@ -118,8 +124,10 @@ test "multiple insertions" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|  bar
@@ -148,8 +156,10 @@ test "multiple deletions" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|- bar
@@ -178,8 +188,10 @@ test "multiple insertions and deletions" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|- bar
@@ -207,8 +219,10 @@ test "no changes" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_false(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|  bar
@@ -229,8 +243,10 @@ test "completely different" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|- foo
       #|- bar
@@ -248,8 +264,10 @@ test "empty to non-empty" {
     #|foo
     #|bar
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|+ foo
       #|+ bar
@@ -265,8 +283,10 @@ test "non-empty to empty" {
     #|bar
   let old = old.split("\n").collect()
   let new = []
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|- foo
       #|- bar
@@ -279,8 +299,10 @@ test "non-empty to empty" {
 test "both empty" {
   let old = []
   let new = []
+  let (changed, edits) = diff(old~, new~)
+  assert_false(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|
     ),
@@ -298,8 +320,10 @@ test "insert at end" {
     #|baz
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|  bar
@@ -320,8 +344,10 @@ test "delete at end" {
     #|bar
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|  bar
@@ -342,8 +368,10 @@ test "insert at beginning" {
     #|baz
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|+ foo
       #|  bar
@@ -364,8 +392,10 @@ test "delete at beginning" {
     #|baz
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|- foo
       #|  bar
@@ -389,8 +419,10 @@ test "consecutive inserts and deletes" {
     #|qux
   let old = old.split("\n").collect()
   let new = new.split("\n").collect()
+  let (changed, edits) = diff(old~, new~)
+  assert_true(changed)
   inspect(
-    print_edits(diff(old~, new~)),
+    print_edits(edits),
     content=(
       #|  foo
       #|- bar

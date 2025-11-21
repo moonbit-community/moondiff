@@ -3,11 +3,10 @@ package "myfreess/moondiff/tokendiff/preopt"
 
 import(
   "myfreess/moondiff/tokendiff/edit"
-  "myfreess/moondiff/tokendiff/mbttoken"
 )
 
 // Values
-fn separate_common_prefix_and_suffix(old~ : ArrayView[@mbttoken.MbtToken], new~ : ArrayView[@mbttoken.MbtToken]) -> (ArrayView[@edit.Edit[@mbttoken.MbtToken]], ArrayView[@edit.Edit[@mbttoken.MbtToken]], ArrayView[@mbttoken.MbtToken], ArrayView[@mbttoken.MbtToken])
+fn[T : Eq] separate_common_prefix_and_suffix(old~ : ArrayView[T], new~ : ArrayView[T]) -> (ArrayView[@edit.Edit[T]], ArrayView[@edit.Edit[T]], ArrayView[T], ArrayView[T])
 
 // Errors
 

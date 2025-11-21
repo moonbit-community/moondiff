@@ -1,8 +1,8 @@
 ///|UUID(506c6efe-832d-479b-ac74-4682c76e2fed)
-fn separate_common_suffix(
-  old~ : ArrayView[MbtToken],
-  new~ : ArrayView[MbtToken],
-) -> (Array[Edit[MbtToken]], ArrayView[MbtToken], ArrayView[MbtToken]) {
+fn[T : Eq] separate_common_suffix(
+  old~ : ArrayView[T],
+  new~ : ArrayView[T],
+) -> (Array[Edit[T]], ArrayView[T], ArrayView[T]) {
   let suffix = Array::new(capacity=40)
   loop (old, new) {
     ([] as old_without_prefix, [] as new_without_prefix)

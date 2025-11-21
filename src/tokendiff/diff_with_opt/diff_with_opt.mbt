@@ -7,7 +7,7 @@ pub fn diff_with_opt(
     old~,
     new~,
   )
-  let middle = @myers.diff(old~, new~)
+  let (_, middle) = @myers.diff(old~, new~)
   let edits = Array::new(
     capacity=prefix.length() + middle.length() + suffix.length(),
   )

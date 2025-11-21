@@ -5,7 +5,7 @@ pub enum REdit {
 } derive(ToJson)
 
 ///|UUID(e9c1b971-0da7-425d-87f6-520910e5a22b)
-pub fn line_group(old : String, new : String) -> Array[REdit] {
+pub fn line_group(old : String, new : String) -> Array[REdit]? {
   let groups = Array::new()
   let mut old = old.split("\n").collect()[:]
   while old is [.. rest, ""] {
@@ -15,7 +15,11 @@ pub fn line_group(old : String, new : String) -> Array[REdit] {
   while new is [.. rest, ""] {
     new = rest
   }
-  let mut edits = @compress.compress_edits(@myers.diff(old~, new~))[:]
+  let (changed, edits) = @myers.diff(old~, new~)
+  if !changed {
+    return None
+  }
+  let mut edits = @compress.compress_edits(edits)[:]
   if edits
     is ([Delete(old~), Insert(new~), .. rest]
     | [Insert(new~), Delete(old~), .. rest]) {
@@ -41,7 +45,7 @@ pub fn line_group(old : String, new : String) -> Array[REdit] {
       }
     }
   }
-  return groups
+  return Some(groups)
 }
 
 ///|UUID(b7cdcb24-ce84-474e-9dfa-9a7ea0d7af02)
@@ -58,7 +62,7 @@ test {
     #|BAZ
     #|QUX
     #|quux
-  let groups = line_group(old, new)
+  let groups = line_group(old, new).unwrap_or([])
   @json.inspect(groups, content=[
     ["Normal", { "equal": { "old": ["foo", "bar"], "new": ["foo", "bar"] } }],
     ["Replace", { "old": ["baz", "qux"], "new": ["BAZ", "QUX"] }],
@@ -75,7 +79,7 @@ test {
     #|epsilon
     #|gamma
     #|DELTA
-  let groups = line_group(old, new)
+  let groups = line_group(old, new).unwrap_or([])
   @json.inspect(groups, content=[
     ["Replace", { "old": ["alpha"], "new": ["ALPHA"] }],
     ["Normal", { "equal": { "old": ["beta"], "new": ["beta"] } }],

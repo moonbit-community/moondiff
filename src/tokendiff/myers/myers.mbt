@@ -177,19 +177,25 @@ fn[T : Eq] Box::find_path(
 // end findpath definition
 
 ///|UUID(866e4570-9ef1-4d1e-b095-203eb6b95f46)
-pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> Array[Edit[T]] {
+pub fn[T : Eq] diff(
+  old~ : ArrayView[T],
+  new~ : ArrayView[T],
+) -> (Bool, Array[Edit[T]]) {
   let initial_box = Box::{
     left: 0,
     top: 0,
     right: old.length(),
     bottom: new.length(),
   }
-  guard initial_box.find_path(old~, new~) is Some(path) else { return [] }
+  guard initial_box.find_path(old~, new~) is Some(path) else {
+    return (false, [])
+  }
   // path length >= 2
   let xy = path.take(1).collect()[0] // (0, 0)
   let mut x1 = xy.0
   let mut y1 = xy.1
   let edits : Array[Edit[T]] = Array::new(capacity=old.length() + new.length())
+  let mut changed = false
   path
   .drop(1)
   .each(fn(xy) {
@@ -201,10 +207,16 @@ pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> Array[Edit[T]] 
       y1 = y1 + 1
     }
     if x2 - x1 < y2 - y1 {
+      if !changed {
+        changed = true
+      }
       edits.push(Insert(new=new[y1]))
       y1 += 1
     }
     if x2 - x1 > y2 - y1 {
+      if !changed {
+        changed = true
+      }
       edits.push(Delete(old=old[x1]))
       x1 += 1
     }
@@ -216,5 +228,5 @@ pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> Array[Edit[T]] 
     x1 = x2
     y1 = y2
   })
-  return edits
+  return (changed, edits)
 }
