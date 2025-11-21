@@ -1,5 +1,4 @@
 ///|
 pub suberror BlockProcessingError {
-  UUIDNotFound(String) // delimiter token
-  EmptyBlock
-}
+  NotWellFormattedSourceCode(completely_no_uuid~ : Bool, line_number~ : Int)
+} derive(Show)

@@ -1,11 +1,6 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/block"
 
-import(
-  "moonbitlang/parser/basic"
-  "moonbitlang/parser/tokens"
-)
-
 // Values
 fn create_blocks(StringView) -> Array[Block[String]] raise BlockProcessingError
 
@@ -14,8 +9,9 @@ fn pairing_blocks_by_uuid(old~ : ArrayView[Block[String]], new~ : ArrayView[Bloc
 // Errors
 pub suberror BlockProcessingError {
   UUIDNotFound(String)
-  EmptyBlock
+  NotWellFormattedSourceCode(completely_no_uuid~ : Bool)
 }
+impl Show for BlockProcessingError
 
 // Types and methods
 pub struct Block[T] {
@@ -23,7 +19,6 @@ pub struct Block[T] {
   uuid : String
   contents : T
 }
-fn Block::get_block_uuid(ArrayView[(@tokens.Token, @basic.Position, @basic.Position)]) -> String raise BlockProcessingError
 impl[T : Show] Show for Block[T]
 impl[T : ToJson] ToJson for Block[T]
 

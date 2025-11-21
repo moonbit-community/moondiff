@@ -8,7 +8,7 @@ using @mbttoken {type MbtToken}
 fn pairing_blocks(
   old~ : String,
   new~ : String,
-) -> Array[@block.EditBlock] raise Error {
+) -> Array[@block.EditBlock] raise @block.BlockProcessingError {
   let old = @block.create_blocks(old)
   let new = @block.create_blocks(new)
   @block.pairing_blocks_by_uuid(old~, new~)
