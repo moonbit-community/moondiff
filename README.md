@@ -17,7 +17,7 @@ cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
 ```
 ### use
 
-moondiff relies on the features of `moonfmt`: `-block-style`(which is now the default behavior) and `-add-uuid`(which is not the default behavior)to function. If you wish to use moondiff in a MoonBit repository, please first execute the following command:
+moondiff relies on the features of `moonfmt`: `-block-style`(which is now the default behavior) and `-add-uuid`(which is not the default behavior). If you wish to use moondiff in a MoonBit repository, please first execute the following command:
 
 ```shell
 moon fmt -- -add-uuid
