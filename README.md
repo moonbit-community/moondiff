@@ -16,6 +16,7 @@ moon build --target native
 mkdir -p ~/.local/bin
 cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
 ```
+
 ### use
 
 moondiff relies on some features of `moonfmt`: 
@@ -31,8 +32,11 @@ moon fmt -- -add-uuid
 
 Then, configure git to use the installed binary as an optional diff tool within that repository:
 
++ native binary
+
 ```shell
 git config diff.tool tokendiff
 git config difftool.tokendiff.cmd '~/.local/bin/tokendiff $LOCAL $REMOTE'
 git config difftool.prompt false
 ```
+

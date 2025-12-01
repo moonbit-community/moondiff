@@ -1,0 +1,17 @@
+[package]
+name = "myfreess/tokendiff"
+version = "0.1.3"
+description = "Token-level diff for Moonbit language"
+
+[[module]]
+name = "tokendiff"
+source = "./target/wasm/release/build/tokendiff/cli/cli.wasm"
+abi = "wasi"
+
+[module.interfaces]
+wasi = '0.1.0-unstable'
+
+[[command]]
+name = "tokendiff"
+module = "tokendiff"
+runner = "wasi"

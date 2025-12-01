@@ -12,8 +12,18 @@
     "moonbitlang/x/fs",
     "Yoorkin/ArgParser",
     "myfreess/moondiff/tokendiff/line_group",
-    "myfreess/piediff/line_diff"
+    "myfreess/piediff/line_diff",
+    "peter-jerry-ye/wasi"
   ],
   "is-main": true,
+  "targets": {
+    "io_wasm.mbt" : ["wasm"],
+    "io_other.mbt" : ["not", "wasm"]
+  },
+  "link": {
+    "wasm": {
+      "export-memory-name": "memory"
+    }
+  },
   "warn-list": "-24-2-29"
 }
