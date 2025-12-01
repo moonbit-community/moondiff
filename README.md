@@ -13,11 +13,26 @@ Difftool that aware MoonBit language syntax.
 ```shell
 moon build --target native
 # add `~/.local/bin` to your `PATH`
+mkdir -p ~/.local/bin
 cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
 ```
+
++ wasm (wasi-preview-1)
+
+```shell
+wasmer run myfreess/tokendiff #install when first run
+```
+
+**Note**: 
+
 ### use
 
-moondiff relies on the features of `moonfmt`: `-block-style`(which is now the default behavior) and `-add-uuid`(which is not the default behavior). If you wish to use moondiff in a MoonBit repository, please first execute the following command:
+moondiff relies on some features of `moonfmt`: 
+
++ `-block-style`(which is now the default behavior) 
++ `-add-uuid`(not the default behavior). 
+
+If you want to use moondiff in a MoonBit repository, please first execute the following command:
 
 ```shell
 moon fmt -- -add-uuid
@@ -25,8 +40,13 @@ moon fmt -- -add-uuid
 
 Then, configure git to use the installed binary as an optional diff tool within that repository:
 
++ native binary
+
 ```shell
 git config diff.tool tokendiff
 git config difftool.tokendiff.cmd '~/.local/bin/tokendiff $LOCAL $REMOTE'
 git config difftool.prompt false
 ```
+
++ wasm
+

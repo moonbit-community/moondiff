@@ -368,8 +368,8 @@ fn rendering_matching_block(matching_block_line_group : Array[REdit]) -> String 
 
 ///|UUID(a47f436d-ecfd-4c75-bf76-1191bf927f77)
 fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
-  let old = @fs.read_file_to_string(old_filename)
-  let new = @fs.read_file_to_string(new_filename)
+  let old = read_file_to_string(old_filename)
+  let new = read_file_to_string(new_filename)
   if !(old_filename.has_suffix(".mbt") && new_filename.has_suffix(".mbt")) {
     // fallback to line diff
     let bold = @chalk.chalk().modifier(Bold)
@@ -421,7 +421,12 @@ fn do_all(old_filename~ : String, new_filename~ : String) -> Unit raise {
 
 ///|UUID(3b04e28e-7b7a-4b4e-b04b-cb4c57577167)
 fn main {
-  let args = @sys.get_cli_args()
+  let args = get_cli_args() catch {
+    _ => {
+      println("failed to get command line arguments")
+      exit(1)
+    }
+  }
   let spec : Array[(String, String, @ArgParser.Spec, String)] = [
     (
       "--display-side-by-side",
@@ -439,7 +444,13 @@ fn main {
     filename => filenames.push(filename),
     usage,
     args[1:].to_array(),
-  )
+  ) catch {
+    e => {
+      println("failed to parse command line argument: " + e.to_string())
+      println(usage)
+      panic()
+    }
+  }
   if filenames is [old_filename, new_filename] {
     do_all(old_filename~, new_filename~) catch {
       e => {
