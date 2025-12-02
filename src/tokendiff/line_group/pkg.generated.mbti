@@ -6,7 +6,7 @@ import(
 )
 
 // Values
-fn line_group(String, String) -> Array[REdit]?
+pub fn line_group(String, String) -> Array[REdit]?
 
 // Errors
 
@@ -15,7 +15,7 @@ pub enum REdit {
   Normal(@edit.Edit[Array[StringView]])
   Replace(old~ : Array[StringView], new~ : Array[StringView])
 }
-impl ToJson for REdit
+pub impl ToJson for REdit
 
 // Type aliases
 

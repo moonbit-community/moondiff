@@ -6,7 +6,7 @@ import(
 )
 
 // Values
-fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> (Bool, Array[@edit.Edit[T]])
+pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> (Bool, Array[@edit.Edit[T]])
 
 // Errors
 

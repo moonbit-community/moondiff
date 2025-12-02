@@ -1,9 +1,6 @@
 {
     "import": [
-        "moonbitlang/parser/syntax",
-        "moonbitlang/parser/basic",
         { "path": "Yoorkin/prettyprinter", "alias": "pp" },
         "myfreess/moondiff/span"
-    ],
-    "warn-list": "-a"
+    ]
 }
