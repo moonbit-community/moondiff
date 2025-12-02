@@ -6,7 +6,7 @@ import(
 )
 
 // Values
-fn[T] compress_edits(ArrayView[@edit.Edit[T]]) -> Array[@edit.Edit[Array[T]]]
+pub fn[T] compress_edits(ArrayView[@edit.Edit[T]]) -> Array[@edit.Edit[Array[T]]]
 
 // Errors
 

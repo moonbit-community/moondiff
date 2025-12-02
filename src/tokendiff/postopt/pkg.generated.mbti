@@ -7,7 +7,7 @@ import(
 )
 
 // Values
-fn align_edit_boundaries(ArrayView[@edit.Edit[Array[@mbttoken.MbtToken]]]) -> Array[@edit.Edit[Array[@mbttoken.MbtToken]]]
+pub fn align_edit_boundaries(ArrayView[@edit.Edit[Array[@mbttoken.MbtToken]]]) -> Array[@edit.Edit[Array[@mbttoken.MbtToken]]]
 
 // Errors
 

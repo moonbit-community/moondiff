@@ -2,15 +2,15 @@
 package "myfreess/moondiff/block"
 
 // Values
-fn create_blocks(StringView) -> Array[Block[String]] raise BlockProcessingError
+pub fn create_blocks(StringView) -> Array[Block[String]] raise BlockProcessingError
 
-fn pairing_blocks_by_uuid(old~ : ArrayView[Block[String]], new~ : ArrayView[Block[String]]) -> Array[EditBlock]
+pub fn pairing_blocks_by_uuid(old~ : ArrayView[Block[String]], new~ : ArrayView[Block[String]]) -> Array[EditBlock]
 
 // Errors
 pub suberror BlockProcessingError {
   NotWellFormattedSourceCode(completely_no_uuid~ : Bool, line_number~ : Int)
 }
-impl Show for BlockProcessingError
+pub impl Show for BlockProcessingError
 
 // Types and methods
 pub struct Block[T] {
@@ -18,16 +18,16 @@ pub struct Block[T] {
   uuid : String
   contents : T
 }
-impl[T : Show] Show for Block[T]
-impl[T : ToJson] ToJson for Block[T]
+pub impl[T : Show] Show for Block[T]
+pub impl[T : ToJson] ToJson for Block[T]
 
 pub enum EditBlock {
   Replace(old~ : Block[String], new~ : Block[String])
   Delete(Block[String])
   Insert(Block[String])
 }
-impl Show for EditBlock
-impl ToJson for EditBlock
+pub impl Show for EditBlock
+pub impl ToJson for EditBlock
 
 // Type aliases
 pub type Blocks[T] = Array[Block[T]]

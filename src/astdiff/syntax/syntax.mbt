@@ -1,5 +1,8 @@
+///|UUID(a1293b4c-0874-4fc4-9902-e44b8cf7e8c8)
+using @span {type SingleLineSpan}
+
 ///|UUID(36f67f34-7466-4f61-8b3d-4216a8be8dee)
-typealias UInt as SyntaxId // must non-zero
+pub type SyntaxId = UInt // must non-zero
 
 ///|UUID(d2ebef10-67f2-4bb6-ba40-9cb123ae7006)
 pub struct SyntaxInfo {
@@ -77,7 +80,7 @@ let default_syntax_atom : Syntax = Syntax::Atom(
 )
 
 ///|UUID(1bc380e9-1250-41bf-8703-71257c729027)
-impl Default for Syntax with default() {
+pub impl Default for Syntax with default() {
   // will be optimized by Syntax::list() constructor
   return default_syntax_atom
 }
@@ -234,13 +237,13 @@ pub fn Syntax::comment_positions(
 }
 
 ///|UUID(3d751dbd-a05e-46c7-aa9c-f7d1bfb5f5a9)
-pub enum StringKind {
+pub(all) enum StringKind {
   StringLiteral
   Text
 }
 
 ///|UUID(557e87f3-ee91-4143-9426-2a2cbaa54578)
-pub enum AtomKind {
+pub(all) enum AtomKind {
   Normal
   String(StringKind)
   Type

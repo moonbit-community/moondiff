@@ -1,0 +1,63 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/astdiff/syntax"
+
+import(
+  "Yoorkin/prettyprinter"
+  "myfreess/moondiff/span"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum AtomKind {
+  Normal
+  String(StringKind)
+  Type
+  Comment
+  Keyword
+}
+
+pub(all) enum StringKind {
+  StringLiteral
+  Text
+}
+
+pub enum Syntax {
+  Atom(info~ : SyntaxInfo, position~ : Array[@span.SingleLineSpan], content~ : String, kind~ : AtomKind)
+  List(info~ : SyntaxInfo, open_position~ : Array[@span.SingleLineSpan], open_content~ : String, children~ : Array[Syntax], close_position~ : Array[@span.SingleLineSpan], close_content~ : String, num_descendants~ : UInt)
+}
+pub fn Syntax::atom(content~ : String, position~ : Array[@span.SingleLineSpan], kind~ : AtomKind) -> Self
+pub fn Syntax::comment_positions(ArrayView[Self]) -> Array[@span.SingleLineSpan]
+pub fn Syntax::content_id(Self) -> UInt
+pub fn Syntax::content_is_unique(Self) -> Bool
+pub fn Syntax::id(Self) -> UInt
+pub fn Syntax::info(Self) -> SyntaxInfo
+pub fn Syntax::list(open_content~ : String, open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_content~ : String, close_position~ : Array[@span.SingleLineSpan]) -> Self
+pub fn Syntax::next_sibling(Self) -> Self?
+pub fn Syntax::num_ancestors(Self) -> UInt
+pub fn Syntax::parent(Self) -> Self?
+pub fn Syntax::simple_list(open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_position~ : Array[@span.SingleLineSpan]) -> Self
+pub impl @prettyprinter.Pretty for Syntax
+pub impl Default for Syntax
+
+pub struct SyntaxInfo {
+  previous_sibling : Syntax?
+  next_sibling : Syntax?
+  prev : Syntax?
+  parent : Syntax?
+  num_ancestors : UInt
+  num_after : UInt64
+  unique_id : UInt
+  content_id : UInt
+  content_is_unique : Bool
+}
+pub fn SyntaxInfo::new() -> Self
+pub impl Default for SyntaxInfo
+
+// Type aliases
+pub type SyntaxId = UInt
+
+// Traits
+
