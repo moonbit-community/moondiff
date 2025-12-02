@@ -1,0 +1,6 @@
+{
+  "import": [
+    "myfreess/moondiff/astdiff/syntax"
+  ]
+
+}

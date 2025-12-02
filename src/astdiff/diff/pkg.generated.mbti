@@ -1,0 +1,70 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/astdiff/diff"
+
+import(
+  "moonbitlang/core/hashmap"
+  "myfreess/moondiff/astdiff/syntax"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub enum ChangeKind {
+  Unchanged(@syntax.Syntax)
+  ReplacedComment(lhs~ : @syntax.Syntax, rhs~ : @syntax.Syntax)
+  ReplacedString(lhs~ : @syntax.Syntax, rhs~ : @syntax.Syntax)
+  Novel
+}
+
+pub struct ChangeMap(@hashmap.HashMap[UInt, ChangeKind])
+pub fn ChangeMap::get(Self, @syntax.Syntax) -> ChangeKind?
+#deprecated
+pub fn ChangeMap::inner(Self) -> @hashmap.HashMap[UInt, ChangeKind]
+pub fn ChangeMap::insert(Self, @syntax.Syntax, ChangeKind) -> Unit
+pub fn ChangeMap::insert_deep_novel(Self, @syntax.Syntax) -> Unit
+pub fn ChangeMap::insert_deep_unchanged(Self, node~ : @syntax.Syntax, opposite_node~ : @syntax.Syntax) -> Unit
+pub fn ChangeMap::new() -> Self
+
+pub enum Edge {
+  UnchangedNode(depth_difference~ : Int, probably_punctuation~ : Bool)
+  EnterUnchangedDelimiter(depth_difference~ : Int)
+  ReplacedComment(levenshtein_pct~ : Int)
+  ReplacedString(levenshtein_pct~ : Int)
+  NovelAtomLHS
+  NovelAtomRHS
+  EnterNovelDelimiterLHS
+  EnterNovelDelimiterRHS
+}
+
+type EnteredDelimiter
+pub impl Show for EnteredDelimiter
+
+type Node[T]
+
+pub struct Stack[T](Node[T]?)
+#deprecated
+pub fn[T] Stack::inner(Self[T]) -> Node[T]?
+pub fn[T] Stack::is_empty(Self[T]) -> Bool
+pub fn[T] Stack::new() -> Self[T]
+pub fn[T] Stack::peek(Self[T]) -> T?
+pub fn[T] Stack::pop(Self[T]) -> Self[T]?
+pub fn[T] Stack::push(Self[T], T) -> Self[T]
+pub fn[T] Stack::size(Self[T]) -> UInt
+
+pub struct Vertex {
+  neighbours : Ref[Array[(Edge, Vertex)]?]
+  predecessor : Ref[(UInt, Vertex)?]
+  lhs_syntax : @syntax.Syntax?
+  rhs_syntax : @syntax.Syntax?
+  parents : Stack[EnteredDelimiter]
+  lhs_parent_id : UInt?
+  rhs_parent_id : UInt?
+}
+pub impl Eq for Vertex
+
+// Type aliases
+
+// Traits
+
