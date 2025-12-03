@@ -7,6 +7,7 @@ import(
 )
 
 // Values
+pub fn init_all_info(ArrayView[Syntax], ArrayView[Syntax]) -> Unit
 
 // Errors
 
@@ -18,11 +19,13 @@ pub(all) enum AtomKind {
   Comment
   Keyword
 }
+pub impl Eq for AtomKind
 
 pub(all) enum StringKind {
   StringLiteral
   Text
 }
+pub impl Eq for StringKind
 
 pub enum Syntax {
   Atom(info~ : SyntaxInfo, position~ : Array[@span.SingleLineSpan], content~ : String, kind~ : AtomKind)
@@ -41,17 +44,18 @@ pub fn Syntax::parent(Self) -> Self?
 pub fn Syntax::simple_list(open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_position~ : Array[@span.SingleLineSpan]) -> Self
 pub impl @prettyprinter.Pretty for Syntax
 pub impl Default for Syntax
+pub impl Eq for Syntax
 
 pub struct SyntaxInfo {
-  previous_sibling : Syntax?
-  next_sibling : Syntax?
-  prev : Syntax?
-  parent : Syntax?
-  num_ancestors : UInt
-  num_after : UInt64
-  unique_id : UInt
-  content_id : UInt
-  content_is_unique : Bool
+  mut previous_sibling : Syntax?
+  mut next_sibling : Syntax?
+  mut prev : Syntax?
+  mut parent : Syntax?
+  mut num_ancestors : UInt
+  mut num_after : UInt64
+  mut unique_id : UInt
+  mut content_id : UInt
+  mut content_is_unique : Bool
 }
 pub fn SyntaxInfo::new() -> Self
 pub impl Default for SyntaxInfo

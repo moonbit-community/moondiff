@@ -7,28 +7,28 @@ pub type SyntaxId = UInt // must non-zero
 ///|UUID(d2ebef10-67f2-4bb6-ba40-9cb123ae7006)
 pub struct SyntaxInfo {
   /// The previous node with the same parent as this one.
-  previous_sibling : Syntax?
+  mut previous_sibling : Syntax?
   /// The next node with the same parent as this one.
-  next_sibling : Syntax?
+  mut next_sibling : Syntax?
   /// The syntax node that occurs before this one, in a depth-first
   /// tree traversal.
-  prev : Syntax?
+  mut prev : Syntax?
   /// The parent syntax node, if present.
-  parent : Syntax?
+  mut parent : Syntax?
   /// The number of nodes that are ancestors of this one.
-  num_ancestors : UInt
-  num_after : UInt64
+  mut num_ancestors : UInt
+  mut num_after : UInt64
   /// A number that uniquely identifies this syntax node.
-  unique_id : SyntaxId
+  mut unique_id : SyntaxId
   /// A number that uniquely identifies the content of this syntax
   /// node. This may be the same as nodes on the other side of the
   /// diff, or nodes at different positions.
   ///
   /// Values are sequential, not hashes. Collisions never occur.
-  content_id : UInt
+  mut content_id : UInt
   /// Is this the only node with this content? Ignores nodes on the
   /// other side.
-  content_is_unique : Bool
+  mut content_is_unique : Bool
 }
 
 ///|UUID(2204ecdf-1b80-4a4d-b16d-f52f9c7f4a08)
@@ -78,6 +78,11 @@ let default_syntax_atom : Syntax = Syntax::Atom(
   position=[],
   kind=Normal,
 )
+
+///|UUID(7d58b16e-9242-4fa3-8465-80ac36208f17)
+pub impl Eq for Syntax with equal(self, other) {
+  self.info().content_id == other.info().content_id
+}
 
 ///|UUID(1bc380e9-1250-41bf-8703-71257c729027)
 pub impl Default for Syntax with default() {
@@ -236,11 +241,218 @@ pub fn Syntax::comment_positions(
   }
 }
 
+///|UUID(9e566b27-2a0c-4777-8ae0-07fdf04f1cff)
+pub fn init_all_info(
+  lhs_roots : ArrayView[Syntax],
+  rhs_roots : ArrayView[Syntax],
+) -> Unit {
+  init_info(lhs_roots, rhs_roots)
+  init_next_prev(lhs_roots)
+  init_next_prev(rhs_roots)
+}
+
+///|UUID(0023a79f-ad16-4d6a-adba-e42e24133367)
+fn init_next_prev(roots : ArrayView[Syntax]) -> Unit {
+  set_prev_sibling(roots)
+  set_next_sibling(roots)
+  set_prev(roots, None)
+}
+
+///|UUID(d889d564-7c61-4814-bf6e-24597f71b6e8)
+fn init_info(
+  lhs_roots : ArrayView[Syntax],
+  rhs_roots : ArrayView[Syntax],
+) -> Unit {
+  let id = Ref::new(1U)
+  init_info_on_side(lhs_roots, id)
+  init_info_on_side(rhs_roots, id)
+  let existing = @hashmap.HashMap::new()
+  set_content_id(lhs_roots, existing)
+  set_content_id(rhs_roots, existing)
+  set_content_is_unique(lhs_roots)
+  set_content_is_unique(rhs_roots)
+}
+
+///|UUID(4e56af18-aa47-4efd-9a8d-fbff78528443)
+type ContentId = UInt
+
+///|UUID(4f54e639-9d2c-44a1-91f9-e57b5a57b9ba)
+fn set_content_is_unique(nodes : ArrayView[Syntax]) -> Unit {
+  let counts = @hashmap.HashMap::new()
+  find_nodes_with_unique_content(nodes, counts)
+  set_content_is_unique_from_counts(nodes, counts)
+}
+
+///|UUID(4a6b000f-7e11-4460-8a15-27ffa89c320e)
+fn set_content_is_unique_from_counts(
+  nodes : ArrayView[Syntax],
+  counts : @hashmap.HashMap[ContentId, UInt64],
+) -> Unit {
+  for node in nodes {
+    let count = counts.get(node.content_id()).unwrap_or_else(() => panic()) // "Count should be present"
+    node.info().content_is_unique = count == 1
+    if node is List(children~, ..) {
+      set_content_is_unique_from_counts(children, counts)
+    }
+  }
+}
+
+///|UUID(4f5e8c3c-ddb9-45c2-89ae-4579cd8e5934)
+fn find_nodes_with_unique_content(
+  nodes : ArrayView[Syntax],
+  counts : @hashmap.HashMap[ContentId, UInt64],
+) -> Unit {
+  for node in nodes {
+    match counts.get(node.content_id()) {
+      Some(count) => counts[node.content_id()] = count + 1
+      None => counts.set(node.content_id(), 1)
+    }
+    if node is List(children~, ..) {
+      find_nodes_with_unique_content(children, counts)
+    }
+  }
+}
+
+///|UUID(786c3580-5508-4015-af34-6476af74ce5a)
+type ContentKey = (String?, String?, Array[UInt], Bool, Bool)
+
+///|UUID(31918e2f-f46e-4be9-9922-71a56ffaa181)
+fn set_content_id(
+  nodes : ArrayView[Syntax],
+  existing : @hashmap.HashMap[ContentKey, UInt],
+) -> Unit {
+  for node in nodes {
+    let key = match node {
+      Atom(content~, kind=highlight, ..) => {
+        let is_comment = highlight == Comment
+        let clean_content = if is_comment && content.split("\n").count() > 1 {
+          content
+          .split("\n")
+          .map(l => l.trim_start(chars=" "))
+          .collect()
+          .join("\n")
+        } else {
+          content
+        }
+        (Some(clean_content), None, [], false, is_comment)
+      }
+      List(open_content~, close_content~, children~, ..) => {
+        // Recurse first, so children all have their content_id set.
+        set_content_id(children, existing)
+        let children_content_ids = children
+          .iterator()
+          .map(c => c.info().content_id)
+          .collect()
+        (
+          Some(open_content),
+          Some(close_content),
+          children_content_ids,
+          true,
+          true,
+        )
+      }
+    }
+
+    // Ensure the ID is always greater than zero, so we can
+    // distinguish an uninitialised SyntaxInfo value.
+    let next_id = existing.length().reinterpret_as_uint() + 1
+    let content_id = existing.get_or_init(key, () => next_id)
+    node.info().content_id = content_id
+  }
+}
+
+///|UUID(052df6b4-380a-4f31-9675-a03d9695b370)
+fn init_info_on_side(
+  roots : ArrayView[Syntax],
+  next_id : Ref[SyntaxId],
+) -> Unit {
+  set_parent(roots, None)
+  set_num_ancestors(roots, 0)
+  set_num_after(roots, 0)
+  set_unique_id(roots, next_id)
+}
+
+///|UUID(7b3606f7-7e75-44dc-a774-1517a210a5e3)
+fn set_unique_id(nodes : ArrayView[Syntax], next_id : Ref[SyntaxId]) -> Unit {
+  for node in nodes {
+    node.info().unique_id = next_id.val
+    next_id.val = next_id.val + 1
+  }
+}
+
+///|UUID(c3f65798-7051-4993-90cf-13d829f5cf48)
+fn set_num_after(nodes : ArrayView[Syntax], parent_num_after : UInt64) -> Unit {
+  for i, node in nodes.iterator2() {
+    let num_after = parent_num_after +
+      nodes.length().reinterpret_as_uint().to_uint64() -
+      1 -
+      i.reinterpret_as_uint().to_uint64()
+    node.info().num_after = num_after
+    if node is List(children~, ..) {
+      set_num_after(children, num_after)
+    }
+  }
+}
+
+///|UUID(36b01c25-91f4-4317-8245-5cd485c46a16)
+fn set_prev_sibling(nodes : ArrayView[Syntax]) -> Unit {
+  let mut prev = None
+  for node in nodes {
+    node.info().previous_sibling = prev
+    prev = Some(node)
+    if node is List(children~, ..) {
+      set_prev_sibling(children)
+    }
+  }
+}
+
+///|UUID(695f3c47-763c-46aa-8fae-3835ad929768)
+fn set_next_sibling(nodes : ArrayView[Syntax]) -> Unit {
+  for i, node in nodes.iterator2() {
+    let sibling = if i + 1 < nodes.length() { Some(nodes[i + 1]) } else { None }
+    node.info().next_sibling = sibling
+    if node is List(children~, ..) {
+      set_next_sibling(children)
+    }
+  }
+}
+
+///|UUID(bff9623e-0b73-4488-8406-02eb0e47bf91)
+fn set_prev(nodes : ArrayView[Syntax], parent : Syntax?) -> Unit {
+  for i, node in nodes.iterator2() {
+    let node_prev = if i == 0 { parent } else { Some(nodes[i - 1]) }
+    node.info().prev = node_prev
+    if node is List(children~, ..) {
+      set_prev(children, Some(node))
+    }
+  }
+}
+
+///|UUID(5ec8e3d9-1d14-4ff5-b122-f5217e1257ba)
+fn set_parent(nodes : ArrayView[Syntax], parent : Syntax?) -> Unit {
+  for node in nodes {
+    node.info().parent = parent
+    if node is List(children~, ..) {
+      set_parent(children, Some(node))
+    }
+  }
+}
+
+///|UUID(250cf6fb-1fdc-4850-b78f-69873899d674)
+fn set_num_ancestors(nodes : ArrayView[Syntax], num_ancestors : UInt) -> Unit {
+  for node in nodes {
+    node.info().num_ancestors = num_ancestors
+    if node is List(children~, ..) {
+      set_num_ancestors(children, num_ancestors + 1)
+    }
+  }
+}
+
 ///|UUID(3d751dbd-a05e-46c7-aa9c-f7d1bfb5f5a9)
 pub(all) enum StringKind {
   StringLiteral
   Text
-}
+} derive(Eq)
 
 ///|UUID(557e87f3-ee91-4143-9426-2a2cbaa54578)
 pub(all) enum AtomKind {
@@ -249,4 +461,4 @@ pub(all) enum AtomKind {
   Type
   Comment
   Keyword
-}
+} derive(Eq)

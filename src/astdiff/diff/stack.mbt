@@ -2,14 +2,13 @@
 struct Node[T] {
   val : T
   next : Node[T]?
-}
+} derive(Eq)
 
 ///|UUID(1abc1ea8-aa15-4919-aa1c-126e2860d439)
 /// A persistent stack.
 ///
-/// This is similar to `Stack` from the rpds crate, but it's faster
-/// and uses less memory.
-pub struct Stack[T](Node[T]?)
+/// TODO: use List
+pub struct Stack[T](Node[T]?) derive(Eq)
 
 ///|UUID(ccb74e09-ee80-4917-9bf2-814ebbe7325a)
 pub fn[T] Stack::new() -> Stack[T] {
