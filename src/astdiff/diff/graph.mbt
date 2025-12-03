@@ -51,17 +51,17 @@ pub enum Edge {
   /// Is this node just punctuation? We penalise this case,
   /// because it's more useful to match e.g. a variable name
   /// than a comma.
-  UnchangedNode(depth_difference~ : Int, probably_punctuation~ : Bool)
-  EnterUnchangedDelimiter(depth_difference~ : Int)
-  ReplacedComment(levenshtein_pct~ : Int)
-  ReplacedString(levenshtein_pct~ : Int)
+  UnchangedNode(depth_difference~ : UInt, probably_punctuation~ : Bool)
+  EnterUnchangedDelimiter(depth_difference~ : UInt)
+  ReplacedComment(levenshtein_pct~ : UInt)
+  ReplacedString(levenshtein_pct~ : UInt)
   NovelAtomLHS
   NovelAtomRHS
   // TODO: An EnterNovelDelimiterBoth edge might help performance
   // rather doing LHS and RHS separately.
   EnterNovelDelimiterLHS
   EnterNovelDelimiterRHS
-}
+} derive(ToJson)
 
 ///|UUID(879374f4-7c01-44be-8149-5b29afe3bf22)
 /// Tracks entering syntax List nodes.
@@ -79,7 +79,7 @@ enum EnteredDelimiter {
   /// New: (a b) c
   /// ```
   PopBoth(Syntax, Syntax)
-}
+} derive(Eq)
 
 ///|UUID(8b967118-a93e-40d9-a68c-a62c8bb8cffc)
 pub impl Show for EnteredDelimiter with output(self, logger) {
@@ -127,6 +127,15 @@ pub impl Eq for Vertex with equal(self, other) {
   let b2 = can_pop_either_parent(self.parents) ==
     can_pop_either_parent(other.parents)
   b0 && b1 && b2
+}
+
+///|UUID(f9fc997f-6277-4262-aaff-0d867a0f3d24)
+pub impl Hash for Vertex with hash_combine(self, hasher) {
+  hasher.combine(self.lhs_syntax.map(node => node.id()))
+  hasher.combine(self.rhs_syntax.map(node => node.id()))
+  hasher.combine(self.lhs_parent_id)
+  hasher.combine(self.rhs_parent_id)
+  hasher.combine(can_pop_either_parent(self.parents))
 }
 
 ///|UUID(afad7258-28b5-4bb5-9467-f4f96c0c67ee)
@@ -242,7 +251,7 @@ fn Vertex::is_end(self : Vertex) -> Bool {
 }
 
 ///|UUID(66a58d63-0909-4ffb-ac33-5c1bc5933f8e)
-fn Vertex::new(lhs~ : Syntax?, rhs~ : Syntax?) -> Vertex {
+pub fn Vertex::new(lhs~ : Syntax?, rhs~ : Syntax?) -> Vertex {
   Vertex::{
     neighbours: Ref::new(None),
     predecessor: Ref::new(None),
@@ -255,7 +264,7 @@ fn Vertex::new(lhs~ : Syntax?, rhs~ : Syntax?) -> Vertex {
 }
 
 ///|UUID(09439f7f-5de9-4b87-b1be-248e286bd856)
-fn Edge::cost(self : Edge) -> Int {
+fn Edge::cost(self : Edge) -> UInt {
   match self {
     // Matching nodes is always best.
     UnchangedNode(depth_difference~, probably_punctuation~) => {
@@ -265,7 +274,7 @@ fn Edge::cost(self : Edge) -> Int {
       // The cost for unchanged nodes can be as low as 1,
       // but we penalise nodes that have a different depth
       // difference, capped at 40.
-      let base = @cmp.minimum(40, depth_difference + 1)
+      let base = @cmp.minimum(40U, depth_difference + 1U)
 
       // If the node is only punctuation, increase the
       // cost. It's better to have unchanged variable names
@@ -280,7 +289,7 @@ fn Edge::cost(self : Edge) -> Int {
       // If we have replacements either side of a node
       // (e.g. see comma_and_comment_1.js), then that's
       // potentially a cost difference of 200.
-      let incr = if probably_punctuation { 200 } else { 0 }
+      let incr = if probably_punctuation { 200U } else { 0U }
       base + incr
     }
     // Matching an outer delimiter is good.
@@ -298,6 +307,38 @@ fn Edge::cost(self : Edge) -> Int {
   }
 }
 
+///|UUID(2898523a-ab3c-40d8-83a2-2815eae2e728)
+fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex {
+  match seen.get(v) {
+    Some(existing) => {
+      // Don't explore more than two possible parenthesis
+      // nestings for each syntax node pair.
+      if existing.last() is Some(allocated) && existing.length() > 2 {
+        return allocated
+      }
+
+      // If we have seen exactly this graph node before, even
+      // considering parenthesis matching, return it.
+      for existing_node in existing {
+        if existing_node.parents == v.parents {
+          return existing_node
+        }
+      }
+      existing.push(v)
+      v
+    }
+    None => {
+      // use a array to enable experiments with the value
+      // of how many possible parenthesis nestings to explore.
+      // 
+      // never have more than 2 nodes
+      let existing = Array::new(capacity=2)
+      existing.push(v)
+      v
+    }
+  }
+}
+
 ///|UUID(a6e967c3-aeb7-453e-bf6e-f308ebcb3b08)
 /// Does this node look like punctuation?
 ///
@@ -310,5 +351,357 @@ fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
   }
 }
 
+///|UUID(e03e2c32-0e95-43a5-996b-37628b179014)
 /// Pop as many parents of `lhs_node` and `rhs_node` as
 /// possible. Return the new syntax nodes and parents.
+fn pop_all_parents(
+  lhs_node : Syntax?,
+  rhs_node : Syntax?,
+  lhs_parent_id : SyntaxId?,
+  rhs_parent_id : SyntaxId?,
+  parents : Stack[EnteredDelimiter],
+) -> (Syntax?, Syntax?, SyntaxId?, SyntaxId?, Stack[EnteredDelimiter]) {
+  let mut lhs_node = lhs_node
+  let mut rhs_node = rhs_node
+  let mut lhs_parent_id = lhs_parent_id
+  let mut rhs_parent_id = rhs_parent_id
+  let mut parents = parents
+  while true {
+    if lhs_node is None {
+      if try_pop_lhs(parents) is Some((lhs_parent, parents_next)) {
+        // Move to next after LHS parent.
+        // Continue from sibling of parent.
+
+        lhs_node = lhs_parent.next_sibling()
+        lhs_parent_id = lhs_parent.parent().map(Syntax::id)
+        parents = parents_next
+        continue
+      }
+    }
+    if rhs_node is None {
+      if try_pop_rhs(parents) is Some((rhs_parent, parents_next)) {
+        // Move to next after RHS parent.
+        // Continue from sibling of parent.
+        rhs_node = rhs_parent.next_sibling()
+        rhs_parent_id = rhs_parent.parent().map(Syntax::id)
+        parents = parents_next
+        continue
+      }
+    }
+    if lhs_node is None && rhs_node is None {
+      // We have exhausted all the nodes on both lists, so we can
+      // move up to the parent node.
+      // Continue from sibling of parent.
+
+      if try_pop_both(parents) is Some((lhs_parent, rhs_parent, parents_next)) {
+        lhs_node = lhs_parent.next_sibling()
+        rhs_node = rhs_parent.next_sibling()
+        lhs_parent_id = lhs_parent.parent().map(Syntax::id)
+        rhs_parent_id = rhs_parent.parent().map(Syntax::id)
+        parents = parents_next
+        continue
+      }
+    }
+    break
+  }
+  (lhs_node, rhs_node, lhs_parent_id, rhs_parent_id, parents)
+}
+
+///|UUID(7be0974c-4087-481f-8d2c-ccd2665fcdef)
+/// Compute the neighbours of `v` if we haven't previously done so,
+/// and write them to the .neighbours cell inside `v`.
+fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
+  if v.neighbours.val is Some(_) {
+    return
+  }
+
+  // There are only seven pushes in this function, so that's sufficient.
+  let neighbours = Array::new(capacity=7)
+  if v.lhs_syntax is Some(lhs_syntax) && v.rhs_syntax is Some(rhs_syntax) {
+    if lhs_syntax == rhs_syntax {
+      let depth_difference = (lhs_syntax.num_ancestors().reinterpret_as_int() -
+        rhs_syntax.num_ancestors().reinterpret_as_int())
+        .abs()
+        .reinterpret_as_uint() // TODO: unsigned_abs
+      let probably_punctuation = lhs_syntax.looks_like_punctuation()
+
+      // Both nodes are equal, the happy case.
+      let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+        lhs_syntax.next_sibling(),
+        rhs_syntax.next_sibling(),
+        v.lhs_parent_id,
+        v.rhs_parent_id,
+        v.parents,
+      )
+      let vertex = allocate_if_new(
+        Vertex::{
+          neighbours: Ref::new(None),
+          predecessor: Ref::new(None),
+          lhs_syntax,
+          rhs_syntax,
+          parents,
+          lhs_parent_id,
+          rhs_parent_id,
+        },
+        seen,
+      )
+      neighbours.push(
+        (UnchangedNode(depth_difference~, probably_punctuation~), vertex),
+      )
+    }
+    if lhs_syntax
+      is List(
+        open_content=lhs_open_content,
+        close_content=lhs_close_content,
+        children=lhs_children,
+        ..
+      ) &&
+      rhs_syntax
+      is List(
+        open_content=rhs_open_content,
+        close_content=rhs_close_content,
+        children=rhs_children,
+        ..
+      ) {
+      // The list delimiters are equal, but children may not be.
+      if lhs_open_content == rhs_open_content &&
+        lhs_close_content == rhs_close_content {
+        let lhs_next = lhs_children.get(0)
+        let rhs_next = rhs_children.get(0)
+
+        // TODO: be consistent between parents_next and next_parents.
+        let parents_next = push_both_delimiters(
+          v.parents,
+          lhs_syntax,
+          rhs_syntax,
+        )
+        let depth_difference = (lhs_syntax.num_ancestors().reinterpret_as_int() -
+          rhs_syntax.num_ancestors().reinterpret_as_int())
+          .abs()
+          .reinterpret_as_uint()
+
+        // When we enter a list, we may need to immediately
+        // pop several levels if the list has no children.
+
+        let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+          lhs_next,
+          rhs_next,
+          Some(lhs_syntax.id()),
+          Some(rhs_syntax.id()),
+          parents_next,
+        )
+        let vertex = allocate_if_new(
+          Vertex::{
+            neighbours: Ref::new(None),
+            predecessor: Ref::new(None),
+            lhs_syntax,
+            rhs_syntax,
+            parents,
+            lhs_parent_id,
+            rhs_parent_id,
+          },
+          seen,
+        )
+        neighbours.push((EnterUnchangedDelimiter(depth_difference~), vertex))
+      }
+    }
+    if lhs_syntax
+      is Atom(content=lhs_content, kind=Comment | String(_) as lhs_kind, ..) &&
+      rhs_syntax
+      is Atom(content=rhs_content, kind=Comment | String(_) as rhs_kind, ..) {
+      // Both sides are comments/both sides are strings and
+      // their content is reasonably similar.
+      if lhs_kind == rhs_kind && lhs_content != rhs_content {
+        let levenshtein_pct = (normalized_levenshtein(
+            lhs=lhs_content,
+            rhs=rhs_content,
+          ) *
+          100.0)
+          .round()
+          .to_uint()
+        let edge = if lhs_kind is Comment {
+          Edge::ReplacedComment(levenshtein_pct~)
+        } else {
+          Edge::ReplacedString(levenshtein_pct~)
+        }
+        let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+          lhs_syntax.next_sibling(),
+          rhs_syntax.next_sibling(),
+          v.lhs_parent_id,
+          v.rhs_parent_id,
+          v.parents,
+        )
+        let vertex = allocate_if_new(
+          Vertex::{
+            neighbours: Ref::new(None),
+            predecessor: Ref::new(None),
+            lhs_syntax,
+            rhs_syntax,
+            parents,
+            lhs_parent_id,
+            rhs_parent_id,
+          },
+          seen,
+        )
+        neighbours.push((edge, vertex))
+      }
+    }
+  }
+  if v.lhs_syntax is Some(lhs_syntax) {
+    match lhs_syntax {
+      // Step over this novel atom.
+      Atom(..) => {
+        let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+          lhs_syntax.next_sibling(),
+          v.rhs_syntax,
+          v.lhs_parent_id,
+          v.rhs_parent_id,
+          v.parents,
+        )
+        let vertex = allocate_if_new(
+          Vertex::{
+            neighbours: Ref::new(None),
+            predecessor: Ref::new(None),
+            lhs_syntax,
+            rhs_syntax,
+            parents,
+            lhs_parent_id,
+            rhs_parent_id,
+          },
+          seen,
+        )
+        neighbours.push((NovelAtomLHS, vertex))
+      }
+      List(children~, ..) => {
+        let lhs_next = children.get(0)
+        let parents_next = push_lhs_delimiter(v.parents, lhs_syntax)
+        let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+          lhs_next,
+          v.rhs_syntax,
+          Some(lhs_syntax.id()),
+          v.rhs_parent_id,
+          parents_next,
+        )
+        let vertex = allocate_if_new(
+          Vertex::{
+            neighbours: Ref::new(None),
+            predecessor: Ref::new(None),
+            lhs_syntax,
+            rhs_syntax,
+            parents,
+            lhs_parent_id,
+            rhs_parent_id,
+          },
+          seen,
+        )
+        neighbours.push((EnterNovelDelimiterLHS, vertex))
+      }
+    }
+  }
+  if v.rhs_syntax is Some(rhs_syntax) {
+    match rhs_syntax {
+      // Step over this novel atom.
+      Atom(..) => {
+        let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+          v.lhs_syntax,
+          rhs_syntax.next_sibling(),
+          v.lhs_parent_id,
+          v.rhs_parent_id,
+          v.parents,
+        )
+        let vertex = allocate_if_new(
+          Vertex::{
+            neighbours: Ref::new(None),
+            predecessor: Ref::new(None),
+            lhs_syntax,
+            rhs_syntax,
+            parents,
+            lhs_parent_id,
+            rhs_parent_id,
+          },
+          seen,
+        )
+        neighbours.push((NovelAtomRHS, vertex))
+      }
+      // Step into this partially/fully novel list.
+      List(children~, ..) => {
+        let rhs_next = children.get(0)
+        let parents_next = push_rhs_delimiter(v.parents, rhs_syntax)
+        let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
+          v.lhs_syntax,
+          rhs_next,
+          v.lhs_parent_id,
+          Some(rhs_syntax.id()),
+          parents_next,
+        )
+        let vertex = allocate_if_new(
+          Vertex::{
+            neighbours: Ref::new(None),
+            predecessor: Ref::new(None),
+            lhs_syntax,
+            rhs_syntax,
+            parents,
+            lhs_parent_id,
+            rhs_parent_id,
+          },
+          seen,
+        )
+        neighbours.push((EnterNovelDelimiterRHS, vertex))
+      }
+    }
+  }
+  v.neighbours.val = Some(neighbours)
+}
+
+///|UUID(7b58d72b-9364-4b33-bb47-a42cf8bfbf45)
+fn populate_change_map(
+  route : Array[(Edge, Vertex)],
+  change_map : ChangeMap,
+) -> Unit {
+  for ev in route {
+    let (e, v) = ev
+    match e {
+      UnchangedNode(..) => {
+        // No change on this node or its children.
+        let lhs = v.lhs_syntax.unwrap()
+        let rhs = v.rhs_syntax.unwrap()
+        change_map.insert_deep_unchanged(node=lhs, opposite_node=rhs)
+        change_map.insert_deep_unchanged(node=rhs, opposite_node=lhs)
+      }
+      EnterUnchangedDelimiter(..) => {
+        // No change on the outer delimiter, but children may
+        // have changed.
+        let lhs = v.lhs_syntax.unwrap()
+        let rhs = v.rhs_syntax.unwrap()
+        change_map.insert(lhs, Unchanged(rhs))
+        change_map.insert(rhs, Unchanged(lhs))
+      }
+      ReplacedComment(levenshtein_pct~) | ReplacedString(levenshtein_pct~) => {
+        let lhs = v.lhs_syntax.unwrap()
+        let rhs = v.rhs_syntax.unwrap()
+        let change_kind = fn(first : Syntax, second : Syntax) {
+          if e is ReplacedComment(..) {
+            ChangeKind::ReplacedComment(lhs=first, rhs=second)
+          } else {
+            ChangeKind::ReplacedString(lhs=first, rhs=second)
+          }
+        }
+        if levenshtein_pct > 20 {
+          change_map.insert(lhs, change_kind(lhs, rhs))
+          change_map.insert(rhs, change_kind(rhs, lhs))
+        } else {
+          change_map.insert(lhs, Novel)
+          change_map.insert(rhs, Novel)
+        }
+      }
+      NovelAtomLHS | EnterNovelDelimiterLHS => {
+        let lhs = v.lhs_syntax.unwrap()
+        change_map.insert(lhs, Novel)
+      }
+      NovelAtomRHS | EnterNovelDelimiterRHS => {
+        let rhs = v.rhs_syntax.unwrap()
+        change_map.insert(rhs, Novel)
+      }
+    }
+  }
+}

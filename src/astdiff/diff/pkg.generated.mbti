@@ -7,8 +7,14 @@ import(
 )
 
 // Values
+pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, ChangeMap, UInt) -> Unit raise ExceededGraphLimit
+
+pub fn shortest_path(Vertex, Int, Int) -> Array[(Edge, Vertex)] raise ExceededGraphLimit
+
+pub fn tree_count(@syntax.Syntax?) -> UInt
 
 // Errors
+type ExceededGraphLimit
 
 // Types and methods
 pub enum ChangeKind {
@@ -28,20 +34,23 @@ pub fn ChangeMap::insert_deep_unchanged(Self, node~ : @syntax.Syntax, opposite_n
 pub fn ChangeMap::new() -> Self
 
 pub enum Edge {
-  UnchangedNode(depth_difference~ : Int, probably_punctuation~ : Bool)
-  EnterUnchangedDelimiter(depth_difference~ : Int)
-  ReplacedComment(levenshtein_pct~ : Int)
-  ReplacedString(levenshtein_pct~ : Int)
+  UnchangedNode(depth_difference~ : UInt, probably_punctuation~ : Bool)
+  EnterUnchangedDelimiter(depth_difference~ : UInt)
+  ReplacedComment(levenshtein_pct~ : UInt)
+  ReplacedString(levenshtein_pct~ : UInt)
   NovelAtomLHS
   NovelAtomRHS
   EnterNovelDelimiterLHS
   EnterNovelDelimiterRHS
 }
+pub impl ToJson for Edge
 
 type EnteredDelimiter
+pub impl Eq for EnteredDelimiter
 pub impl Show for EnteredDelimiter
 
 type Node[T]
+pub impl[T : Eq] Eq for Node[T]
 
 pub struct Stack[T](Node[T]?)
 #deprecated
@@ -52,6 +61,7 @@ pub fn[T] Stack::peek(Self[T]) -> T?
 pub fn[T] Stack::pop(Self[T]) -> Self[T]?
 pub fn[T] Stack::push(Self[T], T) -> Self[T]
 pub fn[T] Stack::size(Self[T]) -> UInt
+pub impl[T : Eq] Eq for Stack[T]
 
 pub struct Vertex {
   neighbours : Ref[Array[(Edge, Vertex)]?]
@@ -62,7 +72,9 @@ pub struct Vertex {
   lhs_parent_id : UInt?
   rhs_parent_id : UInt?
 }
+pub fn Vertex::new(lhs~ : @syntax.Syntax?, rhs~ : @syntax.Syntax?) -> Self
 pub impl Eq for Vertex
+pub impl Hash for Vertex
 
 // Type aliases
 

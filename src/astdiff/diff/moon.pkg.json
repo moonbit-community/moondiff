@@ -1,6 +1,8 @@
 {
   "import": [
     "myfreess/moondiff/astdiff/syntax"
+  ],
+  "test-import": [
+    "myfreess/moondiff/span"
   ]
-
 }
