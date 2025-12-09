@@ -13,11 +13,17 @@ Difftool that aware MoonBit language syntax.
 ```shell
 moon build --target native
 # add `~/.local/bin` to your `PATH`
+mkdir -p ~/.local/bin
 cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
 ```
 ### use
 
-moondiff relies on the features of `moonfmt`: `-block-style`(which is now the default behavior) and `-add-uuid`(which is not the default behavior). If you wish to use moondiff in a MoonBit repository, please first execute the following command:
+moondiff relies on some features of `moonfmt`: 
+
++ `-block-style` (which is now the default behavior) 
++ `-add-uuid` (not the default behavior). 
+
+If you want to use moondiff in a MoonBit repository, please first execute the following command:
 
 ```shell
 moon fmt -- -add-uuid
