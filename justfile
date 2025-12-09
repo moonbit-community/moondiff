@@ -1,6 +1,7 @@
-alias u := update
 
-update:
+
+install:
+  moon update
   moon fmt -- -add-uuid
   moon build --target native --release
   mkdir -p ~/.local/bin/
