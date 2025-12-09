@@ -12,10 +12,17 @@ Difftool that aware MoonBit language syntax.
 
 ```shell
 git clone https://github.com/moonbit-community/moondiff.git
-cd moondiff && moon build --target native
-# add `~/.local/bin` to your `PATH`
+cd moondiff && moon update && moon build --target native
+# optional: add `~/.local/bin` to your `PATH`
 mkdir -p ~/.local/bin
 cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
+```
+
+use just:
+
+```shell
+git clone https://github.com/moonbit-community/moondiff.git
+cd moondiff && just install
 ```
 ### use
 
@@ -28,6 +35,13 @@ If you want to use moondiff in a MoonBit repository, please first execute the fo
 
 ```shell
 moon fmt -- -add-uuid
+```
+
+after first format with `-add-uuid`, save it with a single commit:
+
+```shell
+git add -A
+git commit -m "moon fmt: Generate uuid for all top-level code blocks"
 ```
 
 **Optional**: Set up Git hooks to automatically trigger the formatter and stage the changes when committing code
@@ -56,4 +70,11 @@ Then, configure git to use the installed binary as an optional diff tool within 
 git config diff.tool tokendiff
 git config difftool.tokendiff.cmd '~/.local/bin/tokendiff $LOCAL $REMOTE'
 git config difftool.prompt false
+```
+
+usage:
+
+```shell
+git difftool <commit>^ <commit> # view diff for a specific commit
+git difftool <edited file>
 ```
