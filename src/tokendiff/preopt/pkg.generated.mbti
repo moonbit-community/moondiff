@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/tokendiff/preopt"
 
-import(
-  "myfreess/moondiff/tokendiff/edit"
-)
+import {
+  "myfreess/moondiff/tokendiff/edit",
+}
 
 // Values
 pub fn[T : Eq] separate_common_prefix_and_suffix(old~ : ArrayView[T], new~ : ArrayView[T]) -> (ArrayView[@edit.Edit[T]], ArrayView[@edit.Edit[T]], ArrayView[T], ArrayView[T])

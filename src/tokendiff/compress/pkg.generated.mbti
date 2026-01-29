@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/tokendiff/compress"
 
-import(
-  "myfreess/moondiff/tokendiff/edit"
-)
+import {
+  "myfreess/moondiff/tokendiff/edit",
+}
 
 // Values
 pub fn[T] compress_edits(ArrayView[@edit.Edit[T]]) -> Array[@edit.Edit[Array[T]]]

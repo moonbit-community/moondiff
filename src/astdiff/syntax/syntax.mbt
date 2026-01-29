@@ -340,7 +340,7 @@ fn set_content_id(
         // Recurse first, so children all have their content_id set.
         set_content_id(children, existing)
         let children_content_ids = children
-          .iterator()
+          .iter()
           .map(c => c.info().content_id)
           .collect()
         (
@@ -382,7 +382,7 @@ fn set_unique_id(nodes : ArrayView[Syntax], next_id : Ref[SyntaxId]) -> Unit {
 
 ///|UUID(c3f65798-7051-4993-90cf-13d829f5cf48)
 fn set_num_after(nodes : ArrayView[Syntax], parent_num_after : UInt64) -> Unit {
-  for i, node in nodes.iterator2() {
+  for i, node in nodes.iter2() {
     let num_after = parent_num_after +
       nodes.length().reinterpret_as_uint().to_uint64() -
       1 -
@@ -408,7 +408,7 @@ fn set_prev_sibling(nodes : ArrayView[Syntax]) -> Unit {
 
 ///|UUID(695f3c47-763c-46aa-8fae-3835ad929768)
 fn set_next_sibling(nodes : ArrayView[Syntax]) -> Unit {
-  for i, node in nodes.iterator2() {
+  for i, node in nodes.iter2() {
     let sibling = if i + 1 < nodes.length() { Some(nodes[i + 1]) } else { None }
     node.info().next_sibling = sibling
     if node is List(children~, ..) {
@@ -419,7 +419,7 @@ fn set_next_sibling(nodes : ArrayView[Syntax]) -> Unit {
 
 ///|UUID(bff9623e-0b73-4488-8406-02eb0e47bf91)
 fn set_prev(nodes : ArrayView[Syntax], parent : Syntax?) -> Unit {
-  for i, node in nodes.iterator2() {
+  for i, node in nodes.iter2() {
     let node_prev = if i == 0 { parent } else { Some(nodes[i - 1]) }
     node.info().prev = node_prev
     if node is List(children~, ..) {

@@ -190,15 +190,14 @@ pub fn[T : Eq] diff(
   guard initial_box.find_path(old~, new~) is Some(path) else {
     return (false, [])
   }
+  let path = path.collect()
   // path length >= 2
-  let xy = path.take(1).collect()[0] // (0, 0)
+  let xy = path[0] // (0, 0)
   let mut x1 = xy.0
   let mut y1 = xy.1
   let edits : Array[Edit[T]] = Array::new(capacity=old.length() + new.length())
   let mut changed = false
-  path
-  .drop(1)
-  .each(fn(xy) {
+  path[1:].each(fn(xy) {
     let x2 = xy.0
     let y2 = xy.1
     while x1 < x2 && y1 < y2 && old[x1] == new[y1] {

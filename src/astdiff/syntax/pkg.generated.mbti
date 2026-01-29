@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/astdiff/syntax"
 
-import(
-  "Yoorkin/prettyprinter"
-  "myfreess/moondiff/span"
-)
+import {
+  "Yoorkin/prettyprinter",
+  "myfreess/moondiff/span",
+}
 
 // Values
 pub fn init_all_info(ArrayView[Syntax], ArrayView[Syntax]) -> Unit

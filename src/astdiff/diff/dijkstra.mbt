@@ -170,9 +170,9 @@ pub fn mark_syntax(
 }
 
 ///|UUID(b0f991cc-c1d3-4f68-998a-594ad3288a07)
-fn[T] Option::succ(self : T?, f : (T) -> T?) -> Iterator[T] {
+fn[T] Option::succ(self : T?, f : (T) -> T?) -> Iter[T] {
   let mut curr = self
-  Iterator::new(() => {
+  Iter::new(() => {
     let prev = curr
     curr = match curr {
       Some(x) => f(x)

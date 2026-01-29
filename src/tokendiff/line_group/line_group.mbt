@@ -63,7 +63,7 @@ test {
     #|QUX
     #|quux
   let groups = line_group(old, new).unwrap_or([])
-  @json.inspect(groups, content=[
+  json_inspect(groups, content=[
     ["Normal", { "equal": { "old": ["foo", "bar"], "new": ["foo", "bar"] } }],
     ["Replace", { "old": ["baz", "qux"], "new": ["BAZ", "QUX"] }],
     ["Normal", { "equal": { "old": ["quux"], "new": ["quux"] } }],
@@ -80,7 +80,7 @@ test {
     #|gamma
     #|DELTA
   let groups = line_group(old, new).unwrap_or([])
-  @json.inspect(groups, content=[
+  json_inspect(groups, content=[
     ["Replace", { "old": ["alpha"], "new": ["ALPHA"] }],
     ["Normal", { "equal": { "old": ["beta"], "new": ["beta"] } }],
     ["Normal", { "insert": ["epsilon"] }],

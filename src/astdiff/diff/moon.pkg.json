@@ -1,5 +1,8 @@
 {
   "import": [
+    "moonbitlang/core/cmp",
+    "moonbitlang/core/hashmap",
+    "moonbitlang/core/priority_queue",
     "myfreess/moondiff/astdiff/syntax"
   ],
   "test-import": [

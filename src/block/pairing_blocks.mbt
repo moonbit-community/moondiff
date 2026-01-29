@@ -46,7 +46,7 @@ test {
   let old = create_blocks(old)
   let new = create_blocks(new)
   let pairs = pairing_blocks_by_uuid(old~, new~)
-  @json.inspect(pairs, content=[
+  json_inspect(pairs, content=[
     ["Delete", { "start_line": 1, "uuid": "1", "contents": "" }],
     ["Delete", { "start_line": 2, "uuid": "2", "contents": "" }],
     [

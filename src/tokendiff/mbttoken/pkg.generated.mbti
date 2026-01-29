@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/tokendiff/mbttoken"
 
-import(
-  "moonbitlang/parser/basic"
-  "moonbitlang/parser/tokens"
-)
+import {
+  "moonbitlang/parser/basic",
+  "moonbitlang/parser/tokens",
+}
 
 // Values
 pub fn mbttokens_to_string(ArrayView[MbtToken]) -> String

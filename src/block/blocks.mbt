@@ -68,7 +68,7 @@ test {
     #|///|UUID(2)
     #|fn bar
     #|  // another comment here
-  @json.inspect(create_blocks(text), content=[
+  json_inspect(create_blocks(text), content=[
     { "start_line": 1, "uuid": "1", "contents": "fn foo\n  // comment here\n" },
     {
       "start_line": 4,
@@ -84,7 +84,7 @@ test "empty block" {
     #|///|UUID(1)
     #|///|UUID(2)
     #|///|UUID(3)
-  @json.inspect(create_blocks(text), content=[
+  json_inspect(create_blocks(text), content=[
     { "start_line": 1, "uuid": "1", "contents": "" },
     { "start_line": 2, "uuid": "2", "contents": "" },
   ])
@@ -94,7 +94,7 @@ test "empty block" {
     #|///|UUID(3)
     #|///|UUID(4)
     #|///|UUID(5)
-  @json.inspect(create_blocks(text), content=[
+  json_inspect(create_blocks(text), content=[
     { "start_line": 1, "uuid": "1", "contents": "" },
     { "start_line": 2, "uuid": "2", "contents": "" },
     { "start_line": 3, "uuid": "3", "contents": "" },

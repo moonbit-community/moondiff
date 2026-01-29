@@ -72,7 +72,7 @@ test "line widths" {
     #|
     #|     |
     #|This is a test
-  @json.inspect(LineWidths::from_str(str), content=[
+  json_inspect(LineWidths::from_str(str), content=[
     [],
     ["H", "e", "l", "l", "o", ","],
     ["W", "o", "r", "l", "d", "!"],
@@ -157,7 +157,7 @@ pub fn LineWidths::backward_search(
 //     #| [ bar ] 
 //     #|} baz
 //   let line_widths : LineWidths = LineWidths::from_str(str)
-//   @json.inspect(line_widths, content=[
+//   json_inspect(line_widths, content=[
 //     [],
 //     ["f", "o", "o", " ", "{"],
 //     [" ", "[", " ", "b", "a", "r", " ", "]", " "],
@@ -167,22 +167,22 @@ pub fn LineWidths::backward_search(
 //   let pos_bar_end = @basic.Position::{ lnum: 2, fname: "", bol: 5, cnum: 10 }
 //   inspect(pos_bar_start.column(), content="4")
 //   inspect(pos_bar_end.column(), content="6")
-//   @json.inspect(line_widths.forward_search('}', pos_bar_end), content={
+//   json_inspect(line_widths.forward_search('}', pos_bar_end), content={
 //     "line": 3,
 //     "start_col": 0,
 //     "end_col": 1,
 //   })
-//   @json.inspect(line_widths.backward_search('{', pos_bar_start), content={
+//   json_inspect(line_widths.backward_search('{', pos_bar_start), content={
 //     "line": 1,
 //     "start_col": 4,
 //     "end_col": 5,
 //   })
-//   @json.inspect(line_widths.backward_search('[', pos_bar_start), content={
+//   json_inspect(line_widths.backward_search('[', pos_bar_start), content={
 //     "line": 2,
 //     "start_col": 1,
 //     "end_col": 2,
 //   })
-//   @json.inspect(line_widths.forward_search(']', pos_bar_start), content={
+//   json_inspect(line_widths.forward_search(']', pos_bar_start), content={
 //     "line": 2,
 //     "start_col": 7,
 //     "end_col": 8,

@@ -42,7 +42,7 @@ fn[T] Array::flatten_edits(
 
 ///|UUID(5e0f815c-2802-4413-a038-d26b7a2fdb53)
 test {
-  @json.inspect(
+  json_inspect(
     @postopt.align_edit_boundaries([
       Delete(old=ids(["xyz", "wuv"])),
       Insert(new=ids(["aaa", "bbb", "ccc"])),

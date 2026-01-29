@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/astdiff/diff"
 
-import(
-  "moonbitlang/core/hashmap"
-  "myfreess/moondiff/astdiff/syntax"
-)
+import {
+  "moonbitlang/core/hashmap",
+  "myfreess/moondiff/astdiff/syntax",
+}
 
 // Values
 pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, ChangeMap, UInt) -> Unit raise ExceededGraphLimit

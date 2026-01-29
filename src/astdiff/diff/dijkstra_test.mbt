@@ -13,8 +13,8 @@ test "identical atoms" {
   @syntax.init_all_info([lhs], [rhs])
   let start = Vertex::new(lhs=Some(lhs), rhs=Some(rhs))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[
     ["UnchangedNode", { "depth_difference": 0, "probably_punctuation": false }],
   ])
 }
@@ -42,8 +42,8 @@ test "extra atom lhs" {
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[
     ["EnterUnchangedDelimiter", { "depth_difference": 0 }],
     "NovelAtomLHS",
   ])
@@ -75,8 +75,8 @@ test "repeated atoms" {
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[
     ["EnterUnchangedDelimiter", { "depth_difference": 0 }],
     "NovelAtomRHS",
     "NovelAtomRHS",
@@ -124,8 +124,8 @@ test "atom after empty list" {
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[
     "EnterNovelDelimiterRHS",
     "EnterNovelDelimiterLHS",
     ["UnchangedNode", { "depth_difference": 0, "probably_punctuation": false }],
@@ -144,10 +144,8 @@ test "replace similar comment" {
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
-    ["ReplacedComment", { "levenshtein_pct": 84 }],
-  ])
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[["ReplacedComment", { "levenshtein_pct": 84 }]])
 }
 
 ///|UUID(bc068fb2-54c0-4627-89d9-7195a391979d)
@@ -159,10 +157,8 @@ test "replace very different comment" {
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
-    ["ReplacedComment", { "levenshtein_pct": 11 }],
-  ])
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[["ReplacedComment", { "levenshtein_pct": 11 }]])
 }
 
 ///|UUID(ab724580-01bb-4933-867c-e07b3a951f6d)
@@ -177,8 +173,8 @@ test "replace comment prefer most similar" {
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
-  let actions = route.iterator().map(pair => pair.0).collect()
-  @json.inspect(actions, content=[
+  let actions = route.iter().map(pair => pair.0).collect()
+  json_inspect(actions, content=[
     ["ReplacedComment", { "levenshtein_pct": 95 }],
     "NovelAtomLHS",
   ])

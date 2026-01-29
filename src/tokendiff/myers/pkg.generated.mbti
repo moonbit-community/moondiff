@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/tokendiff/myers"
 
-import(
-  "myfreess/moondiff/tokendiff/edit"
-)
+import {
+  "myfreess/moondiff/tokendiff/edit",
+}
 
 // Values
 pub fn[T : Eq] diff(old~ : ArrayView[T], new~ : ArrayView[T]) -> (Bool, Array[@edit.Edit[T]])

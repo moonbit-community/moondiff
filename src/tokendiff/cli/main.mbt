@@ -163,7 +163,7 @@ test "soft wrap" {
   ]
   max_line_width.val = 5
   let wrapped = soft_wrap(lines)
-  @json.inspect(wrapped, content=[
+  json_inspect(wrapped, content=[
     [true, [[false, ["a", "b", "c", "d", "e"]]]],
     [false, [[true, ["f", "g", "h", "i", "j"]]]],
     [false, [[true, ["k", "l", "m"]]]],
@@ -171,7 +171,7 @@ test "soft wrap" {
   ])
   max_line_width.val = 4
   let wrapped = soft_wrap(lines)
-  @json.inspect(wrapped, content=[
+  json_inspect(wrapped, content=[
     [true, [[false, ["a", "b", "c", "d"]]]],
     [false, [[false, ["e"]], [true, ["f", "g", "h"]]]],
     [false, [[true, ["i", "j", "k", "l"]]]],
@@ -201,10 +201,10 @@ fn ArrayView::split(
 ///|UUID(429b0e77-edb4-40ef-8625-d2cd62e18698)
 test "split arrayview" {
   let widths = [0, 0, 4][:]
-  @json.inspect(widths.split(0), content=[[], [], [4]])
-  @json.inspect([][:].split(0), content=[[]])
+  json_inspect(widths.split(0), content=[[], [], [4]])
+  json_inspect([][:].split(0), content=[[]])
   let widths = [0, 0][:]
-  @json.inspect(widths.split(0), content=[[], [], []])
+  json_inspect(widths.split(0), content=[[], [], []])
 }
 
 ///|UUID(e1136f23-beb4-46f9-828d-e35e49dc0bc0)
