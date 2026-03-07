@@ -144,7 +144,7 @@ fn web_rendering(
       Insert(..) => ()
       Equal(old~, ..) => buf.write_with_eqn(old)
     }
-  } else {
+  } nobreak {
     buf.write_char('\n')
     buf.write_string(code_footer)
     buf.write_char('\n')
@@ -158,7 +158,7 @@ fn web_rendering(
       Delete(..) => ()
       Equal(new~, ..) => buf.write_with_eqn(new)
     }
-  } else {
+  } nobreak {
     buf.write_char('\n')
     buf.write_string(code_footer)
     buf.write_char('\n')

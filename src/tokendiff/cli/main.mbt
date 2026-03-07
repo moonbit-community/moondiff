@@ -76,7 +76,7 @@ fn split_matching_block(
             }
           _ => token.emit_text_to(tok_buf)
         }
-      } else {
+      } nobreak {
         if tok_buf.length() > 0 {
           current_line.val.push((modified, tok_buf))
         }
@@ -93,7 +93,7 @@ fn split_matching_block(
         process_edits(new, false, current_line_right, right)
       }
     }
-  } else {
+  } nobreak {
     if current_line_left.val.length() > 0 {
       left.push(current_line_left.val)
     }
@@ -132,7 +132,7 @@ fn soft_wrap(
         while rest.length() > max_line_width.val {
           result.push((first, [(is_modification, rest[:max_line_width.val])]))
           rest = rest[max_line_width.val:]
-        } else {
+        } nobreak {
           if rest.length() > 0 {
             current_visual_line.push((is_modification, rest))
             current_width += rest.length()
@@ -142,12 +142,12 @@ fn soft_wrap(
         current_visual_line.push((is_modification, text[:]))
         current_width += text.length()
       }
-    } else {
+    } nobreak {
       if current_visual_line.length() > 0 {
         result.push((first, current_visual_line))
       }
     }
-  } else {
+  } nobreak {
     return result
   }
 }

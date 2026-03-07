@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/parser/tokens",
+  "moonbitlang/parser/basic",
+  "myfreess/moondiff/span",
+  "moonbitlang/parser/lexer",
+}
+
+import {
+  "moonbitlang/parser/lexer",
+  "myfreess/moondiff/span",
+} for "wbtest"

@@ -130,9 +130,11 @@ fn edge_between(before : Vertex, after : Vertex) -> Edge {
 fn node_count(root : Syntax?) -> UInt {
   let iter = root.succ(node => node.next_sibling())
   iter
-  .map(node => match node {
-    List(num_descendants~, ..) => num_descendants
-    Atom(..) => 1
+  .map(node => {
+    match node {
+      List(num_descendants~, ..) => num_descendants
+      Atom(..) => 1
+    }
   })
   .fold(init=0U, (x, y) => x + y)
 }

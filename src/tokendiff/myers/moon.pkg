@@ -1,0 +1,9 @@
+import {
+  "myfreess/moondiff/tokendiff/edit",
+}
+
+import {
+  "myfreess/moondiff/tokendiff/edit",
+} for "test"
+
+warnings = "-1"

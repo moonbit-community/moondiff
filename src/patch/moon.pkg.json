@@ -1,9 +1,0 @@
-{
-    "import": [
-        "myfreess/moondiff/block",
-        "myfreess/moondiff/span",
-        "moonbitlang/parser/lexer",
-        "moonbitlang/parser/basic"
-    ],
-    "warn-list": "-a"
-}

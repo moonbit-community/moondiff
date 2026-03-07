@@ -41,7 +41,7 @@ pub fn create_blocks(
       buf.write_stringview(line)
       buf.write_char('\n')
     }
-  } else {
+  } nobreak {
     if !buf.is_empty() {
       if current_uuid == "dummy_uuid_if_ocuur_then_need_fix" {
         raise NotWellFormattedSourceCode(

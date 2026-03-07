@@ -154,7 +154,7 @@ pub fn align_edit_boundaries(
       }
       _ => continue
     }
-  } else {
+  } nobreak {
     return result.remove_leading_trailing_blank()
   }
 }

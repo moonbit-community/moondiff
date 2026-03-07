@@ -144,7 +144,7 @@ fn[T : Eq] Box::midpoint(
         }
       res => return res
     }
-  } else {
+  } nobreak {
     None
   }
 }

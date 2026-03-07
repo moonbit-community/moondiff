@@ -13,7 +13,7 @@ fn BPArray::copy(self : BPArray[Int]) -> BPArray[Int] {
   let newarr = Array::make(arr.length(), 0)
   for i = 0; i < arr.length(); i = i + 1 {
     newarr[i] = arr[i]
-  } else {
+  } nobreak {
     BPArray(newarr)
   }
 }

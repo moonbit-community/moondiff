@@ -65,7 +65,7 @@ fn Array::remove_leading_trailing_blank(
           _ => result.push(edit)
         }
     }
-  } else {
+  } nobreak {
     return result
   }
 }

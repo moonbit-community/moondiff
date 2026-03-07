@@ -1,8 +1,0 @@
-{
-    "import": [
-        { "path": "Yoorkin/prettyprinter", "alias": "pp" },
-        "moonbitlang/core/hashmap",
-        "moonbitlang/core/uint",
-        "myfreess/moondiff/span"
-    ]
-}
