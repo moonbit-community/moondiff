@@ -334,6 +334,7 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
       // never have more than 2 nodes
       let existing = Array::new(capacity=2)
       existing.push(v)
+      seen[v] = existing
       v
     }
   }
