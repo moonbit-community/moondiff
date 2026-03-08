@@ -6,3 +6,6 @@ using @hashmap {type HashMap}
 
 ///|UUID(7f9c57d9-6800-43c3-8e60-44703ccab935)
 using @priority_queue {type PriorityQueue}
+
+///|UUID(8d06c680-42b4-4dd5-89f3-490ee70a4c5d)
+using @span {type SingleLineSpan}

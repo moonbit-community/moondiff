@@ -3,8 +3,5 @@ import {
   "moonbitlang/core/hashmap",
   "moonbitlang/core/priority_queue",
   "myfreess/moondiff/astdiff/syntax",
-}
-
-import {
   "myfreess/moondiff/span",
-} for "test"
+}
