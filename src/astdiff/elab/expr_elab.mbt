@@ -486,8 +486,99 @@ fn ElabCtx::elab_optional_binder(self : Self, binder : Binder?) -> Syntax {
   self.option_node(binder, fn(value) { self.elab_binder(value) })
 }
 
+///|UUID(6d8cfe35-f1e8-4ba8-891f-849791f8def2)
+fn is_stmt_chain_expr(expr : Expr) -> Bool {
+  match expr {
+    Let(..) | LetMut(..) | LetFn(..) | LetRec(..) | LetAnd(..) | Sequence(..) => true
+    _ => false
+  }
+}
+
+///|UUID(1f4b1a8d-f456-45e2-9842-6029d1441cbf)
+fn ElabCtx::elab_stmt_chain(self : Self, expr : Expr) -> Syntax {
+  let statements = Array::new()
+  let mut current = expr
+  while true {
+    match current {
+      Let(pattern~, expr=bound_expr, body~, loc=_) => {
+        statements.push(
+          self.node("Stmt::Let", [
+            self.field("pattern", self.elab_pattern(pattern)),
+            self.field("expr", self.elab_expr(bound_expr)),
+          ]),
+        )
+        current = body
+      }
+      LetMut(binder~, ty~, expr=bound_expr, body~, loc=_) => {
+        statements.push(
+          self.node("Stmt::LetMut", [
+            self.field("binder", self.elab_binder(binder)),
+            self.field_option("ty", ty, fn(value) { self.elab_type(value) }),
+            self.field("expr", self.elab_expr(bound_expr)),
+          ]),
+        )
+        current = body
+      }
+      LetFn(name~, func~, body~, loc=_) => {
+        statements.push(
+          self.node("Stmt::LetFn", [
+            self.field("name", self.elab_binder(name)),
+            self.field("func", self.elab_func(func)),
+          ]),
+        )
+        current = body
+      }
+      LetRec(bindings~, body~, loc=_) => {
+        statements.push(
+          self.node("Stmt::LetRec", [
+            self.field(
+              "bindings",
+              self.list_node("Stmt::LetRec::Bindings", bindings, fn(value) {
+                self.elab_binder_func_pair(value)
+              }),
+            ),
+          ]),
+        )
+        current = body
+      }
+      LetAnd(bindings~, body~, loc=_) => {
+        statements.push(
+          self.node("Stmt::LetAnd", [
+            self.field(
+              "bindings",
+              self.list_node("Stmt::LetAnd::Bindings", bindings, fn(value) {
+                self.elab_binder_type_func_triple(value)
+              }),
+            ),
+          ]),
+        )
+        current = body
+      }
+      Sequence(exprs~, last_expr~, loc=_) => {
+        exprs.each(fn(value) {
+          statements.push(
+            self.node("Stmt::Expr", [self.field("expr", self.elab_expr(value))]),
+          )
+        })
+        current = last_expr
+      }
+      _ => break
+    }
+  }
+
+  self.node("Expr::StmtChain", [
+    self.field("stmts", self.node("Expr::StmtChain::Stmts", statements)),
+    self.field("tail", self.elab_expr(current)),
+  ])
+}
+
 ///|UUID(df959680-a529-453e-9946-7b0cceaa1749)
 pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
+  // Normalize nested let/sequence bodies into a single statement list so
+  // inserted bindings do not hide unchanged following statements.
+  if is_stmt_chain_expr(expr) {
+    return self.elab_stmt_chain(expr)
+  }
   match expr {
     Apply(func~, args~, attr~, loc=_) =>
       self.node("Expr::Apply", [
