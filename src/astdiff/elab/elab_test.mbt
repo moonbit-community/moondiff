@@ -1,10 +1,10 @@
-///|
+///|UUID(2dde4507-d810-4333-a0ae-173aa929afbb)
 using @basic {type Location}
 
-///|
+///|UUID(44282995-f14e-4eed-929e-7184bdf2b4b7)
 using @dsyntax {type Syntax}
 
-///|
+///|UUID(f5a17523-7a2f-4213-95d6-d4f8d19afa15)
 fn loc(start_cnum : Int, end_cnum : Int, line? : Int = 1) -> Location {
   let start = @basic.Position::{
     fname: "",
@@ -16,7 +16,7 @@ fn loc(start_cnum : Int, end_cnum : Int, line? : Int = 1) -> Location {
   { start, end }
 }
 
-///|
+///|UUID(e31e6d63-9b05-416b-887b-39b4467ecbbe)
 fn field_value(node : Syntax, tag : String) -> Syntax raise {
   match node {
     Syntax::List(children~, ..) =>
@@ -37,7 +37,7 @@ fn field_value(node : Syntax, tag : String) -> Syntax raise {
   }
 }
 
-///|
+///|UUID(c7223b88-e184-4405-97e5-c718dafef12b)
 fn node_tag(node : Syntax) -> String raise {
   match node {
     Syntax::List(open_content~, ..) => open_content
@@ -45,12 +45,12 @@ fn node_tag(node : Syntax) -> String raise {
   }
 }
 
-///|
+///|UUID(5fd6f55e-e376-4863-8fb9-a5687729831a)
 fn sexp(node : Syntax) -> String {
   @pp.render(node, width=200)
 }
 
-///|
+///|UUID(c4ddf6cb-e833-45d5-827a-6280dbcef994)
 fn single_span_line(node : Syntax) -> Int raise {
   match node {
     Syntax::Atom(position~, ..) =>
@@ -63,7 +63,7 @@ fn single_span_line(node : Syntax) -> Int raise {
   }
 }
 
-///|
+///|UUID(bfdebfae-866d-4972-8af6-68a959fbfd36)
 fn only_child(node : Syntax) -> Syntax raise {
   match node {
     Syntax::List(children~, ..) =>
@@ -76,7 +76,7 @@ fn only_child(node : Syntax) -> Syntax raise {
   }
 }
 
-///|
+///|UUID(9db33348-9d9a-4b88-b49d-05c36042dea7)
 test "elab parsed function keeps top-level shape and docstring" {
   let source =
     #|/// Adds one
@@ -104,7 +104,7 @@ test "elab parsed function keeps top-level shape and docstring" {
   inspect(single_span_line(only_child(doc)), content="1")
 }
 
-///|
+///|UUID(35058a48-ec09-4b30-947f-9532a9295a0f)
 test "elab dotted type name uses tagged long ident" {
   let source = "pkg.Type"
   let ty = @past.Type::Name(
@@ -125,7 +125,7 @@ test "elab dotted type name uses tagged long ident" {
   inspect(single_span_line(only_child(ident)), content="1")
 }
 
-///|
+///|UUID(2e8bd51d-71af-4423-9723-037e902204e7)
 test "elab open array pattern keeps dotdot binder shape" {
   let source = "[head, ..rest]"
   let pat = @past.Pattern::Array(

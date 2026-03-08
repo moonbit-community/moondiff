@@ -1,4 +1,4 @@
-///|
+///|UUID(3e527f9c-cba3-4bbc-a114-36dc99f533dd)
 fn ElabCtx::elab_local_type_decl(self : Self, decl : LocalTypeDecl) -> Syntax {
   // TODO: `LocalTypeDecl` does not keep an overall declaration location or
   // the `type` keyword span. Only the type constructor location is exposed.
@@ -14,7 +14,7 @@ fn ElabCtx::elab_local_type_decl(self : Self, decl : LocalTypeDecl) -> Syntax {
   ])
 }
 
-///|
+///|UUID(a96a2c35-4d3d-40af-98bf-4caa3a52776d)
 fn ElabCtx::elab_deriving_directive(
   self : Self,
   directive : DerivingDirective,
@@ -30,7 +30,7 @@ fn ElabCtx::elab_deriving_directive(
   ])
 }
 
-///|
+///|UUID(f04187ea-2945-441a-af06-befda367f752)
 fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
   self.node("TypeDecl", [
     self.field("tycon", self.type_atom(content=decl.tycon, loc=decl.tycon_loc)),
@@ -59,7 +59,7 @@ fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
   ])
 }
 
-///|
+///|UUID(89dde800-da7e-45ae-87be-97be65d4a5bf)
 fn ElabCtx::elab_func_stubs(self : Self, stubs : FuncStubs) -> Syntax {
   // TODO: `FuncStubs` stores literal text but not the positions of the
   // string tokens inside the stub body.
@@ -88,7 +88,7 @@ fn ElabCtx::elab_func_stubs(self : Self, stubs : FuncStubs) -> Syntax {
   }
 }
 
-///|
+///|UUID(7c5e356b-9d30-4585-a847-58778c5f5bf8)
 fn ElabCtx::elab_embedded_code(self : Self, code : EmbeddedCode) -> Syntax {
   // TODO: `EmbeddedCode` keeps only raw text; per-line locations are absent.
   match code {
@@ -105,7 +105,7 @@ fn ElabCtx::elab_embedded_code(self : Self, code : EmbeddedCode) -> Syntax {
   }
 }
 
-///|
+///|UUID(273eff4f-e996-44a9-a043-0070d774fbef)
 fn ElabCtx::elab_decl_body(self : Self, body : DeclBody) -> Syntax {
   match body {
     DeclBody(local_types~, expr~) =>
@@ -128,7 +128,7 @@ fn ElabCtx::elab_decl_body(self : Self, body : DeclBody) -> Syntax {
   }
 }
 
-///|
+///|UUID(dda25ac8-8bdb-42aa-b8a5-9df591630071)
 fn ElabCtx::elab_fun_decl(self : Self, decl : FunDecl) -> Syntax {
   self.node("FunDecl", [
     self.field_option("type_name", decl.type_name, fn(value) {
@@ -170,7 +170,7 @@ fn ElabCtx::elab_fun_decl(self : Self, decl : FunDecl) -> Syntax {
   ])
 }
 
-///|
+///|UUID(86c60871-a051-42fe-ba5d-f346c39e537f)
 fn ElabCtx::elab_trait_method_decl(
   self : Self,
   decl : TraitMethodDecl,
@@ -213,7 +213,7 @@ fn ElabCtx::elab_trait_method_decl(
   ])
 }
 
-///|
+///|UUID(0dacaa83-bd09-4604-a0d6-5911112e7bfa)
 fn ElabCtx::elab_trait_decl(self : Self, decl : TraitDecl) -> Syntax {
   self.node("TraitDecl", [
     self.field("name", self.elab_binder(decl.name)),
@@ -241,7 +241,7 @@ fn ElabCtx::elab_trait_decl(self : Self, decl : TraitDecl) -> Syntax {
   ])
 }
 
-///|
+///|UUID(cb392db1-0135-44ae-94b8-a017793a7bf1)
 fn ElabCtx::elab_using_kind(self : Self, kind : UsingKind) -> Syntax {
   ignore(self)
   match kind {
@@ -251,7 +251,7 @@ fn ElabCtx::elab_using_kind(self : Self, kind : UsingKind) -> Syntax {
   }
 }
 
-///|
+///|UUID(db09c59d-7e60-436a-9737-ea856f8ff0d6)
 fn ElabCtx::elab_alias_using_pair(
   self : Self,
   pair : (AliasTarget, UsingKind),
@@ -263,7 +263,7 @@ fn ElabCtx::elab_alias_using_pair(
   ])
 }
 
-///|
+///|UUID(6094e4c4-1b51-4310-89d9-c32f66988f67)
 pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
   match impl_ {
     TopExpr(expr~, is_main~, local_types~, is_async~, loc=_) =>
