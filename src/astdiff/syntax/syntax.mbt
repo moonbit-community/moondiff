@@ -377,6 +377,9 @@ fn set_unique_id(nodes : ArrayView[Syntax], next_id : Ref[SyntaxId]) -> Unit {
   for node in nodes {
     node.info().unique_id = next_id.val
     next_id.val = next_id.val + 1
+    if node is List(children~, ..) {
+      set_unique_id(children, next_id)
+    }
   }
 }
 
