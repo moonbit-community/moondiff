@@ -167,4 +167,13 @@ test "non terminate" {
     #|    ...
     #|  }
     #|}
+  let result = diff_text(
+    "old.mbt",
+    old,
+    "new.mbt",
+    new,
+    options=DiffOptions::new(use_color=true),
+  )
+  println(result.rendered)
+  assert_true(result.kind is Ast)
 }
