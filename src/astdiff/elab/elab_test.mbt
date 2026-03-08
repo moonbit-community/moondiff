@@ -76,6 +76,14 @@ fn only_child(node : Syntax) -> Syntax raise {
   }
 }
 
+///|UUID(32b7d451-f83a-4bb6-b2d9-edec02309048)
+fn list_children(node : Syntax) -> Array[Syntax] raise {
+  match node {
+    Syntax::List(children~, ..) => children
+    _ => fail("expected list node")
+  }
+}
+
 ///|UUID(9db33348-9d9a-4b88-b49d-05c36042dea7)
 test "elab parsed function keeps top-level shape and docstring" {
   let source =
@@ -149,4 +157,31 @@ test "elab open array pattern keeps dotdot binder shape" {
   inspect(sexp(binder), content="(((rest)))")
   let binder_atom = only_child(field_value(binder, "binder"))
   inspect(single_span_line(binder_atom), content="1")
+}
+
+///|UUID(1941b253-3c52-4e0d-aa82-09e7efee4309)
+test "elab normalizes let chain into statement list" {
+  let source =
+    #|fn f() -> Int {
+    #|  let a = 1
+    #|  let b = 2
+    #|  a + b
+    #|}
+  let (impls, reports) = @parser.parse_string(source)
+  inspect(reports.length(), content="0")
+
+  let syntax = elab_impls(source, impls)
+  let decl_body = field_value(syntax[0], "decl_body")
+  let expr = field_value(decl_body, "expr")
+  inspect(node_tag(expr), content="Expr::StmtChain")
+
+  let stmts = field_value(expr, "stmts")
+  inspect(node_tag(stmts), content="Expr::StmtChain::Stmts")
+  let stmt_children = list_children(stmts)
+  inspect(stmt_children.length(), content="2")
+  inspect(node_tag(stmt_children[0]), content="Stmt::Let")
+  inspect(node_tag(stmt_children[1]), content="Stmt::Let")
+
+  let tail = field_value(expr, "tail")
+  inspect(node_tag(tail), content="Expr::Infix")
 }
