@@ -142,3 +142,29 @@ test "diff_text merges nearby ast hunks for real multi-root changes" {
     ),
   )
 }
+
+///|UUID(dd5013c1-91c6-4fc3-aec3-79daed8bd382)
+test "non terminate" {
+  let old =
+    #|pub fn decode(bytes : @bytes.View) -> String raise Malformed {
+    #|  let builder = StringBuilder::new(size_hint=bytes.length())
+    #|  loop bytes {
+    #|    ...
+    #|  }
+    #|}
+  let new =
+    #|pub fn decode(
+    #|  bytes : @bytes.View,
+    #|  ignore_bom? : Bool = false,
+    #|) -> String raise Malformed {
+    #|  let bytes = if ignore_bom && bytes is [.. "\xef\xbb\xbf", .. rest] {
+    #|    rest
+    #|  } else {
+    #|    bytes
+    #|  }
+    #|  let builder = StringBuilder::new(size_hint=bytes.length())
+    #|  loop bytes {
+    #|    ...
+    #|  }
+    #|}
+}
