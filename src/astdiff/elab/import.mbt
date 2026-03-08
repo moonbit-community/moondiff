@@ -1,0 +1,82 @@
+///|
+using @basic {type Location}
+
+///|
+using @past {
+  type Accessor,
+  type AliasTarget,
+  type ApplyAttr,
+  type Argument,
+  type ArgumentKind,
+  type ArrayPattern,
+  type ArrayPatterns,
+  type Binder,
+  type Case,
+  type Constant,
+  type ConstrDecl,
+  type ConstrId,
+  type ConstrName,
+  type ConstrParam,
+  type ConstrPatArg,
+  type Constructor,
+  type ConstructorExtraInfo,
+  type DeclBody,
+  type DerivingDirective,
+  type DocString,
+  type DotDotBinder,
+  type EmbeddedCode,
+  type ErrorType,
+  type ExceptionDecl,
+  type Expr,
+  type FieldDecl,
+  type FieldDef,
+  type FieldName,
+  type FieldPat,
+  type FnKind,
+  type FunDecl,
+  type Func,
+  type FuncStubs,
+  type Group,
+  type Hole,
+  type Impl,
+  type Impls,
+  type InterpElem,
+  type Label,
+  type LexCase,
+  type LexPattern,
+  type LexTopPattern,
+  type LocalTypeDecl,
+  type LongIdent,
+  type MapExprElem,
+  type MapPatElem,
+  type MultilineStringElem,
+  type Parameter,
+  type Pattern,
+  type RangeKind,
+  type SpreadableElem,
+  type StaticAssertion,
+  type TrailingMark,
+  type TraitDecl,
+  type TraitMethodDecl,
+  type TryOperatorKind,
+  type Type,
+  type TypeDecl,
+  type TypeDeclBinder,
+  type TypeDesc,
+  type TypeName,
+  type TypeVarBinder,
+  type TypeVarConstraint,
+  type UsingKind,
+  type Var,
+  type Visibility,
+  type WhereClause,
+}
+
+///|
+using @attribute {type Attribute}
+
+///|
+using @span {type LineWidths, type SingleLineSpan}
+
+///|
+using @dsyntax {type AtomKind, type StringKind, type Syntax}
