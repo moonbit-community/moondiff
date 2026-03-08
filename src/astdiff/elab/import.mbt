@@ -1,7 +1,7 @@
-///|
+///|UUID(df627de9-2147-4850-955a-3c98cd5a1aeb)
 using @basic {type Location}
 
-///|
+///|UUID(1351703e-fe9b-40bc-abba-c55d3126c6d6)
 using @past {
   type Accessor,
   type AliasTarget,
@@ -72,11 +72,11 @@ using @past {
   type WhereClause,
 }
 
-///|
+///|UUID(8b654fac-4316-45c3-936c-bf477fd3c356)
 using @attribute {type Attribute}
 
-///|
+///|UUID(8dd3c020-76bb-4c68-be02-de1633766751)
 using @span {type LineWidths, type SingleLineSpan}
 
-///|
+///|UUID(4dbeb346-f3c0-44f5-982e-600ecb96ec4e)
 using @dsyntax {type AtomKind, type StringKind, type Syntax}

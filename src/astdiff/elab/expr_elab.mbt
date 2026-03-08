@@ -1,4 +1,4 @@
-///|
+///|UUID(2ced3e61-8cf2-404b-8ab1-9674bfe7117f)
 fn ElabCtx::elab_argument(self : Self, argument : Argument) -> Syntax {
   // TODO: `Argument` itself has no location. Positional arguments also lose
   // comma and parenthesis spans, so only the contained value/kind are precise.
@@ -8,7 +8,7 @@ fn ElabCtx::elab_argument(self : Self, argument : Argument) -> Syntax {
   ])
 }
 
-///|
+///|UUID(183a6ecd-6c9c-46fa-9faf-945d1e70ea88)
 fn ElabCtx::elab_parameter(self : Self, parameter : Parameter) -> Syntax {
   // TODO: `Parameter` does not preserve punctuation spans such as `~`, `?`,
   // `:`, or `=`. Only binder/type/default child locations are available.
@@ -42,7 +42,7 @@ fn ElabCtx::elab_parameter(self : Self, parameter : Parameter) -> Syntax {
   }
 }
 
-///|
+///|UUID(06bcd4d0-bbf8-44ee-88c1-50579df54725)
 fn ElabCtx::elab_case(self : Self, case_ : Case) -> Syntax {
   // TODO: `Case` does not expose a standalone location for the `=>` token
   // or the optional guard keyword.
@@ -53,7 +53,7 @@ fn ElabCtx::elab_case(self : Self, case_ : Case) -> Syntax {
   ])
 }
 
-///|
+///|UUID(1e4244d6-7ec2-4737-b9db-5805960d50f0)
 fn ElabCtx::elab_lex_case(self : Self, case_ : LexCase) -> Syntax {
   self.node("LexCase", [
     self.field(
@@ -67,7 +67,7 @@ fn ElabCtx::elab_lex_case(self : Self, case_ : LexCase) -> Syntax {
   ])
 }
 
-///|
+///|UUID(8879acf8-55a1-492b-8a53-09b042328fab)
 fn ElabCtx::elab_lex_top_pattern(self : Self, pat : LexTopPattern) -> Syntax {
   match pat {
     Pattern(pat) =>
@@ -85,7 +85,7 @@ fn ElabCtx::elab_lex_top_pattern(self : Self, pat : LexTopPattern) -> Syntax {
   }
 }
 
-///|
+///|UUID(0a7b2289-91b5-49ff-b15b-3a80a5c2c8e0)
 fn ElabCtx::elab_lex_pattern(self : Self, pat : LexPattern) -> Syntax {
   match pat {
     Regex(lit~, loc~) =>
@@ -110,7 +110,7 @@ fn ElabCtx::elab_lex_pattern(self : Self, pat : LexPattern) -> Syntax {
   }
 }
 
-///|
+///|UUID(d2e13d50-473e-4210-a13a-65b5fe4d51cd)
 fn ElabCtx::elab_spreadable_elem(self : Self, elem : SpreadableElem) -> Syntax {
   match elem {
     Regular(expr) =>
@@ -125,7 +125,7 @@ fn ElabCtx::elab_spreadable_elem(self : Self, elem : SpreadableElem) -> Syntax {
   }
 }
 
-///|
+///|UUID(cf803cd3-2086-4b49-b751-c58573acb998)
 fn ElabCtx::elab_map_expr_elem(self : Self, elem : MapExprElem) -> Syntax {
   self.node("MapExprElem", [
     self.field("key", self.elab_constant(elem.key, elem.key_loc)),
@@ -133,7 +133,7 @@ fn ElabCtx::elab_map_expr_elem(self : Self, elem : MapExprElem) -> Syntax {
   ])
 }
 
-///|
+///|UUID(e88ab191-3222-4657-b9c5-a8397c58558c)
 fn ElabCtx::elab_static_assertion(
   self : Self,
   assertion : StaticAssertion,
@@ -148,7 +148,7 @@ fn ElabCtx::elab_static_assertion(
   ])
 }
 
-///|
+///|UUID(4033290e-d682-4221-a341-4032917c0566)
 fn ElabCtx::elab_func(self : Self, func : Func) -> Syntax {
   self.node("Func", [
     self.field(
@@ -172,7 +172,7 @@ fn ElabCtx::elab_func(self : Self, func : Func) -> Syntax {
   ])
 }
 
-///|
+///|UUID(1be9d5ca-7c9f-48e4-a308-66686a25e11d)
 fn ElabCtx::elab_field_def(self : Self, field : FieldDef) -> Syntax {
   self.node("FieldDef", [
     self.field("label", self.elab_label(field.label)),
@@ -181,7 +181,7 @@ fn ElabCtx::elab_field_def(self : Self, field : FieldDef) -> Syntax {
   ])
 }
 
-///|
+///|UUID(db3027ba-0cbd-442d-9611-eb7b6d0d4b4c)
 fn ElabCtx::elab_interp_elem(self : Self, elem : InterpElem) -> Syntax {
   match elem {
     Literal(repr~, loc~) =>
@@ -195,7 +195,7 @@ fn ElabCtx::elab_interp_elem(self : Self, elem : InterpElem) -> Syntax {
   }
 }
 
-///|
+///|UUID(79a5809d-e6af-4db2-94ab-2bc8a031b1ff)
 fn ElabCtx::elab_multiline_string_elem(
   self : Self,
   elem : MultilineStringElem,
@@ -218,7 +218,7 @@ fn ElabCtx::elab_multiline_string_elem(
   }
 }
 
-///|
+///|UUID(34d7ca97-b84d-41ab-b8ea-dfc77f0874b2)
 fn ElabCtx::elab_try_operator_kind(
   self : Self,
   kind : TryOperatorKind,
@@ -230,7 +230,7 @@ fn ElabCtx::elab_try_operator_kind(
   }
 }
 
-///|
+///|UUID(f163a85d-6d5d-4a7e-bd39-9af8b93d14e6)
 fn ElabCtx::elab_dotdot_binder(self : Self, binder : DotDotBinder) -> Syntax {
   // TODO: `DotDotBinder::Underscore` and `DotDotBinder::NoBinder` do not
   // carry the source span of the `..` pattern segment.
@@ -248,7 +248,7 @@ fn ElabCtx::elab_dotdot_binder(self : Self, binder : DotDotBinder) -> Syntax {
   }
 }
 
-///|
+///|UUID(1051e876-f9a4-4ecc-8d20-2b9012b86f0a)
 fn ElabCtx::elab_array_pattern(self : Self, pat : ArrayPattern) -> Syntax {
   match pat {
     ArrayPattern::Pattern(pat) =>
@@ -276,7 +276,7 @@ fn ElabCtx::elab_array_pattern(self : Self, pat : ArrayPattern) -> Syntax {
   }
 }
 
-///|
+///|UUID(4f3b7cb3-da7f-43c0-a588-7e6b1c80446a)
 fn ElabCtx::elab_array_patterns(
   self : Self,
   patterns : ArrayPatterns,
@@ -307,7 +307,7 @@ fn ElabCtx::elab_array_patterns(
   }
 }
 
-///|
+///|UUID(7e7033c9-cac5-4f0c-a580-b848f0e89958)
 fn ElabCtx::elab_where_clause(
   self : Self,
   where_clause : WhereClause,
@@ -322,7 +322,7 @@ fn ElabCtx::elab_where_clause(
   ])
 }
 
-///|
+///|UUID(cf7ec82c-47e9-4e1c-92ff-c511f2fd534f)
 fn ElabCtx::elab_field_pat(self : Self, field : FieldPat) -> Syntax {
   self.node("FieldPat", [
     self.field("label", self.elab_label(field.label)),
@@ -331,7 +331,7 @@ fn ElabCtx::elab_field_pat(self : Self, field : FieldPat) -> Syntax {
   ])
 }
 
-///|
+///|UUID(8c265480-60a5-4d57-903f-b9416720b2bb)
 fn ElabCtx::elab_constr_pat_arg(self : Self, arg : ConstrPatArg) -> Syntax {
   // TODO: `ConstrPatArg` does not store a separate location, so delimiter
   // and label punctuation spans are unavailable here.
@@ -341,7 +341,7 @@ fn ElabCtx::elab_constr_pat_arg(self : Self, arg : ConstrPatArg) -> Syntax {
   ])
 }
 
-///|
+///|UUID(2457474d-18fa-46e9-bc60-7b6334e3856a)
 fn ElabCtx::elab_map_pat_elem(self : Self, elem : MapPatElem) -> Syntax {
   self.node("MapPatElem", [
     self.field("key", self.elab_constant(elem.key, elem.key_loc)),
@@ -350,7 +350,7 @@ fn ElabCtx::elab_map_pat_elem(self : Self, elem : MapPatElem) -> Syntax {
   ])
 }
 
-///|
+///|UUID(9f02db1e-eb5f-432e-8793-ee6f63d52dd9)
 fn ElabCtx::elab_range_kind(self : Self, kind : RangeKind) -> Syntax {
   ignore(self)
   match kind {
@@ -360,7 +360,7 @@ fn ElabCtx::elab_range_kind(self : Self, kind : RangeKind) -> Syntax {
   }
 }
 
-///|
+///|UUID(16357efa-aba6-4c12-8349-55ac81a81c57)
 pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
   // TODO: `Pattern` nodes do not expose delimiter positions for tuple,
   // record, map, or array punctuation.
@@ -450,7 +450,7 @@ pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
   }
 }
 
-///|
+///|UUID(7043dcb6-12e7-4439-9596-1d1f854cdfc0)
 fn ElabCtx::elab_binder_expr_pair(self : Self, pair : (Binder, Expr)) -> Syntax {
   let (binder, expr) = pair
   self.node("BinderExprPair", [
@@ -459,7 +459,7 @@ fn ElabCtx::elab_binder_expr_pair(self : Self, pair : (Binder, Expr)) -> Syntax 
   ])
 }
 
-///|
+///|UUID(3153e600-b335-43c8-9717-8d4a0a78cb33)
 fn ElabCtx::elab_binder_func_pair(self : Self, pair : (Binder, Func)) -> Syntax {
   let (binder, func) = pair
   self.node("BinderFuncPair", [
@@ -468,7 +468,7 @@ fn ElabCtx::elab_binder_func_pair(self : Self, pair : (Binder, Func)) -> Syntax 
   ])
 }
 
-///|
+///|UUID(ddd37f3e-c143-42a8-8cbc-63e060af5ec4)
 fn ElabCtx::elab_binder_type_func_triple(
   self : Self,
   triple : (Binder, Type?, Func),
@@ -481,12 +481,12 @@ fn ElabCtx::elab_binder_type_func_triple(
   ])
 }
 
-///|
+///|UUID(b8667027-0750-43b5-b257-d3e36c6d7c4f)
 fn ElabCtx::elab_optional_binder(self : Self, binder : Binder?) -> Syntax {
   self.option_node(binder, fn(value) { self.elab_binder(value) })
 }
 
-///|
+///|UUID(df959680-a529-453e-9946-7b0cceaa1749)
 pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
   match expr {
     Apply(func~, args~, attr~, loc=_) =>
