@@ -3,6 +3,7 @@ package "myfreess/moondiff/astdiff/diff"
 
 import {
   "moonbitlang/core/hashmap",
+  "moonbitlang/core/ref",
   "myfreess/moondiff/astdiff/syntax",
 }
 
@@ -64,8 +65,8 @@ pub fn[T] Stack::size(Self[T]) -> UInt
 pub impl[T : Eq] Eq for Stack[T]
 
 pub struct Vertex {
-  neighbours : Ref[Array[(Edge, Vertex)]?]
-  predecessor : Ref[(UInt, Vertex)?]
+  neighbours : @ref.Ref[Array[(Edge, Vertex)]?]
+  predecessor : @ref.Ref[(UInt, Vertex)?]
   lhs_syntax : @syntax.Syntax?
   rhs_syntax : @syntax.Syntax?
   parents : Stack[EnteredDelimiter]
