@@ -201,3 +201,28 @@ test "mark syntax different atoms" {
   assert_true(change_map.get(lhs) is Some(Novel))
   assert_true(change_map.get(rhs) is Some(Novel))
 }
+
+///|UUID(06cdd13e-273c-4ec2-b0fe-329f397e2f32)
+test "mark syntax roots handles multiple changed roots around an unchanged anchor" {
+  let lhs = [
+    Syntax::atom(content="lhs-a", position=pos(1), kind=Normal),
+    Syntax::atom(content="keep", position=pos(2), kind=Normal),
+    Syntax::atom(content="lhs-z", position=pos(3), kind=Normal),
+  ]
+  let rhs = [
+    Syntax::atom(content="rhs-a", position=pos(1), kind=Normal),
+    Syntax::atom(content="keep", position=pos(2), kind=Normal),
+    Syntax::atom(content="rhs-z", position=pos(3), kind=Normal),
+  ]
+  @syntax.init_all_info(lhs, rhs)
+  let change_map = ChangeMap::new()
+
+  mark_syntax_roots(lhs, rhs, change_map, 3000000)
+
+  assert_true(change_map.get(lhs[1]) is Some(Unchanged(_)))
+  assert_true(change_map.get(rhs[1]) is Some(Unchanged(_)))
+  assert_true(change_map.get(lhs[0]) is Some(Novel))
+  assert_true(change_map.get(rhs[0]) is Some(Novel))
+  assert_true(change_map.get(lhs[2]) is Some(Novel))
+  assert_true(change_map.get(rhs[2]) is Some(Novel))
+}

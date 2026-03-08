@@ -8,7 +8,11 @@ import {
 }
 
 // Values
+pub fn fix_all_sliders(ArrayView[@syntax.Syntax], ChangeMap) -> Unit
+
 pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, ChangeMap, UInt) -> Unit raise ExceededGraphLimit
+
+pub fn mark_syntax_roots(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], ChangeMap, UInt) -> Unit raise ExceededGraphLimit
 
 pub fn shortest_path(Vertex, Int, Int) -> Array[(Edge, Vertex)] raise ExceededGraphLimit
 
