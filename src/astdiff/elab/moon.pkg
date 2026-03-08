@@ -1,0 +1,15 @@
+import {
+  "moonbitlang/core/list",
+  "moonbitlang/parser/basic" @basic,
+  "moonbitlang/parser/syntax" @past,
+  "moonbitlang/parser/attribute",
+  "myfreess/moondiff/astdiff/syntax" @dsyntax,
+  "myfreess/moondiff/span",
+}
+
+import {
+  "Yoorkin/prettyprinter" @pp,
+  "moonbitlang/parser",
+} for "test"
+
+warnings = "-28"
