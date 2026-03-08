@@ -1,0 +1,13 @@
+import {
+  "Lampese/moonbit-chalk" @chalk,
+  "moonbit-community/piediff/edit",
+  "moonbit-community/piediff/plain_diff",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/hashmap",
+  "moonbitlang/parser",
+  "moonbitlang/parser/basic" @basic,
+  "myfreess/moondiff/astdiff/diff",
+  "myfreess/moondiff/astdiff/elab",
+  "myfreess/moondiff/astdiff/syntax",
+  "myfreess/moondiff/span",
+}
