@@ -1,0 +1,33 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "myfreess/moondiff/astdiff/tool"
+
+// Values
+pub fn diff_text(String, String, String, String, options? : DiffOptions) -> DiffResult
+
+// Errors
+
+// Types and methods
+pub enum DiffKind {
+  Ast
+  TextFallback(reason~ : String)
+}
+
+pub struct DiffOptions {
+  graph_limit : UInt
+  context_lines : Int
+  use_color : Bool
+}
+pub fn DiffOptions::new(graph_limit? : UInt, context_lines? : Int, use_color? : Bool) -> Self
+pub impl Default for DiffOptions
+
+pub struct DiffResult {
+  kind : DiffKind
+  rendered : String
+  has_changes : Bool
+}
+pub fn DiffResult::is_fallback(Self) -> Bool
+
+// Type aliases
+
+// Traits
+
