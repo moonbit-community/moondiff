@@ -45,6 +45,11 @@
      - 不要硬改 `Impls` alias
      - 优先新增包装返回类型, 例如:
        - `ParsedImpls { impls : List[Impl], trivia : List[TopLevelTrivia] }`
+   - 额外说明:
+     - 如果这么做, 需要把所有公开 parse 入口一起改掉, 不只是 `syntax` 包:
+       - `parser/top.mbt` 的 `parse_string` / `parse_file`
+       - `handrolled_parser.parse`
+       - 以及任何直接返回 `Impls` 的公开 API
 
 3. `syntax/ast.mbt`
    - 修改 `Visibility::Pub`
@@ -277,6 +282,28 @@
    - 建议:
      - 改成 `String(value~ : String, loc~ : Location)`
 
+6. `syntax/ast.mbt`
+   - 修改 `ConstructorExtraInfo::Package`
+   - 当前:
+     - `Package(String)`
+   - 问题:
+     - 下游 `astdiff/elab` 只能把 package 名字作为 synthetic atom 输出
+   - 需要补:
+     - package 名字段自身的位置
+   - 建议:
+     - 改成 `Package(name~ : String, loc~ : Location)`
+
+7. `syntax/ast.mbt`
+   - 修改 `ArrayPattern::ConstSpread`
+   - 当前:
+     - `ConstSpread(binder~ : Binder, pkg~ : String?, loc~ : Location)`
+   - 问题:
+     - `pkg` 现在只有字符串, 没有自己的位置, 下游会退化成 synthetic atom
+   - 需要补:
+     - `pkg` 的位置
+   - 建议:
+     - 新增 `pkg_loc~ : Location?`
+
 ## P2
 
 1. `syntax/ast.mbt`
@@ -299,8 +326,9 @@
    - 问题:
      - `Attribute.parsed` 只有结构没有位置信息
    - 建议:
-     - 给 `attribute.Expr` 各变体补 `Location`
-     - 或让 `Attribute.parsed` 改成一棵带位置的表达式树
+     - 不要只给 `attribute.Expr` 外层补一个 `Location`; 这样仍然不够恢复内部 token
+     - 如果保留当前 AST 形状, 至少把 `attribute.Id` / `attribute.Prop` / `attribute.Expr` 都改成带位置
+     - 或让 `Attribute.parsed` 改成一棵完整的带位置表达式树
 
 ## 验收标准
 
