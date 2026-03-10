@@ -12,4 +12,5 @@ moon fmt -- -add-uuid
 # --cached: Only view the staging area (staged)
 # --name-only: Only output the file name
 # -z: Use null character as a separator to correctly handle file names containing spaces
+# TODO: handle delete file
 git diff --cached --name-only -z | xargs -0 git add
