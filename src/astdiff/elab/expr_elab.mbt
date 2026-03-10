@@ -489,7 +489,8 @@ fn ElabCtx::elab_optional_binder(self : Self, binder : Binder?) -> Syntax {
 ///|UUID(6d8cfe35-f1e8-4ba8-891f-849791f8def2)
 fn is_stmt_chain_expr(expr : Expr) -> Bool {
   match expr {
-    Let(..) | LetMut(..) | LetFn(..) | LetRec(..) | LetAnd(..) | Sequence(..) => true
+    Let(..) | LetMut(..) | LetFn(..) | LetRec(..) | LetAnd(..) | Sequence(..) =>
+      true
     _ => false
   }
 }
