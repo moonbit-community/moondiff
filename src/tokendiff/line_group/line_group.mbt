@@ -2,7 +2,7 @@
 pub enum REdit {
   Normal(@edit.Edit[Array[StringView]])
   Replace(old~ : Array[StringView], new~ : Array[StringView])
-} derive(ToJson)
+} derive(Debug)
 
 ///|UUID(e9c1b971-0da7-425d-87f6-520910e5a22b)
 pub fn line_group(old : String, new : String) -> Array[REdit]? {
@@ -63,11 +63,24 @@ test {
     #|QUX
     #|quux
   let groups = line_group(old, new).unwrap_or([])
-  json_inspect(groups, content=[
-    ["Normal", { "equal": { "old": ["foo", "bar"], "new": ["foo", "bar"] } }],
-    ["Replace", { "old": ["baz", "qux"], "new": ["BAZ", "QUX"] }],
-    ["Normal", { "equal": { "old": ["quux"], "new": ["quux"] } }],
-  ])
+  debug_inspect(
+    groups,
+    content=(
+      #|[
+      #|  Normal(
+      #|    Equal(
+      #|      old=[<StringView: "foo">, <StringView: "bar">],
+      #|      new=[<StringView: "foo">, <StringView: "bar">],
+      #|    ),
+      #|  ),
+      #|  Replace(
+      #|    old=[<StringView: "baz">, <StringView: "qux">],
+      #|    new=[<StringView: "BAZ">, <StringView: "QUX">],
+      #|  ),
+      #|  Normal(Equal(old=[<StringView: "quux">], new=[<StringView: "quux">])),
+      #|]
+    ),
+  )
   let old =
     #|alpha
     #|beta
@@ -80,11 +93,16 @@ test {
     #|gamma
     #|DELTA
   let groups = line_group(old, new).unwrap_or([])
-  json_inspect(groups, content=[
-    ["Replace", { "old": ["alpha"], "new": ["ALPHA"] }],
-    ["Normal", { "equal": { "old": ["beta"], "new": ["beta"] } }],
-    ["Normal", { "insert": ["epsilon"] }],
-    ["Normal", { "equal": { "old": ["gamma"], "new": ["gamma"] } }],
-    ["Replace", { "old": ["delta"], "new": ["DELTA"] }],
-  ])
+  debug_inspect(
+    groups,
+    content=(
+      #|[
+      #|  Replace(old=[<StringView: "alpha">], new=[<StringView: "ALPHA">]),
+      #|  Normal(Equal(old=[<StringView: "beta">], new=[<StringView: "beta">])),
+      #|  Normal(Insert(new=[<StringView: "epsilon">])),
+      #|  Normal(Equal(old=[<StringView: "gamma">], new=[<StringView: "gamma">])),
+      #|  Replace(old=[<StringView: "delta">], new=[<StringView: "DELTA">]),
+      #|]
+    ),
+  )
 }

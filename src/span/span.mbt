@@ -3,21 +3,22 @@ pub(all) struct SingleLineSpan {
   line : Int
   start_col : Int
   end_col : Int
-} derive(ToJson)
+} derive(Debug)
 
 ///|UUID(3694ba0a-e674-4b26-8d99-bd54c2c546bd)
 pub struct LineWidths {
   contents : Array[Char]
   lines : Array[(Int, Int)]
-} derive(Show)
+}
 
-///|UUID(78b34971-d0db-4321-bf4e-3f7a874a1519)
-pub impl ToJson for LineWidths with to_json(self) {
-  let views = Array::new()
+///|
+pub impl Debug for LineWidths with to_repr(self) {
+  let views : Array[ArrayView[Char]] = Array::new()
   for line in self.lines {
     views.push(self.contents[line.0:line.1])
   }
-  return views.to_json()
+  // CHECK: views.to_repr() compile fail
+  Debug::to_repr(views)
 }
 
 ///|UUID(c2453f0a-a480-4e28-bb5c-4ca37c519b2c)
@@ -72,16 +73,57 @@ test "line widths" {
     #|
     #|     |
     #|This is a test
-  json_inspect(LineWidths::from_str(str), content=[
-    [],
-    ["H", "e", "l", "l", "o", ","],
-    ["W", "o", "r", "l", "d", "!"],
-    [" ", " ", " ", " ", " ", "|"],
-    [],
-    [],
-    [" ", " ", " ", " ", " ", "|"],
-    ["T", "h", "i", "s", " ", "i", "s", " ", "a", " ", "t", "e", "s", "t"],
-  ])
+  debug_inspect(
+    LineWidths::from_str(str).contents,
+    content=(
+      #|[
+      #|  'H',
+      #|  'e',
+      #|  'l',
+      #|  'l',
+      #|  'o',
+      #|  ',',
+      #|  '\n',
+      #|  'W',
+      #|  'o',
+      #|  'r',
+      #|  'l',
+      #|  'd',
+      #|  '!',
+      #|  '\n',
+      #|  ' ',
+      #|  ' ',
+      #|  ' ',
+      #|  ' ',
+      #|  ' ',
+      #|  '|',
+      #|  '\n',
+      #|  '\n',
+      #|  '\n',
+      #|  ' ',
+      #|  ' ',
+      #|  ' ',
+      #|  ' ',
+      #|  ' ',
+      #|  '|',
+      #|  '\n',
+      #|  'T',
+      #|  'h',
+      #|  'i',
+      #|  's',
+      #|  ' ',
+      #|  'i',
+      #|  's',
+      #|  ' ',
+      #|  'a',
+      #|  ' ',
+      #|  't',
+      #|  'e',
+      #|  's',
+      #|  't',
+      #|]
+    ),
+  )
 }
 
 ///|UUID(bc4a523c-cabd-455a-af99-eea962898b64)

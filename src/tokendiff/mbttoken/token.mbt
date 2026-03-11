@@ -7,7 +7,7 @@ pub(all) enum MbtToken {
   )
   Invisible(Array[Int]) // whitespace widths, 0 for newline
   Barrier
-}
+} derive(Debug)
 
 ///|UUID(3b275564-69e2-4725-a6a8-fe6f05a3d97c)
 pub impl Show for MbtToken with output(self, logger) {
@@ -26,11 +26,6 @@ pub impl Show for MbtToken with output(self, logger) {
     }
     Barrier => logger.write_string("_")
   }
-}
-
-///|UUID(ec039c5a-1378-43a6-87c5-18a01829b4d1)
-pub impl ToJson for MbtToken with to_json(self) {
-  self.to_string().to_json()
 }
 
 ///|UUID(6af7c0c1-526f-47b5-a84d-94c0cc97ebf7)

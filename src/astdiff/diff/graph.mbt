@@ -61,7 +61,7 @@ pub enum Edge {
   // rather doing LHS and RHS separately.
   EnterNovelDelimiterLHS
   EnterNovelDelimiterRHS
-} derive(ToJson)
+} derive(Debug)
 
 ///|UUID(879374f4-7c01-44be-8149-5b29afe3bf22)
 /// Tracks entering syntax List nodes.

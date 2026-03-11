@@ -5,6 +5,7 @@ import {
   "moonbitlang/parser/attribute",
   "myfreess/moondiff/astdiff/syntax" @dsyntax,
   "myfreess/moondiff/span",
+  "moonbitlang/core/debug",
 }
 
 import {

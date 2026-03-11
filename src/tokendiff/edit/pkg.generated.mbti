@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "myfreess/moondiff/tokendiff/edit"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 
 // Errors
@@ -11,8 +15,7 @@ pub(all) enum Edit[T] {
   Delete(old~ : T)
   Equal(old~ : T, new~ : T)
 }
-pub impl[T : Show] Show for Edit[T]
-pub impl[T : ToJson] ToJson for Edit[T]
+pub impl[T : @debug.Debug] @debug.Debug for Edit[T]
 
 // Type aliases
 
