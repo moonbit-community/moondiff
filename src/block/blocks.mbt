@@ -68,14 +68,19 @@ test {
     #|///|UUID(2)
     #|fn bar
     #|  // another comment here
-  json_inspect(create_blocks(text), content=[
-    { "start_line": 1, "uuid": "1", "contents": "fn foo\n  // comment here\n" },
-    {
-      "start_line": 4,
-      "uuid": "2",
-      "contents": "fn bar\n  // another comment here\n",
-    },
-  ])
+  debug_inspect(
+    create_blocks(text),
+    content=(
+      #|[
+      #|  { start_line: 1, uuid: "1", contents: "fn foo\n  // comment here\n" },
+      #|  {
+      #|    start_line: 4,
+      #|    uuid: "2",
+      #|    contents: "fn bar\n  // another comment here\n",
+      #|  },
+      #|]
+    ),
+  )
 }
 
 ///|UUID(34e9056e-a322-4d07-9d58-3f6a29e00770)
@@ -84,22 +89,32 @@ test "empty block" {
     #|///|UUID(1)
     #|///|UUID(2)
     #|///|UUID(3)
-  json_inspect(create_blocks(text), content=[
-    { "start_line": 1, "uuid": "1", "contents": "" },
-    { "start_line": 2, "uuid": "2", "contents": "" },
-  ])
+  debug_inspect(
+    create_blocks(text),
+    content=(
+      #|[
+      #|  { start_line: 1, uuid: "1", contents: "" },
+      #|  { start_line: 2, uuid: "2", contents: "" },
+      #|]
+    ),
+  )
   let text =
     #|///|UUID(1)
     #|///|UUID(2)
     #|///|UUID(3)
     #|///|UUID(4)
     #|///|UUID(5)
-  json_inspect(create_blocks(text), content=[
-    { "start_line": 1, "uuid": "1", "contents": "" },
-    { "start_line": 2, "uuid": "2", "contents": "" },
-    { "start_line": 3, "uuid": "3", "contents": "" },
-    { "start_line": 4, "uuid": "4", "contents": "" },
-  ])
+  debug_inspect(
+    create_blocks(text),
+    content=(
+      #|[
+      #|  { start_line: 1, uuid: "1", contents: "" },
+      #|  { start_line: 2, uuid: "2", contents: "" },
+      #|  { start_line: 3, uuid: "3", contents: "" },
+      #|  { start_line: 4, uuid: "4", contents: "" },
+      #|]
+    ),
+  )
 }
 
 ///|UUID(44365bb5-b769-444e-8478-00646f3dbc8a)
@@ -110,18 +125,18 @@ test "not well formatted source code" {
     #|///|UUID(2)
     #|fn bar
     #|  // another comment here
-  inspect(
-    try? create_blocks(text),
-    content="Err(NotWellFormattedSourceCode(completely_no_uuid=false, line_number=1))",
+  assert_true(
+    (try? create_blocks(text))
+    is Err(NotWellFormattedSourceCode(completely_no_uuid=false, line_number=1)),
   )
   let text =
     #|fn foo
     #|  // comment here
     #|fn bar
     #|  // another comment here
-  inspect(
-    try? create_blocks(text),
-    content="Err(NotWellFormattedSourceCode(completely_no_uuid=true, line_number=1))",
+  assert_true(
+    (try? create_blocks(text))
+    is Err(NotWellFormattedSourceCode(completely_no_uuid=true, line_number=1)),
   )
   let text =
     #|///|UUID(1)
@@ -130,8 +145,8 @@ test "not well formatted source code" {
     #|///|
     #|fn bar
     #|  // another comment here
-  inspect(
-    try? create_blocks(text),
-    content="Err(NotWellFormattedSourceCode(completely_no_uuid=false, line_number=4))",
+  assert_true(
+    (try? create_blocks(text))
+    is Err(NotWellFormattedSourceCode(completely_no_uuid=false, line_number=4)),
   )
 }

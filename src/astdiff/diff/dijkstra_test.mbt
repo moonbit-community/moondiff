@@ -14,9 +14,12 @@ test "identical atoms" {
   let start = Vertex::new(lhs=Some(lhs), rhs=Some(rhs))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[
-    ["UnchangedNode", { "depth_difference": 0, "probably_punctuation": false }],
-  ])
+  debug_inspect(
+    actions,
+    content=(
+      #|[UnchangedNode(depth_difference=0, probably_punctuation=false)]
+    ),
+  )
 }
 
 ///|UUID(fd9fb746-b732-4a14-a2bb-a4b5e6e31b1c)
@@ -43,10 +46,12 @@ test "extra atom lhs" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[
-    ["EnterUnchangedDelimiter", { "depth_difference": 0 }],
-    "NovelAtomLHS",
-  ])
+  debug_inspect(
+    actions,
+    content=(
+      #|[EnterUnchangedDelimiter(depth_difference=0), NovelAtomLHS]
+    ),
+  )
 }
 
 ///|UUID(63bfd8ce-4e4e-4041-89a7-bf0936f0a8a3)
@@ -76,11 +81,16 @@ test "repeated atoms" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[
-    ["EnterUnchangedDelimiter", { "depth_difference": 0 }],
-    "NovelAtomRHS",
-    "NovelAtomRHS",
-  ])
+  debug_inspect(
+    actions,
+    content=(
+      #|[
+      #|  EnterUnchangedDelimiter(depth_difference=0),
+      #|  NovelAtomRHS,
+      #|  NovelAtomRHS,
+      #|]
+    ),
+  )
 }
 
 ///|UUID(16efeba2-03fa-4c1f-8756-ad797b0443af)
@@ -125,12 +135,17 @@ test "atom after empty list" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[
-    "EnterNovelDelimiterRHS",
-    "EnterNovelDelimiterLHS",
-    ["UnchangedNode", { "depth_difference": 0, "probably_punctuation": false }],
-    ["UnchangedNode", { "depth_difference": 0, "probably_punctuation": false }],
-  ])
+  debug_inspect(
+    actions,
+    content=(
+      #|[
+      #|  EnterNovelDelimiterRHS,
+      #|  EnterNovelDelimiterLHS,
+      #|  UnchangedNode(depth_difference=0, probably_punctuation=false),
+      #|  UnchangedNode(depth_difference=0, probably_punctuation=false),
+      #|]
+    ),
+  )
 }
 
 ///|UUID(40bde2f0-1867-4589-9c65-67e813a8c6b5)
@@ -145,7 +160,12 @@ test "replace similar comment" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[["ReplacedComment", { "levenshtein_pct": 84 }]])
+  debug_inspect(
+    actions,
+    content=(
+      #|[ReplacedComment(levenshtein_pct=84)]
+    ),
+  )
 }
 
 ///|UUID(bc068fb2-54c0-4627-89d9-7195a391979d)
@@ -158,7 +178,12 @@ test "replace very different comment" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[["ReplacedComment", { "levenshtein_pct": 11 }]])
+  debug_inspect(
+    actions,
+    content=(
+      #|[ReplacedComment(levenshtein_pct=11)]
+    ),
+  )
 }
 
 ///|UUID(ab724580-01bb-4933-867c-e07b3a951f6d)
@@ -174,10 +199,12 @@ test "replace comment prefer most similar" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  json_inspect(actions, content=[
-    ["ReplacedComment", { "levenshtein_pct": 95 }],
-    "NovelAtomLHS",
-  ])
+  debug_inspect(
+    actions,
+    content=(
+      #|[ReplacedComment(levenshtein_pct=95), NovelAtomLHS]
+    ),
+  )
 }
 
 ///|UUID(2ad6eb18-343c-4ce1-9d06-22643a7070d4)

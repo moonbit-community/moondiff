@@ -2,6 +2,7 @@
 package "myfreess/moondiff/tokendiff/mbttoken"
 
 import {
+  "moonbitlang/core/debug",
   "moonbitlang/parser/basic",
   "moonbitlang/parser/tokens",
 }
@@ -22,7 +23,7 @@ pub fn MbtToken::from_str(String) -> Array[Self]
 pub fn MbtToken::to_text(Self) -> Array[Char]
 pub impl Eq for MbtToken
 pub impl Show for MbtToken
-pub impl ToJson for MbtToken
+pub impl @debug.Debug for MbtToken
 
 // Type aliases
 

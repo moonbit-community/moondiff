@@ -2,6 +2,7 @@
 package "myfreess/moondiff/span"
 
 import {
+  "moonbitlang/core/debug",
   "moonbitlang/parser/basic",
 }
 
@@ -21,15 +22,14 @@ pub fn LineWidths::get_line_width(Self, Int) -> Int
 pub fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]
 pub fn LineWidths::op_get(Self, Int) -> ArrayView[Char]
 pub fn LineWidths::text_of_loc(Self, @basic.Position, @basic.Position) -> Array[Char]
-pub impl Show for LineWidths
-pub impl ToJson for LineWidths
+pub impl @debug.Debug for LineWidths
 
 pub(all) struct SingleLineSpan {
   line : Int
   start_col : Int
   end_col : Int
 }
-pub impl ToJson for SingleLineSpan
+pub impl @debug.Debug for SingleLineSpan
 
 // Type aliases
 

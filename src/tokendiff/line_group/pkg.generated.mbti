@@ -2,6 +2,7 @@
 package "myfreess/moondiff/tokendiff/line_group"
 
 import {
+  "moonbitlang/core/debug",
   "myfreess/moondiff/tokendiff/edit",
 }
 
@@ -15,7 +16,7 @@ pub enum REdit {
   Normal(@edit.Edit[Array[StringView]])
   Replace(old~ : Array[StringView], new~ : Array[StringView])
 }
-pub impl ToJson for REdit
+pub impl @debug.Debug for REdit
 
 // Type aliases
 

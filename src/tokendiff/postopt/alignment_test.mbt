@@ -42,20 +42,77 @@ fn[T] Array::flatten_edits(
 
 ///|UUID(5e0f815c-2802-4413-a038-d26b7a2fdb53)
 test {
-  json_inspect(
+  debug_inspect(
     @postopt.align_edit_boundaries([
       Delete(old=ids(["xyz", "wuv"])),
       Insert(new=ids(["aaa", "bbb", "ccc"])),
       Equal(old=[Invisible([1])], new=[Invisible([1, 0])]),
     ]).flatten_edits(),
-    content=[
-      { "delete": ["(LIDENT xyz)"] },
-      { "delete": ["(LIDENT wuv)"] },
-      { "equal": { "old": ["|[1]|"], "new": [] } },
-      { "insert": ["(LIDENT aaa)"] },
-      { "insert": ["(LIDENT bbb)"] },
-      { "insert": ["(LIDENT ccc)"] },
-      { "insert": ["|[1, 0]|"] },
-    ],
+    content=(
+      #|[
+      #|  Delete(
+      #|    old=[
+      #|      Visible(
+      #|        kind=TK_LIDENT,
+      #|        loc={
+      #|          start: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|          end: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|        },
+      #|        repr=['x', 'y', 'z'],
+      #|      ),
+      #|    ],
+      #|  ),
+      #|  Delete(
+      #|    old=[
+      #|      Visible(
+      #|        kind=TK_LIDENT,
+      #|        loc={
+      #|          start: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|          end: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|        },
+      #|        repr=['w', 'u', 'v'],
+      #|      ),
+      #|    ],
+      #|  ),
+      #|  Equal(old=[Invisible([1])], new=[]),
+      #|  Insert(
+      #|    new=[
+      #|      Visible(
+      #|        kind=TK_LIDENT,
+      #|        loc={
+      #|          start: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|          end: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|        },
+      #|        repr=['a', 'a', 'a'],
+      #|      ),
+      #|    ],
+      #|  ),
+      #|  Insert(
+      #|    new=[
+      #|      Visible(
+      #|        kind=TK_LIDENT,
+      #|        loc={
+      #|          start: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|          end: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|        },
+      #|        repr=['b', 'b', 'b'],
+      #|      ),
+      #|    ],
+      #|  ),
+      #|  Insert(
+      #|    new=[
+      #|      Visible(
+      #|        kind=TK_LIDENT,
+      #|        loc={
+      #|          start: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|          end: { fname: "dummy", lnum: -1, bol: -1, cnum: -1 },
+      #|        },
+      #|        repr=['c', 'c', 'c'],
+      #|      ),
+      #|    ],
+      #|  ),
+      #|  Insert(new=[Invisible([1, 0])]),
+      #|]
+    ),
   )
 }

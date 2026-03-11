@@ -16,7 +16,7 @@ fn ElabCtx::elab_attribute(self : Self, attr : Attribute) -> Syntax {
       self.option_node(attr.parsed, fn(parsed) {
         // TODO: `attribute.Expr` nodes do not carry locations, so the
         // parsed payload can only be preserved as synthetic text.
-        self.synthetic_atom(content="\{parsed}")
+        self.synthetic_atom(content="\{@debug.render(parsed.to_repr())}")
       }),
     ),
   ]

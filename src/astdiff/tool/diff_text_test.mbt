@@ -82,7 +82,6 @@ test "diff_text highlights only changed word inside string literal" {
   )
   assert_false(result.rendered.contains("\u{1b}[32m\u{1b}[1m\"alpha"))
   assert_false(result.rendered.contains("\u{1b}[31m\u{1b}[1m\"alpha"))
-  println(result.rendered)
 }
 
 ///|UUID(88eea529-4e99-40c4-9ef4-0f7083393a0f)
@@ -174,6 +173,5 @@ test "non terminate" {
     new,
     options=DiffOptions::new(use_color=true),
   )
-  println(result.rendered)
   assert_true(result.kind is Ast)
 }
