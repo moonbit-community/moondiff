@@ -11,7 +11,7 @@ pub struct LineWidths {
   lines : Array[(Int, Int)]
 }
 
-///|
+///|UUID(472aa521-7ba5-4817-9180-4838b8416b23)
 pub impl Debug for LineWidths with to_repr(self) {
   let views : Array[ArrayView[Char]] = Array::new()
   for line in self.lines {
@@ -73,56 +73,22 @@ test "line widths" {
     #|
     #|     |
     #|This is a test
-  debug_inspect(
-    LineWidths::from_str(str).contents,
-    content=(
-      #|[
-      #|  'H',
-      #|  'e',
-      #|  'l',
-      #|  'l',
-      #|  'o',
-      #|  ',',
-      #|  '\n',
-      #|  'W',
-      #|  'o',
-      #|  'r',
-      #|  'l',
-      #|  'd',
-      #|  '!',
-      #|  '\n',
-      #|  ' ',
-      #|  ' ',
-      #|  ' ',
-      #|  ' ',
-      #|  ' ',
-      #|  '|',
-      #|  '\n',
-      #|  '\n',
-      #|  '\n',
-      #|  ' ',
-      #|  ' ',
-      #|  ' ',
-      #|  ' ',
-      #|  ' ',
-      #|  '|',
-      #|  '\n',
-      #|  'T',
-      #|  'h',
-      #|  'i',
-      #|  's',
-      #|  ' ',
-      #|  'i',
-      #|  's',
-      #|  ' ',
-      #|  'a',
-      #|  ' ',
-      #|  't',
-      #|  'e',
-      #|  's',
-      #|  't',
-      #|]
-    ),
+  let line_widths = LineWidths::from_str(str)
+  assert_true(
+    line_widths
+    is {
+      contents: _,
+      lines: [
+        (0, 0),
+        (0, 6),
+        (7, 13),
+        (14, 20),
+        (21, 21),
+        (22, 22),
+        (23, 29),
+        (30, 44),
+      ],
+    },
   )
 }
 
@@ -167,66 +133,3 @@ pub fn LineWidths::loc_to_spans(
     return spans
   }
 }
-
-///|UUID(54567056-0200-4948-8995-939241694b9b)
-pub fn LineWidths::forward_search(
-  self : Self,
-  symbol : Char,
-  start_pos : @basic.Position,
-) -> SingleLineSpan {
-  ignore(self)
-  ignore(symbol)
-  ignore(start_pos)
-  ...
-}
-
-///|UUID(06ec6f3b-3681-474a-b190-fd6c0622f207)
-pub fn LineWidths::backward_search(
-  self : Self,
-  symbol : Char,
-  start_pos : @basic.Position,
-) -> SingleLineSpan {
-  ignore(self)
-  ignore(symbol)
-  ignore(start_pos)
-  ...
-}
-
-///|
-// test {
-//   let str =
-//     #|foo {
-//     #| [ bar ] 
-//     #|} baz
-//   let line_widths : LineWidths = LineWidths::from_str(str)
-//   json_inspect(line_widths, content=[
-//     [],
-//     ["f", "o", "o", " ", "{"],
-//     [" ", "[", " ", "b", "a", "r", " ", "]", " "],
-//     ["}", " ", "b", "a", "z"],
-//   ])
-//   let pos_bar_start = @basic.Position::{ lnum: 2, fname: "", bol: 5, cnum: 8 }
-//   let pos_bar_end = @basic.Position::{ lnum: 2, fname: "", bol: 5, cnum: 10 }
-//   inspect(pos_bar_start.column(), content="4")
-//   inspect(pos_bar_end.column(), content="6")
-//   json_inspect(line_widths.forward_search('}', pos_bar_end), content={
-//     "line": 3,
-//     "start_col": 0,
-//     "end_col": 1,
-//   })
-//   json_inspect(line_widths.backward_search('{', pos_bar_start), content={
-//     "line": 1,
-//     "start_col": 4,
-//     "end_col": 5,
-//   })
-//   json_inspect(line_widths.backward_search('[', pos_bar_start), content={
-//     "line": 2,
-//     "start_col": 1,
-//     "end_col": 2,
-//   })
-//   json_inspect(line_widths.forward_search(']', pos_bar_start), content={
-//     "line": 2,
-//     "start_col": 7,
-//     "end_col": 8,
-//   })
-// }

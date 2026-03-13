@@ -14,11 +14,8 @@ test "identical atoms" {
   let start = Vertex::new(lhs=Some(lhs), rhs=Some(rhs))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[UnchangedNode(depth_difference=0, probably_punctuation=false)]
-    ),
+  assert_true(
+    actions is [UnchangedNode(depth_difference=0, probably_punctuation=false)],
   )
 }
 
@@ -46,11 +43,8 @@ test "extra atom lhs" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[EnterUnchangedDelimiter(depth_difference=0), NovelAtomLHS]
-    ),
+  assert_true(
+    actions is [EnterUnchangedDelimiter(depth_difference=0), NovelAtomLHS],
   )
 }
 
@@ -81,15 +75,9 @@ test "repeated atoms" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[
-      #|  EnterUnchangedDelimiter(depth_difference=0),
-      #|  NovelAtomRHS,
-      #|  NovelAtomRHS,
-      #|]
-    ),
+  assert_true(
+    actions
+    is [EnterUnchangedDelimiter(depth_difference=0), NovelAtomRHS, NovelAtomRHS],
   )
 }
 
@@ -135,16 +123,14 @@ test "atom after empty list" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[
-      #|  EnterNovelDelimiterRHS,
-      #|  EnterNovelDelimiterLHS,
-      #|  UnchangedNode(depth_difference=0, probably_punctuation=false),
-      #|  UnchangedNode(depth_difference=0, probably_punctuation=false),
-      #|]
-    ),
+  assert_true(
+    actions
+    is [
+      EnterNovelDelimiterRHS,
+      EnterNovelDelimiterLHS,
+      UnchangedNode(depth_difference=0, probably_punctuation=false),
+      UnchangedNode(depth_difference=0, probably_punctuation=false),
+    ],
   )
 }
 
@@ -160,12 +146,7 @@ test "replace similar comment" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[ReplacedComment(levenshtein_pct=84)]
-    ),
-  )
+  assert_true(actions is [ReplacedComment(levenshtein_pct=84)])
 }
 
 ///|UUID(bc068fb2-54c0-4627-89d9-7195a391979d)
@@ -178,12 +159,7 @@ test "replace very different comment" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[ReplacedComment(levenshtein_pct=11)]
-    ),
-  )
+  assert_true(actions is [ReplacedComment(levenshtein_pct=11)])
 }
 
 ///|UUID(ab724580-01bb-4933-867c-e07b3a951f6d)
@@ -199,12 +175,7 @@ test "replace comment prefer most similar" {
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = shortest_path(start, 0, 3000000)
   let actions = route.iter().map(pair => pair.0).collect()
-  debug_inspect(
-    actions,
-    content=(
-      #|[ReplacedComment(levenshtein_pct=95), NovelAtomLHS]
-    ),
-  )
+  assert_true(actions is [ReplacedComment(levenshtein_pct=95), NovelAtomLHS])
 }
 
 ///|UUID(2ad6eb18-343c-4ce1-9d06-22643a7070d4)
