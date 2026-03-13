@@ -15,8 +15,6 @@ pub struct LineWidths {
   contents : Array[Char]
   lines : Array[(Int, Int)]
 }
-pub fn LineWidths::backward_search(Self, Char, @basic.Position) -> SingleLineSpan
-pub fn LineWidths::forward_search(Self, Char, @basic.Position) -> SingleLineSpan
 pub fn LineWidths::from_str(StringView) -> Self
 pub fn LineWidths::get_line_width(Self, Int) -> Int
 pub fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]

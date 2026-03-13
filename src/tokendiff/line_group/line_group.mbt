@@ -63,23 +63,13 @@ test {
     #|QUX
     #|quux
   let groups = line_group(old, new).unwrap_or([])
-  debug_inspect(
-    groups,
-    content=(
-      #|[
-      #|  Normal(
-      #|    Equal(
-      #|      old=[<StringView: "foo">, <StringView: "bar">],
-      #|      new=[<StringView: "foo">, <StringView: "bar">],
-      #|    ),
-      #|  ),
-      #|  Replace(
-      #|    old=[<StringView: "baz">, <StringView: "qux">],
-      #|    new=[<StringView: "BAZ">, <StringView: "QUX">],
-      #|  ),
-      #|  Normal(Equal(old=[<StringView: "quux">], new=[<StringView: "quux">])),
-      #|]
-    ),
+  assert_true(
+    groups
+    is [
+      Normal(Equal(old=["foo", "bar"], new=["foo", "bar"])),
+      Replace(old=["baz", "qux"], new=["BAZ", "QUX"]),
+      Normal(Equal(old=["quux"], new=["quux"])),
+    ],
   )
   let old =
     #|alpha
@@ -93,16 +83,14 @@ test {
     #|gamma
     #|DELTA
   let groups = line_group(old, new).unwrap_or([])
-  debug_inspect(
-    groups,
-    content=(
-      #|[
-      #|  Replace(old=[<StringView: "alpha">], new=[<StringView: "ALPHA">]),
-      #|  Normal(Equal(old=[<StringView: "beta">], new=[<StringView: "beta">])),
-      #|  Normal(Insert(new=[<StringView: "epsilon">])),
-      #|  Normal(Equal(old=[<StringView: "gamma">], new=[<StringView: "gamma">])),
-      #|  Replace(old=[<StringView: "delta">], new=[<StringView: "DELTA">]),
-      #|]
-    ),
+  assert_true(
+    groups
+    is [
+      Replace(old=["alpha"], new=["ALPHA"]),
+      Normal(Equal(old=["beta"], new=["beta"])),
+      Normal(Insert(new=["epsilon"])),
+      Normal(Equal(old=["gamma"], new=["gamma"])),
+      Replace(old=["delta"], new=["DELTA"]),
+    ],
   )
 }
