@@ -163,22 +163,28 @@ test "soft wrap" {
   ]
   max_line_width.val = 5
   let wrapped = soft_wrap(lines)
-  json_inspect(wrapped, content=[
-    [true, [[false, ["a", "b", "c", "d", "e"]]]],
-    [false, [[true, ["f", "g", "h", "i", "j"]]]],
-    [false, [[true, ["k", "l", "m"]]]],
-    [true, [[true, ["1", "2", "3", "4", "5"]]]],
-  ])
+  assert_true(
+    wrapped
+    is [
+      (true, [(false, ['a', 'b', 'c', 'd', 'e'])]),
+      (false, [(true, ['f', 'g', 'h', 'i', 'j'])]),
+      (false, [(true, ['k', 'l', 'm'])]),
+      (true, [(true, ['1', '2', '3', '4', '5'])]),
+    ],
+  )
   max_line_width.val = 4
   let wrapped = soft_wrap(lines)
-  json_inspect(wrapped, content=[
-    [true, [[false, ["a", "b", "c", "d"]]]],
-    [false, [[false, ["e"]], [true, ["f", "g", "h"]]]],
-    [false, [[true, ["i", "j", "k", "l"]]]],
-    [false, [[true, ["m"]]]],
-    [true, [[true, ["1", "2", "3", "4"]]]],
-    [false, [[true, ["5"]]]],
-  ])
+  assert_true(
+    wrapped
+    is [
+      (true, [(false, ['a', 'b', 'c', 'd'])]),
+      (false, [(false, ['e']), (true, ['f', 'g', 'h'])]),
+      (false, [(true, ['i', 'j', 'k', 'l'])]),
+      (false, [(true, ['m'])]),
+      (true, [(true, ['1', '2', '3', '4'])]),
+      (false, [(true, ['5'])]),
+    ],
+  )
 }
 
 ///|UUID(07b34f2d-f127-4ad9-b811-ad76d227f5bb)
@@ -201,10 +207,10 @@ fn ArrayView::split(
 ///|UUID(429b0e77-edb4-40ef-8625-d2cd62e18698)
 test "split arrayview" {
   let widths = [0, 0, 4][:]
-  json_inspect(widths.split(0), content=[[], [], [4]])
-  json_inspect([][:].split(0), content=[[]])
+  assert_true(widths.split(0) is [[], [], [4]])
+  assert_true([][:].split(0) is [[]])
   let widths = [0, 0][:]
-  json_inspect(widths.split(0), content=[[], [], []])
+  assert_true(widths.split(0) is [[], [], []])
 }
 
 ///|UUID(e1136f23-beb4-46f9-828d-e35e49dc0bc0)

@@ -90,26 +90,24 @@ test "elab parsed function keeps top-level shape and docstring" {
     #|/// Adds one
     #|fn add(x : Int) -> Int { x }
   let (impls, reports) = @parser.parse_string(source)
-  inspect(reports.length(), content="0")
+  assert_true(reports.length() is 0)
 
   let syntax = elab_impls(source, impls)
-  inspect(syntax.length(), content="1")
-  inspect(node_tag(syntax[0]), content="Impl::TopFuncDef")
-  inspect(
-    sexp(syntax[0]),
-    content=(
-      #|((((()) ((add)) (()) (()) ((((((x)) ((((((Int))) (())))))))) (()) ((((((Int))) (())))) (()) (()) (()) (( Adds one)))) (((()) (((((x))))))))
-    ),
+  assert_true(syntax.length() is 1)
+  assert_true(node_tag(syntax[0]) is "Impl::TopFuncDef")
+  assert_true(
+    sexp(syntax[0])
+    is "((((()) ((add)) (()) (()) ((((((x)) ((((((Int))) (())))))))) (()) ((((((Int))) (())))) (()) (()) (()) (( Adds one)))) (((()) (((((x))))))))",
   )
 
   let fun_decl = field_value(syntax[0], "fun_decl")
   let name = field_value(fun_decl, "name")
-  inspect(sexp(name), content="(add)")
-  inspect(single_span_line(only_child(name)), content="2")
+  assert_true(sexp(name) is "(add)")
+  assert_true(single_span_line(only_child(name)) is 2)
 
   let doc = field_value(fun_decl, "doc")
-  inspect(sexp(doc), content="( Adds one)")
-  inspect(single_span_line(only_child(doc)), content="1")
+  assert_true(sexp(doc) is "( Adds one)")
+  assert_true(single_span_line(only_child(doc)) is 1)
 }
 
 ///|UUID(35058a48-ec09-4b30-947f-9532a9295a0f)
@@ -125,12 +123,12 @@ test "elab dotted type name uses tagged long ident" {
   )
 
   let syntax = elab_type(source, ty)
-  inspect(node_tag(syntax), content="Type::Name")
+  assert_true(node_tag(syntax) is "Type::Name")
 
   let constr_id = field_value(syntax, "constr_id")
   let ident = field_value(constr_id, "id")
-  inspect(sexp(ident), content="(pkg.Type)")
-  inspect(single_span_line(only_child(ident)), content="1")
+  assert_true(sexp(ident) is "(pkg.Type)")
+  assert_true(single_span_line(only_child(ident)) is 1)
 }
 
 ///|UUID(2e8bd51d-71af-4423-9723-037e902204e7)
@@ -151,12 +149,12 @@ test "elab open array pattern keeps dotdot binder shape" {
 
   let syntax = elab_pattern(source, pat)
   let pats = field_value(syntax, "pats")
-  inspect(node_tag(pats), content="ArrayPatterns::Open")
+  assert_true(node_tag(pats) is "ArrayPatterns::Open")
 
   let binder = field_value(pats, "binder")
-  inspect(sexp(binder), content="(((rest)))")
+  assert_true(sexp(binder) is "(((rest)))")
   let binder_atom = only_child(field_value(binder, "binder"))
-  inspect(single_span_line(binder_atom), content="1")
+  assert_true(single_span_line(binder_atom) is 1)
 }
 
 ///|UUID(1941b253-3c52-4e0d-aa82-09e7efee4309)
@@ -168,20 +166,20 @@ test "elab normalizes let chain into statement list" {
     #|  a + b
     #|}
   let (impls, reports) = @parser.parse_string(source)
-  inspect(reports.length(), content="0")
+  assert_true(reports.length() is 0)
 
   let syntax = elab_impls(source, impls)
   let decl_body = field_value(syntax[0], "decl_body")
   let expr = field_value(decl_body, "expr")
-  inspect(node_tag(expr), content="Expr::StmtChain")
+  assert_true(node_tag(expr) is "Expr::StmtChain")
 
   let stmts = field_value(expr, "stmts")
-  inspect(node_tag(stmts), content="Expr::StmtChain::Stmts")
+  assert_true(node_tag(stmts) is "Expr::StmtChain::Stmts")
   let stmt_children = list_children(stmts)
-  inspect(stmt_children.length(), content="2")
-  inspect(node_tag(stmt_children[0]), content="Stmt::Let")
-  inspect(node_tag(stmt_children[1]), content="Stmt::Let")
+  assert_true(stmt_children.length() is 2)
+  assert_true(node_tag(stmt_children[0]) is "Stmt::Let")
+  assert_true(node_tag(stmt_children[1]) is "Stmt::Let")
 
   let tail = field_value(expr, "tail")
-  inspect(node_tag(tail), content="Expr::Infix")
+  assert_true(node_tag(tail) is "Expr::Infix")
 }

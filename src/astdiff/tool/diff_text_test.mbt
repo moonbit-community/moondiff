@@ -9,20 +9,17 @@ test "diff_text renders ast-backed inline diff" {
     #|  foo(baz(bar))
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+  let expected =
+    #|--- old.mbt
+    #|+++ new.mbt
+    #|@@ -1,3 +1,3 @@
+    #|  1 | fn f() {
+    #|  2 |   foo(bar)
+    #|+ 2 |   foo(baz(bar))
+    #|  3 | }
+    #|
   assert_true(result.kind is Ast)
-  inspect(
-    result.rendered,
-    content=(
-      #|--- old.mbt
-      #|+++ new.mbt
-      #|@@ -1,3 +1,3 @@
-      #|  1 | fn f() {
-      #|  2 |   foo(bar)
-      #|+ 2 |   foo(baz(bar))
-      #|  3 | }
-      #|
-    ),
-  )
+  assert_true(result.rendered == expected)
 }
 
 ///|UUID(fe6a815c-dfa1-4b21-af95-0ed557d4e9d6)
@@ -118,28 +115,25 @@ test "diff_text merges nearby ast hunks for real multi-root changes" {
     #|  alpha(gamma(beta))
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+  let expected =
+    #|--- old.mbt
+    #|+++ new.mbt
+    #|@@ -1,9 +1,9 @@
+    #|  1 | fn a() {
+    #|  2 |   foo(bar)
+    #|+ 2 |   foo(baz(bar))
+    #|  3 | }
+    #|  4 | 
+    #|  5 | fn mid() {}
+    #|  6 | 
+    #|  7 | fn z() {
+    #|  8 |   alpha(beta)
+    #|+ 8 |   alpha(gamma(beta))
+    #|  9 | }
+    #|
 
   assert_true(result.kind is Ast)
-  inspect(
-    result.rendered,
-    content=(
-      #|--- old.mbt
-      #|+++ new.mbt
-      #|@@ -1,9 +1,9 @@
-      #|  1 | fn a() {
-      #|  2 |   foo(bar)
-      #|+ 2 |   foo(baz(bar))
-      #|  3 | }
-      #|  4 | 
-      #|  5 | fn mid() {}
-      #|  6 | 
-      #|  7 | fn z() {
-      #|  8 |   alpha(beta)
-      #|+ 8 |   alpha(gamma(beta))
-      #|  9 | }
-      #|
-    ),
-  )
+  assert_true(result.rendered == expected)
 }
 
 ///|UUID(dd5013c1-91c6-4fc3-aec3-79daed8bd382)

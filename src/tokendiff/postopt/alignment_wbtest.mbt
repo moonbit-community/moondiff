@@ -10,37 +10,35 @@ test "compute_common_prefix_length" {
     ])
   }
 
-  inspect(
+  assert_true(
     compute_common_prefix_length([id('a'), id('b'), id('c')], [
       id('a'),
       id('b'),
       id('d'),
-    ]),
-    content="2",
+    ])
+    is 2,
   )
-  inspect(
+  assert_true(
     compute_common_prefix_length([id('a'), id('b'), id('c')], [
       id('a'),
       id('b'),
       id('c'),
-    ]),
-    content="3",
+    ])
+    is 3,
   )
-  inspect(
+  assert_true(
     compute_common_prefix_length([id('a'), id('b'), id('c')], [
       id('x'),
       id('y'),
       id('z'),
-    ]),
-    content="0",
+    ])
+    is 0,
   )
-  inspect(
-    compute_common_prefix_length([], [id('a'), id('b'), id('c')]),
-    content="0",
+  assert_true(
+    compute_common_prefix_length([], [id('a'), id('b'), id('c')]) is 0,
   )
-  inspect(
-    compute_common_prefix_length([id('a'), id('b'), id('c')], []),
-    content="0",
+  assert_true(
+    compute_common_prefix_length([id('a'), id('b'), id('c')], []) is 0,
   )
-  inspect(compute_common_prefix_length([], []), content="0")
+  assert_true(compute_common_prefix_length([], []) is 0)
 }
