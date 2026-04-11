@@ -30,13 +30,13 @@
 <pre><code>
 struct Set[K] {
   mut entries : FixedArray[<del>SEntry</del>[K]?]
-  <del>mut list : FixedArray[SListNode[K]]</del>
-  mut size : Int
+  mut <del>list : FixedArray[SListNode[K]]
+  mut</del> size : Int
   mut capacity : Int
   mut capacity_mask : Int
   mut grow_at : Int
   mut head : <del>SEntry</del>[K]?
-  mut tail : <del>SEntry[K]</del><del>?</del>
+  mut tail : <del>SEntry</del><del>[K]</del><del>?</del>
 }
 </code></pre>
 

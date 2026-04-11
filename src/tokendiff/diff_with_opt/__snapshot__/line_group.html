@@ -63,8 +63,8 @@ pub fn line_group(old : String, new : String) -> Array[REdit] {
       | [
         Equal(..) as prev,
         Delete(old~),
-        Insert(new~)<del>,
-        Equal(..)</del> <del>as next</del>,
+        Insert(new~),
+        <del>Equal(</del><del>..) as next,</del>
         .. rest<del>,</del>
       ] => {
         groups.push(REdit::Normal(prev))

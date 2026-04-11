@@ -208,6 +208,53 @@ fn range_text(start : Int, end_ : Int) -> String {
   }
 }
 
+///|UUID(44f0192c-760a-4982-a364-ebbfac834504)
+fn piediff_old_range(edit : @piediff.Edit) -> (Int, Int) {
+  match edit {
+    @piediff.Edit::Insert(old_index~, ..) => (old_index, old_index)
+    @piediff.Edit::Delete(old_index~, len~, ..) => (old_index, old_index + len)
+    @piediff.Edit::Equal(old_index~, len~, ..) => (old_index, old_index + len)
+  }
+}
+
+///|UUID(bfafc989-9115-4d84-93ba-f7e599e48f59)
+fn piediff_new_range(edit : @piediff.Edit) -> (Int, Int) {
+  match edit {
+    @piediff.Edit::Insert(new_index~, len~, ..) => (new_index, new_index + len)
+    @piediff.Edit::Delete(new_index~, ..) => (new_index, new_index)
+    @piediff.Edit::Equal(new_index~, len~, ..) => (new_index, new_index + len)
+  }
+}
+
+///|UUID(eb698c34-ec71-4ac9-91a6-35c6c6688d34)
+fn render_piediff_hunk_header(edits : ArrayView[@piediff.Edit]) -> String {
+  let (first_old_start, first_old_end) = piediff_old_range(edits[0])
+  let (first_new_start, first_new_end) = piediff_new_range(edits[0])
+  let mut old_end = first_old_end
+  let mut new_end = first_new_end
+  let mut found_old_end = false
+  let mut found_new_end = false
+  let mut i = edits.length()
+  while i > 0 {
+    i -= 1
+    let edit = edits[i]
+    let (edit_old_start, edit_old_end) = piediff_old_range(edit)
+    let (edit_new_start, edit_new_end) = piediff_new_range(edit)
+    if !found_old_end && edit_old_start != edit_old_end {
+      old_end = edit_old_end
+      found_old_end = true
+    }
+    if !found_new_end && edit_new_start != edit_new_end {
+      new_end = edit_new_end
+      found_new_end = true
+    }
+    if found_old_end && found_new_end {
+      break
+    }
+  }
+  "@@ -\{range_text(first_old_start, old_end)} +\{range_text(first_new_start, new_end)} @@"
+}
+
 ///|UUID(8d2ad4b6-7974-44d6-871b-1ef554920ad2)
 fn hunk_side_range(
   lines : ArrayView[(Int?, Int?)],
@@ -419,10 +466,8 @@ fn render_line_diff(
   let new_lines = split_lines(new_source)
   let max_line_count = @cmp.maximum(old_lines.length(), new_lines.length())
   let line_no_width = max_line_count.to_string().length()
-  let old_view = old_lines.mut_view()
-  let new_view = new_lines.mut_view()
-  let edits = @plain_diff.plain_diff(old=old_view, new=new_view)
-  let hunks = @edit.group_edits(edits, radius=options.context_lines)
+  let diff = @piediff.Diff(old=old_lines[:], new=new_lines[:])
+  let hunks = diff.group(radius=options.context_lines)
 
   let buf = StringBuilder::new()
   buf.write_string("--- \{old_label}\n")
@@ -433,12 +478,12 @@ fn render_line_diff(
   }
 
   for hunk in hunks {
-    buf.write_string(@edit.HunkHeader::new(hunk).to_string())
+    buf.write_string(render_piediff_hunk_header(hunk.edits))
     buf.write_char('\n')
-    for edit in hunk {
+    for edit in hunk.edits {
       match edit {
-        @edit.Edit::Delete(old_index~, old_len~, ..) =>
-          for i in 0..<old_len {
+        @piediff.Edit::Delete(old_index~, len~, ..) =>
+          for i in 0..<len {
             let line_no = old_index + i
             let ranges = old_highlights.bind(map => map.get(line_no + 1))
             buf.write_string(
@@ -455,8 +500,8 @@ fn render_line_diff(
             )
             buf.write_char('\n')
           }
-        @edit.Edit::Insert(new_index~, new_len~, ..) =>
-          for i in 0..<new_len {
+        @piediff.Edit::Insert(new_index~, len~, ..) =>
+          for i in 0..<len {
             let line_no = new_index + i
             let ranges = new_highlights.bind(map => map.get(line_no + 1))
             buf.write_string(
@@ -473,7 +518,7 @@ fn render_line_diff(
             )
             buf.write_char('\n')
           }
-        @edit.Edit::Equal(old_index~, len~, ..) =>
+        @piediff.Edit::Equal(old_index~, len~, ..) =>
           for i in 0..<len {
             let line_no = old_index + i
             buf.write_string(

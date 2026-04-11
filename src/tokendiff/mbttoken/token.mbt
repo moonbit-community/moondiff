@@ -43,6 +43,18 @@ pub impl Eq for MbtToken with equal(self, other) {
   }
 }
 
+///|UUID(9e850f58-5976-4117-86d9-cd68f92ef18f)
+pub impl Hash for MbtToken with hash_combine(self, hasher) {
+  match self {
+    Visible(kind~, repr~, ..) => {
+      hasher.combine(0)
+      hasher.combine(kind)
+      hasher.combine(repr)
+    }
+    Invisible(_) | Barrier => hasher.combine(1)
+  }
+}
+
 ///|UUID(fc6fdb12-ac6b-407f-a046-ee9faaf0a0d2)
 pub fn MbtToken::to_text(self : MbtToken) -> Array[Char] {
   match self {

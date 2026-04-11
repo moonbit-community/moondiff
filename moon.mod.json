@@ -6,7 +6,7 @@
     "Lampese/moonbit-chalk": "0.5.0",
     "Yoorkin/ArgParser": "0.2.0",
     "moonbitlang/x": "0.4.38",
-    "moonbit-community/piediff": "0.0.8",
+    "moonbit-community/piediff": "0.0.9",
     "moonbitlang/parser": "0.2.3"
   },
   "readme": "README.md",

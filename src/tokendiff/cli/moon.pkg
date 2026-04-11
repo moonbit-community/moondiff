@@ -8,7 +8,7 @@ import {
   "moonbitlang/x/fs",
   "Yoorkin/ArgParser",
   "myfreess/moondiff/tokendiff/line_group",
-  "moonbit-community/piediff/line_diff",
+  "moonbit-community/piediff" @piediff,
 }
 
 warnings = "-24-2-29"

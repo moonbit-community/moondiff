@@ -1,7 +1,6 @@
 import {
   "Lampese/moonbit-chalk" @chalk,
-  "moonbit-community/piediff/edit",
-  "moonbit-community/piediff/plain_diff",
+  "moonbit-community/piediff" @piediff,
   "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",
   "moonbitlang/parser",

@@ -2,11 +2,14 @@
 package "myfreess/moondiff/tokendiff/compress"
 
 import {
+  "moonbit-community/piediff",
   "myfreess/moondiff/tokendiff/edit",
 }
 
 // Values
 pub fn[T] compress_edits(ArrayView[@edit.Edit[T]]) -> Array[@edit.Edit[Array[T]]]
+
+pub fn[T] compress_piediff_edits(old~ : ArrayView[T], new~ : ArrayView[T], ArrayView[@piediff.Edit]) -> Array[@edit.Edit[Array[T]]]
 
 // Errors
 

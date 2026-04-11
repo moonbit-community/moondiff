@@ -4,7 +4,7 @@ import {
   "myfreess/moondiff/tokendiff/compress",
   "myfreess/moondiff/tokendiff/preopt",
   "myfreess/moondiff/tokendiff/postopt",
-  "myfreess/moondiff/tokendiff/myers",
+  "moonbit-community/piediff" @piediff,
 }
 
 import {

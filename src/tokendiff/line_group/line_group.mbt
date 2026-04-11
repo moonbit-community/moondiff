@@ -15,11 +15,14 @@ pub fn line_group(old : String, new : String) -> Array[REdit]? {
   while new is [.. rest, ""] {
     new = rest
   }
-  let (changed, edits) = @myers.diff(old~, new~)
-  if !changed {
+  let mut edits = @compress.compress_piediff_edits(
+      old~,
+      new~,
+      @piediff.Diff(old~, new~, algorithm=@piediff.Myers).edits,
+    )[:]
+  if edits.is_empty() || edits is [Equal(..)] {
     return None
   }
-  let mut edits = @compress.compress_edits(edits)[:]
   if edits
     is ([Delete(old~), Insert(new~), .. rest]
     | [Insert(new~), Delete(old~), .. rest]) {
