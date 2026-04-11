@@ -6,7 +6,7 @@ let use_color : Ref[Bool] = Ref::new(true)
 
 ///|UUID(9d8d9872-ee94-460e-99e1-8590c4ea178f)
 fn parse_graph_limit(text : String) -> UInt raise {
-  @strconv.parse_int(text).reinterpret_as_uint()
+  @string.parse_int(text).reinterpret_as_uint()
 }
 
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)

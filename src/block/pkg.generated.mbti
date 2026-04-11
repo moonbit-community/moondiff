@@ -13,23 +13,20 @@ pub fn pairing_blocks_by_uuid(old~ : ArrayView[Block[String]], new~ : ArrayView[
 // Errors
 pub suberror BlockProcessingError {
   NotWellFormattedSourceCode(completely_no_uuid~ : Bool, line_number~ : Int)
-}
-pub impl Show for BlockProcessingError
+} derive(@debug.Debug)
 
 // Types and methods
 pub struct Block[T] {
   start_line : Int
   uuid : String
   contents : T
-}
-pub impl[T : @debug.Debug] @debug.Debug for Block[T]
+} derive(@debug.Debug)
 
 pub enum EditBlock {
   Replace(old~ : Block[String], new~ : Block[String])
   Delete(Block[String])
   Insert(Block[String])
-}
-pub impl @debug.Debug for EditBlock
+} derive(@debug.Debug)
 
 // Type aliases
 pub type Blocks[T] = Array[Block[T]]

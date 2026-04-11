@@ -1,6 +1,6 @@
 import {
   "Yoorkin/ArgParser",
-  "moonbitlang/core/strconv",
+  "moonbitlang/core/string",
   "moonbitlang/x/fs",
   "moonbitlang/x/sys",
   "myfreess/moondiff/astdiff/tool",

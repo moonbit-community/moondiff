@@ -18,14 +18,12 @@ pub(all) enum AtomKind {
   Type
   Comment
   Keyword
-}
-pub impl Eq for AtomKind
+} derive(Eq)
 
 pub(all) enum StringKind {
   StringLiteral
   Text
-}
-pub impl Eq for StringKind
+} derive(Eq)
 
 pub enum Syntax {
   Atom(info~ : SyntaxInfo, position~ : Array[@span.SingleLineSpan], content~ : String, kind~ : AtomKind)

@@ -197,12 +197,10 @@ fn not_a_trailing_endmark(input : ArrayView[MbtToken]) -> Bool {
     }
   }
 
-  not(
-    input is [Invisible(repr), .. rest] &&
-    repr.contains(0) &&
-    find_first_ocuurence(rest) is Some(maybe_invisible) &&
-    (maybe_invisible is [] || maybe_invisible is [Invisible(_)]),
-  )
+  !(input is [Invisible(repr), .. rest] &&
+  repr.contains(0) &&
+  find_first_ocuurence(rest) is Some(maybe_invisible) &&
+  (maybe_invisible is [] || maybe_invisible is [Invisible(_)]))
 }
 
 ///|UUID(c4c6b52c-9397-43d8-82b0-1c3c08193c10)
@@ -278,17 +276,19 @@ fn compute_common_prefix_length(
 ) -> Int {
   // assume multiple invisible tokens are merged before call this function
   let mut prefix_length = 0
-  loop (x, y) {
-    ([], []) => return prefix_length
-    ([], _) => return prefix_length
-    (_, []) => return prefix_length
-    ([x_hd, .. x_rest], [y_hd, .. y_rest]) =>
-      if x_hd == y_hd {
-        prefix_length += 1
-        continue (x_rest, y_rest)
-      } else {
-        return prefix_length
-      }
+  for xy = (x, y) {
+    match xy {
+      ([], []) => return prefix_length
+      ([], _) => return prefix_length
+      (_, []) => return prefix_length
+      ([x_hd, .. x_rest], [y_hd, .. y_rest]) =>
+        if x_hd == y_hd {
+          prefix_length += 1
+          continue (x_rest, y_rest)
+        } else {
+          return prefix_length
+        }
+    }
   }
 }
 
@@ -299,17 +299,19 @@ fn compute_common_suffix_length(
 ) -> Int {
   // assume multiple invisible tokens are merged before call this function
   let mut suffix_length = 0
-  loop (x, y) {
-    ([], []) => return suffix_length
-    ([], _) => return suffix_length
-    (_, []) => return suffix_length
-    ([.. x_rest, x_last], [.. y_rest, y_last]) =>
-      if x_last == y_last {
-        suffix_length += 1
-        continue (x_rest, y_rest)
-      } else {
-        return suffix_length
-      }
+  for xy = (x, y) {
+    match xy {
+      ([], []) => return suffix_length
+      ([], _) => return suffix_length
+      (_, []) => return suffix_length
+      ([.. x_rest, x_last], [.. y_rest, y_last]) =>
+        if x_last == y_last {
+          suffix_length += 1
+          continue (x_rest, y_rest)
+        } else {
+          return suffix_length
+        }
+    }
   }
 }
 

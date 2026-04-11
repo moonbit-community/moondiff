@@ -5,14 +5,14 @@ priv struct Box {
   right : Int
   top : Int
   bottom : Int
-} derive(Show)
+}
 
 ///|UUID(713424ee-be92-4fe8-a01c-678274ec4429)
 #valtype
 priv struct Snake {
   start : (Int, Int)
   end : (Int, Int)
-} derive(Show)
+}
 
 ///|UUID(f40ae742-71a5-4901-92a6-6be6b5179979)
 fn Box::width(self : Box) -> Int {

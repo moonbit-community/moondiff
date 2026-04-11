@@ -17,13 +17,12 @@ pub(all) enum MbtToken {
   Visible(kind~ : @tokens.TokenKind, loc~ : @basic.Location, repr~ : Array[Char])
   Invisible(Array[Int])
   Barrier
-}
+} derive(@debug.Debug)
 pub fn MbtToken::emit_text_to(Self, Array[Char]) -> Unit
 pub fn MbtToken::from_str(String) -> Array[Self]
 pub fn MbtToken::to_text(Self) -> Array[Char]
 pub impl Eq for MbtToken
 pub impl Show for MbtToken
-pub impl @debug.Debug for MbtToken
 
 // Type aliases
 

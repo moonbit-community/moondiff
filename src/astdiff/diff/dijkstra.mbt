@@ -30,33 +30,35 @@ fn shortest_vertex_path(
   let heap = PriorityQueue::new()
   heap.push(WeightedVertex::{ vertex: start, distance: @cmp.Reverse(0) })
   let seen = HashMap::new(capacity=size_hint)
-  let end : Vertex = loop heap.pop() {
-    Some({ vertex: current, distance: Reverse(distance) }) => {
-      if current.is_end() {
-        break current
-      }
-      set_neighbours(current, seen)
-      for neighbor in current.neighbours.val.unwrap() {
-        let (edge, next) = neighbor
-        let distance_to_next = distance + edge.cost()
-        let found_shorter_route = match next.predecessor.val {
-          Some((prev_shortest, _)) => distance_to_next < prev_shortest
-          None => true
+  let end : Vertex = for top = heap.pop() {
+    match top {
+      Some({ vertex: current, distance: Reverse(distance) }) => {
+        if current.is_end() {
+          break current
         }
-        if found_shorter_route {
-          next.predecessor.update(_ => Some((distance_to_next, current)))
-          heap.push(WeightedVertex::{
-            vertex: next,
-            distance: @cmp.Reverse(distance_to_next),
-          })
+        set_neighbours(current, seen)
+        for neighbor in current.neighbours.val.unwrap() {
+          let (edge, next) = neighbor
+          let distance_to_next = distance + edge.cost()
+          let found_shorter_route = match next.predecessor.val {
+            Some((prev_shortest, _)) => distance_to_next < prev_shortest
+            None => true
+          }
+          if found_shorter_route {
+            next.predecessor.update(_ => Some((distance_to_next, current)))
+            heap.push(WeightedVertex::{
+              vertex: next,
+              distance: @cmp.Reverse(distance_to_next),
+            })
+          }
         }
+        if seen.length() > graph_limit {
+          raise ExceededGraphLimit
+        }
+        continue heap.pop()
       }
-      if seen.length() > graph_limit {
-        raise ExceededGraphLimit
-      }
-      continue heap.pop()
+      None => panic() // Ran out of graph nodes before reaching end
     }
-    None => panic() // Ran out of graph nodes before reaching end
   }
   let mut current = Some((0U, end))
   let vertex_route = Array::new()

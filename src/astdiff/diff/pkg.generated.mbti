@@ -48,17 +48,14 @@ pub enum Edge {
   NovelAtomRHS
   EnterNovelDelimiterLHS
   EnterNovelDelimiterRHS
-}
-pub impl @debug.Debug for Edge
+} derive(@debug.Debug)
 
-type EnteredDelimiter
-pub impl Eq for EnteredDelimiter
+type EnteredDelimiter derive(Eq)
 pub impl Show for EnteredDelimiter
 
-type Node[T]
-pub impl[T : Eq] Eq for Node[T]
+type Node[T] derive(Eq)
 
-pub struct Stack[T](Node[T]?)
+pub struct Stack[T](Node[T]?) derive(Eq)
 #deprecated
 pub fn[T] Stack::inner(Self[T]) -> Node[T]?
 pub fn[T] Stack::is_empty(Self[T]) -> Bool
@@ -67,7 +64,6 @@ pub fn[T] Stack::peek(Self[T]) -> T?
 pub fn[T] Stack::pop(Self[T]) -> Self[T]?
 pub fn[T] Stack::push(Self[T], T) -> Self[T]
 pub fn[T] Stack::size(Self[T]) -> UInt
-pub impl[T : Eq] Eq for Stack[T]
 
 pub struct Vertex {
   neighbours : @ref.Ref[Array[(Edge, Vertex)]?]

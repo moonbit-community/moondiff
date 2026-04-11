@@ -14,8 +14,7 @@ pub(all) enum Edit[T] {
   Insert(new~ : T)
   Delete(old~ : T)
   Equal(old~ : T, new~ : T)
-}
-pub impl[T : @debug.Debug] @debug.Debug for Edit[T]
+} derive(@debug.Debug)
 
 // Type aliases
 

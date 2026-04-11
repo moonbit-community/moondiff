@@ -4,20 +4,22 @@ fn[T : Eq] separate_common_prefix(
   new~ : ArrayView[T],
 ) -> (Array[Edit[T]], ArrayView[T], ArrayView[T]) {
   let prefix = Array::new(capacity=40)
-  loop (old, new) {
-    ([] as old_without_prefix, [] as new_without_prefix)
-    | ([] as old_without_prefix, new_without_prefix)
-    | (old_without_prefix, [] as new_without_prefix) =>
-      return (prefix, old_without_prefix, new_without_prefix)
-    (
-      [old_hd, .. old_rest] as old_without_prefix,
-      [new_hd, .. new_rest] as new_without_prefix,
-    ) =>
-      if old_hd == new_hd {
-        prefix.push(Edit::Equal(old=old_hd, new=new_hd))
-        continue (old_rest, new_rest)
-      } else {
+  for old_new = (old, new) {
+    match old_new {
+      ([] as old_without_prefix, [] as new_without_prefix)
+      | ([] as old_without_prefix, new_without_prefix)
+      | (old_without_prefix, [] as new_without_prefix) =>
         return (prefix, old_without_prefix, new_without_prefix)
-      }
+      (
+        [old_hd, .. old_rest] as old_without_prefix,
+        [new_hd, .. new_rest] as new_without_prefix,
+      ) =>
+        if old_hd == new_hd {
+          prefix.push(Edit::Equal(old=old_hd, new=new_hd))
+          continue (old_rest, new_rest)
+        } else {
+          return (prefix, old_without_prefix, new_without_prefix)
+        }
+    }
   }
 }

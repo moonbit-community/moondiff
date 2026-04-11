@@ -26,8 +26,7 @@ pub(all) struct SingleLineSpan {
   line : Int
   start_col : Int
   end_col : Int
-}
-pub impl @debug.Debug for SingleLineSpan
+} derive(@debug.Debug)
 
 // Type aliases
 

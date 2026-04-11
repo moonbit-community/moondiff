@@ -38,27 +38,29 @@ pub fn LineWidths::from_str(str : StringView) -> Self {
   lines.push((0, 0)) // dummy for line 0
   let mut current_line_start = 0
   let mut current_column = 0
-  loop contents[:] {
-    [] => {
-      // end of contents
-      lines.push((current_line_start, current_line_start + current_column))
-      break LineWidths::{ contents, lines }
-    }
-    ['\r', '\n', .. rest] => {
-      lines.push((current_line_start, current_line_start + current_column))
-      current_line_start = current_line_start + current_column + 2
-      current_column = 0
-      continue rest
-    }
-    ['\n' | '\r', .. rest] => {
-      lines.push((current_line_start, current_line_start + current_column))
-      current_line_start = current_line_start + current_column + 1
-      current_column = 0
-      continue rest
-    }
-    [_, .. rest] => {
-      current_column = current_column + 1
-      continue rest
+  for contents_view = contents[:] {
+    match contents_view {
+      [] => {
+        // end of contents
+        lines.push((current_line_start, current_line_start + current_column))
+        break LineWidths::{ contents, lines }
+      }
+      ['\r', '\n', .. rest] => {
+        lines.push((current_line_start, current_line_start + current_column))
+        current_line_start = current_line_start + current_column + 2
+        current_column = 0
+        continue rest
+      }
+      ['\n' | '\r', .. rest] => {
+        lines.push((current_line_start, current_line_start + current_column))
+        current_line_start = current_line_start + current_column + 1
+        current_column = 0
+        continue rest
+      }
+      [_, .. rest] => {
+        current_column = current_column + 1
+        continue rest
+      }
     }
   }
 }

@@ -40,7 +40,7 @@ pub fn SyntaxInfo::new() -> Self {
     parent: None,
     num_ancestors: 0,
     num_after: 0,
-    unique_id: @uint.max_value,
+    unique_id: @uint.MAX_VALUE,
     content_id: 0,
     content_is_unique: false,
   }
@@ -119,7 +119,7 @@ pub fn Syntax::list(
   let children = children.filter(fn(n) {
     match n {
       List(..) => true
-      Atom(content~, ..) => not(content.is_empty())
+      Atom(content~, ..) => !content.is_empty()
     }
   })
   // Don't bother creating a list if we have no open/close and

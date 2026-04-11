@@ -15,8 +15,7 @@ pub fn line_group(String, String) -> Array[REdit]?
 pub enum REdit {
   Normal(@edit.Edit[Array[StringView]])
   Replace(old~ : Array[StringView], new~ : Array[StringView])
-}
-pub impl @debug.Debug for REdit
+} derive(@debug.Debug)
 
 // Type aliases
 
