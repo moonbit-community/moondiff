@@ -19,6 +19,8 @@ pub fn elab_type(StringView, @moonbitlang/parser/syntax.Type) -> @myfreess/moond
 // Types and methods
 pub struct ElabCtx {
   line_widths : @span.LineWidths
+  contents : Array[Char]
+  line_ranges : Array[(Int, Int)]
 }
 pub fn ElabCtx::elab_expr(Self, @moonbitlang/parser/syntax.Expr) -> @myfreess/moondiff/astdiff/syntax.Syntax
 pub fn ElabCtx::elab_impl(Self, @moonbitlang/parser/syntax.Impl) -> @myfreess/moondiff/astdiff/syntax.Syntax

@@ -1,9 +1,6 @@
 ///|UUID(0)
 pub fn decode(bytes : @bytes.View) -> String raise Malformed {
   let builder = StringBuilder::new(size_hint=bytes.length())
-  loop bytes {
-    ...
-  }
 }
 
 ///|UUID(4)

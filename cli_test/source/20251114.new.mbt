@@ -9,9 +9,6 @@ pub fn decode(
     bytes
   }
   let builder = StringBuilder::new(size_hint=bytes.length())
-  loop bytes {
-    ...
-  }
 }
 
 ///|UUID(1)

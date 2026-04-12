@@ -69,14 +69,25 @@ fn pad_left(value : String, width : Int) -> String {
   buf.to_string()
 }
 
+///|UUID(1c1b85e4-6d10-43c1-a7d6-e6b5268be2c3)
+fn display_line_no(line_no : Int?, width : Int, line_base : Int) -> String {
+  match line_no {
+    Some(line_no) => pad_left((line_no + line_base).to_string(), width)
+    None => pad_left("", width)
+  }
+}
+
 ///|UUID(6a7523d6-13fe-4ad1-9d78-e8e8d32b2f45)
 fn line_prefix(
   marker : String,
-  line_no : Int,
-  width : Int,
-  line_base : Int,
+  old_line_no : Int?,
+  old_width : Int,
+  old_line_base : Int,
+  new_line_no : Int?,
+  new_width : Int,
+  new_line_base : Int,
 ) -> String {
-  "\{marker} \{pad_left((line_no + line_base).to_string(), width)} | "
+  "\{marker} \{display_line_no(old_line_no, old_width, old_line_base)} \{display_line_no(new_line_no, new_width, new_line_base)} | "
 }
 
 ///|UUID(fc528109-6fac-4326-b0fc-a00841bea702)
@@ -187,16 +198,25 @@ fn render_line_body(
 ///|UUID(adf51724-e0ec-4539-a73d-adbbd1903cf2)
 fn render_hunk_line(
   marker : String,
-  line_no : Int,
-  width : Int,
-  line_base : Int,
+  old_line_no : Int?,
+  old_width : Int,
+  old_line_base : Int,
+  new_line_no : Int?,
+  new_width : Int,
+  new_line_base : Int,
   line : String,
   ranges : Array[(Int, Int)]?,
   style : LineStyle,
   use_color : Bool,
   full_line_fallback : Bool,
 ) -> String {
-  style_prefix(line_prefix(marker, line_no, width, line_base), style, use_color) +
+  style_prefix(
+    line_prefix(
+      marker, old_line_no, old_width, old_line_base, new_line_no, new_width, new_line_base,
+    ),
+    style,
+    use_color,
+  ) +
   render_line_body(line, ranges, style, use_color, full_line_fallback)
 }
 
@@ -322,10 +342,10 @@ fn render_ast_diff(
 ) -> String {
   let old_lines = split_lines(old_source)
   let new_lines = split_lines(new_source)
-  let line_no_width = @cmp.maximum(
-      max_display_line(old_line_base, old_lines.length()),
-      max_display_line(new_line_base, new_lines.length()),
-    )
+  let old_line_no_width = max_display_line(old_line_base, old_lines.length())
+    .to_string()
+    .length()
+  let new_line_no_width = max_display_line(new_line_base, new_lines.length())
     .to_string()
     .length()
   let old_highlights = collect_novel_ranges(lhs_mps)
@@ -348,10 +368,9 @@ fn render_ast_diff(
   }
 
   for hunk in hunks {
+    let render_context_lines = options.context_lines + 1
     let (start, end_) = contextual_index_range_for_hunk(
-      hunk,
-      matched_lines,
-      options.context_lines,
+      hunk, matched_lines, render_context_lines,
     )
     let lines = matched_lines[start:end_]
     buf.write_string(render_hunk_header(lines, old_line_base, new_line_base))
@@ -367,9 +386,12 @@ fn render_ast_diff(
             buf.write_string(
               render_hunk_line(
                 " ",
-                old_line,
-                line_no_width,
+                Some(old_line),
+                old_line_no_width,
                 old_line_base,
+                Some(new_line),
+                new_line_no_width,
+                new_line_base,
                 old_lines[old_line],
                 None,
                 Context,
@@ -386,9 +408,12 @@ fn render_ast_diff(
                 } else {
                   " "
                 },
-                old_line,
-                line_no_width,
+                Some(old_line),
+                old_line_no_width,
                 old_line_base,
+                None,
+                new_line_no_width,
+                new_line_base,
                 old_lines[old_line],
                 old_highlights.get(old_line),
                 if old_is_novel {
@@ -408,8 +433,11 @@ fn render_ast_diff(
                 } else {
                   " "
                 },
-                new_line,
-                line_no_width,
+                None,
+                old_line_no_width,
+                old_line_base,
+                Some(new_line),
+                new_line_no_width,
                 new_line_base,
                 new_lines[new_line],
                 new_highlights.get(new_line),
@@ -434,9 +462,12 @@ fn render_ast_diff(
               } else {
                 " "
               },
-              old_line,
-              line_no_width,
+              Some(old_line),
+              old_line_no_width,
               old_line_base,
+              None,
+              new_line_no_width,
+              new_line_base,
               old_lines[old_line],
               old_highlights.get(old_line),
               if is_novel {
@@ -459,8 +490,11 @@ fn render_ast_diff(
               } else {
                 " "
               },
-              new_line,
-              line_no_width,
+              None,
+              old_line_no_width,
+              old_line_base,
+              Some(new_line),
+              new_line_no_width,
               new_line_base,
               new_lines[new_line],
               new_highlights.get(new_line),
@@ -496,10 +530,10 @@ fn render_line_diff(
 ) -> String {
   let old_lines = split_lines(old_source)
   let new_lines = split_lines(new_source)
-  let line_no_width = @cmp.maximum(
-      max_display_line(old_line_base, old_lines.length()),
-      max_display_line(new_line_base, new_lines.length()),
-    )
+  let old_line_no_width = max_display_line(old_line_base, old_lines.length())
+    .to_string()
+    .length()
+  let new_line_no_width = max_display_line(new_line_base, new_lines.length())
     .to_string()
     .length()
   let diff = @piediff.Diff(old=old_lines[:], new=new_lines[:])
@@ -525,9 +559,12 @@ fn render_line_diff(
             buf.write_string(
               render_hunk_line(
                 "-",
-                line_no,
-                line_no_width,
+                Some(line_no),
+                old_line_no_width,
                 old_line_base,
+                None,
+                new_line_no_width,
+                new_line_base,
                 old_lines[line_no],
                 ranges,
                 Deleted,
@@ -544,8 +581,11 @@ fn render_line_diff(
             buf.write_string(
               render_hunk_line(
                 "+",
-                line_no,
-                line_no_width,
+                None,
+                old_line_no_width,
+                old_line_base,
+                Some(line_no),
+                new_line_no_width,
                 new_line_base,
                 new_lines[line_no],
                 ranges,
@@ -556,16 +596,20 @@ fn render_line_diff(
             )
             buf.write_char('\n')
           }
-        @piediff.Edit::Equal(old_index~, len~, ..) =>
+        @piediff.Edit::Equal(old_index~, new_index~, len~) =>
           for i in 0..<len {
-            let line_no = old_index + i
+            let old_line_no = old_index + i
+            let new_line_no = new_index + i
             buf.write_string(
               render_hunk_line(
                 " ",
-                line_no,
-                line_no_width,
+                Some(old_line_no),
+                old_line_no_width,
                 old_line_base,
-                old_lines[line_no],
+                Some(new_line_no),
+                new_line_no_width,
+                new_line_base,
+                old_lines[old_line_no],
                 None,
                 Context,
                 options.use_color,

@@ -1,73 +1,82 @@
 --- cli_test/source/20251114.old.mbt: line 1
 +++ cli_test/source/20251114.new.mbt: line 1
 @@ -1,4 +1,12 @@
-[90m   1 | [39m///|UUID(0)
-[90m   2 | [39mpub fn decode(bytes : @bytes.View) -> String raise Malformed {
-[90m   2 | [39mpub fn decode(
-[90m   3 | [39m  bytes : @bytes.View,
-[32m[1m+  4 | [22m[39m  [32m[1mignore_bom[22m[39m? : [32m[1mBool[22m[39m = [32m[1mfalse,[22m[39m
-[90m   5 | [39m) -> String raise Malformed {
-[32m[1m+  6 | [22m[39m  let [32m[1mbytes[22m[39m = if [32m[1mignore_bom[22m[39m [32m[1m&&[22m[39m [32m[1mbytes[22m[39m is [.. [32m[1m"\xef\xbb\xbf"[22m[39m, .. [32m[1mrest[22m[39m] {
-[32m[1m+  7 | [22m[39m    [32m[1mrest[22m[39m
-[90m   8 | [39m  } else {
-[32m[1m+  9 | [22m[39m    [32m[1mbytes[22m[39m
-[90m  10 | [39m  }
-[90m   3 | [39m  let builder = StringBuilder::new(size_hint=bytes.length())
-[90m   4 | [39m  loop bytes {
+[90m  1  1 | [39m///|UUID(0)
+[90m  2    | [39mpub fn decode(bytes : @bytes.View) -> String raise Malformed {
+[90m     2 | [39mpub fn decode(
+[32m[1m+    3 | [22m[39m  bytes : @bytes.View[32m[1m,[22m[39m
+[32m[1m+    4 | [22m[39m  [32m[1mignore_bom?[22m[39m [32m[1m:[22m[39m [32m[1mBool[22m[39m [32m[1m=[22m[39m [32m[1mfalse,[22m[39m
+[90m     5 | [39m) -> String raise Malformed {
+[32m[1m+    6 | [22m[39m  [32m[1mlet[22m[39m [32m[1mbytes[22m[39m [32m[1m=[22m[39m [32m[1mif[22m[39m [32m[1mignore_bom[22m[39m [32m[1m&&[22m[39m [32m[1mbytes[22m[39m [32m[1mis[22m[39m [32m[1m[..[22m[39m [32m[1m"\xef\xbb\xbf",[22m[39m [32m[1m..[22m[39m [32m[1mrest][22m[39m [32m[1m{[22m[39m
+[32m[1m+    7 | [22m[39m    [32m[1mrest[22m[39m
+[32m[1m+    8 | [22m[39m  [32m[1m}[22m[39m [32m[1melse[22m[39m [32m[1m{[22m[39m
+[32m[1m+    9 | [22m[39m    [32m[1mbytes[22m[39m
+[32m[1m+   10 | [22m[39m  [32m[1m}[22m[39m
+[90m  3 11 | [39m  let builder = StringBuilder::new(size_hint=bytes.length())
+[90m  4 12 | [39m}
 
---- cli_test/source/20251114.old.mbt: line 9
-+++ cli_test/source/20251114.new.mbt: line 39
-@@ -9,5 +39,5 @@
-[90m   9 | [39m///|UUID(4)
-[90m  10 | [39mpub fn View::from_array(chars : Array[Char]) -> View {
-[90m  11 | [39m  // todo: remove .view() in new version
-[31m[1m- 12 | [22m[39m  String::from_array(chars).[31m[1mview[22m[39m()
-[32m[1m+ 41 | [22m[39m  let [32m[1ms[22m[39m = String::from_array(chars)
-[32m[1m+ 42 | [22m[39m  [32m[1mView[22m[39m::[32m[1mmake_view[22m[39m([32m[1ms[22m[39m, [32m[1m0[22m[39m, [32m[1ms[22m[39m.[32m[1mlength[22m[39m())
-[90m  13 | [39m}
+--- cli_test/source/20251114.old.mbt: line 6
++++ cli_test/source/20251114.new.mbt: line 36
+@@ -6,5 +36,5 @@
+[90m   6 36 | [39m///|UUID(4)
+[90m   7 37 | [39mpub fn View::from_array(chars : Array[Char]) -> View {
+[31m[1m-  8    | [22m[39m  [31m[1m//[22m[39m [31m[1mtodo:[22m[39m [31m[1mremove[22m[39m [31m[1m.view()[22m[39m [31m[1min[22m[39m [31m[1mnew[22m[39m [31m[1mversion[22m[39m
+[31m[1m-  9    | [22m[39m  String::from_array(chars).[31m[1mview[22m[39m()
+[32m[1m+    38 | [22m[39m  [32m[1mlet[22m[39m [32m[1ms[22m[39m [32m[1m=[22m[39m String::from_array(chars)
+[32m[1m+    39 | [22m[39m  [32m[1mView::make_view(s,[22m[39m [32m[1m0,[22m[39m [32m[1ms[22m[39m.[32m[1mlength[22m[39m()[32m[1m)[22m[39m
+[90m  10 40 | [39m}
 
---- cli_test/source/20251114.old.mbt: line 15
-+++ cli_test/source/20251114.new.mbt: line 45
-@@ -15,11 +45,10 @@
-[90m  15 | [39m///|UUID(5)
-[90m  16 | [39mstruct Set[K] {
-[31m[1m- 17 | [22m[39m  mut entries : FixedArray[[31m[1mSEntry[22m[39m[K]?]
-[32m[1m+ 47 | [22m[39m  mut entries : FixedArray[[32m[1mEntry[22m[39m[K]?]
-[31m[1m- 18 | [22m[39m  mut [31m[1mlist[22m[39m : [31m[1mFixedArray[22m[39m[[31m[1mSListNode[22m[39m[[31m[1mK[22m[39m]]
-[90m  19 | [39m  mut size : Int
-[90m  48 | [39m  mut size : Int // active keys count
-[90m  20 | [39m  mut capacity : Int
-[90m  49 | [39m  mut capacity : Int // current capacity
-[90m  21 | [39m  mut capacity_mask : Int
-[90m  50 | [39m  mut capacity_mask : Int // capacity_mask = capacity - 1, used to find idx
-[90m  22 | [39m  mut grow_at : Int
-[90m  51 | [39m  mut grow_at : Int // threshold that triggers grow
-[31m[1m- 23 | [22m[39m  mut head : [31m[1mSEntry[22m[39m[K]?
-[32m[1m+ 52 | [22m[39m  mut head : [32m[1mEntry[22m[39m[K]? // head of linked list
-[31m[1m- 24 | [22m[39m  mut tail : [31m[1mSEntry[22m[39m[[31m[1mK[22m[39m][31m[1m?[22m[39m
-[32m[1m+ 53 | [22m[39m  mut tail : [32m[1mInt[22m[39m // tail of linked list
-[90m  25 | [39m}
+--- cli_test/source/20251114.old.mbt: line 12
++++ cli_test/source/20251114.new.mbt: line 42
+@@ -12,11 +42,10 @@
+[90m  12 42 | [39m///|UUID(5)
+[90m  13 43 | [39mstruct Set[K] {
+[31m[1m- 14    | [22m[39m  mut entries : FixedArray[[31m[1mSEntry[22m[39m[K]?]
+[32m[1m+    44 | [22m[39m  mut entries : FixedArray[[32m[1mEntry[22m[39m[K]?]
+[31m[1m- 15    | [22m[39m  [31m[1mmut[22m[39m [31m[1mlist[22m[39m [31m[1m:[22m[39m [31m[1mFixedArray[SListNode[K]][22m[39m
+[90m  16    | [39m  mut size : Int
+[90m     45 | [39m  mut size : Int [90m//[39m [90mactive[39m [90mkeys[39m [90mcount[39m
+[90m  17    | [39m  mut capacity : Int
+[90m     46 | [39m  mut capacity : Int [90m//[39m [90mcurrent[39m [90mcapacity[39m
+[90m  18    | [39m  mut capacity_mask : Int
+[90m     47 | [39m  mut capacity_mask : Int [90m//[39m [90mcapacity_mask[39m [90m=[39m [90mcapacity[39m [90m-[39m [90m1,[39m [90mused[39m [90mto[39m [90mfind[39m [90midx[39m
+[90m  19    | [39m  mut grow_at : Int
+[90m     48 | [39m  mut grow_at : Int [90m//[39m [90mthreshold[39m [90mthat[39m [90mtriggers[39m [90mgrow[39m
+[31m[1m- 20    | [22m[39m  mut head : [31m[1mSEntry[22m[39m[K]?
+[32m[1m+    49 | [22m[39m  mut head : [32m[1mEntry[22m[39m[K]? [32m[1m//[22m[39m [32m[1mhead[22m[39m [32m[1mof[22m[39m [32m[1mlinked[22m[39m [32m[1mlist[22m[39m
+[31m[1m- 21    | [22m[39m  mut tail : [31m[1mSEntry[K]?[22m[39m
+[32m[1m+    50 | [22m[39m  mut tail : [32m[1mInt[22m[39m [32m[1m//[22m[39m [32m[1mtail[22m[39m [32m[1mof[22m[39m [32m[1mlinked[22m[39m [32m[1mlist[22m[39m
+[90m  22 51 | [39m}
 
---- cli_test/source/20251114.old.mbt: line 33
-+++ cli_test/source/20251114.new.mbt: line 25
-@@ -33,5 +25,5 @@
-[90m  33 | [39m///|UUID(2)
-[90m  34 | [39mpub fn[T, U] map(self : T?, f : (T) -> U) -> U? {
-[32m[1m+ 26 | [22m[39mpub fn[T, U] map(self : T?, f : (T) -> U [32m[1mraise?[22m[39m) -> U? [32m[1mraise?[22m[39m {
-[90m  35 | [39m  match self {
-[90m  36 | [39m    Some(t) => Some(f(t))
-[90m  37 | [39m    None => None
+--- cli_test/source/20251114.old.mbt: line 24
++++ cli_test/source/20251114.new.mbt: line 14
+@@ -24,5 +14,7 @@
+[90m  24 14 | [39m///|UUID(1)
+[90m  25 15 | [39mfn main {
+[90m  26 16 | [39m  println("Hello, world!")
+[32m[1m+    17 | [22m[39m  [32m[1m//[22m[39m [32m[1minsert[22m[39m [32m[1mcomment[22m[39m
+[32m[1m+    18 | [22m[39m  [32m[1m//[22m[39m [32m[1mmore[22m[39m [32m[1mthan[22m[39m [32m[1mone[22m[39m [32m[1mline[22m[39m
+[90m  27 19 | [39m  println(5 + 6)
+[90m  28 20 | [39m}
 
---- cli_test/source/20251114.old.mbt: line 41
-+++ cli_test/source/20251114.new.mbt: line 33
-@@ -41,6 +33,5 @@
-[90m  41 | [39m///|UUID(3)
-[90m  42 | [39mfn main() {
-[90m  43 | [39m  println(
-[90m  35 | [39m  println("Hello, world!")
-[90m  44 | [39m    "Hello, world!"
-[32m[1m+ 36 | [22m[39m  [32m[1mprintln[22m[39m([32m[1m5[22m[39m [32m[1m+[22m[39m [32m[1m6)[22m[39m
-[90m  45 | [39m  )
-[90m  37 | [39m}
-[90m  46 | [39m}
+--- cli_test/source/20251114.old.mbt: line 30
++++ cli_test/source/20251114.new.mbt: line 22
+@@ -30,6 +22,6 @@
+[90m  30 22 | [39m///|UUID(2)
+[90m  31    | [39mpub fn[T, U] map(self : T?, f : (T) -> U) -> U? {
+[32m[1m+    23 | [22m[39mpub fn[T, U] map(self : T?, f : (T) -> U [32m[1mraise?[22m[39m) -> U? [32m[1mraise?[22m[39m {
+[90m  32 24 | [39m  match self {
+[90m  33 25 | [39m    Some(t) => Some(f(t))
+[90m  34 26 | [39m    None => None
+[90m  35 27 | [39m  }
+
+--- cli_test/source/20251114.old.mbt: line 38
++++ cli_test/source/20251114.new.mbt: line 30
+@@ -40,4 +32,3 @@
+[90m  40    | [39m  println(
+[90m  41    | [39m    "Hello, world!"
+[90m  42    | [39m  )
+[90m     32 | [39m  println("Hello, world!")
+[32m[1m+    33 | [22m[39m  [32m[1mprintln(5[22m[39m [32m[1m+[22m[39m [32m[1m6)[22m[39m
+[90m  43 34 | [39m}
 
