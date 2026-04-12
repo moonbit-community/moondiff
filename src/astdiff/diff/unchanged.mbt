@@ -182,12 +182,19 @@ fn mark_syntax_subtree(
               children=rhs_children,
               ..
             ),
-          ) if lhs_open == rhs_open && lhs_close == rhs_close => {
-            change_map.insert(lhs, Unchanged(rhs))
-            change_map.insert(rhs, Unchanged(lhs))
-            mark_syntax_roots(
-              lhs_children, rhs_children, change_map, graph_limit,
-            )
+          ) => {
+            let has_matching_explicit_delimiters = lhs_open == rhs_open &&
+              lhs_close == rhs_close &&
+              (!lhs_open.is_empty() || !lhs_close.is_empty())
+            if has_matching_explicit_delimiters {
+              change_map.insert(lhs, Unchanged(rhs))
+              change_map.insert(rhs, Unchanged(lhs))
+              mark_syntax_roots(
+                lhs_children, rhs_children, change_map, graph_limit,
+              )
+            } else {
+              mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
+            }
           }
           _ => mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
         }
