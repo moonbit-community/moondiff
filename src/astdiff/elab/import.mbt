@@ -39,7 +39,6 @@ using @past {
   type Group,
   type Hole,
   type Impl,
-  type Impls,
   type InterpElem,
   type Label,
   type LexCase,

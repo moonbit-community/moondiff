@@ -1,9 +1,9 @@
 set -euox pipefail
 
 
-token_diff() {
+ast_diff() {
   name=$1
-  ./_build/native/release/build/tokendiff/cli/cli.exe "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
+  ./_build/native/release/build/astdiff/cli/cli.exe "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
 }
 
-token_diff "20251114"
+ast_diff "20251114"

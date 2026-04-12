@@ -9,8 +9,14 @@ fn build_ast_change_map(
     panic()
   }
 
-  let lhs_roots = @elab.elab_impls(old_source, old_impls)
-  let rhs_roots = @elab.elab_impls(new_source, new_impls)
+  let old_units = collect_impl_units(old_source, old_impls)
+  let new_units = collect_impl_units(new_source, new_impls)
+  if old_units.length() != 1 || new_units.length() != 1 {
+    panic()
+  }
+
+  let lhs_roots = [old_units[0].root]
+  let rhs_roots = [new_units[0].root]
   @syntax.init_all_info(lhs_roots, rhs_roots)
   let change_map = @diff.ChangeMap::new()
   @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, 3_000_000) catch {
@@ -204,4 +210,58 @@ test "render_ast_diff uses one merged hunk for nearby ast changes" {
   assert_true(rendered.contains("  5 | fn mid() {}"))
   assert_true(rendered.contains("+ 2 |   foo(baz(bar))"))
   assert_true(rendered.contains("+ 8 |   alpha(gamma(beta))"))
+}
+
+///|UUID(4dca0171-1c6a-41f9-b7b6-167bb9c6953d)
+fn edit_summary(edit : ImplEdit) -> String {
+  match edit {
+    Replace(old~, new~) => {
+      let old_uuid = old.uuid.unwrap_or("none")
+      let new_uuid = new.uuid.unwrap_or("none")
+      "Replace(\{old_uuid}->\{new_uuid})"
+    }
+    Delete(old) => {
+      let old_uuid = old.uuid.unwrap_or("none")
+      "Delete(\{old_uuid})"
+    }
+    Insert(new) => {
+      let new_uuid = new.uuid.unwrap_or("none")
+      "Insert(\{new_uuid})"
+    }
+  }
+}
+
+///|UUID(0c6b3f16-db94-47b3-a98d-6703cfaa9863)
+test "align_impl_units aligns top-level UUID blocks before inner AST diff" {
+  let old_source =
+    #|///|UUID(11111111-1111-1111-1111-111111111111)
+    #|fn keep() {}
+    #|///|UUID(22222222-2222-2222-2222-222222222222)
+    #|fn target() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|///|UUID(99999999-9999-9999-9999-999999999999)
+    #|fn inserted() {}
+    #|///|UUID(11111111-1111-1111-1111-111111111111)
+    #|fn keep() {}
+    #|///|UUID(22222222-2222-2222-2222-222222222222)
+    #|fn target() {
+    #|  foo(baz(bar))
+    #|}
+  let (old_impls, old_reports) = @parser.parse_string(old_source)
+  let (new_impls, new_reports) = @parser.parse_string(new_source)
+  if old_reports.length() != 0 || new_reports.length() != 0 {
+    panic()
+  }
+
+  let edits = align_impl_units(
+    collect_impl_units(old_source, old_impls),
+    collect_impl_units(new_source, new_impls),
+  )
+  assert_eq(edits.map(edit_summary), [
+    "Replace(11111111-1111-1111-1111-111111111111->11111111-1111-1111-1111-111111111111)",
+    "Replace(22222222-2222-2222-2222-222222222222->22222222-2222-2222-2222-222222222222)",
+    "Insert(99999999-9999-9999-9999-999999999999)",
+  ])
 }
