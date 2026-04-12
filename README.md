@@ -8,22 +8,8 @@ Difftool that aware MoonBit language syntax.
 
 ### install
 
-+ native binary
+TODO
 
-```shell
-git clone https://github.com/moonbit-community/moondiff.git
-cd moondiff && moon update && moon build --target native
-# optional: add `~/.local/bin` to your `PATH`
-mkdir -p ~/.local/bin
-cp target/native/release/build/tokendiff/cli/cli.exe ~/.local/bin/tokendiff
-```
-
-use just:
-
-```shell
-git clone https://github.com/moonbit-community/moondiff.git
-cd moondiff && just install
-```
 ### use
 
 moondiff relies on some features of `moonfmt`: 

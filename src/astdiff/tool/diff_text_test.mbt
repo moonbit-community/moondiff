@@ -10,8 +10,8 @@ test "diff_text renders ast-backed inline diff" {
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
   let expected =
-    #|--- old.mbt
-    #|+++ new.mbt
+    #|--- old.mbt: line 1
+    #|+++ new.mbt: line 1
     #|@@ -1,3 +1,3 @@
     #|  1 | fn f() {
     #|  2 |   foo(bar)
@@ -93,7 +93,7 @@ test "diff_text falls back to line diff on parser errors" {
 }
 
 ///|UUID(ffc583a0-bfa9-41da-b66c-454bec464d08)
-test "diff_text merges nearby ast hunks for real multi-root changes" {
+test "diff_text prints each changed impl separately" {
   let old_source =
     #|fn a() {
     #|  foo(bar)
@@ -116,16 +116,17 @@ test "diff_text merges nearby ast hunks for real multi-root changes" {
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
   let expected =
-    #|--- old.mbt
-    #|+++ new.mbt
-    #|@@ -1,9 +1,9 @@
+    #|--- old.mbt: line 1
+    #|+++ new.mbt: line 1
+    #|@@ -1,3 +1,3 @@
     #|  1 | fn a() {
     #|  2 |   foo(bar)
     #|+ 2 |   foo(baz(bar))
     #|  3 | }
-    #|  4 | 
-    #|  5 | fn mid() {}
-    #|  6 | 
+    #|
+    #|--- old.mbt: line 7
+    #|+++ new.mbt: line 7
+    #|@@ -7,3 +7,3 @@
     #|  7 | fn z() {
     #|  8 |   alpha(beta)
     #|+ 8 |   alpha(gamma(beta))
@@ -168,4 +169,32 @@ test "non terminate" {
     options=DiffOptions::new(use_color=true),
   )
   assert_true(result.kind is Ast)
+}
+
+///|UUID(75a63cec-04c6-4517-b902-6ee11ba6cc17)
+test "diff_text keeps UUID-aligned top-level changes on the AST path" {
+  let old_source =
+    #|///|UUID(11111111-1111-1111-1111-111111111111)
+    #|fn keep() {}
+    #|///|UUID(22222222-2222-2222-2222-222222222222)
+    #|fn target() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|///|UUID(99999999-9999-9999-9999-999999999999)
+    #|fn inserted() {}
+    #|///|UUID(11111111-1111-1111-1111-111111111111)
+    #|fn keep() {}
+    #|///|UUID(22222222-2222-2222-2222-222222222222)
+    #|fn target() {
+    #|  foo(baz(bar))
+    #|}
+  let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains("--- old.mbt: line 3"))
+  assert_true(result.rendered.contains("+++ new.mbt: line 5"))
+  assert_true(result.rendered.contains("fn inserted() {}"))
+  assert_true(result.rendered.contains("foo(bar)"))
+  assert_true(result.rendered.contains("foo(baz(bar))"))
 }

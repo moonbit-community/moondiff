@@ -84,6 +84,14 @@ fn list_children(node : Syntax) -> Array[Syntax] raise {
   }
 }
 
+///|UUID(29253b8d-1faf-4d5e-bf49-70e5887a84e5)
+fn only_impl(impls : @list.List[@past.Impl]) -> @past.Impl raise {
+  match impls {
+    @list.More(impl_, tail=@list.Empty) => impl_
+    _ => fail("expected single impl")
+  }
+}
+
 ///|UUID(9db33348-9d9a-4b88-b49d-05c36042dea7)
 test "elab parsed function keeps top-level shape and docstring" {
   let source =
@@ -92,15 +100,14 @@ test "elab parsed function keeps top-level shape and docstring" {
   let (impls, reports) = @parser.parse_string(source)
   assert_true(reports.length() is 0)
 
-  let syntax = elab_impls(source, impls)
-  assert_true(syntax.length() is 1)
-  assert_true(node_tag(syntax[0]) is "Impl::TopFuncDef")
+  let syntax = elab_impl(source, only_impl(impls))
+  assert_true(node_tag(syntax) is "Impl::TopFuncDef")
   assert_true(
-    sexp(syntax[0])
+    sexp(syntax)
     is "((((()) ((add)) (()) (()) ((((((x)) ((((((Int))) (())))))))) (()) ((((((Int))) (())))) (()) (()) (()) (( Adds one)))) (((()) (((((x))))))))",
   )
 
-  let fun_decl = field_value(syntax[0], "fun_decl")
+  let fun_decl = field_value(syntax, "fun_decl")
   let name = field_value(fun_decl, "name")
   assert_true(sexp(name) is "(add)")
   assert_true(single_span_line(only_child(name)) is 2)
@@ -168,8 +175,8 @@ test "elab normalizes let chain into statement list" {
   let (impls, reports) = @parser.parse_string(source)
   assert_true(reports.length() is 0)
 
-  let syntax = elab_impls(source, impls)
-  let decl_body = field_value(syntax[0], "decl_body")
+  let syntax = elab_impl(source, only_impl(impls))
+  let decl_body = field_value(syntax, "decl_body")
   let expr = field_value(decl_body, "expr")
   assert_true(node_tag(expr) is "Expr::StmtChain")
 

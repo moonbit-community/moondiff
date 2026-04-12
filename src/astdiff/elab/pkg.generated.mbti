@@ -2,7 +2,6 @@
 package "myfreess/moondiff/astdiff/elab"
 
 import {
-  "moonbitlang/core/list",
   "myfreess/moondiff/span",
 }
 
@@ -10,8 +9,6 @@ import {
 pub fn elab_expr(StringView, @moonbitlang/parser/syntax.Expr) -> @myfreess/moondiff/astdiff/syntax.Syntax
 
 pub fn elab_impl(StringView, @moonbitlang/parser/syntax.Impl) -> @myfreess/moondiff/astdiff/syntax.Syntax
-
-pub fn elab_impls(StringView, @list.List[@moonbitlang/parser/syntax.Impl]) -> Array[@myfreess/moondiff/astdiff/syntax.Syntax]
 
 pub fn elab_pattern(StringView, @moonbitlang/parser/syntax.Pattern) -> @myfreess/moondiff/astdiff/syntax.Syntax
 
@@ -25,7 +22,6 @@ pub struct ElabCtx {
 }
 pub fn ElabCtx::elab_expr(Self, @moonbitlang/parser/syntax.Expr) -> @myfreess/moondiff/astdiff/syntax.Syntax
 pub fn ElabCtx::elab_impl(Self, @moonbitlang/parser/syntax.Impl) -> @myfreess/moondiff/astdiff/syntax.Syntax
-pub fn ElabCtx::elab_impls(Self, @list.List[@moonbitlang/parser/syntax.Impl]) -> Array[@myfreess/moondiff/astdiff/syntax.Syntax]
 pub fn ElabCtx::elab_pattern(Self, @moonbitlang/parser/syntax.Pattern) -> @myfreess/moondiff/astdiff/syntax.Syntax
 pub fn ElabCtx::elab_type(Self, @moonbitlang/parser/syntax.Type) -> @myfreess/moondiff/astdiff/syntax.Syntax
 pub fn ElabCtx::new(StringView) -> Self

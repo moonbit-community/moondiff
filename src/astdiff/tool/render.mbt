@@ -70,8 +70,13 @@ fn pad_left(value : String, width : Int) -> String {
 }
 
 ///|UUID(6a7523d6-13fe-4ad1-9d78-e8e8d32b2f45)
-fn line_prefix(marker : String, line_no : Int, width : Int) -> String {
-  "\{marker} \{pad_left((line_no + 1).to_string(), width)} | "
+fn line_prefix(
+  marker : String,
+  line_no : Int,
+  width : Int,
+  line_base : Int,
+) -> String {
+  "\{marker} \{pad_left((line_no + line_base).to_string(), width)} | "
 }
 
 ///|UUID(fc528109-6fac-4326-b0fc-a00841bea702)
@@ -184,19 +189,20 @@ fn render_hunk_line(
   marker : String,
   line_no : Int,
   width : Int,
+  line_base : Int,
   line : String,
   ranges : Array[(Int, Int)]?,
   style : LineStyle,
   use_color : Bool,
   full_line_fallback : Bool,
 ) -> String {
-  style_prefix(line_prefix(marker, line_no, width), style, use_color) +
+  style_prefix(line_prefix(marker, line_no, width, line_base), style, use_color) +
   render_line_body(line, ranges, style, use_color, full_line_fallback)
 }
 
 ///|UUID(d0d1ad18-199b-4b66-b233-b6a36da07412)
-fn range_text(start : Int, end_ : Int) -> String {
-  let mut beginning = start + 1
+fn range_text(start : Int, end_ : Int, line_base : Int) -> String {
+  let mut beginning = start + line_base
   let len = end_ - start
   if len == 1 {
     beginning.to_string()
@@ -252,7 +258,7 @@ fn render_piediff_hunk_header(edits : ArrayView[@piediff.Edit]) -> String {
       break
     }
   }
-  "@@ -\{range_text(first_old_start, old_end)} +\{range_text(first_new_start, new_end)} @@"
+  "@@ -\{range_text(first_old_start, old_end, 1)} +\{range_text(first_new_start, new_end, 1)} @@"
 }
 
 ///|UUID(8d2ad4b6-7974-44d6-871b-1ef554920ad2)
@@ -283,10 +289,23 @@ fn hunk_side_range(
 }
 
 ///|UUID(0d6af434-a7db-4978-8293-a43d8240937e)
-fn render_hunk_header(lines : ArrayView[(Int?, Int?)]) -> String {
+fn render_hunk_header(
+  lines : ArrayView[(Int?, Int?)],
+  old_line_base : Int,
+  new_line_base : Int,
+) -> String {
   let (old_start, old_end) = hunk_side_range(lines, true)
   let (new_start, new_end) = hunk_side_range(lines, false)
-  "@@ -\{range_text(old_start, old_end)} +\{range_text(new_start, new_end)} @@"
+  "@@ -\{range_text(old_start, old_end, old_line_base)} +\{range_text(new_start, new_end, new_line_base)} @@"
+}
+
+///|UUID(15f32630-dc4b-4303-aa24-c9bd98ee0b12)
+fn max_display_line(line_base : Int, line_count : Int) -> Int {
+  if line_count == 0 {
+    line_base
+  } else {
+    line_base + line_count - 1
+  }
 }
 
 ///|UUID(26becb16-0cfd-4d6f-9587-97054b5ddfbb)
@@ -298,11 +317,17 @@ fn render_ast_diff(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
   options : DiffOptions,
+  old_line_base? : Int = 1,
+  new_line_base? : Int = 1,
 ) -> String {
   let old_lines = split_lines(old_source)
   let new_lines = split_lines(new_source)
-  let max_line_count = @cmp.maximum(old_lines.length(), new_lines.length())
-  let line_no_width = max_line_count.to_string().length()
+  let line_no_width = @cmp.maximum(
+      max_display_line(old_line_base, old_lines.length()),
+      max_display_line(new_line_base, new_lines.length()),
+    )
+    .to_string()
+    .length()
   let old_highlights = collect_novel_ranges(lhs_mps)
   let new_highlights = collect_novel_ranges(rhs_mps)
   let matched_lines = all_matched_lines_filled(
@@ -329,7 +354,7 @@ fn render_ast_diff(
       options.context_lines,
     )
     let lines = matched_lines[start:end_]
-    buf.write_string(render_hunk_header(lines))
+    buf.write_string(render_hunk_header(lines, old_line_base, new_line_base))
     buf.write_char('\n')
     for pair in lines {
       match pair {
@@ -344,6 +369,7 @@ fn render_ast_diff(
                 " ",
                 old_line,
                 line_no_width,
+                old_line_base,
                 old_lines[old_line],
                 None,
                 Context,
@@ -362,6 +388,7 @@ fn render_ast_diff(
                 },
                 old_line,
                 line_no_width,
+                old_line_base,
                 old_lines[old_line],
                 old_highlights.get(old_line),
                 if old_is_novel {
@@ -383,6 +410,7 @@ fn render_ast_diff(
                 },
                 new_line,
                 line_no_width,
+                new_line_base,
                 new_lines[new_line],
                 new_highlights.get(new_line),
                 if new_is_novel {
@@ -408,6 +436,7 @@ fn render_ast_diff(
               },
               old_line,
               line_no_width,
+              old_line_base,
               old_lines[old_line],
               old_highlights.get(old_line),
               if is_novel {
@@ -432,6 +461,7 @@ fn render_ast_diff(
               },
               new_line,
               line_no_width,
+              new_line_base,
               new_lines[new_line],
               new_highlights.get(new_line),
               if is_novel {
@@ -461,11 +491,17 @@ fn render_line_diff(
   old_highlights : HighlightMap?,
   new_highlights : HighlightMap?,
   options : DiffOptions,
+  old_line_base? : Int = 1,
+  new_line_base? : Int = 1,
 ) -> String {
   let old_lines = split_lines(old_source)
   let new_lines = split_lines(new_source)
-  let max_line_count = @cmp.maximum(old_lines.length(), new_lines.length())
-  let line_no_width = max_line_count.to_string().length()
+  let line_no_width = @cmp.maximum(
+      max_display_line(old_line_base, old_lines.length()),
+      max_display_line(new_line_base, new_lines.length()),
+    )
+    .to_string()
+    .length()
   let diff = @piediff.Diff(old=old_lines[:], new=new_lines[:])
   let hunks = diff.group(radius=options.context_lines)
 
@@ -491,6 +527,7 @@ fn render_line_diff(
                 "-",
                 line_no,
                 line_no_width,
+                old_line_base,
                 old_lines[line_no],
                 ranges,
                 Deleted,
@@ -509,6 +546,7 @@ fn render_line_diff(
                 "+",
                 line_no,
                 line_no_width,
+                new_line_base,
                 new_lines[line_no],
                 ranges,
                 Added,
@@ -526,6 +564,7 @@ fn render_line_diff(
                 " ",
                 line_no,
                 line_no_width,
+                old_line_base,
                 old_lines[line_no],
                 None,
                 Context,

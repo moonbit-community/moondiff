@@ -8,11 +8,6 @@ pub fn ElabCtx::new(source : StringView) -> Self {
   { line_widths: LineWidths::from_str(source) }
 }
 
-///|UUID(41cacaa6-d761-4244-9cf4-7d798e359913)
-pub fn elab_impls(source : StringView, impls : Impls) -> Array[Syntax] {
-  ElabCtx::new(source).elab_impls(impls)
-}
-
 ///|UUID(73d90188-c384-4471-ab1c-29d64a14c96e)
 pub fn elab_impl(source : StringView, impl_ : Impl) -> Syntax {
   ElabCtx::new(source).elab_impl(impl_)
@@ -31,13 +26,6 @@ pub fn elab_type(source : StringView, ty : Type) -> Syntax {
 ///|UUID(72f6b63d-2830-4103-b954-d573cf0c5424)
 pub fn elab_pattern(source : StringView, pat : Pattern) -> Syntax {
   ElabCtx::new(source).elab_pattern(pat)
-}
-
-///|UUID(1c72c6ec-6539-4376-83b4-ff0c5fa12f35)
-pub fn ElabCtx::elab_impls(self : Self, impls : Impls) -> Array[Syntax] {
-  // TODO: `moonbitlang/parser/syntax` drops ordinary comments entirely,
-  // so this elaboration can only emit comment nodes for docstrings.
-  list_to_array(impls, fn(impl_) { self.elab_impl(impl_) })
 }
 
 ///|UUID(7d94ce91-b74a-4662-9a82-a47a6cec9bf6)
