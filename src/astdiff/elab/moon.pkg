@@ -9,7 +9,6 @@ import {
 }
 
 import {
-  "Yoorkin/prettyprinter" @pp,
   "moonbitlang/parser",
 } for "test"
 

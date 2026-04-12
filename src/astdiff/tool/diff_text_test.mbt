@@ -13,10 +13,10 @@ test "diff_text renders ast-backed inline diff" {
     #|--- old.mbt: line 1
     #|+++ new.mbt: line 1
     #|@@ -1,3 +1,3 @@
-    #|  1 | fn f() {
-    #|  2 |   foo(bar)
-    #|+ 2 |   foo(baz(bar))
-    #|  3 | }
+    #|  1 1 | fn f() {
+    #|  2   |   foo(bar)
+    #|+   2 |   foo(baz(bar))
+    #|  3 3 | }
     #|
   assert_true(result.kind is Ast)
   assert_true(result.rendered == expected)
@@ -40,13 +40,44 @@ test "diff_text shows partial rhs highlight for wrapped call" {
     options=DiffOptions::new(use_color=true),
   )
   assert_true(result.kind is Ast)
-  assert_true(result.rendered.contains("\u{1b}[90m  2 | \u{1b}[39m  foo(bar)"))
+  assert_true(
+    result.rendered.contains("\u{1b}[90m  2   | \u{1b}[39m  foo(bar)"),
+  )
   assert_true(
     result.rendered.contains(
-      "foo(\u{1b}[32m\u{1b}[1mbaz\u{1b}[22m\u{1b}[39m(bar))",
+      "foo(\u{1b}[32m\u{1b}[1mbaz(\u{1b}[22m\u{1b}[39mbar\u{1b}[32m\u{1b}[1m))\u{1b}[22m\u{1b}[39m",
     ),
   )
   assert_false(result.rendered.contains("\u{1b}[31m\u{1b}[1m  foo(bar)"))
+}
+
+///|UUID(d2f6d08e-d7c4-4227-9bf5-3ee5ed6a1f2a)
+test "diff_text keeps wrapped call matched when adding a sibling call" {
+  let old_source =
+    #|fn main() {
+    #|  println(
+    #|    "Hello, world!"
+    #|  )
+    #|}
+  let new_source =
+    #|fn main() {
+    #|  println("Hello, world!")
+    #|  println(5 + 6)
+    #|}
+  let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+  let interleaved_prefix =
+    #|  2   |   println(
+    #|    2 |   println("Hello, world!")
+  let separated_suffix =
+    #|  4   |   )
+    #|    2 |   println("Hello, world!")
+    #|+   3 |   println(5 + 6)
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains("--- old.mbt: line 1"))
+  assert_true(result.rendered.contains("+++ new.mbt: line 1"))
+  assert_false(result.rendered.contains(interleaved_prefix))
+  assert_true(result.rendered.contains(separated_suffix))
+  assert_false(result.rendered.contains("-   3 |     \"Hello, world!\""))
 }
 
 ///|UUID(7cee72fa-8f8c-4bcf-b70b-5f21305d87f2)
@@ -119,18 +150,18 @@ test "diff_text prints each changed impl separately" {
     #|--- old.mbt: line 1
     #|+++ new.mbt: line 1
     #|@@ -1,3 +1,3 @@
-    #|  1 | fn a() {
-    #|  2 |   foo(bar)
-    #|+ 2 |   foo(baz(bar))
-    #|  3 | }
+    #|  1 1 | fn a() {
+    #|  2   |   foo(bar)
+    #|+   2 |   foo(baz(bar))
+    #|  3 3 | }
     #|
     #|--- old.mbt: line 7
     #|+++ new.mbt: line 7
     #|@@ -7,3 +7,3 @@
-    #|  7 | fn z() {
-    #|  8 |   alpha(beta)
-    #|+ 8 |   alpha(gamma(beta))
-    #|  9 | }
+    #|  7 7 | fn z() {
+    #|  8   |   alpha(beta)
+    #|+   8 |   alpha(gamma(beta))
+    #|  9 9 | }
     #|
 
   assert_true(result.kind is Ast)
@@ -166,9 +197,19 @@ test "non terminate" {
     old,
     "new.mbt",
     new,
-    options=DiffOptions::new(use_color=true),
+    options=DiffOptions::new(),
   )
   assert_true(result.kind is Ast)
+  assert_true(
+    result.rendered.contains(
+      "  2 10 |   let builder = StringBuilder::new(size_hint=bytes.length())",
+    ),
+  )
+  assert_false(
+    result.rendered.contains(
+      "+   10 |   let builder = StringBuilder::new(size_hint=bytes.length())",
+    ),
+  )
 }
 
 ///|UUID(75a63cec-04c6-4517-b902-6ee11ba6cc17)
@@ -197,4 +238,51 @@ test "diff_text keeps UUID-aligned top-level changes on the AST path" {
   assert_true(result.rendered.contains("fn inserted() {}"))
   assert_true(result.rendered.contains("foo(bar)"))
   assert_true(result.rendered.contains("foo(baz(bar))"))
+}
+
+///|UUID(827921ba-b988-4e71-a6cb-566e48865be0)
+test "diff_text highlights inserted dot access and dot call from the dot" {
+  let field_result = diff_text(
+    "old.mbt",
+    (
+      #|fn f() {
+      #|  obj
+      #|}
+    ),
+    "new.mbt",
+    (
+      #|fn f() {
+      #|  obj.field
+      #|}
+    ),
+    options=DiffOptions::new(use_color=true),
+  )
+  assert_true(field_result.kind is Ast)
+  assert_true(
+    field_result.rendered.contains(
+      "obj\u{1b}[32m\u{1b}[1m.field\u{1b}[22m\u{1b}[39m",
+    ),
+  )
+
+  let call_result = diff_text(
+    "old.mbt",
+    (
+      #|fn f() {
+      #|  obj
+      #|}
+    ),
+    "new.mbt",
+    (
+      #|fn f() {
+      #|  obj.method()
+      #|}
+    ),
+    options=DiffOptions::new(use_color=true),
+  )
+  assert_true(call_result.kind is Ast)
+  assert_true(
+    call_result.rendered.contains(
+      "obj\u{1b}[32m\u{1b}[1m.method()\u{1b}[22m\u{1b}[39m",
+    ),
+  )
 }

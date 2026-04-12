@@ -181,21 +181,10 @@ fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int] {
   lines
 }
 
-///|UUID(67a63f65-6783-4f4d-a6cf-fc5ef332643a)
-fn next_opposite_line(
-  opposite_pos : ArrayView[@span.SingleLineSpan],
-  prev_opposite : Int?,
-) -> Int? {
-  let lines = Array::new()
-  for opposite in opposite_pos {
-    let line = line_index(opposite)
-    if line >= 0 && !lines.contains(line) {
-      lines.push(line)
-    }
-  }
-  lines.sort()
+///|UUID(744fbb0e-b4ab-4202-a020-f3b52d12dad5)
+fn next_line_after(lines : ArrayView[Int], prev_line : Int?) -> Int? {
   for line in lines {
-    if prev_opposite is Some(prev) {
+    if prev_line is Some(prev) {
       if line > prev {
         return Some(line)
       }
@@ -210,6 +199,14 @@ fn next_opposite_line(
 fn matched_lines_from_unchanged(
   mps : ArrayView[MatchedPos],
 ) -> Array[(Int?, Int?)] {
+  let line_to_opposites = opposite_positions(mps)
+  let opposite_to_lines = @hashmap.HashMap::new()
+  for self_line, opposite_lines in line_to_opposites {
+    for opposite_line in opposite_lines {
+      add_opposite_line(opposite_to_lines, opposite_line, self_line)
+    }
+  }
+
   let highest_line = Ref::new(None)
   let highest_opposite_line = Ref::new(None)
   let matched = Array::new()
@@ -218,10 +215,30 @@ fn matched_lines_from_unchanged(
     if self_line < 0 {
       continue
     }
-    let opposite_line = match mp.kind {
-      Unchanged(opposite_pos~) =>
-        next_opposite_line(opposite_pos, highest_opposite_line.val)
-      Novel => None
+    let opposite_line = match line_to_opposites.get(self_line) {
+      Some(opposite_lines) => {
+        let candidate = next_line_after(
+          opposite_lines,
+          highest_opposite_line.val,
+        )
+        match candidate {
+          Some(candidate_line) => {
+            let reverse_is_unique = match
+              opposite_to_lines.get(candidate_line) {
+              Some(self_lines) =>
+                self_lines.length() == 1 && self_lines[0] == self_line
+              None => false
+            }
+            if opposite_lines.length() == 1 && reverse_is_unique {
+              Some(candidate_line)
+            } else {
+              None
+            }
+          }
+          None => None
+        }
+      }
+      None => None
     }
     guard opposite_line is Some(opposite_line) else { continue }
 
@@ -492,36 +509,42 @@ fn ensure_contiguous(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   contiguous
 }
 
+///|UUID(8cbf444a-380a-4ce0-b6eb-fd231b6517fd)
+fn flush_gap_run(
+  compacted : Array[(Int?, Int?)],
+  lhs_unpaired : ArrayView[Int],
+  rhs_unpaired : ArrayView[Int],
+) -> Unit {
+  if lhs_unpaired.length() == 1 && rhs_unpaired.length() == 1 {
+    compacted.push((Some(lhs_unpaired[0]), Some(rhs_unpaired[0])))
+  } else {
+    for lhs_line in lhs_unpaired {
+      compacted.push((Some(lhs_line), None))
+    }
+    for rhs_line in rhs_unpaired {
+      compacted.push((None, Some(rhs_line)))
+    }
+  }
+}
+
 ///|UUID(d1c26121-dd90-4c2e-8bf0-f532bbe21e25)
 fn compact_gaps(items : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   let compacted = Array::new()
-  let unpaired = Array::new()
+  let lhs_unpaired = Array::new()
+  let rhs_unpaired = Array::new()
   for pair in items {
     match pair {
-      (Some(lhs_line), None) =>
-        match unpaired.get(0) {
-          Some((None, Some(rhs_line))) => {
-            compacted.push((Some(lhs_line), Some(rhs_line)))
-            ignore(unpaired.remove(0))
-          }
-          _ => unpaired.push(pair)
-        }
-      (None, Some(rhs_line)) =>
-        match unpaired.get(0) {
-          Some((Some(lhs_line), None)) => {
-            compacted.push((Some(lhs_line), Some(rhs_line)))
-            ignore(unpaired.remove(0))
-          }
-          _ => unpaired.push(pair)
-        }
+      (Some(lhs_line), None) => lhs_unpaired.push(lhs_line)
+      (None, Some(rhs_line)) => rhs_unpaired.push(rhs_line)
       _ => {
-        compacted.push_iter(unpaired.iter())
-        unpaired.clear()
+        flush_gap_run(compacted, lhs_unpaired, rhs_unpaired)
+        lhs_unpaired.clear()
+        rhs_unpaired.clear()
         compacted.push(pair)
       }
     }
   }
-  compacted.push_iter(unpaired.iter())
+  flush_gap_run(compacted, lhs_unpaired, rhs_unpaired)
   compacted
 }
 
@@ -632,6 +655,30 @@ fn sorted_novel_positions(
         lhs_prev_matched_line = Some(line_index(lhs_mp.pos))
         rhs_prev_matched_line = Some(line_index(rhs_mp.pos))
         lhs_i += 1
+        rhs_i += 1
+      }
+      (Some(lhs_mp), _) if !lhs_mp.kind.is_novel() => {
+        ordered.push_iter(
+          novel_section_in_order(
+            lhs_novel_section, rhs_novel_section, lhs_prev_matched_line, rhs_prev_matched_line,
+            opposite_to_lhs, opposite_to_rhs,
+          ).iter(),
+        )
+        lhs_novel_section.clear()
+        rhs_novel_section.clear()
+        lhs_prev_matched_line = Some(line_index(lhs_mp.pos))
+        lhs_i += 1
+      }
+      (_, Some(rhs_mp)) if !rhs_mp.kind.is_novel() => {
+        ordered.push_iter(
+          novel_section_in_order(
+            lhs_novel_section, rhs_novel_section, lhs_prev_matched_line, rhs_prev_matched_line,
+            opposite_to_lhs, opposite_to_rhs,
+          ).iter(),
+        )
+        lhs_novel_section.clear()
+        rhs_novel_section.clear()
+        rhs_prev_matched_line = Some(line_index(rhs_mp.pos))
         rhs_i += 1
       }
       (Some(lhs_mp), _) if lhs_mp.kind.is_novel() => {

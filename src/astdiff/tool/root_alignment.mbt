@@ -67,17 +67,14 @@ fn impl_doc(impl_ : Impl) -> DocString? {
   match impl_ {
     TopExpr(..) => None
     TopTest(doc~, ..)
-    | TopFuncAlias(doc~, ..)
     | TopLetDef(doc~, ..)
-    | TopBatchTypeAlias(doc~, ..)
-    | TopBatchTraitAlias(doc~, ..)
     | TopImpl(doc~, ..)
     | TopView(doc~, ..)
     | TopImplRelation(doc~, ..)
     | TopUsing(doc~, ..) => Some(doc)
-    TopTypeDef(decl) => Some(decl.doc)
+    TopTypeDef(decl, ..) => Some(decl.doc)
     TopFuncDef(fun_decl~, ..) => Some(fun_decl.doc)
-    TopTrait(decl) => Some(decl.doc)
+    TopTrait(decl, ..) => Some(decl.doc)
   }
 }
 

@@ -1,87 +1,39 @@
 ///|UUID(2dde4507-d810-4333-a0ae-173aa929afbb)
-using @basic {type Location}
-
-///|UUID(44282995-f14e-4eed-929e-7184bdf2b4b7)
 using @dsyntax {type Syntax}
 
-///|UUID(f5a17523-7a2f-4213-95d6-d4f8d19afa15)
-fn loc(start_cnum : Int, end_cnum : Int, line? : Int = 1) -> Location {
-  let start = @basic.Position::{
-    fname: "",
-    lnum: line,
-    bol: 0,
-    cnum: start_cnum,
-  }
-  let end = @basic.Position::{ fname: "", lnum: line, bol: 0, cnum: end_cnum }
-  { start, end }
-}
-
-///|UUID(e31e6d63-9b05-416b-887b-39b4467ecbbe)
-fn field_value(node : Syntax, tag : String) -> Syntax raise {
-  match node {
-    Syntax::List(children~, ..) =>
-      for child in children {
-        match child {
-          Syntax::List(open_content~, children~, ..) if open_content == tag =>
-            if children.length() == 1 {
-              return children[0]
-            } else {
-              fail("expected single child field: \{tag}")
-            }
-          _ => ()
-        }
-      } nobreak {
-        fail("missing field: \{tag}")
-      }
-    _ => fail("expected list node")
+///|UUID(7d567fd1-0f85-44a7-99a1-d18df1d56665)
+fn source_lines(source : String) -> Array[Array[Char]] {
+  let lines = Array::new()
+  for line in source.split("\n") {
+    lines.push(line.to_string().to_array())
+  } nobreak {
+    lines
   }
 }
 
-///|UUID(c7223b88-e184-4405-97e5-c718dafef12b)
-fn node_tag(node : Syntax) -> String raise {
-  match node {
-    Syntax::List(open_content~, ..) => open_content
-    _ => fail("expected list node")
-  }
+///|UUID(81551d34-5425-46e8-968b-f16351c60dd4)
+fn span_text(lines : Array[Array[Char]], span : @span.SingleLineSpan) -> String {
+  let start_idx = if span.start_col == 0 { 0 } else { span.start_col - 1 }
+  let end_idx = span.end_col - 1
+  String::from_array(lines[span.line - 1][start_idx:end_idx].to_array())
 }
 
-///|UUID(5fd6f55e-e376-4863-8fb9-a5687729831a)
-fn sexp(node : Syntax) -> String {
-  @pp.render(node, width=200)
-}
-
-///|UUID(c4ddf6cb-e833-45d5-827a-6280dbcef994)
-fn single_span_line(node : Syntax) -> Int raise {
-  match node {
-    Syntax::Atom(position~, ..) =>
-      if position.length() == 1 {
-        position[0].line
-      } else {
-        fail("expected single span")
-      }
-    _ => fail("expected atom")
+///|UUID(738ecb58-db28-4f89-adbb-bf26ad8a4b19)
+fn positions_text(
+  lines : Array[Array[Char]],
+  positions : Array[@span.SingleLineSpan],
+) -> String {
+  let buf = StringBuilder::new()
+  let mut first = true
+  for position in positions {
+    if first {
+      first = false
+    } else {
+      buf.write_string("\n")
+    }
+    buf.write_string(span_text(lines, position))
   }
-}
-
-///|UUID(bfdebfae-866d-4972-8af6-68a959fbfd36)
-fn only_child(node : Syntax) -> Syntax raise {
-  match node {
-    Syntax::List(children~, ..) =>
-      if children.length() == 1 {
-        children[0]
-      } else {
-        fail("expected single child")
-      }
-    _ => fail("expected list node")
-  }
-}
-
-///|UUID(32b7d451-f83a-4bb6-b2d9-edec02309048)
-fn list_children(node : Syntax) -> Array[Syntax] raise {
-  match node {
-    Syntax::List(children~, ..) => children
-    _ => fail("expected list node")
-  }
+  buf.to_string()
 }
 
 ///|UUID(29253b8d-1faf-4d5e-bf49-70e5887a84e5)
@@ -92,101 +44,121 @@ fn only_impl(impls : @list.List[@past.Impl]) -> @past.Impl raise {
   }
 }
 
-///|UUID(9db33348-9d9a-4b88-b49d-05c36042dea7)
-test "elab parsed function keeps top-level shape and docstring" {
+///|UUID(9864c703-6c25-4ec0-b8f0-caef7990d5c1)
+fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
+  let lines = source_lines(source)
+
+  fn walk(lines : Array[Array[Char]], syntax : Syntax) -> Unit raise {
+    match syntax {
+      Syntax::Atom(content~, position~, ..) => {
+        assert_true(!position.is_empty())
+        assert_true(positions_text(lines, position) == content)
+      }
+      Syntax::List(
+        open_content~,
+        open_position~,
+        children~,
+        close_content~,
+        close_position~,
+        ..
+      ) => {
+        if !open_content.is_empty() {
+          assert_true(!open_position.is_empty())
+          assert_true(positions_text(lines, open_position) == open_content)
+        }
+        if !close_content.is_empty() {
+          assert_true(!close_position.is_empty())
+          assert_true(positions_text(lines, close_position) == close_content)
+        }
+        for child in children {
+          walk(lines, child)
+        }
+      }
+    }
+  }
+
+  walk(lines, syntax)
+}
+
+///|UUID(0264a484-ff1e-494d-a90c-7733739fd1d6)
+fn collect_delims(syntax : Syntax, delims : Array[(String, String)]) -> Unit {
+  match syntax {
+    Syntax::Atom(..) => ()
+    Syntax::List(open_content~, children~, close_content~, ..) => {
+      if !open_content.is_empty() || !close_content.is_empty() {
+        delims.push((open_content, close_content))
+      }
+      for child in children {
+        collect_delims(child, delims)
+      }
+    }
+  }
+}
+
+///|UUID(c0b78f9f-5d40-47bf-833a-c3d147fe7e2d)
+fn has_delim(
+  delims : Array[(String, String)],
+  open_ : String,
+  close_ : String,
+) -> Bool {
+  for delim in delims {
+    let (open_content, close_content) = delim
+    if open_content == open_ && close_content == close_ {
+      return true
+    }
+  }
+  false
+}
+
+///|UUID(13f1e0a5-29a1-431e-89f8-652f99cef0e2)
+test "elab atoms and delimiters map back to source" {
   let source =
     #|/// Adds one
-    #|fn add(x : Int) -> Int { x }
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.length() is 0)
-
-  let syntax = elab_impl(source, only_impl(impls))
-  assert_true(node_tag(syntax) is "Impl::TopFuncDef")
-  assert_true(
-    sexp(syntax)
-    is "((((()) ((add)) (()) (()) ((((((x)) ((((((Int))) (())))))))) (()) ((((((Int))) (())))) (()) (()) (()) (( Adds one)))) (((()) (((((x))))))))",
-  )
-
-  let fun_decl = field_value(syntax, "fun_decl")
-  let name = field_value(fun_decl, "name")
-  assert_true(sexp(name) is "(add)")
-  assert_true(single_span_line(only_child(name)) is 2)
-
-  let doc = field_value(fun_decl, "doc")
-  assert_true(sexp(doc) is "( Adds one)")
-  assert_true(single_span_line(only_child(doc)) is 1)
-}
-
-///|UUID(35058a48-ec09-4b30-947f-9532a9295a0f)
-test "elab dotted type name uses tagged long ident" {
-  let source = "pkg.Type"
-  let ty = @past.Type::Name(
-    constr_id=@past.ConstrId::{
-      id: @past.LongIdent::Dot(pkg="pkg", id="Type"),
-      loc: loc(0, 8),
-    },
-    tys=@list.empty(),
-    loc=loc(0, 8),
-  )
-
-  let syntax = elab_type(source, ty)
-  assert_true(node_tag(syntax) is "Type::Name")
-
-  let constr_id = field_value(syntax, "constr_id")
-  let ident = field_value(constr_id, "id")
-  assert_true(sexp(ident) is "(pkg.Type)")
-  assert_true(single_span_line(only_child(ident)) is 1)
-}
-
-///|UUID(2e8bd51d-71af-4423-9723-037e902204e7)
-test "elab open array pattern keeps dotdot binder shape" {
-  let source = "[head, ..rest]"
-  let pat = @past.Pattern::Array(
-    pats=@past.ArrayPatterns::Open(
-      @list.from_array([
-        @past.ArrayPattern::Pattern(
-          @past.Pattern::Var(@past.Binder::{ name: "head", loc: loc(1, 5) }),
-        ),
-      ]),
-      @list.empty(),
-      @past.DotDotBinder::Binder(@past.Binder::{ name: "rest", loc: loc(9, 13) }),
-    ),
-    loc=loc(0, 14),
-  )
-
-  let syntax = elab_pattern(source, pat)
-  let pats = field_value(syntax, "pats")
-  assert_true(node_tag(pats) is "ArrayPatterns::Open")
-
-  let binder = field_value(pats, "binder")
-  assert_true(sexp(binder) is "(((rest)))")
-  let binder_atom = only_child(field_value(binder, "binder"))
-  assert_true(single_span_line(binder_atom) is 1)
-}
-
-///|UUID(1941b253-3c52-4e0d-aa82-09e7efee4309)
-test "elab normalizes let chain into statement list" {
-  let source =
-    #|fn f() -> Int {
-    #|  let a = 1
-    #|  let b = 2
-    #|  a + b
+    #|pub fn add(x : Int, y : Int) -> Int {
+    #|  foo([x], { baz: y })
     #|}
   let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.length() is 0)
+  assert_true(reports.is_empty())
 
   let syntax = elab_impl(source, only_impl(impls))
-  let decl_body = field_value(syntax, "decl_body")
-  let expr = field_value(decl_body, "expr")
-  assert_true(node_tag(expr) is "Expr::StmtChain")
+  assert_source_faithful(source, syntax)
+}
 
-  let stmts = field_value(expr, "stmts")
-  assert_true(node_tag(stmts) is "Expr::StmtChain::Stmts")
-  let stmt_children = list_children(stmts)
-  assert_true(stmt_children.length() is 2)
-  assert_true(node_tag(stmt_children[0]) is "Stmt::Let")
-  assert_true(node_tag(stmt_children[1]) is "Stmt::Let")
+///|UUID(8d704ff0-86ff-41ce-b6c5-3149e7056cf4)
+test "elab preserves nested paren bracket brace delimiters" {
+  let source = "fn f() { foo([bar], { baz: qux }) }"
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
 
-  let tail = field_value(expr, "tail")
-  assert_true(node_tag(tail) is "Expr::Infix")
+  let syntax = elab_impl(source, only_impl(impls))
+  let delims = Array::new()
+  collect_delims(syntax, delims)
+
+  assert_true(has_delim(delims, "(", ")"))
+  assert_true(has_delim(delims, "[", "]"))
+  assert_true(has_delim(delims, "{", "}"))
+}
+
+///|UUID(5d33875a-7831-4215-ad6f-c1b18bbdce6e)
+test "elab uses bracket delimiters for array indexing" {
+  let source = "let y = xs[i:j]"
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
+
+  let syntax = elab_impl(source, only_impl(impls))
+  let delims = Array::new()
+  collect_delims(syntax, delims)
+
+  assert_source_faithful(source, syntax)
+  assert_true(has_delim(delims, "[", "]"))
+}
+
+///|UUID(f7398ef1-020e-4754-9b09-72bb5050a3ae)
+test "elab recovers using type and trait items from source gaps" {
+  let source = "using @pkg { type Foo as Bar, trait Baz }"
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
+
+  let syntax = elab_impl(source, only_impl(impls))
+  assert_source_faithful(source, syntax)
 }

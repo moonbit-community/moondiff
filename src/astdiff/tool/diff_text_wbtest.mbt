@@ -27,6 +27,33 @@ fn build_ast_change_map(
   (lhs_roots, rhs_roots, change_map)
 }
 
+///|UUID(a0ddd29f-d143-4418-93f5-a6d707b7d80a)
+fn build_ast_change_map_no_slider(
+  old_source : String,
+  new_source : String,
+) -> (Array[@syntax.Syntax], Array[@syntax.Syntax], @diff.ChangeMap) {
+  let (old_impls, old_reports) = @parser.parse_string(old_source)
+  let (new_impls, new_reports) = @parser.parse_string(new_source)
+  if old_reports.length() != 0 || new_reports.length() != 0 {
+    panic()
+  }
+
+  let old_units = collect_impl_units(old_source, old_impls)
+  let new_units = collect_impl_units(new_source, new_impls)
+  if old_units.length() != 1 || new_units.length() != 1 {
+    panic()
+  }
+
+  let lhs_roots = [old_units[0].root]
+  let rhs_roots = [new_units[0].root]
+  @syntax.init_all_info(lhs_roots, rhs_roots)
+  let change_map = @diff.ChangeMap::new()
+  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, 3_000_000) catch {
+    _ => panic()
+  }
+  (lhs_roots, rhs_roots, change_map)
+}
+
 ///|UUID(0c2c36b1-de77-483c-976e-ad2c6e594952)
 fn total_width(ranges : Array[(Int, Int)]) -> Int {
   ranges.fold(init=0, fn(acc, range) {
@@ -207,9 +234,9 @@ test "render_ast_diff uses one merged hunk for nearby ast changes" {
   )
 
   assert_eq(rendered.split("@@").count(), 3)
-  assert_true(rendered.contains("  5 | fn mid() {}"))
-  assert_true(rendered.contains("+ 2 |   foo(baz(bar))"))
-  assert_true(rendered.contains("+ 8 |   alpha(gamma(beta))"))
+  assert_true(rendered.contains("  5 5 | fn mid() {}"))
+  assert_true(rendered.contains("+   2 |   foo(baz(bar))"))
+  assert_true(rendered.contains("+   8 |   alpha(gamma(beta))"))
 }
 
 ///|UUID(4dca0171-1c6a-41f9-b7b6-167bb9c6953d)
@@ -264,4 +291,104 @@ test "align_impl_units aligns top-level UUID blocks before inner AST diff" {
     "Replace(22222222-2222-2222-2222-222222222222->22222222-2222-2222-2222-222222222222)",
     "Insert(99999999-9999-9999-9999-999999999999)",
   ])
+}
+
+///|UUID(5899396d-f317-4aa3-bdae-68ae6ff257e5)
+test "empty delimiter wrappers do not hide inserted sibling statements" {
+  let old_source =
+    #|fn main() {
+    #|  println(
+    #|    "Hello, world!"
+    #|  )
+    #|}
+  let new_source =
+    #|fn main() {
+    #|  println("Hello, world!")
+    #|  println(5 + 6)
+    #|}
+  let (lhs_roots, rhs_roots, change_map) = build_ast_change_map_no_slider(
+    old_source, new_source,
+  )
+  let lhs_block = match lhs_roots[0] {
+    @syntax.Syntax::List(children~, ..) => children[1]
+    _ => panic()
+  }
+  let lhs_stmt_wrapper = match lhs_block {
+    @syntax.Syntax::List(children~, ..) => children[0]
+    _ => panic()
+  }
+  let rhs_block = match rhs_roots[0] {
+    @syntax.Syntax::List(children~, ..) => children[1]
+    _ => panic()
+  }
+  let rhs_stmt_chain = match rhs_block {
+    @syntax.Syntax::List(children~, ..) => children[0]
+    _ => panic()
+  }
+
+  assert_true(change_map.get(rhs_stmt_chain) is Some(@diff.ChangeKind::Novel))
+  match change_map.get(lhs_stmt_wrapper) {
+    Some(@diff.ChangeKind::Unchanged(opposite)) =>
+      assert_eq(opposite.content_id(), lhs_stmt_wrapper.content_id())
+    _ => panic()
+  }
+}
+
+///|UUID(266f7907-5d79-4fc2-b462-3d1b5889dd0a)
+test "matched lines keep inserted sibling after wrapped call block" {
+  let old_source =
+    #|fn main() {
+    #|  println(
+    #|    "Hello, world!"
+    #|  )
+    #|}
+  let new_source =
+    #|fn main() {
+    #|  println("Hello, world!")
+    #|  println(5 + 6)
+    #|}
+  let (lhs_roots, rhs_roots, change_map) = build_ast_change_map(
+    old_source, new_source,
+  )
+  let lhs_mps = change_positions(lhs_roots, change_map)
+  let rhs_mps = change_positions(rhs_roots, change_map)
+  let lhs_lines = split_lines(old_source)
+  let rhs_lines = split_lines(new_source)
+  assert_eq(all_matched_lines_filled(lhs_mps, rhs_mps, lhs_lines, rhs_lines), [
+    (Some(0), Some(0)),
+    (Some(1), None),
+    (Some(2), None),
+    (Some(3), None),
+    (None, Some(1)),
+    (None, Some(2)),
+    (Some(4), Some(3)),
+  ])
+}
+
+///|UUID(8d4c2ad7-608d-4de0-95a8-b4e59816b4f4)
+test "wrapped call opener stays in rendered context" {
+  let old_source =
+    #|fn main() {
+    #|  println(
+    #|    "Hello, world!"
+    #|  )
+    #|}
+  let new_source =
+    #|fn main() {
+    #|  println("Hello, world!")
+    #|  println(5 + 6)
+    #|}
+  let (lhs_roots, rhs_roots, change_map) = build_ast_change_map(
+    old_source, new_source,
+  )
+  let lhs_mps = change_positions(lhs_roots, change_map)
+  let rhs_mps = change_positions(rhs_roots, change_map)
+  let matched_lines = all_matched_lines_filled(
+    lhs_mps,
+    rhs_mps,
+    split_lines(old_source),
+    split_lines(new_source),
+  )
+  let hunks = matched_pos_to_hunks(lhs_mps, rhs_mps)
+  assert_eq(contextual_index_range_for_hunk(hunks[0], matched_lines, 4), (1, 7))
 }
