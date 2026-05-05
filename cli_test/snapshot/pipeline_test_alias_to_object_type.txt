@@ -1,0 +1,10 @@
+--- cli_test/source/pipeline_test_alias_to_object_type.old.mbt: line 11
++++ cli_test/source/pipeline_test_alias_to_object_type.new.mbt: line 11
+@@ -11,4 +11,5 @@
+[90m  11 11 | [39mfn init {
+[31m[1m- 12    | [22m[39m  let obj = [31m[1m42[22m[39m as Obj
+[32m[1m+    12 | [22m[39m  let obj = [32m[1m64[22m[39m as Obj
+[90m  13 13 | [39m  obj.f()
+[32m[1m+    14 | [22m[39m  [32m[1mprintln(7)[22m[39m
+[90m  14 15 | [39m}
+

@@ -1,0 +1,11 @@
+--- cli_test/source/pipeline_test_any_as_object.old.mbt: line 16
++++ cli_test/source/pipeline_test_any_as_object.new.mbt: line 16
+@@ -16,5 +16,6 @@
+[90m  16 16 | [39mfn init {
+[31m[1m- 17    | [22m[39m  let f = F::F(fn (_x) { [31m[1m42[22m[39m })
+[32m[1m+    17 | [22m[39m  let f = F::F(fn (_x) { [32m[1m64[22m[39m })
+[90m  18 18 | [39m  let a = use_t(f)
+[90m  19 19 | [39m  println(a)
+[32m[1m+    20 | [22m[39m  [32m[1mprintln(a[22m[39m [32m[1m+[22m[39m [32m[1m1)[22m[39m
+[90m  20 21 | [39m}
+

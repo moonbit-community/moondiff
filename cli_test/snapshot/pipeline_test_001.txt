@@ -1,0 +1,32 @@
+--- cli_test/source/pipeline_test_001.old.mbt: line 1
++++ cli_test/source/pipeline_test_001.new.mbt: line 1
+@@ -1,5 +1,6 @@
+[90m  1 1 | [39mfn init {
+[90m  2 2 | [39m  printX()
+[90m  3 3 | [39m  println(a)
+[32m[1m+   4 | [22m[39m  [32m[1mprintln(a[22m[39m [32m[1m+[22m[39m [32m[1m4)[22m[39m
+[90m  4 5 | [39m  nested()()
+[90m  5 6 | [39m}
+
+--- cli_test/source/pipeline_test_001.old.mbt: line 7
++++ cli_test/source/pipeline_test_001.new.mbt: line 8
+@@ -7 +8 @@
+[31m[1m- 7   | [22m[39mlet a = [31m[1m3[22m[39m
+[32m[1m+   8 | [22m[39mlet a = [32m[1m7[22m[39m
+
+--- cli_test/source/pipeline_test_001.old.mbt: line 10
++++ cli_test/source/pipeline_test_001.new.mbt: line 11
+@@ -10 +11 @@
+[31m[1m- 10    | [22m[39mlet data2 = "\nbest [31m[1mxx"[22m[39m
+[32m[1m+    11 | [22m[39mlet data2 = "\nbest [32m[1mrandom"[22m[39m
+
+--- cli_test/source/pipeline_test_001.old.mbt: line 26
++++ cli_test/source/pipeline_test_001.new.mbt: line 27
+@@ -26,5 +27,5 @@
+[90m  26 27 | [39mfn init {
+[90m  27    | [39m  let v = [1,2,3]  
+[32m[1m+    28 | [22m[39m  let v = [1,2,3[32m[1m,4[22m[39m]  
+[90m  28 29 | [39m  let v : MyArray = [1,2, .. v]
+[90m  29 30 | [39m  println(v)
+[90m  30 31 | [39m}
+
