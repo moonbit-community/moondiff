@@ -1,0 +1,23 @@
+--- cli_test/source/pipeline_test_add_string.old.mbt: line 1
++++ cli_test/source/pipeline_test_add_string.new.mbt: line 1
+@@ -1,7 +1,7 @@
+[90m   1  1 | [39mfn init {
+[90m   2    | [39m  let xs: FixedArray[_] = ["", "1", "12", "123", "1234"]
+[32m[1m+     2 | [22m[39m  let xs: FixedArray[_] = ["", "1", "12", "123", "1234"[32m[1m,[22m[39m [32m[1m"12345"][22m[39m
+[90m   3    | [39m  let ys: FixedArray[_] = ["", "a", "ab", "abc", "abcd"]
+[32m[1m+     3 | [22m[39m  let ys: FixedArray[_] = ["", "a", "ab", "abc", "abcd"[32m[1m,[22m[39m [32m[1m"z"][22m[39m
+[90m   4  4 | [39m  let mut i = 0
+[90m   5  5 | [39m  while i < xs.length() {
+[90m   6  6 | [39m    let mut j = 0
+[90m   7  7 | [39m    while j < ys.length() {
+@@ -14,8 +14,9 @@
+[90m  14 14 | [39m  let mut sum = ""
+[90m  15 15 | [39m  i = 0
+[90m  16 16 | [39m  while i < ys.length() {
+[90m  17 17 | [39m    sum = sum + ys[i]
+[32m[1m+    18 | [22m[39m    [32m[1msum[22m[39m [32m[1m=[22m[39m [32m[1msum[22m[39m [32m[1m+[22m[39m [32m[1m"-"[22m[39m
+[90m  18 19 | [39m    i = i + 1
+[90m  19 20 | [39m  }
+[90m  20 21 | [39m  println(sum)
+[90m  21 22 | [39m
+

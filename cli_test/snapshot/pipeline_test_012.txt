@@ -1,0 +1,9 @@
+--- cli_test/source/pipeline_test_012.old.mbt: line 42
++++ cli_test/source/pipeline_test_012.new.mbt: line 42
+@@ -42,3 +42,4 @@
+[90m  42 42 | [39mfn init {
+[31m[1m- 43    | [22m[39m  println(levenshtein("abcdheloworldabcd", "[31m[1mabcdhellowoorldabcd[22m[39m"))
+[32m[1m+    43 | [22m[39m  println(levenshtein("abcdheloworldabcd", "[32m[1mabcdhello-worldabcd[22m[39m"))
+[32m[1m+    44 | [22m[39m  [32m[1mprintln(levenshtein("moon",[22m[39m [32m[1m"moons"))[22m[39m
+[90m  44 45 | [39m}
+

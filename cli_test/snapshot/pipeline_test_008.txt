@@ -1,0 +1,9 @@
+--- cli_test/source/pipeline_test_008.old.mbt: line 8
++++ cli_test/source/pipeline_test_008.new.mbt: line 8
+@@ -8,3 +8,4 @@
+[90m   8  8 | [39mfn init {
+[31m[1m-  9    | [22m[39m  println(fib([31m[1m10[22m[39m))
+[32m[1m+     9 | [22m[39m  println[32m[1m(fib(9))[22m[39m
+[32m[1m+    10 | [22m[39m  [32m[1mprintln[22m[39m(fib([32m[1m3[22m[39m))
+[90m  10 11 | [39m}
+
