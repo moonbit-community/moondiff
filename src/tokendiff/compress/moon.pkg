@@ -1,4 +1,4 @@
 import {
   "myfreess/moondiff/tokendiff/edit",
-  "moonbit-community/piediff" @piediff,
+  "moonbit-community/piediff",
 }

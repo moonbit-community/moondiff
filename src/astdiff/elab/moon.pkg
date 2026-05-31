@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/list",
-  "moonbitlang/parser/basic" @basic,
+  "moonbitlang/parser/basic",
   "moonbitlang/parser/syntax" @past,
   "moonbitlang/parser/attribute",
   "myfreess/moondiff/astdiff/syntax" @dsyntax,
