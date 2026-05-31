@@ -8,7 +8,7 @@ import {
   "Yoorkin/ArgParser@0.2.0",
   "moonbitlang/x@0.4.38",
   "moonbit-community/piediff@0.0.9",
-  "moonbitlang/parser",
+  "moonbitlang/parser@0.3.3",
 }
 
 readme = "README.md"

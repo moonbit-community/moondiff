@@ -1,4 +1,4 @@
 [submodule "parser"]
 	path = parser
 	url = https://github.com/moonbitlang/parser.git
-	branch = use_cst
+	branch = use_cst_20260528
