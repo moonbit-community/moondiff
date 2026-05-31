@@ -1,14 +1,28 @@
 ///|UUID(67c1d4d7-f89c-4654-a9ce-18873f9c72fa)
+fn ElabCtx::constr_param_loc(self : Self, param : ConstrParam) -> Location {
+  let mut loc = Some(self.type_loc(param.ty))
+  loc = merge_loc_option(loc, param.mut_loc)
+  match param.label {
+    Some(label) => loc = merge_loc_option(loc, Some(label.loc))
+    None => ()
+  }
+  loc = merge_loc_option(loc, param.post_label_loc)
+  loc = merge_loc_option(loc, param.colon_loc)
+  loc.unwrap_or(self.type_loc(param.ty))
+}
+
+///|UUID(67c1d4d7-f89c-4654-a9ce-18873f9c72fa)
 fn ElabCtx::elab_constr_param(self : Self, param : ConstrParam) -> Syntax {
+  let loc = self.constr_param_loc(param)
   let parts = Array::new()
   self.append_part(parts, param.label.map(fn(label) { self.part_label(label) }))
   parts.push(self.part_type(param.ty))
-  self.region(param.loc, parts)
+  self.region(loc, parts)
 }
 
 ///|UUID(ac988fa0-272d-477b-a1e1-f2ec1d24ce1d)
 fn ElabCtx::part_constr_param(self : Self, param : ConstrParam) -> Part {
-  self.part(self.elab_constr_param(param), Some(param.loc))
+  self.part(self.elab_constr_param(param), Some(self.constr_param_loc(param)))
 }
 
 ///|UUID(70e14edc-8d74-431c-9c01-4b723440d446)
@@ -19,18 +33,10 @@ fn ElabCtx::elab_constr_decl(self : Self, decl : ConstrDecl) -> Syntax {
   parts.push(self.part(self.elab_constr_name(decl.name), Some(decl.name.loc)))
   match decl.args {
     Some(args) => {
-      let search_end = match decl.tag {
-        Some((_, tag_loc)) => tag_loc.start.cnum
-        None => decl.loc.end.cnum
-      }
       let arg_parts = self.parts_from_list(args, fn(arg) {
         self.part_constr_param(arg)
       })
-      match
-        (
-          self.find_char_forward(decl.name.loc.end.cnum, search_end, '('),
-          self.find_char_backward(decl.name.loc.end.cnum, search_end, ')'),
-        ) {
+      match (decl.args_lparen_loc, decl.args_rparen_loc) {
         (Some(open_loc), Some(close_loc)) =>
           parts.push(
             self.part(
@@ -88,27 +94,39 @@ fn ElabCtx::part_field_decl(self : Self, decl : FieldDecl) -> Part {
   self.part(self.elab_field_decl(decl), Some(decl.loc))
 }
 
-///|UUID(1b6d0d8b-6b3e-49dc-a264-a60120490495)
-fn ElabCtx::exception_decl_parts(
-  self : Self,
-  decl : ExceptionDecl,
-) -> Array[Part] {
-  match decl {
-    NoPayload => []
-    SinglePayload(ty) => [self.part_type(ty)]
-    EnumPayload(constrs) =>
-      self.parts_from_list(constrs, fn(constr) { self.part_constr_decl(constr) })
-  }
-}
-
-///|UUID(07ec8657-9207-4d74-9cfe-21f1b3f388d5)
-fn ElabCtx::type_desc_parts(self : Self, desc : TypeDesc) -> Array[Part] {
+///|UUID(eec0af22-06e4-45b1-acd8-7d5a6d8de72d)
+fn ElabCtx::type_desc_part(self : Self, desc : TypeDesc) -> Part? {
   match desc {
-    Abstract | Extern => []
-    Error(exception_decl) => self.exception_decl_parts(exception_decl)
-    Variant(constrs) =>
-      self.parts_from_list(constrs, fn(constr) { self.part_constr_decl(constr) })
-    Record(fields~, constr_decl~) => {
+    Abstract | Error(NoPayload) => None
+    Error(EnumPayload(constrs~, lbrace_loc~, rbrace_loc~, ..))
+    | ExtensibleEnum(constrs~, lbrace_loc~, rbrace_loc~, ..)
+    | Variant(constrs~, lbrace_loc~, rbrace_loc~, ..) => {
+      let parts = self.parts_from_list(constrs, fn(constr) {
+        self.part_constr_decl(constr)
+      })
+      Some(
+        self.part(
+          self.delimited(lbrace_loc, parts, rbrace_loc),
+          Some(lbrace_loc.merge(rbrace_loc)),
+        ),
+      )
+    }
+    ExtendEnum(target~, constructors~, lbrace_loc~, rbrace_loc~, ..) => {
+      let parts = Array::new()
+      parts.push(self.part(self.elab_type_name(target), Some(target.loc)))
+      let constr_parts = self.parts_from_list(constructors, fn(constr) {
+        self.part_constr_decl(constr)
+      })
+      parts.push(
+        self.part(
+          self.delimited(lbrace_loc, constr_parts, rbrace_loc),
+          Some(lbrace_loc.merge(rbrace_loc)),
+        ),
+      )
+      let loc = target.loc.merge(rbrace_loc)
+      Some(self.part(self.region(loc, parts), Some(loc)))
+    }
+    Record(fields~, constr_decl~, lbrace_loc~, rbrace_loc~, ..) => {
       let parts = self.parts_from_list(fields, fn(field) {
         self.part_field_decl(field)
       })
@@ -116,45 +134,23 @@ fn ElabCtx::type_desc_parts(self : Self, desc : TypeDesc) -> Array[Part] {
         parts,
         constr_decl.map(fn(decl) { self.part_fun_decl(decl) }),
       )
-      parts
-    }
-    TupleStruct(tys) => self.parts_from_list(tys, fn(ty) { self.part_type(ty) })
-    Alias(ty) => [self.part_type(ty)]
-  }
-}
-
-///|UUID(eec0af22-06e4-45b1-acd8-7d5a6d8de72d)
-fn ElabCtx::type_desc_part(
-  self : Self,
-  desc : TypeDesc,
-  body_lbrace_loc : Location?,
-  body_rbrace_loc : Location?,
-  body_lparen_loc : Location?,
-  body_rparen_loc : Location?,
-) -> Part? {
-  let parts = self.type_desc_parts(desc)
-  match (body_lbrace_loc, body_rbrace_loc) {
-    (Some(lbrace_loc), Some(rbrace_loc)) =>
       Some(
         self.part(
           self.delimited(lbrace_loc, parts, rbrace_loc),
           Some(lbrace_loc.merge(rbrace_loc)),
         ),
       )
-    _ =>
-      match (body_lparen_loc, body_rparen_loc) {
-        (Some(lparen_loc), Some(rparen_loc)) =>
-          Some(
-            self.part(
-              self.delimited(lparen_loc, parts, rparen_loc),
-              Some(lparen_loc.merge(rparen_loc)),
-            ),
-          )
-        _ =>
-          merge_part_locs(parts).map(fn(loc) {
-            self.part(self.region(loc, parts), Some(loc))
-          })
-      }
+    }
+    TupleStruct(types~, lparen_loc~, rparen_loc~, ..) => {
+      let parts = self.parts_from_list(types, fn(ty) { self.part_type(ty) })
+      Some(
+        self.part(
+          self.delimited(lparen_loc, parts, rparen_loc),
+          Some(lparen_loc.merge(rparen_loc)),
+        ),
+      )
+    }
+    Alias(type_~, ..) => Some(self.part_type(type_))
   }
 }
 
@@ -240,64 +236,6 @@ fn ElabCtx::deriving_part(
   }
 }
 
-///|UUID(82262a44-a402-4d01-aa77-25b5fd85d91c)
-fn ElabCtx::local_type_decl_loc(self : Self, decl : LocalTypeDecl) -> Location {
-  let mut loc = Some(decl.tycon_loc)
-  loc = merge_loc_option(loc, decl.keyword_loc)
-  loc = merge_loc_option(loc, decl.body_lbrace_loc)
-  loc = merge_loc_option(loc, decl.body_rbrace_loc)
-  loc = merge_loc_option(loc, decl.body_lparen_loc)
-  loc = merge_loc_option(loc, decl.body_rparen_loc)
-  loc = merge_loc_option(loc, decl.derive_loc)
-  loc = merge_loc_option(loc, decl.derive_lparen_loc)
-  loc = merge_loc_option(loc, decl.derive_rparen_loc)
-  loc = merge_loc_option(
-    loc,
-    merge_part_locs(self.type_desc_parts(decl.components)),
-  )
-  decl.deriving.each(fn(directive) {
-    loc = merge_loc_option(loc, Some(directive.loc))
-  })
-  loc.unwrap_or(decl.tycon_loc)
-}
-
-///|UUID(3e527f9c-cba3-4bbc-a114-36dc99f533dd)
-fn ElabCtx::elab_local_type_decl(self : Self, decl : LocalTypeDecl) -> Syntax {
-  let loc = self.local_type_decl_loc(decl)
-  let parts = Array::new()
-  parts.push(
-    self.part(
-      self.tokenize_loc(decl.tycon_loc, word_kind=AtomKind::Type),
-      Some(decl.tycon_loc),
-    ),
-  )
-  self.append_part(
-    parts,
-    self.type_desc_part(
-      decl.components,
-      decl.body_lbrace_loc,
-      decl.body_rbrace_loc,
-      decl.body_lparen_loc,
-      decl.body_rparen_loc,
-    ),
-  )
-  self.append_part(
-    parts,
-    self.deriving_part(
-      decl.deriving,
-      decl.derive_lparen_loc,
-      decl.derive_rparen_loc,
-    ),
-  )
-  self.region(loc, parts)
-}
-
-///|UUID(4d3545ab-99ae-4f3c-a446-d5c7cd827768)
-fn ElabCtx::part_local_type_decl(self : Self, decl : LocalTypeDecl) -> Part {
-  let loc = self.local_type_decl_loc(decl)
-  self.part(self.elab_local_type_decl(decl), Some(loc))
-}
-
 ///|UUID(f04187ea-2945-441a-af06-befda367f752)
 fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
   let parts = Array::new()
@@ -311,17 +249,14 @@ fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
     ),
   )
   if !decl.params.is_empty() ||
-    (
-      decl.type_params_lbracket_loc is Some(_) &&
-      decl.type_params_rbracket_loc is Some(_)
-    ) {
+    (decl.params_lbracket_loc is Some(_) && decl.params_rbracket_loc is Some(_)) {
     let param_parts = self.parts_from_list(decl.params, fn(param) {
       self.part_type_decl_binder(param)
     })
     let loc = match
       (
-        decl.type_params_lbracket_loc,
-        decl.type_params_rbracket_loc,
+        decl.params_lbracket_loc,
+        decl.params_rbracket_loc,
         merge_part_locs(param_parts),
       ) {
       (Some(lbracket_loc), Some(rbracket_loc), _) =>
@@ -335,25 +270,16 @@ fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
         self.part(
           self.delimited_or_region(
             loc,
-            decl.type_params_lbracket_loc,
+            decl.params_lbracket_loc,
             param_parts,
-            decl.type_params_rbracket_loc,
+            decl.params_rbracket_loc,
           ),
           Some(loc),
         )
       }),
     )
   }
-  self.append_part(
-    parts,
-    self.type_desc_part(
-      decl.components,
-      decl.body_lbrace_loc,
-      decl.body_rbrace_loc,
-      decl.body_lparen_loc,
-      decl.body_rparen_loc,
-    ),
-  )
+  self.append_part(parts, self.type_desc_part(decl.components))
   self.append_part(
     parts,
     self.deriving_part(
@@ -366,46 +292,61 @@ fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
 }
 
 ///|UUID(89dde800-da7e-45ae-87be-97be65d4a5bf)
+fn func_stubs_loc(stubs : FuncStubs) -> Location {
+  match stubs {
+    Import(module_name_loc~, func_name_loc~, ..) =>
+      module_name_loc.merge(func_name_loc)
+    Embedded(code_loc~, ..) => code_loc
+  }
+}
+
+///|UUID(89dde800-da7e-45ae-87be-97be65d4a5bf)
 fn ElabCtx::elab_func_stubs(self : Self, stubs : FuncStubs) -> Syntax {
-  ignore(self)
-  ignore(stubs)
-  Syntax::simple_list(open_position=[], children=[], close_position=[])
+  match stubs {
+    Import(module_name_loc~, func_name_loc~, ..) => {
+      let loc = module_name_loc.merge(func_name_loc)
+      self.region(loc, [
+        self.part(self.string_from_loc(module_name_loc), Some(module_name_loc)),
+        self.part(self.string_from_loc(func_name_loc), Some(func_name_loc)),
+      ])
+    }
+    Embedded(code=CodeString(_, loc=literal_loc), ..) =>
+      self.string_from_loc(literal_loc)
+    Embedded(code=CodeMultilineString(_, string_locs~), code_loc~, ..) =>
+      self.region(
+        code_loc,
+        self.parts_from_list(string_locs, fn(loc) {
+          self.part(self.string_from_loc(loc), Some(loc))
+        }),
+      )
+  }
+}
+
+///|UUID(89dde800-da7e-45ae-87be-97be65d4a5bf)
+fn ElabCtx::part_func_stubs(self : Self, stubs : FuncStubs) -> Part {
+  let loc = func_stubs_loc(stubs)
+  self.part(self.elab_func_stubs(stubs), Some(loc))
 }
 
 ///|UUID(224a8f8a-6271-47d9-9a95-d9872e3b9c7d)
 fn ElabCtx::decl_body_loc(self : Self, body : DeclBody) -> Location? {
   match body {
-    DeclBody(
-      local_types~,
-      expr~,
-      lbrace_loc~,
-      rbrace_loc~,
-      semi_locs~,
-      trailing_semi_loc~
-    ) => {
+    DeclBody(expr~, lbrace_loc~, rbrace_loc~) => {
       let mut loc = Some(self.expr_loc(expr))
-      self
-      .parts_from_list(local_types, fn(local_type) {
-        self.part_local_type_decl(local_type)
-      })
-      .each(fn(part) { loc = merge_loc_option(loc, part.loc) })
       loc = merge_loc_option(loc, lbrace_loc)
       loc = merge_loc_option(loc, rbrace_loc)
-      loc = merge_loc_option(loc, merge_loc_list(semi_locs))
-      loc = merge_loc_option(loc, trailing_semi_loc)
       loc
     }
-    DeclStubs(_) | DeclNone => None
+    DeclStubs(stubs, equal_loc~) => Some(equal_loc.merge(func_stubs_loc(stubs)))
+    DeclNone => None
   }
 }
 
 ///|UUID(273eff4f-e996-44a9-a043-0070d774fbef)
 fn ElabCtx::elab_decl_body(self : Self, body : DeclBody) -> Syntax {
   match body {
-    DeclBody(local_types~, expr~, lbrace_loc~, rbrace_loc~, ..) => {
-      let parts = self.parts_from_list(local_types, fn(local_type) {
-        self.part_local_type_decl(local_type)
-      })
+    DeclBody(expr~, lbrace_loc~, rbrace_loc~) => {
+      let parts = Array::new()
       parts.push(self.part_expr(expr))
       match self.decl_body_loc(body) {
         Some(loc) =>
@@ -413,7 +354,11 @@ fn ElabCtx::elab_decl_body(self : Self, body : DeclBody) -> Syntax {
         None => self.empty()
       }
     }
-    DeclStubs(stubs) => self.elab_func_stubs(stubs)
+    DeclStubs(stubs, ..) =>
+      match self.decl_body_loc(body) {
+        Some(loc) => self.region(loc, [self.part_func_stubs(stubs)])
+        None => self.empty()
+      }
     DeclNone => self.empty()
   }
 }
@@ -582,8 +527,8 @@ fn ElabCtx::elab_trait_method_decl(
     parts,
     self.fun_params_part(
       Some(decl.params),
-      decl.params_lparen_loc,
-      decl.params_rparen_loc,
+      Some(decl.params_lparen_loc),
+      Some(decl.params_rparen_loc),
     ),
   )
   self.append_part(parts, decl.return_type.map(fn(ty) { self.part_type(ty) }))
@@ -610,36 +555,40 @@ fn ElabCtx::elab_trait_decl(self : Self, decl : TraitDecl) -> Syntax {
     })
     .iter(),
   )
-  match (decl.lbrace_loc, decl.rbrace_loc) {
-    (Some(lbrace_loc), Some(rbrace_loc)) =>
-      parts.push(
-        self.part(
-          self.delimited(
-            lbrace_loc,
-            self.parts_from_list(decl.methods, fn(method_decl) {
-              self.part_trait_method_decl(method_decl)
-            }),
-            rbrace_loc,
-          ),
-          Some(lbrace_loc.merge(rbrace_loc)),
-        ),
-      )
-    _ => ()
-  }
+  parts.push(
+    self.part(
+      self.delimited(
+        decl.lbrace_loc,
+        self.parts_from_list(decl.methods, fn(method_decl) {
+          self.part_trait_method_decl(method_decl)
+        }),
+        decl.rbrace_loc,
+      ),
+      Some(decl.lbrace_loc.merge(decl.rbrace_loc)),
+    ),
+  )
   self.region(decl.loc, parts)
 }
 
 ///|UUID(6094e4c4-1b51-4310-89d9-c32f66988f67)
 pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
   match impl_ {
-    TopExpr(expr~, local_types~, loc~, ..) => {
-      let parts = self.parts_from_list(local_types, fn(local_type) {
-        self.part_local_type_decl(local_type)
-      })
+    TopExpr(expr~, loc~, ..) => {
+      let parts = Array::new()
       parts.push(self.part_expr(expr))
       self.region(loc, parts)
     }
-    TopTest(expr~, name~, params~, local_types~, loc~, attrs~, doc~, ..) => {
+    TopTest(
+      expr~,
+      name~,
+      params~,
+      loc~,
+      attrs~,
+      doc~,
+      params_lparen_loc~,
+      params_rparen_loc~,
+      ..
+    ) => {
       let parts = Array::new()
       self.append_part(parts, self.part_doc(doc))
       attrs.each(fn(attr) { parts.push(self.part_attribute(attr)) })
@@ -648,50 +597,14 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
           parts.push(self.part(self.string_from_loc(name_loc), Some(name_loc)))
         None => ()
       }
-      match params {
-        Some(params) =>
-          self.append_part(
-            parts,
-            merge_part_locs(
-              self.parts_from_list(params, fn(param) {
-                self.part_parameter(param)
-              }),
-            ).map(fn(params_loc) {
-              self.part(
-                match self.outer_delim_locs(params_loc, '(', ')') {
-                  Some((lparen_loc, rparen_loc)) =>
-                    self.delimited(
-                      lparen_loc,
-                      self.parts_from_list(params, fn(param) {
-                        self.part_parameter(param)
-                      }),
-                      rparen_loc,
-                    )
-                  None =>
-                    self.region(
-                      params_loc,
-                      self.parts_from_list(params, fn(param) {
-                        self.part_parameter(param)
-                      }),
-                    )
-                },
-                Some(params_loc),
-              )
-            }),
-          )
-        None => ()
-      }
-      parts.push_iter(
-        self
-        .parts_from_list(local_types, fn(local_type) {
-          self.part_local_type_decl(local_type)
-        })
-        .iter(),
+      self.append_part(
+        parts,
+        self.fun_params_part(params, params_lparen_loc, params_rparen_loc),
       )
       parts.push(self.part_expr(expr))
       self.region(loc, parts)
     }
-    TopTypeDef(type_decl, ..) => self.elab_type_decl(type_decl)
+    TopTypeDef(type_decl) => self.elab_type_decl(type_decl)
     TopFuncDef(fun_decl~, decl_body~, loc~, ..) => {
       let parts = Array::new()
       parts.push(self.part_fun_decl(fun_decl))
@@ -708,7 +621,7 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       parts.push(self.part_expr(expr))
       self.region(loc, parts)
     }
-    TopTrait(trait_decl, ..) => self.elab_trait_decl(trait_decl)
+    TopTrait(trait_decl) => self.elab_trait_decl(trait_decl)
     TopImpl(
       self_ty~,
       trait_~,
@@ -768,7 +681,11 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       }
       self.append_part(
         parts,
-        self.fun_params_part(Some(params), params_lparen_loc, params_rparen_loc),
+        self.fun_params_part(
+          Some(params),
+          Some(params_lparen_loc),
+          Some(params_rparen_loc),
+        ),
       )
       self.append_part(parts, ret_ty.map(fn(ty) { self.part_type(ty) }))
       self.append_part(parts, self.part_error_type(err_ty))
@@ -790,8 +707,8 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       doc~,
       type_params_lbracket_loc~,
       type_params_rbracket_loc~,
-      constr_lbrace_loc~,
-      constr_rbrace_loc~,
+      lbrace_loc~,
+      rbrace_loc~,
       params_lparen_loc~,
       params_rparen_loc~,
       ..
@@ -838,29 +755,25 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
           Some(view_type_loc),
         ),
       )
-      match (constr_lbrace_loc, constr_rbrace_loc) {
-        (Some(lbrace_loc), Some(rbrace_loc)) =>
-          parts.push(
-            self.part(
-              self.delimited(
-                lbrace_loc,
-                self.parts_from_list(view_constrs, fn(constr) {
-                  self.part_constr_decl(constr)
-                }),
-                rbrace_loc,
-              ),
-              Some(lbrace_loc.merge(rbrace_loc)),
-            ),
-          )
-        _ => ()
-      }
+      parts.push(
+        self.part(
+          self.delimited(
+            lbrace_loc,
+            self.parts_from_list(view_constrs, fn(constr) {
+              self.part_constr_decl(constr)
+            }),
+            rbrace_loc,
+          ),
+          Some(lbrace_loc.merge(rbrace_loc)),
+        ),
+      )
       parts.push(self.part_binder(view_func_name))
       self.append_part(
         parts,
         self.fun_params_part(
           Some(parameters),
-          params_lparen_loc,
-          params_rparen_loc,
+          Some(params_lparen_loc),
+          Some(params_rparen_loc),
         ),
       )
       parts.push(self.part_expr(body))
@@ -933,23 +846,19 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       attrs.each(fn(attr) { parts.push(self.part_attribute(attr)) })
       self.append_part(parts, self.part_visibility(vis))
       parts.push(self.part_label(pkg))
-      match (lbrace_loc, rbrace_loc) {
-        (Some(lbrace_loc), Some(rbrace_loc)) =>
-          parts.push(
-            self.part(
-              self.delimited(
-                lbrace_loc,
-                self.parts_from_list(names, fn(name) {
-                  let (target, _kind) = name
-                  self.part_alias_target(target)
-                }),
-                rbrace_loc,
-              ),
-              Some(lbrace_loc.merge(rbrace_loc)),
-            ),
-          )
-        _ => ()
-      }
+      parts.push(
+        self.part(
+          self.delimited(
+            lbrace_loc,
+            self.parts_from_list(names, fn(name) {
+              let (target, _kind) = name
+              self.part_alias_target(target)
+            }),
+            rbrace_loc,
+          ),
+          Some(lbrace_loc.merge(rbrace_loc)),
+        ),
+      )
       self.region(loc, parts)
     }
   }
