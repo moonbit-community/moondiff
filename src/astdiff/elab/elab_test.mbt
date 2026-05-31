@@ -110,6 +110,29 @@ fn has_delim(
   false
 }
 
+///|UUID(0a45c58a-1e09-465d-b0a5-a16f329af536)
+fn syntax_contains(syntax : Syntax, content : String) -> Bool {
+  match syntax {
+    Syntax::Atom(content=atom_content, ..) => atom_content == content
+    Syntax::List(open_content~, children~, close_content~, ..) => {
+      if open_content == content || close_content == content {
+        return true
+      }
+      for child in children {
+        if syntax_contains(child, content) {
+          return true
+        }
+      }
+      false
+    }
+  }
+}
+
+///|UUID(480238d4-3c5c-4052-a17f-dc5a6d57e1ab)
+fn assert_contains(syntax : Syntax, content : String) -> Unit raise {
+  assert_true(syntax_contains(syntax, content))
+}
+
 ///|UUID(13f1e0a5-29a1-431e-89f8-652f99cef0e2)
 test "elab atoms and delimiters map back to source" {
   let source =
@@ -122,6 +145,29 @@ test "elab atoms and delimiters map back to source" {
 
   let syntax = elab_impl(source, only_impl(impls))
   assert_source_faithful(source, syntax)
+}
+
+///|UUID(944b0d47-3581-4c4a-a565-b1660d510e30)
+test "elab keeps raise keyword in explicit error type" {
+  let source = "fn f() -> Unit raise E { () }"
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
+
+  let syntax = elab_impl(source, only_impl(impls))
+  assert_source_faithful(source, syntax)
+  assert_contains(syntax, "raise")
+}
+
+///|UUID(2d1c37d8-ccbc-4e9d-a6d9-df191fae0b89)
+test "elab keeps equal sign in function stubs" {
+  let source =
+    #|fn ffi(x : Int) -> Int = "module" "function"
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
+
+  let syntax = elab_impl(source, only_impl(impls))
+  assert_source_faithful(source, syntax)
+  assert_contains(syntax, "=")
 }
 
 ///|UUID(8d704ff0-86ff-41ce-b6c5-3149e7056cf4)

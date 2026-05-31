@@ -72,9 +72,9 @@ fn impl_doc(impl_ : Impl) -> DocString? {
     | TopView(doc~, ..)
     | TopImplRelation(doc~, ..)
     | TopUsing(doc~, ..) => Some(doc)
-    TopTypeDef(decl, ..) => Some(decl.doc)
+    TopTypeDef(decl) => Some(decl.doc)
     TopFuncDef(fun_decl~, ..) => Some(fun_decl.doc)
-    TopTrait(decl, ..) => Some(decl.doc)
+    TopTrait(decl) => Some(decl.doc)
   }
 }
 

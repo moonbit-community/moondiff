@@ -22,9 +22,14 @@ fn ElabCtx::pattern_loc(self : Self, pat : Pattern) -> Location {
 fn argument_kind_loc(kind : ArgumentKind) -> Location? {
   match kind {
     Positional => None
-    Labelled(label) | LabelledPun(label) => Some(label.loc)
-    LabelledOption(label~, question_loc~)
-    | LabelledOptionPun(label~, question_loc~) =>
+    Labelled(label~, equal_loc~) =>
+      merge_loc_option(Some(label.loc), Some(equal_loc))
+    LabelledPun(label) => Some(label.loc)
+    LabelledOption(label~, question_loc~, equal_loc~) => {
+      let loc = merge_loc_option(Some(label.loc), Some(question_loc))
+      merge_loc_option(loc, Some(equal_loc))
+    }
+    LabelledOptionPun(label~, question_loc~) =>
       merge_loc_option(Some(label.loc), Some(question_loc))
   }
 }
@@ -33,7 +38,6 @@ fn argument_kind_loc(kind : ArgumentKind) -> Location? {
 fn ElabCtx::argument_loc(self : Self, argument : Argument) -> Location {
   let mut loc = Some(self.expr_loc(argument.value))
   loc = merge_loc_option(loc, argument_kind_loc(argument.kind))
-  loc = merge_loc_option(loc, argument.equal_loc)
   loc.unwrap_or(self.expr_loc(argument.value))
 }
 
@@ -43,7 +47,7 @@ fn ElabCtx::elab_argument(self : Self, argument : Argument) -> Syntax {
   match argument.kind {
     Positional | LabelledPun(_) | LabelledOptionPun(..) =>
       self.region(loc, [self.part_expr(argument.value)])
-    Labelled(label) | LabelledOption(label~, ..) =>
+    Labelled(label~, ..) | LabelledOption(label~, ..) =>
       self.region(loc, [self.part_label(label), self.part_expr(argument.value)])
   }
 }
@@ -63,24 +67,40 @@ fn ElabCtx::parameter_loc(self : Self, parameter : Parameter) -> Location {
       full = merge_loc_option(full, ty.map(fn(ty) { self.type_loc(ty) }))
       full.unwrap_or(loc)
     }
-    Positional(binder~, ty~, colon_loc~) | Labelled(binder~, ty~, colon_loc~) => {
+    Positional(binder~, ty~, colon_loc~) => {
       let mut full = Some(binder.loc)
       full = merge_loc_option(full, colon_loc)
       full = merge_loc_option(full, ty.map(fn(ty) { self.type_loc(ty) }))
       full.unwrap_or(binder.loc)
     }
-    Optional(binder~, default~, ty~, question_loc~, colon_loc~, equal_loc~) => {
+    Labelled(binder~, ty~, post_label_loc~, colon_loc~) => {
       let mut full = Some(binder.loc)
+      full = merge_loc_option(full, post_label_loc)
+      full = merge_loc_option(full, colon_loc)
+      full = merge_loc_option(full, ty.map(fn(ty) { self.type_loc(ty) }))
+      full.unwrap_or(binder.loc)
+    }
+    Optional(
+      binder~,
+      default~,
+      ty~,
+      post_label_loc~,
+      question_loc~,
+      colon_loc~,
+      equal_loc~
+    ) => {
+      let mut full = Some(binder.loc)
+      full = merge_loc_option(full, post_label_loc)
       full = merge_loc_option(full, question_loc)
       full = merge_loc_option(full, colon_loc)
-      full = merge_loc_option(full, equal_loc)
+      full = merge_loc_option(full, Some(equal_loc))
       full = merge_loc_option(full, ty.map(fn(ty) { self.type_loc(ty) }))
       full = merge_loc_option(full, Some(self.expr_loc(default)))
       full.unwrap_or(binder.loc)
     }
     QuestionOptional(binder~, ty~, question_loc~, colon_loc~) => {
       let mut full = Some(binder.loc)
-      full = merge_loc_option(full, question_loc)
+      full = merge_loc_option(full, Some(question_loc))
       full = merge_loc_option(full, colon_loc)
       full = merge_loc_option(full, ty.map(fn(ty) { self.type_loc(ty) }))
       full.unwrap_or(binder.loc)
@@ -129,7 +149,7 @@ fn ElabCtx::case_loc(self : Self, case_ : Case) -> Location {
     loc,
     case_.guard_.map(fn(expr) { self.expr_loc(expr) }),
   )
-  loc = merge_loc_option(loc, case_.guard_keyword_loc)
+  loc = merge_loc_option(loc, case_.if_loc)
   loc = merge_loc_option(loc, case_.fat_arrow_loc)
   loc = merge_loc_option(loc, Some(self.expr_loc(case_.body)))
   loc.unwrap_or(self.pattern_loc(case_.pattern))
@@ -156,6 +176,7 @@ fn lex_pattern_loc(pat : LexPattern) -> Location {
   match pat {
     Regex(loc~, ..)
     | RegexInterp(loc~, ..)
+    | ConstantRef(loc~, ..)
     | Alias(loc~, ..)
     | Sequence(loc~, ..) => loc
   }
@@ -174,12 +195,13 @@ fn lex_top_pattern_loc(pat : LexTopPattern) -> Location {
 fn ElabCtx::elab_lex_pattern(self : Self, pat : LexPattern) -> Syntax {
   match pat {
     Regex(loc~, ..) | RegexInterp(loc~, ..) => self.string_from_loc(loc)
-    Alias(pat~, binder~, loc~) =>
+    ConstantRef(lid~, loc~) => self.elab_long_ident(lid, loc, AtomKind::Normal)
+    Alias(pat~, binder~, loc~, ..) =>
       self.region(loc, [
         self.part(self.elab_lex_pattern(pat), Some(lex_pattern_loc(pat))),
         self.part_binder(binder),
       ])
-    Sequence(pats~, loc~) =>
+    Sequence(pats~, loc~, ..) =>
       self.region(
         loc,
         self.parts_from_list(pats, fn(pat) {
@@ -211,7 +233,7 @@ fn ElabCtx::lex_case_loc(self : Self, case_ : LexCase) -> Location {
     loc,
     case_.guard_.map(fn(expr) { self.expr_loc(expr) }),
   )
-  loc = merge_loc_option(loc, case_.guard_keyword_loc)
+  loc = merge_loc_option(loc, case_.if_loc)
   loc = merge_loc_option(loc, case_.fat_arrow_loc)
   loc = merge_loc_option(loc, Some(self.expr_loc(case_.body)))
   loc.unwrap_or(case_.pat_loc)
@@ -238,10 +260,45 @@ fn ElabCtx::part_lex_case(self : Self, case_ : LexCase) -> Part {
 }
 
 ///|UUID(cf803cd3-2086-4b49-b751-c58573acb998)
+fn regex_pattern_loc(pat : RegexPattern) -> Location {
+  match pat {
+    Literal(loc~, ..)
+    | Reference(loc~, ..)
+    | Sequence(loc~, ..)
+    | Alternation(loc~, ..)
+    | Alias(loc~, ..) => loc
+  }
+}
+
+///|UUID(cf803cd3-2086-4b49-b751-c58573acb998)
+fn ElabCtx::elab_regex_pattern(self : Self, pat : RegexPattern) -> Syntax {
+  match pat {
+    Literal(loc~, ..) => self.string_from_loc(loc)
+    Reference(lid~, loc~) => self.elab_long_ident(lid, loc, AtomKind::Normal)
+    Sequence(pat1~, pat2~, loc~, ..) | Alternation(pat1~, pat2~, loc~, ..) =>
+      self.region(loc, [
+        self.part(self.elab_regex_pattern(pat1), Some(regex_pattern_loc(pat1))),
+        self.part(self.elab_regex_pattern(pat2), Some(regex_pattern_loc(pat2))),
+      ])
+    Alias(pat~, binder~, loc~, ..) =>
+      self.region(loc, [
+        self.part(self.elab_regex_pattern(pat), Some(regex_pattern_loc(pat))),
+        self.part_binder(binder),
+      ])
+  }
+}
+
+///|UUID(cf803cd3-2086-4b49-b751-c58573acb998)
+fn ElabCtx::part_regex_pattern(self : Self, pat : RegexPattern) -> Part {
+  let loc = regex_pattern_loc(pat)
+  self.part(self.elab_regex_pattern(pat), Some(loc))
+}
+
+///|UUID(cf803cd3-2086-4b49-b751-c58573acb998)
 fn ElabCtx::elab_spreadable_elem(self : Self, elem : SpreadableElem) -> Syntax {
   match elem {
     Regular(expr) => self.elab_expr(expr)
-    Spread(expr~, loc~) => self.region(loc, [self.part_expr(expr)])
+    Spread(expr~, loc~, ..) => self.region(loc, [self.part_expr(expr)])
   }
 }
 
@@ -329,22 +386,16 @@ fn ElabCtx::elab_where_clause(
     self.part_field_def(field)
   })
   let parts = Array::new()
-  match (where_clause.lbrace_loc, where_clause.rbrace_loc) {
-    (Some(lbrace_loc), Some(rbrace_loc)) =>
-      parts.push(
-        self.part(
-          self.delimited(lbrace_loc, field_parts, rbrace_loc),
-          Some(lbrace_loc.merge(rbrace_loc)),
-        ),
-      )
-    _ =>
-      parts.push(
-        self.part(
-          self.region(where_clause.loc, field_parts),
-          Some(where_clause.loc),
-        ),
-      )
-  }
+  parts.push(
+    self.part(
+      self.delimited(
+        where_clause.lbrace_loc,
+        field_parts,
+        where_clause.rbrace_loc,
+      ),
+      Some(where_clause.lbrace_loc.merge(where_clause.rbrace_loc)),
+    ),
+  )
   self.region(where_clause.loc, parts)
 }
 
@@ -384,7 +435,7 @@ fn ElabCtx::elab_constr_pat_arg(self : Self, arg : ConstrPatArg) -> Syntax {
   match arg.kind {
     Positional | LabelledPun(_) | LabelledOptionPun(..) =>
       self.region(loc, [self.part_pattern(arg.pat)])
-    Labelled(label) | LabelledOption(label~, ..) =>
+    Labelled(label~, ..) | LabelledOption(label~, ..) =>
       self.region(loc, [self.part_label(label), self.part_pattern(arg.pat)])
   }
 }
@@ -413,9 +464,9 @@ fn array_pattern_loc(pattern : ArrayPattern) -> Location {
   match pattern {
     Pattern(pat) => pat.loc()
     StringSpread(loc~, dotdot_loc~, ..) | BytesSpread(loc~, dotdot_loc~, ..) =>
-      merge_loc_option(Some(loc), dotdot_loc).unwrap_or(loc)
+      merge_loc_option(Some(loc), Some(dotdot_loc)).unwrap_or(loc)
     ConstSpread(loc~, dotdot_loc~, ..) =>
-      merge_loc_option(Some(loc), dotdot_loc).unwrap_or(loc)
+      merge_loc_option(Some(loc), Some(dotdot_loc)).unwrap_or(loc)
   }
 }
 
@@ -424,7 +475,7 @@ fn ElabCtx::elab_array_pattern(self : Self, pat : ArrayPattern) -> Syntax {
   match pat {
     ArrayPattern::Pattern(pat) => self.elab_pattern(pat)
     StringSpread(loc=literal_loc, dotdot_loc~, ..) => {
-      let loc = merge_loc_option(Some(literal_loc), dotdot_loc).unwrap_or(
+      let loc = merge_loc_option(Some(literal_loc), Some(dotdot_loc)).unwrap_or(
         literal_loc,
       )
       self.region(loc, [
@@ -432,7 +483,7 @@ fn ElabCtx::elab_array_pattern(self : Self, pat : ArrayPattern) -> Syntax {
       ])
     }
     BytesSpread(loc=literal_loc, dotdot_loc~, ..) => {
-      let loc = merge_loc_option(Some(literal_loc), dotdot_loc).unwrap_or(
+      let loc = merge_loc_option(Some(literal_loc), Some(dotdot_loc)).unwrap_or(
         literal_loc,
       )
       self.region(loc, [
@@ -453,9 +504,9 @@ fn ElabCtx::part_array_pattern(self : Self, pat : ArrayPattern) -> Part {
 ///|UUID(f163a85d-6d5d-4a7e-bd39-9af8b93d14e6)
 fn ElabCtx::dotdot_binder_part(self : Self, binder : DotDotBinder) -> Part? {
   match binder {
-    BinderAs(binder) | DotDotBinder::Binder(binder) =>
+    BinderAs(binder~, ..) | DotDotBinder::Binder(binder~, ..) =>
       Some(self.part_binder(binder))
-    Underscore | NoBinder => None
+    Underscore(..) | NoBinder(..) => None
   }
 }
 
@@ -465,9 +516,9 @@ fn ElabCtx::array_pattern_parts(
   patterns : ArrayPatterns,
 ) -> Array[Part] {
   match patterns {
-    Closed(items) =>
+    Closed(items, ..) =>
       self.parts_from_list(items, fn(item) { self.part_array_pattern(item) })
-    Open(prefix, suffix, binder) => {
+    Open(prefix, suffix, binder, ..) => {
       let parts = self.parts_from_list(prefix, fn(item) {
         self.part_array_pattern(item)
       })
@@ -485,23 +536,23 @@ fn ElabCtx::array_pattern_parts(
 ///|UUID(16357efa-aba6-4c12-8349-55ac81a81c57)
 pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
   match pat {
-    Alias(pat~, alias_~, loc~) =>
+    Alias(pat~, alias_~, loc~, ..) =>
       self.region(loc, [self.part_pattern(pat), self.part_binder(alias_)])
     Any(loc~) => self.tokenize_loc(loc, classify_keywords=true)
-    Pattern::Array(pats~, loc~, lbracket_loc~, rbracket_loc~, ..) =>
+    Pattern::Array(pats~, loc~, lbracket_loc~, rbracket_loc~) =>
       self.delimited_or_region(
         loc,
-        lbracket_loc,
+        Some(lbracket_loc),
         self.array_pattern_parts(pats),
-        rbracket_loc,
+        Some(rbracket_loc),
       )
-    Constant(c~, loc~, ..) => self.elab_constant(c, loc)
-    Constraint(pat~, ty~, loc~) =>
+    Constant(c~, loc~) => self.elab_constant(c, loc)
+    Constraint(pat~, ty~, loc~, ..) =>
       self.outer_delimited_or_region(loc, '(', ')', [
         self.part_pattern(pat),
         self.part_type(ty),
       ])
-    Constr(constr~, args~, loc~, lparen_loc~, rparen_loc~, ..) => {
+    Constr(constr~, args~, loc~, args_lparen_loc~, args_rparen_loc~, ..) => {
       let parts = Array::new()
       parts.push(self.part(self.elab_constructor(constr), Some(constr.loc)))
       match args {
@@ -510,7 +561,7 @@ pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
             self.part_constr_pat_arg(arg)
           })
           let arg_loc = match
-            (lparen_loc, rparen_loc, merge_part_locs(arg_parts)) {
+            (args_lparen_loc, args_rparen_loc, merge_part_locs(arg_parts)) {
             (Some(lparen_loc), Some(rparen_loc), _) =>
               Some(lparen_loc.merge(rparen_loc))
             (_, _, Some(arg_loc)) => Some(arg_loc)
@@ -521,7 +572,7 @@ pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
             arg_loc.map(fn(arg_loc) {
               self.part(
                 self.delimited_or_region(
-                  arg_loc, lparen_loc, arg_parts, rparen_loc,
+                  arg_loc, args_lparen_loc, arg_parts, args_rparen_loc,
                 ),
                 Some(arg_loc),
               )
@@ -529,7 +580,8 @@ pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
           )
         }
         None =>
-          if lparen_loc is Some(lparen_loc) && rparen_loc is Some(rparen_loc) {
+          if args_lparen_loc is Some(lparen_loc) &&
+            args_rparen_loc is Some(rparen_loc) {
             let arg_loc = lparen_loc.merge(rparen_loc)
             parts.push(
               self.part(
@@ -541,33 +593,33 @@ pub fn ElabCtx::elab_pattern(self : Self, pat : Pattern) -> Syntax {
       }
       self.region(loc, parts)
     }
-    Or(pat1~, pat2~, loc~) =>
+    Or(pat1~, pat2~, loc~, ..) =>
       self.region(loc, [self.part_pattern(pat1), self.part_pattern(pat2)])
     Tuple(pats~, loc~, lparen_loc~, rparen_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lparen_loc,
+        Some(lparen_loc),
         self.parts_from_list(pats, fn(pat) { self.part_pattern(pat) }),
-        rparen_loc,
+        Some(rparen_loc),
       )
     Pattern::Var(binder) => self.elab_binder(binder)
     Record(fields~, loc~, lbrace_loc~, rbrace_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lbrace_loc,
+        Some(lbrace_loc),
         self.parts_from_list(fields, fn(field) { self.part_field_pat(field) }),
-        rbrace_loc,
+        Some(rbrace_loc),
       )
     Map(elems~, loc~, lbrace_loc~, rbrace_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lbrace_loc,
+        Some(lbrace_loc),
         self.parts_from_list(elems, fn(elem) { self.part_map_pat_elem(elem) }),
-        rbrace_loc,
+        Some(rbrace_loc),
       )
     Range(lhs~, rhs~, loc~, ..) =>
       self.region(loc, [self.part_pattern(lhs), self.part_pattern(rhs)])
-    SpecialConstr(binder~, args~, loc~) => {
+    SpecialConstr(binder~, args~, loc~, ..) => {
       let parts = Array::new()
       parts.push(self.part_binder(binder))
       parts.push_iter(
@@ -587,16 +639,6 @@ fn ElabCtx::binder_expr_pair_loc(
 ) -> Location {
   let (binder, expr) = pair
   binder.loc.merge(self.expr_loc(expr))
-}
-
-///|UUID(3153e600-b335-43c8-9717-8d4a0a78cb33)
-fn ElabCtx::binder_func_pair_loc(
-  self : Self,
-  pair : (Binder, Func),
-) -> Location {
-  ignore(self)
-  let (binder, func) = pair
-  binder.loc.merge(func.loc)
 }
 
 ///|UUID(ddd37f3e-c143-42a8-8cbc-63e060af5ec4)
@@ -621,16 +663,6 @@ fn ElabCtx::part_binder_expr_pair(self : Self, pair : (Binder, Expr)) -> Part {
   )
 }
 
-///|UUID(48d5d500-35a8-4712-81cf-a54408fddf81)
-fn ElabCtx::part_binder_func_pair(self : Self, pair : (Binder, Func)) -> Part {
-  let loc = self.binder_func_pair_loc(pair)
-  let (binder, func) = pair
-  self.part(
-    self.region(loc, [self.part_binder(binder), self.part_func(func)]),
-    Some(loc),
-  )
-}
-
 ///|UUID(c4040a96-a4f1-43f1-ad68-50b236dbf9b5)
 fn ElabCtx::part_binder_type_func_triple(
   self : Self,
@@ -648,6 +680,54 @@ fn ElabCtx::part_binder_type_func_triple(
 ///|UUID(e523b5fc-1f77-4eec-8d17-69f7881a1988)
 fn ElabCtx::optional_binder_part(self : Self, binder : Binder?) -> Part? {
   binder.map(fn(binder) { self.part_binder(binder) })
+}
+
+///|UUID(b6283c55-4a56-4fa1-8a8d-0a21b5099c84)
+fn ElabCtx::list_comprehension_kind_parts(
+  self : Self,
+  kind : ListComprehensionKind,
+) -> Array[Part] {
+  let parts = Array::new()
+  match kind {
+    Foreach(binders~, expr~, init~, continue_block~, ..) => {
+      binders.each(fn(binder) {
+        self.append_part(parts, self.optional_binder_part(binder))
+      })
+      parts.push(self.part_expr(expr))
+      parts.push_iter(
+        self
+        .parts_from_list(init, fn(binding) {
+          self.part_binder_expr_pair(binding)
+        })
+        .iter(),
+      )
+      parts.push_iter(
+        self
+        .parts_from_list(continue_block, fn(binding) {
+          self.part_binder_expr_pair(binding)
+        })
+        .iter(),
+      )
+    }
+    For(binders~, condition~, continue_block~, ..) => {
+      parts.push_iter(
+        self
+        .parts_from_list(binders, fn(binding) {
+          self.part_binder_expr_pair(binding)
+        })
+        .iter(),
+      )
+      self.append_part(parts, condition.map(fn(expr) { self.part_expr(expr) }))
+      parts.push_iter(
+        self
+        .parts_from_list(continue_block, fn(binding) {
+          self.part_binder_expr_pair(binding)
+        })
+        .iter(),
+      )
+    }
+  }
+  parts
 }
 
 ///|UUID(b6283c55-4a56-4fa1-8a8d-0a21b5099c84)
@@ -812,23 +892,6 @@ fn ElabCtx::part_let_fn_stmt(
   self.part(self.region(loc, parts), Some(loc))
 }
 
-///|UUID(4bc950d8-e6e6-4322-ab53-173e23a1579b)
-fn ElabCtx::part_letrec_stmt(
-  self : Self,
-  bindings : @list.List[(Binder, Func)],
-  fn_locs : @list.List[Location],
-  semi_loc : Location?,
-) -> Part {
-  let parts = self.parts_from_list(bindings, fn(binding) {
-    self.part_binder_func_pair(binding)
-  })
-  let mut loc = merge_part_locs(parts)
-  loc = merge_loc_option(loc, merge_loc_list(fn_locs))
-  loc = merge_loc_option(loc, semi_loc)
-  let loc = loc.unwrap_or_else(fn() { panic() })
-  self.part(self.region(loc, parts), Some(loc))
-}
-
 ///|UUID(5d6933ec-6fee-4928-8b9c-dce90ad2d428)
 fn ElabCtx::part_letand_stmt(
   self : Self,
@@ -904,32 +967,32 @@ fn ElabCtx::append_stmt_chain_parts(
       else_loc~,
       else_lbrace_loc~,
       else_rbrace_loc~,
-      else_semi_locs=_,
-      else_trailing_semi_loc~,
       semi_loc~
     ) => {
       parts.push(
         self.part_guard_stmt(
-          cond, otherwise, guard_loc, else_loc, else_lbrace_loc, else_rbrace_loc,
-          else_trailing_semi_loc, semi_loc,
+          cond,
+          otherwise,
+          Some(guard_loc),
+          else_loc,
+          else_lbrace_loc,
+          else_rbrace_loc,
+          None,
+          semi_loc,
         ),
       )
       self.append_stmt_chain_parts(parts, body)
     }
     Defer(expr~, body~, loc=_, defer_loc~, semi_loc~) => {
-      parts.push(self.part_defer_stmt(expr, defer_loc, semi_loc))
+      parts.push(self.part_defer_stmt(expr, Some(defer_loc), semi_loc))
       self.append_stmt_chain_parts(parts, body)
     }
-    LetFn(name~, func~, body~, loc=_, fn_loc~, semi_loc~) => {
-      parts.push(self.part_let_fn_stmt(name, func, fn_loc, semi_loc))
+    LetFn(name~, func~, body~, loc=_, semi_loc~) => {
+      parts.push(self.part_let_fn_stmt(name, func, func.fn_loc, semi_loc))
       self.append_stmt_chain_parts(parts, body)
     }
-    LetRec(bindings~, body~, loc=_, fn_locs~, semi_loc~) => {
-      parts.push(self.part_letrec_stmt(bindings, fn_locs, semi_loc))
-      self.append_stmt_chain_parts(parts, body)
-    }
-    LetAnd(bindings~, body~, loc=_, letrec_loc~, semi_loc~) => {
-      parts.push(self.part_letand_stmt(bindings, letrec_loc, semi_loc))
+    LetAnd(bindings~, body~, loc=_, letrec_loc~, semi_loc~, ..) => {
+      parts.push(self.part_letand_stmt(bindings, Some(letrec_loc), semi_loc))
       self.append_stmt_chain_parts(parts, body)
     }
     Let(
@@ -939,10 +1002,17 @@ fn ElabCtx::append_stmt_chain_parts(
       loc=_,
       let_loc~,
       equal_loc~,
-      semi_loc~
+      semi_loc~,
+      ..
     ) => {
       parts.push(
-        self.part_let_stmt(pattern, bound_expr, let_loc, equal_loc, semi_loc),
+        self.part_let_stmt(
+          pattern,
+          bound_expr,
+          Some(let_loc),
+          Some(equal_loc),
+          semi_loc,
+        ),
       )
       self.append_stmt_chain_parts(parts, body)
     }
@@ -955,11 +1025,18 @@ fn ElabCtx::append_stmt_chain_parts(
       let_loc~,
       mut_loc~,
       equal_loc~,
-      semi_loc~
+      semi_loc~,
+      ..
     ) => {
       parts.push(
         self.part_letmut_stmt(
-          binder, ty, bound_expr, let_loc, mut_loc, equal_loc, semi_loc,
+          binder,
+          ty,
+          bound_expr,
+          Some(let_loc),
+          Some(mut_loc),
+          Some(equal_loc),
+          semi_loc,
         ),
       )
       self.append_stmt_chain_parts(parts, body)
@@ -982,29 +1059,17 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
     Apply(func~, args~, loc~, lparen_loc~, rparen_loc~, ..) => {
       let parts = Array::new()
       parts.push(self.part_expr(func))
-      if lparen_loc is Some(lparen_loc) && rparen_loc is Some(rparen_loc) {
-        let arg_loc = lparen_loc.merge(rparen_loc)
-        parts.push(
-          self.part(
-            self.delimited(
-              lparen_loc,
-              self.parts_from_list(args, fn(arg) { self.part_argument(arg) }),
-              rparen_loc,
-            ),
-            Some(arg_loc),
+      let arg_loc = lparen_loc.merge(rparen_loc)
+      parts.push(
+        self.part(
+          self.delimited(
+            lparen_loc,
+            self.parts_from_list(args, fn(arg) { self.part_argument(arg) }),
+            rparen_loc,
           ),
-        )
-      } else if !args.is_empty() {
-        let arg_parts = self.parts_from_list(args, fn(arg) {
-          self.part_argument(arg)
-        })
-        self.append_part(
-          parts,
-          merge_part_locs(arg_parts).map(fn(arg_loc) {
-            self.part(self.region(arg_loc, arg_parts), Some(arg_loc))
-          }),
-        )
-      }
+          Some(arg_loc),
+        ),
+      )
       self.region(loc, parts)
     }
     Infix(op~, lhs~, rhs~, loc~) =>
@@ -1021,41 +1086,57 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
     Array(exprs~, loc~, lbracket_loc~, rbracket_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lbracket_loc,
+        Some(lbracket_loc),
         self.parts_from_list(exprs, fn(expr) { self.part_expr(expr) }),
-        rbracket_loc,
+        Some(rbracket_loc),
       )
     ArraySpread(elems~, loc~, lbracket_loc~, rbracket_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lbracket_loc,
+        Some(lbracket_loc),
         self.parts_from_list(elems, fn(elem) { self.part_spreadable_elem(elem) }),
-        rbracket_loc,
+        Some(rbracket_loc),
       )
-    ArrayGet(array~, index~, loc~) => {
-      let array_loc = self.expr_loc(array)
-      let index_loc = self.expr_loc(index)
+    ListComprehension(
+      kind~,
+      guard_~,
+      body~,
+      loc~,
+      lbracket_loc~,
+      rbracket_loc~,
+      ..
+    ) => {
+      let parts = self.list_comprehension_kind_parts(kind)
+      self.append_part(parts, guard_.map(fn(expr) { self.part_expr(expr) }))
+      parts.push(self.part_expr(body))
+      self.delimited_or_region(
+        loc,
+        Some(lbracket_loc),
+        parts,
+        Some(rbracket_loc),
+      )
+    }
+    ArrayGet(array~, index~, lbracket_loc~, rbracket_loc~, loc~) => {
       let parts = Array::new()
       parts.push(self.part_expr(array))
-      match
-        (
-          self.find_char_forward(array_loc.end.cnum, loc.end.cnum, '['),
-          self.find_char_backward(index_loc.end.cnum, loc.end.cnum, ']'),
-        ) {
-        (Some(open_loc), Some(close_loc)) => {
-          let bracket_loc = open_loc.merge(close_loc)
-          parts.push(
-            self.part(
-              self.delimited(open_loc, [self.part_expr(index)], close_loc),
-              Some(bracket_loc),
-            ),
-          )
-        }
-        _ => parts.push(self.part_expr(index))
-      }
+      let bracket_loc = lbracket_loc.merge(rbracket_loc)
+      parts.push(
+        self.part(
+          self.delimited(lbracket_loc, [self.part_expr(index)], rbracket_loc),
+          Some(bracket_loc),
+        ),
+      )
       self.region(loc, parts)
     }
-    ArrayGetSlice(array~, start_index~, end_index~, index_loc~, loc~) => {
+    ArrayGetSlice(
+      array~,
+      start_index~,
+      end_index~,
+      lbracket_loc~,
+      rbracket_loc~,
+      loc~,
+      ..
+    ) => {
       let parts = Array::new()
       parts.push(self.part_expr(array))
       let index_parts = Array::new()
@@ -1067,65 +1148,52 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
         index_parts,
         end_index.map(fn(expr) { self.part_expr(expr) }),
       )
-      let index_syntax = match self.outer_delim_locs(index_loc, '[', ']') {
-        Some((open_loc, close_loc)) =>
-          self.delimited(open_loc, index_parts, close_loc)
-        None => self.region(index_loc, index_parts)
-      }
-      parts.push(self.part(index_syntax, Some(index_loc)))
+      let index_loc = lbracket_loc.merge(rbracket_loc)
+      parts.push(
+        self.part(
+          self.delimited(lbracket_loc, index_parts, rbracket_loc),
+          Some(index_loc),
+        ),
+      )
       self.region(loc, parts)
     }
-    ArraySet(array~, index~, value~, loc~) => {
-      let array_loc = self.expr_loc(array)
-      let value_loc = self.expr_loc(value)
+    ArraySet(array~, index~, value~, lbracket_loc~, rbracket_loc~, loc~, ..) => {
       let parts = Array::new()
       parts.push(self.part_expr(array))
-      match
-        (
-          self.find_char_forward(array_loc.end.cnum, value_loc.start.cnum, '['),
-          self.find_char_backward(array_loc.end.cnum, value_loc.start.cnum, ']'),
-        ) {
-        (Some(open_loc), Some(close_loc)) => {
-          let bracket_loc = open_loc.merge(close_loc)
-          parts.push(
-            self.part(
-              self.delimited(open_loc, [self.part_expr(index)], close_loc),
-              Some(bracket_loc),
-            ),
-          )
-        }
-        _ => parts.push(self.part_expr(index))
-      }
+      let bracket_loc = lbracket_loc.merge(rbracket_loc)
+      parts.push(
+        self.part(
+          self.delimited(lbracket_loc, [self.part_expr(index)], rbracket_loc),
+          Some(bracket_loc),
+        ),
+      )
       parts.push(self.part_expr(value))
       self.region(loc, parts)
     }
-    ArrayAugmentedSet(array~, index~, value~, loc~, ..) => {
-      let array_loc = self.expr_loc(array)
-      let value_loc = self.expr_loc(value)
+    ArrayAugmentedSet(
+      array~,
+      index~,
+      value~,
+      lbracket_loc~,
+      rbracket_loc~,
+      loc~,
+      ..
+    ) => {
       let parts = Array::new()
       parts.push(self.part_expr(array))
-      match
-        (
-          self.find_char_forward(array_loc.end.cnum, value_loc.start.cnum, '['),
-          self.find_char_backward(array_loc.end.cnum, value_loc.start.cnum, ']'),
-        ) {
-        (Some(open_loc), Some(close_loc)) => {
-          let bracket_loc = open_loc.merge(close_loc)
-          parts.push(
-            self.part(
-              self.delimited(open_loc, [self.part_expr(index)], close_loc),
-              Some(bracket_loc),
-            ),
-          )
-        }
-        _ => parts.push(self.part_expr(index))
-      }
+      let bracket_loc = lbracket_loc.merge(rbracket_loc)
+      parts.push(
+        self.part(
+          self.delimited(lbracket_loc, [self.part_expr(index)], rbracket_loc),
+          Some(bracket_loc),
+        ),
+      )
       parts.push(self.part_expr(value))
       self.region(loc, parts)
     }
-    Constant(c~, loc~, ..) => self.elab_constant(c, loc)
+    Constant(c~, loc~) => self.elab_constant(c, loc)
     MultilineString(loc~, ..) | Interp(loc~, ..) => self.string_from_loc(loc)
-    Constraint(expr~, ty~, loc~) =>
+    Constraint(expr~, ty~, loc~, ..) =>
       self.outer_delimited_or_region(loc, '(', ')', [
         self.part_expr(expr),
         self.part_type(ty),
@@ -1137,8 +1205,8 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       while_else~,
       label~,
       loc~,
-      loop_lbrace_loc~,
-      loop_rbrace_loc~,
+      body_lbrace_loc~,
+      body_rbrace_loc~,
       nobreak_lbrace_loc~,
       nobreak_rbrace_loc~,
       ..
@@ -1149,9 +1217,9 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       self.append_part(
         parts,
         self.make_block_part(
-          loop_lbrace_loc,
+          Some(body_lbrace_loc),
           Some(self.part_expr(loop_body)),
-          loop_rbrace_loc,
+          Some(body_rbrace_loc),
         ),
       )
       self.append_part(
@@ -1175,8 +1243,8 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       ifso~,
       ifnot~,
       loc~,
-      if_lbrace_loc~,
-      if_rbrace_loc~,
+      then_lbrace_loc~,
+      then_rbrace_loc~,
       else_lbrace_loc~,
       else_rbrace_loc~,
       ..
@@ -1186,9 +1254,9 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       self.append_part(
         parts,
         self.make_block_part(
-          if_lbrace_loc,
+          Some(then_lbrace_loc),
           Some(self.part_expr(ifso)),
-          if_rbrace_loc,
+          Some(then_rbrace_loc),
         ),
       )
       self.append_part(
@@ -1214,15 +1282,19 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       else_loc~,
       else_lbrace_loc~,
       else_rbrace_loc~,
-      else_semi_locs=_,
-      else_trailing_semi_loc~,
       semi_loc~
     ) => {
       let parts = Array::new()
       parts.push(
         self.part_guard_stmt(
-          cond, otherwise, guard_loc, else_loc, else_lbrace_loc, else_rbrace_loc,
-          else_trailing_semi_loc, semi_loc,
+          cond,
+          otherwise,
+          Some(guard_loc),
+          else_loc,
+          else_lbrace_loc,
+          else_rbrace_loc,
+          None,
+          semi_loc,
         ),
       )
       self.append_stmt_chain_parts(parts, body)
@@ -1248,29 +1320,53 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       )
       self.region(loc, parts)
     }
+    RegexMatch(expr~, pat~, bindings~, loc~, ..) => {
+      let parts = Array::new()
+      parts.push(self.part_expr(expr))
+      parts.push(self.part_regex_pattern(pat))
+      bindings.each(fn(binding) {
+        let (label, binder) = binding
+        parts.push(self.part_label(label))
+        self.append_part(
+          parts,
+          binder.map(fn(binder) { self.part_binder(binder) }),
+        )
+      })
+      self.region(loc, parts)
+    }
     Defer(expr~, body~, loc~, defer_loc~, semi_loc~) => {
-      let parts = [self.part_defer_stmt(expr, defer_loc, semi_loc)]
+      let parts = [self.part_defer_stmt(expr, Some(defer_loc), semi_loc)]
       self.append_stmt_chain_parts(parts, body)
       self.region(loc, parts)
     }
-    LetFn(name~, func~, body~, loc~, fn_loc~, semi_loc~) => {
-      let parts = [self.part_let_fn_stmt(name, func, fn_loc, semi_loc)]
+    LetFn(name~, func~, body~, loc~, semi_loc~) => {
+      let parts = [self.part_let_fn_stmt(name, func, func.fn_loc, semi_loc)]
       self.append_stmt_chain_parts(parts, body)
       self.region(loc, parts)
     }
-    LetRec(bindings~, body~, loc~, fn_locs~, semi_loc~) => {
-      let parts = [self.part_letrec_stmt(bindings, fn_locs, semi_loc)]
+    LetAnd(bindings~, body~, loc~, letrec_loc~, semi_loc~, ..) => {
+      let parts = [self.part_letand_stmt(bindings, Some(letrec_loc), semi_loc)]
       self.append_stmt_chain_parts(parts, body)
       self.region(loc, parts)
     }
-    LetAnd(bindings~, body~, loc~, letrec_loc~, semi_loc~) => {
-      let parts = [self.part_letand_stmt(bindings, letrec_loc, semi_loc)]
-      self.append_stmt_chain_parts(parts, body)
-      self.region(loc, parts)
-    }
-    Let(pattern~, expr=bound_expr, body~, loc~, let_loc~, equal_loc~, semi_loc~) => {
+    Let(
+      pattern~,
+      expr=bound_expr,
+      body~,
+      loc~,
+      let_loc~,
+      equal_loc~,
+      semi_loc~,
+      ..
+    ) => {
       let parts = [
-        self.part_let_stmt(pattern, bound_expr, let_loc, equal_loc, semi_loc),
+        self.part_let_stmt(
+          pattern,
+          bound_expr,
+          Some(let_loc),
+          Some(equal_loc),
+          semi_loc,
+        ),
       ]
       self.append_stmt_chain_parts(parts, body)
       self.region(loc, parts)
@@ -1283,9 +1379,9 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
     Tuple(exprs~, loc~, lparen_loc~, rparen_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lparen_loc,
+        Some(lparen_loc),
         self.parts_from_list(exprs, fn(expr) { self.part_expr(expr) }),
-        rparen_loc,
+        Some(rparen_loc),
       )
     Record(type_name~, fields~, loc~, lbrace_loc~, rbrace_loc~, ..) => {
       let parts = Array::new()
@@ -1295,13 +1391,13 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
           self.part(self.elab_type_name(type_name), Some(type_name.loc))
         }),
       )
-      let braces_loc = merge_loc_option(lbrace_loc, rbrace_loc).unwrap_or(loc)
+      let braces_loc = lbrace_loc.merge(rbrace_loc)
       let field_part = self.part(
         self.delimited_or_region(
           braces_loc,
-          lbrace_loc,
+          Some(lbrace_loc),
           self.parts_from_list(fields, fn(field) { self.part_field_def(field) }),
-          rbrace_loc,
+          Some(rbrace_loc),
         ),
         Some(braces_loc),
       )
@@ -1331,20 +1427,16 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
         .parts_from_list(fields, fn(field) { self.part_field_def(field) })
         .iter(),
       )
-      let braces_loc = match (lbrace_loc, rbrace_loc) {
-        (Some(lbrace_loc), Some(rbrace_loc)) =>
-          Some(lbrace_loc.merge(rbrace_loc))
-        _ => Some(loc)
-      }
+      let braces_loc = lbrace_loc.merge(rbrace_loc)
       parts.push(
         self.part(
           self.delimited_or_region(
-            braces_loc.unwrap_or(loc),
-            lbrace_loc,
+            braces_loc,
+            Some(lbrace_loc),
             inner_parts,
-            rbrace_loc,
+            Some(rbrace_loc),
           ),
-          braces_loc,
+          Some(braces_loc),
         ),
       )
       self.region(loc, parts)
@@ -1371,32 +1463,20 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       let parts = Array::new()
       parts.push(self.part_expr(self_expr))
       parts.push(self.part_label(method_name))
-      if lparen_loc is Some(lparen_loc) && rparen_loc is Some(rparen_loc) {
-        let arg_loc = lparen_loc.merge(rparen_loc)
-        parts.push(
-          self.part(
-            self.delimited(
-              lparen_loc,
-              self.parts_from_list(args, fn(arg) { self.part_argument(arg) }),
-              rparen_loc,
-            ),
-            Some(arg_loc),
+      let arg_loc = lparen_loc.merge(rparen_loc)
+      parts.push(
+        self.part(
+          self.delimited(
+            lparen_loc,
+            self.parts_from_list(args, fn(arg) { self.part_argument(arg) }),
+            rparen_loc,
           ),
-        )
-      } else if !args.is_empty() {
-        let arg_parts = self.parts_from_list(args, fn(arg) {
-          self.part_argument(arg)
-        })
-        self.append_part(
-          parts,
-          merge_part_locs(arg_parts).map(fn(arg_loc) {
-            self.part(self.region(arg_loc, arg_parts), Some(arg_loc))
-          }),
-        )
-      }
+          Some(arg_loc),
+        ),
+      )
       self.region(loc, parts)
     }
-    As(expr~, trait_~, loc~) =>
+    As(expr~, trait_~, loc~, ..) =>
       self.region(loc, [
         self.part_expr(expr),
         self.part(self.elab_type_name(trait_), Some(trait_.loc)),
@@ -1412,7 +1492,7 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       parts.push(self.part_expr(expr))
       self.append_part(
         parts,
-        self.make_cases_block_part(lbrace_loc, cases, rbrace_loc),
+        self.make_cases_block_part(Some(lbrace_loc), cases, Some(rbrace_loc)),
       )
       self.region(loc, parts)
     }
@@ -1425,7 +1505,11 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       )
       self.append_part(
         parts,
-        self.make_lex_cases_block_part(lbrace_loc, cases, rbrace_loc),
+        self.make_lex_cases_block_part(
+          Some(lbrace_loc),
+          cases,
+          Some(rbrace_loc),
+        ),
       )
       self.region(loc, parts)
     }
@@ -1438,17 +1522,26 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       let_loc~,
       mut_loc~,
       equal_loc~,
-      semi_loc~
+      semi_loc~,
+      ..
     ) => {
       let parts = [
         self.part_letmut_stmt(
-          binder, ty, bound_expr, let_loc, mut_loc, equal_loc, semi_loc,
+          binder,
+          ty,
+          bound_expr,
+          Some(let_loc),
+          Some(mut_loc),
+          Some(equal_loc),
+          semi_loc,
         ),
       ]
       self.append_stmt_chain_parts(parts, body)
       self.region(loc, parts)
     }
-    Pipe(lhs~, rhs~, loc~) =>
+    Pipe(lhs~, rhs~, loc~, ..) =>
+      self.region(loc, [self.part_expr(lhs), self.part_expr(rhs)])
+    RevPipe(lhs~, rhs~, loc~, ..) =>
       self.region(loc, [self.part_expr(lhs), self.part_expr(rhs)])
     Assign(var_~, expr~, loc~, ..) =>
       self.region(loc, [
@@ -1465,7 +1558,18 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       self.region(loc, parts)
     }
     Raise(err_value~, loc~, ..) => self.region(loc, [self.part_expr(err_value)])
-    Unit(loc~, faked~) =>
+    Quantifier(binder~, binder_ty~, body~, loc~, ..) =>
+      self.region(loc, [
+        self.part_binder(binder),
+        self.part_type(binder_ty),
+        self.part_expr(body),
+      ])
+    Implies(lhs~, rhs~, loc~, ..) =>
+      self.region(loc, [self.part_expr(lhs), self.part_expr(rhs)])
+    ProofAssert(expr~, loc~, ..) => self.region(loc, [self.part_expr(expr)])
+    ProofLet(binder~, expr~, loc~, ..) =>
+      self.region(loc, [self.part_binder(binder), self.part_expr(expr)])
+    Unit(loc~, faked~, ..) =>
       if faked {
         self.empty()
       } else {
@@ -1482,16 +1586,6 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       self.append_part(parts, label.map(fn(label) { self.part_label(label) }))
       parts.push_iter(
         self.parts_from_list(args, fn(expr) { self.part_expr(expr) }).iter(),
-      )
-      self.region(loc, parts)
-    }
-    Loop(arg~, body~, label~, loc~, lbrace_loc~, rbrace_loc~, ..) => {
-      let parts = Array::new()
-      self.append_part(parts, label.map(fn(label) { self.part_label(label) }))
-      parts.push(self.part_expr(arg))
-      self.append_part(
-        parts,
-        self.make_cases_block_part(lbrace_loc, body, rbrace_loc),
       )
       self.region(loc, parts)
     }
@@ -1530,9 +1624,9 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       self.append_part(
         parts,
         self.make_block_part(
-          body_lbrace_loc,
+          Some(body_lbrace_loc),
           Some(self.part_expr(body)),
-          body_rbrace_loc,
+          Some(body_rbrace_loc),
         ),
       )
       self.append_part(
@@ -1577,9 +1671,9 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       self.append_part(
         parts,
         self.make_block_part(
-          body_lbrace_loc,
+          Some(body_lbrace_loc),
           Some(self.part_expr(body)),
-          body_rbrace_loc,
+          Some(body_rbrace_loc),
         ),
       )
       self.append_part(
@@ -1603,21 +1697,27 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
       loc~,
       catch_lbrace_loc~,
       catch_rbrace_loc~,
-      else_lbrace_loc~,
-      else_rbrace_loc~,
+      noraise_lbrace_loc~,
+      noraise_rbrace_loc~,
       ..
     ) => {
       let parts = Array::new()
       parts.push(self.part_expr(body))
       self.append_part(
         parts,
-        self.make_cases_block_part(catch_lbrace_loc, catch_, catch_rbrace_loc),
+        self.make_cases_block_part(
+          Some(catch_lbrace_loc),
+          catch_,
+          Some(catch_rbrace_loc),
+        ),
       )
       self.append_part(
         parts,
         try_else.map(fn(cases) {
           match
-            self.make_cases_block_part(else_lbrace_loc, cases, else_rbrace_loc) {
+            self.make_cases_block_part(
+              noraise_lbrace_loc, cases, noraise_rbrace_loc,
+            ) {
             Some(part) => part
             None => self.part(self.empty(), None)
           }
@@ -1629,35 +1729,29 @@ pub fn ElabCtx::elab_expr(self : Self, expr : Expr) -> Syntax {
     Map(elems~, loc~, lbrace_loc~, rbrace_loc~, ..) =>
       self.delimited_or_region(
         loc,
-        lbrace_loc,
+        Some(lbrace_loc),
         self.parts_from_list(elems, fn(elem) { self.part_map_expr_elem(elem) }),
-        rbrace_loc,
+        Some(rbrace_loc),
       )
-    Group(
-      expr~,
-      group~,
-      loc~,
-      lparen_loc~,
-      rparen_loc~,
-      lbrace_loc~,
-      rbrace_loc~
-    ) =>
+    Group(expr~, group~, loc~, left_delim_loc~, right_delim_loc~) =>
       match group {
         Paren =>
           self.delimited_or_region(
             loc,
-            lparen_loc,
+            Some(left_delim_loc),
             [self.part_expr(expr)],
-            rparen_loc,
+            Some(right_delim_loc),
           )
         Brace =>
           self.delimited_or_region(
             loc,
-            lbrace_loc,
+            Some(left_delim_loc),
             [self.part_expr(expr)],
-            rbrace_loc,
+            Some(right_delim_loc),
           )
       }
+    TemplateWriting(expr~, template~, loc~, ..) =>
+      self.region(loc, [self.part_expr(expr), self.part_expr(template)])
     StaticAssert(body~, ..) => self.elab_expr(body)
   }
 }

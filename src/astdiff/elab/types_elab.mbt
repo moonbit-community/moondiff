@@ -16,7 +16,7 @@ fn ElabCtx::elab_constant(
 ) -> Syntax {
   match constant {
     Bool(_) => self.atom_from_loc(loc, kind=AtomKind::Keyword)
-    Byte(_) | Bytes(_) | Char(_) | Constant::String(_) =>
+    Byte(_) | Bytes(_) | Char(_) | Constant::String(_) | Regex(_) =>
       self.string_from_loc(loc)
     Int(_)
     | Int64(_)
@@ -85,11 +85,7 @@ fn ElabCtx::elab_accessor(self : Self, accessor : Accessor) -> Syntax {
 ///|UUID(b8bd070f-d02a-43d0-a8fd-10f0c530b997)
 fn ElabCtx::type_loc(self : Self, ty : Type) -> Location {
   ignore(self)
-  match ty {
-    Object(constr_id~, amp_loc~) =>
-      merge_loc_option(Some(constr_id.loc), amp_loc).unwrap_or(constr_id.loc)
-    _ => ty.loc()
-  }
+  ty.loc()
 }
 
 ///|UUID(6f849862-455a-4b6e-b909-673c48c8b758)
@@ -98,43 +94,47 @@ pub fn ElabCtx::elab_type(self : Self, ty : Type) -> Syntax {
     Any(loc~) => self.tokenize_loc(loc, word_kind=AtomKind::Type)
     Arrow(args~, res~, err~, loc~, lparen_loc~, rparen_loc~, ..) => {
       let parts = Array::new()
-      if lparen_loc is Some(lparen) && rparen_loc is Some(rparen) {
-        let arg_parts = self.parts_from_list(args, fn(arg) {
-          self.part_type(arg)
-        })
-        parts.push(
-          self.part(
-            self.delimited(lparen, arg_parts, rparen),
-            Some(lparen.merge(rparen)),
-          ),
-        )
-      } else {
-        parts.push_iter(
-          self.parts_from_list(args, fn(arg) { self.part_type(arg) }).iter(),
-        )
-      }
+      let arg_parts = self.parts_from_list(args, fn(arg) { self.part_type(arg) })
+      parts.push(
+        self.part(
+          self.delimited(lparen_loc, arg_parts, rparen_loc),
+          Some(lparen_loc.merge(rparen_loc)),
+        ),
+      )
       parts.push(self.part_type(res))
       self.append_part(parts, self.part_error_type(err))
       self.region(loc, parts)
     }
     Tuple(tys~, loc~, lparen_loc~, rparen_loc~, ..) => {
       let parts = self.parts_from_list(tys, fn(ty) { self.part_type(ty) })
-      self.delimited_or_region(loc, lparen_loc, parts, rparen_loc)
+      self.delimited_or_region(loc, Some(lparen_loc), parts, Some(rparen_loc))
     }
-    Name(constr_id~, tys~, loc~, lbracket_loc~, rbracket_loc~, ..) => {
+    Name(
+      constr_id~,
+      tys~,
+      loc~,
+      type_args_lbracket_loc~,
+      type_args_rbracket_loc~,
+      ..
+    ) => {
       let parts = Array::new()
       parts.push(self.part(self.elab_constr_id(constr_id), Some(constr_id.loc)))
-      if !tys.is_empty() || (lbracket_loc is Some(_) && rbracket_loc is Some(_)) {
+      if !tys.is_empty() ||
+        (type_args_lbracket_loc is Some(_) && type_args_rbracket_loc is Some(_)) {
         let ty_parts = self.parts_from_list(tys, fn(ty) { self.part_type(ty) })
         let arg_loc = match
-          (lbracket_loc, rbracket_loc, merge_part_locs(ty_parts)) {
+          (
+            type_args_lbracket_loc,
+            type_args_rbracket_loc,
+            merge_part_locs(ty_parts),
+          ) {
           (Some(lbracket), Some(rbracket), _) => Some(lbracket.merge(rbracket))
           (_, _, Some(inner_loc)) => Some(inner_loc)
           _ => None
         }
         parts.push(
           self.part(
-            match (lbracket_loc, rbracket_loc, arg_loc) {
+            match (type_args_lbracket_loc, type_args_rbracket_loc, arg_loc) {
               (Some(lbracket), Some(rbracket), _) =>
                 self.delimited(lbracket, ty_parts, rbracket)
               (_, _, Some(arg_loc)) => self.region(arg_loc, ty_parts)
@@ -147,26 +147,22 @@ pub fn ElabCtx::elab_type(self : Self, ty : Type) -> Syntax {
       self.region(loc, parts)
     }
     Option(ty~, loc~, ..) => self.region(loc, [self.part_type(ty)])
-    Object(constr_id~, amp_loc~) => {
-      let loc = merge_loc_option(Some(constr_id.loc), amp_loc).unwrap_or(
-        constr_id.loc,
-      )
+    Object(constr_id~, loc~, ..) =>
       self.region(loc, [
         self.part(self.elab_constr_id(constr_id), Some(constr_id.loc)),
       ])
-    }
   }
 }
 
 ///|UUID(3c562e37-31b5-4d77-9917-fbda6c697b92)
 fn ElabCtx::error_type_loc(self : Self, err : ErrorType) -> Location? {
+  ignore(self)
   match err {
-    ErrorType(ty~) => Some(self.type_loc(ty))
+    ErrorType(loc~, ..) => Some(loc)
     DefaultErrorType(loc~) => Some(loc)
     NoErrorType => None
     Noraise(loc~) => Some(loc)
-    MaybeError(ty~, question_loc~) =>
-      merge_loc_option(Some(self.type_loc(ty)), question_loc)
+    MaybeError(loc~, ..) => Some(loc)
   }
 }
 
@@ -180,16 +176,11 @@ fn ElabCtx::part_error_type(self : Self, err : ErrorType) -> Part? {
 ///|UUID(6e4024b0-ab2c-4b97-8ee8-50e774a9846c)
 fn ElabCtx::elab_error_type(self : Self, err : ErrorType) -> Syntax {
   match err {
-    ErrorType(ty~) => self.elab_type(ty)
+    ErrorType(ty~, loc~, ..) => self.region(loc, [self.part_type(ty)])
     DefaultErrorType(loc~) | Noraise(loc~) =>
       self.tokenize_loc(loc, classify_keywords=true)
     NoErrorType => self.empty()
-    MaybeError(ty~, question_loc~) => {
-      let loc = merge_loc_option(Some(self.type_loc(ty)), question_loc).unwrap_or(
-        self.type_loc(ty),
-      )
-      self.region(loc, [self.part_type(ty)])
-    }
+    MaybeError(ty~, loc~, ..) => self.region(loc, [self.part_type(ty)])
   }
 }
 
