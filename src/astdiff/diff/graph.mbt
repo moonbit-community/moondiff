@@ -82,7 +82,7 @@ enum EnteredDelimiter {
 } derive(Eq)
 
 ///|UUID(8b967118-a93e-40d9-a68c-a62c8bb8cffc)
-pub impl Show for EnteredDelimiter with output(self, logger) {
+pub impl Show for EnteredDelimiter with fn output(self, logger) {
   let s = match self {
     PopEither(lhs_delims, rhs_delims) =>
       "PopEither(lhs count: \{lhs_delims.size()}, rhs count: \{rhs_delims.size()})"
@@ -92,7 +92,7 @@ pub impl Show for EnteredDelimiter with output(self, logger) {
 }
 
 ///|UUID(b91c4cfd-ae3a-4e92-9979-1a9130aeb7f8)
-pub impl Eq for Vertex with equal(self, other) {
+pub impl Eq for Vertex with fn equal(self, other) {
   // Strictly speaking, we should compare the whole
   // EnteredDelimiter stack, not just the immediate
   // parents. By taking the immediate parent, we have
@@ -130,7 +130,7 @@ pub impl Eq for Vertex with equal(self, other) {
 }
 
 ///|UUID(f9fc997f-6277-4262-aaff-0d867a0f3d24)
-pub impl Hash for Vertex with hash_combine(self, hasher) {
+pub impl Hash for Vertex with fn hash_combine(self, hasher) {
   hasher.combine(self.lhs_syntax.map(node => node.id()))
   hasher.combine(self.rhs_syntax.map(node => node.id()))
   hasher.combine(self.lhs_parent_id)
@@ -253,8 +253,8 @@ fn Vertex::is_end(self : Vertex) -> Bool {
 ///|UUID(66a58d63-0909-4ffb-ac33-5c1bc5933f8e)
 pub fn Vertex::new(lhs~ : Syntax?, rhs~ : Syntax?) -> Vertex {
   Vertex::{
-    neighbours: Ref::new(None),
-    predecessor: Ref::new(None),
+    neighbours: Ref(None),
+    predecessor: Ref(None),
     lhs_syntax: lhs,
     rhs_syntax: rhs,
     parents: Stack::new(),
@@ -451,8 +451,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
       )
       let vertex = allocate_if_new(
         Vertex::{
-          neighbours: Ref::new(None),
-          predecessor: Ref::new(None),
+          neighbours: Ref(None),
+          predecessor: Ref(None),
           lhs_syntax,
           rhs_syntax,
           parents,
@@ -508,8 +508,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
         )
         let vertex = allocate_if_new(
           Vertex::{
-            neighbours: Ref::new(None),
-            predecessor: Ref::new(None),
+            neighbours: Ref(None),
+            predecessor: Ref(None),
             lhs_syntax,
             rhs_syntax,
             parents,
@@ -549,8 +549,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
         )
         let vertex = allocate_if_new(
           Vertex::{
-            neighbours: Ref::new(None),
-            predecessor: Ref::new(None),
+            neighbours: Ref(None),
+            predecessor: Ref(None),
             lhs_syntax,
             rhs_syntax,
             parents,
@@ -576,8 +576,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
         )
         let vertex = allocate_if_new(
           Vertex::{
-            neighbours: Ref::new(None),
-            predecessor: Ref::new(None),
+            neighbours: Ref(None),
+            predecessor: Ref(None),
             lhs_syntax,
             rhs_syntax,
             parents,
@@ -600,8 +600,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
         )
         let vertex = allocate_if_new(
           Vertex::{
-            neighbours: Ref::new(None),
-            predecessor: Ref::new(None),
+            neighbours: Ref(None),
+            predecessor: Ref(None),
             lhs_syntax,
             rhs_syntax,
             parents,
@@ -627,8 +627,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
         )
         let vertex = allocate_if_new(
           Vertex::{
-            neighbours: Ref::new(None),
-            predecessor: Ref::new(None),
+            neighbours: Ref(None),
+            predecessor: Ref(None),
             lhs_syntax,
             rhs_syntax,
             parents,
@@ -652,8 +652,8 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
         )
         let vertex = allocate_if_new(
           Vertex::{
-            neighbours: Ref::new(None),
-            predecessor: Ref::new(None),
+            neighbours: Ref(None),
+            predecessor: Ref(None),
             lhs_syntax,
             rhs_syntax,
             parents,

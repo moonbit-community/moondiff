@@ -2,6 +2,31 @@
 pub type Blocks[T] = Array[Block[T]]
 
 ///|UUID(00741b24-3154-45e7-bfa3-db9d3d75fdd6)
+fn is_uuid_char(ch : Char) -> Bool {
+  match ch {
+    '0'..='9' | 'a'..='z' | '-' => true
+    _ => false
+  }
+}
+
+///|UUID(6dd6c48a-b95f-488c-8c9b-464ceee72461)
+fn uuid_prefix(rest : StringView) -> String? {
+  let buf = StringBuilder::new()
+  for ch in rest {
+    if is_uuid_char(ch) {
+      buf.write_char(ch)
+    } else {
+      break
+    }
+  }
+  if buf.is_empty() {
+    None
+  } else {
+    Some(buf.to_string())
+  }
+}
+
+///|UUID(6be83e9a-09cf-4c5e-9121-69685061f141)
 pub fn create_blocks(
   input : StringView,
 ) -> Blocks[String] raise BlockProcessingError {
@@ -12,30 +37,39 @@ pub fn create_blocks(
   let mut current_start_line = 1
   for i in 0..<lines.length() {
     let line = lines[i]
-    if line lexmatch? ("///\|", rest) {
-      if rest lexmatch? ("UUID\(", rest) &&
-        rest lexmatch? ("[0-9a-z\-]+" as next_uuid, _) {
-        if current_uuid != "dummy_uuid_if_ocuur_then_need_fix" {
-          res.push(Block::{
-            start_line: current_start_line,
-            uuid: current_uuid,
-            contents: buf.to_string(),
-          })
-          buf.reset()
-        } else if !buf.is_empty() {
-          // there is content before the first UUID
+    if line.has_prefix("///|") {
+      match line {
+        [.. "///|UUID(", .. rest] =>
+          match uuid_prefix(rest) {
+            Some(next_uuid) => {
+              if current_uuid != "dummy_uuid_if_ocuur_then_need_fix" {
+                res.push(Block::{
+                  start_line: current_start_line,
+                  uuid: current_uuid,
+                  contents: buf.to_string(),
+                })
+                buf.reset()
+              } else if !buf.is_empty() {
+                // there is content before the first UUID
+                raise NotWellFormattedSourceCode(
+                  completely_no_uuid=false,
+                  line_number=current_start_line,
+                )
+              }
+              current_uuid = next_uuid
+              current_start_line = i + 1
+            }
+            None =>
+              raise NotWellFormattedSourceCode(
+                completely_no_uuid=false,
+                line_number=i + 1,
+              )
+          }
+        _ =>
           raise NotWellFormattedSourceCode(
             completely_no_uuid=false,
-            line_number=current_start_line,
+            line_number=i + 1,
           )
-        }
-        current_uuid = next_uuid.to_string()
-        current_start_line = i + 1
-      } else {
-        raise NotWellFormattedSourceCode(
-          completely_no_uuid=false,
-          line_number=i + 1,
-        )
       }
     } else {
       buf.write_stringview(line)

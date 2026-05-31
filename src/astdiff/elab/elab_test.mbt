@@ -5,7 +5,7 @@ using @dsyntax {type Syntax}
 fn source_lines(source : String) -> Array[Array[Char]] {
   let lines = Array::new()
   for line in source.split("\n") {
-    lines.push(line.to_string().to_array())
+    lines.push(line.to_owned().to_array())
   } nobreak {
     lines
   }
@@ -15,7 +15,7 @@ fn source_lines(source : String) -> Array[Array[Char]] {
 fn span_text(lines : Array[Array[Char]], span : @span.SingleLineSpan) -> String {
   let start_idx = if span.start_col == 0 { 0 } else { span.start_col - 1 }
   let end_idx = span.end_col - 1
-  String::from_array(lines[span.line - 1][start_idx:end_idx].to_array())
+  String::from_array(lines[span.line - 1][start_idx:end_idx].to_owned())
 }
 
 ///|UUID(738ecb58-db28-4f89-adbb-bf26ad8a4b19)

@@ -13,13 +13,13 @@ fn Array::remove_leading_trailing_blank(
             is [Invisible(_) as blank, .. rest] => {
             result.truncate(result.length() - 1)
             result.push(Equal(new~, old=hd + [blank]))
-            result.push(Delete(old=rest.to_array()))
+            result.push(Delete(old=rest.to_owned()))
           }
           // try eliminate trailing invisible token in delete
           (Delete(old=hd), Equal(new~, old=tl)) if hd
             is [.. rest, Invisible(_) as blank] => {
             result.truncate(result.length() - 1)
-            result.push(Delete(old=rest.to_array()))
+            result.push(Delete(old=rest.to_owned()))
             result.push(Equal(new~, old=[blank] + tl))
           }
           // try eliminate leading invisible token in insert
@@ -27,25 +27,25 @@ fn Array::remove_leading_trailing_blank(
             is [Invisible(_) as blank, .. rest] => {
             result.truncate(result.length() - 1)
             result.push(Equal(new=hd + [blank], old~))
-            result.push(Insert(new=rest.to_array()))
+            result.push(Insert(new=rest.to_owned()))
           }
           //try eliminate trailing invisible token in insert
           (Insert(new=hd), Equal(new=tl, old~)) if hd
             is [.. rest, Invisible(_) as blank] => {
             result.truncate(result.length() - 1)
-            result.push(Insert(new=rest.to_array()))
+            result.push(Insert(new=rest.to_owned()))
             result.push(Equal(new=[blank] + tl, old~))
           }
           // eliminate leading/trailing invisible token in delete followed by insert
           (Delete(old~), Insert(new~)) =>
             if old is [.. rest, Invisible(_) as blank] {
               result.truncate(result.length() - 1)
-              result.push(Delete(old=rest.to_array()))
+              result.push(Delete(old=rest.to_owned()))
               result.push(Equal(old=[blank], new=[]))
               result.push(edit)
             } else if new is [Invisible(_) as blank, .. rest] {
               result.push(Equal(old=[], new=[blank]))
-              result.push(Insert(new=rest.to_array()))
+              result.push(Insert(new=rest.to_owned()))
             } else {
               result.push(edit)
             }
@@ -53,10 +53,10 @@ fn Array::remove_leading_trailing_blank(
           (Insert(new~), Delete(old~)) =>
             if old is [Invisible(_) as blank, .. rest] {
               result.push(Equal(old=[blank], new=[]))
-              result.push(Delete(old=rest.to_array()))
+              result.push(Delete(old=rest.to_owned()))
             } else if new is [.. rest, Invisible(_) as blank] {
               result.truncate(result.length() - 1)
-              result.push(Insert(new=rest.to_array()))
+              result.push(Insert(new=rest.to_owned()))
               result.push(Equal(old=[], new=[blank]))
               result.push(edit)
             } else {

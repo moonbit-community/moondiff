@@ -14,9 +14,9 @@ fn split_lines(source : String) -> Array[String] {
   for line in source.split("\n") {
     let chars = line.to_array()
     if chars.last() is Some('\r') {
-      lines.push(String::from_array(chars[:chars.length() - 1].to_array()))
+      lines.push(String::from_array(chars[:chars.length() - 1].to_owned()))
     } else {
-      lines.push(line.to_string())
+      lines.push(line.to_owned())
     }
   } nobreak {
     lines
@@ -41,7 +41,7 @@ fn add_changed_span(
 
 ///|UUID(e85e59c2-20e3-4407-ae4d-acba47947ac7)
 fn collect_novel_ranges(mps : ArrayView[MatchedPos]) -> HighlightMap {
-  let highlights = @hashmap.HashMap::new()
+  let highlights = @hashmap.HashMap([])
   for mp in mps {
     if !mp.kind.is_novel() {
       continue
@@ -184,7 +184,7 @@ fn render_line_body(
     while end < chars.length() && mask[end] == highlighted {
       end += 1
     }
-    let segment = String::from_array(chars[start:end].to_array())
+    let segment = String::from_array(chars[start:end].to_owned())
     if highlighted {
       buf.write_string(style_text(segment, style, true))
     } else {
@@ -286,9 +286,9 @@ fn hunk_side_range(
   lines : ArrayView[(Int?, Int?)],
   use_old_side : Bool,
 ) -> (Int, Int) {
-  let first = Ref::new(None)
-  let last = Ref::new(None)
-  let fallback = Ref::new(0)
+  let first = Ref(None)
+  let last = Ref(None)
+  let fallback = Ref(0)
   for pair in lines {
     let (old_line, new_line) = pair
     let selected = if use_old_side { old_line } else { new_line }

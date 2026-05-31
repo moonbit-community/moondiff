@@ -365,22 +365,10 @@ fn ElabCtx::elab_type_decl(self : Self, decl : TypeDecl) -> Syntax {
   self.region(decl.loc, parts)
 }
 
-///|UUID(3e3d276f-5591-4a1f-b13a-9bb7d2c438b8)
-fn ElabCtx::part_type_decl(self : Self, decl : TypeDecl) -> Part {
-  self.part(self.elab_type_decl(decl), Some(decl.loc))
-}
-
 ///|UUID(89dde800-da7e-45ae-87be-97be65d4a5bf)
 fn ElabCtx::elab_func_stubs(self : Self, stubs : FuncStubs) -> Syntax {
   ignore(self)
   ignore(stubs)
-  Syntax::simple_list(open_position=[], children=[], close_position=[])
-}
-
-///|UUID(7c5e356b-9d30-4585-a847-58778c5f5bf8)
-fn ElabCtx::elab_embedded_code(self : Self, code : EmbeddedCode) -> Syntax {
-  ignore(self)
-  ignore(code)
   Syntax::simple_list(open_position=[], children=[], close_position=[])
 }
 
@@ -641,11 +629,6 @@ fn ElabCtx::elab_trait_decl(self : Self, decl : TraitDecl) -> Syntax {
   self.region(decl.loc, parts)
 }
 
-///|UUID(1f1434ab-82b9-4c03-a51c-c0c372f854bf)
-fn ElabCtx::part_trait_decl(self : Self, decl : TraitDecl) -> Part {
-  self.part(self.elab_trait_decl(decl), Some(decl.loc))
-}
-
 ///|UUID(6094e4c4-1b51-4310-89d9-c32f66988f67)
 pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
   match impl_ {
@@ -795,7 +778,7 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
     TopView(
       quantifiers~,
       source_ty~,
-      view_type_name~,
+      view_type_name=_,
       view_type_loc~,
       view_constrs~,
       view_func_name~,

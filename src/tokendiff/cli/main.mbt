@@ -20,8 +20,8 @@ fn split_matching_block(
 ) -> (Array[Array[(Bool, Array[Char])]], Array[Array[(Bool, Array[Char])]]) {
   let left = []
   let right = []
-  let current_line_left = Ref::new([])
-  let current_line_right = Ref::new([])
+  let current_line_left = Ref([])
+  let current_line_right = Ref([])
   fn process_edits(
     old : Array[MbtToken],
     modified : Bool,
@@ -41,7 +41,7 @@ fn split_matching_block(
         match token {
           Invisible(widths) =>
             if widths.search(0) is Some(start) {
-              let first = widths[:start].to_array()
+              let first = widths[:start].to_owned()
               if first.length() > 0 {
                 tok_buf.append(MbtToken::Invisible(first).to_text())
               }
@@ -58,7 +58,7 @@ fn split_matching_block(
                       full.push([
                         (
                           modified,
-                          MbtToken::Invisible(segment.to_array()).to_text(),
+                          MbtToken::Invisible(segment.to_owned()).to_text(),
                         ),
                       ])
                     } else {
@@ -67,7 +67,7 @@ fn split_matching_block(
                   }
                   // processing last
                   current_line.val.push(
-                    (modified, MbtToken::Invisible(last.to_array()).to_text()),
+                    (modified, MbtToken::Invisible(last.to_owned()).to_text()),
                   )
                 }
               }
@@ -449,7 +449,7 @@ fn main {
     spec,
     filename => filenames.push(filename),
     usage,
-    args[1:].to_array(),
+    args[1:].to_owned(),
   ) catch {
     e => {
       println("failed to parse command line argument: " + e.to_string())
@@ -468,7 +468,7 @@ fn main {
     // peaceful exit
     println("No input files provided.")
   } else {
-    println("unexpected filenames: \{filenames}")
+    println("unexpected filenames: " + repr(filenames))
     println(usage)
     panic()
   }

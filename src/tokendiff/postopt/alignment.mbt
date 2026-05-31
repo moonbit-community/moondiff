@@ -37,7 +37,7 @@ pub fn align_edit_boundaries(
             ([], []) => ()
             (old_rest, new_rest) =>
               result.push_edit(
-                Equal(new=new_rest.to_array(), old=old_rest.to_array()),
+                Equal(new=new_rest.to_owned(), old=old_rest.to_owned()),
               )
           }
         }
@@ -210,11 +210,11 @@ fn slide_to_prev(
   next~ : Array[MbtToken],
   index_for_max_score_prev~ : Int,
 ) -> (Array[MbtToken], Array[MbtToken], Array[MbtToken]) {
-  let new_current = prev[prev.length() - index_for_max_score_prev - 1:].to_array() +
-    current[:current.length() - index_for_max_score_prev - 1].to_array()
-  let new_next = current[current.length() - index_for_max_score_prev - 1:].to_array() +
+  let new_current = prev[prev.length() - index_for_max_score_prev - 1:].to_owned() +
+    current[:current.length() - index_for_max_score_prev - 1].to_owned()
+  let new_next = current[current.length() - index_for_max_score_prev - 1:].to_owned() +
     next
-  let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_array()
+  let new_prev = prev[:prev.length() - index_for_max_score_prev - 1].to_owned()
   (new_prev, new_current, new_next)
 }
 
@@ -225,10 +225,10 @@ fn slide_to_next(
   next~ : Array[MbtToken],
   index_for_max_score_next~ : Int,
 ) -> (Array[MbtToken], Array[MbtToken], Array[MbtToken]) {
-  let new_current = current[index_for_max_score_next + 1:].to_array() +
-    next[:index_for_max_score_next + 1].to_array()
-  let new_prev = prev + current[:index_for_max_score_next + 1].to_array()
-  let new_next = next[index_for_max_score_next + 1:].to_array()
+  let new_current = current[index_for_max_score_next + 1:].to_owned() +
+    next[:index_for_max_score_next + 1].to_owned()
+  let new_prev = prev + current[:index_for_max_score_next + 1].to_owned()
+  let new_next = next[index_for_max_score_next + 1:].to_owned()
   (new_prev, new_current, new_next)
 }
 

@@ -189,12 +189,6 @@ fn ElabCtx::elab_lex_pattern(self : Self, pat : LexPattern) -> Syntax {
   }
 }
 
-///|UUID(fca04eb3-6d9e-4510-a523-f81445fbdd62)
-fn ElabCtx::part_lex_pattern(self : Self, pat : LexPattern) -> Part {
-  let loc = lex_pattern_loc(pat)
-  self.part(self.elab_lex_pattern(pat), Some(loc))
-}
-
 ///|UUID(a0bd3b15-3330-465e-b5ff-9c15371cbb06)
 fn ElabCtx::elab_lex_top_pattern(self : Self, pat : LexTopPattern) -> Syntax {
   match pat {

@@ -79,7 +79,7 @@ fn same_word_part_kind(kind : WordPartKind, ch : Char) -> Bool {
 
 ///|UUID(23e682f0-8377-4384-a224-591ddab3bada)
 fn string_slice(chars : ArrayView[Char], start : Int, end_ : Int) -> String {
-  String::from_array(chars[start:end_].to_array())
+  String::from_array(chars[start:end_].to_owned())
 }
 
 ///|UUID(45eeaf7c-0d40-4941-8f67-33a67f5ed403)
@@ -114,7 +114,7 @@ fn split_word_parts(content : String) -> Array[WordPart] {
 fn split_content_lines(content : String) -> Array[String] {
   let lines = Array::new()
   for line in content.split("\n") {
-    lines.push(line.to_string())
+    lines.push(line.to_owned())
   } nobreak {
     lines
   }
@@ -159,7 +159,7 @@ fn relative_region_positions(
 
 ///|UUID(e6ad8aa3-0196-4422-aef1-d9b99d90c3a3)
 fn token_display_width(positions : ArrayView[@span.SingleLineSpan]) -> Int {
-  let width = Ref::new(0)
+  let width = Ref(0)
   for span in positions {
     width.val += span.end_col - span.start_col
   }
@@ -216,7 +216,7 @@ fn unchanged_positions(
     opposite_pos.length()
   }
   let matched = Array::new(capacity=limit)
-  let opposite = opposite_pos.to_array()
+  let opposite = opposite_pos.to_owned()
   for i in 0..<limit {
     let span = positions[i]
     if limit == 1 && span.start_col == span.end_col {
@@ -265,8 +265,8 @@ fn word_diffs(
   }
 
   let diffs = Array::new()
-  let lhs_i = Ref::new(0)
-  let rhs_i = Ref::new(0)
+  let lhs_i = Ref(0)
+  let rhs_i = Ref(0)
   while lhs_i.val < lhs_parts.length() && rhs_i.val < rhs_parts.length() {
     let lhs_part = lhs_parts[lhs_i.val]
     let rhs_part = rhs_parts[rhs_i.val]
@@ -296,8 +296,8 @@ fn word_diffs(
 
 ///|UUID(7d30871c-c26e-4f07-bbc9-87e8b24959b7)
 fn has_common_words(diffs : ArrayView[WordDiff]) -> Bool {
-  let unchanged_count = Ref::new(0)
-  let novel_count = Ref::new(0)
+  let unchanged_count = Ref(0)
+  let novel_count = Ref(0)
   for diff in diffs {
     match diff {
       MatchedPart(self_part~, ..) =>

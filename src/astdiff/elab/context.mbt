@@ -90,7 +90,7 @@ fn ElabCtx::slice_cnums(
   start_cnum : Int,
   end_cnum : Int,
 ) -> String {
-  String::from_array(self.contents[start_cnum:end_cnum].to_array())
+  String::from_array(self.contents[start_cnum:end_cnum].to_owned())
 }
 
 ///|UUID(a9766739-6a47-4934-b948-4c4340f9a3e3)
@@ -372,20 +372,6 @@ fn ElabCtx::delimited_or_region(
   }
 }
 
-///|UUID(f790053a-3cf3-41dc-a053-2e1fc4ad6910)
-fn ElabCtx::part_delimited_or_region(
-  self : Self,
-  loc : Location,
-  open_loc : Location?,
-  parts : Array[Part],
-  close_loc : Location?,
-) -> Part {
-  self.part(
-    self.delimited_or_region(loc, open_loc, parts, close_loc),
-    Some(loc),
-  )
-}
-
 ///|UUID(41a8966c-2dda-4ed5-a8ea-915f2eeb08db)
 fn ElabCtx::outer_delim_locs(
   self : Self,
@@ -456,22 +442,6 @@ fn ElabCtx::find_char_backward(
     i -= 1
   }
   None
-}
-
-///|UUID(a9f792ab-41f7-4ef2-9b38-aa0beac6a596)
-fn ElabCtx::part_bracketed_range(
-  self : Self,
-  loc : Location,
-  search_start : Int,
-  search_end : Int,
-  parts : Array[Part],
-) -> Part {
-  let open_loc = self.find_char_forward(search_start, search_end, '[')
-  let close_loc = self.find_char_backward(search_start, search_end, ']')
-  self.part(
-    self.delimited_or_region(loc, open_loc, parts, close_loc),
-    Some(loc),
-  )
 }
 
 ///|UUID(10a17d6d-b946-4103-a227-22716f157c79)
