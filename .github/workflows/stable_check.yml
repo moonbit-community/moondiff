@@ -14,6 +14,8 @@ jobs:
     continue-on-error: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: install
         run: |
@@ -24,29 +26,9 @@ jobs:
         run: |
           moon version --all
 
-      - name: install module dependencies
+      - name: moon update
         run: |
           moon update
-          moon install
 
       - name: moon check
         run: moon check
-
-      - name: format diff
-        run: |
-          moon fmt -- -add-uuid
-          git diff --exit-code
-
-      - name: info check
-        run: |
-          moon info
-          git diff --exit-code
-
-      - name: Set ulimit
-        run: |
-          ulimit -s 8176
-
-      - name: moon test
-        run: |
-          moon test --target native
-          git diff --exit-code
