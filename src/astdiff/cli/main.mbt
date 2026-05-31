@@ -1,8 +1,8 @@
 ///|UUID(781bc9a3-8ba9-4dfc-90fc-a08894f78b78)
-let graph_limit_text : Ref[String] = Ref::new("3000000")
+let graph_limit_text : Ref[String] = Ref("3000000")
 
 ///|UUID(64cf617a-ebad-4e41-ada4-c89891bd0d7c)
-let use_color : Ref[Bool] = Ref::new(true)
+let use_color : Ref[Bool] = Ref(true)
 
 ///|UUID(9d8d9872-ee94-460e-99e1-8590c4ea178f)
 fn parse_graph_limit(text : String) -> UInt raise {
@@ -33,7 +33,7 @@ fn main {
     ),
     ("--no-color", "", @ArgParser.Spec::Clear(use_color), "Disable ANSI colors"),
   ]
-  @ArgParser.parse(spec, file => files.push(file), usage, args[1:].to_array()) catch {
+  @ArgParser.parse(spec, file => files.push(file), usage, args[1:].to_owned()) catch {
     @ArgParser.ErrorMsg(msg) => fatal(msg)
     e => fatal("failed to parse command line arguments: \{e}\n\{usage}")
   }

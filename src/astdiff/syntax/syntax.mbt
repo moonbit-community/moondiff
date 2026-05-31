@@ -47,7 +47,7 @@ pub fn SyntaxInfo::new() -> Self {
 }
 
 ///|UUID(525b78cc-a805-4f38-9a3f-ac7213295ac4)
-pub impl Default for SyntaxInfo with default() {
+pub impl Default for SyntaxInfo with fn default() {
   SyntaxInfo::new()
 }
 
@@ -80,18 +80,18 @@ let default_syntax_atom : Syntax = Syntax::Atom(
 )
 
 ///|UUID(7d58b16e-9242-4fa3-8465-80ac36208f17)
-pub impl Eq for Syntax with equal(self, other) {
+pub impl Eq for Syntax with fn equal(self, other) {
   self.info().content_id == other.info().content_id
 }
 
 ///|UUID(1bc380e9-1250-41bf-8703-71257c729027)
-pub impl Default for Syntax with default() {
+pub impl Default for Syntax with fn default() {
   // will be optimized by Syntax::list() constructor
   return default_syntax_atom
 }
 
 ///|UUID(c58acc73-ea64-47b3-99e9-b20192be0386)
-pub impl @pp.Pretty for Syntax with pretty(syntax : Syntax) {
+pub impl @pp.Pretty for Syntax with fn pretty(syntax : Syntax) {
   match syntax {
     Atom(content~, ..) => @pp.text(content)
     List(children~, ..) => {
@@ -263,10 +263,10 @@ fn init_info(
   lhs_roots : ArrayView[Syntax],
   rhs_roots : ArrayView[Syntax],
 ) -> Unit {
-  let id = Ref::new(1U)
+  let id = Ref(1U)
   init_info_on_side(lhs_roots, id)
   init_info_on_side(rhs_roots, id)
-  let existing = @hashmap.HashMap::new()
+  let existing = @hashmap.HashMap([])
   set_content_id(lhs_roots, existing)
   set_content_id(rhs_roots, existing)
   set_content_is_unique(lhs_roots)
@@ -278,7 +278,7 @@ type ContentId = UInt
 
 ///|UUID(4f54e639-9d2c-44a1-91f9-e57b5a57b9ba)
 fn set_content_is_unique(nodes : ArrayView[Syntax]) -> Unit {
-  let counts = @hashmap.HashMap::new()
+  let counts = @hashmap.HashMap([])
   find_nodes_with_unique_content(nodes, counts)
   set_content_is_unique_from_counts(nodes, counts)
 }

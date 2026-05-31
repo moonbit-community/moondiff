@@ -11,7 +11,7 @@ pub fn pairing_blocks_by_uuid(
   new~ : ArrayView[Block[String]],
 ) -> Array[EditBlock] {
   let result = []
-  let new_map = @hashmap.new(capacity=new.length())
+  let new_map = @hashmap.HashMap([], capacity=new.length())
   for blk in new {
     new_map[blk.uuid] = blk
   }

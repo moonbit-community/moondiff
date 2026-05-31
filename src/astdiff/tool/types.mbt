@@ -15,7 +15,7 @@ pub fn DiffOptions::new(
 }
 
 ///|UUID(67af8150-11cf-4e6a-93e4-32813df70c26)
-pub impl Default for DiffOptions with default() {
+pub impl Default for DiffOptions with fn default() {
   DiffOptions::new()
 }
 

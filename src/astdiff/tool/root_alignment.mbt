@@ -41,12 +41,12 @@ fn parse_uuid_line(line : String) -> String? {
       return None
     }
   }
-  Some(String::from_array(chars[start:end_].to_array()))
+  Some(String::from_array(chars[start:end_].to_owned()))
 }
 
 ///|UUID(c8af895b-35ec-44e7-8f9e-f81f90e0bfb9)
 fn doc_uuid(doc : DocString) -> String? {
-  let uuid = Ref::new(None)
+  let uuid = Ref(None)
   doc.content.each(fn(line) {
     if uuid.val is None {
       uuid.val = parse_uuid_line(line)
@@ -57,7 +57,7 @@ fn doc_uuid(doc : DocString) -> String? {
 
 ///|UUID(ff5687d4-4636-433d-ba6c-7ac2ed877abd)
 fn doc_has_content(doc : DocString) -> Bool {
-  let has_content = Ref::new(false)
+  let has_content = Ref(false)
   doc.content.each(fn(_) { has_content.val = true })
   has_content.val
 }
@@ -152,7 +152,7 @@ fn align_impl_units_by_uuid(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
 ) -> Array[ImplEdit] {
-  let new_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap::new()
+  let new_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([])
   for i in 0..<new_units.length() {
     match new_units[i].uuid {
       Some(uuid) => new_positions.get_or_init(uuid, fn() { [] }).push(i)
@@ -160,8 +160,8 @@ fn align_impl_units_by_uuid(
     }
   }
 
-  let new_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap::new()
-  let used_new : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap::new()
+  let new_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  let used_new : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let edits = Array::new()
 
   for old_unit in old_units {

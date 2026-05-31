@@ -25,7 +25,7 @@ pub fn[T] compress_piediff_edits(
         if len > 0 {
           compressed.push(
             Edit::Delete(
-              old=old.view(start=old_index, end=old_index + len).to_array(),
+              old=old.view(start=old_index, end=old_index + len).to_owned(),
             ),
           )
         }
@@ -33,7 +33,7 @@ pub fn[T] compress_piediff_edits(
         if len > 0 {
           compressed.push(
             Edit::Insert(
-              new=new.view(start=new_index, end=new_index + len).to_array(),
+              new=new.view(start=new_index, end=new_index + len).to_owned(),
             ),
           )
         }
@@ -41,8 +41,8 @@ pub fn[T] compress_piediff_edits(
         if len > 0 {
           compressed.push(
             Edit::Equal(
-              old=old.view(start=old_index, end=old_index + len).to_array(),
-              new=new.view(start=new_index, end=new_index + len).to_array(),
+              old=old.view(start=old_index, end=old_index + len).to_owned(),
+              new=new.view(start=new_index, end=new_index + len).to_owned(),
             ),
           )
         }

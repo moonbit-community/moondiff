@@ -12,7 +12,7 @@ pub struct LineWidths {
 }
 
 ///|UUID(472aa521-7ba5-4817-9180-4838b8416b23)
-pub impl Debug for LineWidths with to_repr(self) {
+pub impl Debug for LineWidths with fn to_repr(self) {
   let views : Array[ArrayView[Char]] = Array::new()
   for line in self.lines {
     views.push(self.contents[line.0:line.1])
@@ -102,7 +102,7 @@ pub fn LineWidths::text_of_loc(
 ) -> Array[Char] {
   let start = start_pos.cnum
   let end = end_pos.cnum
-  self.contents[start:end].to_array()
+  self.contents[start:end].to_owned()
 }
 
 ///|UUID(b1be2268-a2f5-4aea-aacb-b462e246b523)

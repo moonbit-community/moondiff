@@ -19,7 +19,7 @@ priv struct AstHunk {
 
 ///|UUID(2e358b6e-82df-4236-8652-859c7030f9c3)
 fn copy_line_set(lines : LineSet) -> LineSet {
-  let copied = @hashmap.HashMap::new()
+  let copied = @hashmap.HashMap([])
   for line, _ in lines {
     copied.set(line, true)
   }
@@ -31,8 +31,8 @@ fn AstHunk::merge(self : Self, other : Self) -> Self {
   let lines = self.lines.copy()
   lines.push_iter(other.lines.iter())
 
-  let lhs_seen = @hashmap.HashMap::new()
-  let rhs_seen = @hashmap.HashMap::new()
+  let lhs_seen = @hashmap.HashMap([])
+  let rhs_seen = @hashmap.HashMap([])
   let deduped = Array::new()
   for pair in lines {
     let (lhs_line, rhs_line) = pair
@@ -128,7 +128,7 @@ fn add_opposite_line(
 
 ///|UUID(1bbf5231-2b70-4e32-8fdf-dff28a419898)
 fn opposite_positions(mps : ArrayView[MatchedPos]) -> OppositeMap {
-  let opposites = @hashmap.HashMap::new()
+  let opposites = @hashmap.HashMap([])
   for mp in mps {
     match mp.kind {
       Unchanged(opposite_pos~) => {
@@ -149,8 +149,8 @@ fn lines_with_novel(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
 ) -> (LineSet, LineSet) {
-  let lhs_lines = @hashmap.HashMap::new()
-  let rhs_lines = @hashmap.HashMap::new()
+  let lhs_lines = @hashmap.HashMap([])
+  let rhs_lines = @hashmap.HashMap([])
   for mp in lhs_mps {
     if mp.kind.is_novel() {
       push_line(lhs_lines, line_index(mp.pos))
@@ -166,7 +166,7 @@ fn lines_with_novel(
 
 ///|UUID(67f1ba22-01fd-49b9-884e-b047dd93fe23)
 fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int] {
-  let seen = @hashmap.HashMap::new()
+  let seen = @hashmap.HashMap([])
   for mp in mps {
     let line = line_index(mp.pos)
     if line >= 0 {
@@ -200,15 +200,15 @@ fn matched_lines_from_unchanged(
   mps : ArrayView[MatchedPos],
 ) -> Array[(Int?, Int?)] {
   let line_to_opposites = opposite_positions(mps)
-  let opposite_to_lines = @hashmap.HashMap::new()
+  let opposite_to_lines = @hashmap.HashMap([])
   for self_line, opposite_lines in line_to_opposites {
     for opposite_line in opposite_lines {
       add_opposite_line(opposite_to_lines, opposite_line, self_line)
     }
   }
 
-  let highest_line = Ref::new(None)
-  let highest_opposite_line = Ref::new(None)
+  let highest_line = Ref(None)
+  let highest_opposite_line = Ref(None)
   let matched = Array::new()
   for mp in mps {
     let self_line = line_index(mp.pos)
@@ -306,8 +306,8 @@ fn add_ends(
   lhs_line_count : Int,
   rhs_line_count : Int,
 ) -> Array[(Int?, Int?)] {
-  let lhs_min = Ref::new(None)
-  let rhs_min = Ref::new(None)
+  let lhs_min = Ref(None)
+  let rhs_min = Ref(None)
   for pair in matched_lines {
     let (lhs_line, rhs_line) = pair
     if lhs_min.val is None && lhs_line is Some(line) {
@@ -321,8 +321,8 @@ fn add_ends(
     }
   }
 
-  let lhs_max = Ref::new(None)
-  let rhs_max = Ref::new(None)
+  let lhs_max = Ref(None)
+  let rhs_max = Ref(None)
   let reversed = reversed_pairs(matched_lines)
   for pair in reversed {
     let (lhs_line, rhs_line) = pair
@@ -450,8 +450,8 @@ fn match_preceding_blanks(
   lhs_lines : ArrayView[String],
   rhs_lines : ArrayView[String],
 ) -> Array[(Int?, Int?)] {
-  let prev_lhs = Ref::new(None)
-  let prev_rhs = Ref::new(None)
+  let prev_lhs = Ref(None)
+  let prev_rhs = Ref(None)
   let matched = Array::new()
   for pair in line_nums {
     match (pair.0, pair.1, prev_lhs.val, prev_rhs.val) {
@@ -484,8 +484,8 @@ fn match_preceding_blanks(
 ///|UUID(a25a4c74-48e8-4578-9c20-d1a02ce224b3)
 fn ensure_contiguous(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   let contiguous = Array::new()
-  let lhs_prev = Ref::new(None)
-  let rhs_prev = Ref::new(None)
+  let lhs_prev = Ref(None)
+  let rhs_prev = Ref(None)
   for pair in lines {
     let (lhs_line, rhs_line) = pair
     if lhs_line is Some(line) {
@@ -731,8 +731,8 @@ fn matched_novel_lines(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
 ) -> Array[(Int?, Int?)] {
-  let highest_lhs = Ref::new(None)
-  let highest_rhs = Ref::new(None)
+  let highest_lhs = Ref(None)
+  let highest_rhs = Ref(None)
   let opposite_to_lhs = opposite_positions(lhs_mps)
   let opposite_to_rhs = opposite_positions(rhs_mps)
   let lines = Array::new()
@@ -834,8 +834,8 @@ fn fill_increasing_line(max_seen : Ref[Int?], line : Int?) -> Int? {
 ///|UUID(f583e103-7bd9-4e38-ae85-51cb86af6dee)
 fn enforce_increasing(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   let ordered = Array::new()
-  let max_lhs = Ref::new(None)
-  let max_rhs = Ref::new(None)
+  let max_lhs = Ref(None)
+  let max_rhs = Ref(None)
   for pair in lines {
     let lhs_line = fill_increasing_line(max_lhs, pair.0)
     let rhs_line = fill_increasing_line(max_rhs, pair.1)
@@ -852,8 +852,8 @@ fn find_novel_lines(
   all_lhs_novel : LineSet,
   all_rhs_novel : LineSet,
 ) -> (LineSet, LineSet) {
-  let lhs_novel = @hashmap.HashMap::new()
-  let rhs_novel = @hashmap.HashMap::new()
+  let lhs_novel = @hashmap.HashMap([])
+  let rhs_novel = @hashmap.HashMap([])
   for pair in lines {
     let (lhs_line, rhs_line) = pair
     if lhs_line is Some(line) && all_lhs_novel.contains(line) {
@@ -875,8 +875,8 @@ fn lines_to_hunks(
   let (all_lhs_novel, all_rhs_novel) = lines_with_novel(lhs_mps, rhs_mps)
   let hunks = Array::new()
   let current_hunk_lines = Array::new()
-  let max_lhs = Ref::new(None)
-  let max_rhs = Ref::new(None)
+  let max_lhs = Ref(None)
+  let max_rhs = Ref(None)
 
   for line in enforce_increasing(lines) {
     let (lhs_line, rhs_line) = line
@@ -964,8 +964,8 @@ fn fill_between(
 ///|UUID(97feb0f2-c6cc-4093-9c13-6870ac972bb3)
 fn extract_hunk_lines(hunk : AstHunk) -> Array[(Int?, Int?)] {
   let relevant = Array::new()
-  let max_lhs = Ref::new(None)
-  let max_rhs = Ref::new(None)
+  let max_lhs = Ref(None)
+  let max_rhs = Ref(None)
   for pair in hunk.lines {
     let (lhs_line, rhs_line) = pair
     relevant.push_iter(
@@ -984,8 +984,8 @@ fn extract_hunk_lines(hunk : AstHunk) -> Array[(Int?, Int?)] {
 
 ///|UUID(e2071738-353c-470e-9815-760d318ccd39)
 fn hunk_line_sets(hunk : AstHunk) -> (LineSet, LineSet) {
-  let lhs_lines = @hashmap.HashMap::new()
-  let rhs_lines = @hashmap.HashMap::new()
+  let lhs_lines = @hashmap.HashMap([])
+  let rhs_lines = @hashmap.HashMap([])
   for pair in extract_hunk_lines(hunk) {
     if pair.0 is Some(line) {
       lhs_lines.set(line, true)
@@ -1003,8 +1003,8 @@ fn matched_lines_indexes_for_hunk(
   matched_lines : ArrayView[(Int?, Int?)],
 ) -> (Int, Int) {
   let (lhs_lines, rhs_lines) = hunk_line_sets(hunk)
-  let start = Ref::new(None)
-  let end_ = Ref::new(None)
+  let start = Ref(None)
+  let end_ = Ref(None)
   for i in 0..<matched_lines.length() {
     let pair = matched_lines[i]
     let contains_line = (pair.0 is Some(line) && lhs_lines.contains(line)) ||
@@ -1042,9 +1042,9 @@ fn merge_adjacent_hunks(
   context_lines : Int,
 ) -> Array[AstHunk] {
   let merged = Array::new()
-  let prev_hunk = Ref::new(None)
-  let prev_start = Ref::new(0)
-  let prev_end = Ref::new(0)
+  let prev_hunk = Ref(None)
+  let prev_start = Ref(0)
+  let prev_end = Ref(0)
 
   let merge_radius = context_lines + 1
   for hunk in hunks {

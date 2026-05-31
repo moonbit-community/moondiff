@@ -10,7 +10,7 @@ pub(all) enum MbtToken {
 } derive(Debug)
 
 ///|UUID(3b275564-69e2-4725-a6a8-fe6f05a3d97c)
-pub impl Show for MbtToken with output(self, logger) {
+pub impl Show for MbtToken with fn output(self, logger) {
   match self {
     Visible(kind~, repr~, ..) => {
       logger.write_string("(")
@@ -21,7 +21,7 @@ pub impl Show for MbtToken with output(self, logger) {
     }
     Invisible(repr) => {
       logger.write_string("|")
-      logger.write_object(repr)
+      logger.write_string(@debug.to_string(repr))
       logger.write_string("|")
     }
     Barrier => logger.write_string("_")
@@ -29,7 +29,7 @@ pub impl Show for MbtToken with output(self, logger) {
 }
 
 ///|UUID(6af7c0c1-526f-47b5-a84d-94c0cc97ebf7)
-pub impl Eq for MbtToken with equal(self, other) {
+pub impl Eq for MbtToken with fn equal(self, other) {
   match (self, other) {
     (Invisible(_), Invisible(_))
     | (Barrier, Barrier)
@@ -44,7 +44,7 @@ pub impl Eq for MbtToken with equal(self, other) {
 }
 
 ///|UUID(9e850f58-5976-4117-86d9-cd68f92ef18f)
-pub impl Hash for MbtToken with hash_combine(self, hasher) {
+pub impl Hash for MbtToken with fn hash_combine(self, hasher) {
   match self {
     Visible(kind~, repr~, ..) => {
       hasher.combine(0)

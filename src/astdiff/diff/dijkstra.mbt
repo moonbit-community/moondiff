@@ -13,7 +13,7 @@ priv struct WeightedVertex {
 } derive(Eq)
 
 ///|UUID(5b821e8f-5dc5-43ea-b19b-6473450629cd)
-impl Compare for WeightedVertex with compare(self, other) {
+impl Compare for WeightedVertex with fn compare(self, other) {
   self.distance.compare(other.distance)
 }
 
@@ -27,9 +27,9 @@ fn shortest_vertex_path(
   // We want to visit nodes with the shortest distance first, but
   // PriorityQueue is a max-heap. Ensure nodes are wrapped with
   // @cmp.Reverse to flip comparisons.
-  let heap = PriorityQueue::new()
+  let heap = PriorityQueue([])
   heap.push(WeightedVertex::{ vertex: start, distance: @cmp.Reverse(0) })
-  let seen = HashMap::new(capacity=size_hint)
+  let seen = HashMap([], capacity=size_hint)
   let end : Vertex = for top = heap.pop() {
     match top {
       Some({ vertex: current, distance: Reverse(distance) }) => {

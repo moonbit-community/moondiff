@@ -170,9 +170,9 @@ test "matched_pos_to_hunks keeps wrapped call on the same line pair" {
     change_positions(rhs_roots, change_map),
   )
 
-  assert_eq(hunks.length(), 1)
-  assert_eq(hunks[0].lines.length(), 1)
-  assert_eq(hunks[0].lines[0], (Some(1), Some(1)))
+  @debug.assert_eq(hunks.length(), 1)
+  @debug.assert_eq(hunks[0].lines.length(), 1)
+  @debug.assert_eq(hunks[0].lines[0], (Some(1), Some(1)))
   assert_true(!hunks[0].novel_lhs.contains(1))
   assert_true(hunks[0].novel_rhs.contains(1))
 }
@@ -207,17 +207,17 @@ test "merge_adjacent_hunks combines overlapping context windows" {
   )
   let hunks = matched_pos_to_hunks(lhs_positions, rhs_positions)
 
-  assert_eq(hunks.length(), 2)
+  @debug.assert_eq(hunks.length(), 2)
 
   let merged = merge_adjacent_hunks(hunks, matched_lines, 3)
-  assert_eq(merged.length(), 1)
+  @debug.assert_eq(merged.length(), 1)
 
   let (start, end_) = contextual_index_range_for_hunk(
     merged[0],
     matched_lines,
     3,
   )
-  assert_eq((start, end_), (0, matched_lines.length()))
+  @debug.assert_eq((start, end_), (0, matched_lines.length()))
 }
 
 ///|UUID(cb822c15-f51a-4177-bfaf-a6b59daae2eb)
@@ -233,7 +233,7 @@ test "render_ast_diff uses one merged hunk for nearby ast changes" {
     DiffOptions::new(context_lines=3),
   )
 
-  assert_eq(rendered.split("@@").count(), 3)
+  @debug.assert_eq(rendered.split("@@").count(), 3)
   assert_true(rendered.contains("  5 5 | fn mid() {}"))
   assert_true(rendered.contains("+   2 |   foo(baz(bar))"))
   assert_true(rendered.contains("+   8 |   alpha(gamma(beta))"))
@@ -286,7 +286,7 @@ test "align_impl_units aligns top-level UUID blocks before inner AST diff" {
     collect_impl_units(old_source, old_impls),
     collect_impl_units(new_source, new_impls),
   )
-  assert_eq(edits.map(edit_summary), [
+  @debug.assert_eq(edits.map(edit_summary), [
     "Replace(11111111-1111-1111-1111-111111111111->11111111-1111-1111-1111-111111111111)",
     "Replace(22222222-2222-2222-2222-222222222222->22222222-2222-2222-2222-222222222222)",
     "Insert(99999999-9999-9999-9999-999999999999)",
@@ -329,7 +329,7 @@ test "empty delimiter wrappers do not hide inserted sibling statements" {
   assert_true(change_map.get(rhs_stmt_chain) is Some(@diff.ChangeKind::Novel))
   match change_map.get(lhs_stmt_wrapper) {
     Some(@diff.ChangeKind::Unchanged(opposite)) =>
-      assert_eq(opposite.content_id(), lhs_stmt_wrapper.content_id())
+      @debug.assert_eq(opposite.content_id(), lhs_stmt_wrapper.content_id())
     _ => panic()
   }
 }
@@ -354,15 +354,18 @@ test "matched lines keep inserted sibling after wrapped call block" {
   let rhs_mps = change_positions(rhs_roots, change_map)
   let lhs_lines = split_lines(old_source)
   let rhs_lines = split_lines(new_source)
-  assert_eq(all_matched_lines_filled(lhs_mps, rhs_mps, lhs_lines, rhs_lines), [
-    (Some(0), Some(0)),
-    (Some(1), None),
-    (Some(2), None),
-    (Some(3), None),
-    (None, Some(1)),
-    (None, Some(2)),
-    (Some(4), Some(3)),
-  ])
+  @debug.assert_eq(
+    all_matched_lines_filled(lhs_mps, rhs_mps, lhs_lines, rhs_lines),
+    [
+      (Some(0), Some(0)),
+      (Some(1), None),
+      (Some(2), None),
+      (Some(3), None),
+      (None, Some(1)),
+      (None, Some(2)),
+      (Some(4), Some(3)),
+    ],
+  )
 }
 
 ///|UUID(8d4c2ad7-608d-4de0-95a8-b4e59816b4f4)
@@ -390,5 +393,8 @@ test "wrapped call opener stays in rendered context" {
     split_lines(new_source),
   )
   let hunks = matched_pos_to_hunks(lhs_mps, rhs_mps)
-  assert_eq(contextual_index_range_for_hunk(hunks[0], matched_lines, 4), (1, 7))
+  @debug.assert_eq(
+    contextual_index_range_for_hunk(hunks[0], matched_lines, 4),
+    (1, 7),
+  )
 }

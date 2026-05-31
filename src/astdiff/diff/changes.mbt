@@ -14,7 +14,7 @@ pub struct ChangeMap(@hashmap.HashMap[SyntaxId, ChangeKind])
 
 ///|UUID(cb577564-5b6e-4c0c-a65c-06ed05ff9047)
 pub fn ChangeMap::new() -> Self {
-  ChangeMap(@hashmap.HashMap::new())
+  ChangeMap(@hashmap.HashMap([]))
 }
 
 ///|UUID(c8846d67-5871-402b-b4aa-d6ba6e55d69f)

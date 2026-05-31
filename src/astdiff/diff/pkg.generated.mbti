@@ -32,8 +32,6 @@ pub enum ChangeKind {
 
 pub struct ChangeMap(@hashmap.HashMap[UInt, ChangeKind])
 pub fn ChangeMap::get(Self, @syntax.Syntax) -> ChangeKind?
-#deprecated
-pub fn ChangeMap::inner(Self) -> @hashmap.HashMap[UInt, ChangeKind]
 pub fn ChangeMap::insert(Self, @syntax.Syntax, ChangeKind) -> Unit
 pub fn ChangeMap::insert_deep_novel(Self, @syntax.Syntax) -> Unit
 pub fn ChangeMap::insert_deep_unchanged(Self, node~ : @syntax.Syntax, opposite_node~ : @syntax.Syntax) -> Unit
@@ -56,8 +54,6 @@ pub impl Show for EnteredDelimiter
 type Node[T] derive(Eq)
 
 pub struct Stack[T](Node[T]?) derive(Eq)
-#deprecated
-pub fn[T] Stack::inner(Self[T]) -> Node[T]?
 pub fn[T] Stack::is_empty(Self[T]) -> Bool
 pub fn[T] Stack::new() -> Self[T]
 pub fn[T] Stack::peek(Self[T]) -> T?
