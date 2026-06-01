@@ -16,6 +16,6 @@
 --- cli_test/source/pipeline_test_adt.old.mbt: line 8
 +++ cli_test/source/pipeline_test_adt.new.mbt: line 9
 @@ -8 +9 @@
-[31m[1m- 8   | [22m[39mlet x:(T, T) = (A, [31m[1mA)[22m[39m
-[32m[1m+   9 | [22m[39mlet x:(T, T) = (A, [32m[1mB)[22m[39m
+[31m[1m- 8   | [22m[39mlet x:(T, T) = (A, [31m[1mA[22m[39m)
+[32m[1m+   9 | [22m[39mlet x:(T, T) = (A, [32m[1mB[22m[39m)
 

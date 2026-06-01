@@ -149,14 +149,12 @@ fn render_line_body(
   let mut has_highlight = false
   for range in ranges {
     let (start_col, end_col) = range
-    let start = @cmp.maximum(start_col - 1, 0)
     // `SingleLineSpan` currently mixes 1-based parser columns with
     // synthetic 0-based full-line spans. Normalize to 0-based
     // half-open ranges here.
+    let start = if start_col == 0 { 0 } else { @cmp.maximum(start_col - 1, 0) }
     let end = @cmp.minimum(
-      if start_col == 0 && end_col == chars.length() {
-        end_col
-      } else if start_col > 0 && end_col == chars.length() {
+      if start_col == 0 {
         end_col
       } else {
         end_col - 1

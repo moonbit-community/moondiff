@@ -11,8 +11,8 @@
 @@ -9,4 +9,4 @@
 [90m   9  9 | [39mfn init {
 [90m  10 10 | [39m  println(1)
-[31m[1m- 11    | [22m[39m  println([31m[1m2)[22m[39m
-[32m[1m+    11 | [22m[39m  println([32m[1m22)[22m[39m
+[31m[1m- 11    | [22m[39m  println([31m[1m2[22m[39m)
+[32m[1m+    11 | [22m[39m  println([32m[1m22[22m[39m)
 [90m  12 12 | [39m}
 
 --- cli_test/source/pipeline_test_003.old.mbt: line 14

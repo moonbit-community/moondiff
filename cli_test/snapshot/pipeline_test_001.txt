@@ -17,8 +17,8 @@
 --- cli_test/source/pipeline_test_001.old.mbt: line 10
 +++ cli_test/source/pipeline_test_001.new.mbt: line 11
 @@ -10 +11 @@
-[31m[1m- 10    | [22m[39mlet data2 = "\nbest [31m[1mxx"[22m[39m
-[32m[1m+    11 | [22m[39mlet data2 = "\nbest [32m[1mrandom"[22m[39m
+[31m[1m- 10    | [22m[39mlet data2 = "\nbest [31m[1mxx[22m[39m"
+[32m[1m+    11 | [22m[39mlet data2 = "\nbest [32m[1mrandom[22m[39m"
 
 --- cli_test/source/pipeline_test_001.old.mbt: line 26
 +++ cli_test/source/pipeline_test_001.new.mbt: line 27

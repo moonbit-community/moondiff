@@ -1,8 +1,8 @@
 --- cli_test/source/pipeline_test_009.old.mbt: line 1
 +++ cli_test/source/pipeline_test_009.new.mbt: line 1
 @@ -1 +1 @@
-[31m[1m- 1   | [22m[39mlet a:FixedArray[Int] = FixedArray::make(3, [31m[1m2)[22m[39m
-[32m[1m+   1 | [22m[39mlet a:FixedArray[Int] = FixedArray::make(3, [32m[1m3)[22m[39m
+[31m[1m- 1   | [22m[39mlet a:FixedArray[Int] = FixedArray::make(3, [31m[1m2[22m[39m)
+[32m[1m+   1 | [22m[39mlet a:FixedArray[Int] = FixedArray::make(3, [32m[1m3[22m[39m)
 
 --- cli_test/source/pipeline_test_009.old.mbt: line 7
 +++ cli_test/source/pipeline_test_009.new.mbt: line 7

@@ -3,9 +3,9 @@
 @@ -1,7 +1,7 @@
 [90m   1  1 | [39mfn init {
 [90m   2    | [39m  let xs: FixedArray[_] = ["", "1", "12", "123", "1234"]
-[32m[1m+     2 | [22m[39m  let xs: FixedArray[_] = ["", "1", "12", "123", "1234"[32m[1m,[22m[39m [32m[1m"12345"][22m[39m
+[32m[1m+     2 | [22m[39m  let xs: FixedArray[_] = ["", "1", "12", "123", "1234"[32m[1m,[22m[39m [32m[1m"12345"[22m[39m]
 [90m   3    | [39m  let ys: FixedArray[_] = ["", "a", "ab", "abc", "abcd"]
-[32m[1m+     3 | [22m[39m  let ys: FixedArray[_] = ["", "a", "ab", "abc", "abcd"[32m[1m,[22m[39m [32m[1m"z"][22m[39m
+[32m[1m+     3 | [22m[39m  let ys: FixedArray[_] = ["", "a", "ab", "abc", "abcd"[32m[1m,[22m[39m [32m[1m"z"[22m[39m]
 [90m   4  4 | [39m  let mut i = 0
 [90m   5  5 | [39m  while i < xs.length() {
 [90m   6  6 | [39m    let mut j = 0

@@ -2,7 +2,7 @@
 +++ cli_test/source/pipeline_test_010.new.mbt: line 5
 @@ -5 +5 @@
 [90m  5   | [39mlet b:FixedArray[Int] = [1, 2, 3, 4, 88]
-[32m[1m+   5 | [22m[39mlet b:FixedArray[Int] = [1, 2, 3, 4, 88[32m[1m,[22m[39m [32m[1m144][22m[39m
+[32m[1m+   5 | [22m[39mlet b:FixedArray[Int] = [1, 2, 3, 4, 88[32m[1m,[22m[39m [32m[1m144[22m[39m]
 
 --- cli_test/source/pipeline_test_010.old.mbt: line 7
 +++ cli_test/source/pipeline_test_010.new.mbt: line 7

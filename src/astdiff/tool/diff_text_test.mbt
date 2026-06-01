@@ -45,7 +45,7 @@ test "diff_text shows partial rhs highlight for wrapped call" {
   )
   assert_true(
     result.rendered.contains(
-      "foo(\u{1b}[32m\u{1b}[1mbaz(\u{1b}[22m\u{1b}[39mbar\u{1b}[32m\u{1b}[1m))\u{1b}[22m\u{1b}[39m",
+      "foo(\u{1b}[32m\u{1b}[1mbaz(\u{1b}[22m\u{1b}[39mbar\u{1b}[32m\u{1b}[1m)\u{1b}[22m\u{1b}[39m)",
     ),
   )
   assert_false(result.rendered.contains("\u{1b}[31m\u{1b}[1m  foo(bar)"))
@@ -135,6 +135,36 @@ test "diff_text highlights only changed word inside string literal" {
   )
   assert_false(result.rendered.contains("\u{1b}[32m\u{1b}[1m\"alpha"))
   assert_false(result.rendered.contains("\u{1b}[31m\u{1b}[1m\"alpha"))
+}
+
+///|UUID(7c1ca837-48e4-44b3-86e5-d5ebae5c8720)
+test "diff_text does not highlight unchanged trailing delimiter at line end" {
+  let old_source = "let a:FixedArray[Int] = FixedArray::make(3, 2)\n"
+  let new_source = "let a:FixedArray[Int] = FixedArray::make(3, 3)\n"
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(use_color=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(
+    result.rendered.contains(
+      "FixedArray::make(3, \u{1b}[31m\u{1b}[1m2\u{1b}[22m\u{1b}[39m)",
+    ),
+  )
+  assert_true(
+    result.rendered.contains(
+      "FixedArray::make(3, \u{1b}[32m\u{1b}[1m3\u{1b}[22m\u{1b}[39m)",
+    ),
+  )
+  assert_false(
+    result.rendered.contains("\u{1b}[31m\u{1b}[1m2)\u{1b}[22m\u{1b}[39m"),
+  )
+  assert_false(
+    result.rendered.contains("\u{1b}[32m\u{1b}[1m3)\u{1b}[22m\u{1b}[39m"),
+  )
 }
 
 ///|UUID(88eea529-4e99-40c4-9ef4-0f7083393a0f)
