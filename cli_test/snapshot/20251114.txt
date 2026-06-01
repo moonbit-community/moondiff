@@ -35,13 +35,13 @@
 [32m[1m+    44 | [22m[39m  mut entries : FixedArray[[32m[1mEntry[22m[39m[K]?]
 [31m[1m- 15    | [22m[39m  [31m[1mmut[22m[39m [31m[1mlist[22m[39m [31m[1m:[22m[39m [31m[1mFixedArray[SListNode[K]][22m[39m
 [90m  16    | [39m  mut size : Int
-[90m     45 | [39m  mut size : Int [90m//[39m [90mactive[39m [90mkeys[39m [90mcount[39m
+[32m[1m+    45 | [22m[39m  mut size : Int [32m[1m//[22m[39m [32m[1mactive[22m[39m [32m[1mkeys[22m[39m [32m[1mcount[22m[39m
 [90m  17    | [39m  mut capacity : Int
-[90m     46 | [39m  mut capacity : Int [90m//[39m [90mcurrent[39m [90mcapacity[39m
+[32m[1m+    46 | [22m[39m  mut capacity : Int [32m[1m//[22m[39m [32m[1mcurrent[22m[39m [32m[1mcapacity[22m[39m
 [90m  18    | [39m  mut capacity_mask : Int
-[90m     47 | [39m  mut capacity_mask : Int [90m//[39m [90mcapacity_mask[39m [90m=[39m [90mcapacity[39m [90m-[39m [90m1,[39m [90mused[39m [90mto[39m [90mfind[39m [90midx[39m
+[32m[1m+    47 | [22m[39m  mut capacity_mask : Int [32m[1m//[22m[39m [32m[1mcapacity_mask[22m[39m [32m[1m=[22m[39m [32m[1mcapacity[22m[39m [32m[1m-[22m[39m [32m[1m1,[22m[39m [32m[1mused[22m[39m [32m[1mto[22m[39m [32m[1mfind[22m[39m [32m[1midx[22m[39m
 [90m  19    | [39m  mut grow_at : Int
-[90m     48 | [39m  mut grow_at : Int [90m//[39m [90mthreshold[39m [90mthat[39m [90mtriggers[39m [90mgrow[39m
+[32m[1m+    48 | [22m[39m  mut grow_at : Int [32m[1m//[22m[39m [32m[1mthreshold[22m[39m [32m[1mthat[22m[39m [32m[1mtriggers[22m[39m [32m[1mgrow[22m[39m
 [31m[1m- 20    | [22m[39m  mut head : [31m[1mSEntry[22m[39m[K]?
 [32m[1m+    49 | [22m[39m  mut head : [32m[1mEntry[22m[39m[K]? [32m[1m//[22m[39m [32m[1mhead[22m[39m [32m[1mof[22m[39m [32m[1mlinked[22m[39m [32m[1mlist[22m[39m
 [31m[1m- 21    | [22m[39m  mut tail : [31m[1mSEntry[K]?[22m[39m

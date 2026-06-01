@@ -133,6 +133,99 @@ fn assert_contains(syntax : Syntax, content : String) -> Unit raise {
   assert_true(syntax_contains(syntax, content))
 }
 
+///|UUID(eb194fbd-352e-489b-9159-39938f71e45)
+fn collect_brace_blocks(syntax : Syntax, blocks : Array[Syntax]) -> Unit {
+  match syntax {
+    Syntax::Atom(..) => ()
+    Syntax::List(open_content~, close_content~, children~, ..) => {
+      if open_content == "{" && close_content == "}" {
+        blocks.push(syntax)
+      }
+      for child in children {
+        collect_brace_blocks(child, blocks)
+      }
+    }
+  }
+}
+
+///|UUID(7196a25b-12ee-4313-9ae5-7a449fb68b3d)
+fn only_brace_block(syntax : Syntax) -> Syntax raise {
+  let blocks = Array::new()
+  collect_brace_blocks(syntax, blocks)
+  @debug.assert_eq(blocks.length(), 1)
+  blocks[0]
+}
+
+///|UUID(92ff70c0-3f26-4d66-b64d-d6d3702cbacd)
+fn push_line_once(lines : Array[Int], line : Int) -> Unit {
+  if !lines.contains(line) {
+    lines.push(line)
+  }
+}
+
+///|UUID(7ee5584b-8db6-4f78-9dfc-a099413a4747)
+fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
+  match syntax {
+    Syntax::Atom(position~, ..) =>
+      for span in position {
+        push_line_once(lines, span.line)
+      }
+    Syntax::List(open_position~, children~, close_position~, ..) => {
+      for span in open_position {
+        push_line_once(lines, span.line)
+      }
+      for child in children {
+        collect_syntax_lines(child, lines)
+      }
+      for span in close_position {
+        push_line_once(lines, span.line)
+      }
+    }
+  }
+}
+
+///|UUID(68573825-9f8a-4271-8025-44dde9c9f290)
+fn syntax_lines(syntax : Syntax) -> Array[Int] {
+  let lines = Array::new()
+  collect_syntax_lines(syntax, lines)
+  lines.sort()
+  lines
+}
+
+///|UUID(0fec8b3b-772e-441e-9755-d219f3da18fb)
+fn direct_child_line_sets(block : Syntax) -> Array[Array[Int]] raise {
+  match block {
+    Syntax::List(children~, ..) => children.map(syntax_lines)
+    Syntax::Atom(..) => fail("expected list")
+  }
+}
+
+///|UUID(2385d0af-6017-425d-a62f-323fd77352e2)
+fn same_int_array(lhs : Array[Int], rhs : Array[Int]) -> Bool {
+  if lhs.length() != rhs.length() {
+    return false
+  }
+  for i in 0..<lhs.length() {
+    if lhs[i] != rhs[i] {
+      return false
+    }
+  }
+  true
+}
+
+///|UUID(a994c5ee-aab2-4cc8-8feb-9e4eb1874071)
+fn line_sets_contain(
+  line_sets : Array[Array[Int]],
+  expected : Array[Int],
+) -> Bool {
+  for line_set in line_sets {
+    if same_int_array(line_set, expected) {
+      return true
+    }
+  }
+  false
+}
+
 ///|UUID(13f1e0a5-29a1-431e-89f8-652f99cef0e2)
 test "elab atoms and delimiters map back to source" {
   let source =
@@ -197,6 +290,29 @@ test "elab uses bracket delimiters for array indexing" {
 
   assert_source_faithful(source, syntax)
   assert_true(has_delim(delims, "[", "]"))
+}
+
+///|UUID(0977d5f4-30fb-48a8-bf41-e9a422946ddd)
+test "elab exposes explicit block statement chain as siblings" {
+  let source =
+    #|fn init {
+    #|  // case 002
+    #|  let marker = "case-002"
+    #|  println(marker)
+    #|  println(fib(8))
+    #|}
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
+
+  let syntax = elab_impl(source, only_impl(impls))
+  let block = only_brace_block(syntax)
+  let line_sets = direct_child_line_sets(block)
+
+  assert_source_faithful(source, syntax)
+  assert_true(line_sets_contain(line_sets, [3]))
+  assert_true(line_sets_contain(line_sets, [4]))
+  assert_true(line_sets_contain(line_sets, [5]))
+  assert_false(line_sets_contain(line_sets, [3, 4, 5]))
 }
 
 ///|UUID(f7398ef1-020e-4754-9b09-72bb5050a3ae)

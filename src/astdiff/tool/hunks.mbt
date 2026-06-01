@@ -164,6 +164,16 @@ fn lines_with_novel(
   (lhs_lines, rhs_lines)
 }
 
+///|UUID(0c609d1a-c14b-4e7f-9773-4e2a75230d63)
+fn sorted_line_set_lines(line_set : LineSet) -> Array[Int] {
+  let lines = Array::new(capacity=line_set.length())
+  for line, _ in line_set {
+    lines.push(line)
+  }
+  lines.sort()
+  lines
+}
+
 ///|UUID(67f1ba22-01fd-49b9-884e-b047dd93fe23)
 fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int] {
   let seen = @hashmap.HashMap([])
@@ -917,7 +927,16 @@ fn matched_pos_to_hunks(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
 ) -> Array[AstHunk] {
-  lines_to_hunks(matched_novel_lines(lhs_mps, rhs_mps), lhs_mps, rhs_mps)
+  let lines = matched_novel_lines(lhs_mps, rhs_mps)
+  let (lhs_novel, rhs_novel) = lines_with_novel(lhs_mps, rhs_mps)
+  let lines = merge_in_opposite_lines(lines, sorted_line_set_lines(rhs_novel))
+  let lines = flip_line_pairs(
+    merge_in_opposite_lines(
+      flip_line_pairs(lines),
+      sorted_line_set_lines(lhs_novel),
+    ),
+  )
+  lines_to_hunks(lines, lhs_mps, rhs_mps)
 }
 
 ///|UUID(e8149d12-9789-4f7a-b999-e5855bda3518)
