@@ -1,21 +1,21 @@
 --- cli_test/source/pipeline_test_adt.old.mbt: line 1
 +++ cli_test/source/pipeline_test_adt.new.mbt: line 1
 @@ -1,4 +1,5 @@
-[90m  1 1 | [39menum T {
-[90m  2 2 | [39m  A
-[90m  3 3 | [39m  B
-[32m[1m+   4 | [22m[39m  [32m[1mC[22m[39m
-[90m  4 5 | [39m}
+[90m1[39m [90m1[39m enum T {
+[90m2[39m [90m2[39m   A
+[90m3[39m [90m3[39m   B
+[90m.[39m [32m4[39m   [32m[1mC[22m[39m
+[90m4[39m [90m5[39m }
 
 --- cli_test/source/pipeline_test_adt.old.mbt: line 6
 +++ cli_test/source/pipeline_test_adt.new.mbt: line 7
 @@ -6 +7 @@
-[31m[1m- 6   | [22m[39mlet h:T = [31m[1mB[22m[39m
-[32m[1m+   7 | [22m[39mlet h:T = [32m[1mC[22m[39m
+[31m6[39m [90m.[39m let h:T = [31m[1mB[22m[39m
+[90m.[39m [32m7[39m let h:T = [32m[1mC[22m[39m
 
 --- cli_test/source/pipeline_test_adt.old.mbt: line 8
 +++ cli_test/source/pipeline_test_adt.new.mbt: line 9
 @@ -8 +9 @@
-[31m[1m- 8   | [22m[39mlet x:(T, T) = (A, [31m[1mA[22m[39m)
-[32m[1m+   9 | [22m[39mlet x:(T, T) = (A, [32m[1mB[22m[39m)
+[31m8[39m [90m.[39m let x:(T, T) = (A, [31m[1mA[22m[39m)
+[90m.[39m [32m9[39m let x:(T, T) = (A, [32m[1mB[22m[39m)
 

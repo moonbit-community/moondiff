@@ -13,10 +13,10 @@ test "diff_text renders ast-backed inline diff" {
     #|--- old.mbt: line 1
     #|+++ new.mbt: line 1
     #|@@ -1,3 +1,3 @@
-    #|  1 1 | fn f() {
-    #|  2   |   foo(bar)
-    #|+   2 |   foo(baz(bar))
-    #|  3 3 | }
+    #|1 1 fn f() {
+    #|2 .   foo(bar)
+    #|. 2   foo(baz(bar))
+    #|3 3 }
     #|
   assert_true(result.kind is Ast)
   assert_true(result.rendered == expected)
@@ -41,7 +41,9 @@ test "diff_text shows partial rhs highlight for wrapped call" {
   )
   assert_true(result.kind is Ast)
   assert_true(
-    result.rendered.contains("\u{1b}[90m  2   | \u{1b}[39m  foo(bar)"),
+    result.rendered.contains(
+      "\u{1b}[90m2\u{1b}[39m \u{1b}[90m.\u{1b}[39m   foo(bar)",
+    ),
   )
   assert_true(
     result.rendered.contains(
@@ -49,6 +51,54 @@ test "diff_text shows partial rhs highlight for wrapped call" {
     ),
   )
   assert_false(result.rendered.contains("\u{1b}[31m\u{1b}[1m  foo(bar)"))
+}
+
+///|UUID(9cc28892-f44a-44f1-a962-19fe451fe4f2)
+test "diff_text colors line numbers without prefix backgrounds or separators" {
+  let old_source =
+    #|fn f() {
+    #|  let x = 1
+    #|}
+  let new_source =
+    #|fn f() {
+    #|  let x = 2
+    #|}
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(use_color=true),
+  )
+
+  assert_true(result.kind is Ast)
+  assert_true(
+    result.rendered.contains(
+      "\u{1b}[90m1\u{1b}[39m \u{1b}[90m1\u{1b}[39m fn f() {",
+    ),
+  )
+  assert_true(
+    result.rendered.contains(
+      "\u{1b}[31m2\u{1b}[39m \u{1b}[90m.\u{1b}[39m   let x = ",
+    ),
+  )
+  assert_true(
+    result.rendered.contains(
+      "\u{1b}[90m.\u{1b}[39m \u{1b}[32m2\u{1b}[39m   let x = ",
+    ),
+  )
+  assert_false(result.rendered.contains("\u{1b}[100m"))
+  assert_false(result.rendered.contains("\u{1b}[41m"))
+  assert_false(result.rendered.contains("\u{1b}[42m"))
+  assert_false(result.rendered.contains("|"))
+  assert_false(result.rendered.contains("- 2"))
+  assert_false(result.rendered.contains("+ 2"))
+  assert_true(
+    result.rendered.contains("\u{1b}[31m\u{1b}[1m1\u{1b}[22m\u{1b}[39m"),
+  )
+  assert_true(
+    result.rendered.contains("\u{1b}[32m\u{1b}[1m2\u{1b}[22m\u{1b}[39m"),
+  )
 }
 
 ///|UUID(d2f6d08e-d7c4-4227-9bf5-3ee5ed6a1f2a)
@@ -66,12 +116,12 @@ test "diff_text keeps wrapped call matched when adding a sibling call" {
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
   let interleaved_prefix =
-    #|  2   |   println(
-    #|    2 |   println("Hello, world!")
+    #|2 .   println(
+    #|. 2   println("Hello, world!")
   let separated_suffix =
-    #|  4   |   )
-    #|    2 |   println("Hello, world!")
-    #|+   3 |   println(5 + 6)
+    #|4 .   )
+    #|. 2   println("Hello, world!")
+    #|. 3   println(5 + 6)
   assert_true(result.kind is Ast)
   assert_true(result.rendered.contains("--- old.mbt: line 1"))
   assert_true(result.rendered.contains("+++ new.mbt: line 1"))
@@ -97,12 +147,14 @@ test "diff_text keeps inserted case marker statements novel" {
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
 
   assert_true(result.kind is Ast)
-  assert_true(result.rendered.contains("+   3 |   let marker = \"case-002\""))
-  assert_true(result.rendered.contains("+   4 |   println(marker)"))
-  assert_true(result.rendered.contains("- 3   |   println(fib(10))"))
-  assert_true(result.rendered.contains("+   5 |   println(fib(8))"))
-  assert_false(result.rendered.contains("  3 3 |   let marker = \"case-002\""))
-  assert_false(result.rendered.contains("  3 4 |   println(marker)"))
+  assert_true(result.rendered.contains(". 3   let marker = \"case-002\""))
+  assert_true(result.rendered.contains(". 4   println(marker)"))
+  assert_true(result.rendered.contains("3 .   println(fib(10))"))
+  assert_true(result.rendered.contains(". 5   println(fib(8))"))
+  assert_false(result.rendered.contains("+   3   let marker = \"case-002\""))
+  assert_false(result.rendered.contains("- 3 .   println(fib(10))"))
+  assert_false(result.rendered.contains("3 3   let marker = \"case-002\""))
+  assert_false(result.rendered.contains("3 4   println(marker)"))
 }
 
 ///|UUID(7cee72fa-8f8c-4bcf-b70b-5f21305d87f2)
@@ -205,18 +257,18 @@ test "diff_text prints each changed impl separately" {
     #|--- old.mbt: line 1
     #|+++ new.mbt: line 1
     #|@@ -1,3 +1,3 @@
-    #|  1 1 | fn a() {
-    #|  2   |   foo(bar)
-    #|+   2 |   foo(baz(bar))
-    #|  3 3 | }
+    #|1 1 fn a() {
+    #|2 .   foo(bar)
+    #|. 2   foo(baz(bar))
+    #|3 3 }
     #|
     #|--- old.mbt: line 7
     #|+++ new.mbt: line 7
     #|@@ -7,3 +7,3 @@
-    #|  7 7 | fn z() {
-    #|  8   |   alpha(beta)
-    #|+   8 |   alpha(gamma(beta))
-    #|  9 9 | }
+    #|7 7 fn z() {
+    #|8 .   alpha(beta)
+    #|. 8   alpha(gamma(beta))
+    #|9 9 }
     #|
 
   assert_true(result.kind is Ast)
@@ -257,7 +309,7 @@ test "non terminate" {
   assert_true(result.kind is Ast)
   assert_true(
     result.rendered.contains(
-      "  2 10 |   let builder = StringBuilder::new(size_hint=bytes.length())",
+      "2 10   let builder = StringBuilder::new(size_hint=bytes.length())",
     ),
   )
   assert_false(

@@ -1,12 +1,12 @@
 --- cli_test/source/pipeline_test_005.old.mbt: line 5
 +++ cli_test/source/pipeline_test_005.new.mbt: line 5
 @@ -5,6 +5,7 @@
-[90m   5  5 | [39mfn init {
-[31m[1m-  6    | [22m[39m  let add1 = add([31m[1m111[22m[39m)
-[32m[1m+     6 | [22m[39m  let add1 = add([32m[1m17[22m[39m)
-[90m   7  7 | [39m  let add2 = add(1111)
-[90m   8  8 | [39m  println(add1(3, 4))
-[32m[1m+     9 | [22m[39m  [32m[1mprintln(add1(8,[22m[39m [32m[1m13))[22m[39m
-[90m   9 10 | [39m  println(add2(3, 4))
-[90m  10 11 | [39m}
+ [90m5[39m  [90m5[39m fn init {
+ [31m6[39m [90m..[39m   let add1 = add([31m[1m111[22m[39m)
+[90m..[39m  [32m6[39m   let add1 = add([32m[1m17[22m[39m)
+ [90m7[39m  [90m7[39m   let add2 = add(1111)
+ [90m8[39m  [90m8[39m   println(add1(3, 4))
+[90m..[39m  [32m9[39m   [32m[1mprintln(add1(8,[22m[39m [32m[1m13))[22m[39m
+ [90m9[39m [90m10[39m   println(add2(3, 4))
+[90m10[39m [90m11[39m }
 

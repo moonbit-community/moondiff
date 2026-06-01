@@ -1,29 +1,29 @@
 --- cli_test/source/pipeline_test_003.old.mbt: line 5
 +++ cli_test/source/pipeline_test_003.new.mbt: line 5
 @@ -5,3 +5,3 @@
-[90m  5 5 | [39mfn init {
-[31m[1m- 6   | [22m[39m  println(add([31m[1m1,[22m[39m 2))
-[32m[1m+   6 | [22m[39m  println(add(2[32m[1m,[22m[39m [32m[1m5[22m[39m))
-[90m  7 7 | [39m}
+[90m5[39m [90m5[39m fn init {
+[31m6[39m [90m.[39m   println(add([31m[1m1,[22m[39m 2))
+[90m.[39m [32m6[39m   println(add(2[32m[1m,[22m[39m [32m[1m5[22m[39m))
+[90m7[39m [90m7[39m }
 
 --- cli_test/source/pipeline_test_003.old.mbt: line 9
 +++ cli_test/source/pipeline_test_003.new.mbt: line 9
 @@ -9,4 +9,4 @@
-[90m   9  9 | [39mfn init {
-[90m  10 10 | [39m  println(1)
-[31m[1m- 11    | [22m[39m  println([31m[1m2[22m[39m)
-[32m[1m+    11 | [22m[39m  println([32m[1m22[22m[39m)
-[90m  12 12 | [39m}
+ [90m9[39m  [90m9[39m fn init {
+[90m10[39m [90m10[39m   println(1)
+[31m11[39m [90m..[39m   println([31m[1m2[22m[39m)
+[90m..[39m [32m11[39m   println([32m[1m22[22m[39m)
+[90m12[39m [90m12[39m }
 
 --- cli_test/source/pipeline_test_003.old.mbt: line 14
 +++ cli_test/source/pipeline_test_003.new.mbt: line 14
 @@ -14,7 +14,8 @@
-[90m  14 14 | [39mfn init {
-[90m  15 15 | [39m  println(3)
-[90m  16 16 | [39m  println(4)
-[32m[1m+    17 | [22m[39m  [32m[1mprintln(44)[22m[39m
-[90m  17 18 | [39m  println(5)
-[90m  18 19 | [39m  println(6)
-[90m  19 20 | [39m  println(7)
-[90m  20 21 | [39m  println(8)
+[90m14[39m [90m14[39m fn init {
+[90m15[39m [90m15[39m   println(3)
+[90m16[39m [90m16[39m   println(4)
+[90m..[39m [32m17[39m   [32m[1mprintln(44)[22m[39m
+[90m17[39m [90m18[39m   println(5)
+[90m18[39m [90m19[39m   println(6)
+[90m19[39m [90m20[39m   println(7)
+[90m20[39m [90m21[39m   println(8)
 

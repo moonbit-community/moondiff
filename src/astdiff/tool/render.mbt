@@ -56,50 +56,66 @@ fn collect_novel_ranges(mps : ArrayView[MatchedPos]) -> HighlightMap {
   }
 }
 
-///|UUID(d4848c4e-44ca-415a-8ce8-39306301dd72)
-fn pad_left(value : String, width : Int) -> String {
-  if value.length() >= width {
-    return value
-  }
+///|UUID(7b86a3ce-71eb-4062-b338-914509d4793a)
+fn repeat_char(ch : Char, width : Int) -> String {
   let buf = StringBuilder::new(size_hint=width)
-  for _ in 0..<(width - value.length()) {
-    buf.write_char(' ')
+  for _ in 0..<width {
+    buf.write_char(ch)
   }
-  buf.write_string(value)
   buf.to_string()
 }
 
+///|UUID(4a548ca3-bd2d-4a39-9c5e-77c5501d85f3)
+fn line_no_color(style : LineStyle) -> @chalk.Colors {
+  match style {
+    Context => BlackBright
+    Deleted => Red
+    Added => Green
+  }
+}
+
 ///|UUID(1c1b85e4-6d10-43c1-a7d6-e6b5268be2c3)
-fn display_line_no(line_no : Int?, width : Int, line_base : Int) -> String {
+fn display_line_no(
+  line_no : Int?,
+  width : Int,
+  line_base : Int,
+  style : LineStyle,
+  use_color : Bool,
+) -> String {
   match line_no {
-    Some(line_no) => pad_left((line_no + line_base).to_string(), width)
-    None => pad_left("", width)
+    Some(line_no) => {
+      let value = (line_no + line_base).to_string()
+      let padding = repeat_char(' ', @cmp.maximum(width - value.length(), 0))
+      if use_color {
+        padding + @chalk.chalk().color(line_no_color(style)).render(value)
+      } else {
+        padding + value
+      }
+    }
+    None => {
+      let dots = repeat_char('.', width)
+      if use_color {
+        @chalk.chalk().color(BlackBright).render(dots)
+      } else {
+        dots
+      }
+    }
   }
 }
 
 ///|UUID(6a7523d6-13fe-4ad1-9d78-e8e8d32b2f45)
 fn line_prefix(
-  marker : String,
+  _marker : String,
   old_line_no : Int?,
   old_width : Int,
   old_line_base : Int,
   new_line_no : Int?,
   new_width : Int,
   new_line_base : Int,
+  style : LineStyle,
+  use_color : Bool,
 ) -> String {
-  "\{marker} \{display_line_no(old_line_no, old_width, old_line_base)} \{display_line_no(new_line_no, new_width, new_line_base)} | "
-}
-
-///|UUID(fc528109-6fac-4326-b0fc-a00841bea702)
-fn style_prefix(prefix : String, style : LineStyle, use_color : Bool) -> String {
-  if !use_color {
-    return prefix
-  }
-  match style {
-    Context => @chalk.chalk().color(BlackBright).render(prefix)
-    Deleted => @chalk.chalk().color(Red).modifier(Bold).render(prefix)
-    Added => @chalk.chalk().color(Green).modifier(Bold).render(prefix)
-  }
+  "\{display_line_no(old_line_no, old_width, old_line_base, style, use_color)} \{display_line_no(new_line_no, new_width, new_line_base, style, use_color)}"
 }
 
 ///|UUID(665cb8b1-546a-4c3f-af21-5f80889a1ee3)
@@ -208,13 +224,11 @@ fn render_hunk_line(
   use_color : Bool,
   full_line_fallback : Bool,
 ) -> String {
-  style_prefix(
-    line_prefix(
-      marker, old_line_no, old_width, old_line_base, new_line_no, new_width, new_line_base,
-    ),
-    style,
-    use_color,
+  line_prefix(
+    marker, old_line_no, old_width, old_line_base, new_line_no, new_width, new_line_base,
+    style, use_color,
   ) +
+  " " +
   render_line_body(line, ranges, style, use_color, full_line_fallback)
 }
 

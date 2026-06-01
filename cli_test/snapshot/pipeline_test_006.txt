@@ -1,16 +1,16 @@
 --- cli_test/source/pipeline_test_006.old.mbt: line 1
 +++ cli_test/source/pipeline_test_006.new.mbt: line 1
 @@ -1,10 +1,11 @@
-[90m   1  1 | [39mfn init {
-[90m   2  2 | [39m  let mut i = 0
-[31m[1m-  3    | [22m[39m  while i < [31m[1m11[22m[39m {
-[32m[1m+     3 | [22m[39m  while i < [32m[1m7[22m[39m {
-[90m   4  4 | [39m    println(i)
-[90m   5  5 | [39m    i = i + 1
-[90m   6  6 | [39m  }
-[32m[1m+     7 | [22m[39m  [32m[1mprintln(100)[22m[39m
-[90m   7  8 | [39m  i = 10
-[90m   8  9 | [39m  while 0 <= i {
-[90m   9 10 | [39m    println(i)
-[90m  10 11 | [39m    i = i - 1
+ [90m1[39m  [90m1[39m fn init {
+ [90m2[39m  [90m2[39m   let mut i = 0
+ [31m3[39m [90m..[39m   while i < [31m[1m11[22m[39m {
+[90m..[39m  [32m3[39m   while i < [32m[1m7[22m[39m {
+ [90m4[39m  [90m4[39m     println(i)
+ [90m5[39m  [90m5[39m     i = i + 1
+ [90m6[39m  [90m6[39m   }
+[90m..[39m  [32m7[39m   [32m[1mprintln(100)[22m[39m
+ [90m7[39m  [90m8[39m   i = 10
+ [90m8[39m  [90m9[39m   while 0 <= i {
+ [90m9[39m [90m10[39m     println(i)
+[90m10[39m [90m11[39m     i = i - 1
 

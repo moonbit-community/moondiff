@@ -1,14 +1,14 @@
 --- cli_test/source/pipeline_test_007.old.mbt: line 12
 +++ cli_test/source/pipeline_test_007.new.mbt: line 12
 @@ -12,8 +12,8 @@
-[90m  12 12 | [39mfn init {
-[90m  13 13 | [39m  let mut i = 0
-[31m[1m- 14    | [22m[39m  while i < [31m[1m11[22m[39m {
-[32m[1m+    14 | [22m[39m  while i < [32m[1m9[22m[39m {
-[90m  15 15 | [39m    println(i)
-[31m[1m- 16    | [22m[39m    if even(i) { print_int([31m[1m1[22m[39m) } else { print_int([31m[1m0[22m[39m) }
-[32m[1m+    16 | [22m[39m    if even(i) { print_int([32m[1m2[22m[39m) } else { print_int([32m[1m9[22m[39m) }
-[90m  17 17 | [39m    i = i + 1
-[90m  18 18 | [39m  }
-[90m  19 19 | [39m}
+[90m12[39m [90m12[39m fn init {
+[90m13[39m [90m13[39m   let mut i = 0
+[31m14[39m [90m..[39m   while i < [31m[1m11[22m[39m {
+[90m..[39m [32m14[39m   while i < [32m[1m9[22m[39m {
+[90m15[39m [90m15[39m     println(i)
+[31m16[39m [90m..[39m     if even(i) { print_int([31m[1m1[22m[39m) } else { print_int([31m[1m0[22m[39m) }
+[90m..[39m [32m16[39m     if even(i) { print_int([32m[1m2[22m[39m) } else { print_int([32m[1m9[22m[39m) }
+[90m17[39m [90m17[39m     i = i + 1
+[90m18[39m [90m18[39m   }
+[90m19[39m [90m19[39m }
 

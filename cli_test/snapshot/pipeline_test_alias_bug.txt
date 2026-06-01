@@ -1,11 +1,11 @@
 --- cli_test/source/pipeline_test_alias_bug.old.mbt: line 2
 +++ cli_test/source/pipeline_test_alias_bug.new.mbt: line 2
 @@ -2 +2 @@
-[90m  2   | [39mpub let x1 : Int = x0
-[32m[1m+   2 | [22m[39mpub let x1 : Int = x0 [32m[1m+[22m[39m [32m[1m1[22m[39m
+[90m2[39m [90m.[39m pub let x1 : Int = x0
+[90m.[39m [32m2[39m pub let x1 : Int = x0 [32m[1m+[22m[39m [32m[1m1[22m[39m
 
 --- cli_test/source/pipeline_test_alias_bug.old.mbt
 +++ cli_test/source/pipeline_test_alias_bug.new.mbt: line 3
 @@ -0,0 +3 @@
-[32m[1m+   3 | [22m[39m[32m[1mlet[22m[39m [32m[1mx2[22m[39m [32m[1m=[22m[39m [32m[1mx1[22m[39m [32m[1m*[22m[39m [32m[1m2[22m[39m
+[90m.[39m [32m3[39m [32m[1mlet[22m[39m [32m[1mx2[22m[39m [32m[1m=[22m[39m [32m[1mx1[22m[39m [32m[1m*[22m[39m [32m[1m2[22m[39m
 

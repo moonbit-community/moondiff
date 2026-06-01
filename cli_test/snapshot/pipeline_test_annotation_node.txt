@@ -1,11 +1,11 @@
 --- cli_test/source/pipeline_test_annotation_node.old.mbt: line 2
 +++ cli_test/source/pipeline_test_annotation_node.new.mbt: line 2
 @@ -2,5 +2,5 @@
-[90m  2 2 | [39mfn tlf (x: Int) -> Int {
-[31m[1m- 3   | [22m[39m  let lv: Bool = [31m[1mfalse[22m[39m
-[32m[1m+   3 | [22m[39m  let lv: Bool = [32m[1mtrue[22m[39m
-[90m  4 4 | [39m  fn lf(x: Char) -> Char { 'c' }
-[31m[1m- 5   | [22m[39m  [31m[1m4[22m[39m
-[32m[1m+   5 | [22m[39m  [32m[1m5[22m[39m
-[90m  6 6 | [39m}
+[90m2[39m [90m2[39m fn tlf (x: Int) -> Int {
+[31m3[39m [90m.[39m   let lv: Bool = [31m[1mfalse[22m[39m
+[90m.[39m [32m3[39m   let lv: Bool = [32m[1mtrue[22m[39m
+[90m4[39m [90m4[39m   fn lf(x: Char) -> Char { 'c' }
+[31m5[39m [90m.[39m   [31m[1m4[22m[39m
+[90m.[39m [32m5[39m   [32m[1m5[22m[39m
+[90m6[39m [90m6[39m }
 

@@ -234,9 +234,28 @@ test "render_ast_diff uses one merged hunk for nearby ast changes" {
   )
 
   @debug.assert_eq(rendered.split("@@").count(), 3)
-  assert_true(rendered.contains("  5 5 | fn mid() {}"))
-  assert_true(rendered.contains("+   2 |   foo(baz(bar))"))
-  assert_true(rendered.contains("+   8 |   alpha(gamma(beta))"))
+  assert_true(rendered.contains("5 5 fn mid() {}"))
+  assert_true(rendered.contains(". 2   foo(baz(bar))"))
+  assert_true(rendered.contains(". 8   alpha(gamma(beta))"))
+  assert_false(rendered.contains("+   2   foo(baz(bar))"))
+  assert_false(rendered.contains("+   8   alpha(gamma(beta))"))
+}
+
+///|UUID(0d1a0a7b-5a0d-4d9e-8fd3-e90428d09cc1)
+test "display_line_no colors missing placeholder dots gray for every line style" {
+  @debug.assert_eq(
+    display_line_no(None, 2, 1, Deleted, true),
+    "\u{1b}[90m..\u{1b}[39m",
+  )
+  @debug.assert_eq(
+    display_line_no(None, 2, 1, Added, true),
+    "\u{1b}[90m..\u{1b}[39m",
+  )
+  @debug.assert_eq(
+    display_line_no(None, 2, 1, Context, true),
+    "\u{1b}[90m..\u{1b}[39m",
+  )
+  @debug.assert_eq(display_line_no(None, 2, 1, Added, false), "..")
 }
 
 ///|UUID(4dca0171-1c6a-41f9-b7b6-167bb9c6953d)
