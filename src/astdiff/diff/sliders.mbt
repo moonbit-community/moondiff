@@ -88,6 +88,52 @@ fn unchanged_descendants(
   }
 }
 
+///|UUID(257108f5-995d-4704-bf99-dfc778158790)
+fn has_unchanged_child(
+  nodes : ArrayView[Syntax],
+  change_map : ChangeMap,
+) -> Bool {
+  for node in nodes {
+    if change_map.get(node) is Some(Unchanged(_)) {
+      return true
+    }
+  }
+  false
+}
+
+///|UUID(f02cdb28-193d-4d55-b35f-adb95b2ed7bb)
+fn unchanged_descendants_for_outer_slider(
+  nodes : ArrayView[Syntax],
+  found : Array[Syntax],
+  change_map : ChangeMap,
+) -> Unit {
+  if found.length() > 1 {
+    return
+  }
+  for node in nodes {
+    let is_unchanged = change_map.get(node) is Some(Unchanged(_))
+    match node {
+      Syntax::Atom(..) =>
+        if is_unchanged {
+          found.push(node)
+          return
+        }
+      Syntax::List(children~, ..) =>
+        if is_unchanged {
+          found.push(node)
+          return
+        } else if has_unchanged_child(children, change_map) {
+          found.push(node)
+        } else {
+          unchanged_descendants_for_outer_slider(children, found, change_map)
+        }
+    }
+    if found.length() > 1 {
+      return
+    }
+  }
+}
+
 ///|UUID(fd27c1be-5ed7-47aa-997a-bf6596231434)
 fn push_unchanged_to_ancestor(
   root : Syntax,
@@ -165,8 +211,10 @@ fn fix_nested_slider_prefer_outer(
     match change_map.get(node) {
       Some(Unchanged(_)) => {
         let found = Array::new()
-        unchanged_descendants(children, found, change_map)
-        if found is [candidate] && candidate is Syntax::List(..) {
+        unchanged_descendants_for_outer_slider(children, found, change_map)
+        if found is [candidate] &&
+          candidate is Syntax::List(..) &&
+          change_map.get(candidate) is Some(Novel) {
           push_unchanged_to_descendant(node, candidate, change_map)
         }
       }
@@ -361,6 +409,28 @@ fn fix_all_sliders_one_step(
   fix_sliders(nodes, change_map)
 }
 
+///|UUID(4f03b646-4e43-40a4-bfe4-4559154b886b)
+fn prefer_outer_delimiter() -> Bool {
+  // MoonBit delimiters are typically call-like (`foo(bar)`), matching
+  // difftastic's default non-Lisp heuristic: prefer the inner delimiter.
+  false
+}
+
+///|UUID(a3fe7997-1888-4c87-8bd1-358c4f8c9865)
+fn fix_all_nested_sliders(
+  nodes : ArrayView[Syntax],
+  change_map : ChangeMap,
+) -> Unit {
+  let prefer_outer = prefer_outer_delimiter()
+  for node in nodes {
+    if prefer_outer {
+      fix_nested_slider_prefer_outer(node, change_map)
+    } else {
+      fix_nested_slider_prefer_inner(node, change_map)
+    }
+  }
+}
+
 ///|UUID(5e76bab1-3d2d-4425-a787-48be88368f4a)
 pub fn fix_all_sliders(
   nodes : ArrayView[Syntax],
@@ -368,8 +438,5 @@ pub fn fix_all_sliders(
 ) -> Unit {
   fix_all_sliders_one_step(nodes, change_map)
   fix_all_sliders_one_step(nodes, change_map)
-  for node in nodes {
-    fix_nested_slider_prefer_inner(node, change_map)
-    fix_nested_slider_prefer_outer(node, change_map)
-  }
+  fix_all_nested_sliders(nodes, change_map)
 }

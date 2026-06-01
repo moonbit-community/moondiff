@@ -370,6 +370,47 @@ test "matched lines keep inserted sibling after wrapped call block" {
   )
 }
 
+///|UUID(ba4f4f2e-3068-4fda-8319-6a52de2dbe80)
+test "unchanged nested constructor pattern stays context" {
+  let old_source =
+    #|fn init {
+    #|  let f = fn(x) {
+    #|    match x {
+    #|      H::A => println('a')
+    #|      E((x:Int)) => println(x)
+    #|      F(c) => println('f')
+    #|    }
+    #|  }
+    #|  f(E(1))
+    #|  f(A)
+    #|}
+  let new_source =
+    #|fn init {
+    #|  let f = fn(x) {
+    #|    match x {
+    #|      H::A => println('a')
+    #|      E((x:Int)) => println(x)
+    #|      F(c) => println('g')
+    #|      G => println('z')
+    #|    }
+    #|  }
+    #|  f(E(2))
+    #|  f(A)
+    #|  f(G)
+    #|}
+  let (lhs_roots, rhs_roots, change_map) = build_ast_change_map(
+    old_source, new_source,
+  )
+  let lhs_mps = change_positions(lhs_roots, change_map)
+  let rhs_mps = change_positions(rhs_roots, change_map)
+  let hunks = matched_pos_to_hunks(lhs_mps, rhs_mps)
+  assert_true(hunks.length() > 0)
+  for hunk in hunks {
+    assert_true(!hunk.novel_lhs.contains(4))
+    assert_true(!hunk.novel_rhs.contains(4))
+  }
+}
+
 ///|UUID(8d4c2ad7-608d-4de0-95a8-b4e59816b4f4)
 test "wrapped call opener stays in rendered context" {
   let old_source =

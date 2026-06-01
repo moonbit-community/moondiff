@@ -10,13 +10,11 @@
 
 --- cli_test/source/pipeline_test_004.old.mbt: line 8
 +++ cli_test/source/pipeline_test_004.new.mbt: line 9
-@@ -8,11 +9,13 @@
-[90m   8  9 | [39mfn init {
+@@ -9,10 +10,12 @@
 [90m   9 10 | [39m  let f = fn(x) {
 [90m  10 11 | [39m    match x {
 [90m  11 12 | [39m      H::A => println('a')
-[31m[1m- 12    | [22m[39m      E[31m[1m([22m[39m(x:Int)[31m[1m)[22m[39m => println(x)
-[32m[1m+    13 | [22m[39m      E[32m[1m([22m[39m(x:Int)[32m[1m)[22m[39m => println(x)
+[90m  12 13 | [39m      E((x:Int)) => println(x)
 [31m[1m- 13    | [22m[39m      F(c) => println('[31m[1mf[22m[39m')
 [32m[1m+    14 | [22m[39m      F(c) => println('[32m[1mg[22m[39m')
 [32m[1m+    15 | [22m[39m      [32m[1mG[22m[39m [32m[1m=>[22m[39m [32m[1mprintln('z')[22m[39m
