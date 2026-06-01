@@ -321,12 +321,14 @@ test "empty delimiter wrappers do not hide inserted sibling statements" {
     @syntax.Syntax::List(children~, ..) => children[1]
     _ => panic()
   }
-  let rhs_stmt_chain = match rhs_block {
-    @syntax.Syntax::List(children~, ..) => children[0]
+  let rhs_inserted_stmt = match rhs_block {
+    @syntax.Syntax::List(children~, ..) => children[1]
     _ => panic()
   }
 
-  assert_true(change_map.get(rhs_stmt_chain) is Some(@diff.ChangeKind::Novel))
+  assert_true(
+    change_map.get(rhs_inserted_stmt) is Some(@diff.ChangeKind::Novel),
+  )
   match change_map.get(lhs_stmt_wrapper) {
     Some(@diff.ChangeKind::Unchanged(opposite)) =>
       @debug.assert_eq(opposite.content_id(), lhs_stmt_wrapper.content_id())

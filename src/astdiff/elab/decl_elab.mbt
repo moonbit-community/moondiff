@@ -346,8 +346,10 @@ fn ElabCtx::decl_body_loc(self : Self, body : DeclBody) -> Location? {
 fn ElabCtx::elab_decl_body(self : Self, body : DeclBody) -> Syntax {
   match body {
     DeclBody(expr~, lbrace_loc~, rbrace_loc~) => {
-      let parts = Array::new()
-      parts.push(self.part_expr(expr))
+      let parts = match (lbrace_loc, rbrace_loc) {
+        (Some(_), Some(_)) => self.block_stmt_parts(expr)
+        _ => [self.part_expr(expr)]
+      }
       match self.decl_body_loc(body) {
         Some(loc) =>
           self.delimited_or_region(loc, lbrace_loc, parts, rbrace_loc)
@@ -587,6 +589,8 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       doc~,
       params_lparen_loc~,
       params_rparen_loc~,
+      body_lbrace_loc~,
+      body_rbrace_loc~,
       ..
     ) => {
       let parts = Array::new()
@@ -601,7 +605,16 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
         parts,
         self.fun_params_part(params, params_lparen_loc, params_rparen_loc),
       )
-      parts.push(self.part_expr(expr))
+      parts.push(
+        self.part(
+          self.delimited(
+            body_lbrace_loc,
+            self.block_stmt_parts(expr),
+            body_rbrace_loc,
+          ),
+          Some(body_lbrace_loc.merge(body_rbrace_loc)),
+        ),
+      )
       self.region(loc, parts)
     }
     TopTypeDef(type_decl) => self.elab_type_decl(type_decl)
@@ -711,6 +724,8 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       rbrace_loc~,
       params_lparen_loc~,
       params_rparen_loc~,
+      body_lbrace_loc~,
+      body_rbrace_loc~,
       ..
     ) => {
       let parts = Array::new()
@@ -776,7 +791,16 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
           Some(params_rparen_loc),
         ),
       )
-      parts.push(self.part_expr(body))
+      parts.push(
+        self.part(
+          self.delimited(
+            body_lbrace_loc,
+            self.block_stmt_parts(body),
+            body_rbrace_loc,
+          ),
+          Some(body_lbrace_loc.merge(body_rbrace_loc)),
+        ),
+      )
       self.region(loc, parts)
     }
     TopImplRelation(

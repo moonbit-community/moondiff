@@ -80,6 +80,31 @@ test "diff_text keeps wrapped call matched when adding a sibling call" {
   assert_false(result.rendered.contains("-   3 |     \"Hello, world!\""))
 }
 
+///|UUID(9a02fd35-742e-448f-ae7d-88dd7cf69e8e)
+test "diff_text keeps inserted case marker statements novel" {
+  let old_source =
+    #|fn init {
+    #|  // case 002
+    #|  println(fib(10))
+    #|}
+  let new_source =
+    #|fn init {
+    #|  // case 002
+    #|  let marker = "case-002"
+    #|  println(marker)
+    #|  println(fib(8))
+    #|}
+  let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains("+   3 |   let marker = \"case-002\""))
+  assert_true(result.rendered.contains("+   4 |   println(marker)"))
+  assert_true(result.rendered.contains("- 3   |   println(fib(10))"))
+  assert_true(result.rendered.contains("+   5 |   println(fib(8))"))
+  assert_false(result.rendered.contains("  3 3 |   let marker = \"case-002\""))
+  assert_false(result.rendered.contains("  3 4 |   println(marker)"))
+}
+
 ///|UUID(7cee72fa-8f8c-4bcf-b70b-5f21305d87f2)
 test "diff_text highlights only changed word inside string literal" {
   let old_source =
@@ -173,7 +198,7 @@ test "non terminate" {
   let old =
     #|pub fn decode(bytes : @bytes.View) -> String raise Malformed {
     #|  let builder = StringBuilder::new(size_hint=bytes.length())
-    #|  loop bytes {
+    #|  while true {
     #|    ...
     #|  }
     #|}
@@ -188,7 +213,7 @@ test "non terminate" {
     #|    bytes
     #|  }
     #|  let builder = StringBuilder::new(size_hint=bytes.length())
-    #|  loop bytes {
+    #|  while true {
     #|    ...
     #|  }
     #|}

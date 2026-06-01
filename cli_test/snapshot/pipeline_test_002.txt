@@ -4,10 +4,10 @@
 [90m   5  5 | [39mfn init {
 [90m   6  6 | [39m
 [90m   7  7 | [39m    // last line
+[32m[1m+     8 | [22m[39m    [32m[1mlet[22m[39m [32m[1mmarker[22m[39m [32m[1m=[22m[39m [32m[1m"case-002"[22m[39m
+[32m[1m+     9 | [22m[39m    [32m[1mprintln(marker)[22m[39m
 [31m[1m-  8    | [22m[39m    println(fib([31m[1m10[22m[39m))
-[90m      8 | [39m    [90mlet[39m [90mmarker[39m [90m=[39m [90m"case-002"[39m
-[32m[1m+     9 | [22m[39m    println[32m[1m(marker)[22m[39m
-[32m[1m+    10 | [22m[39m    [32m[1mprintln[22m[39m(fib([32m[1m8[22m[39m))
+[32m[1m+    10 | [22m[39m    println(fib([32m[1m8[22m[39m))
 [90m   9 11 | [39m
 [90m  10 12 | [39m}
 
