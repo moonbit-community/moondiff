@@ -128,25 +128,6 @@ fn all_units_have_uuid(units : ArrayView[ImplUnit]) -> Bool {
   units.all(fn(unit) { unit.uuid is Some(_) })
 }
 
-///|UUID(58ac384d-5e05-4e16-8ced-e465cedf4774)
-fn align_impl_units_by_order(
-  old_units : ArrayView[ImplUnit],
-  new_units : ArrayView[ImplUnit],
-) -> Array[ImplEdit] {
-  let edits = Array::new()
-  let shared = @cmp.minimum(old_units.length(), new_units.length())
-  for i in 0..<shared {
-    edits.push(Replace(old=old_units[i], new=new_units[i]))
-  }
-  for i in shared..<old_units.length() {
-    edits.push(Delete(old_units[i]))
-  }
-  for i in shared..<new_units.length() {
-    edits.push(Insert(new_units[i]))
-  }
-  edits
-}
-
 ///|UUID(75486f71-7af0-4c26-a905-97cdfbc7d623)
 fn align_impl_units_by_uuid(
   old_units : ArrayView[ImplUnit],
@@ -191,18 +172,6 @@ fn align_impl_units_by_uuid(
     }
   }
   edits
-}
-
-///|UUID(86aa7e88-7f7a-4232-baf0-b765d970f8f2)
-fn align_impl_units(
-  old_units : ArrayView[ImplUnit],
-  new_units : ArrayView[ImplUnit],
-) -> Array[ImplEdit] {
-  if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
-    align_impl_units_by_uuid(old_units, new_units)
-  } else {
-    align_impl_units_by_order(old_units, new_units)
-  }
 }
 
 ///|UUID(efd8452b-7521-4f76-9171-86843cf72de6)
@@ -390,19 +359,47 @@ fn render_no_changes(old_label : String, new_label : String) -> String {
   "--- \{old_label}\n" + "+++ \{new_label}\n" + "No changes.\n"
 }
 
-///|UUID(5904eab2-e4fe-4ce5-b9bc-b437e4d7191f)
-fn render_aligned_impl_diffs(
+///|UUID(58ac384d-5e05-4e16-8ced-e465cedf4774)
+fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
+  let roots = Array::new()
+  for unit in units {
+    roots.push(unit.root)
+  }
+  roots
+}
+
+///|UUID(86aa7e88-7f7a-4232-baf0-b765d970f8f2)
+fn render_root_list_line_fallback(
+  reason : String,
   old_label : String,
   old_source : String,
-  old_impls : Impls,
   new_label : String,
   new_source : String,
-  new_impls : Impls,
   options : DiffOptions,
 ) -> String {
-  let old_units = collect_impl_units(old_source, old_impls)
-  let new_units = collect_impl_units(new_source, new_impls)
-  let edits = align_impl_units(old_units, new_units)
+  "note: fallback to line diff (\{reason})\n" +
+  render_line_diff(
+    old_label,
+    old_source,
+    new_label,
+    new_source,
+    None,
+    None,
+    options,
+  )
+}
+
+///|UUID(5904eab2-e4fe-4ce5-b9bc-b437e4d7191f)
+fn render_uuid_aligned_impl_diffs(
+  old_label : String,
+  old_source : String,
+  old_units : ArrayView[ImplUnit],
+  new_label : String,
+  new_source : String,
+  new_units : ArrayView[ImplUnit],
+  options : DiffOptions,
+) -> String {
+  let edits = align_impl_units_by_uuid(old_units, new_units)
 
   let buf = StringBuilder::new()
   let mut wrote = false
@@ -454,5 +451,68 @@ fn render_aligned_impl_diffs(
     buf.to_string()
   } else {
     render_no_changes(old_label, new_label)
+  }
+}
+
+///|UUID(109a4d3f-cbaa-42e9-a5d5-5680327e8e55)
+fn render_root_list_diff(
+  old_label : String,
+  old_source : String,
+  old_units : ArrayView[ImplUnit],
+  new_label : String,
+  new_source : String,
+  new_units : ArrayView[ImplUnit],
+  options : DiffOptions,
+) -> String {
+  let lhs_roots = impl_roots(old_units)
+  let rhs_roots = impl_roots(new_units)
+  @syntax.init_all_info(lhs_roots, rhs_roots)
+  let change_map = @diff.ChangeMap::new()
+  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, options.graph_limit) catch {
+    _ =>
+      return render_root_list_line_fallback(
+        "graph limit exceeded (\{options.graph_limit})",
+        old_label,
+        old_source,
+        new_label,
+        new_source,
+        options,
+      )
+  }
+
+  @diff.fix_all_sliders(lhs_roots, change_map)
+  @diff.fix_all_sliders(rhs_roots, change_map)
+
+  render_ast_diff(
+    old_label,
+    old_source,
+    new_label,
+    new_source,
+    change_positions(lhs_roots, change_map),
+    change_positions(rhs_roots, change_map),
+    options,
+  )
+}
+
+///|UUID(efd2e0c6-d9fc-4b57-b551-e31b0146cde7)
+fn render_aligned_impl_diffs(
+  old_label : String,
+  old_source : String,
+  old_impls : Impls,
+  new_label : String,
+  new_source : String,
+  new_impls : Impls,
+  options : DiffOptions,
+) -> String {
+  let old_units = collect_impl_units(old_source, old_impls)
+  let new_units = collect_impl_units(new_source, new_impls)
+  if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
+    render_uuid_aligned_impl_diffs(
+      old_label, old_source, old_units, new_label, new_source, new_units, options,
+    )
+  } else {
+    render_root_list_diff(
+      old_label, old_source, old_units, new_label, new_source, new_units, options,
+    )
   }
 }

@@ -1,9 +1,14 @@
---- cli_test/source/pipeline_test_011.old.mbt: line 7
-+++ cli_test/source/pipeline_test_011.new.mbt: line 7
-@@ -7,3 +7,4 @@
-[90m7[39m  [90m7[39m fn init {
-[31m8[39m [90m..[39m   println("hello [31m[1mworld[22m[39m")
-[90m.[39m  [32m8[39m   println("hello [32m[1mmoon[22m[39m")
-[90m.[39m  [32m9[39m   [32m[1moutput_string("cli")[22m[39m
-[90m9[39m [90m10[39m }
+--- cli_test/source/pipeline_test_011.old.mbt
++++ cli_test/source/pipeline_test_011.new.mbt
+@@ -4,8 +4,8 @@
+ [90m4[39m  [90m4[39m   }
+ [90m5[39m  [90m5[39m }
+ [90m6[39m  [90m6[39m 
+ [90m7[39m  [90m7[39m fn init {
+ [31m8[39m [90m..[39m   println("hello [31m[1mworld[22m[39m")
+[90m..[39m  [32m8[39m   println("hello [32m[1mmoon[22m[39m")
+[90m..[39m  [32m9[39m   [32m[1moutput_string("cli")[22m[39m
+ [90m9[39m [90m10[39m }
+[90m10[39m [90m11[39m 
+[90m11[39m [90m..[39m 
 

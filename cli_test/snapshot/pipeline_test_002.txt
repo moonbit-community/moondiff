@@ -1,6 +1,7 @@
---- cli_test/source/pipeline_test_002.old.mbt: line 5
-+++ cli_test/source/pipeline_test_002.new.mbt: line 5
-@@ -5,6 +5,8 @@
+--- cli_test/source/pipeline_test_002.old.mbt
++++ cli_test/source/pipeline_test_002.new.mbt
+@@ -4,9 +4,11 @@
+ [90m4[39m  [90m4[39m 
  [90m5[39m  [90m5[39m fn init {
  [90m6[39m  [90m6[39m 
  [90m7[39m  [90m7[39m     // last line
@@ -10,4 +11,6 @@
 [90m..[39m [32m10[39m     println(fib([32m[1m8[22m[39m))
  [90m9[39m [90m11[39m 
 [90m10[39m [90m12[39m }
+[90m11[39m [90m13[39m 
+[90m12[39m [90m14[39m // last line
 

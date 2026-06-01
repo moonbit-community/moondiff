@@ -9,6 +9,7 @@ ast_diff() {
 moon build --target native --release
 
 ast_diff "20251114"
+ast_diff "20260601"
 ast_diff "pipeline_test_001"
 ast_diff "pipeline_test_002"
 ast_diff "pipeline_test_003"

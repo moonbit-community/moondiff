@@ -1,6 +1,9 @@
---- cli_test/source/pipeline_test_any_as_object.old.mbt: line 16
-+++ cli_test/source/pipeline_test_any_as_object.new.mbt: line 16
-@@ -16,5 +16,6 @@
+--- cli_test/source/pipeline_test_any_as_object.old.mbt
++++ cli_test/source/pipeline_test_any_as_object.new.mbt
+@@ -13,9 +13,10 @@
+[90m13[39m [90m13[39m   t.f()
+[90m14[39m [90m14[39m }
+[90m15[39m [90m15[39m 
 [90m16[39m [90m16[39m fn init {
 [31m17[39m [90m..[39m   let f = F::F(fn (_x) { [31m[1m42[22m[39m })
 [90m..[39m [32m17[39m   let f = F::F(fn (_x) { [32m[1m64[22m[39m })
@@ -8,4 +11,5 @@
 [90m19[39m [90m19[39m   println(a)
 [90m..[39m [32m20[39m   [32m[1mprintln(a[22m[39m [32m[1m+[22m[39m [32m[1m1)[22m[39m
 [90m20[39m [90m21[39m }
+[90m21[39m [90m22[39m 
 

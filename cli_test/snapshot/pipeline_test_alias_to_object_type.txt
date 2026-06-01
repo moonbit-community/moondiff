@@ -1,10 +1,14 @@
---- cli_test/source/pipeline_test_alias_to_object_type.old.mbt: line 11
-+++ cli_test/source/pipeline_test_alias_to_object_type.new.mbt: line 11
-@@ -11,4 +11,5 @@
+--- cli_test/source/pipeline_test_alias_to_object_type.old.mbt
++++ cli_test/source/pipeline_test_alias_to_object_type.new.mbt
+@@ -8,8 +8,9 @@
+ [90m8[39m  [90m8[39m 
+ [90m9[39m  [90m9[39m type Obj = &I
+[90m10[39m [90m10[39m 
 [90m11[39m [90m11[39m fn init {
 [31m12[39m [90m..[39m   let obj = [31m[1m42[22m[39m as Obj
 [90m..[39m [32m12[39m   let obj = [32m[1m64[22m[39m as Obj
 [90m13[39m [90m13[39m   obj.f()
 [90m..[39m [32m14[39m   [32m[1mprintln(7)[22m[39m
 [90m14[39m [90m15[39m }
+[90m15[39m [90m16[39m 
 

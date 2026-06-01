@@ -1,18 +1,16 @@
---- cli_test/source/pipeline_test_009.old.mbt: line 1
-+++ cli_test/source/pipeline_test_009.new.mbt: line 1
-@@ -1 +1 @@
-[31m1[39m [90m.[39m let a:FixedArray[Int] = FixedArray::make(3, [31m[1m2[22m[39m)
-[90m.[39m [32m1[39m let a:FixedArray[Int] = FixedArray::make(3, [32m[1m3[22m[39m)
-
---- cli_test/source/pipeline_test_009.old.mbt: line 7
-+++ cli_test/source/pipeline_test_009.new.mbt: line 7
-@@ -7 +7 @@
-[31m7[39m [90m.[39m let d = [31m[1m4[22m[39m
-[90m.[39m [32m7[39m let d = [32m[1m5[22m[39m
-
---- cli_test/source/pipeline_test_009.old.mbt: line 9
-+++ cli_test/source/pipeline_test_009.new.mbt: line 9
-@@ -9,6 +9,7 @@
+--- cli_test/source/pipeline_test_009.old.mbt
++++ cli_test/source/pipeline_test_009.new.mbt
+@@ -1,14 +1,15 @@
+ [31m1[39m [90m..[39m let a:FixedArray[Int] = FixedArray::make(3, [31m[1m2[22m[39m)
+[90m..[39m  [32m1[39m let a:FixedArray[Int] = FixedArray::make(3, [32m[1m3[22m[39m)
+ [90m2[39m  [90m2[39m 
+ [90m3[39m  [90m3[39m fn init {
+ [90m4[39m  [90m4[39m   println(a.length())
+ [90m5[39m  [90m5[39m }
+ [90m6[39m  [90m6[39m 
+ [31m7[39m [90m..[39m let d = [31m[1m4[22m[39m
+[90m..[39m  [32m7[39m let d = [32m[1m5[22m[39m
+ [90m8[39m  [90m8[39m 
  [90m9[39m  [90m9[39m fn init {
 [90m10[39m [90m10[39m   a[1] = 33
 [90m..[39m [32m11[39m   [32m[1ma[2][22m[39m [32m[1m=[22m[39m [32m[1m44[22m[39m

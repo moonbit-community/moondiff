@@ -10,8 +10,8 @@ test "diff_text renders ast-backed inline diff" {
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
   let expected =
-    #|--- old.mbt: line 1
-    #|+++ new.mbt: line 1
+    #|--- old.mbt
+    #|+++ new.mbt
     #|@@ -1,3 +1,3 @@
     #|1 1 fn f() {
     #|2 .   foo(bar)
@@ -123,8 +123,10 @@ test "diff_text keeps wrapped call matched when adding a sibling call" {
     #|. 2   println("Hello, world!")
     #|. 3   println(5 + 6)
   assert_true(result.kind is Ast)
-  assert_true(result.rendered.contains("--- old.mbt: line 1"))
-  assert_true(result.rendered.contains("+++ new.mbt: line 1"))
+  assert_true(result.rendered.contains("--- old.mbt"))
+  assert_true(result.rendered.contains("+++ new.mbt"))
+  assert_false(result.rendered.contains("--- old.mbt: line"))
+  assert_false(result.rendered.contains("+++ new.mbt: line"))
   assert_false(result.rendered.contains(interleaved_prefix))
   assert_true(result.rendered.contains(separated_suffix))
   assert_false(result.rendered.contains("-   3 |     \"Hello, world!\""))
@@ -231,7 +233,7 @@ test "diff_text falls back to line diff on parser errors" {
 }
 
 ///|UUID(ffc583a0-bfa9-41da-b66c-454bec464d08)
-test "diff_text prints each changed impl separately" {
+test "diff_text uses whole-file root-list diff without UUIDs" {
   let old_source =
     #|fn a() {
     #|  foo(bar)
@@ -253,26 +255,74 @@ test "diff_text prints each changed impl separately" {
     #|  alpha(gamma(beta))
     #|}
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
-  let expected =
-    #|--- old.mbt: line 1
-    #|+++ new.mbt: line 1
-    #|@@ -1,3 +1,3 @@
-    #|1 1 fn a() {
-    #|2 .   foo(bar)
-    #|. 2   foo(baz(bar))
-    #|3 3 }
-    #|
-    #|--- old.mbt: line 7
-    #|+++ new.mbt: line 7
-    #|@@ -7,3 +7,3 @@
-    #|7 7 fn z() {
-    #|8 .   alpha(beta)
-    #|. 8   alpha(gamma(beta))
-    #|9 9 }
-    #|
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.has_prefix("--- old.mbt\n+++ new.mbt\n"))
+  assert_true(result.rendered.split("--- old.mbt").count() == 2)
+  assert_true(result.rendered.split("+++ new.mbt").count() == 2)
+  assert_false(result.rendered.contains("--- old.mbt: line"))
+  assert_false(result.rendered.contains("+++ new.mbt: line"))
+  assert_true(result.rendered.contains("2 .   foo(bar)"))
+  assert_true(result.rendered.contains(". 2   foo(baz(bar))"))
+  assert_true(result.rendered.contains("8 .   alpha(beta)"))
+  assert_true(result.rendered.contains(". 8   alpha(gamma(beta))"))
+  assert_true(result.rendered.contains("5 5 fn mid() {}"))
+}
+
+///|UUID(a950075e-cfce-4d10-a195-3db5d77760ed)
+test "diff_text matches no-UUID top-level roots after insertion" {
+  let old_source =
+    #|fn keep() {}
+    #|fn target() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|fn inserted() {}
+    #|fn keep() {}
+    #|fn target() {
+    #|  foo(baz(bar))
+    #|}
+  let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
 
   assert_true(result.kind is Ast)
-  assert_true(result.rendered == expected)
+  assert_true(result.rendered.has_prefix("--- old.mbt\n+++ new.mbt\n"))
+  assert_false(result.rendered.contains("--- old.mbt: line"))
+  assert_false(result.rendered.contains("+++ new.mbt: line"))
+  assert_true(result.rendered.contains(". 1 fn inserted() {}"))
+  assert_true(result.rendered.contains("1 2 fn keep() {}"))
+  assert_true(result.rendered.contains("3 .   foo(bar)"))
+  assert_true(result.rendered.contains(". 4   foo(baz(bar))"))
+}
+
+///|UUID(9a2b04b5-4a30-486c-8dc0-58806c525b56)
+test "diff_text falls back to whole-file line diff for root-list graph limit" {
+  let old_source =
+    #|fn keep() {}
+    #|fn target() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|fn inserted() {}
+    #|fn keep() {}
+    #|fn target() {
+    #|  foo(baz(bar))
+    #|}
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(graph_limit=0),
+  )
+
+  assert_true(result.kind is Ast)
+  assert_true(
+    result.rendered.has_prefix(
+      "note: fallback to line diff (graph limit exceeded (0))\n--- old.mbt\n+++ new.mbt\n",
+    ),
+  )
+  assert_false(result.rendered.contains(": line"))
+  assert_true(result.rendered.contains("fn inserted() {}"))
+  assert_true(result.rendered.contains("foo(baz(bar))"))
 }
 
 ///|UUID(dd5013c1-91c6-4fc3-aec3-79daed8bd382)

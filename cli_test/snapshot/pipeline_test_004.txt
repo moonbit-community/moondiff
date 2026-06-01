@@ -1,16 +1,14 @@
---- cli_test/source/pipeline_test_004.old.mbt: line 1
-+++ cli_test/source/pipeline_test_004.new.mbt: line 1
-@@ -2,5 +2,6 @@
-[90m2[39m [90m2[39m   A
-[90m3[39m [90m3[39m   D
-[90m4[39m [90m4[39m   E (M)
-[90m5[39m [90m5[39m   F (N)
-[90m.[39m [32m6[39m   [32m[1mG[22m[39m
-[90m6[39m [90m7[39m }
-
---- cli_test/source/pipeline_test_004.old.mbt: line 8
-+++ cli_test/source/pipeline_test_004.new.mbt: line 9
-@@ -9,10 +10,12 @@
+--- cli_test/source/pipeline_test_004.old.mbt
++++ cli_test/source/pipeline_test_004.new.mbt
+@@ -2,19 +2,21 @@
+ [90m2[39m  [90m2[39m   A
+ [90m3[39m  [90m3[39m   D
+ [90m4[39m  [90m4[39m   E (M)
+ [90m5[39m  [90m5[39m   F (N)
+[90m..[39m  [32m6[39m   [32m[1mG[22m[39m
+ [90m6[39m  [90m7[39m }
+ [90m7[39m  [90m8[39m 
+ [90m8[39m  [90m9[39m fn init {
  [90m9[39m [90m10[39m   let f = fn(x) {
 [90m10[39m [90m11[39m     match x {
 [90m11[39m [90m12[39m       H::A => println('a')
@@ -25,4 +23,6 @@
 [90m17[39m [90m19[39m   f(A)
 [90m..[39m [32m20[39m   [32m[1mf(G)[22m[39m
 [90m18[39m [90m21[39m }
+[90m19[39m [90m22[39m 
+[90m20[39m [90m..[39m 
 

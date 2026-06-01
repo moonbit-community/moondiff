@@ -1,10 +1,11 @@
---- cli_test/source/pipeline_test_allow_positional.old.mbt: line 10
-+++ cli_test/source/pipeline_test_allow_positional.new.mbt: line 10
-@@ -12,5 +12,6 @@
+--- cli_test/source/pipeline_test_allow_positional.old.mbt
++++ cli_test/source/pipeline_test_allow_positional.new.mbt
+@@ -12,6 +12,7 @@
 [90m12[39m [90m12[39m   allow_positional(2, 3, 4)
 [90m13[39m [90m13[39m   allow_positional(2, a=3, 4)
 [90m14[39m [90m14[39m   allow_positional(2, a=3, d=4, c=1)
 [90m15[39m [90m15[39m   allow_positional(a=3, d=4, c=1, 2)
 [90m..[39m [32m16[39m   [32m[1mallow_positional(8,[22m[39m [32m[1ma=5,[22m[39m [32m[1md=7,[22m[39m [32m[1mc=6)[22m[39m
 [90m16[39m [90m17[39m }
+[90m17[39m [90m18[39m 
 

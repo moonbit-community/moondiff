@@ -1,12 +1,16 @@
---- cli_test/source/pipeline_test_010.old.mbt: line 5
-+++ cli_test/source/pipeline_test_010.new.mbt: line 5
-@@ -5 +5 @@
-[90m5[39m [90m.[39m let b:FixedArray[Int] = [1, 2, 3, 4, 88]
-[90m.[39m [32m5[39m let b:FixedArray[Int] = [1, 2, 3, 4, 88[32m[1m,[22m[39m [32m[1m144[22m[39m]
-
---- cli_test/source/pipeline_test_010.old.mbt: line 7
-+++ cli_test/source/pipeline_test_010.new.mbt: line 7
-@@ -10,6 +10,7 @@
+--- cli_test/source/pipeline_test_010.old.mbt
++++ cli_test/source/pipeline_test_010.new.mbt
+@@ -1,17 +1,17 @@
+ [90m1[39m  [90m1[39m fn sum(arr: FixedArray[Int], i: Int, acc: Int) -> Int {
+ [90m2[39m  [90m2[39m   if i < arr.length() { sum(arr, i + 1, acc + arr[i]) } else { acc }
+ [90m3[39m  [90m3[39m }
+ [90m4[39m  [90m4[39m 
+ [90m5[39m [90m..[39m let b:FixedArray[Int] = [1, 2, 3, 4, 88]
+[90m..[39m  [32m5[39m let b:FixedArray[Int] = [1, 2, 3, 4, 88[32m[1m,[22m[39m [32m[1m144[22m[39m]
+ [90m6[39m  [90m6[39m 
+ [90m7[39m  [90m7[39m fn init {
+ [90m8[39m  [90m8[39m   let mut i = 0
+ [90m9[39m  [90m9[39m   while i < b.length() {
 [90m10[39m [90m10[39m     println(b[i])
 [90m11[39m [90m11[39m     i = i + 1
 [90m12[39m [90m12[39m   }
@@ -14,4 +18,6 @@
 [90m..[39m [32m14[39m   [32m[1mprintln(sum(b,[22m[39m [32m[1m0,[22m[39m [32m[1m2))[22m[39m
 [90m14[39m [90m15[39m   println(sum(b, 0, 0))
 [90m15[39m [90m16[39m }
+[90m16[39m [90m17[39m 
+[90m17[39m [90m..[39m 
 

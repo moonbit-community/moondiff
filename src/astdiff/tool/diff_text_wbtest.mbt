@@ -278,7 +278,7 @@ fn edit_summary(edit : ImplEdit) -> String {
 }
 
 ///|UUID(0c6b3f16-db94-47b3-a98d-6703cfaa9863)
-test "align_impl_units aligns top-level UUID blocks before inner AST diff" {
+test "align_impl_units_by_uuid aligns top-level UUID blocks before inner AST diff" {
   let old_source =
     #|///|UUID(11111111-1111-1111-1111-111111111111)
     #|fn keep() {}
@@ -301,7 +301,7 @@ test "align_impl_units aligns top-level UUID blocks before inner AST diff" {
     panic()
   }
 
-  let edits = align_impl_units(
+  let edits = align_impl_units_by_uuid(
     collect_impl_units(old_source, old_impls),
     collect_impl_units(new_source, new_impls),
   )

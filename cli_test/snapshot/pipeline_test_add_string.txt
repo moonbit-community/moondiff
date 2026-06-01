@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_add_string.old.mbt: line 1
-+++ cli_test/source/pipeline_test_add_string.new.mbt: line 1
+--- cli_test/source/pipeline_test_add_string.old.mbt
++++ cli_test/source/pipeline_test_add_string.new.mbt
 @@ -1,7 +1,7 @@
  [90m1[39m  [90m1[39m fn init {
  [90m2[39m [90m..[39m   let xs: FixedArray[_] = ["", "1", "12", "123", "1234"]

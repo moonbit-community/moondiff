@@ -1,6 +1,7 @@
---- cli_test/source/pipeline_test_annotation_node.old.mbt: line 2
-+++ cli_test/source/pipeline_test_annotation_node.new.mbt: line 2
-@@ -2,5 +2,5 @@
+--- cli_test/source/pipeline_test_annotation_node.old.mbt
++++ cli_test/source/pipeline_test_annotation_node.new.mbt
+@@ -1,6 +1,7 @@
+[90m1[39m [90m1[39m let tlv: @list.List[Int] = @list.cons(1, @list.empty())
 [90m2[39m [90m2[39m fn tlf (x: Int) -> Int {
 [31m3[39m [90m.[39m   let lv: Bool = [31m[1mfalse[22m[39m
 [90m.[39m [32m3[39m   let lv: Bool = [32m[1mtrue[22m[39m
@@ -8,4 +9,5 @@
 [31m5[39m [90m.[39m   [31m[1m4[22m[39m
 [90m.[39m [32m5[39m   [32m[1m5[22m[39m
 [90m6[39m [90m6[39m }
+[90m.[39m [90m7[39m 
 

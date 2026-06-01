@@ -1,6 +1,8 @@
---- cli_test/source/pipeline_test_007.old.mbt: line 12
-+++ cli_test/source/pipeline_test_007.new.mbt: line 12
-@@ -12,8 +12,8 @@
+--- cli_test/source/pipeline_test_007.old.mbt
++++ cli_test/source/pipeline_test_007.new.mbt
+@@ -10,11 +10,11 @@
+[90m10[39m [90m10[39m }
+[90m11[39m [90m11[39m 
 [90m12[39m [90m12[39m fn init {
 [90m13[39m [90m13[39m   let mut i = 0
 [31m14[39m [90m..[39m   while i < [31m[1m11[22m[39m {
@@ -11,4 +13,5 @@
 [90m17[39m [90m17[39m     i = i + 1
 [90m18[39m [90m18[39m   }
 [90m19[39m [90m19[39m }
+[90m20[39m [90m20[39m 
 
