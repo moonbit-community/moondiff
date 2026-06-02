@@ -7,9 +7,9 @@ import {
   "moonbitlang/parser",
   "moonbitlang/parser/syntax" @past,
   "moonbitlang/parser/basic",
-  "moonbit-community/moondiff/astdiff/diff",
-  "moonbit-community/moondiff/astdiff/elab",
-  "moonbit-community/moondiff/astdiff/syntax",
+  "moonbit-community/moondiff/astdiff" @diff,
+  "moonbit-community/moondiff/elab",
+  "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/span",
 }
 

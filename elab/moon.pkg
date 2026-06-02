@@ -3,7 +3,7 @@ import {
   "moonbitlang/parser/basic",
   "moonbitlang/parser/syntax" @past,
   "moonbitlang/parser/attribute",
-  "moonbit-community/moondiff/astdiff/syntax" @dsyntax,
+  "moonbit-community/moondiff/syntax" @dsyntax,
   "moonbit-community/moondiff/span",
   "moonbitlang/core/debug",
 }

@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "moonbit-community/moondiff/astdiff/diff"
+package "moonbit-community/moondiff/astdiff"
 
 import {
-  "moonbit-community/moondiff/astdiff/syntax",
+  "moonbit-community/moondiff/syntax",
   "moonbitlang/core/debug",
   "moonbitlang/core/hashmap",
   "moonbitlang/core/ref",

@@ -2,6 +2,6 @@ import {
   "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",
   "moonbitlang/core/priority_queue",
-  "moonbit-community/moondiff/astdiff/syntax",
+  "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/span",
 }

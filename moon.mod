@@ -20,7 +20,3 @@ license = "Apache-2.0"
 keywords = [ ]
 
 description = "Difftool that aware MoonBit language syntax"
-
-options(
-  source: "src",
-)

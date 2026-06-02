@@ -3,7 +3,7 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/x/fs",
   "moonbitlang/x/sys",
-  "moonbit-community/moondiff/astdiff/tool",
+  "moonbit-community/moondiff/tool",
 }
 
 options(
