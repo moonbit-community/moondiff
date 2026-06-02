@@ -89,7 +89,9 @@ fn program_args() -> ArrayView[String] {
 
 ///|UUID(5da5cf7f-b7c4-474b-a87a-be6436f0b5f2)
 fn main {
-  let options = parse_cli_args(program_args()) catch { e => fatal(e.to_string()) }
+  let options = parse_cli_args(program_args()) catch {
+    e => fatal(e.to_string())
+  }
   let old_source = @miniio.read_text_file(options.old_path) catch {
     e => fatal("failed to read \{options.old_path}: \{e}")
   }
