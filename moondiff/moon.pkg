@@ -1,5 +1,5 @@
 import {
-  "Yoorkin/ArgParser",
+  "moonbitlang/core/argparse",
   "moonbitlang/core/string",
   "moonbitlang/x/fs",
   "moonbitlang/x/sys",
