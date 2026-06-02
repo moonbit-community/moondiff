@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "myfreess/moondiff/astdiff/tool"
+package "moonbit-community/moondiff/astdiff/tool"
 
 // Values
 pub fn diff_text(String, String, String, String, options? : DiffOptions) -> DiffResult

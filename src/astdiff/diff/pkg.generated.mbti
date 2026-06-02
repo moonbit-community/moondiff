@@ -1,11 +1,11 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "myfreess/moondiff/astdiff/diff"
+package "moonbit-community/moondiff/astdiff/diff"
 
 import {
+  "moonbit-community/moondiff/astdiff/syntax",
   "moonbitlang/core/debug",
   "moonbitlang/core/hashmap",
   "moonbitlang/core/ref",
-  "myfreess/moondiff/astdiff/syntax",
 }
 
 // Values

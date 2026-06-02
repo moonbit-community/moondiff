@@ -7,10 +7,10 @@ import {
   "moonbitlang/parser",
   "moonbitlang/parser/syntax" @past,
   "moonbitlang/parser/basic",
-  "myfreess/moondiff/astdiff/diff",
-  "myfreess/moondiff/astdiff/elab",
-  "myfreess/moondiff/astdiff/syntax",
-  "myfreess/moondiff/span",
+  "moonbit-community/moondiff/astdiff/diff",
+  "moonbit-community/moondiff/astdiff/elab",
+  "moonbit-community/moondiff/astdiff/syntax",
+  "moonbit-community/moondiff/span",
 }
 
 import {

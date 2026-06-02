@@ -1,6 +1,6 @@
-name = "myfreess/moondiff"
+name = "moonbit-community/moondiff"
 
-version = "0.1.3"
+version = "0.0.1"
 
 import {
   "Yoorkin/prettyprinter@0.4.8",

@@ -1,6 +1,0 @@
-fn main {
-  println("Hello, world!")
-  // insert comment
-  // more than one line
-  println(5 + 6)
-}

@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "myfreess/moondiff/astdiff/syntax"
+package "moonbit-community/moondiff/astdiff/syntax"
 
 import {
   "Yoorkin/prettyprinter",
-  "myfreess/moondiff/span",
+  "moonbit-community/moondiff/span",
 }
 
 // Values

@@ -3,8 +3,8 @@ import {
   "moonbitlang/parser/basic",
   "moonbitlang/parser/syntax" @past,
   "moonbitlang/parser/attribute",
-  "myfreess/moondiff/astdiff/syntax" @dsyntax,
-  "myfreess/moondiff/span",
+  "moonbit-community/moondiff/astdiff/syntax" @dsyntax,
+  "moonbit-community/moondiff/span",
   "moonbitlang/core/debug",
 }
 
