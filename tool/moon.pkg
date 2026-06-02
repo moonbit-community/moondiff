@@ -1,5 +1,5 @@
 import {
-  "Lampese/moonbit-chalk" @chalk,
+  "moonbit-community/chalk",
   "moonbit-community/piediff",
   "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",
