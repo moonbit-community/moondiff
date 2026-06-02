@@ -12,11 +12,11 @@ moon test tool
 ### No Behavior Change
 
 ```
-bash cli_test.sh && git diff --exit-code cli_test
+bash scripts/cli_test.sh && git diff --exit-code cli_test
 ```
 
 ### Expect Behavior Change
 
 ```
-bash cli_test.sh
+bash scripts/cli_test.sh
 ```

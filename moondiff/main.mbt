@@ -16,9 +16,18 @@ fn parse_graph_limit(text : String) -> UInt raise {
 
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
 fn[T] fatal(message : String) -> T {
-  println(message)
-  @sys.exit(1)
+  @miniio.stderr.write_text("\{message}\n") catch {
+    _ => ()
+  }
+  @miniio.exit(1)
   panic()
+}
+
+///|UUID(5fb97ce8-62bb-4966-b0a3-61d2905cbf95)
+fn write_stdout(message : String) -> Unit {
+  @miniio.stdout.write_text(message) catch {
+    e => fatal("failed to write stdout: \{e}")
+  }
 }
 
 ///|UUID(07090eb9-2c1a-4f1c-902b-014898f20578)
@@ -66,14 +75,25 @@ fn parse_cli_args(argv : ArrayView[String]) -> CliOptions raise {
   }
 }
 
+///|UUID(df9a5580-e3b6-4bda-b76f-f1c9dc4a95c0)
+fn program_args() -> ArrayView[String] {
+  let args = @miniio.args_get() catch {
+    e => fatal("failed to read command line arguments: \{e}")
+  }
+  if args.length() > 1 {
+    args[1:]
+  } else {
+    []
+  }
+}
+
 ///|UUID(5da5cf7f-b7c4-474b-a87a-be6436f0b5f2)
 fn main {
-  let args = @sys.get_cli_args()
-  let options = parse_cli_args(args[1:]) catch { e => fatal(e.to_string()) }
-  let old_source = @fs.read_file_to_string(options.old_path) catch {
+  let options = parse_cli_args(program_args()) catch { e => fatal(e.to_string()) }
+  let old_source = @miniio.read_text_file(options.old_path) catch {
     e => fatal("failed to read \{options.old_path}: \{e}")
   }
-  let new_source = @fs.read_file_to_string(options.new_path) catch {
+  let new_source = @miniio.read_text_file(options.new_path) catch {
     e => fatal("failed to read \{options.new_path}: \{e}")
   }
   let graph_limit = parse_graph_limit(options.graph_limit_text) catch {
@@ -90,5 +110,5 @@ fn main {
       use_color=options.use_color,
     ),
   )
-  println(result.rendered)
+  write_stdout("\{result.rendered}\n")
 }

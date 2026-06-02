@@ -1,10 +1,11 @@
 import {
   "moonbitlang/core/argparse",
   "moonbitlang/core/string",
-  "moonbitlang/x/fs",
-  "moonbitlang/x/sys",
+  "moonbit-community/miniio",
   "moonbit-community/moondiff/tool",
 }
+
+supported_targets = "wasm"
 
 options(
   "is-main": true,
