@@ -1,5 +1,5 @@
 ///|UUID(0bd12d82-303a-49bc-a679-a5f0b7d7f683)
-using @syntax {type Syntax, type SyntaxId}
+using @syntax {type ChangeKind, type ChangeMap, type Syntax, type SyntaxId}
 
 ///|UUID(12f0c78d-7999-4efd-8e2d-58f26c3d749a)
 using @hashmap {type HashMap}

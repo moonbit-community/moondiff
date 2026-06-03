@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/tool/render"
+
+import {
+  "moonbit-community/moondiff/syntax",
+  "moonbitlang/core/hashmap",
+}
+
+// Values
+pub fn render_ast_diff(String, String, String, String, ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos], RenderOptions, old_line_base? : Int, new_line_base? : Int) -> String
+
+pub fn render_line_diff(String, String, String, String, @hashmap.HashMap[Int, Array[(Int, Int)]]?, @hashmap.HashMap[Int, Array[(Int, Int)]]?, RenderOptions, old_line_base? : Int, new_line_base? : Int) -> String
+
+pub fn split_lines(String) -> Array[String]
+
+// Errors
+
+// Types and methods
+pub struct RenderOptions {
+  context_lines : Int
+  use_color : Bool
+}
+pub fn RenderOptions::new(context_lines? : Int, use_color? : Bool) -> Self
+
+// Type aliases
+
+// Traits
+

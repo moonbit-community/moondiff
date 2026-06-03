@@ -1,6 +1,9 @@
 ///|UUID(7c0c7c9f-4e7b-4ece-9b42-5450f4682b1f)
 using @past {type DocString, type Impl, type Impls}
 
+///|UUID(e9fe4725-d84d-44b4-9808-9a4e03f95f7d)
+using @syntax {type MatchKind, type MatchedPos}
+
 ///|UUID(535b5674-e035-46f6-becf-f8cd4ac7ff03)
 priv struct ImplUnit {
   root : @syntax.Syntax
@@ -195,7 +198,7 @@ fn source_slice(source : String, unit : ImplUnit?) -> String {
   match unit {
     None => ""
     Some(unit) => {
-      let lines = split_lines(source)
+      let lines = @render.split_lines(source)
       if lines.is_empty() {
         return ""
       }
@@ -237,9 +240,9 @@ fn rebase_matched_positions(
   let rebased = Array::new()
   for position in positions {
     let kind = match position.kind {
-      Novel => Novel
+      Novel => MatchKind::Novel
       Unchanged(opposite_pos~) =>
-        Unchanged(
+        MatchKind::Unchanged(
           opposite_pos=opposite_pos.map(fn(span) {
             rebase_span(span, opposite_delta)
           }),
@@ -259,21 +262,21 @@ fn render_impl_line_fallback(
   new_label : String,
   new_source : String,
   new_unit : ImplUnit?,
-  options : DiffOptions,
+  render_options : @render.RenderOptions,
 ) -> String {
   let old_slice = source_slice(old_source, old_unit)
   let new_slice = source_slice(new_source, new_unit)
   let old_line_base = impl_line_base(old_unit)
   let new_line_base = impl_line_base(new_unit)
   "note: fallback to line diff (\{reason})\n" +
-  render_line_diff(
+  @render.render_line_diff(
     format_impl_label(old_label, old_unit),
     old_slice,
     format_impl_label(new_label, new_unit),
     new_slice,
     None,
     None,
-    options,
+    render_options,
     old_line_base~,
     new_line_base~,
   )
@@ -287,7 +290,8 @@ fn render_impl_edit(
   new_label : String,
   new_source : String,
   new_unit : ImplUnit?,
-  options : DiffOptions,
+  graph_limit : UInt,
+  render_options : @render.RenderOptions,
 ) -> String? {
   let old_slice = source_slice(old_source, old_unit)
   let new_slice = source_slice(new_source, new_unit)
@@ -305,19 +309,19 @@ fn render_impl_edit(
   }
 
   @syntax.init_all_info(lhs_roots, rhs_roots)
-  let change_map = @diff.ChangeMap::new()
-  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, options.graph_limit) catch {
+  let change_map = @syntax.ChangeMap::new()
+  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, graph_limit) catch {
     _ =>
       return Some(
         render_impl_line_fallback(
-          "graph limit exceeded (\{options.graph_limit})",
+          "graph limit exceeded (\{graph_limit})",
           old_label,
           old_source,
           old_unit,
           new_label,
           new_source,
           new_unit,
-          options,
+          render_options,
         ),
       )
   }
@@ -326,27 +330,27 @@ fn render_impl_edit(
   @diff.fix_all_sliders(rhs_roots, change_map)
 
   let lhs_positions = rebase_matched_positions(
-    change_positions(lhs_roots, change_map),
+    @syntax.change_positions(lhs_roots, change_map),
     old_line_base - 1,
     new_line_base - 1,
   )
   let rhs_positions = rebase_matched_positions(
-    change_positions(rhs_roots, change_map),
+    @syntax.change_positions(rhs_roots, change_map),
     new_line_base - 1,
     old_line_base - 1,
   )
-  if matched_pos_to_hunks(lhs_positions, rhs_positions).is_empty() {
+  if @hunks.matched_pos_to_hunks(lhs_positions, rhs_positions).is_empty() {
     None
   } else {
     Some(
-      render_ast_diff(
+      @render.render_ast_diff(
         format_impl_label(old_label, old_unit),
         old_slice,
         format_impl_label(new_label, new_unit),
         new_slice,
         lhs_positions,
         rhs_positions,
-        options,
+        render_options,
         old_line_base~,
         new_line_base~,
       ),
@@ -375,17 +379,17 @@ fn render_root_list_line_fallback(
   old_source : String,
   new_label : String,
   new_source : String,
-  options : DiffOptions,
+  render_options : @render.RenderOptions,
 ) -> String {
   "note: fallback to line diff (\{reason})\n" +
-  render_line_diff(
+  @render.render_line_diff(
     old_label,
     old_source,
     new_label,
     new_source,
     None,
     None,
-    options,
+    render_options,
   )
 }
 
@@ -397,7 +401,8 @@ fn render_uuid_aligned_impl_diffs(
   new_label : String,
   new_source : String,
   new_units : ArrayView[ImplUnit],
-  options : DiffOptions,
+  graph_limit : UInt,
+  render_options : @render.RenderOptions,
 ) -> String {
   let edits = align_impl_units_by_uuid(old_units, new_units)
 
@@ -413,7 +418,8 @@ fn render_uuid_aligned_impl_diffs(
           new_label,
           new_source,
           Some(new),
-          options,
+          graph_limit,
+          render_options,
         )
       Delete(old) =>
         render_impl_edit(
@@ -423,7 +429,8 @@ fn render_uuid_aligned_impl_diffs(
           new_label,
           new_source,
           None,
-          options,
+          graph_limit,
+          render_options,
         )
       Insert(new) =>
         render_impl_edit(
@@ -433,7 +440,8 @@ fn render_uuid_aligned_impl_diffs(
           new_label,
           new_source,
           Some(new),
-          options,
+          graph_limit,
+          render_options,
         )
     }
     match rendered {
@@ -462,57 +470,61 @@ fn render_root_list_diff(
   new_label : String,
   new_source : String,
   new_units : ArrayView[ImplUnit],
-  options : DiffOptions,
+  graph_limit : UInt,
+  render_options : @render.RenderOptions,
 ) -> String {
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
   @syntax.init_all_info(lhs_roots, rhs_roots)
-  let change_map = @diff.ChangeMap::new()
-  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, options.graph_limit) catch {
+  let change_map = @syntax.ChangeMap::new()
+  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, graph_limit) catch {
     _ =>
       return render_root_list_line_fallback(
-        "graph limit exceeded (\{options.graph_limit})",
+        "graph limit exceeded (\{graph_limit})",
         old_label,
         old_source,
         new_label,
         new_source,
-        options,
+        render_options,
       )
   }
 
   @diff.fix_all_sliders(lhs_roots, change_map)
   @diff.fix_all_sliders(rhs_roots, change_map)
 
-  render_ast_diff(
+  @render.render_ast_diff(
     old_label,
     old_source,
     new_label,
     new_source,
-    change_positions(lhs_roots, change_map),
-    change_positions(rhs_roots, change_map),
-    options,
+    @syntax.change_positions(lhs_roots, change_map),
+    @syntax.change_positions(rhs_roots, change_map),
+    render_options,
   )
 }
 
 ///|UUID(efd2e0c6-d9fc-4b57-b551-e31b0146cde7)
-fn render_aligned_impl_diffs(
+pub fn render_aligned_impl_diffs(
   old_label : String,
   old_source : String,
   old_impls : Impls,
   new_label : String,
   new_source : String,
   new_impls : Impls,
-  options : DiffOptions,
+  graph_limit : UInt,
+  render_options : @render.RenderOptions,
 ) -> String {
   let old_units = collect_impl_units(old_source, old_impls)
   let new_units = collect_impl_units(new_source, new_impls)
   if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
     render_uuid_aligned_impl_diffs(
-      old_label, old_source, old_units, new_label, new_source, new_units, options,
+      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
+      render_options,
     )
   } else {
     render_root_list_diff(
-      old_label, old_source, old_units, new_label, new_source, new_units, options,
+      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
+      render_options,
     )
   }
 }

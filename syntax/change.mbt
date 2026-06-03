@@ -1,5 +1,5 @@
 ///|UUID(0c93d9f9-f1d1-4f4c-98c6-d55e42da960a)
-pub enum ChangeKind {
+pub(all) enum ChangeKind {
   /// This node is shallowly unchanged. For lists, this means that
   /// the delimiters match, but there may still be some differences
   /// in the children between LHS and RHS.

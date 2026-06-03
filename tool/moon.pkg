@@ -1,18 +1,6 @@
 import {
-  "moonbit-community/chalk",
-  "moonbit-community/piediff",
-  "moonbitlang/core/cmp",
-  "moonbitlang/core/hashmap",
-  "moonbitlang/core/list",
   "moonbitlang/parser",
-  "moonbitlang/parser/syntax" @past,
   "moonbitlang/parser/basic",
-  "moonbit-community/moondiff/astdiff" @diff,
-  "moonbit-community/moondiff/elab",
-  "moonbit-community/moondiff/syntax",
-  "moonbit-community/moondiff/span",
+  "moonbit-community/moondiff/tool/alignment",
+  "moonbit-community/moondiff/tool/render",
 }
-
-import {
-  "moonbitlang/core/debug",
-} for "wbtest"

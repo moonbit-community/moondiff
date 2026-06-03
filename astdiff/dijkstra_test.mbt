@@ -1,5 +1,5 @@
 ///|UUID(4761b20b-3691-4220-b38a-f164bb52d0ca)
-using @syntax {type Syntax}
+using @syntax {type ChangeMap, type Syntax}
 
 ///|UUID(07773283-18ef-444e-8074-3b5ae7c18565)
 fn pos(line : Int) -> Array[@span.SingleLineSpan] {

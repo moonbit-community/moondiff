@@ -1,0 +1,13 @@
+import {
+  "moonbit-community/chalk",
+  "moonbit-community/piediff",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/hashmap",
+  "moonbit-community/moondiff/syntax",
+  "moonbit-community/moondiff/tool/hunks",
+}
+
+import {
+  "moonbitlang/core/debug",
+  "moonbit-community/moondiff/span",
+} for "wbtest"

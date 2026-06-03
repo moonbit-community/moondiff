@@ -1,5 +1,8 @@
+///|UUID(9e00411e-058e-4cef-92e3-1a0637d1a928)
+using @syntax {type MatchedPos}
+
 ///|UUID(43ea7bcf-0a8b-449e-aac4-dc8c0b633959)
-type LineSet = @hashmap.HashMap[Int, Bool]
+pub type LineSet = @hashmap.HashMap[Int, Bool]
 
 ///|UUID(9675cda4-4b44-406d-9128-9d311f3dd4e7)
 type OppositeMap = @hashmap.HashMap[Int, Array[Int]]
@@ -11,7 +14,7 @@ priv enum DisplaySide {
 }
 
 ///|UUID(041c85e4-e4b3-4134-8363-2fcaa3baee16)
-priv struct AstHunk {
+pub(all) struct AstHunk {
   novel_lhs : LineSet
   novel_rhs : LineSet
   lines : Array[(Int?, Int?)]
@@ -132,9 +135,9 @@ fn opposite_positions(mps : ArrayView[MatchedPos]) -> OppositeMap {
   for mp in mps {
     match mp.kind {
       Unchanged(opposite_pos~) => {
-        let self_line = line_index(mp.pos)
+        let self_line = @syntax.line_index(mp.pos)
         for opposite in opposite_pos {
-          add_opposite_line(opposites, self_line, line_index(opposite))
+          add_opposite_line(opposites, self_line, @syntax.line_index(opposite))
         }
       }
       Novel => ()
@@ -153,12 +156,12 @@ fn lines_with_novel(
   let rhs_lines = @hashmap.HashMap([])
   for mp in lhs_mps {
     if mp.kind.is_novel() {
-      push_line(lhs_lines, line_index(mp.pos))
+      push_line(lhs_lines, @syntax.line_index(mp.pos))
     }
   }
   for mp in rhs_mps {
     if mp.kind.is_novel() {
-      push_line(rhs_lines, line_index(mp.pos))
+      push_line(rhs_lines, @syntax.line_index(mp.pos))
     }
   }
   (lhs_lines, rhs_lines)
@@ -178,7 +181,7 @@ fn sorted_line_set_lines(line_set : LineSet) -> Array[Int] {
 fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int] {
   let seen = @hashmap.HashMap([])
   for mp in mps {
-    let line = line_index(mp.pos)
+    let line = @syntax.line_index(mp.pos)
     if line >= 0 {
       seen.set(line, true)
     }
@@ -221,7 +224,7 @@ fn matched_lines_from_unchanged(
   let highest_opposite_line = Ref(None)
   let matched = Array::new()
   for mp in mps {
-    let self_line = line_index(mp.pos)
+    let self_line = @syntax.line_index(mp.pos)
     if self_line < 0 {
       continue
     }
@@ -559,7 +562,7 @@ fn compact_gaps(items : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
 }
 
 ///|UUID(64e67fe4-b776-4693-ad5e-2cda081ef617)
-fn all_matched_lines_filled(
+pub fn all_matched_lines_filled(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
   lhs_lines : ArrayView[String],
@@ -592,7 +595,8 @@ fn novel_section_in_order(
 
   while lhs_i < lhs_novel_mps.length() {
     let lhs_mp = lhs_novel_mps[lhs_i]
-    if lhs_prev_matched_line is Some(prev) && line_index(lhs_mp.pos) == prev {
+    if lhs_prev_matched_line is Some(prev) &&
+      @syntax.line_index(lhs_mp.pos) == prev {
       ordered.push((Left, lhs_mp))
       lhs_i += 1
     } else {
@@ -601,7 +605,8 @@ fn novel_section_in_order(
   }
   while rhs_i < rhs_novel_mps.length() {
     let rhs_mp = rhs_novel_mps[rhs_i]
-    if rhs_prev_matched_line is Some(prev) && line_index(rhs_mp.pos) == prev {
+    if rhs_prev_matched_line is Some(prev) &&
+      @syntax.line_index(rhs_mp.pos) == prev {
       ordered.push((Right, rhs_mp))
       rhs_i += 1
     } else {
@@ -611,7 +616,7 @@ fn novel_section_in_order(
 
   while lhs_i < lhs_novel_mps.length() {
     let lhs_mp = lhs_novel_mps[lhs_i]
-    if opposite_to_lhs.contains(line_index(lhs_mp.pos)) {
+    if opposite_to_lhs.contains(@syntax.line_index(lhs_mp.pos)) {
       break
     }
     ordered.push((Left, lhs_mp))
@@ -619,7 +624,7 @@ fn novel_section_in_order(
   }
   while rhs_i < rhs_novel_mps.length() {
     let rhs_mp = rhs_novel_mps[rhs_i]
-    if opposite_to_rhs.contains(line_index(rhs_mp.pos)) {
+    if opposite_to_rhs.contains(@syntax.line_index(rhs_mp.pos)) {
       break
     }
     ordered.push((Right, rhs_mp))
@@ -662,8 +667,8 @@ fn sorted_novel_positions(
         )
         lhs_novel_section.clear()
         rhs_novel_section.clear()
-        lhs_prev_matched_line = Some(line_index(lhs_mp.pos))
-        rhs_prev_matched_line = Some(line_index(rhs_mp.pos))
+        lhs_prev_matched_line = Some(@syntax.line_index(lhs_mp.pos))
+        rhs_prev_matched_line = Some(@syntax.line_index(rhs_mp.pos))
         lhs_i += 1
         rhs_i += 1
       }
@@ -676,7 +681,7 @@ fn sorted_novel_positions(
         )
         lhs_novel_section.clear()
         rhs_novel_section.clear()
-        lhs_prev_matched_line = Some(line_index(lhs_mp.pos))
+        lhs_prev_matched_line = Some(@syntax.line_index(lhs_mp.pos))
         lhs_i += 1
       }
       (_, Some(rhs_mp)) if !rhs_mp.kind.is_novel() => {
@@ -688,7 +693,7 @@ fn sorted_novel_positions(
         )
         lhs_novel_section.clear()
         rhs_novel_section.clear()
-        rhs_prev_matched_line = Some(line_index(rhs_mp.pos))
+        rhs_prev_matched_line = Some(@syntax.line_index(rhs_mp.pos))
         rhs_i += 1
       }
       (Some(lhs_mp), _) if lhs_mp.kind.is_novel() => {
@@ -752,7 +757,7 @@ fn matched_novel_lines(
       lhs_mps, rhs_mps, opposite_to_lhs, opposite_to_rhs,
     ) {
     let (side, mp) = entry
-    let self_line = line_index(mp.pos)
+    let self_line = @syntax.line_index(mp.pos)
     match side {
       Left =>
         if highest_lhs.val is Some(highest) {
@@ -923,7 +928,7 @@ fn lines_to_hunks(
 }
 
 ///|UUID(160566ec-5965-45cc-bc44-0e630b4bd1fb)
-fn matched_pos_to_hunks(
+pub fn matched_pos_to_hunks(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
 ) -> Array[AstHunk] {
@@ -1042,7 +1047,7 @@ fn matched_lines_indexes_for_hunk(
 }
 
 ///|UUID(ccd8a955-311f-4247-ad00-a5f62b63de43)
-fn contextual_index_range_for_hunk(
+pub fn contextual_index_range_for_hunk(
   hunk : AstHunk,
   matched_lines : ArrayView[(Int?, Int?)],
   radius : Int,
@@ -1055,7 +1060,7 @@ fn contextual_index_range_for_hunk(
 }
 
 ///|UUID(6249eec7-8cf2-468c-b6fa-01f689dd04c8)
-fn merge_adjacent_hunks(
+pub fn merge_adjacent_hunks(
   hunks : ArrayView[AstHunk],
   matched_lines : ArrayView[(Int?, Int?)],
   context_lines : Int,

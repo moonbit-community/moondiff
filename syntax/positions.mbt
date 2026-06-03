@@ -1,14 +1,13 @@
 ///|UUID(0d8759b8-4c57-4578-9d9d-e6262c6ffafb)
-using @syntax {type Syntax}
 
 ///|UUID(088fda98-b537-498f-8fde-63d23e0561a0)
-priv enum MatchKind {
+pub(all) enum MatchKind {
   Novel
   Unchanged(opposite_pos~ : Array[@span.SingleLineSpan])
 }
 
 ///|UUID(54435d56-16ac-4c12-9185-3cb3441df57b)
-priv struct MatchedPos {
+pub(all) struct MatchedPos {
   kind : MatchKind
   pos : @span.SingleLineSpan
 }
@@ -35,12 +34,12 @@ priv enum WordPartKind {
 }
 
 ///|UUID(ff5b2bac-34fa-4c10-8007-ed3e7b09a006)
-fn MatchKind::is_novel(self : Self) -> Bool {
+pub fn MatchKind::is_novel(self : Self) -> Bool {
   self is Novel
 }
 
 ///|UUID(75e492e5-70a3-452a-bf1c-adb398a0db09)
-fn line_index(span : @span.SingleLineSpan) -> Int {
+pub fn line_index(span : @span.SingleLineSpan) -> Int {
   span.line - 1
 }
 
@@ -177,11 +176,13 @@ fn first_line_padding_for_content(
   }
   let extra = token_display_width(positions) - content.length()
   match node {
-    Syntax::Atom(
-      kind=@syntax.AtomKind::String(@syntax.StringKind::StringLiteral),
-      ..
-    ) => if extra >= 2 { 1 } else { 0 }
-    Syntax::Atom(kind=@syntax.AtomKind::Comment, ..) =>
+    Syntax::Atom(kind=AtomKind::String(StringKind::StringLiteral), ..) =>
+      if extra >= 2 {
+        1
+      } else {
+        0
+      }
+    Syntax::Atom(kind=AtomKind::Comment, ..) =>
       if extra > 0 {
         extra
       } else {
@@ -315,12 +316,12 @@ fn has_common_words(diffs : ArrayView[WordDiff]) -> Bool {
 
 ///|UUID(ae703ce3-9408-43ab-8e5c-65c6f4d49510)
 fn split_replaced_atom_positions(
-  change : @diff.ChangeKind,
+  change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
 ) -> Array[MatchedPos] {
   let (self_node, opposite_node) = match change {
-    @diff.ChangeKind::ReplacedComment(lhs~, rhs~) => (lhs, rhs)
-    @diff.ChangeKind::ReplacedString(lhs~, rhs~) => (lhs, rhs)
+    ChangeKind::ReplacedComment(lhs~, rhs~) => (lhs, rhs)
+    ChangeKind::ReplacedString(lhs~, rhs~) => (lhs, rhs)
     _ => panic()
   }
 
@@ -423,11 +424,11 @@ fn filter_empty_ends(
 
 ///|UUID(0ec2b85f-3d8b-4b49-b522-612388afcf2e)
 fn opposite_positions_for(
-  change : @diff.ChangeKind,
+  change : ChangeKind,
   is_close_delim : Bool,
 ) -> Array[@span.SingleLineSpan] {
   match change {
-    @diff.ChangeKind::Unchanged(opposite) =>
+    ChangeKind::Unchanged(opposite) =>
       match opposite {
         Syntax::Atom(position~, ..) => filter_empty_ends(position)
         Syntax::List(open_position~, close_position~, ..) =>
@@ -443,17 +444,16 @@ fn opposite_positions_for(
 
 ///|UUID(90c893dc-5add-480c-a20e-c92b10cfcd20)
 fn matched_positions_for(
-  change : @diff.ChangeKind,
+  change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
   is_close_delim : Bool,
 ) -> Array[MatchedPos] {
   let positions = filter_empty_ends(positions)
   match change {
-    @diff.ChangeKind::Novel => whole_novel_positions(positions)
-    @diff.ChangeKind::ReplacedComment(..)
-    | @diff.ChangeKind::ReplacedString(..) =>
+    ChangeKind::Novel => whole_novel_positions(positions)
+    ChangeKind::ReplacedComment(..) | ChangeKind::ReplacedString(..) =>
       split_replaced_atom_positions(change, positions)
-    @diff.ChangeKind::Unchanged(_) => {
+    ChangeKind::Unchanged(_) => {
       let opposite_pos = opposite_positions_for(change, is_close_delim)
       unchanged_positions(positions, opposite_pos)
     }
@@ -461,9 +461,9 @@ fn matched_positions_for(
 }
 
 ///|UUID(b48e6514-1f58-46da-a6cb-783370a7f41c)
-fn change_positions(
+pub fn change_positions(
   nodes : ArrayView[Syntax],
-  change_map : @diff.ChangeMap,
+  change_map : ChangeMap,
 ) -> Array[MatchedPos] {
   let positions = Array::new()
   fn walk(node : Syntax) -> Unit {

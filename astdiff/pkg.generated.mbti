@@ -4,16 +4,15 @@ package "moonbit-community/moondiff/astdiff"
 import {
   "moonbit-community/moondiff/syntax",
   "moonbitlang/core/debug",
-  "moonbitlang/core/hashmap",
   "moonbitlang/core/ref",
 }
 
 // Values
-pub fn fix_all_sliders(ArrayView[@syntax.Syntax], ChangeMap) -> Unit
+pub fn fix_all_sliders(ArrayView[@syntax.Syntax], @syntax.ChangeMap) -> Unit
 
-pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, ChangeMap, UInt) -> Unit raise ExceededGraphLimit
+pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, @syntax.ChangeMap, UInt) -> Unit raise ExceededGraphLimit
 
-pub fn mark_syntax_roots(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], ChangeMap, UInt) -> Unit raise ExceededGraphLimit
+pub fn mark_syntax_roots(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt) -> Unit raise ExceededGraphLimit
 
 pub fn shortest_path(Vertex, Int, Int) -> Array[(Edge, Vertex)] raise ExceededGraphLimit
 
@@ -23,20 +22,6 @@ pub fn tree_count(@syntax.Syntax?) -> UInt
 type ExceededGraphLimit
 
 // Types and methods
-pub enum ChangeKind {
-  Unchanged(@syntax.Syntax)
-  ReplacedComment(lhs~ : @syntax.Syntax, rhs~ : @syntax.Syntax)
-  ReplacedString(lhs~ : @syntax.Syntax, rhs~ : @syntax.Syntax)
-  Novel
-}
-
-pub struct ChangeMap(@hashmap.HashMap[UInt, ChangeKind])
-pub fn ChangeMap::get(Self, @syntax.Syntax) -> ChangeKind?
-pub fn ChangeMap::insert(Self, @syntax.Syntax, ChangeKind) -> Unit
-pub fn ChangeMap::insert_deep_novel(Self, @syntax.Syntax) -> Unit
-pub fn ChangeMap::insert_deep_unchanged(Self, node~ : @syntax.Syntax, opposite_node~ : @syntax.Syntax) -> Unit
-pub fn ChangeMap::new() -> Self
-
 pub enum Edge {
   UnchangedNode(depth_difference~ : UInt, probably_punctuation~ : Bool)
   EnterUnchangedDelimiter(depth_difference~ : UInt)

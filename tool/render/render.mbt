@@ -1,6 +1,23 @@
 ///|UUID(4c963221-4eea-4a97-95c2-09ed50ace4a9)
 type HighlightMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
+///|UUID(c2f9d869-7911-4c49-abdd-e44523adee74)
+using @syntax {type MatchedPos}
+
+///|UUID(58e0f8c9-2d25-44d5-b23b-f729f3341d84)
+pub struct RenderOptions {
+  context_lines : Int
+  use_color : Bool
+}
+
+///|UUID(777a738b-08e7-4d99-8186-fde9524531ab)
+pub fn RenderOptions::new(
+  context_lines? : Int = 3,
+  use_color? : Bool = false,
+) -> Self {
+  { context_lines, use_color }
+}
+
 ///|UUID(8b903a0c-90d4-4242-b885-8d74d5f6d260)
 priv enum LineStyle {
   Context
@@ -9,7 +26,7 @@ priv enum LineStyle {
 }
 
 ///|UUID(32757abf-5f53-4a4d-bb1a-3df50a424d47)
-fn split_lines(source : String) -> Array[String] {
+pub fn split_lines(source : String) -> Array[String] {
   let lines = Array::new()
   for line in source.split("\n") {
     let chars = line.to_array()
@@ -46,7 +63,7 @@ fn collect_novel_ranges(mps : ArrayView[MatchedPos]) -> HighlightMap {
     if !mp.kind.is_novel() {
       continue
     }
-    let line = line_index(mp.pos)
+    let line = @syntax.line_index(mp.pos)
     if line < 0 {
       continue
     }
@@ -341,14 +358,14 @@ fn max_display_line(line_base : Int, line_count : Int) -> Int {
 }
 
 ///|UUID(26becb16-0cfd-4d6f-9587-97054b5ddfbb)
-fn render_ast_diff(
+pub fn render_ast_diff(
   old_label : String,
   old_source : String,
   new_label : String,
   new_source : String,
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
-  options : DiffOptions,
+  options : RenderOptions,
   old_line_base? : Int = 1,
   new_line_base? : Int = 1,
 ) -> String {
@@ -362,11 +379,11 @@ fn render_ast_diff(
     .length()
   let old_highlights = collect_novel_ranges(lhs_mps)
   let new_highlights = collect_novel_ranges(rhs_mps)
-  let matched_lines = all_matched_lines_filled(
+  let matched_lines = @hunks.all_matched_lines_filled(
     lhs_mps, rhs_mps, old_lines, new_lines,
   )
-  let hunks = merge_adjacent_hunks(
-    matched_pos_to_hunks(lhs_mps, rhs_mps),
+  let hunks = @hunks.merge_adjacent_hunks(
+    @hunks.matched_pos_to_hunks(lhs_mps, rhs_mps),
     matched_lines,
     options.context_lines,
   )
@@ -381,7 +398,7 @@ fn render_ast_diff(
 
   for hunk in hunks {
     let render_context_lines = options.context_lines + 1
-    let (start, end_) = contextual_index_range_for_hunk(
+    let (start, end_) = @hunks.contextual_index_range_for_hunk(
       hunk, matched_lines, render_context_lines,
     )
     let lines = matched_lines[start:end_]
@@ -529,14 +546,14 @@ fn render_ast_diff(
 }
 
 ///|UUID(e282663c-5f0b-4f1d-8b46-5463657976a4)
-fn render_line_diff(
+pub fn render_line_diff(
   old_label : String,
   old_source : String,
   new_label : String,
   new_source : String,
   old_highlights : HighlightMap?,
   new_highlights : HighlightMap?,
-  options : DiffOptions,
+  options : RenderOptions,
   old_line_base? : Int = 1,
   new_line_base? : Int = 1,
 ) -> String {

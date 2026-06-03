@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/tool/hunks"
+
+import {
+  "moonbit-community/moondiff/syntax",
+  "moonbitlang/core/hashmap",
+}
+
+// Values
+pub fn all_matched_lines_filled(ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos], ArrayView[String], ArrayView[String]) -> Array[(Int?, Int?)]
+
+pub fn contextual_index_range_for_hunk(AstHunk, ArrayView[(Int?, Int?)], Int) -> (Int, Int)
+
+pub fn matched_pos_to_hunks(ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos]) -> Array[AstHunk]
+
+pub fn merge_adjacent_hunks(ArrayView[AstHunk], ArrayView[(Int?, Int?)], Int) -> Array[AstHunk]
+
+// Errors
+
+// Types and methods
+pub(all) struct AstHunk {
+  novel_lhs : @hashmap.HashMap[Int, Bool]
+  novel_rhs : @hashmap.HashMap[Int, Bool]
+  lines : Array[(Int?, Int?)]
+}
+
+// Type aliases
+pub type LineSet = @hashmap.HashMap[Int, Bool]
+
+// Traits
+

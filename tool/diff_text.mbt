@@ -22,14 +22,14 @@ fn render_text_fallback(
   options : DiffOptions,
 ) -> String {
   "note: fallback to line diff (\{reason})\n" +
-  render_line_diff(
+  @render.render_line_diff(
     old_label,
     old_source,
     new_label,
     new_source,
     None,
     None,
-    options,
+    options.render_options(),
   )
 }
 
@@ -64,8 +64,15 @@ pub fn diff_text(
     }
   }
 
-  let rendered = render_aligned_impl_diffs(
-    old_label, old_source, old_impls, new_label, new_source, new_impls, options,
+  let rendered = @alignment.render_aligned_impl_diffs(
+    old_label,
+    old_source,
+    old_impls,
+    new_label,
+    new_source,
+    new_impls,
+    options.graph_limit,
+    options.render_options(),
   )
   DiffResult::{ kind: Ast, rendered, has_changes }
 }

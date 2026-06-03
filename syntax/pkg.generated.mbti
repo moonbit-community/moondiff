@@ -2,12 +2,17 @@
 package "moonbit-community/moondiff/syntax"
 
 import {
-  "Yoorkin/prettyprinter",
   "moonbit-community/moondiff/span",
+  "moonbit-community/prettyprinter",
+  "moonbitlang/core/hashmap",
 }
 
 // Values
+pub fn change_positions(ArrayView[Syntax], ChangeMap) -> Array[MatchedPos]
+
 pub fn init_all_info(ArrayView[Syntax], ArrayView[Syntax]) -> Unit
+
+pub fn line_index(@span.SingleLineSpan) -> Int
 
 // Errors
 
@@ -19,6 +24,31 @@ pub(all) enum AtomKind {
   Comment
   Keyword
 } derive(Eq)
+
+pub(all) enum ChangeKind {
+  Unchanged(Syntax)
+  ReplacedComment(lhs~ : Syntax, rhs~ : Syntax)
+  ReplacedString(lhs~ : Syntax, rhs~ : Syntax)
+  Novel
+}
+
+pub struct ChangeMap(@hashmap.HashMap[UInt, ChangeKind])
+pub fn ChangeMap::get(Self, Syntax) -> ChangeKind?
+pub fn ChangeMap::insert(Self, Syntax, ChangeKind) -> Unit
+pub fn ChangeMap::insert_deep_novel(Self, Syntax) -> Unit
+pub fn ChangeMap::insert_deep_unchanged(Self, node~ : Syntax, opposite_node~ : Syntax) -> Unit
+pub fn ChangeMap::new() -> Self
+
+pub(all) enum MatchKind {
+  Novel
+  Unchanged(opposite_pos~ : Array[@span.SingleLineSpan])
+}
+pub fn MatchKind::is_novel(Self) -> Bool
+
+pub(all) struct MatchedPos {
+  kind : MatchKind
+  pos : @span.SingleLineSpan
+}
 
 pub(all) enum StringKind {
   StringLiteral

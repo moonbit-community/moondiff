@@ -1,5 +1,6 @@
 import {
   "moonbit-community/prettyprinter" @pp,
+  "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",
   "moonbitlang/core/uint",
   "moonbit-community/moondiff/span",
