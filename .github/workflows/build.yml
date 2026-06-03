@@ -30,6 +30,12 @@ jobs:
       - name: moon update
         run: moon update
 
+      - name: moon check
+        run: |
+          # temporarily fix this
+          moon check || cp .mooncakes parser -r
+          moon check --target wasm
+
       - name: build wasm
         run: moon build --target wasm --release
 
