@@ -2,15 +2,11 @@
 
 Difftool that aware MoonBit language syntax.
 
-![tokendiff](./tokendiff.png)
-
-## Token based diff
-
-### install
+## install
 
 TODO
 
-### use
+## use
 
 moondiff relies on some features of `moonfmt`: 
 
@@ -35,6 +31,8 @@ git commit -m "moon fmt: Generate uuid for all top-level code blocks"
 ```shell
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 # moondiff helper script
 # use your favorite editor save this script to your git pre-commit hook (default is .git/hooks/pre-commit)
 # e.g: code .git/hooks/pre-commit
@@ -47,14 +45,18 @@ moon fmt -- -add-uuid
 # --cached: Only view the staging area (staged)
 # --name-only: Only output the file name
 # -z: Use null character as a separator to correctly handle file names containing spaces
-git diff --cached --name-only -z | xargs -0 git add
+# --diff-filter=d: Exclude deleted files. They are already staged as deletions,
+# and re-adding their missing worktree paths makes git fail.
+while IFS= read -r -d '' file; do
+  git add -- "$file"
+done < <(git diff --cached --name-only --diff-filter=d -z)
 ```
 
-Then, configure git to use the installed binary as an optional diff tool within that repository:
+Then, configure git to use the installed wasm as an optional diff tool within that repository:
 
 ```shell
-git config diff.tool tokendiff
-git config difftool.tokendiff.cmd '~/.local/bin/tokendiff $LOCAL $REMOTE'
+git config diff.tool moondiff
+git config difftool.moondiff.cmd '<TODO> $LOCAL $REMOTE'
 git config difftool.prompt false
 ```
 
