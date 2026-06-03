@@ -347,20 +347,7 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
 /// accurately recognise punctuation in a language-agnostic way.
 fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
   match self {
-    Atom(content~, ..) => {
-      // TODO: This rule is too broad and needs to be refined in the future.
-      if content.is_empty() {
-        return false
-      }
-      for ch in content.iter() {
-        match ch {
-          '0'..='9' | 'a'..='z' | 'A'..='Z' | '_' => return false
-          _ => ()
-        }
-      } nobreak {
-        true
-      }
-    }
+    Atom(content~, ..) => content is "." || content is ","
     _ => false
   }
 }
@@ -664,6 +651,7 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
       }
     }
   }
+  // assert_false(neighbours.is_empty())
   v.neighbours.val = Some(neighbours)
 }
 
