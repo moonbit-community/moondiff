@@ -294,7 +294,7 @@ fn Edge::cost(self : Edge) -> UInt {
     }
     // Matching an outer delimiter is good.
     EnterUnchangedDelimiter(depth_difference~) =>
-      100 + @cmp.minimum(40, depth_difference + 10)
+      100 + @cmp.minimum(40, depth_difference)
     // Otherwise, we've added/removed a node.
     NovelAtomLHS | NovelAtomRHS => 300
     EnterNovelDelimiterLHS | EnterNovelDelimiterRHS => 300
