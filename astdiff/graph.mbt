@@ -313,7 +313,7 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
     Some(existing) => {
       // Don't explore more than two possible parenthesis
       // nestings for each syntax node pair.
-      if existing.last() is Some(allocated) && existing.length() > 2 {
+      if existing.last() is Some(allocated) && existing.length() >= 2 {
         return allocated
       }
 
