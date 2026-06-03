@@ -3,12 +3,12 @@
 @@ -1,8 +1,7 @@
 [90m1[39m [90m1[39m test "debug inspect error path" {
 [31m2[39m [90m.[39m   [31m[1mlet[22m[39m [31m[1mresult[22m[39m [31m[1m=[22m[39m try[31m[1m?[22m[39m @debug.debug_inspect(1)
-[90m.[39m [32m2[39m   try @debug.debug_inspect(1) [32m[1mcatch[22m[39m [32m[1m{[22m[39m
 [31m3[39m [90m.[39m   [31m[1mlet[22m[39m [31m[1mis_err[22m[39m [31m[1m=[22m[39m [31m[1mmatch[22m[39m [31m[1mresult[22m[39m [31m[1m{[22m[39m
 [31m4[39m [90m.[39m     [31m[1mOk(_)[22m[39m [31m[1m=>[22m[39m [31m[1mfalse[22m[39m
 [31m5[39m [90m.[39m     [31m[1mErr(_)[22m[39m [31m[1m=>[22m[39m [31m[1mtrue[22m[39m
 [31m6[39m [90m.[39m   [31m[1m}[22m[39m
 [31m7[39m [90m.[39m   [31m[1minspect(is_err,[22m[39m [31m[1mcontent="true")[22m[39m
+[90m.[39m [32m2[39m   try @debug.debug_inspect(1) [32m[1mcatch[22m[39m [32m[1m{[22m[39m
 [90m.[39m [32m3[39m     [32m[1m_[22m[39m [32m[1m=>[22m[39m [32m[1m()[22m[39m
 [90m.[39m [32m4[39m   [32m[1m}[22m[39m [32m[1mnoraise[22m[39m [32m[1m{[22m[39m
 [90m.[39m [32m5[39m     [32m[1m_[22m[39m [32m[1m=>[22m[39m [32m[1mfail("expected debug_inspect failure")[22m[39m

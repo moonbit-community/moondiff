@@ -348,6 +348,111 @@ fn render_hunk_header(
   "@@ -\{range_text(old_start, old_end, old_line_base)} +\{range_text(new_start, new_end, new_line_base)} @@"
 }
 
+///|UUID(19d80924-6de8-496c-91ff-4cf297095b35)
+fn line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
+  match line {
+    Some(line) => novel_lines.contains(line)
+    None => false
+  }
+}
+
+///|UUID(0b3d50a5-761a-438d-8d2f-d42b953ff01d)
+fn hunk_pair_has_novel(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
+  line_is_novel(pair.0, hunk.novel_lhs) || line_is_novel(pair.1, hunk.novel_rhs)
+}
+
+///|UUID(feb9b345-8e81-4d88-80fd-67e658d3d4ec)
+fn add_unique_line(lines : @hashmap.HashMap[Int, Bool], line : Int) -> Unit {
+  lines.set(line, true)
+}
+
+///|UUID(6f45e079-8271-40bc-aa81-a1269eaa3aec)
+fn should_render_as_block_replacement(
+  segment : ArrayView[(Int?, Int?)],
+  hunk : @hunks.AstHunk,
+) -> Bool {
+  let lhs_lines = @hashmap.HashMap([])
+  let rhs_lines = @hashmap.HashMap([])
+  let mut paired_novel_rows = 0
+  let mut all_present_sides_are_novel = true
+
+  for pair in segment {
+    let lhs_novel = line_is_novel(pair.0, hunk.novel_lhs)
+    let rhs_novel = line_is_novel(pair.1, hunk.novel_rhs)
+    match pair.0 {
+      Some(lhs_line) =>
+        if lhs_novel {
+          add_unique_line(lhs_lines, lhs_line)
+        } else {
+          all_present_sides_are_novel = false
+        }
+      None => ()
+    }
+    match pair.1 {
+      Some(rhs_line) =>
+        if rhs_novel {
+          add_unique_line(rhs_lines, rhs_line)
+        } else {
+          all_present_sides_are_novel = false
+        }
+      None => ()
+    }
+    if lhs_novel && rhs_novel {
+      paired_novel_rows += 1
+    }
+  }
+
+  let lhs_count = lhs_lines.length()
+  let rhs_count = rhs_lines.length()
+  all_present_sides_are_novel &&
+  lhs_count >= 2 &&
+  rhs_count >= 2 &&
+  paired_novel_rows > 0 &&
+  paired_novel_rows * 3 <= @cmp.minimum(lhs_count, rhs_count)
+}
+
+///|UUID(5ecf727f-a39d-490c-8321-00cd7b702ca8)
+fn append_segment_lines(
+  output : Array[(Int?, Int?)],
+  segment : ArrayView[(Int?, Int?)],
+  hunk : @hunks.AstHunk,
+) -> Unit {
+  if should_render_as_block_replacement(segment, hunk) {
+    for pair in segment {
+      if line_is_novel(pair.0, hunk.novel_lhs) {
+        output.push((pair.0, None))
+      }
+    }
+    for pair in segment {
+      if line_is_novel(pair.1, hunk.novel_rhs) {
+        output.push((None, pair.1))
+      }
+    }
+  } else {
+    output.push_iter(segment.iter())
+  }
+}
+
+///|UUID(2df61dad-cbc1-4926-8e42-c38e94db8206)
+fn reduce_sparse_interleaved_replacements(
+  lines : ArrayView[(Int?, Int?)],
+  hunk : @hunks.AstHunk,
+) -> Array[(Int?, Int?)] {
+  let output = Array::new()
+  let segment = Array::new()
+  for pair in lines {
+    if hunk_pair_has_novel(pair, hunk) {
+      segment.push(pair)
+    } else {
+      append_segment_lines(output, segment, hunk)
+      segment.clear()
+      output.push(pair)
+    }
+  }
+  append_segment_lines(output, segment, hunk)
+  output
+}
+
 ///|UUID(15f32630-dc4b-4303-aa24-c9bd98ee0b12)
 fn max_display_line(line_base : Int, line_count : Int) -> Int {
   if line_count == 0 {
@@ -401,7 +506,10 @@ pub fn render_ast_diff(
     let (start, end_) = @hunks.contextual_index_range_for_hunk(
       hunk, matched_lines, render_context_lines,
     )
-    let lines = matched_lines[start:end_]
+    let lines = reduce_sparse_interleaved_replacements(
+      matched_lines[start:end_],
+      hunk,
+    )
     buf.write_string(render_hunk_header(lines, old_line_base, new_line_base))
     buf.write_char('\n')
     for pair in lines {
