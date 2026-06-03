@@ -1,10 +1,7 @@
 ## Test
 
 ```
-moon test span
-moon test elab
-moon test astdiff
-moon test tool
+bash scripts/regular_test.sh
 ```
 
 ## E2E Test

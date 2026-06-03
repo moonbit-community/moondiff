@@ -1,0 +1,44 @@
+name: check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: install
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: moon version
+        run: |
+          moon version --all
+          moonrun --version
+
+      - name: moon update
+        run: moon update
+
+      - name: moon check
+        run: |
+          # temporarily fix this
+          moon check || cp .mooncakes parser -r
+          moon check --target all
+      
+      - name: run test
+        run: |
+          bash scripts/regular_test.sh
+          bash scripts/cli_test.sh && git diff --exit-code cli_test
+      
+      
