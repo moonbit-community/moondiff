@@ -159,6 +159,43 @@ test "diff_text keeps inserted case marker statements novel" {
   assert_false(result.rendered.contains("3 4   println(marker)"))
 }
 
+///|UUID(1a5d3597-5a96-43ed-9e96-f88454480fd1)
+test "diff_text separates mostly block replacements with one aligned line" {
+  let old_source =
+    #|test "debug inspect error path" {
+    #|  let result = try? @debug.debug_inspect(1)
+    #|  let is_err = match result {
+    #|    Ok(_) => false
+    #|    Err(_) => true
+    #|  }
+    #|  inspect(is_err, content="true")
+    #| }
+  let new_source =
+    #|test "debug inspect error path" {
+    #|  try @debug.debug_inspect(1) catch {
+    #|    _ => ()
+    #|  } noraise {
+    #|    _ => fail("expected debug_inspect failure")
+    #|  }
+    #| }
+  let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+  let separated_block =
+    #|2 .   let result = try? @debug.debug_inspect(1)
+    #|3 .   let is_err = match result {
+    #|4 .     Ok(_) => false
+    #|5 .     Err(_) => true
+    #|6 .   }
+    #|7 .   inspect(is_err, content="true")
+    #|. 2   try @debug.debug_inspect(1) catch {
+  let interleaved_prefix =
+    #|2 .   let result = try? @debug.debug_inspect(1)
+    #|. 2   try @debug.debug_inspect(1) catch {
+
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains(separated_block))
+  assert_false(result.rendered.contains(interleaved_prefix))
+}
+
 ///|UUID(7cee72fa-8f8c-4bcf-b70b-5f21305d87f2)
 test "diff_text highlights only changed word inside string literal" {
   let old_source =
