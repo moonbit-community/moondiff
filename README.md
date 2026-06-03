@@ -2,6 +2,8 @@
 
 Difftool that aware MoonBit language syntax.
 
+Inspired by [difftastic](https://github.com/Wilfred/difftastic)
+
 ## install
 
 TODO

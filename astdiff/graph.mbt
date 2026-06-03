@@ -347,23 +347,21 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
 /// accurately recognise punctuation in a language-agnostic way.
 fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
   match self {
-    Atom(content~, ..) => atom_text_is_punctuation(content)
-    _ => false
-  }
-}
-
-///|UUID(49080bd9-e70e-4b23-b7c8-b2cf8a30d5eb)
-fn atom_text_is_punctuation(content : String) -> Bool {
-  if content.is_empty() {
-    return false
-  }
-  for ch in content.to_array() {
-    match ch {
-      '0'..='9' | 'a'..='z' | 'A'..='Z' | '_' => return false
-      _ => ()
+    Atom(content~, ..) => {
+      // TODO: This rule is too broad and needs to be refined in the future.
+      if content.is_empty() {
+        return false
+      }
+      for ch in content.iter() {
+        match ch {
+          '0'..='9' | 'a'..='z' | 'A'..='Z' | '_' => return false
+          _ => ()
+        }
+      } nobreak {
+        true
+      }
     }
-  } nobreak {
-    true
+    _ => false
   }
 }
 
