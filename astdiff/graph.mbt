@@ -347,7 +347,7 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
 /// accurately recognise punctuation in a language-agnostic way.
 fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
   match self {
-    Atom(content~, ..) => content is "." || content is ","
+    Atom(content~, ..) => content is "." || content is "," || content is ";"
     _ => false
   }
 }
