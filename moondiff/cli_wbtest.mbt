@@ -8,3 +8,25 @@ test "parse_cli_args handles graph limit color flag and files" {
   assert_true(options.old_path == "old.mbt")
   assert_true(options.new_path == "new.mbt")
 }
+
+///|UUID(f4c874ad-006a-41cb-ab86-0013549f7845)
+test "should_use_astdiff requires both inputs to be mbt files" {
+  assert_true(should_use_astdiff("old.mbt", "new.mbt"))
+  assert_false(should_use_astdiff("old.txt", "new.mbt"))
+  assert_false(should_use_astdiff("old.mbt", "new.txt"))
+}
+
+///|UUID(fad12a14-0144-4f4f-8891-706c7971b622)
+test "render_cli_diff uses regular line diff for non-mbt paths" {
+  let options = CliOptions::{
+    old_path: "old.txt",
+    new_path: "new.txt",
+    graph_limit_text: "0",
+    use_color: false,
+  }
+  let rendered = render_cli_diff(options, "plain old\n", "plain new\n", 0)
+  assert_false(rendered.has_prefix("note: fallback to line diff"))
+  assert_true(rendered.has_prefix("--- old.txt\n+++ new.txt\n@@ -1"))
+  assert_true(rendered.contains("1 . plain old"))
+  assert_true(rendered.contains(". 1 plain new"))
+}

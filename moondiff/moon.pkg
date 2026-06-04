@@ -3,6 +3,7 @@ import {
   "moonbitlang/core/string",
   "moonbit-community/miniio",
   "moonbit-community/moondiff/tool",
+  "moonbit-community/moondiff/tool/render",
 }
 
 supported_targets = "wasm"

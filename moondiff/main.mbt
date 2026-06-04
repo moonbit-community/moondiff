@@ -14,6 +14,11 @@ fn parse_graph_limit(text : String) -> UInt raise {
   @string.parse_int(text).reinterpret_as_uint()
 }
 
+///|UUID(a34f9833-2141-48c6-8927-c7a3203564ee)
+fn should_use_astdiff(old_path : String, new_path : String) -> Bool {
+  old_path.has_suffix(".mbt") && new_path.has_suffix(".mbt")
+}
+
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
 fn[T] fatal(message : String) -> T {
   @miniio.stderr.write_text("\{message}\n") catch {
@@ -87,6 +92,38 @@ fn program_args() -> ArrayView[String] {
   }
 }
 
+///|UUID(b961590c-b024-4017-94ea-9bff5e338b80)
+fn render_cli_diff(
+  options : CliOptions,
+  old_source : String,
+  new_source : String,
+  graph_limit : UInt,
+) -> String {
+  if should_use_astdiff(options.old_path, options.new_path) {
+    @tool.diff_text(
+      options.old_path,
+      old_source,
+      options.new_path,
+      new_source,
+      options=@tool.DiffOptions::new(
+        graph_limit~,
+        context_lines=3,
+        use_color=options.use_color,
+      ),
+    ).rendered
+  } else {
+    @render.render_line_diff(
+      options.old_path,
+      old_source,
+      options.new_path,
+      new_source,
+      None,
+      None,
+      @render.RenderOptions::new(context_lines=3, use_color=options.use_color),
+    )
+  }
+}
+
 ///|UUID(5da5cf7f-b7c4-474b-a87a-be6436f0b5f2)
 fn main {
   let options = parse_cli_args(program_args()) catch {
@@ -101,16 +138,6 @@ fn main {
   let graph_limit = parse_graph_limit(options.graph_limit_text) catch {
     e => fatal("invalid --graph-limit value \{options.graph_limit_text}: \{e}")
   }
-  let result = @tool.diff_text(
-    options.old_path,
-    old_source,
-    options.new_path,
-    new_source,
-    options=@tool.DiffOptions::new(
-      graph_limit~,
-      context_lines=3,
-      use_color=options.use_color,
-    ),
-  )
-  write_stdout("\{result.rendered}\n")
+  let rendered = render_cli_diff(options, old_source, new_source, graph_limit)
+  write_stdout("\{rendered}\n")
 }
