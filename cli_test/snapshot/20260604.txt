@@ -1,0 +1,22 @@
+[34m--- cli_test/source/20260604.old.mbt[39m
+[34m+++ cli_test/source/20260604.new.mbt: line 1[39m
+@@ -1,0 +1,18 @@
+[90m.[39m  [32m1[39m [32m[1m///|UUID(31d25c5a-0e2a-49e8-9e32-8de8940bded3)[22m[39m
+[90m.[39m  [32m2[39m [32m[1mtest[22m[39m [32m[1m"diff_text colors file headers blue"[22m[39m [32m[1m{[22m[39m
+[90m.[39m  [32m3[39m   [32m[1mlet[22m[39m [32m[1mold_source[22m[39m [32m[1m=[22m[39m
+[90m.[39m  [32m4[39m     [32m[1m#|fn f() [22m[39m{
+[90m.[39m  [32m5[39m [32m[1m    #|  foo(bar)[22m[39m
+[90m.[39m  [32m6[39m [32m[1m    #|}[22m[39m
+[90m.[39m  [32m7[39m   [32m[1mlet[22m[39m [32m[1mnew_source[22m[39m [32m[1m=[22m[39m
+[90m.[39m  [32m8[39m     [32m[1m#|fn f() [22m[39m{
+[90m.[39m  [32m9[39m [32m[1m    #|  foo(baz(bar))[22m[39m
+[90m.[39m [32m10[39m [32m[1m    #|}[22m[39m
+[90m.[39m [32m11[39m   [32m[1mlet[22m[39m [32m[1mresult[22m[39m [32m[1m=[22m[39m [32m[1mdiff_text([22m[39m
+[90m.[39m [32m12[39m     [32m[1m"old.mbt",[22m[39m
+[90m.[39m [32m13[39m     [32m[1mold_source,[22m[39m
+[90m.[39m [32m14[39m     [32m[1m"new.mbt",[22m[39m
+[90m.[39m [32m15[39m     [32m[1mnew_source,[22m[39m
+[90m.[39m [32m16[39m     [32m[1moptions=DiffOptions::new(use_color=true),[22m[39m
+[90m.[39m [32m17[39m   [32m[1m)[22m[39m
+[90m.[39m [32m18[39m [32m[1m}[22m[39m
+

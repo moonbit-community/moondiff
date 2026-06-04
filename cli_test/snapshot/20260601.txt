@@ -1,5 +1,5 @@
---- cli_test/source/20260601.old.mbt
-+++ cli_test/source/20260601.new.mbt
+[34m--- cli_test/source/20260601.old.mbt[39m
+[34m+++ cli_test/source/20260601.new.mbt[39m
 @@ -1,8 +1,7 @@
 [90m1[39m [90m1[39m test "debug inspect error path" {
 [31m2[39m [90m.[39m   [31m[1mlet[22m[39m [31m[1mresult[22m[39m [31m[1m=[22m[39m try[31m[1m?[22m[39m @debug.debug_inspect(1)

@@ -147,6 +147,27 @@ fn style_text(text : String, style : LineStyle, use_color : Bool) -> String {
   }
 }
 
+///|UUID(fb6c161d-a7a0-4606-8cd8-1e401ce07176)
+fn style_file_header(text : String, use_color : Bool) -> String {
+  if use_color {
+    @chalk.chalk().color(Blue).render(text)
+  } else {
+    text
+  }
+}
+
+///|UUID(06f17b4e-fb70-42ea-880f-a1af1661af4e)
+pub fn render_file_headers(
+  old_label : String,
+  new_label : String,
+  use_color : Bool,
+) -> String {
+  style_file_header("--- \{old_label}", use_color) +
+  "\n" +
+  style_file_header("+++ \{new_label}", use_color) +
+  "\n"
+}
+
 ///|UUID(3209ce96-bf1f-4476-aaab-bb49814c52f5)
 fn render_line_body(
   line : String,
@@ -494,8 +515,7 @@ pub fn render_ast_diff(
   )
 
   let buf = StringBuilder::new()
-  buf.write_string("--- \{old_label}\n")
-  buf.write_string("+++ \{new_label}\n")
+  buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   if hunks.is_empty() {
     buf.write_string("No changes.\n")
     return buf.to_string()
@@ -677,8 +697,7 @@ pub fn render_line_diff(
   let hunks = diff.group(radius=options.context_lines)
 
   let buf = StringBuilder::new()
-  buf.write_string("--- \{old_label}\n")
-  buf.write_string("+++ \{new_label}\n")
+  buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   if hunks.is_empty() {
     buf.write_string("No changes.\n")
     return buf.to_string()

@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_012.old.mbt
-+++ cli_test/source/pipeline_test_012.new.mbt
+[34m--- cli_test/source/pipeline_test_012.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_012.new.mbt[39m
 @@ -39,8 +39,8 @@
 [90m39[39m [90m39[39m   s[m.land(1)][n]
 [90m40[39m [90m40[39m }

@@ -359,8 +359,13 @@ fn render_impl_edit(
 }
 
 ///|UUID(a20b165d-89ae-42ea-a43a-2c4ff53fd6ca)
-fn render_no_changes(old_label : String, new_label : String) -> String {
-  "--- \{old_label}\n" + "+++ \{new_label}\n" + "No changes.\n"
+fn render_no_changes(
+  old_label : String,
+  new_label : String,
+  render_options : @render.RenderOptions,
+) -> String {
+  @render.render_file_headers(old_label, new_label, render_options.use_color) +
+  "No changes.\n"
 }
 
 ///|UUID(58ac384d-5e05-4e16-8ced-e465cedf4774)
@@ -458,7 +463,7 @@ fn render_uuid_aligned_impl_diffs(
   if wrote {
     buf.to_string()
   } else {
-    render_no_changes(old_label, new_label)
+    render_no_changes(old_label, new_label, render_options)
   }
 }
 

@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_alias_to_object_type.old.mbt
-+++ cli_test/source/pipeline_test_alias_to_object_type.new.mbt
+[34m--- cli_test/source/pipeline_test_alias_to_object_type.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_alias_to_object_type.new.mbt[39m
 @@ -8,8 +8,9 @@
  [90m8[39m  [90m8[39m 
  [90m9[39m  [90m9[39m type Obj = &I

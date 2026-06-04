@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_010.old.mbt
-+++ cli_test/source/pipeline_test_010.new.mbt
+[34m--- cli_test/source/pipeline_test_010.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_010.new.mbt[39m
 @@ -1,17 +1,17 @@
  [90m1[39m  [90m1[39m fn sum(arr: FixedArray[Int], i: Int, acc: Int) -> Int {
  [90m2[39m  [90m2[39m   if i < arr.length() { sum(arr, i + 1, acc + arr[i]) } else { acc }

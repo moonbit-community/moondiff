@@ -22,6 +22,31 @@ test "diff_text renders ast-backed inline diff" {
   assert_true(result.rendered == expected)
 }
 
+///|UUID(31d25c5a-0e2a-49e8-9e32-8de8940bded3)
+test "diff_text colors file headers blue" {
+  let old_source =
+    #|fn f() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|fn f() {
+    #|  foo(baz(bar))
+    #|}
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(use_color=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(
+    result.rendered.has_prefix(
+      "\u{1b}[34m--- old.mbt\u{1b}[39m\n\u{1b}[34m+++ new.mbt\u{1b}[39m\n",
+    ),
+  )
+}
+
 ///|UUID(fe6a815c-dfa1-4b21-af95-0ed557d4e9d6)
 test "diff_text shows partial rhs highlight for wrapped call" {
   let old_source =

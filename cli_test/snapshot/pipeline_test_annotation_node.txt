@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_annotation_node.old.mbt
-+++ cli_test/source/pipeline_test_annotation_node.new.mbt
+[34m--- cli_test/source/pipeline_test_annotation_node.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_annotation_node.new.mbt[39m
 @@ -1,6 +1,7 @@
 [90m1[39m [90m1[39m let tlv: @list.List[Int] = @list.cons(1, @list.empty())
 [90m2[39m [90m2[39m fn tlf (x: Int) -> Int {

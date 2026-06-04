@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_any_as_object.old.mbt
-+++ cli_test/source/pipeline_test_any_as_object.new.mbt
+[34m--- cli_test/source/pipeline_test_any_as_object.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_any_as_object.new.mbt[39m
 @@ -13,9 +13,10 @@
 [90m13[39m [90m13[39m   t.f()
 [90m14[39m [90m14[39m }

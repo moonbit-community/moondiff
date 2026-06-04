@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_allow_positional.old.mbt
-+++ cli_test/source/pipeline_test_allow_positional.new.mbt
+[34m--- cli_test/source/pipeline_test_allow_positional.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_allow_positional.new.mbt[39m
 @@ -12,6 +12,7 @@
 [90m12[39m [90m12[39m   allow_positional(2, 3, 4)
 [90m13[39m [90m13[39m   allow_positional(2, a=3, 4)

@@ -1,5 +1,5 @@
---- cli_test/source/20260603.old.mbt
-+++ cli_test/source/20260603.new.mbt
+[34m--- cli_test/source/20260603.old.mbt[39m
+[34m+++ cli_test/source/20260603.new.mbt[39m
 @@ -1,20 +1,7 @@
  [31m1[39m [90m..[39m fn Syntax::looks_like_punctuation(self : Syntax) -> Bool [31m[1m{[22m[39m
 [90m..[39m  [32m1[39m fn Syntax::looks_like_punctuation(self : Syntax) -> Bool [32m[1m{[22m[39m

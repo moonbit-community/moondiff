@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_adt.old.mbt
-+++ cli_test/source/pipeline_test_adt.new.mbt
+[34m--- cli_test/source/pipeline_test_adt.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_adt.new.mbt[39m
 @@ -1,10 +1,10 @@
  [90m1[39m  [90m1[39m enum T {
  [90m2[39m  [90m2[39m   A

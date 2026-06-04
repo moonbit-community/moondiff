@@ -1,5 +1,5 @@
---- cli_test/source/pipeline_test_005.old.mbt
-+++ cli_test/source/pipeline_test_005.new.mbt
+[34m--- cli_test/source/pipeline_test_005.old.mbt[39m
+[34m+++ cli_test/source/pipeline_test_005.new.mbt[39m
 @@ -2,11 +2,11 @@
  [90m2[39m  [90m2[39m   fn(b, c) { a + b + c }
  [90m3[39m  [90m3[39m }
