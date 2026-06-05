@@ -317,8 +317,7 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
         return allocated
       }
 
-      // If we have seen exactly this graph node before, even
-      // considering parenthesis matching, return it.
+      // Otherwise, reuse an exact parenthesis-matching state when we have one.
       for existing_node in existing {
         if existing_node.parents == v.parents {
           return existing_node
@@ -510,8 +509,9 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
       is Atom(content=lhs_content, kind=Comment | String(_) as lhs_kind, ..) &&
       rhs_syntax
       is Atom(content=rhs_content, kind=Comment | String(_) as rhs_kind, ..) {
-      // Both sides are comments/both sides are strings and
-      // their content is reasonably similar.
+      // Both sides are comments or both sides are strings. Any changed content
+      // gets a replacement edge; the edit distance becomes part of the edge
+      // cost instead of a construction-time threshold.
       if lhs_kind == rhs_kind && lhs_content != rhs_content {
         let levenshtein_pct = (normalized_levenshtein(
             lhs=lhs_content,
