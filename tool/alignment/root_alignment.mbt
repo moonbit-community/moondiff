@@ -5,6 +5,9 @@ using @past {type DocString, type Impl, type Impls}
 using @syntax {type MatchKind, type MatchedPos}
 
 ///|UUID(535b5674-e035-46f6-becf-f8cd4ac7ff03)
+// One top-level implementation item plus the source range needed to render it
+// independently. A UUID in the leading doc comment lets us align moved items
+// before running the structural diff.
 priv struct ImplUnit {
   root : @syntax.Syntax
   uuid : String?
@@ -13,6 +16,8 @@ priv struct ImplUnit {
 }
 
 ///|UUID(53d6d454-50dd-433e-83c9-b2a93eefef14)
+// The top-level edit script used when all units carry UUIDs. Replacement means
+// "diff these two roots"; delete/insert compare a real root with an empty side.
 priv enum ImplEdit {
   Replace(old~ : ImplUnit, new~ : ImplUnit)
   Delete(ImplUnit)
@@ -28,6 +33,9 @@ fn is_uuid_char(ch : Char) -> Bool {
 }
 
 ///|UUID(5d752005-29eb-4426-a51b-c7ef06be58b5)
+// UUID lines are expected inside doc comments as `UUID(...)`. The parser keeps
+// doc comment content without the leading `///|`, so only the payload is parsed
+// here.
 fn parse_uuid_line(line : String) -> String? {
   let line = line.trim(char_set=" ")
   if !(line.has_prefix("UUID(") && line.has_suffix(")")) {
@@ -87,6 +95,8 @@ fn impl_uuid(impl_ : Impl) -> String? {
 }
 
 ///|UUID(3ac7e4c6-c245-48ec-97f9-56e561b4016d)
+// Include attached doc comments in the source slice. Otherwise a changed UUID
+// or documentation line would be outside the rendered hunk for the declaration.
 fn impl_start_line(impl_ : Impl) -> Int {
   let fallback = impl_.loc().start.lnum
   match impl_doc(impl_) {
@@ -113,6 +123,8 @@ fn impl_array(impls : Impls) -> Array[Impl] {
 }
 
 ///|UUID(7c2c53bf-e829-4e44-bf26-b1c452e3f8a0)
+// Elaborate parser items into syntax roots once, while preserving source line
+// bounds for later per-item fallback rendering.
 fn collect_impl_units(source : String, impls : Impls) -> Array[ImplUnit] {
   let units = Array::new()
   for impl_ in impl_array(impls) {
@@ -132,6 +144,8 @@ fn all_units_have_uuid(units : ArrayView[ImplUnit]) -> Bool {
 }
 
 ///|UUID(75486f71-7af0-4c26-a905-97cdfbc7d623)
+// Align duplicated UUIDs by occurrence order. This keeps repeated generated
+// declarations deterministic without requiring UUIDs to be globally unique.
 fn align_impl_units_by_uuid(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
@@ -194,6 +208,9 @@ fn impl_line_base(unit : ImplUnit?) -> Int {
 }
 
 ///|UUID(92c64499-ea3f-4acd-8121-453b75789ee2)
+// Extract the exact source text for one implementation unit. The caller passes
+// the corresponding line base so hunk headers still refer to original file
+// lines.
 fn source_slice(source : String, unit : ImplUnit?) -> String {
   match unit {
     None => ""
@@ -232,6 +249,9 @@ fn rebase_span(
 }
 
 ///|UUID(34c71798-ef33-4462-bbc6-a6d7965ade32)
+// Per-unit diffs run on sliced source text. Rebase structural positions so the
+// renderer can operate on the slice while hunk labels keep the original line
+// numbers.
 fn rebase_matched_positions(
   positions : ArrayView[MatchedPos],
   own_delta : Int,
@@ -254,6 +274,8 @@ fn rebase_matched_positions(
 }
 
 ///|UUID(2d9e21e9-c8cc-40cf-b572-5e163bf3b4b8)
+// If the tree graph grows beyond the configured limit for a single unit, show a
+// regular line diff for just that unit instead of abandoning the whole file.
 fn render_impl_line_fallback(
   reason : String,
   old_label : String,
@@ -283,6 +305,9 @@ fn render_impl_line_fallback(
 }
 
 ///|UUID(b38a16e3-c759-41aa-93fc-db2763cc9bcb)
+// Render one top-level edit. Empty-side edits are represented by omitting the
+// corresponding root, which lets the normal structural path mark the whole unit
+// as novel when the graph stays within limits.
 fn render_impl_edit(
   old_label : String,
   old_source : String,
@@ -399,6 +424,8 @@ fn render_root_list_line_fallback(
 }
 
 ///|UUID(5904eab2-e4fe-4ce5-b9bc-b437e4d7191f)
+// UUID alignment diffs top-level units independently. This makes moved or
+// reordered declarations easier to read and limits graph size per comparison.
 fn render_uuid_aligned_impl_diffs(
   old_label : String,
   old_source : String,
@@ -468,6 +495,8 @@ fn render_uuid_aligned_impl_diffs(
 }
 
 ///|UUID(109a4d3f-cbaa-42e9-a5d5-5680327e8e55)
+// When UUIDs are missing, fall back to a single root-list diff, matching the
+// regular difftastic strategy of comparing syntax roots in order.
 fn render_root_list_diff(
   old_label : String,
   old_source : String,
@@ -509,6 +538,9 @@ fn render_root_list_diff(
 }
 
 ///|UUID(efd2e0c6-d9fc-4b57-b551-e31b0146cde7)
+// Prefer UUID alignment only when both sides are fully annotated. A partial
+// annotation set is more dangerous than useful because unmatched units could be
+// paired with the wrong declaration.
 pub fn render_aligned_impl_diffs(
   old_label : String,
   old_source : String,
