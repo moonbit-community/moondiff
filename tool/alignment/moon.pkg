@@ -1,6 +1,7 @@
 import {
   "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",
+  "moonbitlang/core/list",
   "moonbitlang/parser/syntax" @past,
   "moonbit-community/moondiff/astdiff" @diff,
   "moonbit-community/moondiff/elab",

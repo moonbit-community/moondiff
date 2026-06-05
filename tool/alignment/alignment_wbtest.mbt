@@ -17,6 +17,15 @@ fn edit_summary(edit : ImplEdit) -> String {
   }
 }
 
+///|UUID(42a6fa59-8e84-4dad-aee4-0435e8c07d32)
+fn edit_line_summary(edit : ImplEdit) -> String {
+  match edit {
+    Replace(old~, new~) => "Replace(\{old.start_line}->\{new.start_line})"
+    Delete(old) => "Delete(\{old.start_line})"
+    Insert(new) => "Insert(\{new.start_line})"
+  }
+}
+
 ///|UUID(1bfc1fdd-7d6e-45d9-9a3d-12672bcd26bd)
 fn parse_units(source : String) -> Array[ImplUnit] {
   let (impls, reports) = @parser.parse_string(source)
@@ -53,6 +62,92 @@ test "align_impl_units_by_uuid aligns top-level UUID blocks before inner AST dif
     "Replace(11111111-1111-1111-1111-111111111111->11111111-1111-1111-1111-111111111111)",
     "Replace(22222222-2222-2222-2222-222222222222->22222222-2222-2222-2222-222222222222)",
     "Insert(99999999-9999-9999-9999-999999999999)",
+  ])
+}
+
+///|UUID(17292d71-1f7b-4cc1-bbcd-dd2bc7cb2d3f)
+test "align_impl_units_by_key matches no-UUID functions after insertion" {
+  let old_source =
+    #|fn keep() {}
+    #|fn target() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|fn inserted() {}
+    #|fn keep() {}
+    #|fn target() {
+    #|  foo(baz(bar))
+    #|}
+
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->2)", "Replace(2->3)", "Insert(1)",
+  ])
+}
+
+///|UUID(51f6f23d-97bc-4936-ae62-a0c7f5f76c6e)
+test "align_impl_units_by_key matches no-UUID functions after reordering" {
+  let old_source =
+    #|fn a() {}
+    #|fn b() {}
+  let new_source =
+    #|fn b() {}
+    #|fn a() {}
+
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->2)", "Replace(2->1)",
+  ])
+}
+
+///|UUID(0982674c-8c35-465a-93af-e316ca662015)
+test "align_impl_units_by_key uses semantic key when UUID is missing on one side" {
+  let old_source =
+    #|///|UUID(22222222-2222-2222-2222-222222222222)
+    #|fn target() {
+    #|  foo(bar)
+    #|}
+  let new_source =
+    #|fn target() {
+    #|  foo(baz(bar))
+    #|}
+
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), ["Replace(1->1)"])
+}
+
+///|UUID(4fbb6c68-67c1-4ab6-b063-a7e463b207ca)
+test "align_impl_units_by_key pairs duplicate semantic keys by occurrence order" {
+  let old_source =
+    #|fn dup() {
+    #|  first()
+    #|}
+    #|fn dup() {
+    #|  second()
+    #|}
+  let new_source =
+    #|fn dup() {
+    #|  first_changed()
+    #|}
+    #|fn dup() {
+    #|  second_changed()
+    #|}
+
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->1)", "Replace(4->4)",
   ])
 }
 
