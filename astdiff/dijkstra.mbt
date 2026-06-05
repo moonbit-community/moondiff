@@ -162,10 +162,13 @@ pub fn mark_syntax(
   // so we don't spend too much time re-hashing and expanding the
   // predecessors hashmap.
   //
-  // Cap this number to the graph limit, so we don't try to allocate
+  // Cap this size hint to the graph limit, so we don't try to allocate
   // an absurdly large (i.e. greater than physical memory) hashmap
-  // when there is a large number of nodes. We'll never visit more
-  // than graph_limit nodes.
+  // when there is a large number of nodes.
+  //
+  // The runtime limit is approximate: it is checked after neighbours are
+  // generated, and seen counts canonical graph keys rather than every
+  // Vertex variant.
 
   let size_hint = @cmp.minimum(lhs_node_count * rhs_node_count, graph_limit).reinterpret_as_int()
   let start = Vertex::new(lhs=lhs_syntax, rhs=rhs_syntax)
