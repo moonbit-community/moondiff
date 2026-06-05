@@ -13,9 +13,10 @@ fn expect_parse_ok(input : String, expected : String) -> Unit raise {
 }
 
 ///|
-fn inspect_parse(input : String, expected : String) -> Unit raise {
+fn expect_parse_err(input : String, expected : String) -> Unit raise {
   match parse_program(input) {
-    Ok(exprs) => inspect(exprs[0], content=expected)
+    Ok(exprs) =>
+      abort("expected parse diagnostic, got \{exprs.length()} expression(s)")
     Err(diagnostic) => inspect(diagnostic, content=expected)
   }
 }
