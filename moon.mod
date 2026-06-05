@@ -5,7 +5,7 @@ version = "0.0.1"
 import {
   "moonbit-community/prettyprinter@0.4.8",
   "moonbit-community/chalk@0.0.1",
-  "moonbit-community/piediff@0.0.9",
+  "moonbit-community/piediff@0.0.10",
   "moonbitlang/parser@0.3.3",
   "moonbit-community/miniio@0.2.0",
 }

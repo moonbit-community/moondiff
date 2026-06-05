@@ -38,7 +38,7 @@ fn write_stdout(message : String) -> Unit {
 ///|UUID(07090eb9-2c1a-4f1c-902b-014898f20578)
 fn moondiff_command() -> @argparse.Command {
   @argparse.Command(
-    "astdiff",
+    "moondiff",
     options=[
       @argparse.OptionArg(
         "graph-limit",

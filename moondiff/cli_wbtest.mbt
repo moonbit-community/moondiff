@@ -9,6 +9,15 @@ test "parse_cli_args handles graph limit color flag and files" {
   assert_true(options.new_path == "new.mbt")
 }
 
+///|UUID(5fbce824-f73c-4607-8f3e-81cd9195dc4f)
+test "moondiff command help uses README command name" {
+  let help = moondiff_command().render_help()
+  assert_true(
+    help.has_prefix("Usage: moondiff [options] <old-file> <new-file>"),
+  )
+  assert_false(help.contains("Usage: astdiff"))
+}
+
 ///|UUID(f4c874ad-006a-41cb-ab86-0013549f7845)
 test "should_use_astdiff requires both inputs to be mbt files" {
   assert_true(should_use_astdiff("old.mbt", "new.mbt"))
