@@ -1,5 +1,7 @@
 ///|UUID(4c963221-4eea-4a97-95c2-09ed50ace4a9)
-// Changed highlight ranges grouped by zero-based source line.
+// Changed highlight ranges grouped by line key. AST-generated maps use
+// zero-based source line indices; `render_line_diff`'s optional text-level maps
+// are queried with one-based line numbers relative to the provided text.
 type HighlightMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|UUID(c2f9d869-7911-4c49-abdd-e44523adee74)
@@ -696,7 +698,8 @@ pub fn render_ast_diff(
 
 ///|UUID(e282663c-5f0b-4f1d-8b46-5463657976a4)
 // Plain line-oriented fallback used for parser failures, graph-limit failures,
-// and callers that only have text-level highlights.
+// and callers that only have text-level highlights. When highlight maps are
+// provided here, their keys are one-based line numbers in the supplied text.
 pub fn render_line_diff(
   old_label : String,
   old_source : String,

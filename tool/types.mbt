@@ -31,16 +31,17 @@ fn DiffOptions::render_options(self : Self) -> @render.RenderOptions {
 }
 
 ///|UUID(3056bc33-5b65-4d21-bdfc-d602536de30d)
-// Records whether we rendered the structural diff or had to fall back to a
-// line-oriented diff. The reason is user-visible, so keep it concise.
+// Records the top-level mode selected by `diff_text`. `Ast` means both sides
+// parsed and AST alignment/rendering was attempted; graph-limit fallbacks can
+// still be rendered inside that output.
 pub enum DiffKind {
   Ast
   TextFallback(reason~ : String)
 }
 
 ///|UUID(9fb5ba8b-d057-4c8d-b7f8-2bed3405b0a4)
-// The rendered output is returned with lightweight metadata so callers do not
-// need to recompare the source strings or parse the text note.
+// The rendered output is returned with lightweight metadata for parser-level
+// fallback and change detection. Alignment fallbacks are reported in `rendered`.
 pub struct DiffResult {
   kind : DiffKind
   rendered : String

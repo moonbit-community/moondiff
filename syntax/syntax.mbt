@@ -10,8 +10,9 @@ pub struct SyntaxInfo {
   mut previous_sibling : Syntax?
   /// The next node with the same parent as this one.
   mut next_sibling : Syntax?
-  /// The syntax node that occurs before this one, in a depth-first
-  /// tree traversal.
+  /// For the first child this is the parent; otherwise it is the immediately
+  /// previous sibling. This is not the last node of the previous sibling's
+  /// subtree.
   mut prev : Syntax?
   /// The parent syntax node, if present.
   mut parent : Syntax?
@@ -20,11 +21,11 @@ pub struct SyntaxInfo {
   mut num_after : UInt64
   /// A number that uniquely identifies this syntax node.
   mut unique_id : SyntaxId
-  /// A number that uniquely identifies the content of this syntax
-  /// node. This may be the same as nodes on the other side of the
-  /// diff, or nodes at different positions.
+  /// A sequential id for the normalized content key used by matching. This may
+  /// be the same as nodes on the other side of the diff, or nodes at different
+  /// positions. Multiline comment indentation is normalized before keying.
   ///
-  /// Values are sequential, not hashes. Collisions never occur.
+  /// Values are sequential key ids, not hashes.
   mut content_id : UInt
   /// Is this the only node with this content? Ignores nodes on the
   /// other side.
