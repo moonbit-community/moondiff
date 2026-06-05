@@ -1,16 +1,26 @@
 ///|UUID(7c0c7c9f-4e7b-4ece-9b42-5450f4682b1f)
-using @past {type DocString, type Impl, type Impls}
+using @past {
+  type AliasTarget,
+  type DocString,
+  type Impl,
+  type Impls,
+  type LongIdent,
+  type Type,
+  type TypeName,
+  type UsingKind,
+}
 
 ///|UUID(e9fe4725-d84d-44b4-9808-9a4e03f95f7d)
 using @syntax {type MatchKind, type MatchedPos}
 
 ///|UUID(535b5674-e035-46f6-becf-f8cd4ac7ff03)
 // One top-level implementation item plus the source range needed to render it
-// independently. A UUID in the leading doc comment lets us align moved items
-// before running the structural diff.
+// independently. UUIDs, semantic keys, and unique root hashes let us align
+// moved items before running the structural diff.
 priv struct ImplUnit {
   root : @syntax.Syntax
   uuid : String?
+  semantic_key : String?
   start_line : Int
   end_line : Int
 }
@@ -94,6 +104,108 @@ fn impl_uuid(impl_ : Impl) -> String? {
   impl_doc(impl_).bind(doc_uuid)
 }
 
+///|UUID(6f42fca4-8ba4-4053-848d-151d706f0f1d)
+fn long_ident_key(id : LongIdent) -> String {
+  match id {
+    Ident(name~) => name
+    Dot(pkg~, id~, ..) => "\{pkg}.\{id}"
+  }
+}
+
+///|UUID(0151c50c-bda0-42d2-b04d-83fe7eb3f1ec)
+fn type_name_key(name : TypeName) -> String {
+  let prefix = if name.is_object { "&" } else { "" }
+  prefix + long_ident_key(name.name)
+}
+
+///|UUID(f03aa81c-e1a9-4efc-b6db-41dd3441238b)
+fn simple_type_key(ty : Type) -> String? {
+  match ty {
+    Name(constr_id~, tys~, ..) =>
+      if tys.is_empty() {
+        Some(long_ident_key(constr_id.id))
+      } else {
+        None
+      }
+    Object(constr_id~, ..) => Some("&" + long_ident_key(constr_id.id))
+    _ => None
+  }
+}
+
+///|UUID(4987453e-3019-4c32-942c-e723c080bc93)
+fn optional_simple_type_key(ty : Type?) -> String? {
+  match ty {
+    None => Some("")
+    Some(ty) => simple_type_key(ty)
+  }
+}
+
+///|UUID(2588288b-4962-46b8-a9b6-800a78bdf9f4)
+fn using_kind_key(kind : UsingKind) -> String {
+  match kind {
+    Value => "value"
+    Type(..) => "type"
+    Trait(..) => "trait"
+  }
+}
+
+///|UUID(b5e5b14f-caa1-4e15-bd2d-f68aa144e294)
+fn using_alias_target_key(target : AliasTarget) -> String {
+  match target.target {
+    Some(actual) => "\{actual.name} as \{target.binder.name}"
+    None => target.binder.name
+  }
+}
+
+///|UUID(c6885b7d-879d-4f86-83c5-93fd1a3988ea)
+fn using_names_key(names : @list.List[(AliasTarget, UsingKind)]) -> String {
+  let items = Array::new()
+  names.each(fn(item) {
+    let (target, kind) = item
+    items.push("\{using_kind_key(kind)}:\{using_alias_target_key(target)}")
+  })
+  items.join(",")
+}
+
+///|UUID(26abb637-f7b0-49d5-900d-fb2c57b1fded)
+fn impl_semantic_key(impl_ : Impl) -> String? {
+  match impl_ {
+    TopExpr(..) => None
+    TopFuncDef(fun_decl~, ..) => {
+      let receiver = match fun_decl.type_name {
+        Some(type_name) => type_name_key(type_name)
+        None => ""
+      }
+      Some("fn:\{receiver}::\{fun_decl.name.name}")
+    }
+    TopTypeDef(decl) => Some("type:\{decl.tycon}")
+    TopTrait(decl) => Some("trait:\{decl.name.name}")
+    TopLetDef(binder~, is_constant~, ..) =>
+      if is_constant {
+        Some("const:\{binder.name}")
+      } else {
+        Some("let:\{binder.name}")
+      }
+    TopTest(name~, ..) =>
+      match name {
+        Some((name, _)) => Some("test:\{name}")
+        None => None
+      }
+    TopImpl(self_ty~, trait_~, method_name~, ..) =>
+      optional_simple_type_key(self_ty).map(fn(self_key) {
+        "impl-fn:\{self_key}:\{type_name_key(trait_)}::\{method_name.name}"
+      })
+    TopImplRelation(self_ty~, trait_~, ..) =>
+      simple_type_key(self_ty).map(fn(self_key) {
+        "impl:\{self_key}:\{type_name_key(trait_)}"
+      })
+    TopView(view_type_name~, view_func_name~, ..) =>
+      Some("view:\{view_type_name}:\{view_func_name.name}")
+    TopUsing(pkg~, names~, ..) =>
+      Some("using:\{pkg.name}:\{using_names_key(names)}")
+  }
+}
+
 ///|UUID(3ac7e4c6-c245-48ec-97f9-56e561b4016d)
 // Include attached doc comments in the source slice. Otherwise a changed UUID
 // or documentation line would be outside the rendered hunk for the declaration.
@@ -131,6 +243,7 @@ fn collect_impl_units(source : String, impls : Impls) -> Array[ImplUnit] {
     units.push(ImplUnit::{
       root: @elab.elab_impl(source, impl_),
       uuid: impl_uuid(impl_),
+      semantic_key: impl_semantic_key(impl_),
       start_line: impl_start_line(impl_),
       end_line: impl_end_line(impl_),
     })
@@ -185,6 +298,129 @@ fn align_impl_units_by_uuid(
 
   for i in 0..<new_units.length() {
     if !used_new.contains(i) {
+      edits.push(Insert(new_units[i]))
+    }
+  }
+  edits
+}
+
+///|UUID(218731b6-e35d-469a-b7a9-a31dcc3b1c70)
+fn align_impl_units_by_key(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+) -> Array[ImplEdit] {
+  let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
+  let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
+  let replacements : @hashmap.HashMap[Int, Int] = @hashmap.HashMap([])
+
+  fn pair(old_index : Int, new_index : Int) -> Unit {
+    if !old_used.contains(old_index) && !new_used.contains(new_index) {
+      old_used.set(old_index, true)
+      new_used.set(new_index, true)
+      replacements.set(old_index, new_index)
+    }
+  }
+
+  let new_uuid_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
+  )
+  for i in 0..<new_units.length() {
+    match new_units[i].uuid {
+      Some(uuid) => new_uuid_positions.get_or_init(uuid, fn() { [] }).push(i)
+      None => ()
+    }
+  }
+  let uuid_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  for i in 0..<old_units.length() {
+    match old_units[i].uuid {
+      Some(uuid) =>
+        match new_uuid_positions.get(uuid) {
+          Some(indices) => {
+            let offset = uuid_offsets.get(uuid).unwrap_or(0)
+            if offset < indices.length() {
+              uuid_offsets[uuid] = offset + 1
+              pair(i, indices[offset])
+            }
+          }
+          None => ()
+        }
+      None => ()
+    }
+  }
+
+  let new_key_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
+  )
+  for i in 0..<new_units.length() {
+    if !new_used.contains(i) {
+      match new_units[i].semantic_key {
+        Some(key) => new_key_positions.get_or_init(key, fn() { [] }).push(i)
+        None => ()
+      }
+    }
+  }
+  let key_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  for i in 0..<old_units.length() {
+    if !old_used.contains(i) {
+      match old_units[i].semantic_key {
+        Some(key) =>
+          match new_key_positions.get(key) {
+            Some(indices) => {
+              let offset = key_offsets.get(key).unwrap_or(0)
+              if offset < indices.length() {
+                key_offsets[key] = offset + 1
+                pair(i, indices[offset])
+              }
+            }
+            None => ()
+          }
+        None => ()
+      }
+    }
+  }
+
+  let old_roots = impl_roots(old_units)
+  let new_roots = impl_roots(new_units)
+  @syntax.init_all_info(old_roots, new_roots)
+  let old_content_counts : @hashmap.HashMap[UInt, Int] = @hashmap.HashMap([])
+  for i in 0..<old_units.length() {
+    if !old_used.contains(i) {
+      let content_id = old_units[i].root.content_id()
+      old_content_counts[content_id] = old_content_counts
+        .get(content_id)
+        .unwrap_or(0) +
+        1
+    }
+  }
+  let new_content_positions : @hashmap.HashMap[UInt, Array[Int]] = @hashmap.HashMap([],
+  )
+  for i in 0..<new_units.length() {
+    if !new_used.contains(i) {
+      let content_id = new_units[i].root.content_id()
+      new_content_positions.get_or_init(content_id, fn() { [] }).push(i)
+    }
+  }
+  for i in 0..<old_units.length() {
+    if !old_used.contains(i) {
+      let content_id = old_units[i].root.content_id()
+      if old_content_counts.get(content_id).unwrap_or(0) == 1 {
+        match new_content_positions.get(content_id) {
+          Some(indices) => if indices.length() == 1 { pair(i, indices[0]) }
+          None => ()
+        }
+      }
+    }
+  }
+
+  let edits = Array::new()
+  for i in 0..<old_units.length() {
+    match replacements.get(i) {
+      Some(new_index) =>
+        edits.push(Replace(old=old_units[i], new=new_units[new_index]))
+      None => edits.push(Delete(old_units[i]))
+    }
+  }
+
+  for i in 0..<new_units.length() {
+    if !new_used.contains(i) {
       edits.push(Insert(new_units[i]))
     }
   }
@@ -423,21 +659,26 @@ fn render_root_list_line_fallback(
   )
 }
 
-///|UUID(5904eab2-e4fe-4ce5-b9bc-b437e4d7191f)
-// UUID alignment diffs top-level units independently. This makes moved or
-// reordered declarations easier to read and limits graph size per comparison.
-fn render_uuid_aligned_impl_diffs(
+///|UUID(97bfcfe4-80de-498e-a147-90d250e6c93e)
+fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
+  edits.any(fn(edit) {
+    match edit {
+      Replace(..) => true
+      _ => false
+    }
+  })
+}
+
+///|UUID(85a087f2-92d2-4240-8b75-a5c086d18e14)
+fn render_impl_edits(
   old_label : String,
   old_source : String,
-  old_units : ArrayView[ImplUnit],
   new_label : String,
   new_source : String,
-  new_units : ArrayView[ImplUnit],
+  edits : ArrayView[ImplEdit],
   graph_limit : UInt,
   render_options : @render.RenderOptions,
 ) -> String {
-  let edits = align_impl_units_by_uuid(old_units, new_units)
-
   let buf = StringBuilder::new()
   let mut wrote = false
   for edit in edits {
@@ -494,6 +735,52 @@ fn render_uuid_aligned_impl_diffs(
   }
 }
 
+///|UUID(5904eab2-e4fe-4ce5-b9bc-b437e4d7191f)
+// UUID alignment diffs top-level units independently. This makes moved or
+// reordered declarations easier to read and limits graph size per comparison.
+fn render_uuid_aligned_impl_diffs(
+  old_label : String,
+  old_source : String,
+  old_units : ArrayView[ImplUnit],
+  new_label : String,
+  new_source : String,
+  new_units : ArrayView[ImplUnit],
+  graph_limit : UInt,
+  render_options : @render.RenderOptions,
+) -> String {
+  render_impl_edits(
+    old_label,
+    old_source,
+    new_label,
+    new_source,
+    align_impl_units_by_uuid(old_units, new_units),
+    graph_limit,
+    render_options,
+  )
+}
+
+///|UUID(8d173f23-17f9-43af-a67e-f7a7592399e5)
+fn render_key_aligned_impl_diffs(
+  old_label : String,
+  old_source : String,
+  old_units : ArrayView[ImplUnit],
+  new_label : String,
+  new_source : String,
+  new_units : ArrayView[ImplUnit],
+  graph_limit : UInt,
+  render_options : @render.RenderOptions,
+) -> String? {
+  let edits = align_impl_units_by_key(old_units, new_units)
+  if !impl_edits_have_replacement(edits) {
+    return None
+  }
+  Some(
+    render_impl_edits(
+      old_label, old_source, new_label, new_source, edits, graph_limit, render_options,
+    ),
+  )
+}
+
 ///|UUID(109a4d3f-cbaa-42e9-a5d5-5680327e8e55)
 // When UUIDs are missing, fall back to a single root-list diff, matching the
 // regular difftastic strategy of comparing syntax roots in order.
@@ -538,9 +825,9 @@ fn render_root_list_diff(
 }
 
 ///|UUID(efd2e0c6-d9fc-4b57-b551-e31b0146cde7)
-// Prefer UUID alignment only when both sides are fully annotated. A partial
-// annotation set is more dangerous than useful because unmatched units could be
-// paired with the wrong declaration.
+// Fully annotated files keep the UUID-only path. Otherwise use conservative
+// semantic/hash alignment when at least one top-level pair is reliable, and
+// retain the whole root-list diff when no reliable pair exists.
 pub fn render_aligned_impl_diffs(
   old_label : String,
   old_source : String,
@@ -559,9 +846,17 @@ pub fn render_aligned_impl_diffs(
       render_options,
     )
   } else {
-    render_root_list_diff(
-      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
-      render_options,
-    )
+    match
+      render_key_aligned_impl_diffs(
+        old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
+        render_options,
+      ) {
+      Some(rendered) => rendered
+      None =>
+        render_root_list_diff(
+          old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
+          render_options,
+        )
+    }
   }
 }
