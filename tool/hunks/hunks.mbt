@@ -1,4 +1,5 @@
 ///|UUID(9e00411e-058e-4cef-92e3-1a0637d1a928)
+// Calculate which modified lines should be displayed together.
 using @syntax {type MatchedPos}
 
 ///|UUID(43ea7bcf-0a8b-449e-aac4-dc8c0b633959)
@@ -14,6 +15,8 @@ priv enum DisplaySide {
 }
 
 ///|UUID(041c85e4-e4b3-4134-8363-2fcaa3baee16)
+// A hunk is a compact set of modified line pairs that will be rendered
+// together. `lines` contains the changed core; context padding is added later.
 pub(all) struct AstHunk {
   novel_lhs : LineSet
   novel_rhs : LineSet
@@ -30,6 +33,8 @@ fn copy_line_set(lines : LineSet) -> LineSet {
 }
 
 ///|UUID(9379de66-12f9-41b8-bbd1-fe07dc747699)
+// Merge nearby hunks and drop duplicate line numbers introduced by overlapping
+// context. If only one side duplicates, keep the other side as an unpaired line.
 fn AstHunk::merge(self : Self, other : Self) -> Self {
   let lines = self.lines.copy()
   lines.push_iter(other.lines.iter())
@@ -130,6 +135,8 @@ fn add_opposite_line(
 }
 
 ///|UUID(1bbf5231-2b70-4e32-8fdf-dff28a419898)
+// Map each line on this side to the lines that contain matching unchanged
+// positions on the opposite side.
 fn opposite_positions(mps : ArrayView[MatchedPos]) -> OppositeMap {
   let opposites = @hashmap.HashMap([])
   for mp in mps {
@@ -148,6 +155,8 @@ fn opposite_positions(mps : ArrayView[MatchedPos]) -> OppositeMap {
 }
 
 ///|UUID(1be4c24f-d501-4268-a7fc-4cc39f737bcf)
+// Collect line numbers containing novel positions on either side. Hunk
+// rendering uses these sets to decide whether a line should be highlighted.
 fn lines_with_novel(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
@@ -209,6 +218,8 @@ fn next_line_after(lines : ArrayView[Int], prev_line : Int?) -> Int? {
 }
 
 ///|UUID(2d7570d2-4269-42f1-8097-58250d0336e5)
+// Build an increasing list of line pairs from unchanged positions. Ambiguous
+// many-to-many line matches are skipped so they do not force bad alignment.
 fn matched_lines_from_unchanged(
   mps : ArrayView[MatchedPos],
 ) -> Array[(Int?, Int?)] {
@@ -269,6 +280,8 @@ fn matched_lines_from_unchanged(
 }
 
 ///|UUID(647bcb7d-9201-4b6d-aee2-164fc21411ef)
+// Insert lines from the opposite side that were not anchored by unchanged
+// matches, preserving order around the existing pairs.
 fn merge_in_opposite_lines(
   matched_lines : ArrayView[(Int?, Int?)],
   novel_opposite_lines : ArrayView[Int],
@@ -314,6 +327,8 @@ fn all_matched_lines(
 }
 
 ///|UUID(ba69d93b-6545-4bd6-b603-6011b5577992)
+// Extend matched lines to include leading and trailing file lines. Blank lines
+// at file edges often have no syntax positions but still need stable alignment.
 fn add_ends(
   matched_lines : ArrayView[(Int?, Int?)],
   lhs_line_count : Int,
@@ -398,6 +413,8 @@ fn add_ends(
 }
 
 ///|UUID(c20590f8-530c-4f8b-9ad9-5e99894e8876)
+// If blank lines immediately precede the current matched pair on both sides,
+// pair those blanks too. This improves visual alignment around sparse syntax.
 fn match_blanks_between(
   current : (Int, Int),
   prev : (Int, Int),
@@ -458,6 +475,8 @@ fn match_blanks_before(
 }
 
 ///|UUID(267ec904-c05a-4bba-8acf-9488c7d3b8ce)
+// Add preceding blank-line matches for every anchored pair. Following blank
+// lines are handled by filling contiguous gaps after all anchors are known.
 fn match_preceding_blanks(
   line_nums : ArrayView[(Int?, Int?)],
   lhs_lines : ArrayView[String],
@@ -495,6 +514,8 @@ fn match_preceding_blanks(
 }
 
 ///|UUID(a25a4c74-48e8-4578-9c20-d1a02ce224b3)
+// Ensure intermediate source lines are not skipped. Missing LHS/RHS lines are
+// inserted as one-sided pairs so renderers can preserve outer gaps.
 fn ensure_contiguous(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   let contiguous = Array::new()
   let lhs_prev = Ref(None)
@@ -541,6 +562,8 @@ fn flush_gap_run(
 }
 
 ///|UUID(d1c26121-dd90-4c2e-8bf0-f532bbe21e25)
+// Compact a single one-line gap from both sides into a paired row. Larger gaps
+// stay separate to avoid implying unrelated lines are equal.
 fn compact_gaps(items : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   let compacted = Array::new()
   let lhs_unpaired = Array::new()
@@ -562,6 +585,8 @@ fn compact_gaps(items : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
 }
 
 ///|UUID(64e67fe4-b776-4693-ad5e-2cda081ef617)
+// Return all line pairs needed for rendering: unchanged anchors, novel lines,
+// file edges, blank-line anchors, and contiguous gap fillers.
 pub fn all_matched_lines_filled(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
@@ -581,6 +606,9 @@ pub fn all_matched_lines_filled(
 }
 
 ///|UUID(6e2c5291-f077-4d50-ac37-ca3578e859df)
+// Order novel positions within a section between unchanged anchors. Positions
+// on the previous anchor line come first, then fully unanchored lines, then
+// positions attached to the following anchor.
 fn novel_section_in_order(
   lhs_novel_mps : ArrayView[MatchedPos],
   rhs_novel_mps : ArrayView[MatchedPos],
@@ -641,6 +669,8 @@ fn novel_section_in_order(
 }
 
 ///|UUID(f521588c-0a9f-4cc0-92a9-b5195a681588)
+// Novel positions have no direct opposite span. Use the surrounding unchanged
+// positions to choose an order that remains displayable on both sides.
 fn sorted_novel_positions(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
@@ -847,6 +877,8 @@ fn fill_increasing_line(max_seen : Ref[Int?], line : Int?) -> Int? {
 }
 
 ///|UUID(f583e103-7bd9-4e38-ae85-51cb86af6dee)
+// Given line pairs that are ordered as well as possible, keep only
+// monotonically increasing line numbers. Earlier repeats are replaced by None.
 fn enforce_increasing(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
   let ordered = Array::new()
   let max_lhs = Ref(None)
@@ -882,6 +914,8 @@ fn find_novel_lines(
 }
 
 ///|UUID(ed4c5395-1afb-48dc-8af0-cde52c38e55e)
+// Split modified line pairs into hunks. Lines within four rows of the latest
+// changed line stay in the same hunk; larger gaps start a new hunk.
 fn lines_to_hunks(
   lines : ArrayView[(Int?, Int?)],
   lhs_mps : ArrayView[MatchedPos],
@@ -928,6 +962,8 @@ fn lines_to_hunks(
 }
 
 ///|UUID(160566ec-5965-45cc-bc44-0e630b4bd1fb)
+// Convert syntax change positions into display hunks by first selecting novel
+// line pairs, then making sure unmatched novel lines on either side are present.
 pub fn matched_pos_to_hunks(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
@@ -945,6 +981,8 @@ pub fn matched_pos_to_hunks(
 }
 
 ///|UUID(e8149d12-9789-4f7a-b999-e5855bda3518)
+// Fill line gaps inside a hunk core so later context calculations see every
+// relevant line between the first and last changed pair.
 fn fill_between(
   prev_lhs : Int?,
   next_lhs : Int?,
@@ -1022,6 +1060,8 @@ fn hunk_line_sets(hunk : AstHunk) -> (LineSet, LineSet) {
 }
 
 ///|UUID(37df1400-5ca1-41eb-b615-f333eaba87b5)
+// Locate the slice of `matched_lines` that covers this hunk core before context
+// expansion.
 fn matched_lines_indexes_for_hunk(
   hunk : AstHunk,
   matched_lines : ArrayView[(Int?, Int?)],
@@ -1047,6 +1087,8 @@ fn matched_lines_indexes_for_hunk(
 }
 
 ///|UUID(ccd8a955-311f-4247-ad00-a5f62b63de43)
+// Expand a hunk's core range by the requested context radius, clamped to the
+// available matched-line table.
 pub fn contextual_index_range_for_hunk(
   hunk : AstHunk,
   matched_lines : ArrayView[(Int?, Int?)],
@@ -1060,6 +1102,8 @@ pub fn contextual_index_range_for_hunk(
 }
 
 ///|UUID(6249eec7-8cf2-468c-b6fa-01f689dd04c8)
+// Merge hunks whose context windows overlap. The extra line in the merge radius
+// makes immediately adjacent hunks render as one block.
 pub fn merge_adjacent_hunks(
   hunks : ArrayView[AstHunk],
   matched_lines : ArrayView[(Int?, Int?)],

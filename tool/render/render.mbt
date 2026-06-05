@@ -1,10 +1,12 @@
 ///|UUID(4c963221-4eea-4a97-95c2-09ed50ace4a9)
+// Changed highlight ranges grouped by zero-based source line.
 type HighlightMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|UUID(c2f9d869-7911-4c49-abdd-e44523adee74)
 using @syntax {type MatchedPos}
 
 ///|UUID(58e0f8c9-2d25-44d5-b23b-f729f3341d84)
+// Rendering controls shared by AST and fallback line diffs.
 pub struct RenderOptions {
   context_lines : Int
   use_color : Bool
@@ -26,6 +28,8 @@ priv enum LineStyle {
 }
 
 ///|UUID(32757abf-5f53-4a4d-bb1a-3df50a424d47)
+// Split on LF and CRLF. This intentionally returns a non-empty array and keeps
+// a trailing empty line, unlike APIs that treat `foo\n` as one line.
 pub fn split_lines(source : String) -> Array[String] {
   let lines = Array::new()
   for line in source.split("\n") {
@@ -57,6 +61,7 @@ fn add_changed_span(
 }
 
 ///|UUID(e85e59c2-20e3-4407-ae4d-acba47947ac7)
+// Calculate the added/removed content highlight positions for one side.
 fn collect_novel_ranges(mps : ArrayView[MatchedPos]) -> HighlightMap {
   let highlights = @hashmap.HashMap([])
   for mp in mps {
@@ -92,6 +97,8 @@ fn line_no_color(style : LineStyle) -> @chalk.Colors {
 }
 
 ///|UUID(1c1b85e4-6d10-43c1-a7d6-e6b5268be2c3)
+// Display dots when a line has no counterpart on that side, matching the
+// visual convention used by difftastic's side-by-side renderer.
 fn display_line_no(
   line_no : Int?,
   width : Int,
@@ -169,6 +176,8 @@ pub fn render_file_headers(
 }
 
 ///|UUID(3209ce96-bf1f-4476-aaab-bb49814c52f5)
+// Apply intra-line changed spans. Span positions are relative to parser/source
+// offsets, so normalization happens before slicing the visible string.
 fn render_line_body(
   line : String,
   ranges : Array[(Int, Int)]?,
@@ -271,6 +280,8 @@ fn render_hunk_line(
 }
 
 ///|UUID(d0d1ad18-199b-4b66-b233-b6a36da07412)
+// Format a unified-diff range. Empty ranges are displayed at the preceding
+// line, as required for pure insertions/deletions.
 fn range_text(start : Int, end_ : Int, line_base : Int) -> String {
   let mut beginning = start + line_base
   let len = end_ - start
@@ -303,6 +314,7 @@ fn piediff_new_range(edit : @piediff.Edit) -> (Int, Int) {
 }
 
 ///|UUID(eb698c34-ec71-4ac9-91a6-35c6c6688d34)
+// Build a hunk header for the fallback line diff produced by `piediff`.
 fn render_piediff_hunk_header(edits : ArrayView[@piediff.Edit]) -> String {
   let (first_old_start, first_old_end) = piediff_old_range(edits[0])
   let (first_new_start, first_new_end) = piediff_new_range(edits[0])
@@ -332,6 +344,8 @@ fn render_piediff_hunk_header(edits : ArrayView[@piediff.Edit]) -> String {
 }
 
 ///|UUID(8d2ad4b6-7974-44d6-871b-1ef554920ad2)
+// Find the covered range for one side of an AST hunk. If a hunk has no line on
+// that side, use the opposite side as the insertion/deletion anchor.
 fn hunk_side_range(
   lines : ArrayView[(Int?, Int?)],
   use_old_side : Bool,
@@ -388,6 +402,9 @@ fn add_unique_line(lines : @hashmap.HashMap[Int, Bool], line : Int) -> Unit {
 }
 
 ///|UUID(6f45e079-8271-40bc-aa81-a1269eaa3aec)
+// Sparse paired replacements can be hard to read when only a few rows line up.
+// Render such blocks as deletions followed by insertions instead of forcing
+// misleading side-by-side rows.
 fn should_render_as_block_replacement(
   segment : ArrayView[(Int?, Int?)],
   hunk : @hunks.AstHunk,
@@ -455,6 +472,8 @@ fn append_segment_lines(
 }
 
 ///|UUID(2df61dad-cbc1-4926-8e42-c38e94db8206)
+// Rewrite only the dense changed segments that look like sparse block
+// replacements; leave context and well-aligned replacements untouched.
 fn reduce_sparse_interleaved_replacements(
   lines : ArrayView[(Int?, Int?)],
   hunk : @hunks.AstHunk,
@@ -484,6 +503,8 @@ fn max_display_line(line_base : Int, line_count : Int) -> Int {
 }
 
 ///|UUID(26becb16-0cfd-4d6f-9587-97054b5ddfbb)
+// Render an AST-aware unified diff. Structural positions choose the hunks and
+// intra-line highlights; the final text format stays line-oriented.
 pub fn render_ast_diff(
   old_label : String,
   old_source : String,
@@ -674,6 +695,8 @@ pub fn render_ast_diff(
 }
 
 ///|UUID(e282663c-5f0b-4f1d-8b46-5463657976a4)
+// Plain line-oriented fallback used for parser failures, graph-limit failures,
+// and callers that only have text-level highlights.
 pub fn render_line_diff(
   old_label : String,
   old_source : String,

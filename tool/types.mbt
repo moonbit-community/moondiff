@@ -1,4 +1,7 @@
 ///|UUID(199e1683-8dce-4b5b-ade5-21d8199f249b)
+// Diff options kept by the public text-diff entry point. This is a small
+// subset of difftastic's display options: graph size, context radius, and
+// whether the renderer should emit ANSI colors.
 pub struct DiffOptions {
   graph_limit : UInt
   context_lines : Int
@@ -28,12 +31,16 @@ fn DiffOptions::render_options(self : Self) -> @render.RenderOptions {
 }
 
 ///|UUID(3056bc33-5b65-4d21-bdfc-d602536de30d)
+// Records whether we rendered the structural diff or had to fall back to a
+// line-oriented diff. The reason is user-visible, so keep it concise.
 pub enum DiffKind {
   Ast
   TextFallback(reason~ : String)
 }
 
 ///|UUID(9fb5ba8b-d057-4c8d-b7f8-2bed3405b0a4)
+// The rendered output is returned with lightweight metadata so callers do not
+// need to recompare the source strings or parse the text note.
 pub struct DiffResult {
   kind : DiffKind
   rendered : String
