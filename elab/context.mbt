@@ -158,6 +158,15 @@ fn ElabCtx::atom_from_loc(
   Syntax::atom(content=self.slice(loc), position=self.spans(loc), kind~)
 }
 
+///|UUID(628c4942-4e1b-4480-a31d-a98ce5c67ce9)
+fn ElabCtx::package_atom_from_loc(
+  self : Self,
+  loc : Location,
+  kind? : AtomKind = AtomKind::Normal,
+) -> Syntax {
+  self.atom_from_loc(loc, kind~)
+}
+
 ///|UUID(fea75fd6-9b40-4f42-9afe-3d7e2dbcda14)
 fn ElabCtx::string_from_loc(self : Self, loc : Location) -> Syntax {
   self.atom_from_loc(loc, kind=AtomKind::String(StringKind::StringLiteral))

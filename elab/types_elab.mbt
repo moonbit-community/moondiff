@@ -50,8 +50,20 @@ fn ElabCtx::elab_long_ident(
   loc : Location,
   atom_kind : AtomKind,
 ) -> Syntax {
-  ignore(ident)
-  self.tokenize_loc(loc, word_kind=atom_kind)
+  match ident {
+    Ident(_) => self.tokenize_loc(loc, word_kind=atom_kind)
+    Dot(pkg_loc~, dot_id_loc~, ..) =>
+      self.region(loc, [
+        self.part(
+          self.package_atom_from_loc(pkg_loc, kind=atom_kind),
+          Some(pkg_loc),
+        ),
+        self.part(
+          self.tokenize_loc(dot_id_loc, word_kind=atom_kind),
+          Some(dot_id_loc),
+        ),
+      ])
+  }
 }
 
 ///|UUID(b27e66a8-5e01-46dc-9b48-deac49285613)
@@ -71,7 +83,31 @@ fn ElabCtx::elab_var(self : Self, var_ : Var) -> Syntax {
 
 ///|UUID(767e5d8e-0223-43d6-997b-2c2642f32930)
 fn ElabCtx::elab_constructor(self : Self, ctor : Constructor) -> Syntax {
-  self.tokenize_loc(ctor.loc, word_kind=AtomKind::Type)
+  match ctor.extra_info {
+    NoExtraInfo => self.tokenize_loc(ctor.loc, word_kind=AtomKind::Type)
+    TypeName(type_name~, ..) =>
+      self.region(ctor.loc, [
+        self.part(self.elab_type_name(type_name), Some(type_name.loc)),
+        self.part(self.elab_constr_name(ctor.name), Some(ctor.name.loc)),
+      ])
+    TypeNameWithConstrPackage(type_name~, pkg_loc~, ..) =>
+      self.region(ctor.loc, [
+        self.part(self.elab_type_name(type_name), Some(type_name.loc)),
+        self.part(
+          self.package_atom_from_loc(pkg_loc, kind=AtomKind::Type),
+          Some(pkg_loc),
+        ),
+        self.part(self.elab_constr_name(ctor.name), Some(ctor.name.loc)),
+      ])
+    Package(pkg_loc~, ..) =>
+      self.region(ctor.loc, [
+        self.part(
+          self.package_atom_from_loc(pkg_loc, kind=AtomKind::Type),
+          Some(pkg_loc),
+        ),
+        self.part(self.elab_constr_name(ctor.name), Some(ctor.name.loc)),
+      ])
+  }
 }
 
 ///|UUID(7e1f9a37-89c7-424c-8a58-0e5fc90145e7)
