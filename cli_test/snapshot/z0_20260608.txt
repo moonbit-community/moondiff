@@ -1,0 +1,29 @@
+[34m--- cli_test/source/z0_20260608.old.mbt: line 1[39m
+[34m+++ cli_test/source/z0_20260608.new.mbt: line 1[39m
+@@ -1,18 +1,19 @@
+ [90m1[39m  [90m1[39m pub fn AstManager::mk_distinct(
+ [90m2[39m  [90m2[39m   self : AstManager,
+ [90m3[39m  [90m3[39m   args : Array[@util.ExprId],
+ [31m4[39m [90m..[39m ) -> [31m[1mResult[[22m[39m@util.ExprId[31m[1m,[22m[39m @[31m[1mutil.Diagnostic][22m[39m {
+[90m..[39m  [32m4[39m ) -> @util.ExprId [32m[1mraise[22m[39m @[32m[1mtype_error.TypeError[22m[39m {
+ [90m5[39m  [90m5[39m   if args.length() <= 1 {
+ [31m6[39m [90m..[39m     [31m[1mOk([22m[39mself.intern(Distinct(args.copy()), self.bool_sort())[31m[1m)[22m[39m
+[90m..[39m  [90m6[39m     self.intern(Distinct(args.copy()), self.bool_sort())
+ [90m7[39m  [90m7[39m   } else {
+ [90m8[39m  [90m8[39m     let sort = self.expr_sort(args[0])
+ [90m9[39m  [90m9[39m     for arg in args {
+[90m10[39m [90m10[39m       if self.expr_sort(arg) != sort {
+[31m11[39m [90m..[39m         [31m[1mreturn[22m[39m [31m[1mErr([22m[39m
+[31m12[39m [90m..[39m           @[31m[1mutil.[22m[39mtype_error("distinct arguments have different sorts", None)[31m[1m,[22m[39m
+[31m13[39m [90m..[39m         [31m[1m)[22m[39m
+[90m..[39m [32m11[39m         [32m[1mraise[22m[39m @type_error[32m[1m.TypeError[22m[39m(
+[90m..[39m [90m12[39m           "distinct arguments have different sorts",
+[90m..[39m [32m13[39m           None[32m[1m,[22m[39m
+[90m..[39m [90m14[39m         )
+[90m14[39m [90m15[39m       }
+[90m15[39m [90m16[39m     }
+[31m16[39m [90m..[39m     [31m[1mOk([22m[39mself.intern(Distinct(args.copy()), self.bool_sort())[31m[1m)[22m[39m
+[90m..[39m [90m17[39m     self.intern(Distinct(args.copy()), self.bool_sort())
+[90m17[39m [90m18[39m   }
+[90m18[39m [90m19[39m }
+
