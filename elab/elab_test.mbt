@@ -324,3 +324,15 @@ test "elab recovers using type and trait items from source gaps" {
   let syntax = elab_impl(source, only_impl(impls))
   assert_source_faithful(source, syntax)
 }
+
+///|UUID(d01911f1-df95-4da8-90f6-0de6908126ec)
+test "elab keeps package prefix and name in one atom" {
+  let source = "using @pkg { func }"
+  let (impls, reports) = @parser.parse_string(source)
+  assert_true(reports.is_empty())
+
+  let syntax = elab_impl(source, only_impl(impls))
+  assert_source_faithful(source, syntax)
+  assert_contains(syntax, "@pkg")
+  assert_false(syntax_contains(syntax, "@"))
+}

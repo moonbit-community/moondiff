@@ -489,8 +489,20 @@ fn ElabCtx::elab_array_pattern(self : Self, pat : ArrayPattern) -> Syntax {
         self.part(self.string_from_loc(literal_loc), Some(literal_loc)),
       ])
     }
-    ConstSpread(binder~, loc~, ..) =>
-      self.region(loc, [self.part_binder(binder)])
+    ConstSpread(binder~, pkg_loc~, loc~, ..) => {
+      let parts = Array::new()
+      self.append_part(
+        parts,
+        pkg_loc.map(fn(pkg_loc) {
+          self.part(
+            self.package_atom_from_loc(pkg_loc, kind=AtomKind::Type),
+            Some(pkg_loc),
+          )
+        }),
+      )
+      parts.push(self.part_binder(binder))
+      self.region(loc, parts)
+    }
   }
 }
 

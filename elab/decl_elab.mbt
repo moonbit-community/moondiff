@@ -869,7 +869,7 @@ pub fn ElabCtx::elab_impl(self : Self, impl_ : Impl) -> Syntax {
       self.append_part(parts, self.part_doc(doc))
       attrs.each(fn(attr) { parts.push(self.part_attribute(attr)) })
       self.append_part(parts, self.part_visibility(vis))
-      parts.push(self.part_label(pkg))
+      parts.push(self.part(self.package_atom_from_loc(pkg.loc), Some(pkg.loc)))
       parts.push(
         self.part(
           self.delimited(
