@@ -1,12 +1,12 @@
 [34m--- cli_test/source/z0_20260604.old.mbt[39m
 [34m+++ cli_test/source/z0_20260604.new.mbt[39m
 @@ -1,6 +1,7 @@
-[31m1[39m [90m.[39m fn [31m[1mrun_command[22m[39m(context : CommandContext, command : Command) -> Unit raise {
-[90m.[39m [32m1[39m fn [32m[1mexpect_command_ok[22m[39m(context : CommandContext, command : Command) -> Unit raise {
+[31m1[39m [90m.[39m [90mfn [39m[31m[1mrun_command[22m[39m[90m(context : CommandContext, command : Command) -> Unit raise {[39m
+[90m.[39m [32m1[39m [90mfn [39m[32m[1mexpect_command_ok[22m[39m[90m(context : CommandContext, command : Command) -> Unit raise {[39m
 [90m2[39m [90m2[39m   match context.execute(command) {
-[31m3[39m [90m.[39m     Some(diagnostic) => [31m[1minspect[22m[39m([31m[1mdiagnostic,[22m[39m [31m[1mcontent="ok"[22m[39m)
-[90m.[39m [90m3[39m     Some(diagnostic) =>
-[90m.[39m [32m4[39m       [32m[1mfail[22m[39m([32m[1m"unexpected command diagnostic: \{diagnostic.format()}"[22m[39m)
+[31m3[39m [90m.[39m [90m    Some(diagnostic) => [39m[31m[1minspect[22m[39m[90m([39m[31m[1mdiagnostic,[22m[39m[90m [39m[31m[1mcontent="ok"[22m[39m[90m)[39m
+[90m.[39m [90m3[39m [90m    Some(diagnostic) =>[39m
+[90m.[39m [32m4[39m [90m      [39m[32m[1mfail[22m[39m[90m([39m[32m[1m"unexpected command diagnostic: \{diagnostic.format()}"[22m[39m[90m)[39m
 [90m4[39m [90m5[39m     None => ()
 [90m5[39m [90m6[39m   }
 [90m6[39m [90m7[39m }

@@ -67,12 +67,12 @@ test "diff_text shows partial rhs highlight for wrapped call" {
   assert_true(result.kind is Ast)
   assert_true(
     result.rendered.contains(
-      "\u{1b}[90m2\u{1b}[39m \u{1b}[90m.\u{1b}[39m   foo(bar)",
+      "\u{1b}[90m2\u{1b}[39m \u{1b}[90m.\u{1b}[39m \u{1b}[90m  foo(bar)\u{1b}[39m",
     ),
   )
   assert_true(
     result.rendered.contains(
-      "foo(\u{1b}[32m\u{1b}[1mbaz(\u{1b}[22m\u{1b}[39mbar\u{1b}[32m\u{1b}[1m)\u{1b}[22m\u{1b}[39m)",
+      "\u{1b}[90m  foo(\u{1b}[39m\u{1b}[32m\u{1b}[1mbaz(\u{1b}[22m\u{1b}[39m\u{1b}[90mbar\u{1b}[39m\u{1b}[32m\u{1b}[1m)\u{1b}[22m\u{1b}[39m",
     ),
   )
   assert_false(result.rendered.contains("\u{1b}[31m\u{1b}[1m  foo(bar)"))
@@ -102,14 +102,19 @@ test "diff_text colors line numbers without prefix backgrounds or separators" {
       "\u{1b}[90m1\u{1b}[39m \u{1b}[90m1\u{1b}[39m fn f() {",
     ),
   )
-  assert_true(
+  assert_false(
     result.rendered.contains(
-      "\u{1b}[31m2\u{1b}[39m \u{1b}[90m.\u{1b}[39m   let x = ",
+      "\u{1b}[90m1\u{1b}[39m \u{1b}[90m1\u{1b}[39m \u{1b}[90mfn f() {\u{1b}[39m",
     ),
   )
   assert_true(
     result.rendered.contains(
-      "\u{1b}[90m.\u{1b}[39m \u{1b}[32m2\u{1b}[39m   let x = ",
+      "\u{1b}[31m2\u{1b}[39m \u{1b}[90m.\u{1b}[39m \u{1b}[90m  let x = \u{1b}[39m",
+    ),
+  )
+  assert_true(
+    result.rendered.contains(
+      "\u{1b}[90m.\u{1b}[39m \u{1b}[32m2\u{1b}[39m \u{1b}[90m  let x = \u{1b}[39m",
     ),
   )
   assert_false(result.rendered.contains("\u{1b}[100m"))
@@ -241,12 +246,12 @@ test "diff_text highlights only changed word inside string literal" {
   assert_true(result.kind is Ast)
   assert_true(
     result.rendered.contains(
-      "println(\"alpha \u{1b}[31m\u{1b}[1mbeta\u{1b}[22m\u{1b}[39m gamma\")",
+      "\u{1b}[90m  println(\"alpha \u{1b}[39m\u{1b}[31m\u{1b}[1mbeta\u{1b}[22m\u{1b}[39m\u{1b}[90m gamma\")\u{1b}[39m",
     ),
   )
   assert_true(
     result.rendered.contains(
-      "println(\"alpha \u{1b}[32m\u{1b}[1mzeta\u{1b}[22m\u{1b}[39m gamma\")",
+      "\u{1b}[90m  println(\"alpha \u{1b}[39m\u{1b}[32m\u{1b}[1mzeta\u{1b}[22m\u{1b}[39m\u{1b}[90m gamma\")\u{1b}[39m",
     ),
   )
   assert_false(result.rendered.contains("\u{1b}[32m\u{1b}[1m\"alpha"))
@@ -267,12 +272,12 @@ test "diff_text does not highlight unchanged trailing delimiter at line end" {
   assert_true(result.kind is Ast)
   assert_true(
     result.rendered.contains(
-      "FixedArray::make(3, \u{1b}[31m\u{1b}[1m2\u{1b}[22m\u{1b}[39m)",
+      "\u{1b}[90mlet a:FixedArray[Int] = FixedArray::make(3, \u{1b}[39m\u{1b}[31m\u{1b}[1m2\u{1b}[22m\u{1b}[39m\u{1b}[90m)\u{1b}[39m",
     ),
   )
   assert_true(
     result.rendered.contains(
-      "FixedArray::make(3, \u{1b}[32m\u{1b}[1m3\u{1b}[22m\u{1b}[39m)",
+      "\u{1b}[90mlet a:FixedArray[Int] = FixedArray::make(3, \u{1b}[39m\u{1b}[32m\u{1b}[1m3\u{1b}[22m\u{1b}[39m\u{1b}[90m)\u{1b}[39m",
     ),
   )
   assert_false(
@@ -500,7 +505,7 @@ test "diff_text highlights inserted dot access and dot call from the dot" {
   assert_true(field_result.kind is Ast)
   assert_true(
     field_result.rendered.contains(
-      "obj\u{1b}[32m\u{1b}[1m.field\u{1b}[22m\u{1b}[39m",
+      "\u{1b}[90m  obj\u{1b}[39m\u{1b}[32m\u{1b}[1m.field\u{1b}[22m\u{1b}[39m",
     ),
   )
 
@@ -522,7 +527,7 @@ test "diff_text highlights inserted dot access and dot call from the dot" {
   assert_true(call_result.kind is Ast)
   assert_true(
     call_result.rendered.contains(
-      "obj\u{1b}[32m\u{1b}[1m.method()\u{1b}[22m\u{1b}[39m",
+      "\u{1b}[90m  obj\u{1b}[39m\u{1b}[32m\u{1b}[1m.method()\u{1b}[22m\u{1b}[39m",
     ),
   )
 }

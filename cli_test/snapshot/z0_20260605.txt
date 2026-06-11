@@ -2,11 +2,11 @@
 [34m+++ cli_test/source/z0_20260605.new.mbt[39m
 @@ -1,7 +1,0 @@
 [31m1[39m [90m.[39m [31m[1m///|[22m[39m
-[31m2[39m [90m.[39m [31m[1mfn[22m[39m [31m[1minspect_parse(input[22m[39m [31m[1m:[22m[39m [31m[1mString,[22m[39m [31m[1mexpected[22m[39m [31m[1m:[22m[39m [31m[1mString)[22m[39m [31m[1m->[22m[39m [31m[1mUnit[22m[39m [31m[1mraise[22m[39m [31m[1m{[22m[39m
-[31m3[39m [90m.[39m   [31m[1mmatch[22m[39m [31m[1mparse_program(input)[22m[39m [31m[1m{[22m[39m
-[31m4[39m [90m.[39m     [31m[1mOk(exprs)[22m[39m [31m[1m=>[22m[39m [31m[1minspect(exprs[0],[22m[39m [31m[1mcontent=expected)[22m[39m
-[31m5[39m [90m.[39m     [31m[1mErr(diagnostic)[22m[39m [31m[1m=>[22m[39m [31m[1minspect(diagnostic,[22m[39m [31m[1mcontent=expected)[22m[39m
-[31m6[39m [90m.[39m   [31m[1m}[22m[39m
+[31m2[39m [90m.[39m [31m[1mfn[22m[39m[90m [39m[31m[1minspect_parse(input[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mString,[22m[39m[90m [39m[31m[1mexpected[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mString)[22m[39m[90m [39m[31m[1m->[22m[39m[90m [39m[31m[1mUnit[22m[39m[90m [39m[31m[1mraise[22m[39m[90m [39m[31m[1m{[22m[39m
+[31m3[39m [90m.[39m [90m  [39m[31m[1mmatch[22m[39m[90m [39m[31m[1mparse_program(input)[22m[39m[90m [39m[31m[1m{[22m[39m
+[31m4[39m [90m.[39m [90m    [39m[31m[1mOk(exprs)[22m[39m[90m [39m[31m[1m=>[22m[39m[90m [39m[31m[1minspect(exprs[0],[22m[39m[90m [39m[31m[1mcontent=expected)[22m[39m
+[31m5[39m [90m.[39m [90m    [39m[31m[1mErr(diagnostic)[22m[39m[90m [39m[31m[1m=>[22m[39m[90m [39m[31m[1minspect(diagnostic,[22m[39m[90m [39m[31m[1mcontent=expected)[22m[39m
+[31m6[39m [90m.[39m [90m  [39m[31m[1m}[22m[39m
 [31m7[39m [90m.[39m [31m[1m}[22m[39m
 
 [34m--- cli_test/source/z0_20260605.old.mbt: line 11[39m
@@ -14,8 +14,8 @@
 @@ -11,4 +24,4 @@
 [90m11[39m [90m24[39m ///|
 [90m12[39m [90m25[39m test "sexpr_skips_comments" {
-[31m13[39m [90m..[39m   [31m[1minspect_parse[22m[39m("; comment\np", "Atom(\"p\")")
-[90m..[39m [32m26[39m   [32m[1mexpect_parse_ok[22m[39m("; comment\np", "Atom(\"p\")")
+[31m13[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m("; comment\np", "Atom(\"p\")")[39m
+[90m..[39m [32m26[39m [90m  [39m[32m[1mexpect_parse_ok[22m[39m[90m("; comment\np", "Atom(\"p\")")[39m
 [90m14[39m [90m27[39m }
 
 [34m--- cli_test/source/z0_20260605.old.mbt: line 16[39m
@@ -23,8 +23,8 @@
 @@ -16,6 +29,6 @@
 [90m16[39m [90m29[39m ///|
 [90m17[39m [90m30[39m test "sexpr_parses_nested_lists" {
-[31m18[39m [90m..[39m   [31m[1minspect_parse[22m[39m(
-[90m..[39m [32m31[39m   [32m[1mexpect_parse_ok[22m[39m(
+[31m18[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m([39m
+[90m..[39m [32m31[39m [90m  [39m[32m[1mexpect_parse_ok[22m[39m[90m([39m
 [90m19[39m [90m32[39m     "; comment\n(assert (and p (not q)))", "List([Atom(\"assert\"), List([Atom(\"and\"), Atom(\"p\"), List([Atom(\"not\"), Atom(\"q\")])])])",
 [90m20[39m [90m33[39m   )
 [90m21[39m [90m34[39m }
@@ -34,8 +34,8 @@
 @@ -23,6 +36,6 @@
 [90m23[39m [90m36[39m ///|
 [90m24[39m [90m37[39m test "sexpr_parses_quoted_strings" {
-[31m25[39m [90m..[39m   [31m[1minspect_parse[22m[39m(
-[90m..[39m [32m38[39m   [32m[1mexpect_parse_ok[22m[39m(
+[31m25[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m([39m
+[90m..[39m [32m38[39m [90m  [39m[32m[1mexpect_parse_ok[22m[39m[90m([39m
 [90m26[39m [90m39[39m     "(echo \"a \"\"quote\"\"\")", "List([Atom(\"echo\"), StringLit(\"a \\\"quote\\\"\")])",
 [90m27[39m [90m40[39m   )
 [90m28[39m [90m41[39m }
@@ -45,8 +45,8 @@
 @@ -30,4 +43,4 @@
 [90m30[39m [90m43[39m ///|
 [90m31[39m [90m44[39m test "sexpr_reports_unclosed_list" {
-[31m32[39m [90m..[39m   [31m[1minspect_parse[22m[39m("(assert p", "line 1, col 1: unclosed list")
-[90m..[39m [32m45[39m   [32m[1mexpect_parse_err[22m[39m("(assert p", "line 1, col 1: unclosed list")
+[31m32[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m("(assert p", "line 1, col 1: unclosed list")[39m
+[90m..[39m [32m45[39m [90m  [39m[32m[1mexpect_parse_err[22m[39m[90m("(assert p", "line 1, col 1: unclosed list")[39m
 [90m33[39m [90m46[39m }
 
 [34m--- cli_test/source/z0_20260605.old.mbt: line 35[39m
@@ -54,8 +54,8 @@
 @@ -35,4 +48,4 @@
 [90m35[39m [90m48[39m ///|
 [90m36[39m [90m49[39m test "sexpr_reports_unclosed_string" {
-[31m37[39m [90m..[39m   [31m[1minspect_parse[22m[39m("\"unterminated", "line 1, col 1: unclosed string")
-[90m..[39m [32m50[39m   [32m[1mexpect_parse_err[22m[39m("\"unterminated", "line 1, col 1: unclosed string")
+[31m37[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m("\"unterminated", "line 1, col 1: unclosed string")[39m
+[90m..[39m [32m50[39m [90m  [39m[32m[1mexpect_parse_err[22m[39m[90m("\"unterminated", "line 1, col 1: unclosed string")[39m
 [90m38[39m [90m51[39m }
 
 [34m--- cli_test/source/z0_20260605.old.mbt: line 40[39m
@@ -63,36 +63,36 @@
 @@ -40,4 +53,4 @@
 [90m40[39m [90m53[39m ///|
 [90m41[39m [90m54[39m test "sexpr_reports_extra_right_paren" {
-[31m42[39m [90m..[39m   [31m[1minspect_parse[22m[39m(")", "line 1, col 1: extra ')'")
-[90m..[39m [32m55[39m   [32m[1mexpect_parse_err[22m[39m(")", "line 1, col 1: extra ')'")
+[31m42[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m(")", "line 1, col 1: extra ')'")[39m
+[90m..[39m [32m55[39m [90m  [39m[32m[1mexpect_parse_err[22m[39m[90m(")", "line 1, col 1: extra ')'")[39m
 [90m43[39m [90m56[39m }
 
 [34m--- cli_test/source/z0_20260605.old.mbt[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: line 1[39m
 @@ -1,0 +1,13 @@
 [90m.[39m  [32m1[39m [32m[1m///|[22m[39m
-[90m.[39m  [32m2[39m [32m[1mfn[22m[39m [32m[1mexpect_parse_ok(input[22m[39m [32m[1m:[22m[39m [32m[1mString,[22m[39m [32m[1mexpected[22m[39m [32m[1m:[22m[39m [32m[1mString)[22m[39m [32m[1m->[22m[39m [32m[1mUnit[22m[39m [32m[1mraise[22m[39m [32m[1m{[22m[39m
-[90m.[39m  [32m3[39m   [32m[1mmatch[22m[39m [32m[1mparse_program(input)[22m[39m [32m[1m{[22m[39m
-[90m.[39m  [32m4[39m     [32m[1mOk(exprs)[22m[39m [32m[1m=>[22m[39m
-[90m.[39m  [32m5[39m       [32m[1mif[22m[39m [32m[1mexprs.length()[22m[39m [32m[1m==[22m[39m [32m[1m0[22m[39m [32m[1m{[22m[39m
-[90m.[39m  [32m6[39m         [32m[1mabort("expected parsed expression")[22m[39m
-[90m.[39m  [32m7[39m       [32m[1m}[22m[39m [32m[1melse[22m[39m [32m[1m{[22m[39m
-[90m.[39m  [32m8[39m         [32m[1minspect(exprs[0],[22m[39m [32m[1mcontent=expected)[22m[39m
-[90m.[39m  [32m9[39m       [32m[1m}[22m[39m
-[90m.[39m [32m10[39m     [32m[1mErr(diagnostic)[22m[39m [32m[1m=>[22m[39m
-[90m.[39m [32m11[39m       [32m[1mabort("unexpected parse diagnostic: \{diagnostic.format()}")[22m[39m
-[90m.[39m [32m12[39m   [32m[1m}[22m[39m
+[90m.[39m  [32m2[39m [32m[1mfn[22m[39m[90m [39m[32m[1mexpect_parse_ok(input[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString,[22m[39m[90m [39m[32m[1mexpected[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mUnit[22m[39m[90m [39m[32m[1mraise[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m  [32m3[39m [90m  [39m[32m[1mmatch[22m[39m[90m [39m[32m[1mparse_program(input)[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m  [32m4[39m [90m    [39m[32m[1mOk(exprs)[22m[39m[90m [39m[32m[1m=>[22m[39m
+[90m.[39m  [32m5[39m [90m      [39m[32m[1mif[22m[39m[90m [39m[32m[1mexprs.length()[22m[39m[90m [39m[32m[1m==[22m[39m[90m [39m[32m[1m0[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m  [32m6[39m [90m        [39m[32m[1mabort("expected parsed expression")[22m[39m
+[90m.[39m  [32m7[39m [90m      [39m[32m[1m}[22m[39m[90m [39m[32m[1melse[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m  [32m8[39m [90m        [39m[32m[1minspect(exprs[0],[22m[39m[90m [39m[32m[1mcontent=expected)[22m[39m
+[90m.[39m  [32m9[39m [90m      [39m[32m[1m}[22m[39m
+[90m.[39m [32m10[39m [90m    [39m[32m[1mErr(diagnostic)[22m[39m[90m [39m[32m[1m=>[22m[39m
+[90m.[39m [32m11[39m [90m      [39m[32m[1mabort("unexpected parse diagnostic: \{diagnostic.format()}")[22m[39m
+[90m.[39m [32m12[39m [90m  [39m[32m[1m}[22m[39m
 [90m.[39m [32m13[39m [32m[1m}[22m[39m
 
 [34m--- cli_test/source/z0_20260605.old.mbt[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: line 15[39m
 @@ -1,0 +15,8 @@
 [90m.[39m [32m15[39m [32m[1m///|[22m[39m
-[90m.[39m [32m16[39m [32m[1mfn[22m[39m [32m[1mexpect_parse_err(input[22m[39m [32m[1m:[22m[39m [32m[1mString,[22m[39m [32m[1mexpected[22m[39m [32m[1m:[22m[39m [32m[1mString)[22m[39m [32m[1m->[22m[39m [32m[1mUnit[22m[39m [32m[1mraise[22m[39m [32m[1m{[22m[39m
-[90m.[39m [32m17[39m   [32m[1mmatch[22m[39m [32m[1mparse_program(input)[22m[39m [32m[1m{[22m[39m
-[90m.[39m [32m18[39m     [32m[1mOk(exprs)[22m[39m [32m[1m=>[22m[39m
-[90m.[39m [32m19[39m       [32m[1mabort("expected parse diagnostic, got \{exprs.length()} expression(s)")[22m[39m
-[90m.[39m [32m20[39m     [32m[1mErr(diagnostic)[22m[39m [32m[1m=>[22m[39m [32m[1minspect(diagnostic,[22m[39m [32m[1mcontent=expected)[22m[39m
-[90m.[39m [32m21[39m   [32m[1m}[22m[39m
+[90m.[39m [32m16[39m [32m[1mfn[22m[39m[90m [39m[32m[1mexpect_parse_err(input[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString,[22m[39m[90m [39m[32m[1mexpected[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mUnit[22m[39m[90m [39m[32m[1mraise[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m [32m17[39m [90m  [39m[32m[1mmatch[22m[39m[90m [39m[32m[1mparse_program(input)[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m [32m18[39m [90m    [39m[32m[1mOk(exprs)[22m[39m[90m [39m[32m[1m=>[22m[39m
+[90m.[39m [32m19[39m [90m      [39m[32m[1mabort("expected parse diagnostic, got \{exprs.length()} expression(s)")[22m[39m
+[90m.[39m [32m20[39m [90m    [39m[32m[1mErr(diagnostic)[22m[39m[90m [39m[32m[1m=>[22m[39m[90m [39m[32m[1minspect(diagnostic,[22m[39m[90m [39m[32m[1mcontent=expected)[22m[39m
+[90m.[39m [32m21[39m [90m  [39m[32m[1m}[22m[39m
 [90m.[39m [32m22[39m [32m[1m}[22m[39m
 

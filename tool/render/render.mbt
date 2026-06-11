@@ -185,22 +185,18 @@ fn render_line_body(
   ranges : Array[(Int, Int)]?,
   style : LineStyle,
   use_color : Bool,
-  full_line_fallback : Bool,
+  plain_context_line : Bool,
 ) -> String {
   if !use_color {
-    if full_line_fallback {
-      return style_text(line, style, use_color)
-    } else {
-      return line
-    }
+    return line
   }
   let ranges = match ranges {
     Some(ranges) => ranges
     None =>
-      if full_line_fallback {
-        return style_text(line, style, use_color)
-      } else {
+      if plain_context_line && style is Context {
         return line
+      } else {
+        return style_text(line, style, true)
       }
   }
   let chars = line.to_array()
@@ -232,10 +228,10 @@ fn render_line_body(
     }
   }
   if !has_highlight {
-    if full_line_fallback {
-      return style_text(line, style, use_color)
-    } else {
+    if plain_context_line && style is Context {
       return line
+    } else {
+      return style_text(line, style, true)
     }
   }
 
@@ -251,7 +247,7 @@ fn render_line_body(
     if highlighted {
       buf.write_string(style_text(segment, style, true))
     } else {
-      buf.write_string(segment)
+      buf.write_string(style_text(segment, Context, true))
     }
     start = end
   }
@@ -271,14 +267,14 @@ fn render_hunk_line(
   ranges : Array[(Int, Int)]?,
   style : LineStyle,
   use_color : Bool,
-  full_line_fallback : Bool,
+  plain_context_line : Bool,
 ) -> String {
   line_prefix(
     marker, old_line_no, old_width, old_line_base, new_line_no, new_width, new_line_base,
     style, use_color,
   ) +
   " " +
-  render_line_body(line, ranges, style, use_color, full_line_fallback)
+  render_line_body(line, ranges, style, use_color, plain_context_line)
 }
 
 ///|UUID(d0d1ad18-199b-4b66-b233-b6a36da07412)
@@ -576,7 +572,7 @@ pub fn render_ast_diff(
                 None,
                 Context,
                 options.use_color,
-                false,
+                true,
               ),
             )
             buf.write_char('\n')
@@ -751,7 +747,7 @@ pub fn render_line_diff(
                 ranges,
                 Deleted,
                 options.use_color,
-                true,
+                false,
               ),
             )
             buf.write_char('\n')
@@ -773,7 +769,7 @@ pub fn render_line_diff(
                 ranges,
                 Added,
                 options.use_color,
-                true,
+                false,
               ),
             )
             buf.write_char('\n')
