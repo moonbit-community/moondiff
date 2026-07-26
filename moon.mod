@@ -8,7 +8,7 @@ import {
   "moonbit-community/piediff@0.0.10",
   "moonbitlang/lexer@0.3.14",
   "moonbitlang/parser@0.3.14",
-  "moonbit-community/miniio@0.2.0",
+  "moonbitlang/async@0.20.3",
 }
 
 readme = "README.md"
