@@ -22,8 +22,9 @@ pub impl Debug for LineWidths with fn to_repr(self) {
 }
 
 ///|UUID(c2453f0a-a480-4e28-bb5c-4ca37c519b2c)
-pub fn LineWidths::op_get(self : Self, line : Int) -> ArrayView[Char] {
-  self.contents[self.lines[line].1:self.lines[line].0]
+#alias("_[_]")
+pub fn LineWidths::at(self : Self, line : Int) -> ArrayView[Char] {
+  self.contents[self.lines[line].0:self.lines[line].1]
 }
 
 ///|UUID(5fde8c1c-43d9-41aa-9876-b54f660d01d9)
@@ -92,6 +93,11 @@ test "line widths" {
       ],
     },
   )
+  assert_eq(line_widths[1].to_owned(), ['H', 'e', 'l', 'l', 'o', ','])
+  assert_eq(line_widths[4].to_owned(), [])
+  assert_eq(line_widths[7].to_owned(), [
+    'T', 'h', 'i', 's', ' ', 'i', 's', ' ', 'a', ' ', 't', 'e', 's', 't',
+  ])
 }
 
 ///|UUID(bc4a523c-cabd-455a-af99-eea962898b64)

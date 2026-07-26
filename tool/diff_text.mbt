@@ -4,7 +4,7 @@
 // output stays readable.
 fn parse_report_summary(
   label : String,
-  reports : Array[@basic.Report],
+  reports : ArrayView[@basic.Report],
 ) -> String? {
   if reports.is_empty() {
     None
@@ -39,7 +39,7 @@ fn render_text_fallback(
 }
 
 ///|UUID(4dc6c7bd-e552-4ca2-b156-8b254afe1200)
-// Parse both inputs, render an AST-aware diff when possible, and fall back to a
+// Parse both inputs, render a CST-aware diff when possible, and fall back to a
 // plain line diff when either side cannot be parsed.
 pub fn diff_text(
   old_label : String,
@@ -50,8 +50,10 @@ pub fn diff_text(
 ) -> DiffResult {
   let has_changes = old_source != new_source
 
-  let (old_impls, old_reports) = @parser.parse_string(old_source)
-  let (new_impls, new_reports) = @parser.parse_string(new_source)
+  let old_parse = @cst.parse_structure(old_source, name=old_label)
+  let new_parse = @cst.parse_structure(new_source, name=new_label)
+  let old_reports = old_parse.diagnostics_view()
+  let new_reports = new_parse.diagnostics_view()
   let parser_reason = match
     (
       parse_report_summary("old", old_reports),
@@ -71,13 +73,13 @@ pub fn diff_text(
     }
   }
 
-  let rendered = @alignment.render_aligned_impl_diffs(
+  let rendered = @alignment.render_aligned_cst_diffs(
     old_label,
     old_source,
-    old_impls,
+    old_parse.root(),
     new_label,
     new_source,
-    new_impls,
+    new_parse.root(),
     options.graph_limit,
     options.render_options(),
   )

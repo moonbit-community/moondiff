@@ -5,6 +5,7 @@ import {
   "moonbit-community/moondiff/span",
   "moonbit-community/prettyprinter",
   "moonbitlang/core/hashmap",
+  "moonbitlang/parser/untyped_cst",
 }
 
 // Values
@@ -39,6 +40,9 @@ pub fn ChangeMap::insert_deep_novel(Self, Syntax) -> Unit
 pub fn ChangeMap::insert_deep_unchanged(Self, node~ : Syntax, opposite_node~ : Syntax) -> Unit
 pub fn ChangeMap::new() -> Self
 
+type ListKind derive(Eq)
+pub fn ListKind::from_node_kind(@untyped_cst.NodeKind) -> Self
+
 pub(all) enum MatchKind {
   Novel
   Unchanged(opposite_pos~ : Array[@span.SingleLineSpan])
@@ -57,7 +61,7 @@ pub(all) enum StringKind {
 
 pub enum Syntax {
   Atom(info~ : SyntaxInfo, position~ : Array[@span.SingleLineSpan], content~ : String, kind~ : AtomKind)
-  List(info~ : SyntaxInfo, open_position~ : Array[@span.SingleLineSpan], open_content~ : String, children~ : Array[Syntax], close_position~ : Array[@span.SingleLineSpan], close_content~ : String, num_descendants~ : UInt)
+  List(info~ : SyntaxInfo, kind~ : ListKind?, open_position~ : Array[@span.SingleLineSpan], open_content~ : String, children~ : Array[Syntax], close_position~ : Array[@span.SingleLineSpan], close_content~ : String, num_descendants~ : UInt)
 }
 pub fn Syntax::atom(content~ : String, position~ : Array[@span.SingleLineSpan], kind~ : AtomKind) -> Self
 pub fn Syntax::comment_positions(ArrayView[Self]) -> Array[@span.SingleLineSpan]
@@ -65,11 +69,11 @@ pub fn Syntax::content_id(Self) -> UInt
 pub fn Syntax::content_is_unique(Self) -> Bool
 pub fn Syntax::id(Self) -> UInt
 pub fn Syntax::info(Self) -> SyntaxInfo
-pub fn Syntax::list(open_content~ : String, open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_content~ : String, close_position~ : Array[@span.SingleLineSpan]) -> Self
+pub fn Syntax::list(open_content~ : String, open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_content~ : String, close_position~ : Array[@span.SingleLineSpan], kind? : ListKind) -> Self
 pub fn Syntax::next_sibling(Self) -> Self?
 pub fn Syntax::num_ancestors(Self) -> UInt
 pub fn Syntax::parent(Self) -> Self?
-pub fn Syntax::simple_list(open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_position~ : Array[@span.SingleLineSpan]) -> Self
+pub fn Syntax::simple_list(open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_position~ : Array[@span.SingleLineSpan], kind? : ListKind) -> Self
 pub impl @prettyprinter.Pretty for Syntax
 pub impl Default for Syntax
 pub impl Eq for Syntax
@@ -92,4 +96,3 @@ pub impl Default for SyntaxInfo
 pub type SyntaxId = UInt
 
 // Traits
-

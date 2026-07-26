@@ -1,256 +1,3 @@
-///|UUID(7c0c7c9f-4e7b-4ece-9b42-5450f4682b1f)
-using @past {
-  type AliasTarget,
-  type DocString,
-  type Impl,
-  type Impls,
-  type LongIdent,
-  type Type,
-  type TypeName,
-  type UsingKind,
-}
-
-///|UUID(e9fe4725-d84d-44b4-9808-9a4e03f95f7d)
-using @syntax {type MatchKind, type MatchedPos}
-
-///|UUID(535b5674-e035-46f6-becf-f8cd4ac7ff03)
-// One top-level implementation item plus the source range needed to render it
-// independently. UUIDs, semantic keys, and unique root hashes let us align
-// moved items before running the structural diff.
-priv struct ImplUnit {
-  root : @syntax.Syntax
-  uuid : String?
-  semantic_key : String?
-  start_line : Int
-  end_line : Int
-}
-
-///|UUID(53d6d454-50dd-433e-83c9-b2a93eefef14)
-// The top-level edit script used when all units carry UUIDs. Replacement means
-// "diff these two roots"; delete/insert compare a real root with an empty side.
-priv enum ImplEdit {
-  Replace(old~ : ImplUnit, new~ : ImplUnit)
-  Delete(ImplUnit)
-  Insert(ImplUnit)
-}
-
-///|UUID(8fd346b7-8ce5-4b06-9148-35ac8601a592)
-fn is_uuid_char(ch : Char) -> Bool {
-  (ch >= '0' && ch <= '9') ||
-  (ch >= 'a' && ch <= 'z') ||
-  (ch >= 'A' && ch <= 'Z') ||
-  ch == '-'
-}
-
-///|UUID(5d752005-29eb-4426-a51b-c7ef06be58b5)
-// UUID lines are expected inside doc comments as `UUID(...)`. The parser keeps
-// doc comment content without the leading `///|`, so only the payload is parsed
-// here.
-fn parse_uuid_line(line : String) -> String? {
-  let line = line.trim(char_set=" ")
-  if !(line.has_prefix("UUID(") && line.has_suffix(")")) {
-    return None
-  }
-  let chars = line.to_array()
-  let start = "UUID(".length()
-  let end_ = chars.length() - 1
-  if start >= end_ {
-    return None
-  }
-  for ch in chars[start:end_] {
-    if !is_uuid_char(ch) {
-      return None
-    }
-  }
-  Some(String::from_array(chars[start:end_].to_owned()))
-}
-
-///|UUID(c8af895b-35ec-44e7-8f9e-f81f90e0bfb9)
-fn doc_uuid(doc : DocString) -> String? {
-  let uuid = Ref(None)
-  doc.content.each(fn(line) {
-    if uuid.val is None {
-      uuid.val = parse_uuid_line(line)
-    }
-  })
-  uuid.val
-}
-
-///|UUID(ff5687d4-4636-433d-ba6c-7ac2ed877abd)
-fn doc_has_content(doc : DocString) -> Bool {
-  let has_content = Ref(false)
-  doc.content.each(fn(_) { has_content.val = true })
-  has_content.val
-}
-
-///|UUID(7f79051c-265a-4539-bfbd-88bdc902f42e)
-fn impl_doc(impl_ : Impl) -> DocString? {
-  match impl_ {
-    TopExpr(..) => None
-    TopTest(doc~, ..)
-    | TopLetDef(doc~, ..)
-    | TopImpl(doc~, ..)
-    | TopView(doc~, ..)
-    | TopImplRelation(doc~, ..)
-    | TopUsing(doc~, ..) => Some(doc)
-    TopTypeDef(decl) => Some(decl.doc)
-    TopFuncDef(fun_decl~, ..) => Some(fun_decl.doc)
-    TopTrait(decl) => Some(decl.doc)
-  }
-}
-
-///|UUID(60810475-c784-47f5-9a24-4fcb7c9f8c9f)
-fn impl_uuid(impl_ : Impl) -> String? {
-  impl_doc(impl_).bind(doc_uuid)
-}
-
-///|UUID(6f42fca4-8ba4-4053-848d-151d706f0f1d)
-fn long_ident_key(id : LongIdent) -> String {
-  match id {
-    Ident(name~) => name
-    Dot(pkg~, id~, ..) => "\{pkg}.\{id}"
-  }
-}
-
-///|UUID(0151c50c-bda0-42d2-b04d-83fe7eb3f1ec)
-fn type_name_key(name : TypeName) -> String {
-  let prefix = if name.is_object { "&" } else { "" }
-  prefix + long_ident_key(name.name)
-}
-
-///|UUID(f03aa81c-e1a9-4efc-b6db-41dd3441238b)
-fn simple_type_key(ty : Type) -> String? {
-  match ty {
-    Name(constr_id~, tys~, ..) =>
-      if tys.is_empty() {
-        Some(long_ident_key(constr_id.id))
-      } else {
-        None
-      }
-    Object(constr_id~, ..) => Some("&" + long_ident_key(constr_id.id))
-    _ => None
-  }
-}
-
-///|UUID(4987453e-3019-4c32-942c-e723c080bc93)
-fn optional_simple_type_key(ty : Type?) -> String? {
-  match ty {
-    None => Some("")
-    Some(ty) => simple_type_key(ty)
-  }
-}
-
-///|UUID(2588288b-4962-46b8-a9b6-800a78bdf9f4)
-fn using_kind_key(kind : UsingKind) -> String {
-  match kind {
-    Value => "value"
-    Type(..) => "type"
-    Trait(..) => "trait"
-  }
-}
-
-///|UUID(b5e5b14f-caa1-4e15-bd2d-f68aa144e294)
-fn using_alias_target_key(target : AliasTarget) -> String {
-  match target.target {
-    Some(actual) => "\{actual.name} as \{target.binder.name}"
-    None => target.binder.name
-  }
-}
-
-///|UUID(c6885b7d-879d-4f86-83c5-93fd1a3988ea)
-fn using_names_key(names : @list.List[(AliasTarget, UsingKind)]) -> String {
-  let items = Array::new()
-  names.each(fn(item) {
-    let (target, kind) = item
-    items.push("\{using_kind_key(kind)}:\{using_alias_target_key(target)}")
-  })
-  items.join(",")
-}
-
-///|UUID(26abb637-f7b0-49d5-900d-fb2c57b1fded)
-fn impl_semantic_key(impl_ : Impl) -> String? {
-  match impl_ {
-    TopExpr(..) => None
-    TopFuncDef(fun_decl~, ..) => {
-      let receiver = match fun_decl.type_name {
-        Some(type_name) => type_name_key(type_name)
-        None => ""
-      }
-      Some("fn:\{receiver}::\{fun_decl.name.name}")
-    }
-    TopTypeDef(decl) => Some("type:\{decl.tycon}")
-    TopTrait(decl) => Some("trait:\{decl.name.name}")
-    TopLetDef(binder~, is_constant~, ..) =>
-      if is_constant {
-        Some("const:\{binder.name}")
-      } else {
-        Some("let:\{binder.name}")
-      }
-    TopTest(name~, ..) =>
-      match name {
-        Some((name, _)) => Some("test:\{name}")
-        None => None
-      }
-    TopImpl(self_ty~, trait_~, method_name~, ..) =>
-      optional_simple_type_key(self_ty).map(fn(self_key) {
-        "impl-fn:\{self_key}:\{type_name_key(trait_)}::\{method_name.name}"
-      })
-    TopImplRelation(self_ty~, trait_~, ..) =>
-      simple_type_key(self_ty).map(fn(self_key) {
-        "impl:\{self_key}:\{type_name_key(trait_)}"
-      })
-    TopView(view_type_name~, view_func_name~, ..) =>
-      Some("view:\{view_type_name}:\{view_func_name.name}")
-    TopUsing(pkg~, names~, ..) =>
-      Some("using:\{pkg.name}:\{using_names_key(names)}")
-  }
-}
-
-///|UUID(3ac7e4c6-c245-48ec-97f9-56e561b4016d)
-// Include attached doc comments in the source slice. Otherwise a changed UUID
-// or documentation line would be outside the rendered hunk for the declaration.
-fn impl_start_line(impl_ : Impl) -> Int {
-  let fallback = impl_.loc().start.lnum
-  match impl_doc(impl_) {
-    Some(doc) =>
-      if doc_has_content(doc) {
-        doc.loc.start.lnum
-      } else {
-        fallback
-      }
-    None => fallback
-  }
-}
-
-///|UUID(e78433fb-660a-4a48-a7e8-53af2fd22fdc)
-fn impl_end_line(impl_ : Impl) -> Int {
-  impl_.loc().end.lnum
-}
-
-///|UUID(0dbdcb8c-a1be-4a07-bb2f-e9282790f58f)
-fn impl_array(impls : Impls) -> Array[Impl] {
-  let items = Array::new()
-  impls.each(fn(impl_) { items.push(impl_) })
-  items
-}
-
-///|UUID(7c2c53bf-e829-4e44-bf26-b1c452e3f8a0)
-// Elaborate parser items into syntax roots once, while preserving source line
-// bounds for later per-item fallback rendering.
-fn collect_impl_units(source : String, impls : Impls) -> Array[ImplUnit] {
-  let units = Array::new()
-  for impl_ in impl_array(impls) {
-    units.push(ImplUnit::{
-      root: @elab.elab_impl(source, impl_),
-      uuid: impl_uuid(impl_),
-      semantic_key: impl_semantic_key(impl_),
-      start_line: impl_start_line(impl_),
-      end_line: impl_end_line(impl_),
-    })
-  }
-  units
-}
-
 ///|UUID(9ea4541d-91e0-4981-b8f4-c068d6994e52)
 fn all_units_have_uuid(units : ArrayView[ImplUnit]) -> Bool {
   units.all(fn(unit) { unit.uuid is Some(_) })
@@ -730,8 +477,10 @@ fn render_impl_edits(
   }
   if wrote {
     buf.to_string()
-  } else {
+  } else if old_source == new_source {
     render_no_changes(old_label, new_label, render_options)
+  } else {
+    ""
   }
 }
 
@@ -813,33 +562,38 @@ fn render_root_list_diff(
   @diff.fix_all_sliders(lhs_roots, change_map)
   @diff.fix_all_sliders(rhs_roots, change_map)
 
-  @render.render_ast_diff(
-    old_label,
-    old_source,
-    new_label,
-    new_source,
-    @syntax.change_positions(lhs_roots, change_map),
-    @syntax.change_positions(rhs_roots, change_map),
-    render_options,
-  )
+  let lhs_positions = @syntax.change_positions(lhs_roots, change_map)
+  let rhs_positions = @syntax.change_positions(rhs_roots, change_map)
+  if @hunks.matched_pos_to_hunks(lhs_positions, rhs_positions).is_empty() {
+    if old_source == new_source {
+      render_no_changes(old_label, new_label, render_options)
+    } else {
+      ""
+    }
+  } else {
+    @render.render_ast_diff(
+      old_label, old_source, new_label, new_source, lhs_positions, rhs_positions,
+      render_options,
+    )
+  }
 }
 
 ///|UUID(efd2e0c6-d9fc-4b57-b551-e31b0146cde7)
 // Fully annotated files keep the UUID-only path. Otherwise use conservative
 // semantic/hash alignment when at least one top-level pair is reliable, and
 // retain the whole root-list diff when no reliable pair exists.
-pub fn render_aligned_impl_diffs(
+pub fn render_aligned_cst_diffs(
   old_label : String,
   old_source : String,
-  old_impls : Impls,
+  old_root : @cst.CstNode,
   new_label : String,
   new_source : String,
-  new_impls : Impls,
+  new_root : @cst.CstNode,
   graph_limit : UInt,
   render_options : @render.RenderOptions,
 ) -> String {
-  let old_units = collect_impl_units(old_source, old_impls)
-  let new_units = collect_impl_units(new_source, new_impls)
+  let old_units = collect_impl_units(old_source, old_root)
+  let new_units = collect_impl_units(new_source, new_root)
   if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
     render_uuid_aligned_impl_diffs(
       old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,

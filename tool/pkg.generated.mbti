@@ -30,4 +30,3 @@ pub fn DiffResult::is_fallback(Self) -> Bool
 // Type aliases
 
 // Traits
-

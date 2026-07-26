@@ -3,12 +3,11 @@ package "moonbit-community/moondiff/tool/alignment"
 
 import {
   "moonbit-community/moondiff/tool/render",
-  "moonbitlang/core/list",
-  "moonbitlang/parser/syntax",
+  "moonbitlang/parser/untyped_cst",
 }
 
 // Values
-pub fn render_aligned_impl_diffs(String, String, @list.List[@syntax.Impl], String, String, @list.List[@syntax.Impl], UInt, @render.RenderOptions) -> String
+pub fn render_aligned_cst_diffs(String, String, @untyped_cst.CstNode, String, String, @untyped_cst.CstNode, UInt, @render.RenderOptions) -> String
 
 // Errors
 
@@ -17,4 +16,3 @@ pub fn render_aligned_impl_diffs(String, String, @list.List[@syntax.Impl], Strin
 // Type aliases
 
 // Traits
-

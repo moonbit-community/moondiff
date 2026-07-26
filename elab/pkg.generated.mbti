@@ -2,33 +2,19 @@
 package "moonbit-community/moondiff/elab"
 
 import {
-  "moonbit-community/moondiff/span",
+  "moonbit-community/moondiff/syntax",
+  "moonbitlang/parser/untyped_cst",
 }
 
 // Values
-pub fn elab_expr(StringView, @moonbitlang/parser/syntax.Expr) -> @moonbit-community/moondiff/syntax.Syntax
+pub fn elab_cst(String, @untyped_cst.CstNode) -> @syntax.Syntax
 
-pub fn elab_impl(StringView, @moonbitlang/parser/syntax.Impl) -> @moonbit-community/moondiff/syntax.Syntax
-
-pub fn elab_pattern(StringView, @moonbitlang/parser/syntax.Pattern) -> @moonbit-community/moondiff/syntax.Syntax
-
-pub fn elab_type(StringView, @moonbitlang/parser/syntax.Type) -> @moonbit-community/moondiff/syntax.Syntax
+pub fn elab_cst_nodes(String, ArrayView[@untyped_cst.CstNode]) -> @syntax.Syntax
 
 // Errors
 
 // Types and methods
-pub struct ElabCtx {
-  line_widths : @span.LineWidths
-  contents : Array[Char]
-  line_ranges : Array[(Int, Int)]
-}
-pub fn ElabCtx::elab_expr(Self, @moonbitlang/parser/syntax.Expr) -> @moonbit-community/moondiff/syntax.Syntax
-pub fn ElabCtx::elab_impl(Self, @moonbitlang/parser/syntax.Impl) -> @moonbit-community/moondiff/syntax.Syntax
-pub fn ElabCtx::elab_pattern(Self, @moonbitlang/parser/syntax.Pattern) -> @moonbit-community/moondiff/syntax.Syntax
-pub fn ElabCtx::elab_type(Self, @moonbitlang/parser/syntax.Type) -> @moonbit-community/moondiff/syntax.Syntax
-pub fn ElabCtx::new(StringView) -> Self
 
 // Type aliases
 
 // Traits
-

@@ -28,15 +28,115 @@ fn edit_line_summary(edit : ImplEdit) -> String {
 
 ///|UUID(1bfc1fdd-7d6e-45d9-9a3d-12672bcd26bd)
 fn parse_units(source : String) -> Array[ImplUnit] {
-  let (impls, reports) = @parser.parse_string(source)
-  if reports.length() != 0 {
+  let result = @cst.parse_structure(source)
+  if !result.diagnostics_view().is_empty() {
     panic()
   }
-  collect_impl_units(source, impls)
+  collect_impl_units(source, result.root())
+}
+
+///|
+test "UUID extraction accepts only exact own-line markers" {
+  let standard_uuid = "8bf07bdd-6cbd-4d64-8b82-a40f69970b25"
+  let cases : Array[(String, String?)] = [
+    ("///|UUID(0)", Some("0")),
+    ("///|UUID(\{standard_uuid})", Some(standard_uuid)),
+    ("// UUID(ordinary)", None),
+    ("/// Documentation mentions UUID(narrative).", None),
+    ("///UUID(no-pipe)", None),
+    ("///|UUID()", None),
+    ("///|UUID(has space)", None),
+    ("///| UUID(spaced-prefix)", None),
+    ("  ///|UUID(indented)", None),
+    ("///|UUID(trailing-space) ", None),
+    ("///|UUID(trailing-text) extra", None),
+    ("///|UUID(under_score)", None),
+  ]
+  for entry in cases {
+    let (comment, expected) = entry
+    let units = parse_units("\{comment}\nfn tagged() {}")
+    @debug.assert_eq(units.length(), 1)
+    @debug.assert_eq(units[0].uuid, expected)
+  }
+}
+
+///|
+test "UUID markers must be declaration-leading own-line trivia" {
+  let inline_units = parse_units(
+    "fn before() {} ///|UUID(inline)\nfn after() {}",
+  )
+  @debug.assert_eq(inline_units.length(), 2)
+  @debug.assert_eq(inline_units[0].uuid, None)
+  @debug.assert_eq(inline_units[1].uuid, None)
+
+  let orphan_units = parse_units("fn tagged() {}\n///|UUID(orphan)")
+  @debug.assert_eq(orphan_units.length(), 2)
+  @debug.assert_eq(orphan_units[0].uuid, None)
+  @debug.assert_eq(orphan_units[1].uuid, None)
+}
+
+///|
+test "invalid UUID-like comments do not override semantic reordering" {
+  let cases : Array[(String, String)] = [
+    ("// UUID(first)", "// UUID(second)"),
+    (
+      "/// Documentation mentions UUID(first).", "/// Documentation mentions UUID(second).",
+    ),
+    ("///UUID(first)", "///UUID(second)"),
+    ("///| UUID(first)", "///| UUID(second)"),
+    ("  ///|UUID(first)", "  ///|UUID(second)"),
+    ("///|UUID(first) trailing", "///|UUID(second) trailing"),
+  ]
+  for entry in cases {
+    let (first_comment, second_comment) = entry
+    let old_source = "\{first_comment}\nfn a() {}\n\{second_comment}\nfn b() {}"
+    let new_source = "\{first_comment}\nfn b() {}\n\{second_comment}\nfn a() {}"
+    let edits = align_impl_units_by_key(
+      parse_units(old_source),
+      parse_units(new_source),
+    )
+    @debug.assert_eq(edits.map(edit_line_summary), [
+      "Replace(1->3)", "Replace(3->1)",
+    ])
+  }
+}
+
+///|
+test "new CST implementation kinds retain semantic alignment keys" {
+  let cases = [
+    ("import { \"pkg/core\" }", "import:"),
+    ("import { \"pkg/test\" } for \"test\"", "import:\"test\""),
+    (
+      "extend @pkg.Type with @pkg.Trait::{method}", "extend:@pkg.Type:@pkg.Trait",
+    ),
+    ("fn f() {}", "fn:::f"),
+    ("fn Widget::method() {}", "fn:Widget::method"),
+    ("fn &Widget::method() {}", "fn:&Widget::method"),
+    ("let value = 1", "let:value"),
+    ("const VALUE = 1", "const:VALUE"),
+    ("type Alias = Int", "type:Alias"),
+    ("struct Record {}", "type:Record"),
+    ("enum Variant { A }", "type:Variant"),
+    ("trait Show {}", "trait:Show"),
+    ("test \"named\" {}", "test:\"named\""),
+    ("impl Eq for Int", "impl:Int:Eq"),
+    ("impl @debug.Debug for T", "impl:T:@debug.Debug"),
+    (
+      "impl Eq for Int with equal(self, other) { true }", "impl-fn:Int:Eq::equal",
+    ),
+    ("enumview V { C } for T with view(x) { x }", "view:V:view"),
+    ("using @pkg {func as func2}", "using:@pkg:{func as func2}"),
+  ]
+  for entry in cases {
+    let (source, expected) = entry
+    let units = parse_units(source)
+    @debug.assert_eq(units.length(), 1)
+    @debug.assert_eq(units[0].semantic_key, Some(expected))
+  }
 }
 
 ///|UUID(0c6b3f16-db94-47b3-a98d-6703cfaa9863)
-test "align_impl_units_by_uuid aligns top-level UUID blocks before inner AST diff" {
+test "align_impl_units_by_uuid aligns UUID blocks before inner structural diff" {
   let old_source =
     #|///|UUID(11111111-1111-1111-1111-111111111111)
     #|fn keep() {}
@@ -151,8 +251,55 @@ test "align_impl_units_by_key pairs duplicate semantic keys by occurrence order"
   ])
 }
 
+///|
+test "align_impl_units_by_key distinguishes methods on the same type" {
+  let old_source =
+    #|fn Widget::first() {
+    #|  old_first()
+    #|}
+    #|fn Widget::second() {
+    #|  old_second()
+    #|}
+  let new_source =
+    #|fn Widget::second() {
+    #|  new_second()
+    #|}
+    #|fn Widget::first() {
+    #|  new_first()
+    #|}
+
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->4)", "Replace(4->1)",
+  ])
+}
+
+///|
+fn find_atom(node : @syntax.Syntax, content : String) -> @syntax.Syntax? {
+  match node {
+    @syntax.Syntax::Atom(content=actual, ..) =>
+      if actual == content {
+        Some(node)
+      } else {
+        None
+      }
+    @syntax.Syntax::List(children~, ..) => {
+      for child in children {
+        match find_atom(child, content) {
+          Some(found) => return Some(found)
+          None => ()
+        }
+      }
+      None
+    }
+  }
+}
+
 ///|UUID(5899396d-f317-4aa3-bdae-68ae6ff257e5)
-test "empty delimiter wrappers do not hide inserted sibling statements" {
+test "CST wrappers do not hide inserted sibling statements" {
   let old_source =
     #|fn main() {
     #|  println(
@@ -178,29 +325,14 @@ test "empty delimiter wrappers do not hide inserted sibling statements" {
     _ => panic()
   }
 
-  let lhs_block = match lhs_roots[0] {
-    @syntax.Syntax::List(children~, ..) => children[1]
-    _ => panic()
-  }
-  let lhs_stmt_wrapper = match lhs_block {
-    @syntax.Syntax::List(children~, ..) => children[0]
-    _ => panic()
-  }
-  let rhs_block = match rhs_roots[0] {
-    @syntax.Syntax::List(children~, ..) => children[1]
-    _ => panic()
-  }
-  let rhs_inserted_stmt = match rhs_block {
-    @syntax.Syntax::List(children~, ..) => children[1]
-    _ => panic()
-  }
-
+  let rhs_inserted_atom = find_atom(rhs_roots[0], "5").unwrap()
   assert_true(
-    change_map.get(rhs_inserted_stmt) is Some(@syntax.ChangeKind::Novel),
+    change_map.get(rhs_inserted_atom) is Some(@syntax.ChangeKind::Novel),
   )
-  match change_map.get(lhs_stmt_wrapper) {
+  let lhs_string = find_atom(lhs_roots[0], "\"Hello, world!\"").unwrap()
+  match change_map.get(lhs_string) {
     Some(@syntax.ChangeKind::Unchanged(opposite)) =>
-      @debug.assert_eq(opposite.content_id(), lhs_stmt_wrapper.content_id())
+      @debug.assert_eq(opposite.content_id(), lhs_string.content_id())
     _ => panic()
   }
 }

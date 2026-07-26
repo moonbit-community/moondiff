@@ -171,19 +171,22 @@ fn mark_syntax_subtree(
         match (lhs, rhs) {
           (
             Syntax::List(
+              kind=lhs_kind,
               open_content=lhs_open,
               close_content=lhs_close,
               children=lhs_children,
               ..
             ),
             Syntax::List(
+              kind=rhs_kind,
               open_content=rhs_open,
               close_content=rhs_close,
               children=rhs_children,
               ..
             ),
           ) => {
-            let has_matching_explicit_delimiters = lhs_open == rhs_open &&
+            let has_matching_explicit_delimiters = lhs_kind == rhs_kind &&
+              lhs_open == rhs_open &&
               lhs_close == rhs_close &&
               (!lhs_open.is_empty() || !lhs_close.is_empty())
             if has_matching_explicit_delimiters {
