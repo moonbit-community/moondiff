@@ -32,8 +32,6 @@ jobs:
 
       - name: moon check
         run: |
-          # temporarily fix this
-          moon check || cp .mooncakes parser -r
           moon check --target all
       
       - name: run test
