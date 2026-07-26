@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "moonbit-community/moondiff/moondiff"
+package "moonbit-community/moondiff"
 
 // Values
 
@@ -10,4 +10,3 @@ package "moonbit-community/moondiff/moondiff"
 // Type aliases
 
 // Traits
-

@@ -3,7 +3,7 @@ set -euox pipefail
 
 ast_diff() {
   name=$1
-  moonrun ./_build/wasm/release/build/moonbit-community/moondiff/moondiff/moondiff.wasm "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
+  moonrun ./_build/wasm/release/build/moondiff.wasm "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
 }
 
 moon build --target wasm --release

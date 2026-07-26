@@ -15,22 +15,30 @@ fn parse_graph_limit(text : String) -> UInt raise {
 }
 
 ///|UUID(a34f9833-2141-48c6-8927-c7a3203564ee)
-fn should_use_astdiff(old_path : String, new_path : String) -> Bool {
+fn should_use_structural_diff(old_path : String, new_path : String) -> Bool {
   old_path.has_suffix(".mbt") && new_path.has_suffix(".mbt")
 }
 
+///|
+#cfg(target="wasm")
+fn proc_exit_ffi(rval : Int) -> Unit = "wasi_snapshot_preview1" "proc_exit"
+
+///|
+#cfg(target="native")
+extern "c" fn proc_exit_ffi(rval : Int) -> Unit = "exit"
+
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
-fn[T] fatal(message : String) -> T {
-  @miniio.stderr.write_text("\{message}\n") catch {
+async fn[T] fatal(message : String) -> T {
+  @stdio.stderr.write("\{message}\n") catch {
     _ => ()
   }
-  @miniio.exit(1)
+  proc_exit_ffi(1)
   panic()
 }
 
 ///|UUID(5fb97ce8-62bb-4966-b0a3-61d2905cbf95)
-fn write_stdout(message : String) -> Unit {
-  @miniio.stdout.write_text(message) catch {
+async fn write_stdout(message : String) -> Unit {
+  @stdio.stdout.write(message) catch {
     e => fatal("failed to write stdout: \{e}")
   }
 }
@@ -43,7 +51,7 @@ fn moondiff_command() -> @argparse.Command {
       @argparse.OptionArg(
         "graph-limit",
         short='g',
-        about="Maximum AST graph size before falling back to line diff",
+        about="Maximum syntax graph size before falling back to line diff",
         default_values=[default_graph_limit_text],
       ),
     ],
@@ -82,9 +90,7 @@ fn parse_cli_args(argv : ArrayView[String]) -> CliOptions raise {
 
 ///|UUID(df9a5580-e3b6-4bda-b76f-f1c9dc4a95c0)
 fn program_args() -> ArrayView[String] {
-  let args = @miniio.args_get() catch {
-    e => fatal("failed to read command line arguments: \{e}")
-  }
+  let args = @env.args()
   if args.length() > 1 {
     args[1:]
   } else {
@@ -99,7 +105,7 @@ fn render_cli_diff(
   new_source : String,
   graph_limit : UInt,
 ) -> String {
-  if should_use_astdiff(options.old_path, options.new_path) {
+  if should_use_structural_diff(options.old_path, options.new_path) {
     @tool.diff_text(
       options.old_path,
       old_source,
@@ -125,14 +131,14 @@ fn render_cli_diff(
 }
 
 ///|UUID(5da5cf7f-b7c4-474b-a87a-be6436f0b5f2)
-fn main {
+async fn main {
   let options = parse_cli_args(program_args()) catch {
     e => fatal(e.to_string())
   }
-  let old_source = @miniio.read_text_file(options.old_path) catch {
+  let old_source = @fs.read_file(options.old_path).text() catch {
     e => fatal("failed to read \{options.old_path}: \{e}")
   }
-  let new_source = @miniio.read_text_file(options.new_path) catch {
+  let new_source = @fs.read_file(options.new_path).text() catch {
     e => fatal("failed to read \{options.new_path}: \{e}")
   }
   let graph_limit = parse_graph_limit(options.graph_limit_text) catch {

@@ -1,13 +1,15 @@
 import {
   "moonbitlang/core/argparse",
+  "moonbitlang/core/env",
   "moonbitlang/core/string",
-  "moonbit-community/miniio",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/io",
+  "moonbitlang/async/stdio",
   "moonbit-community/moondiff/tool",
   "moonbit-community/moondiff/tool/render",
 }
 
 supported_targets = "wasm"
 
-options(
-  "is-main": true,
-)
+pkgtype(kind: "executable")
