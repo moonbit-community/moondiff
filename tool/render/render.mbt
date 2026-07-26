@@ -1,5 +1,5 @@
 ///|UUID(4c963221-4eea-4a97-95c2-09ed50ace4a9)
-// Changed highlight ranges grouped by line key. AST-generated maps use
+// Changed highlight ranges grouped by line key. Syntax-generated maps use
 // zero-based source line indices; `render_line_diff`'s optional text-level maps
 // are queried with one-based line numbers relative to the provided text.
 type HighlightMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
@@ -8,7 +8,7 @@ type HighlightMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 using @syntax {type MatchedPos}
 
 ///|UUID(58e0f8c9-2d25-44d5-b23b-f729f3341d84)
-// Rendering controls shared by AST and fallback line diffs.
+// Rendering controls shared by structural and fallback line diffs.
 pub struct RenderOptions {
   context_lines : Int
   use_color : Bool
@@ -342,7 +342,7 @@ fn render_piediff_hunk_header(edits : ArrayView[@piediff.Edit]) -> String {
 }
 
 ///|UUID(8d2ad4b6-7974-44d6-871b-1ef554920ad2)
-// Find the covered range for one side of an AST hunk. If a hunk has no line on
+// Find the covered range for one side of a structural hunk. If a hunk has no line on
 // that side, use the opposite side as the insertion/deletion anchor.
 fn hunk_side_range(
   lines : ArrayView[(Int?, Int?)],
@@ -390,8 +390,18 @@ fn line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
 }
 
 ///|UUID(0b3d50a5-761a-438d-8d2f-d42b953ff01d)
-fn hunk_pair_has_novel(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
-  line_is_novel(pair.0, hunk.novel_lhs) || line_is_novel(pair.1, hunk.novel_rhs)
+fn pair_side_is_changed(
+  line : Int?,
+  opposite : Int?,
+  novel_lines : @hunks.LineSet,
+) -> Bool {
+  line_is_novel(line, novel_lines) || (line is Some(_) && opposite is None)
+}
+
+///|
+fn hunk_pair_has_change(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
+  pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) ||
+  pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
 }
 
 ///|UUID(feb9b345-8e81-4d88-80fd-67e658d3d4ec)
@@ -400,21 +410,19 @@ fn add_unique_line(lines : @hashmap.HashMap[Int, Bool], line : Int) -> Unit {
 }
 
 ///|UUID(6f45e079-8271-40bc-aa81-a1269eaa3aec)
-// Sparse paired replacements can be hard to read when only a few rows line up.
-// Render such blocks as deletions followed by insertions instead of forcing
-// misleading side-by-side rows.
+// Multi-line replacement blocks are easier to read as deletions followed by
+// insertions. Single-line replacements remain paired for compactness.
 fn should_render_as_block_replacement(
   segment : ArrayView[(Int?, Int?)],
   hunk : @hunks.AstHunk,
 ) -> Bool {
   let lhs_lines = @hashmap.HashMap([])
   let rhs_lines = @hashmap.HashMap([])
-  let mut paired_novel_rows = 0
   let mut all_present_sides_are_novel = true
 
   for pair in segment {
-    let lhs_novel = line_is_novel(pair.0, hunk.novel_lhs)
-    let rhs_novel = line_is_novel(pair.1, hunk.novel_rhs)
+    let lhs_novel = pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs)
+    let rhs_novel = pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
     match pair.0 {
       Some(lhs_line) =>
         if lhs_novel {
@@ -433,18 +441,11 @@ fn should_render_as_block_replacement(
         }
       None => ()
     }
-    if lhs_novel && rhs_novel {
-      paired_novel_rows += 1
-    }
   }
 
   let lhs_count = lhs_lines.length()
   let rhs_count = rhs_lines.length()
-  all_present_sides_are_novel &&
-  lhs_count >= 2 &&
-  rhs_count >= 2 &&
-  paired_novel_rows > 0 &&
-  paired_novel_rows * 3 <= @cmp.minimum(lhs_count, rhs_count)
+  all_present_sides_are_novel && lhs_count >= 2 && rhs_count >= 2
 }
 
 ///|UUID(5ecf727f-a39d-490c-8321-00cd7b702ca8)
@@ -455,12 +456,12 @@ fn append_segment_lines(
 ) -> Unit {
   if should_render_as_block_replacement(segment, hunk) {
     for pair in segment {
-      if line_is_novel(pair.0, hunk.novel_lhs) {
+      if pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) {
         output.push((pair.0, None))
       }
     }
     for pair in segment {
-      if line_is_novel(pair.1, hunk.novel_rhs) {
+      if pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs) {
         output.push((None, pair.1))
       }
     }
@@ -479,7 +480,7 @@ fn reduce_sparse_interleaved_replacements(
   let output = Array::new()
   let segment = Array::new()
   for pair in lines {
-    if hunk_pair_has_novel(pair, hunk) {
+    if hunk_pair_has_change(pair, hunk) {
       segment.push(pair)
     } else {
       append_segment_lines(output, segment, hunk)
@@ -501,8 +502,8 @@ fn max_display_line(line_base : Int, line_count : Int) -> Int {
 }
 
 ///|UUID(26becb16-0cfd-4d6f-9587-97054b5ddfbb)
-// Render an AST-aware unified diff. Structural positions choose the hunks and
-// intra-line highlights; the final text format stays line-oriented.
+// Render a syntax-aware unified diff. Structural positions choose the hunks
+// and intra-line highlights; the final text format stays line-oriented.
 pub fn render_ast_diff(
   old_label : String,
   old_source : String,
