@@ -27,4 +27,3 @@ pub fn RenderOptions::new(context_lines? : Int, use_color? : Bool) -> Self
 // Type aliases
 
 // Traits
-
