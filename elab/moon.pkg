@@ -1,15 +1,7 @@
 import {
-  "moonbitlang/core/list",
-  "moonbitlang/parser/basic",
-  "moonbitlang/parser/syntax" @past,
-  "moonbitlang/parser/attribute",
+  "moonbitlang/parser/untyped_cst" @cst,
   "moonbit-community/moondiff/syntax" @dsyntax,
   "moonbit-community/moondiff/span",
-  "moonbitlang/core/debug",
 }
-
-import {
-  "moonbitlang/parser",
-} for "test"
 
 warnings = "-28"

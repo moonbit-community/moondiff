@@ -1,6 +1,21 @@
 ///|UUID(a1293b4c-0874-4fc4-9902-e44b8cf7e8c8)
 using @span {type SingleLineSpan}
 
+///|
+/// The exact parser CST kind of a list node.
+///
+/// `ListKind` participates in structural matching but is not rendered. Use
+/// `ListKind::from_node_kind` to retain a CST node's identity.
+struct ListKind {
+  node_kind : @cst.NodeKind
+} derive(Eq)
+
+///|
+/// Wraps a parser CST node kind for use as a syntax list identity.
+pub fn ListKind::from_node_kind(node_kind : @cst.NodeKind) -> Self {
+  { node_kind, }
+}
+
 ///|UUID(36f67f34-7466-4f61-8b3d-4216a8be8dee)
 pub type SyntaxId = UInt // must non-zero
 
@@ -62,6 +77,9 @@ pub enum Syntax {
   )
   List(
     info~ : SyntaxInfo,
+    // Parser CST kind. It participates in structural identity but is never
+    // rendered, allowing similarly delimited constructs to remain distinct.
+    kind~ : ListKind?,
     open_position~ : Array[SingleLineSpan],
     open_content~ : String,
     children~ : Array[Syntax], // dont modify this
@@ -113,6 +131,7 @@ pub fn Syntax::list(
   children~ : Array[Syntax],
   close_content~ : String,
   close_position~ : Array[SingleLineSpan],
+  kind? : ListKind,
 ) -> Self {
   // Skip empty atoms: they aren't displayed, so there's no
   // point making our syntax tree bigger. These occur when we're
@@ -127,7 +146,8 @@ pub fn Syntax::list(
   // there's only one child. 
   if children.length() == 1 &&
     open_content.is_empty() &&
-    close_content.is_empty() {
+    close_content.is_empty() &&
+    kind is None {
     return children[0]
   }
   let mut num_descendants : UInt = 0
@@ -139,6 +159,7 @@ pub fn Syntax::list(
   }
   Syntax::List(
     info=SyntaxInfo::default(),
+    kind~,
     open_position~,
     open_content~,
     children~,
@@ -153,6 +174,7 @@ pub fn Syntax::simple_list(
   open_position~ : Array[SingleLineSpan],
   children~ : Array[Syntax],
   close_position~ : Array[SingleLineSpan],
+  kind? : ListKind,
 ) -> Self {
   // This is a convenience function for creating lists without
   // open/close content.
@@ -164,6 +186,7 @@ pub fn Syntax::simple_list(
     children~,
     close_content~,
     close_position~,
+    kind?,
   )
 }
 
@@ -268,8 +291,9 @@ fn init_info(
   init_info_on_side(lhs_roots, id)
   init_info_on_side(rhs_roots, id)
   let existing = @hashmap.HashMap([])
-  set_content_id(lhs_roots, existing)
-  set_content_id(rhs_roots, existing)
+  let list_kinds = ListKindInterner::new()
+  set_content_id(lhs_roots, existing, list_kinds)
+  set_content_id(rhs_roots, existing, list_kinds)
   set_content_is_unique(lhs_roots)
   set_content_is_unique(rhs_roots)
 }
@@ -315,12 +339,35 @@ fn find_nodes_with_unique_content(
 }
 
 ///|UUID(786c3580-5508-4015-af34-6476af74ce5a)
-type ContentKey = (String?, String?, Array[UInt], Bool, Bool)
+type ContentKey = (String?, String?, UInt?, Array[UInt], Bool, Bool)
+
+///|
+priv struct ListKindInterner {
+  kinds : Array[ListKind]
+}
+
+///|
+fn ListKindInterner::new() -> Self {
+  { kinds: [] }
+}
+
+///|
+fn ListKindInterner::intern(self : Self, kind : ListKind) -> UInt {
+  for i, existing_kind in self.kinds.iter2() {
+    if existing_kind == kind {
+      return i.reinterpret_as_uint()
+    }
+  }
+  let id = self.kinds.length().reinterpret_as_uint()
+  self.kinds.push(kind)
+  id
+}
 
 ///|UUID(31918e2f-f46e-4be9-9922-71a56ffaa181)
 fn set_content_id(
   nodes : ArrayView[Syntax],
   existing : @hashmap.HashMap[ContentKey, UInt],
+  list_kinds : ListKindInterner,
 ) -> Unit {
   for node in nodes {
     let key = match node {
@@ -335,18 +382,23 @@ fn set_content_id(
         } else {
           content
         }
-        (Some(clean_content), None, [], false, is_comment)
+        (Some(clean_content), None, None, [], false, is_comment)
       }
-      List(open_content~, close_content~, children~, ..) => {
+      List(kind~, open_content~, close_content~, children~, ..) => {
         // Recurse first, so children all have their content_id set.
-        set_content_id(children, existing)
+        set_content_id(children, existing, list_kinds)
         let children_content_ids = children
           .iter()
           .map(c => c.info().content_id)
           .collect()
+        let kind_id = match kind {
+          Some(kind) => Some(list_kinds.intern(kind))
+          None => None
+        }
         (
           Some(open_content),
           Some(close_content),
+          kind_id,
           children_content_ids,
           true,
           true,

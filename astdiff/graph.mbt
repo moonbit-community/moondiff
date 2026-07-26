@@ -451,6 +451,7 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
     }
     if lhs_syntax
       is List(
+        kind=lhs_kind,
         open_content=lhs_open_content,
         close_content=lhs_close_content,
         children=lhs_children,
@@ -458,13 +459,15 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
       ) &&
       rhs_syntax
       is List(
+        kind=rhs_kind,
         open_content=rhs_open_content,
         close_content=rhs_close_content,
         children=rhs_children,
         ..
       ) {
       // The list delimiters are equal, but children may not be.
-      if lhs_open_content == rhs_open_content &&
+      if lhs_kind == rhs_kind &&
+        lhs_open_content == rhs_open_content &&
         lhs_close_content == rhs_close_content {
         let lhs_next = lhs_children.get(0)
         let rhs_next = rhs_children.get(0)

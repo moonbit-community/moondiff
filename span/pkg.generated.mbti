@@ -3,7 +3,7 @@ package "moonbit-community/moondiff/span"
 
 import {
   "moonbitlang/core/debug",
-  "moonbitlang/parser/basic",
+  "moonbitlang/lexer/basic",
 }
 
 // Values
@@ -15,10 +15,11 @@ pub struct LineWidths {
   contents : Array[Char]
   lines : Array[(Int, Int)]
 }
+#alias("_[_]")
+pub fn LineWidths::at(Self, Int) -> ArrayView[Char]
 pub fn LineWidths::from_str(StringView) -> Self
 pub fn LineWidths::get_line_width(Self, Int) -> Int
 pub fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]
-pub fn LineWidths::op_get(Self, Int) -> ArrayView[Char]
 pub fn LineWidths::text_of_loc(Self, @basic.Position, @basic.Position) -> Array[Char]
 pub impl @debug.Debug for LineWidths
 
@@ -31,4 +32,3 @@ pub(all) struct SingleLineSpan {
 // Type aliases
 
 // Traits
-

@@ -20,7 +20,7 @@
 @@ -6,5 +36,5 @@
  [90m6[39m [90m36[39m ///|UUID(4)
  [90m7[39m [90m37[39m pub fn View::from_array(chars : Array[Char]) -> View {
- [31m8[39m [90m..[39m [90m  [39m[31m[1m//[22m[39m[90m [39m[31m[1mtodo:[22m[39m[90m [39m[31m[1mremove[22m[39m[90m [39m[31m[1m.view()[22m[39m[90m [39m[31m[1min[22m[39m[90m [39m[31m[1mnew[22m[39m[90m [39m[31m[1mversion[22m[39m
+ [31m8[39m [90m..[39m [90m  [39m[31m[1m// todo: remove .view() in new version[22m[39m
  [31m9[39m [90m..[39m [90m  String::from_array(chars).[39m[31m[1mview[22m[39m[90m()[39m
 [90m..[39m [32m38[39m [90m  [39m[32m[1mlet[22m[39m[90m [39m[32m[1ms[22m[39m[90m [39m[32m[1m=[22m[39m[90m String::from_array(chars)[39m
 [90m..[39m [32m39[39m [90m  [39m[32m[1mView::make_view(s,[22m[39m[90m [39m[32m[1m0,[22m[39m[90m [39m[32m[1ms[22m[39m[90m.[39m[32m[1mlength[22m[39m[90m()[39m[32m[1m)[22m[39m
@@ -35,17 +35,17 @@
 [90m..[39m [32m44[39m [90m  mut entries : FixedArray[[39m[32m[1mEntry[22m[39m[90m[K]?][39m
 [31m15[39m [90m..[39m [90m  [39m[31m[1mmut[22m[39m[90m [39m[31m[1mlist[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mFixedArray[SListNode[K]][22m[39m
 [90m16[39m [90m..[39m [90m  mut size : Int[39m
-[90m..[39m [32m45[39m [90m  mut size : Int [39m[32m[1m//[22m[39m[90m [39m[32m[1mactive[22m[39m[90m [39m[32m[1mkeys[22m[39m[90m [39m[32m[1mcount[22m[39m
+[90m..[39m [32m45[39m [90m  mut size : Int [39m[32m[1m// active keys count[22m[39m
 [90m17[39m [90m..[39m [90m  mut capacity : Int[39m
-[90m..[39m [32m46[39m [90m  mut capacity : Int [39m[32m[1m//[22m[39m[90m [39m[32m[1mcurrent[22m[39m[90m [39m[32m[1mcapacity[22m[39m
+[90m..[39m [32m46[39m [90m  mut capacity : Int [39m[32m[1m// current capacity[22m[39m
 [90m18[39m [90m..[39m [90m  mut capacity_mask : Int[39m
-[90m..[39m [32m47[39m [90m  mut capacity_mask : Int [39m[32m[1m//[22m[39m[90m [39m[32m[1mcapacity_mask[22m[39m[90m [39m[32m[1m=[22m[39m[90m [39m[32m[1mcapacity[22m[39m[90m [39m[32m[1m-[22m[39m[90m [39m[32m[1m1,[22m[39m[90m [39m[32m[1mused[22m[39m[90m [39m[32m[1mto[22m[39m[90m [39m[32m[1mfind[22m[39m[90m [39m[32m[1midx[22m[39m
+[90m..[39m [32m47[39m [90m  mut capacity_mask : Int [39m[32m[1m// capacity_mask = capacity - 1, used to find idx[22m[39m
 [90m19[39m [90m..[39m [90m  mut grow_at : Int[39m
-[90m..[39m [32m48[39m [90m  mut grow_at : Int [39m[32m[1m//[22m[39m[90m [39m[32m[1mthreshold[22m[39m[90m [39m[32m[1mthat[22m[39m[90m [39m[32m[1mtriggers[22m[39m[90m [39m[32m[1mgrow[22m[39m
+[90m..[39m [32m48[39m [90m  mut grow_at : Int [39m[32m[1m// threshold that triggers grow[22m[39m
 [31m20[39m [90m..[39m [90m  mut head : [39m[31m[1mSEntry[22m[39m[90m[K]?[39m
-[90m..[39m [32m49[39m [90m  mut head : [39m[32m[1mEntry[22m[39m[90m[K]? [39m[32m[1m//[22m[39m[90m [39m[32m[1mhead[22m[39m[90m [39m[32m[1mof[22m[39m[90m [39m[32m[1mlinked[22m[39m[90m [39m[32m[1mlist[22m[39m
+[90m..[39m [32m49[39m [90m  mut head : [39m[32m[1mEntry[22m[39m[90m[K]? [39m[32m[1m// head of linked list[22m[39m
 [31m21[39m [90m..[39m [90m  mut tail : [39m[31m[1mSEntry[K]?[22m[39m
-[90m..[39m [32m50[39m [90m  mut tail : [39m[32m[1mInt[22m[39m[90m [39m[32m[1m//[22m[39m[90m [39m[32m[1mtail[22m[39m[90m [39m[32m[1mof[22m[39m[90m [39m[32m[1mlinked[22m[39m[90m [39m[32m[1mlist[22m[39m
+[90m..[39m [32m50[39m [90m  mut tail : [39m[32m[1mInt[22m[39m[90m [39m[32m[1m// tail of linked list[22m[39m
 [90m22[39m [90m51[39m }
 
 [34m--- cli_test/source/20251114.old.mbt: line 24[39m
@@ -54,8 +54,8 @@
 [90m24[39m [90m14[39m ///|UUID(1)
 [90m25[39m [90m15[39m fn main {
 [90m26[39m [90m16[39m   println("Hello, world!")
-[90m..[39m [32m17[39m [90m  [39m[32m[1m//[22m[39m[90m [39m[32m[1minsert[22m[39m[90m [39m[32m[1mcomment[22m[39m
-[90m..[39m [32m18[39m [90m  [39m[32m[1m//[22m[39m[90m [39m[32m[1mmore[22m[39m[90m [39m[32m[1mthan[22m[39m[90m [39m[32m[1mone[22m[39m[90m [39m[32m[1mline[22m[39m
+[90m..[39m [32m17[39m [90m  [39m[32m[1m// insert comment[22m[39m
+[90m..[39m [32m18[39m [90m  [39m[32m[1m// more than one line[22m[39m
 [90m27[39m [90m19[39m   println(5 + 6)
 [90m28[39m [90m20[39m }
 

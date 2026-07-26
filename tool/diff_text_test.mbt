@@ -1,5 +1,5 @@
 ///|UUID(74905026-1f99-4aed-9889-801676fd886a)
-test "diff_text renders ast-backed inline diff" {
+test "diff_text renders CST-backed inline diff" {
   let old_source =
     #|fn f() {
     #|  foo(bar)
@@ -20,6 +20,18 @@ test "diff_text renders ast-backed inline diff" {
     #|
   assert_true(result.kind is Ast)
   assert_true(result.rendered == expected)
+}
+
+///|
+test "diff_text ignores Unicode whitespace-only changes structurally" {
+  let old_source = "let value = 1\n"
+  for unicode_space in ["\u{00a0}", "\u{3000}"] {
+    let new_source = "let\{unicode_space}value = 1\n"
+    let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
+    assert_true(result.kind is Ast)
+    assert_eq(result.rendered, "")
+    assert_true(result.has_changes)
+  }
 }
 
 ///|UUID(31d25c5a-0e2a-49e8-9e32-8de8940bded3)
@@ -193,7 +205,7 @@ test "diff_text keeps inserted case marker statements novel" {
 test "diff_text separates mostly block replacements with one aligned line" {
   let old_source =
     #|test "debug inspect error path" {
-    #|  let result = try? @debug.debug_inspect(1)
+    #|  let result = try! @debug.debug_inspect(1)
     #|  let is_err = match result {
     #|    Ok(_) => false
     #|    Err(_) => true
@@ -210,7 +222,7 @@ test "diff_text separates mostly block replacements with one aligned line" {
     #| }
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
   let separated_block =
-    #|2 .   let result = try? @debug.debug_inspect(1)
+    #|2 .   let result = try! @debug.debug_inspect(1)
     #|3 .   let is_err = match result {
     #|4 .     Ok(_) => false
     #|5 .     Err(_) => true
@@ -218,7 +230,7 @@ test "diff_text separates mostly block replacements with one aligned line" {
     #|7 .   inspect(is_err, content="true")
     #|. 2   try @debug.debug_inspect(1) catch {
   let interleaved_prefix =
-    #|2 .   let result = try? @debug.debug_inspect(1)
+    #|2 .   let result = try! @debug.debug_inspect(1)
     #|. 2   try @debug.debug_inspect(1) catch {
 
   assert_true(result.kind is Ast)
@@ -458,7 +470,7 @@ test "non terminate" {
 }
 
 ///|UUID(75a63cec-04c6-4517-b902-6ee11ba6cc17)
-test "diff_text keeps UUID-aligned top-level changes on the AST path" {
+test "diff_text keeps UUID-aligned top-level changes on the CST path" {
   let old_source =
     #|///|UUID(11111111-1111-1111-1111-111111111111)
     #|fn keep() {}

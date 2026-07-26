@@ -28,4 +28,3 @@ pub(all) struct AstHunk {
 pub type LineSet = @hashmap.HashMap[Int, Bool]
 
 // Traits
-

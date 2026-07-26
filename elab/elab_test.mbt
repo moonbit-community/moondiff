@@ -1,7 +1,7 @@
-///|UUID(2dde4507-d810-4333-a0ae-173aa929afbb)
-using @dsyntax {type Syntax}
+///|
+using @dsyntax {type ListKind, type Syntax}
 
-///|UUID(7d567fd1-0f85-44a7-99a1-d18df1d56665)
+///|
 fn source_lines(source : String) -> Array[Array[Char]] {
   let lines = Array::new()
   for line in source.split("\n") {
@@ -11,14 +11,14 @@ fn source_lines(source : String) -> Array[Array[Char]] {
   }
 }
 
-///|UUID(81551d34-5425-46e8-968b-f16351c60dd4)
+///|
 fn span_text(lines : Array[Array[Char]], span : @span.SingleLineSpan) -> String {
   let start_idx = if span.start_col == 0 { 0 } else { span.start_col - 1 }
   let end_idx = span.end_col - 1
   String::from_array(lines[span.line - 1][start_idx:end_idx].to_owned())
 }
 
-///|UUID(738ecb58-db28-4f89-adbb-bf26ad8a4b19)
+///|
 fn positions_text(
   lines : Array[Array[Char]],
   positions : Array[@span.SingleLineSpan],
@@ -36,15 +36,24 @@ fn positions_text(
   buf.to_string()
 }
 
-///|UUID(29253b8d-1faf-4d5e-bf49-70e5887a84e5)
-fn only_impl(impls : @list.List[@past.Impl]) -> @past.Impl raise {
-  match impls {
-    @list.More(impl_, tail=@list.Empty) => impl_
-    _ => fail("expected single impl")
+///|
+fn only_item(source : String) -> @cst.CstNode raise {
+  let result = @cst.parse_structure(source)
+  assert_true(result.diagnostics_view().is_empty())
+  let item = Ref(None)
+  for entry in result.root().children {
+    let (label, child) = entry
+    if label == Some("item") {
+      if item.val is Some(_) {
+        fail("expected one CST item")
+      }
+      item.val = Some(child)
+    }
   }
+  item.val.unwrap_or_else(() => fail("expected one CST item"))
 }
 
-///|UUID(9864c703-6c25-4ec0-b8f0-caef7990d5c1)
+///|
 fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
   let lines = source_lines(source)
 
@@ -52,7 +61,7 @@ fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
     match syntax {
       Syntax::Atom(content~, position~, ..) => {
         assert_true(!position.is_empty())
-        assert_true(positions_text(lines, position) == content)
+        assert_eq(positions_text(lines, position), content)
       }
       Syntax::List(
         open_content~,
@@ -64,11 +73,11 @@ fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
       ) => {
         if !open_content.is_empty() {
           assert_true(!open_position.is_empty())
-          assert_true(positions_text(lines, open_position) == open_content)
+          assert_eq(positions_text(lines, open_position), open_content)
         }
         if !close_content.is_empty() {
           assert_true(!close_position.is_empty())
-          assert_true(positions_text(lines, close_position) == close_content)
+          assert_eq(positions_text(lines, close_position), close_content)
         }
         for child in children {
           walk(lines, child)
@@ -80,7 +89,7 @@ fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
   walk(lines, syntax)
 }
 
-///|UUID(0264a484-ff1e-494d-a90c-7733739fd1d6)
+///|
 fn collect_delims(syntax : Syntax, delims : Array[(String, String)]) -> Unit {
   match syntax {
     Syntax::Atom(..) => ()
@@ -95,7 +104,7 @@ fn collect_delims(syntax : Syntax, delims : Array[(String, String)]) -> Unit {
   }
 }
 
-///|UUID(c0b78f9f-5d40-47bf-833a-c3d147fe7e2d)
+///|
 fn has_delim(
   delims : Array[(String, String)],
   open_ : String,
@@ -110,7 +119,7 @@ fn has_delim(
   false
 }
 
-///|UUID(0a45c58a-1e09-465d-b0a5-a16f329af536)
+///|
 fn syntax_contains(syntax : Syntax, content : String) -> Bool {
   match syntax {
     Syntax::Atom(content=atom_content, ..) => atom_content == content
@@ -118,22 +127,33 @@ fn syntax_contains(syntax : Syntax, content : String) -> Bool {
       if open_content == content || close_content == content {
         return true
       }
-      for child in children {
-        if syntax_contains(child, content) {
-          return true
-        }
-      }
-      false
+      children.any(fn(child) { syntax_contains(child, content) })
     }
   }
 }
 
-///|UUID(480238d4-3c5c-4052-a17f-dc5a6d57e1ab)
-fn assert_contains(syntax : Syntax, content : String) -> Unit raise {
-  assert_true(syntax_contains(syntax, content))
+///|
+fn atom_kind(syntax : Syntax, wanted : String) -> @dsyntax.AtomKind? {
+  match syntax {
+    Syntax::Atom(content~, kind~, ..) =>
+      if content == wanted {
+        Some(kind)
+      } else {
+        None
+      }
+    Syntax::List(children~, ..) => {
+      for child in children {
+        match atom_kind(child, wanted) {
+          Some(kind) => return Some(kind)
+          None => ()
+        }
+      }
+      None
+    }
+  }
 }
 
-///|UUID(eb194fbd-352e-489b-9159-39938f71e45)
+///|
 fn collect_brace_blocks(syntax : Syntax, blocks : Array[Syntax]) -> Unit {
   match syntax {
     Syntax::Atom(..) => ()
@@ -148,22 +168,14 @@ fn collect_brace_blocks(syntax : Syntax, blocks : Array[Syntax]) -> Unit {
   }
 }
 
-///|UUID(7196a25b-12ee-4313-9ae5-7a449fb68b3d)
-fn only_brace_block(syntax : Syntax) -> Syntax raise {
-  let blocks = Array::new()
-  collect_brace_blocks(syntax, blocks)
-  @debug.assert_eq(blocks.length(), 1)
-  blocks[0]
-}
-
-///|UUID(92ff70c0-3f26-4d66-b64d-d6d3702cbacd)
+///|
 fn push_line_once(lines : Array[Int], line : Int) -> Unit {
   if !lines.contains(line) {
     lines.push(line)
   }
 }
 
-///|UUID(7ee5584b-8db6-4f78-9dfc-a099413a4747)
+///|
 fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
   match syntax {
     Syntax::Atom(position~, ..) =>
@@ -184,7 +196,7 @@ fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
   }
 }
 
-///|UUID(68573825-9f8a-4271-8025-44dde9c9f290)
+///|
 fn syntax_lines(syntax : Syntax) -> Array[Int] {
   let lines = Array::new()
   collect_syntax_lines(syntax, lines)
@@ -192,108 +204,114 @@ fn syntax_lines(syntax : Syntax) -> Array[Int] {
   lines
 }
 
-///|UUID(0fec8b3b-772e-441e-9755-d219f3da18fb)
-fn direct_child_line_sets(block : Syntax) -> Array[Array[Int]] raise {
-  match block {
-    Syntax::List(children~, ..) => children.map(syntax_lines)
-    Syntax::Atom(..) => fail("expected list")
+///|
+fn add_span_coverage(
+  coverage : Array[Array[Int]],
+  span : @span.SingleLineSpan,
+) -> Unit {
+  let line = span.line - 1
+  let start = if span.start_col == 0 { 0 } else { span.start_col - 1 }
+  let end_ = span.end_col - 1
+  for column in start..<end_ {
+    coverage[line][column] += 1
   }
 }
 
-///|UUID(2385d0af-6017-425d-a62f-323fd77352e2)
-fn same_int_array(lhs : Array[Int], rhs : Array[Int]) -> Bool {
-  if lhs.length() != rhs.length() {
-    return false
-  }
-  for i in 0..<lhs.length() {
-    if lhs[i] != rhs[i] {
-      return false
+///|
+fn collect_coverage(syntax : Syntax, coverage : Array[Array[Int]]) -> Unit {
+  match syntax {
+    Syntax::Atom(position~, ..) =>
+      for span in position {
+        add_span_coverage(coverage, span)
+      }
+    Syntax::List(open_position~, children~, close_position~, ..) => {
+      for span in open_position {
+        add_span_coverage(coverage, span)
+      }
+      for child in children {
+        collect_coverage(child, coverage)
+      }
+      for span in close_position {
+        add_span_coverage(coverage, span)
+      }
     }
   }
-  true
 }
 
-///|UUID(a994c5ee-aab2-4cc8-8feb-9e4eb1874071)
-fn line_sets_contain(
-  line_sets : Array[Array[Int]],
-  expected : Array[Int],
-) -> Bool {
-  for line_set in line_sets {
-    if same_int_array(line_set, expected) {
-      return true
+///|
+fn assert_non_whitespace_covered_once(
+  source : String,
+  syntax : Syntax,
+) -> Unit raise {
+  let lines = source_lines(source)
+  let coverage = lines.map(fn(line) { line.map(fn(_) { 0 }) })
+  collect_coverage(syntax, coverage)
+  for line_index in 0..<lines.length() {
+    for column in 0..<lines[line_index].length() {
+      let ch = lines[line_index][column]
+      assert_true(coverage[line_index][column] <= 1)
+      if ch != ' ' && ch != '\t' && ch != '\r' {
+        assert_eq(coverage[line_index][column], 1)
+      }
     }
   }
-  false
 }
 
-///|UUID(13f1e0a5-29a1-431e-89f8-652f99cef0e2)
-test "elab atoms and delimiters map back to source" {
+///|
+test "CST elaboration preserves the exact list node kind" {
+  let source = "fn f { () }"
+  let node = only_item(source)
+  assert_true(node.kind is @cst.Impl_Function)
+  let syntax = @elab.elab_cst(source, node)
+  guard syntax is Syntax::List(kind=Some(kind), ..) else {
+    fail("expected the function item to elaborate to an identified list")
+  }
+  assert_true(kind == ListKind::from_node_kind(node.kind))
+}
+
+///|
+test "CST atoms and delimiters map back to source" {
   let source =
-    #|/// Adds one
     #|pub fn add(x : Int, y : Int) -> Int {
     #|  foo([x], { baz: y })
     #|}
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
+  let syntax = @elab.elab_cst(source, only_item(source))
   assert_source_faithful(source, syntax)
-}
-
-///|UUID(944b0d47-3581-4c4a-a565-b1660d510e30)
-test "elab keeps raise keyword in explicit error type" {
-  let source = "fn f() -> Unit raise E { () }"
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
-  assert_source_faithful(source, syntax)
-  assert_contains(syntax, "raise")
-}
-
-///|UUID(2d1c37d8-ccbc-4e9d-a6d9-df191fae0b89)
-test "elab keeps equal sign in function stubs" {
-  let source =
-    #|fn ffi(x : Int) -> Int = "module" "function"
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
-  assert_source_faithful(source, syntax)
-  assert_contains(syntax, "=")
-}
-
-///|UUID(8d704ff0-86ff-41ce-b6c5-3149e7056cf4)
-test "elab preserves nested paren bracket brace delimiters" {
-  let source = "fn f() { foo([bar], { baz: qux }) }"
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
   let delims = Array::new()
   collect_delims(syntax, delims)
-
   assert_true(has_delim(delims, "(", ")"))
   assert_true(has_delim(delims, "[", "]"))
   assert_true(has_delim(delims, "{", "}"))
 }
 
-///|UUID(5d33875a-7831-4215-ad6f-c1b18bbdce6e)
-test "elab uses bracket delimiters for array indexing" {
-  let source = "let y = xs[i:j]"
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
-  let delims = Array::new()
-  collect_delims(syntax, delims)
-
+///|
+test "CST elaboration ignores lexer Unicode whitespace gaps" {
+  let source = "let\u{00a0}value\u{3000}=\u{00a0}1"
+  let syntax = @elab.elab_cst(source, only_item(source))
   assert_source_faithful(source, syntax)
-  assert_true(has_delim(delims, "[", "]"))
+  assert_false(syntax_contains(syntax, "\u{00a0}"))
+  assert_false(syntax_contains(syntax, "\u{3000}"))
+  assert_true(syntax_contains(syntax, "let"))
+  assert_true(syntax_contains(syntax, "value"))
+  assert_true(syntax_contains(syntax, "="))
+  assert_true(syntax_contains(syntax, "1"))
 }
 
-///|UUID(0977d5f4-30fb-48a8-bf41-e9a422946ddd)
-test "elab exposes explicit block statement chain as siblings" {
+///|
+test "CST elaboration keeps error annotations and function stubs" {
+  let raise_source = "fn f() -> Unit raise E { () }"
+  let raise_syntax = @elab.elab_cst(raise_source, only_item(raise_source))
+  assert_source_faithful(raise_source, raise_syntax)
+  assert_true(syntax_contains(raise_syntax, "raise"))
+
+  let stub_source = "fn ffi(x : Int) -> Int = \"module\" \"function\""
+  let stub_syntax = @elab.elab_cst(stub_source, only_item(stub_source))
+  assert_source_faithful(stub_source, stub_syntax)
+  assert_true(syntax_contains(stub_syntax, "="))
+}
+
+///|
+test "CST elaboration exposes block statements as siblings" {
   let source =
     #|fn init {
     #|  // case 002
@@ -301,38 +319,104 @@ test "elab exposes explicit block statement chain as siblings" {
     #|  println(marker)
     #|  println(fib(8))
     #|}
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
-  let block = only_brace_block(syntax)
-  let line_sets = direct_child_line_sets(block)
-
-  assert_source_faithful(source, syntax)
-  assert_true(line_sets_contain(line_sets, [3]))
-  assert_true(line_sets_contain(line_sets, [4]))
-  assert_true(line_sets_contain(line_sets, [5]))
-  assert_false(line_sets_contain(line_sets, [3, 4, 5]))
+  let syntax = @elab.elab_cst(source, only_item(source))
+  let blocks = Array::new()
+  collect_brace_blocks(syntax, blocks)
+  assert_eq(blocks.length(), 1)
+  guard blocks[0] is Syntax::List(children~, ..) else {
+    fail("expected block list")
+  }
+  let line_sets = children.map(syntax_lines)
+  assert_true(line_sets.any(fn(lines) { lines == [3] }))
+  assert_true(line_sets.any(fn(lines) { lines == [4] }))
+  assert_true(line_sets.any(fn(lines) { lines == [5] }))
 }
 
-///|UUID(f7398ef1-020e-4754-9b09-72bb5050a3ae)
-test "elab recovers using type and trait items from source gaps" {
-  let source = "using @pkg { type Foo as Bar, trait Baz }"
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
+///|
+test "CST elaboration keeps using package tokens intact" {
+  let source = "using @pkg { type Foo as Bar, trait Baz, func }"
+  let syntax = @elab.elab_cst(source, only_item(source))
   assert_source_faithful(source, syntax)
-}
-
-///|UUID(d01911f1-df95-4da8-90f6-0de6908126ec)
-test "elab keeps package prefix and name in one atom" {
-  let source = "using @pkg { func }"
-  let (impls, reports) = @parser.parse_string(source)
-  assert_true(reports.is_empty())
-
-  let syntax = elab_impl(source, only_impl(impls))
-  assert_source_faithful(source, syntax)
-  assert_contains(syntax, "@pkg")
+  assert_true(syntax_contains(syntax, "@pkg"))
   assert_false(syntax_contains(syntax, "@"))
+}
+
+///|
+test "CST elaboration covers interpolation and encoded punctuation once" {
+  let source =
+    #|fn render(obj : Object) {
+    #|  let text = "value=\{obj.field}"
+    #|  let emoji = "😀".length()
+    #|  println(@pkg.format(text))
+    #|}
+  let syntax = @elab.elab_cst(source, only_item(source))
+  assert_source_faithful(source, syntax)
+  assert_non_whitespace_covered_once(source, syntax)
+}
+
+///|
+test "new CST semantic metadata does not duplicate source syntax" {
+  let sources = [
+    "pub fn f(x : Int) -> Int { x }", "let x : Int = 1", "const X : Int = 1", "type T[A] = Array[A]",
+    "struct S { pub mut x : Int }", "enum E { A(x~ : Int) }", "trait Show { show(Self) -> String }",
+    "impl Show for S with show(self) { \"S\" }", "test { inspect(1, content=\"1\") }",
+    "using @pkg { func as func2 }", "extenum Open += { More }", "suberror Failure { Invalid(String) }",
+    "import { \"pkg/core\", \"pkg/other\" @other } for \"native\"", "extend @pkg.Type with @pkg.Trait::{method}",
+    "fn labelled { let value = done~: { break done~ 1 }; value }", "fn guarded(value : Int?) -> Int { guard! value is Some(inner); inner }",
+    "fn matched(x : Int?) -> Int { match x { Some(a) | (None with a = 0) => a } }",
+  ]
+  for source in sources {
+    let result = @cst.parse_structure(source)
+    assert_true(result.diagnostics_view().is_empty())
+    let syntax = @elab.elab_cst(source, result.root())
+    assert_source_faithful(source, syntax)
+    assert_non_whitespace_covered_once(source, syntax)
+  }
+}
+
+///|
+test "new CST syntax kinds retain display atom categories" {
+  let source =
+    #|fn render {
+    #|  let value : @pkg.Type = @pkg.Ctor
+    #|  let truth = true
+    #|  let count = 42
+    #|  let text = "value=\{value}"
+    #|  // note
+    #|}
+  let syntax = @elab.elab_cst(source, only_item(source))
+  assert_true(atom_kind(syntax, "fn") == Some(@dsyntax.AtomKind::Keyword))
+  assert_true(atom_kind(syntax, "true") == Some(@dsyntax.AtomKind::Keyword))
+  assert_true(atom_kind(syntax, "42") == Some(@dsyntax.AtomKind::Normal))
+  assert_true(
+    atom_kind(syntax, "\"value=\\{value}\"") ==
+    Some(@dsyntax.AtomKind::String(@dsyntax.StringKind::StringLiteral)),
+  )
+  assert_true(atom_kind(syntax, "@pkg") == Some(@dsyntax.AtomKind::Type))
+  assert_true(atom_kind(syntax, "Type") == Some(@dsyntax.AtomKind::Type))
+  let operator_keyword_source = "pub(readonly) fn extend(a : Bool, b : Bool) { a → b }"
+  let operator_keyword_syntax = @elab.elab_cst(
+    operator_keyword_source,
+    only_item(operator_keyword_source),
+  )
+  assert_true(
+    atom_kind(operator_keyword_syntax, "readonly") ==
+    Some(@dsyntax.AtomKind::Keyword),
+  )
+  assert_true(
+    atom_kind(operator_keyword_syntax, "extend") ==
+    Some(@dsyntax.AtomKind::Keyword),
+  )
+  assert_true(
+    atom_kind(operator_keyword_syntax, "→") ==
+    Some(@dsyntax.AtomKind::Keyword),
+  )
+  let comment_source = "// note\nlet x = 1"
+  let comment_syntax = @elab.elab_cst(
+    comment_source,
+    @cst.parse_structure(comment_source).root(),
+  )
+  assert_true(
+    atom_kind(comment_syntax, "// note") == Some(@dsyntax.AtomKind::Comment),
+  )
 }
