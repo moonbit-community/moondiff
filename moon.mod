@@ -17,7 +17,7 @@ repository = "https://github.com/moonbit-community/moondiff"
 
 license = "Apache-2.0"
 
-keywords = ["diff", "astdiff" ]
+keywords = ["diff", "astdiff"]
 
 description = "Difftool that aware MoonBit language syntax"
 
