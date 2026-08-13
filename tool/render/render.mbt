@@ -15,10 +15,13 @@ pub struct RenderOptions {
 }
 
 ///|UUID(777a738b-08e7-4d99-8186-fde9524531ab)
+// Piediff requires a non-negative grouping radius. Clamp at this public
+// boundary so line and structural rendering share the same safe behavior.
 pub fn RenderOptions::new(
   context_lines? : Int = 3,
   use_color? : Bool = false,
 ) -> Self {
+  let context_lines = if context_lines < 0 { 0 } else { context_lines }
   { context_lines, use_color }
 }
 

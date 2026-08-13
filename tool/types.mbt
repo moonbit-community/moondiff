@@ -9,11 +9,14 @@ pub struct DiffOptions {
 }
 
 ///|UUID(4b4b0094-f004-4736-8152-8313861cbdf7)
+// Treat a negative context radius as zero so every DiffOptions value is safe
+// to pass to the rendering layer.
 pub fn DiffOptions::new(
   graph_limit? : UInt = 3_000_000,
   context_lines? : Int = 3,
   use_color? : Bool = false,
 ) -> Self {
+  let context_lines = if context_lines < 0 { 0 } else { context_lines }
   { graph_limit, context_lines, use_color }
 }
 
