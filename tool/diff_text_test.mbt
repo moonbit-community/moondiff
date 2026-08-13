@@ -34,6 +34,15 @@ test "diff_text ignores Unicode whitespace-only changes structurally" {
   }
 }
 
+///|
+test "diff_text returns before parsing identical sources" {
+  let source = "fn broken("
+  let result = diff_text("old.mbt", source, "new.mbt", source)
+  assert_true(result.kind is Ast)
+  assert_false(result.has_changes)
+  assert_eq(result.rendered, "--- old.mbt\n+++ new.mbt\nNo changes.\n")
+}
+
 ///|UUID(31d25c5a-0e2a-49e8-9e32-8de8940bded3)
 test "diff_text colors file headers blue" {
   let old_source =

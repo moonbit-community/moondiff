@@ -368,6 +368,21 @@ fn CstElabCtx::elab_node(
 }
 
 ///|
+fn CstElabCtx::elab_nodes(
+  self : Self,
+  nodes : ArrayView[@cst.CstNode],
+) -> Syntax {
+  let children = Array::new()
+  for node in nodes {
+    match self.elab_node(node, false) {
+      Some(node) => children.push(node)
+      None => ()
+    }
+  }
+  Syntax::simple_list(open_position=[], children~, close_position=[])
+}
+
+///|
 /// Converts one source-faithful parser CST node into moondiff's matching tree.
 /// Token text and positions are always sliced from the same original source
 /// that was passed to `@cst.parse_structure` or `@cst.parse_expression`.
@@ -388,13 +403,21 @@ pub fn elab_cst_nodes(
   source : String,
   nodes : ArrayView[@cst.CstNode],
 ) -> Syntax {
+  CstElabCtx::new(source).elab_nodes(nodes)
+}
+
+///|
+/// Converts several groups of adjacent CST nodes using one source index.
+/// Top-level alignment uses this entry point so elaborating many declarations
+/// scans the source once instead of once per declaration.
+pub fn elab_cst_node_groups(
+  source : String,
+  groups : ArrayView[Array[@cst.CstNode]],
+) -> Array[Syntax] {
   let ctx = CstElabCtx::new(source)
-  let children = Array::new()
-  for node in nodes {
-    match ctx.elab_node(node, false) {
-      Some(node) => children.push(node)
-      None => ()
-    }
+  let roots = Array::new()
+  for nodes in groups {
+    roots.push(ctx.elab_nodes(nodes))
   }
-  Syntax::simple_list(open_position=[], children~, close_position=[])
+  roots
 }
