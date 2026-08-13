@@ -5,3 +5,7 @@ import {
   "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/span",
 }
+
+import {
+  "moonbitlang/parser/untyped_cst" @cst,
+} for "wbtest"

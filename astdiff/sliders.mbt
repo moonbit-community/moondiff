@@ -146,9 +146,22 @@ fn push_unchanged_to_ancestor(
   }
   let delimiters_match = match (root, inner) {
     (
-      Syntax::List(open_content=root_open, close_content=root_close, ..),
-      Syntax::List(open_content=inner_open, close_content=inner_close, ..),
-    ) => root_open == inner_open && root_close == inner_close
+      Syntax::List(
+        kind=root_kind,
+        open_content=root_open,
+        close_content=root_close,
+        ..
+      ),
+      Syntax::List(
+        kind=inner_kind,
+        open_content=inner_open,
+        close_content=inner_close,
+        ..
+      ),
+    ) =>
+      root_kind == inner_kind &&
+      root_open == inner_open &&
+      root_close == inner_close
     _ => false
   }
   if delimiters_match {
@@ -169,9 +182,22 @@ fn push_unchanged_to_descendant(
   }
   let delimiters_match = match (root, inner) {
     (
-      Syntax::List(open_content=root_open, close_content=root_close, ..),
-      Syntax::List(open_content=inner_open, close_content=inner_close, ..),
-    ) => root_open == inner_open && root_close == inner_close
+      Syntax::List(
+        kind=root_kind,
+        open_content=root_open,
+        close_content=root_close,
+        ..
+      ),
+      Syntax::List(
+        kind=inner_kind,
+        open_content=inner_open,
+        close_content=inner_close,
+        ..
+      ),
+    ) =>
+      root_kind == inner_kind &&
+      root_open == inner_open &&
+      root_close == inner_close
     _ => false
   }
   if delimiters_match {
