@@ -36,6 +36,22 @@ fn parse_units(source : String) -> Array[ImplUnit] {
 }
 
 ///|
+test "implementation units cache their source slices" {
+  let source =
+    #|/// leading a
+    #|fn a() {
+    #|  first()
+    #|}
+    #|
+    #|/// leading b
+    #|fn b() { second() }
+  let units = parse_units(source)
+  @debug.assert_eq(units.length(), 2)
+  @debug.assert_eq(units[0].source, "/// leading a\nfn a() {\n  first()\n}")
+  @debug.assert_eq(units[1].source, "/// leading b\nfn b() { second() }")
+}
+
+///|
 test "UUID extraction accepts only exact own-line markers" {
   let standard_uuid = "8bf07bdd-6cbd-4d64-8b82-a40f69970b25"
   let cases : Array[(String, String?)] = [

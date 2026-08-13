@@ -191,31 +191,12 @@ fn impl_line_base(unit : ImplUnit?) -> Int {
 }
 
 ///|UUID(92c64499-ea3f-4acd-8121-453b75789ee2)
-// Extract the exact source text for one implementation unit. The caller passes
-// the corresponding line base so hunk headers still refer to original file
-// lines.
-fn source_slice(source : String, unit : ImplUnit?) -> String {
+// Return the source text cached while collecting implementation units. The
+// corresponding line base keeps hunk headers referring to original file lines.
+fn source_slice(unit : ImplUnit?) -> String {
   match unit {
     None => ""
-    Some(unit) => {
-      let lines = @render.split_lines(source)
-      if lines.is_empty() {
-        return ""
-      }
-      let start = @cmp.maximum(unit.start_line - 1, 0)
-      let end_ = @cmp.minimum(unit.end_line, lines.length())
-      if start >= end_ {
-        return ""
-      }
-      let buf = StringBuilder::new()
-      for i in start..<end_ {
-        if i > start {
-          buf.write_char('\n')
-        }
-        buf.write_string(lines[i])
-      }
-      buf.to_string()
-    }
+    Some(unit) => unit.source
   }
 }
 
@@ -262,15 +243,13 @@ fn rebase_matched_positions(
 fn render_impl_line_fallback(
   reason : String,
   old_label : String,
-  old_source : String,
   old_unit : ImplUnit?,
   new_label : String,
-  new_source : String,
   new_unit : ImplUnit?,
   render_options : @render.RenderOptions,
 ) -> String {
-  let old_slice = source_slice(old_source, old_unit)
-  let new_slice = source_slice(new_source, new_unit)
+  let old_slice = source_slice(old_unit)
+  let new_slice = source_slice(new_unit)
   let old_line_base = impl_line_base(old_unit)
   let new_line_base = impl_line_base(new_unit)
   "note: fallback to line diff (\{reason})\n" +
@@ -293,16 +272,14 @@ fn render_impl_line_fallback(
 // as novel when the graph stays within limits.
 fn render_impl_edit(
   old_label : String,
-  old_source : String,
   old_unit : ImplUnit?,
   new_label : String,
-  new_source : String,
   new_unit : ImplUnit?,
   graph_limit : UInt,
   render_options : @render.RenderOptions,
 ) -> String? {
-  let old_slice = source_slice(old_source, old_unit)
-  let new_slice = source_slice(new_source, new_unit)
+  let old_slice = source_slice(old_unit)
+  let new_slice = source_slice(new_unit)
   let old_line_base = impl_line_base(old_unit)
   let new_line_base = impl_line_base(new_unit)
   let lhs_roots = Array::new()
@@ -324,10 +301,8 @@ fn render_impl_edit(
         render_impl_line_fallback(
           "graph limit exceeded (\{graph_limit})",
           old_label,
-          old_source,
           old_unit,
           new_label,
-          new_source,
           new_unit,
           render_options,
         ),
@@ -433,10 +408,8 @@ fn render_impl_edits(
       Replace(old~, new~) =>
         render_impl_edit(
           old_label,
-          old_source,
           Some(old),
           new_label,
-          new_source,
           Some(new),
           graph_limit,
           render_options,
@@ -444,10 +417,8 @@ fn render_impl_edits(
       Delete(old) =>
         render_impl_edit(
           old_label,
-          old_source,
           Some(old),
           new_label,
-          new_source,
           None,
           graph_limit,
           render_options,
@@ -455,10 +426,8 @@ fn render_impl_edits(
       Insert(new) =>
         render_impl_edit(
           old_label,
-          old_source,
           None,
           new_label,
-          new_source,
           Some(new),
           graph_limit,
           render_options,

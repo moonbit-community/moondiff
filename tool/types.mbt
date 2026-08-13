@@ -32,9 +32,9 @@ fn DiffOptions::render_options(self : Self) -> @render.RenderOptions {
 
 ///|UUID(3056bc33-5b65-4d21-bdfc-d602536de30d)
 // Records the top-level mode selected by `diff_text`. `Ast` is retained for
-// API compatibility; it now means both sides parsed and CST-backed structural
-// alignment/rendering was attempted. Graph-limit fallbacks can still be
-// rendered inside that output.
+// API compatibility; it means the inputs were identical or both sides parsed
+// and CST-backed structural alignment/rendering was attempted. Graph-limit
+// fallbacks can still be rendered inside that output.
 pub enum DiffKind {
   Ast
   TextFallback(reason~ : String)

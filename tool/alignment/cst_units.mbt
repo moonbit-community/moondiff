@@ -10,7 +10,16 @@ priv struct ImplUnit {
   uuid : String?
   semantic_key : String?
   start_line : Int
-  end_line : Int
+  source : String
+}
+
+///|
+// CST nodes are grouped first, then elaborated together with one file-level
+// context. Keeping this intermediate form also lets source lines be indexed
+// once before the final implementation units are built.
+priv struct ImplUnitInput {
+  nodes : Array[@cst.CstNode]
+  item : @cst.CstNode?
 }
 
 ///|
@@ -269,18 +278,48 @@ fn root_child_is_visible(source : String, node : @cst.CstNode) -> Bool {
 ///|
 fn make_impl_unit(
   source : String,
+  source_lines : ArrayView[String],
   nodes : Array[@cst.CstNode],
   item : @cst.CstNode?,
+  root : @syntax.Syntax,
 ) -> ImplUnit {
   let first = nodes[0]
   let last = nodes[nodes.length() - 1]
   ImplUnit::{
-    root: @elab.elab_cst_nodes(source, nodes),
+    root,
     uuid: nodes_uuid(source, nodes),
     semantic_key: item.bind(fn(item) { impl_semantic_key(source, item) }),
     start_line: first.loc.start.lnum,
-    end_line: last.loc.end.lnum,
+    source: source_lines_slice(
+      source_lines,
+      first.loc.start.lnum,
+      last.loc.end.lnum,
+    ),
   }
+}
+
+///|
+fn source_lines_slice(
+  lines : ArrayView[String],
+  start_line : Int,
+  end_line : Int,
+) -> String {
+  if lines.is_empty() {
+    return ""
+  }
+  let start = @cmp.maximum(start_line - 1, 0)
+  let end_ = @cmp.minimum(end_line, lines.length())
+  if start >= end_ {
+    return ""
+  }
+  let buf = StringBuilder::new()
+  for i in start..<end_ {
+    if i > start {
+      buf.write_char('\n')
+    }
+    buf.write_string(lines[i])
+  }
+  buf.to_string()
 }
 
 ///|
@@ -289,7 +328,7 @@ fn make_impl_unit(
 // the same independently rendered unit. Trailing comment-only content becomes
 // a final unit rather than disappearing from the structural diff.
 fn collect_impl_units(source : String, root : @cst.CstNode) -> Array[ImplUnit] {
-  let units = Array::new()
+  let inputs = Array::new()
   let mut pending : Array[@cst.CstNode] = []
   for entry in root.children {
     let (label, child) = entry
@@ -297,13 +336,27 @@ fn collect_impl_units(source : String, root : @cst.CstNode) -> Array[ImplUnit] {
       let nodes = pending
       pending = []
       nodes.push(child)
-      units.push(make_impl_unit(source, nodes, Some(child)))
+      inputs.push(ImplUnitInput::{ nodes, item: Some(child) })
     } else if root_child_is_visible(source, child) {
       pending.push(child)
     }
   }
   if !pending.is_empty() {
-    units.push(make_impl_unit(source, pending, None))
+    inputs.push(ImplUnitInput::{ nodes: pending, item: None })
+  }
+
+  let node_groups = Array::new()
+  for input in inputs {
+    node_groups.push(input.nodes)
+  }
+  let roots = @elab.elab_cst_node_groups(source, node_groups)
+  let source_lines = @render.split_lines(source)
+  let units = Array::new()
+  for i in 0..<inputs.length() {
+    let input = inputs[i]
+    units.push(
+      make_impl_unit(source, source_lines, input.nodes, input.item, roots[i]),
+    )
   }
   units
 }

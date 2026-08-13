@@ -49,6 +49,18 @@ pub fn diff_text(
   options? : DiffOptions = DiffOptions::default(),
 ) -> DiffResult {
   let has_changes = old_source != new_source
+  if !has_changes {
+    return DiffResult::{
+      kind: Ast,
+      rendered: @render.render_file_headers(
+        old_label,
+        new_label,
+        options.use_color,
+      ) +
+      "No changes.\n",
+      has_changes,
+    }
+  }
 
   let old_parse = @cst.parse_structure(old_source, name=old_label)
   let new_parse = @cst.parse_structure(new_source, name=new_label)
