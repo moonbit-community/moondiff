@@ -23,6 +23,28 @@ test "diff_text renders CST-backed inline diff" {
 }
 
 ///|
+test "diff_text renders structural changes with negative context as zero" {
+  let old_source =
+    #|fn f() {
+    #|  let value = 1
+    #|}
+  let new_source =
+    #|fn f() {
+    #|  let value = 2
+    #|}
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(context_lines=-2),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains("let value = 1"))
+  assert_true(result.rendered.contains("let value = 2"))
+}
+
+///|
 test "diff_text ignores Unicode whitespace-only changes structurally" {
   let old_source = "let value = 1\n"
   for unicode_space in ["\u{00a0}", "\u{3000}"] {

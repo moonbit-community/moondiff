@@ -11,7 +11,11 @@ priv struct CliOptions {
 
 ///|UUID(9d8d9872-ee94-460e-99e1-8590c4ea178f)
 fn parse_graph_limit(text : String) -> UInt raise {
-  @string.parse_int(text).reinterpret_as_uint()
+  let limit = @string.parse_int(text)
+  if limit < 0 {
+    raise Failure::Failure("graph limit must be non-negative")
+  }
+  limit.reinterpret_as_uint()
 }
 
 ///|UUID(a34f9833-2141-48c6-8927-c7a3203564ee)

@@ -30,6 +30,25 @@ fn render_novel_span(
   }
 }
 
+///|
+test "RenderOptions clamps negative context lines to zero" {
+  let options = RenderOptions::new(context_lines=-1)
+  assert_eq(options.context_lines, 0)
+  let rendered = render_line_diff(
+    "old.txt",
+    "unchanged before\nold value\nunchanged after",
+    "new.txt",
+    "unchanged before\nnew value\nunchanged after",
+    None,
+    None,
+    options,
+  )
+  assert_true(rendered.contains("old value"))
+  assert_true(rendered.contains("new value"))
+  assert_false(rendered.contains("unchanged before"))
+  assert_false(rendered.contains("unchanged after"))
+}
+
 ///|UUID(cb822c15-f51a-4177-bfaf-a6b59daae2eb)
 test "render_ast_diff uses one merged hunk for nearby ast changes" {
   let old_source =

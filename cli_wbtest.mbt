@@ -9,6 +9,31 @@ test "parse_cli_args handles graph limit color flag and files" {
   assert_true(options.new_path == "new.mbt")
 }
 
+///|
+test "parse_graph_limit accepts values representable as Int" {
+  assert_eq(parse_graph_limit("0"), 0U)
+  assert_eq(parse_graph_limit("2147483647"), 2147483647U)
+}
+
+///|
+test "parse_graph_limit rejects negative values" {
+  let result = parse_graph_limit("-1") catch {
+    error => {
+      assert_true(
+        error.to_string().contains("graph limit must be non-negative"),
+      )
+      0U
+    }
+  }
+  assert_eq(result, 0U)
+}
+
+///|
+test "parse_graph_limit rejects values larger than Int" {
+  let result = parse_graph_limit("2147483648") catch { _ => 0U }
+  assert_eq(result, 0U)
+}
+
 ///|UUID(5fbce824-f73c-4607-8f3e-81cd9195dc4f)
 test "moondiff command help uses README command name" {
   let help = moondiff_command().render_help()
