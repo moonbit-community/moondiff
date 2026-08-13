@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>html fallback resource path</title><style>
+body { font-family: monospace; }
+.hunk-header { color: #00a; }
+.del { background: #ffecec; }
+.add { background: #eaffea; }
+td.empty { background: #fafafa; }
+b.wd { background: #f8b4b4; font-weight: normal; }
+b.wa { background: #97e0a0; font-weight: normal; }
+pre.unified span { display: block; }
+table.split, table.unified { border-collapse: collapse; width: 100%; }
+table.split td { width: 50%; vertical-align: top;
+  white-space: pre-wrap; border: 1px solid #eee; }
+table.unified td { vertical-align: top; white-space: pre-wrap; border: 1px solid #eee; }
+td.line-number { width: 1%; min-width: 3em; padding: 0 .5em;
+  color: #6e7781; background: #f6f8fa; text-align: right; user-select: none; }
+table.unified td:last-child { width: 100%; }
+</style></head><body>
+<h3>Split view</h3>
+<table class="split">
+<tr><td class="hunk-header" colspan="2">@@ -1,4 +1,12 @@</td></tr>
+<tr><td class="del">    path =&gt;</td><td class="add">    path =&gt; <b class="wa">{</b></td></tr>
+<tr><td class="del">      <b class="wd">match</b> self.vfs.read(path) {</td><td class="add">      <b class="wa">let resource = if</b> self.vfs.read(path) <b class="wa">is Some(content)</b> {</td></tr>
+<tr><td class="empty"></td><td class="add">        <b class="wa">Some((path, content))</b></td></tr>
+<tr><td class="empty"></td><td class="add">      <b class="wa">} else if request_accepts_html(request) &amp;&amp;</b></td></tr>
+<tr><td class="empty"></td><td class="add">        <b class="wa">self.html_fallback_path is Some(fallback) {</b></td></tr>
+<tr><td class="empty"></td><td class="add">        <b class="wa">self.vfs.read(fallback).map(content =&gt; (fallback, content))</b></td></tr>
+<tr><td class="empty"></td><td class="add">      <b class="wa">} else {</b></td></tr>
+<tr><td class="empty"></td><td class="add">        <b class="wa">None</b></td></tr>
+<tr><td class="empty"></td><td class="add">      <b class="wa">}</b></td></tr>
+<tr><td class="empty"></td><td class="add">      <b class="wa">match resource {</b></td></tr>
+<tr><td class="del">        Some(content) =&gt; {</td><td class="add">        Some(<b class="wa">(resource_path,</b> content)<b class="wa">)</b> =&gt; {</td></tr>
+<tr><td class="del">          let content_type = match @path.Path::extname(<b class="wd">path</b>) {</td><td class="add">          let content_type = match @path.Path::extname(<b class="wa">resource_path</b>) {</td></tr>
+</table>
+<h3>Unified view</h3>
+<pre class="unified">
+<span class="hunk-header">@@ -1,4 +1,12 @@</span>
+<span class="del">-    path =&gt;</span>
+<span class="del">-      <b class="wd">match</b> self.vfs.read(path) {</span>
+<span class="del">-        Some(content) =&gt; {</span>
+<span class="del">-          let content_type = match @path.Path::extname(<b class="wd">path</b>) {</span>
+<span class="add">+    path =&gt; <b class="wa">{</b></span>
+<span class="add">+      <b class="wa">let resource = if</b> self.vfs.read(path) <b class="wa">is Some(content)</b> {</span>
+<span class="add">+        <b class="wa">Some((path, content))</b></span>
+<span class="add">+      <b class="wa">} else if request_accepts_html(request) &amp;&amp;</b></span>
+<span class="add">+        <b class="wa">self.html_fallback_path is Some(fallback) {</b></span>
+<span class="add">+        <b class="wa">self.vfs.read(fallback).map(content =&gt; (fallback, content))</b></span>
+<span class="add">+      <b class="wa">} else {</b></span>
+<span class="add">+        <b class="wa">None</b></span>
+<span class="add">+      <b class="wa">}</b></span>
+<span class="add">+      <b class="wa">match resource {</b></span>
+<span class="add">+        Some(<b class="wa">(resource_path,</b> content)<b class="wa">)</b> =&gt; {</span>
+<span class="add">+          let content_type = match @path.Path::extname(<b class="wa">resource_path</b>) {</span>
+</pre>
+</body></html>

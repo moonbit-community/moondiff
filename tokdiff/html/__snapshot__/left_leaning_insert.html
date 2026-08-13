@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>left leaning insert</title><style>
+body { font-family: monospace; }
+.hunk-header { color: #00a; }
+.del { background: #ffecec; }
+.add { background: #eaffea; }
+td.empty { background: #fafafa; }
+b.wd { background: #f8b4b4; font-weight: normal; }
+b.wa { background: #97e0a0; font-weight: normal; }
+pre.unified span { display: block; }
+table.split, table.unified { border-collapse: collapse; width: 100%; }
+table.split td { width: 50%; vertical-align: top;
+  white-space: pre-wrap; border: 1px solid #eee; }
+table.unified td { vertical-align: top; white-space: pre-wrap; border: 1px solid #eee; }
+td.line-number { width: 1%; min-width: 3em; padding: 0 .5em;
+  color: #6e7781; background: #f6f8fa; text-align: right; user-select: none; }
+table.unified td:last-child { width: 100%; }
+</style></head><body>
+<h3>Split view</h3>
+<table class="split">
+<tr><td class="hunk-header" colspan="2">@@ -1,7 +1,7 @@</td></tr>
+<tr><td class="del">    <b class="wd">match</b> candidate.normalized_expr_identifier_name() <b class="wd">{</b></td><td class="add">    <b class="wa">if</b> candidate.normalized_expr_identifier_name() <b class="wa">is</b> Some(candidate_name) <b class="wa">{</b></td></tr>
+<tr><td class="del">      Some(candidate_name) <b class="wd">=&gt;</b></td><td class="empty"></td></tr>
+<tr><td class="del">        Some(</td><td class="add">      Some(</td></tr>
+<tr><td class="del">          bind_value(bindings, name, string_binding(candidate_name, candidate)),</td><td class="add">        bind_value(bindings, name, string_binding(candidate_name, candidate)),</td></tr>
+<tr><td class="del">        )</td><td class="add">      )</td></tr>
+<tr><td class="empty"></td><td class="add">    <b class="wa">} else {</b></td></tr>
+<tr><td class="del">      <b class="wd">None =&gt;</b> Some(false)</td><td class="add">      Some(false)</td></tr>
+<tr><td class="del">    }</td><td class="add">   }</td></tr>
+</table>
+<h3>Unified view</h3>
+<pre class="unified">
+<span class="hunk-header">@@ -1,7 +1,7 @@</span>
+<span class="del">-    <b class="wd">match</b> candidate.normalized_expr_identifier_name() <b class="wd">{</b></span>
+<span class="del">-      Some(candidate_name) <b class="wd">=&gt;</b></span>
+<span class="del">-        Some(</span>
+<span class="del">-          bind_value(bindings, name, string_binding(candidate_name, candidate)),</span>
+<span class="del">-        )</span>
+<span class="del">-      <b class="wd">None =&gt;</b> Some(false)</span>
+<span class="del">-    }</span>
+<span class="add">+    <b class="wa">if</b> candidate.normalized_expr_identifier_name() <b class="wa">is</b> Some(candidate_name) <b class="wa">{</b></span>
+<span class="add">+      Some(</span>
+<span class="add">+        bind_value(bindings, name, string_binding(candidate_name, candidate)),</span>
+<span class="add">+      )</span>
+<span class="add">+    <b class="wa">} else {</b></span>
+<span class="add">+      Some(false)</span>
+<span class="add">+   }</span>
+</pre>
+</body></html>

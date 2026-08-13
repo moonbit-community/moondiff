@@ -1,0 +1,7 @@
+import {
+  "moonbit-community/moondiff/tokdiff",
+}
+
+import {
+  "moonbitlang/core/test",
+} for "test"

@@ -1,0 +1,29 @@
+{
+  "sha": "0123456789abcdef0123456789abcdef01234567",
+  "html_url": "https://github.com/example/root/commit/0123456789abcdef0123456789abcdef01234567",
+  "commit": {
+    "message": "Initial commit"
+  },
+  "parents": [],
+  "stats": {
+    "additions": 2,
+    "deletions": 0,
+    "total": 2
+  },
+  "files": [
+    {
+      "filename": "moon.mod",
+      "status": "added",
+      "additions": 1,
+      "deletions": 0,
+      "changes": 1
+    },
+    {
+      "filename": "main.mbt",
+      "status": "added",
+      "additions": 1,
+      "deletions": 0,
+      "changes": 1
+    }
+  ]
+}
