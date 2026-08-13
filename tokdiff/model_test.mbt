@@ -107,3 +107,42 @@ test "calculation IR retains raw text without renderer markup or escaping" {
     }
   }
 }
+
+///|
+test "DiffDocument rebase updates headers ranges context and changed indexes" {
+  let original = @tokdiff.diff(
+    old=["before", "let old = 1", "after"],
+    new=["before", "let new = 2", "after"],
+    context=1,
+  )
+  let rebased = original.rebase(10, 20)
+  guard rebased.hunks is [hunk] else { fail("expected one rebased hunk") }
+  assert_eq(hunk.header, "@@ -11,3 +21,3 @@")
+  assert_eq(
+    (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
+    (10, 3, 20, 3),
+  )
+  guard hunk.blocks
+    is [
+      ContextBlock([before]),
+      ChangeBlock([Paired(old_line, new_line)]),
+      ContextBlock([after]),
+    ] else {
+    fail("expected rebased context/change/context blocks")
+  }
+  assert_eq((before.old_index, before.new_index), (10, 20))
+  assert_eq((old_line.index, new_line.index), (11, 21))
+  assert_eq((after.old_index, after.new_index), (12, 22))
+
+  let insertion = @tokdiff.line_diff(old=[], new=["new"], context=0).rebase(
+    7, 12,
+  )
+  guard insertion.hunks is [insert_hunk] else {
+    fail("expected one insertion hunk")
+  }
+  assert_eq(insert_hunk.header, "@@ -7,0 +13 @@")
+  guard insert_hunk.blocks is [ChangeBlock([NewOnly(inserted)])] else {
+    fail("expected one inserted line")
+  }
+  assert_eq(inserted.index, 12)
+}

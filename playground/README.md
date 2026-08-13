@@ -10,9 +10,18 @@ https://github.com/{owner}/{repo}/pull/{number}/changes/{sha}
 Both forms compare the commit with its first parent (or an empty old side for
 a root commit). Every changed file receives a card in GitHub's order. Files
 whose old or new path ends in `.mbt` use the bundled `tokdiff` engine's
-MoonBit-aware lexical diff;
-other valid UTF-8 text files use a plain line diff. The first 20 MoonBit diffs
-open automatically, while all other files load on demand.
+MoonBit-aware lexical diff by default. The global **Lexical / AST** control
+switches those files to structural diffing; pure formatting and top-level
+reordering become an explicit no-structural-changes state. Parser failures and
+whole-file graph-limit failures show a lexical fallback reason; when only one
+aligned top-level declaration exceeds the graph limit, the playground labels
+that declaration as a partial lexical fallback and keeps AST diffing the rest
+of the file. Other valid UTF-8 text files always use a plain line diff. The
+selected algorithm survives later
+commit navigation in the open app but is not written into share URLs. The
+first 20 MoonBit diffs open automatically, while all other files load on
+demand. Calculated documents are cached independently by algorithm, so layout
+switches and analysis rendering reuse the same hunks.
 
 Each downloaded side is limited to 1 MiB and 20,000 lines. Invalid UTF-8,
 NUL-containing, binary, and over-limit content keeps its file card and shows
@@ -23,11 +32,14 @@ apply.
 
 When the playground is served by its optional local Node backend, an
 **Analyze changes** action appears. It loads both sides of every changed file
-without expanding file cards, builds the same `context=3` hunks shown in the
-UI, and asks OpenSeek to group them by cross-file function in descending review
-importance. After analysis, the ordered groups replace the file list: the most
-important group opens first, later groups stay collapsed until requested, and
-each hunk keeps its file path, highlighted diff, and dedicated explanation.
+without expanding file cards, uses the current algorithm's cached `context=3`
+hunks, and asks OpenSeek to group them by cross-file function in descending
+review importance. AST files with no structural changes are listed as skipped;
+if the commit has no analyzable hunks, the browser reports that locally without
+calling the backend. After analysis, the ordered groups replace the file list:
+the most important group opens first, later groups stay collapsed until
+requested, and each hunk keeps its file path, highlighted diff, and dedicated
+explanation.
 Commits over 50 files, 200 text hunks, or 256 KiB of UTF-8 patch data are
 rejected as a whole. Invalid UTF-8, NUL-containing, and binary files are listed
 as skipped; download failures and the existing 1 MiB/20,000-line source limits

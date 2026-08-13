@@ -468,6 +468,44 @@ button.toolbar-button:active {
   background: var(--border);
 }
 
+.algorithm-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08rem;
+  border: 1px solid var(--border);
+  border-radius: 0.42rem;
+  padding: 0.1rem;
+  background: var(--surface-subtle);
+}
+
+button.algorithm-option {
+  min-height: 1.55rem;
+  border: 0;
+  border-radius: 0.3rem;
+  padding: 0 0.48rem;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.66rem;
+  font-weight: 590;
+}
+
+button.algorithm-option:hover {
+  border-color: transparent;
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+button.algorithm-option:active {
+  transform: none;
+}
+
+button.algorithm-option.active {
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
 .source-icon {
   margin-top: -0.06rem;
   font-size: 1rem;
@@ -1119,6 +1157,35 @@ button.copy-button.copied {
   margin-top: 0;
 }
 
+.structural-empty {
+  color: var(--muted-strong);
+  background: var(--surface-subtle);
+}
+
+.structural-empty p {
+  margin: 0;
+}
+
+.diff-notice {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border-soft);
+  padding: 0.62rem 0.85rem;
+  color: var(--muted-strong);
+  background: color-mix(in srgb, #b99a36 8%, var(--surface));
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.diff-notice strong {
+  flex: 0 0 auto;
+  color: #806615;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .loading-inline::before {
   content: "";
   display: inline-block;
@@ -1420,6 +1487,11 @@ footer {
     padding: 0;
   }
 
+  button.algorithm-option {
+    padding-inline: 0.34rem;
+    font-size: 0.62rem;
+  }
+
   .commit-card {
     padding-inline: 0.65rem;
   }
@@ -1465,6 +1537,10 @@ footer {
 
   .error {
     color: #ff8e96;
+  }
+
+  .diff-notice strong {
+    color: #d7b94f;
   }
 
   .diff-scroll td.line-number {

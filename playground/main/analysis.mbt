@@ -107,6 +107,7 @@ priv enum AnalysisStatus {
   PreparingSources
   Analyzing
   AnalysisDone(AnalysisResult, Array[SkippedFile], Array[Bool])
+  AnalysisNoHunks(Array[SkippedFile])
   AnalysisFailed(String)
 } derive(Eq)
 
@@ -226,25 +227,147 @@ extern "js" fn send_analysis_request(
   #| }
 
 ///|
-fn file_diff_document(
-  mode : FileDiffMode,
-  old : ArrayView[String],
-  new : ArrayView[String],
-) -> @tokdiff.DiffDocument {
-  match mode {
-    MoonBitDiff => @tokdiff.diff(old~, new~, context=3, line_cleanup=true)
-    LineDiff => @tokdiff.line_diff(old~, new~, context=3)
+fn aligned_mode(algorithm : DiffAlgorithm) -> @alignment.AlignedDiffMode {
+  match algorithm {
+    LexicalAlgorithm => @alignment.AlignedDiffMode::Lexical
+    AstAlgorithm => @alignment.AlignedDiffMode::Ast
   }
 }
 
 ///|
-fn file_hunks(file : FileState) -> Array[String] {
-  guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
-    return []
+fn cached_file_document(
+  file : FileState,
+  algorithm : DiffAlgorithm,
+) -> @alignment.AlignedDiffResult? {
+  match file.diff_mode {
+    LineDiff => file.diff_cache.line
+    MoonBitDiff =>
+      match algorithm {
+        LexicalAlgorithm => file.diff_cache.lexical
+        AstAlgorithm => file.diff_cache.ast
+      }
   }
-  @tokdiff_text.render_unified_hunks(
-    file_diff_document(file.diff_mode, old, new),
-  )
+}
+
+///|
+fn calculate_file_document(
+  file : FileState,
+  algorithm : DiffAlgorithm,
+) -> @alignment.AlignedDiffResult? {
+  guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
+    return None
+  }
+  match file.diff_mode {
+    LineDiff =>
+      Some({
+        document: @tokdiff.line_diff(old~, new~, context=3),
+        outcome: @alignment.AlignedDiffOutcome::Rendered,
+      })
+    MoonBitDiff =>
+      Some(
+        @alignment.diff_document(
+          old.join("\n"),
+          new.join("\n"),
+          aligned_mode(algorithm),
+          context=3,
+          graph_limit=3_000_000,
+        ),
+      )
+  }
+}
+
+///|
+fn ensure_file_document(
+  file : FileState,
+  algorithm : DiffAlgorithm,
+) -> FileState {
+  if cached_file_document(file, algorithm) is Some(_) {
+    return file
+  }
+  guard calculate_file_document(file, algorithm) is Some(result) else {
+    return file
+  }
+  let cache = match file.diff_mode {
+    LineDiff =>
+      {
+        line: Some(result),
+        lexical: file.diff_cache.lexical,
+        ast: file.diff_cache.ast,
+      }
+    MoonBitDiff =>
+      match algorithm {
+        LexicalAlgorithm =>
+          {
+            line: file.diff_cache.line,
+            lexical: Some(result),
+            ast: file.diff_cache.ast,
+          }
+        AstAlgorithm =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            ast: Some(result),
+          }
+      }
+  }
+  {
+    file: file.file,
+    diff_mode: file.diff_mode,
+    expanded: file.expanded,
+    old_side: file.old_side,
+    new_side: file.new_side,
+    diff_cache: cache,
+  }
+}
+
+///|
+fn ensure_expanded_file_documents(
+  view : CommitView,
+  algorithm : DiffAlgorithm,
+) -> CommitView {
+  let files = view.files.copy()
+  for index, file in files {
+    if file.expanded {
+      files[index] = ensure_file_document(file, algorithm)
+    }
+  }
+  {
+    reference: view.reference,
+    sha: view.sha,
+    parent_sha: view.parent_sha,
+    message: view.message,
+    html_url: view.html_url,
+    stats: view.stats,
+    total_files: view.total_files,
+    files,
+  }
+}
+
+///|
+fn ensure_all_file_documents(
+  view : CommitView,
+  algorithm : DiffAlgorithm,
+) -> CommitView {
+  let files = view.files.copy()
+  for index, file in files {
+    files[index] = ensure_file_document(file, algorithm)
+  }
+  {
+    reference: view.reference,
+    sha: view.sha,
+    parent_sha: view.parent_sha,
+    message: view.message,
+    html_url: view.html_url,
+    stats: view.stats,
+    total_files: view.total_files,
+    files,
+  }
+}
+
+///|
+fn file_hunks(file : FileState, algorithm : DiffAlgorithm) -> Array[String] {
+  guard cached_file_document(file, algorithm) is Some(result) else { return [] }
+  @tokdiff_text.render_unified_hunks(result.document)
 }
 
 ///|
@@ -285,6 +408,7 @@ fn sources_pending(view : CommitView) -> Bool {
 ///|
 fn build_analysis_request(
   view : CommitView,
+  algorithm : DiffAlgorithm,
 ) -> Result[(AnalysisRequest, Array[SkippedFile]), String] {
   let hunks : Array[AnalysisHunkInput] = []
   let skipped : Array[SkippedFile] = []
@@ -297,7 +421,21 @@ fn build_analysis_request(
       skipped.push({ path: state.file.filename, reason })
       continue
     }
-    for hunk_index, patch in file_hunks(state) {
+    guard cached_file_document(state, algorithm) is Some(diff) else {
+      return Err(
+        "Could not prepare \{state.file.filename}: diff is unavailable",
+      )
+    }
+    if state.diff_mode is MoonBitDiff &&
+      algorithm is AstAlgorithm &&
+      diff.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges {
+      skipped.push({
+        path: state.file.filename,
+        reason: "No structural changes were found; switch to Lexical to analyze text changes.",
+      })
+      continue
+    }
+    for hunk_index, patch in file_hunks(state, algorithm) {
       patch_bytes += @utf8.encode(patch).length()
       if hunks.length() + 1 > MAX_ANALYSIS_HUNKS {
         return Err(

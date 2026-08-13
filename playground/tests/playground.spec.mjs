@@ -34,6 +34,48 @@ const newReadme = [
 
 const binarySource = Buffer.from([0xff, 0x00, 0x01, 0x02]);
 
+const algorithmSha = "2222222222222222222222222222222222222222";
+const algorithmUrl = `https://github.com/example/algorithms/commit/${algorithmSha}`;
+const formattingOld = 'fn formatting() { "<same&value>" }';
+const formattingNew = [
+  "fn formatting() {",
+  '  "<same&value>"',
+  "}",
+].join("\n");
+const structuralOld = 'fn structural() { old_call("<script>&safe") }';
+const structuralNew = 'fn structural() { new_call("<script>&safe") }';
+
+const algorithmCommit = {
+  sha: algorithmSha,
+  html_url: algorithmUrl,
+  commit: { message: "Exercise both diff algorithms" },
+  parents: [{ sha: parentSha }],
+  stats: { additions: 4, deletions: 2, total: 6 },
+  files: [
+    {
+      filename: "src/formatting_only.mbt",
+      status: "modified",
+      additions: 3,
+      deletions: 1,
+      changes: 4,
+    },
+    {
+      filename: "src/structural.mbt",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+    {
+      filename: "README.md",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+  ],
+};
+
 const apiCommit = {
   sha: commitSha,
   html_url: commitUrl,
@@ -100,12 +142,61 @@ async function installMockRoutes(page) {
   });
 }
 
+async function installAlgorithmRoutes(
+  page,
+  { formatOnly = false, health = false, parseFailure = false } = {},
+) {
+  const commit = formatOnly
+    ? { ...algorithmCommit, files: [algorithmCommit.files[0]] }
+    : algorithmCommit;
+  if (health) await installAnalysisHealth(page);
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify(commit),
+    });
+  });
+  await page.route("https://raw.githubusercontent.com/**", async route => {
+    const parts = new URL(route.request().url()).pathname.split("/");
+    const revision = parts[3];
+    const filename = decodeURIComponent(parts.slice(4).join("/"));
+    let body;
+    if (filename === "src/formatting_only.mbt") {
+      body = parseFailure
+        ? (revision === parentSha ? "fn broken( {" : "fn broken() {}")
+        : (revision === parentSha ? formattingOld : formattingNew);
+    } else if (filename === "src/structural.mbt") {
+      body = revision === parentSha ? structuralOld : structuralNew;
+    } else {
+      body = revision === parentSha ? oldReadme : newReadme;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+}
+
+async function loadAlgorithmCommit(page, options) {
+  await installAlgorithmRoutes(page, options);
+  await page.goto("/");
+  await page.getByLabel("Public GitHub commit URL").fill(algorithmUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page.locator("table.split").first()).toBeVisible();
+}
+
 async function loadMockedCommit(page) {
   await installMockRoutes(page);
   await page.goto("/");
   await page.getByLabel("Public GitHub commit URL").fill(commitUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Lexical" })).toHaveAttribute("aria-pressed", "true");
 }
 
 async function openMockedShareLink(page) {
@@ -345,6 +436,133 @@ test("narrow viewport scrolls only the diff and keeps controls usable", async ({
     scrollWidth: element.scrollWidth,
   }));
   expect(unifiedOverflow.scrollWidth).toBeGreaterThan(unifiedOverflow.clientWidth);
+});
+
+test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loadAlgorithmCommit(page);
+
+  const formattingCard = page.locator(".file-card").filter({ hasText: "src/formatting_only.mbt" });
+  const structuralCard = page.locator(".file-card").filter({ hasText: "src/structural.mbt" });
+  const readmeCard = page.locator(".file-card").filter({ hasText: "README.md" });
+  const urlBeforeSwitch = page.url();
+
+  await expect(page.getByRole("button", { name: "Lexical" })).toHaveAttribute("aria-pressed", "true");
+  await expect(formattingCard.locator("table.split")).toBeVisible();
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
+  await expect(formattingCard).toContainText(
+    "No structural changes found. Switch to Lexical to view text changes.",
+  );
+  await expect(formattingCard.locator("table")).toHaveCount(0);
+
+  await expect(structuralCard.locator("table.split")).toBeVisible();
+  await expect(structuralCard.locator("b.wd")).toContainText("old_call");
+  await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+  await expect(structuralCard.locator("td.old-line-number").first()).not.toHaveText("");
+  await expect(structuralCard).toContainText('"<script>&safe"');
+  await expect(structuralCard.locator("script")).toHaveCount(0);
+
+  await readmeCard.getByRole("button", { name: "Expand" }).click();
+  await expect(readmeCard.locator("table.split")).toBeVisible();
+  const lineHtmlInAstMode = await readmeCard.locator(".diff-scroll").innerHTML();
+  await expect(readmeCard.locator("b.wd, b.wa")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(structuralCard.locator("table.unified")).toBeVisible();
+  await expect(readmeCard.locator("table.unified")).toBeVisible();
+  await expect(structuralCard.locator("b.wd")).toContainText("old_call");
+  await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+
+  await page.setViewportSize({ width: 640, height: 900 });
+  const astOverflow = await structuralCard.locator(".diff-scroll").evaluate(element => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(astOverflow.scrollWidth).toBeGreaterThan(astOverflow.clientWidth);
+  expect(astOverflow.pageWidth).toBeLessThanOrEqual(astOverflow.viewportWidth);
+
+  await page.getByRole("button", { name: "Lexical" }).click();
+  await expect(formattingCard.locator("table.unified")).toBeVisible();
+  await page.getByRole("button", { name: "Use split view" }).click();
+  await expect(readmeCard.locator(".diff-scroll")).toHaveJSProperty("innerHTML", lineHtmlInAstMode);
+  expect(page.url()).toBe(urlBeforeSwitch);
+  expect(new URL(page.url()).search).toBe("");
+  expect(new URL(page.url()).hash).toBe(`#/example/algorithms/commit/${algorithmSha}`);
+});
+
+test("AST structural empty analysis is handled locally without a backend request", async ({ page }) => {
+  let analyzeCalls = 0;
+  await page.route("**/api/analyze", async route => {
+    analyzeCalls += 1;
+    await route.fulfill({ status: 500, body: "unexpected" });
+  });
+  await loadAlgorithmCommit(page, { formatOnly: true, health: true });
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(page.locator(".structural-empty")).toBeVisible();
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.getByRole("heading", { name: "Nothing to analyze" })).toBeVisible();
+  await expect(page.locator(".analysis-skipped")).toContainText("src/formatting_only.mbt");
+  await expect(page.locator(".analysis-skipped")).toContainText("No structural changes");
+  expect(analyzeCalls).toBe(0);
+});
+
+test("the selected algorithm survives later commit navigation without entering the URL", async ({ page }) => {
+  await loadAlgorithmCommit(page);
+  await page.getByRole("button", { name: "AST" }).click();
+  const nextSha = "3333333333333333333333333333333333333333";
+  const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
+  await page.getByLabel("Public GitHub commit URL").fill(nextUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".structural-empty")).toBeVisible();
+  await expect(page).toHaveURL(`/#/example/algorithms/commit/${nextSha}`);
+  expect(new URL(page.url()).search).toBe("");
+});
+
+test("parse failures show their lexical fallback reason above both layouts", async ({ page }) => {
+  await loadAlgorithmCommit(page, { formatOnly: true, parseFailure: true });
+  const card = page.locator(".file-card").filter({ hasText: "src/formatting_only.mbt" });
+  await expect(card.locator(".diff-notice")).toContainText("Lexical fallback");
+  await expect(card.locator(".diff-notice")).toContainText("this entire file");
+  await expect(card.locator(".diff-notice")).toContainText("old:");
+  await expect(card.locator("table.split")).toBeVisible();
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(card.locator(".diff-notice")).toContainText("Lexical fallback");
+  await expect(card.locator(".diff-notice")).toContainText("this entire file");
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(card.locator("table.unified")).toBeVisible();
+  await expect(card.locator(".diff-notice")).toContainText("old:");
+});
+
+test("switching algorithms cancels the visible analysis and ignores its late response", async ({ page }) => {
+  await installAnalysisHealth(page);
+  let releaseAnalysis;
+  const analysisGate = new Promise(resolve => {
+    releaseAnalysis = resolve;
+  });
+  await page.route("**/api/analyze", async route => {
+    const request = route.request().postDataJSON();
+    await analysisGate;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(analysisForRequest(request)),
+    });
+  });
+  await loadMockedCommit(page);
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.getByRole("button", { name: "Analyzing…" })).toBeVisible();
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(page.locator(".analysis-card")).toHaveCount(0);
+  await expect(page.locator(".file-card")).toHaveCount(3);
+  const lateResponse = page.waitForResponse(response => response.url().endsWith("/api/analyze"));
+  releaseAnalysis();
+  await lateResponse;
+  await expect(page.getByRole("heading", { name: "Change groups" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Analyze changes" })).toBeVisible();
 });
 
 test("manual functional analysis prepares the whole commit and annotates stable hunks", async ({ page }) => {

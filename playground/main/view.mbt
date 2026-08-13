@@ -97,9 +97,7 @@ fn landing_details() -> @rabbita.Html {
   @html.fragment([
     @html.div(class="public-note", [
       @html.span(class="note-dot", ""),
-      @html.p(
-        "Public repositories only.",
-      ),
+      @html.p("Public repositories only."),
     ]),
     @html.section(class="supported-links", [
       @html.h2("Supported links"),
@@ -201,6 +199,53 @@ fn share_control(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
 }
 
 ///|
+fn algorithm_control(
+  algorithm : DiffAlgorithm,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  @html.div(
+    class="algorithm-toggle",
+    attrs=@html.Attrs::build().role("group").aria_label("Diff algorithm"),
+    [
+      @html.button(
+        type_="button",
+        class=if algorithm is LexicalAlgorithm {
+          "algorithm-option active"
+        } else {
+          "algorithm-option"
+        },
+        attrs=@html.Attrs::build().aria_pressed(
+          if algorithm is LexicalAlgorithm {
+            "true"
+          } else {
+            "false"
+          },
+        ),
+        on_click=emit(SelectDiffAlgorithm(LexicalAlgorithm)),
+        "Lexical",
+      ),
+      @html.button(
+        type_="button",
+        class=if algorithm is AstAlgorithm {
+          "algorithm-option active"
+        } else {
+          "algorithm-option"
+        },
+        attrs=@html.Attrs::build().aria_pressed(
+          if algorithm is AstAlgorithm {
+            "true"
+          } else {
+            "false"
+          },
+        ),
+        on_click=emit(SelectDiffAlgorithm(AstAlgorithm)),
+        "AST",
+      ),
+    ],
+  )
+}
+
+///|
 fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
   match model.phase {
     Showing(commit) => {
@@ -225,7 +270,8 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
             let (label, busy) = match model.analysis_status {
               PreparingSources => ("Preparing source…", true)
               Analyzing => ("Analyzing…", true)
-              AnalysisDone(_, _, _) => ("Analyze again", false)
+              AnalysisDone(_, _, _) | AnalysisNoHunks(_) =>
+                ("Analyze again", false)
               AnalysisFailed(_) => ("Retry analysis", false)
               AnalysisIdle => ("Analyze changes", false)
             }
@@ -244,6 +290,7 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
           } else {
             @html.nothing
           },
+          algorithm_control(model.diff_algorithm, emit),
           @html.span(class="toolbar-divider", ""),
           @html.button(
             type_="button",
@@ -265,12 +312,39 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
 }
 
 ///|
+priv struct DiffNotice {
+  class_name : String
+  label : String
+  message : String
+}
+
+///|
+fn diff_notice(outcome : @alignment.AlignedDiffOutcome) -> DiffNotice? {
+  match outcome {
+    @alignment.AlignedDiffOutcome::Fallback(reason) =>
+      Some({
+        class_name: "diff-notice fallback",
+        label: "Lexical fallback",
+        message: "AST diff was unavailable, so this entire file is shown using lexical diff. \{reason}",
+      })
+    @alignment.AlignedDiffOutcome::PartialFallback(reasons) =>
+      Some({
+        class_name: "diff-notice partial-fallback",
+        label: "Partial lexical fallback",
+        message: "AST diff was used for the rest of this file. Lexical diff was used only for: \{reasons.join("; ")}.",
+      })
+    _ => None
+  }
+}
+
+///|
 #warnings("-alert_xss_vulnerable")
 fn file_diff_view(
   file : FileState,
   generation : Int,
   index : Int,
   mode : ViewMode,
+  algorithm : DiffAlgorithm,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let problem = if source_problem(file.old_side) is Some(message) {
@@ -295,19 +369,40 @@ fn file_diff_view(
     ])
   }
   match (file.old_side, file.new_side) {
-    (Ready(old), Ready(new)) => {
-      let document = file_diff_document(file.diff_mode, old, new)
+    (Ready(_), Ready(_)) => {
+      guard cached_file_document(file, algorithm) is Some(result) else {
+        return @html.p(class="file-message loading-inline", "Preparing diff…")
+      }
+      if result.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges {
+        return @html.div(class="file-message structural-empty", [
+          @html.p(
+            "No structural changes found. Switch to Lexical to view text changes.",
+          ),
+        ])
+      }
       let rendered = match mode {
-        Split => @tokdiff_html.render_side_by_side(document, line_numbers=true)
-        Unified => @tokdiff_html.render_unified(document, line_numbers=true)
+        Split =>
+          @tokdiff_html.render_side_by_side(result.document, line_numbers=true)
+        Unified =>
+          @tokdiff_html.render_unified(result.document, line_numbers=true)
       }
       // `rendered` is the only raw HTML accepted by the application. tokdiff
       // has already escaped every source line and hunk header.
-      @html.div(
-        class="diff-scroll",
-        attrs=@html.Attrs::build().inner_html(rendered),
-        ([] : Array[@rabbita.Html]),
-      )
+      @html.fragment([
+        match diff_notice(result.outcome) {
+          Some(notice) =>
+            @html.div(class=notice.class_name, [
+              @html.strong(notice.label),
+              @html.span(notice.message),
+            ])
+          None => @html.nothing
+        },
+        @html.div(
+          class="diff-scroll",
+          attrs=@html.Attrs::build().inner_html(rendered),
+          ([] : Array[@rabbita.Html]),
+        ),
+      ])
     }
     (Loading, _) | (_, Loading) =>
       @html.p(class="file-message loading-inline", "Loading file contents…")
@@ -321,6 +416,7 @@ fn file_card(
   generation : Int,
   index : Int,
   mode : ViewMode,
+  algorithm : DiffAlgorithm,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let toggle_label = if file.expanded { "Collapse" } else { "Expand" }
@@ -351,7 +447,7 @@ fn file_card(
         ]),
       ]),
       if file.expanded {
-        file_diff_view(file, generation, index, mode, emit)
+        file_diff_view(file, generation, index, mode, algorithm, emit)
       } else {
         @html.nothing
       },
@@ -374,7 +470,14 @@ fn file_list_view(
   let file_views : Array[@rabbita.Html] = []
   for index, file in commit.files {
     file_views.push(
-      file_card(file, model.generation, index, model.view_mode, emit),
+      file_card(
+        file,
+        model.generation,
+        index,
+        model.view_mode,
+        model.diff_algorithm,
+        emit,
+      ),
     )
   }
   @html.div(class="file-list", file_views)
@@ -401,22 +504,24 @@ fn analysis_file_hunks_html(
   file_index : Int,
   result : AnalysisResult,
   mode : ViewMode,
+  algorithm : DiffAlgorithm,
 ) -> Array[String] {
-  guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
-    return []
-  }
-  let document = file_diff_document(file.diff_mode, old, new)
-  let hunk_notes = notes_for_file(result, file_index, document.hunks.length())
+  guard cached_file_document(file, algorithm) is Some(diff) else { return [] }
+  let hunk_notes = notes_for_file(
+    result,
+    file_index,
+    diff.document.hunks.length(),
+  )
   match mode {
     Split =>
       @tokdiff_html.render_side_by_side_hunks(
-        document,
+        diff.document,
         line_numbers=true,
         hunk_notes~,
       )
     Unified =>
       @tokdiff_html.render_unified_hunks(
-        document,
+        diff.document,
         line_numbers=true,
         hunk_notes~,
       )
@@ -440,6 +545,7 @@ fn rendered_analysis_hunks(
   result : AnalysisResult,
   expanded : ArrayView[Bool],
   mode : ViewMode,
+  algorithm : DiffAlgorithm,
 ) -> Map[String, RenderedAnalysisHunk] {
   let wanted : Map[String, Unit] = Map([])
   for group_index, group in result.groups {
@@ -454,7 +560,9 @@ fn rendered_analysis_hunks(
     if !analysis_wants_file(wanted, file_index) {
       continue
     }
-    let hunks = analysis_file_hunks_html(file, file_index, result, mode)
+    let hunks = analysis_file_hunks_html(
+      file, file_index, result, mode, algorithm,
+    )
     for hunk_index, html in hunks {
       let id = "f\{file_index}-h\{hunk_index}"
       if wanted.contains(id) {
@@ -542,9 +650,29 @@ fn analysis_group_view(
 }
 
 ///|
+fn analysis_skipped_view(skipped : ArrayView[SkippedFile]) -> @rabbita.Html {
+  if skipped.is_empty() {
+    return @html.nothing
+  }
+  let skipped_views : Array[@rabbita.Html] = []
+  for file in skipped {
+    skipped_views.push(
+      @html.li([@html.code(file.path), @html.span(" — \{file.reason}")]),
+    )
+  }
+  @html.div(class="analysis-skipped", [
+    @html.p(
+      "Skipped \{skipped.length()} \{if skipped.length() == 1 { "file" } else { "files" }}:",
+    ),
+    @html.ul(skipped_views),
+  ])
+}
+
+///|
 fn analysis_overview(
   commit : CommitView,
   mode : ViewMode,
+  algorithm : DiffAlgorithm,
   status : AnalysisStatus,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
@@ -578,8 +706,20 @@ fn analysis_overview(
           "Retry analysis",
         ),
       ])
+    AnalysisNoHunks(skipped) =>
+      @html.section(class="analysis-card analysis-complete", [
+        @html.p(class="section-label", "OpenSeek functional analysis"),
+        @html.h2("Nothing to analyze"),
+        @html.p(
+          class="analysis-empty",
+          "No diff hunks are available for the current algorithm, so no backend request was sent.",
+        ),
+        analysis_skipped_view(skipped),
+      ])
     AnalysisDone(result, skipped, expanded) => {
-      let rendered = rendered_analysis_hunks(commit, result, expanded, mode)
+      let rendered = rendered_analysis_hunks(
+        commit, result, expanded, mode, algorithm,
+      )
       let group_views : Array[@rabbita.Html] = []
       for group_index, group in result.groups {
         group_views.push(
@@ -592,26 +732,11 @@ fn analysis_overview(
           ),
         )
       }
-      let skipped_views : Array[@rabbita.Html] = []
-      for file in skipped {
-        skipped_views.push(
-          @html.li([@html.code(file.path), @html.span(" — \{file.reason}")]),
-        )
-      }
       @html.section(class="analysis-card analysis-complete", [
         @html.p(class="section-label", "OpenSeek functional analysis"),
         @html.h2("Change groups"),
         @html.p(class="analysis-summary", result.summary),
-        if skipped.length() > 0 {
-          @html.div(class="analysis-skipped", [
-            @html.p(
-              "Skipped \{skipped.length()} non-text \{if skipped.length() == 1 { "file" } else { "files" }}:",
-            ),
-            @html.ul(skipped_views),
-          ])
-        } else {
-          @html.nothing
-        },
+        analysis_skipped_view(skipped),
         if group_views.length() == 0 {
           @html.p(
             class="analysis-empty",
@@ -654,7 +779,13 @@ fn commit_view(
         @html.pre(class="commit-message", commit.message),
       ]),
     ]),
-    analysis_overview(commit, model.view_mode, model.analysis_status, emit),
+    analysis_overview(
+      commit,
+      model.view_mode,
+      model.diff_algorithm,
+      model.analysis_status,
+      emit,
+    ),
     match model.analysis_status {
       AnalysisDone(_, _, _) => @html.nothing
       _ => file_list_view(commit, model, emit)

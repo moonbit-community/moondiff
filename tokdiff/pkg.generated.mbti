@@ -27,6 +27,7 @@ pub(all) enum DiffBlock {
 pub(all) struct DiffDocument {
   hunks : Array[DiffHunk]
 } derive(Eq)
+pub fn DiffDocument::rebase(Self, Int, Int) -> Self
 
 pub(all) struct DiffHunk {
   header : String

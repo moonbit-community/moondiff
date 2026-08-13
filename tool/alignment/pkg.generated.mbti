@@ -2,16 +2,35 @@
 package "moonbit-community/moondiff/tool/alignment"
 
 import {
+  "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tool/render",
   "moonbitlang/parser/untyped_cst",
 }
 
 // Values
+pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt) -> AlignedDiffResult
+
 pub fn render_aligned_cst_diffs(String, String, @untyped_cst.CstNode, String, String, @untyped_cst.CstNode, UInt, @render.RenderOptions) -> String
 
 // Errors
 
 // Types and methods
+pub(all) enum AlignedDiffMode {
+  Lexical
+  Ast
+} derive(Eq)
+
+pub(all) enum AlignedDiffOutcome {
+  Rendered
+  Fallback(String)
+  PartialFallback(Array[String])
+  NoStructuralChanges
+} derive(Eq)
+
+pub(all) struct AlignedDiffResult {
+  document : @tokdiff.DiffDocument
+  outcome : AlignedDiffOutcome
+} derive(Eq)
 
 // Type aliases
 

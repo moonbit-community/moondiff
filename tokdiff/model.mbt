@@ -91,6 +91,104 @@ pub(all) struct DiffDocument {
 } derive(Eq)
 
 ///|
+fn rebased_range_text(start : Int, len : Int) -> String {
+  if len == 1 {
+    (start + 1).to_string()
+  } else if len == 0 {
+    "\{start},0"
+  } else {
+    "\{start + 1},\{len}"
+  }
+}
+
+///|
+fn rebased_hunk_header(
+  old_start : Int,
+  old_len : Int,
+  new_start : Int,
+  new_len : Int,
+) -> String {
+  "@@ -\{rebased_range_text(old_start, old_len)} +\{rebased_range_text(new_start, new_len)} @@"
+}
+
+///|
+fn DiffLine::rebase_index(self : DiffLine, offset : Int) -> DiffLine {
+  { index: self.index + offset, segments: self.segments.copy() }
+}
+
+///|
+fn DiffBlock::rebase_indexes(
+  self : DiffBlock,
+  old_line_offset : Int,
+  new_line_offset : Int,
+) -> DiffBlock {
+  match self {
+    ContextBlock(lines) => {
+      let rebased : Array[ContextLine] = []
+      for line in lines {
+        rebased.push({
+          old_index: line.old_index + old_line_offset,
+          new_index: line.new_index + new_line_offset,
+          text: line.text,
+        })
+      }
+      ContextBlock(rebased)
+    }
+    ChangeBlock(rows) => {
+      let rebased : Array[DiffRow] = []
+      for row in rows {
+        rebased.push(
+          match row {
+            Paired(old_line, new_line) =>
+              Paired(
+                old_line.rebase_index(old_line_offset),
+                new_line.rebase_index(new_line_offset),
+              )
+            OldOnly(line) => OldOnly(line.rebase_index(old_line_offset))
+            NewOnly(line) => NewOnly(line.rebase_index(new_line_offset))
+          },
+        )
+      }
+      ChangeBlock(rebased)
+    }
+  }
+}
+
+///|
+/// Return a new document whose zero-based source indexes are shifted by the
+/// supplied offsets. Hunk ranges, canonical headers, context indexes, and
+/// changed-line indexes are rebased together.
+pub fn DiffDocument::rebase(
+  self : DiffDocument,
+  old_line_offset : Int,
+  new_line_offset : Int,
+) -> DiffDocument {
+  let hunks : Array[DiffHunk] = []
+  for hunk in self.hunks {
+    let old_start = hunk.old_start + old_line_offset
+    let new_start = hunk.new_start + new_line_offset
+    let blocks : Array[DiffBlock] = []
+    for block in hunk.blocks {
+      blocks.push(block.rebase_indexes(old_line_offset, new_line_offset))
+    }
+    hunks.push({
+      header: rebased_hunk_header(
+        old_start,
+        hunk.old_len,
+        new_start,
+        hunk.new_len,
+      ),
+      old_start,
+      old_len: hunk.old_len,
+      new_start,
+      new_len: hunk.new_len,
+      blocks,
+    })
+  }
+  { hunks, }
+}
+
+///|
 fn push_diff_segment(
   segments : Array[DiffSegment],
   kind : DiffSegmentKind,
