@@ -13,11 +13,11 @@ import {
 
 readme = "README.md"
 
-repository = ""
+repository = "https://github.com/moonbit-community/moondiff"
 
 license = "Apache-2.0"
 
-keywords = [ ]
+keywords = ["diff", "astdiff" ]
 
 description = "Difftool that aware MoonBit language syntax"
 
