@@ -239,36 +239,33 @@ fn matched_lines_from_unchanged(
     if self_line < 0 {
       continue
     }
-    let opposite_line = match line_to_opposites.get(self_line) {
-      Some(opposite_lines) => {
-        let candidate = next_line_after(
-          opposite_lines,
-          highest_opposite_line.val,
-        )
-        match candidate {
-          Some(candidate_line) => {
-            let reverse_is_unique = match
-              opposite_to_lines.get(candidate_line) {
-              Some(self_lines) =>
-                self_lines.length() == 1 && self_lines[0] == self_line
-              None => false
-            }
-            if opposite_lines.length() == 1 && reverse_is_unique {
-              Some(candidate_line)
-            } else {
-              None
-            }
-          }
-          None => None
+    let opposite_line = if line_to_opposites.get(self_line)
+      is Some(opposite_lines) {
+      let candidate = next_line_after(opposite_lines, highest_opposite_line.val)
+      if candidate is Some(candidate_line) {
+        let reverse_is_unique = if opposite_to_lines.get(candidate_line)
+          is Some(self_lines) {
+          self_lines.length() == 1 && self_lines[0] == self_line
+        } else {
+          false
         }
+        if opposite_lines.length() == 1 && reverse_is_unique {
+          Some(candidate_line)
+        } else {
+          None
+        }
+      } else {
+        None
       }
-      None => None
+    } else {
+      None
     }
     guard opposite_line is Some(opposite_line) else { continue }
 
-    let should_insert = match highest_line.val {
-      Some(highest) => self_line > highest
-      None => true
+    let should_insert = if highest_line.val is Some(highest) {
+      self_line > highest
+    } else {
+      true
     }
     if should_insert {
       matched.push((Some(self_line), Some(opposite_line)))
@@ -754,20 +751,19 @@ fn next_opposite(
   opposites : OppositeMap,
   prev_opposite : Int?,
 ) -> Int? {
-  match opposites.get(line) {
-    Some(lines) => {
-      for opposite in lines {
-        if prev_opposite is Some(prev) {
-          if opposite > prev {
-            return Some(opposite)
-          }
-        } else {
+  if opposites.get(line) is Some(lines) {
+    for opposite in lines {
+      if prev_opposite is Some(prev) {
+        if opposite > prev {
           return Some(opposite)
         }
+      } else {
+        return Some(opposite)
       }
-      None
     }
-    None => None
+    None
+  } else {
+    None
   }
 }
 
@@ -1119,23 +1115,21 @@ pub fn merge_adjacent_hunks(
     let (start, end_) = contextual_index_range_for_hunk(
       hunk, matched_lines, merge_radius,
     )
-    match prev_hunk.val {
-      Some(prev) =>
-        if start > prev_end.val {
-          merged.push(prev)
-          prev_hunk.val = Some(hunk)
-          prev_start.val = start
-          prev_end.val = end_
-        } else {
-          prev_hunk.val = Some(prev.merge(hunk))
-          prev_start.val = @cmp.minimum(prev_start.val, start)
-          prev_end.val = @cmp.maximum(prev_end.val, end_)
-        }
-      None => {
+    if prev_hunk.val is Some(prev) {
+      if start > prev_end.val {
+        merged.push(prev)
         prev_hunk.val = Some(hunk)
         prev_start.val = start
         prev_end.val = end_
+      } else {
+        prev_hunk.val = Some(prev.merge(hunk))
+        prev_start.val = @cmp.minimum(prev_start.val, start)
+        prev_end.val = @cmp.maximum(prev_end.val, end_)
       }
+    } else {
+      prev_hunk.val = Some(hunk)
+      prev_start.val = start
+      prev_end.val = end_
     }
   }
 

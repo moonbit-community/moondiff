@@ -32,6 +32,7 @@ fn proc_exit_ffi(rval : Int) -> Unit = "wasi_snapshot_preview1" "proc_exit"
 extern "c" fn proc_exit_ffi(rval : Int) -> Unit = "exit"
 
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
+#moongrep.skip
 async fn[T] fatal(message : String) -> T {
   @stdio.stderr.write("\{message}\n") catch {
     _ => ()
@@ -41,6 +42,7 @@ async fn[T] fatal(message : String) -> T {
 }
 
 ///|UUID(5fb97ce8-62bb-4966-b0a3-61d2905cbf95)
+#moongrep.skip
 async fn write_stdout(message : String) -> Unit {
   @stdio.stdout.write(message) catch {
     e => fatal("failed to write stdout: \{e}")
@@ -135,6 +137,7 @@ fn render_cli_diff(
 }
 
 ///|UUID(5da5cf7f-b7c4-474b-a87a-be6436f0b5f2)
+#moongrep.skip
 async fn main {
   let options = parse_cli_args(program_args()) catch {
     e => fatal(e.to_string())

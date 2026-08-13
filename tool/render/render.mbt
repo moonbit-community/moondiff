@@ -59,9 +59,10 @@ fn add_changed_span(
   if end_col <= start_col {
     return
   }
-  match highlights.get(line) {
-    Some(ranges) => ranges.push((start_col, end_col))
-    None => highlights.set(line, [(start_col, end_col)])
+  if highlights.get(line) is Some(ranges) {
+    ranges.push((start_col, end_col))
+  } else {
+    highlights.set(line, [(start_col, end_col)])
   }
 }
 
@@ -111,23 +112,20 @@ fn display_line_no(
   style : LineStyle,
   use_color : Bool,
 ) -> String {
-  match line_no {
-    Some(line_no) => {
-      let value = (line_no + line_base).to_string()
-      let padding = repeat_char(' ', @cmp.maximum(width - value.length(), 0))
-      if use_color {
-        padding + @chalk.chalk().color(line_no_color(style)).render(value)
-      } else {
-        padding + value
-      }
+  if line_no is Some(line_no) {
+    let value = (line_no + line_base).to_string()
+    let padding = repeat_char(' ', @cmp.maximum(width - value.length(), 0))
+    if use_color {
+      padding + @chalk.chalk().color(line_no_color(style)).render(value)
+    } else {
+      padding + value
     }
-    None => {
-      let dots = repeat_char('.', width)
-      if use_color {
-        @chalk.chalk().color(BlackBright).render(dots)
-      } else {
-        dots
-      }
+  } else {
+    let dots = repeat_char('.', width)
+    if use_color {
+      @chalk.chalk().color(BlackBright).render(dots)
+    } else {
+      dots
     }
   }
 }
@@ -193,14 +191,12 @@ fn render_line_body(
   if !use_color {
     return line
   }
-  let ranges = match ranges {
-    Some(ranges) => ranges
-    None =>
-      if plain_context_line && style is Context {
-        return line
-      } else {
-        return style_text(line, style, true)
-      }
+  let ranges = if ranges is Some(ranges) {
+    ranges
+  } else if plain_context_line && style is Context {
+    return line
+  } else {
+    return style_text(line, style, true)
   }
   let chars = line.to_array()
   if chars.is_empty() {
@@ -386,9 +382,10 @@ fn render_hunk_header(
 
 ///|UUID(19d80924-6de8-496c-91ff-4cf297095b35)
 fn line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
-  match line {
-    Some(line) => novel_lines.contains(line)
-    None => false
+  if line is Some(line) {
+    novel_lines.contains(line)
+  } else {
+    false
   }
 }
 
@@ -426,23 +423,19 @@ fn should_render_as_block_replacement(
   for pair in segment {
     let lhs_novel = pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs)
     let rhs_novel = pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
-    match pair.0 {
-      Some(lhs_line) =>
-        if lhs_novel {
-          add_unique_line(lhs_lines, lhs_line)
-        } else {
-          all_present_sides_are_novel = false
-        }
-      None => ()
+    if pair.0 is Some(lhs_line) {
+      if lhs_novel {
+        add_unique_line(lhs_lines, lhs_line)
+      } else {
+        all_present_sides_are_novel = false
+      }
     }
-    match pair.1 {
-      Some(rhs_line) =>
-        if rhs_novel {
-          add_unique_line(rhs_lines, rhs_line)
-        } else {
-          all_present_sides_are_novel = false
-        }
-      None => ()
+    if pair.1 is Some(rhs_line) {
+      if rhs_novel {
+        add_unique_line(rhs_lines, rhs_line)
+      } else {
+        all_present_sides_are_novel = false
+      }
     }
   }
 

@@ -13,7 +13,7 @@ fn levenshtein(lhs~ : Array[Char], rhs~ : Array[Char]) -> Int {
   let mut j = 1
   while j <= n {
     s[0][j] = j
-    j = j + 1
+    j += 1
   }
   let mut i = 1
   while i <= m {
@@ -29,9 +29,9 @@ fn levenshtein(lhs~ : Array[Char], rhs~ : Array[Char]) -> Int {
           s[i & 1][j - 1],
         )
       }
-      j = j + 1
+      j += 1
     }
-    i = i + 1
+    i += 1
   }
   s[m & 1][n]
 }

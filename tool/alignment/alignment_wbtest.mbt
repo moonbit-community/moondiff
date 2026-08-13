@@ -304,9 +304,8 @@ fn find_atom(node : @syntax.Syntax, content : String) -> @syntax.Syntax? {
       }
     @syntax.Syntax::List(children~, ..) => {
       for child in children {
-        match find_atom(child, content) {
-          Some(found) => return Some(found)
-          None => ()
+        if find_atom(child, content) is Some(found) {
+          return Some(found)
         }
       }
       None

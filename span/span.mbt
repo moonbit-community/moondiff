@@ -59,7 +59,7 @@ pub fn LineWidths::from_str(str : StringView) -> Self {
         continue rest
       }
       [_, .. rest] => {
-        current_column = current_column + 1
+        current_column += 1
         continue rest
       }
     }

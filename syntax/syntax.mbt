@@ -328,9 +328,10 @@ fn find_nodes_with_unique_content(
   counts : @hashmap.HashMap[ContentId, UInt64],
 ) -> Unit {
   for node in nodes {
-    match counts.get(node.content_id()) {
-      Some(count) => counts[node.content_id()] = count + 1
-      None => counts.set(node.content_id(), 1)
+    if counts.get(node.content_id()) is Some(count) {
+      counts[node.content_id()] = count + 1
+    } else {
+      counts.set(node.content_id(), 1)
     }
     if node is List(children~, ..) {
       find_nodes_with_unique_content(children, counts)
@@ -391,9 +392,10 @@ fn set_content_id(
           .iter()
           .map(c => c.info().content_id)
           .collect()
-        let kind_id = match kind {
-          Some(kind) => Some(list_kinds.intern(kind))
-          None => None
+        let kind_id = if kind is Some(kind) {
+          Some(list_kinds.intern(kind))
+        } else {
+          None
         }
         (
           Some(open_content),
@@ -429,7 +431,7 @@ fn init_info_on_side(
 fn set_unique_id(nodes : ArrayView[Syntax], next_id : Ref[SyntaxId]) -> Unit {
   for node in nodes {
     node.info().unique_id = next_id.val
-    next_id.val = next_id.val + 1
+    next_id.val += 1
     if node is List(children~, ..) {
       set_unique_id(children, next_id)
     }

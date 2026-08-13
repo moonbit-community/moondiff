@@ -143,9 +143,8 @@ fn atom_kind(syntax : Syntax, wanted : String) -> @dsyntax.AtomKind? {
       }
     Syntax::List(children~, ..) => {
       for child in children {
-        match atom_kind(child, wanted) {
-          Some(kind) => return Some(kind)
-          None => ()
+        if atom_kind(child, wanted) is Some(kind) {
+          return Some(kind)
         }
       }
       None
