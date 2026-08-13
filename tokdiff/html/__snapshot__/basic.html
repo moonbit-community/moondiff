@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>tokdiff basic</title><style>
+body { font-family: monospace; }
+.hunk-header { color: #00a; }
+.del { background: #ffecec; }
+.add { background: #eaffea; }
+td.empty { background: #fafafa; }
+b.wd { background: #f8b4b4; font-weight: normal; }
+b.wa { background: #97e0a0; font-weight: normal; }
+pre.unified span { display: block; }
+table.split, table.unified { border-collapse: collapse; width: 100%; }
+table.split td { width: 50%; vertical-align: top;
+  white-space: pre-wrap; border: 1px solid #eee; }
+table.unified td { vertical-align: top; white-space: pre-wrap; border: 1px solid #eee; }
+td.line-number { width: 1%; min-width: 3em; padding: 0 .5em;
+  color: #6e7781; background: #f6f8fa; text-align: right; user-select: none; }
+table.unified td:last-child { width: 100%; }
+</style></head><body>
+<h3>Split view</h3>
+<table class="split">
+<tr><td class="hunk-header" colspan="2">@@ -1,8 +1,8 @@</td></tr>
+<tr><td class="del">///| sum with <b class="wd">default</b></td><td class="add">///| sum with <b class="wa">tax</b></td></tr>
+<tr><td class="del">pub fn total(items : Array[Item]) -&gt; Int {</td><td class="add">pub fn total(items : Array[Item]<b class="wa">, tax~ : Int</b>) -&gt; Int {</td></tr>
+<tr><td class="ctx">  let mut sum = 0</td><td class="ctx">  let mut sum = 0</td></tr>
+<tr><td class="ctx">  for item in items {</td><td class="ctx">  for item in items {</td></tr>
+<tr><td class="del">    sum += item.price * item.count</td><td class="add">    sum += item.price * item.count <b class="wa">+ tax</b></td></tr>
+<tr><td class="ctx">  }</td><td class="ctx">  }</td></tr>
+<tr><td class="ctx">  sum // final</td><td class="ctx">  sum // final</td></tr>
+<tr><td class="ctx">}</td><td class="ctx">}</td></tr>
+</table>
+<h3>Unified view</h3>
+<pre class="unified">
+<span class="hunk-header">@@ -1,8 +1,8 @@</span>
+<span class="del">-///| sum with <b class="wd">default</b></span>
+<span class="del">-pub fn total(items : Array[Item]) -&gt; Int {</span>
+<span class="add">+///| sum with <b class="wa">tax</b></span>
+<span class="add">+pub fn total(items : Array[Item]<b class="wa">, tax~ : Int</b>) -&gt; Int {</span>
+<span class="ctx">   let mut sum = 0</span>
+<span class="ctx">   for item in items {</span>
+<span class="del">-    sum += item.price * item.count</span>
+<span class="add">+    sum += item.price * item.count <b class="wa">+ tax</b></span>
+<span class="ctx">   }</span>
+<span class="ctx">   sum // final</span>
+<span class="ctx"> }</span>
+</pre>
+<h3>Attributes, Unicode, HTML-specials</h3>
+<table class="split">
+<tr><td class="hunk-header" colspan="2">@@ -1,2 +1,2 @@</td></tr>
+<tr><td class="del"><b class="wd">#deprecated("use `f` instead")</b></td><td class="empty"></td></tr>
+<tr><td class="empty"></td><td class="add"><b class="wa">#deprecated("use `h` instead")</b></td></tr>
+<tr><td class="del">fn g(a : Int) -&gt; <b class="wd">Int</b> { a <b class="wd">&lt;</b> 3 &amp;&amp; a &gt; 0 } // 判断<b class="wd">范围</b></td><td class="add">fn g(a : Int) -&gt; <b class="wa">Bool</b> { a <b class="wa">&lt;=</b> 3 &amp;&amp; a &gt; 0 } // 判断<b class="wa">闭区间</b></td></tr>
+</table>
+</body></html>

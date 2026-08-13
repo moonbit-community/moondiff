@@ -1,0 +1,455 @@
+import { expect, test } from "@playwright/test";
+
+const commitSha = "abcdef1234567890abcdef1234567890abcdef12";
+const parentSha = "1111111111111111111111111111111111111111";
+const commitUrl = `https://github.com/example/project/commit/${commitSha}`;
+
+const oldSource = [
+  "///|",
+  "pub fn format_change(input : String) -> String {",
+  `  let label = "${"old-value-".repeat(48)}"`,
+  "  label + input",
+  "}",
+].join("\n");
+
+const newSource = [
+  "///|",
+  "pub fn format_change(input : String) -> String {",
+  `  let label = "${"new-value-".repeat(48)}"`,
+  "  label + input.trim()",
+  "}",
+].join("\n");
+
+const oldReadme = [
+  "# Project notes",
+  "Use the <old> workflow.",
+  "Keep this line.",
+].join("\r\n");
+
+const newReadme = [
+  "# Project notes",
+  "Use the &new workflow.",
+  "Keep this line.",
+].join("\r\n");
+
+const binarySource = Buffer.from([0xff, 0x00, 0x01, 0x02]);
+
+const apiCommit = {
+  sha: commitSha,
+  html_url: commitUrl,
+  commit: { message: "Make the playground diff easier to scan" },
+  parents: [{ sha: parentSha }],
+  stats: { additions: 4, deletions: 4, total: 8 },
+  files: [
+    {
+      filename: "src/format_change.mbt",
+      status: "modified",
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+    },
+    {
+      filename: "README.md",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+    {
+      filename: "assets/logo.bin",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+  ],
+};
+
+async function installMockRoutes(page) {
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify(apiCommit),
+    });
+  });
+  await page.route("https://raw.githubusercontent.com/**", async route => {
+    const parts = new URL(route.request().url()).pathname.split("/");
+    const revision = parts[3];
+    const filename = decodeURIComponent(parts.slice(4).join("/"));
+    if (filename === "assets/logo.bin") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/octet-stream",
+        headers: { "access-control-allow-origin": "*" },
+        body: binarySource,
+      });
+      return;
+    }
+    const body = filename === "README.md"
+      ? (revision === parentSha ? oldReadme : newReadme)
+      : (revision === parentSha ? oldSource : newSource);
+    await route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+}
+
+async function loadMockedCommit(page) {
+  await installMockRoutes(page);
+  await page.goto("/");
+  await page.getByLabel("Public GitHub commit URL").fill(commitUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page.locator("table.split")).toBeVisible();
+}
+
+async function openMockedShareLink(page) {
+  await installMockRoutes(page);
+  await page.goto(`/#/example/project/commit/${commitSha}`);
+  await expect(page.locator("table.split")).toBeVisible();
+}
+
+function analysisForRequest(request) {
+  const groups = request.hunks.map((hunk, index) => ({
+    title: index === 0 ? "Formatting behavior" : "Documentation flow",
+    description: index === 0
+      ? "Updates the formatting path across the commit."
+      : "Keeps the documented workflow aligned with the implementation.",
+    hunks: [{
+      id: hunk.id,
+      explanation: index === 0
+        ? "Updates <formatting> & output behavior."
+        : "Refreshes the user-facing workflow description.",
+    }],
+  }));
+  return {
+    version: 1,
+    ok: true,
+    analysis: {
+      summary: "The commit updates formatting behavior and its documentation.",
+      groups: groups.reverse(),
+    },
+  };
+}
+
+async function installAnalysisHealth(page) {
+  await page.route("**/api/health", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ version: 1, ok: true, openseek_available: true }),
+  }));
+}
+
+test("landing follows the compact DiffsHub-style URL handoff", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Moondiff playground" })).toBeVisible();
+  await expect(page.getByText("− github", { exact: true })).toBeVisible();
+  await expect(page.getByText("+ playground", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Supported links" })).toBeVisible();
+
+  const landingMetrics = await page.locator(".shell.landing").evaluate(shell => ({
+    width: shell.getBoundingClientRect().width,
+    background: getComputedStyle(document.body).backgroundColor,
+  }));
+  expect(landingMetrics.width).toBeLessThanOrEqual(688);
+  expect(landingMetrics.background).toBe("rgb(247, 247, 247)");
+});
+
+test("desktop keeps split columns balanced and switches views", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loadMockedCommit(page);
+
+  await expect(page.getByText("example/project@", { exact: false })).toBeVisible();
+  await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
+  await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
+  await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+  await expect(page.locator(".summary-grid, .share-panel")).toHaveCount(0);
+
+  const heroLayout = await page.locator(".hero").evaluate(hero => {
+    const copy = hero.querySelector(".hero-copy").getBoundingClientRect();
+    const controls = hero.querySelector(".hero-controls").getBoundingClientRect();
+    return {
+      height: hero.getBoundingClientRect().height,
+      position: getComputedStyle(hero).position,
+      top: getComputedStyle(hero).top,
+      copyX: copy.x,
+      copyCenterY: copy.y + copy.height / 2,
+      controlsX: controls.x,
+      controlsCenterY: controls.y + controls.height / 2,
+    };
+  });
+  expect(heroLayout.height).toBeLessThanOrEqual(56);
+  expect(heroLayout.position).toBe("sticky");
+  expect(heroLayout.top).toBe("0px");
+  expect(heroLayout.controlsX).toBeGreaterThan(heroLayout.copyX);
+  expect(Math.abs(heroLayout.controlsCenterY - heroLayout.copyCenterY)).toBeLessThan(1);
+
+  const fileHeading = await page.locator(".file-heading").first().evaluate(heading => ({
+    height: heading.getBoundingClientRect().height,
+    position: getComputedStyle(heading).position,
+  }));
+  expect(fileHeading.height).toBeLessThanOrEqual(48);
+  expect(fileHeading.position).toBe("sticky");
+
+  const maximumGutterWidth = await page
+    .locator("table.split td.line-number")
+    .evaluateAll(cells => Math.max(...cells.map(cell => cell.getBoundingClientRect().width)));
+  expect(maximumGutterWidth).toBeLessThanOrEqual(64);
+
+  const splitMetrics = await page.locator("table.split").evaluate(table => {
+    const row = [...table.rows].find(candidate => candidate.querySelectorAll("td.ctx").length === 2);
+    const codeCells = [...row.querySelectorAll("td.ctx")];
+    return {
+      tableWidth: table.getBoundingClientRect().width,
+      leftWidth: codeCells[0].getBoundingClientRect().width,
+      rightWidth: codeCells[1].getBoundingClientRect().width,
+    };
+  });
+  expect(Math.abs(splitMetrics.leftWidth - splitMetrics.rightWidth)).toBeLessThanOrEqual(1);
+  expect(splitMetrics.leftWidth).toBeGreaterThanOrEqual(splitMetrics.tableWidth * 0.4);
+  expect(splitMetrics.rightWidth).toBeGreaterThanOrEqual(splitMetrics.tableWidth * 0.4);
+
+  const changedRowColors = await page.locator("table.split tr").filter({
+    has: page.locator("td.del"),
+  }).first().evaluate(row => ({
+    oldNumber: getComputedStyle(row.querySelector(".old-line-number")).backgroundColor,
+    newNumber: getComputedStyle(row.querySelector(".new-line-number")).backgroundColor,
+    oldCode: getComputedStyle(row.querySelector("td.del")).backgroundColor,
+    newCode: getComputedStyle(row.querySelector("td.add")).backgroundColor,
+  }));
+  expect(changedRowColors.oldNumber).toBe(changedRowColors.oldCode);
+  expect(changedRowColors.newNumber).toBe(changedRowColors.newCode);
+  expect(changedRowColors.oldCode).not.toBe(changedRowColors.newCode);
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(page.locator("table.unified")).toBeVisible();
+  await expect(page.locator("table.split")).toHaveCount(0);
+  await page.getByRole("button", { name: "Use split view" }).click();
+  await expect(page.locator("table.split")).toBeVisible();
+});
+
+test("mixed commits use lazy line diffs and preserve binary file cards", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await loadMockedCommit(page);
+
+  const cards = page.locator(".file-card");
+  const moonbitCard = cards.filter({ hasText: "src/format_change.mbt" });
+  const readmeCard = cards.filter({ hasText: "README.md" });
+  const binaryCard = cards.filter({ hasText: "assets/logo.bin" });
+
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator(".file-path")).toHaveText([
+    "src/format_change.mbt",
+    "README.md",
+    "assets/logo.bin",
+  ]);
+  await expect(moonbitCard.locator("table.split")).toBeVisible();
+  expect(await moonbitCard.locator("b.wd, b.wa").count()).toBeGreaterThan(0);
+  await expect(readmeCard.getByRole("button", { name: "Expand" })).toBeVisible();
+  await expect(binaryCard.getByRole("button", { name: "Expand" })).toBeVisible();
+  await expect(page.locator(".diff-scroll")).toHaveCount(1);
+
+  await readmeCard.getByRole("button", { name: "Expand" }).click();
+  await expect(readmeCard.locator("table.split")).toBeVisible();
+  await expect(readmeCard.locator("td.del")).toContainText("Use the <old> workflow.");
+  await expect(readmeCard.locator("td.add")).toContainText("Use the &new workflow.");
+  await expect(readmeCard.locator("b.wd, b.wa")).toHaveCount(0);
+
+  await binaryCard.getByRole("button", { name: "Expand" }).click();
+  await expect(binaryCard).toContainText("Cannot render: the file is binary or is not valid UTF-8.");
+  await expect(binaryCard.locator(".diff-scroll")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(moonbitCard.locator("table.unified")).toBeVisible();
+  await expect(readmeCard.locator("table.unified")).toBeVisible();
+  await expect(page.locator("table.unified")).toHaveCount(2);
+  await expect(readmeCard.locator("b.wd, b.wa")).toHaveCount(0);
+});
+
+test("a shared playground URL restores the commit and can be copied", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openMockedShareLink(page);
+
+  await expect(page.getByLabel("Public GitHub commit URL")).toHaveValue(commitUrl);
+  await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
+  await page.getByRole("button", { name: "Copy link" }).click();
+  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
+
+  await page.reload();
+  await expect(page.locator("table.split")).toBeVisible();
+});
+
+test("narrow viewport scrolls only the diff and keeps controls usable", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 900 });
+  await loadMockedCommit(page);
+
+  const heroLayout = await page.locator(".hero").evaluate(hero => {
+    const copy = hero.querySelector(".hero-copy").getBoundingClientRect();
+    const controls = hero.querySelector(".hero-controls").getBoundingClientRect();
+    return { copyBottom: copy.bottom, controlsTop: controls.top };
+  });
+  expect(heroLayout.controlsTop).toBeGreaterThanOrEqual(heroLayout.copyBottom);
+
+  const formFitsViewport = await page.locator(".commit-form").evaluate(form => {
+    const input = form.querySelector("input").getBoundingClientRect();
+    const button = form.querySelector("button").getBoundingClientRect();
+    return input.left >= 0 && input.right <= innerWidth && button.left >= 0 && button.right <= innerWidth;
+  });
+  expect(formFitsViewport).toBe(true);
+
+  const splitOverflow = await page.locator(".diff-scroll").evaluate(scroller => {
+    const codeCells = [...scroller.querySelectorAll("table.split td.ctx, table.split td.del, table.split td.add")];
+    return {
+      clientWidth: scroller.clientWidth,
+      scrollWidth: scroller.scrollWidth,
+      codeDoesNotWrap: codeCells.every(cell => getComputedStyle(cell).whiteSpace === "pre"),
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+    };
+  });
+  expect(splitOverflow.scrollWidth).toBeGreaterThan(splitOverflow.clientWidth);
+  expect(splitOverflow.codeDoesNotWrap).toBe(true);
+  expect(splitOverflow.documentScrollWidth).toBeLessThanOrEqual(splitOverflow.documentClientWidth);
+
+  const scroller = page.locator(".diff-scroll");
+  await scroller.evaluate(element => {
+    element.scrollLeft = 120;
+  });
+  expect(await scroller.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+
+  const fileButton = page
+    .locator(".file-card")
+    .filter({ hasText: "src/format_change.mbt" })
+    .locator("button.file-toggle");
+  await fileButton.click();
+  await expect(page.locator(".file-card .diff-scroll")).toHaveCount(0);
+  await expect(fileButton).toHaveAttribute("aria-expanded", "false");
+  await fileButton.click();
+  await expect(fileButton).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".file-card .diff-scroll")).toBeVisible();
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(page.locator("table.unified")).toBeVisible();
+  const unifiedOverflow = await page.locator(".diff-scroll").evaluate(element => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(unifiedOverflow.scrollWidth).toBeGreaterThan(unifiedOverflow.clientWidth);
+});
+
+test("manual functional analysis prepares the whole commit and annotates stable hunks", async ({ page }) => {
+  await installAnalysisHealth(page);
+  let submitted;
+  await page.route("**/api/analyze", async route => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(analysisForRequest(submitted)),
+    });
+  });
+  await loadMockedCommit(page);
+
+  await expect(page.getByRole("button", { name: "Analyze changes" })).toBeVisible();
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.getByRole("heading", { name: "Change groups" })).toBeVisible();
+
+  expect(submitted.version).toBe(1);
+  expect(submitted.commit).toMatchObject({
+    owner: "example",
+    repo: "project",
+    sha: commitSha,
+    parent_sha: parentSha,
+  });
+  expect(submitted.hunks.map(hunk => hunk.id)).toEqual(["f0-h0", "f1-h0"]);
+  expect(submitted.hunks.map(hunk => hunk.path)).toEqual([
+    "src/format_change.mbt",
+    "README.md",
+  ]);
+  expect(submitted.hunks.every(hunk => hunk.patch.startsWith("@@ "))).toBe(true);
+  expect(submitted.skipped_files.map(file => file.path)).toEqual(["assets/logo.bin"]);
+
+  await expect(page.locator(".analysis-summary")).toContainText("formatting behavior");
+  await expect(page.locator(".analysis-skipped")).toContainText("assets/logo.bin");
+  await expect(page.locator(".analysis-group-title")).toHaveText([
+    "Documentation flow",
+    "Formatting behavior",
+  ]);
+  const groups = page.locator(".analysis-group");
+  await expect(groups).toHaveCount(2);
+  await expect(groups.nth(0).getByRole("button", { name: "Collapse Documentation flow" })).toHaveAttribute("aria-expanded", "true");
+  await expect(groups.nth(1).getByRole("button", { name: "Expand Formatting behavior" })).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator(".file-list, .file-card")).toHaveCount(0);
+  await expect(page.locator(".analysis-hunk")).toHaveCount(1);
+  await expect(page.locator(".analysis-hunk .file-path")).toHaveText("README.md");
+  await expect(page.locator(".diff-scroll")).toHaveCount(1);
+  await expect(page.locator("td.hunk-note")).toHaveCount(1);
+  await expect(page.locator("td.hunk-note")).toContainText("Documentation flow");
+  await expect(page.locator("td.hunk-note")).toContainText("Refreshes the user-facing workflow description.");
+
+  await groups.nth(1).getByRole("button", { name: "Expand Formatting behavior" }).click();
+  await expect(page.locator(".analysis-hunk")).toHaveCount(2);
+  await expect(page.locator("td.hunk-note")).toHaveCount(2);
+  await expect(groups.nth(1).locator("td.hunk-note")).toContainText("Updates <formatting> & output behavior.");
+  await expect(groups.nth(1).locator("td.hunk-note script, td.hunk-note formatting")).toHaveCount(0);
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(page.locator("table.unified td.hunk-note")).toHaveCount(2);
+  await groups.nth(0).getByRole("button", { name: "Collapse Documentation flow" }).click();
+  await expect(page.locator("table.unified td.hunk-note")).toHaveCount(1);
+  await expect(groups.nth(1).locator("table.unified td.hunk-note")).toContainText("Formatting behavior");
+});
+
+test("analysis errors can be retried without reloading or expanding files", async ({ page }) => {
+  await installAnalysisHealth(page);
+  let attempts = 0;
+  await page.route("**/api/analyze", async route => {
+    attempts += 1;
+    const request = route.request().postDataJSON();
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({
+          version: 1,
+          ok: false,
+          error: {
+            code: "invalid_answer",
+            message: "OpenSeek returned malformed JSON, so the analysis could not be displayed. Please retry.",
+          },
+        }),
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(analysisForRequest(request)),
+      });
+    }
+  });
+  await loadMockedCommit(page);
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.getByRole("heading", { name: "Analysis failed" })).toBeVisible();
+  await expect(page.locator(".analysis-card")).toContainText(
+    "OpenSeek returned malformed JSON, so the analysis could not be displayed. Please retry.",
+  );
+  await page.locator(".analysis-card").getByRole("button", { name: "Retry analysis" }).click();
+  await expect(page.getByRole("heading", { name: "Change groups" })).toBeVisible();
+  expect(attempts).toBe(2);
+  await expect(page.locator(".analysis-group").first().getByRole("button", { name: "Collapse Documentation flow" })).toBeVisible();
+  await expect(page.locator(".file-card")).toHaveCount(0);
+});
+
+test("a static deployment hides analysis when no backend is detected", async ({ page }) => {
+  await loadMockedCommit(page);
+  await expect(page.getByRole("button", { name: /Analyze changes|Retry analysis|Analyze again/ })).toHaveCount(0);
+});

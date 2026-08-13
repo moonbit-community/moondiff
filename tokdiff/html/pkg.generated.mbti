@@ -1,0 +1,45 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/tokdiff/html"
+
+import {
+  "moonbit-community/moondiff/tokdiff",
+}
+
+// Values
+pub fn html_page(title~ : String, String) -> String
+
+pub fn render_side_by_side(@tokdiff.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+
+pub fn render_side_by_side_hunks(@tokdiff.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+
+pub fn render_unified(@tokdiff.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+
+pub fn render_unified_hunks(@tokdiff.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+
+pub fn side_by_side_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+
+pub fn side_by_side_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+
+pub fn side_by_side_line_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+
+pub fn side_by_side_line_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+
+pub fn unified_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+
+pub fn unified_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+
+pub fn unified_line_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+
+pub fn unified_line_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+
+// Errors
+
+// Types and methods
+pub(all) struct HunkNote {
+  title : String
+  body : String
+} derive(Eq)
+
+// Type aliases
+
+// Traits

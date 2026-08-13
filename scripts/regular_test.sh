@@ -7,3 +7,5 @@ moon test tool/alignment
 moon test tool/hunks
 moon test tool/render
 moon test tool
+moon test tokdiff --target all
+moon test playground/main --target js

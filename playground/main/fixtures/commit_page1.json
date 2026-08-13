@@ -1,0 +1,40 @@
+{
+  "sha": "abcdef1234567890abcdef1234567890abcdef12",
+  "html_url": "https://github.com/moonbit-community/moondiff/commit/abcdef1234567890abcdef1234567890abcdef12",
+  "commit": {
+    "message": "Add playground\n\nRender public MoonBit commits."
+  },
+  "parents": [
+    { "sha": "1111111111111111111111111111111111111111" },
+    { "sha": "2222222222222222222222222222222222222222" }
+  ],
+  "stats": {
+    "additions": 120,
+    "deletions": 17,
+    "total": 137
+  },
+  "files": [
+    {
+      "filename": "src/main.mbt",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 2,
+      "changes": 7
+    },
+    {
+      "filename": "src/new_name.mbt",
+      "previous_filename": "src/old_name.txt",
+      "status": "renamed",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2
+    },
+    {
+      "filename": "README.md",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 1,
+      "changes": 5
+    }
+  ]
+}
