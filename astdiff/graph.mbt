@@ -169,18 +169,17 @@ fn try_pop_lhs(
 ) -> (Syntax, Stack[EnteredDelimiter])? {
   match entered.peek() {
     Some(EnteredDelimiter::PopEither(lhs_delims, rhs_delims)) =>
-      match lhs_delims.peek() {
-        Some(lhs_delim) => {
-          let mut entered = entered.pop().unwrap()
-          let new_lhs_delims = lhs_delims.pop().unwrap()
-          if !new_lhs_delims.is_empty() || !rhs_delims.is_empty() {
-            entered = entered.push(
-              EnteredDelimiter::PopEither(new_lhs_delims, rhs_delims),
-            )
-          }
-          Some((lhs_delim, entered))
+      if lhs_delims.peek() is Some(lhs_delim) {
+        let mut entered = entered.pop().unwrap()
+        let new_lhs_delims = lhs_delims.pop().unwrap()
+        if !new_lhs_delims.is_empty() || !rhs_delims.is_empty() {
+          entered = entered.push(
+            EnteredDelimiter::PopEither(new_lhs_delims, rhs_delims),
+          )
         }
-        None => None
+        Some((lhs_delim, entered))
+      } else {
+        None
       }
     _ => None
   }
@@ -192,18 +191,17 @@ fn try_pop_rhs(
 ) -> (Syntax, Stack[EnteredDelimiter])? {
   match entered.peek() {
     Some(EnteredDelimiter::PopEither(lhs_delims, rhs_delims)) =>
-      match rhs_delims.peek() {
-        Some(rhs_delim) => {
-          let mut entered = entered.pop().unwrap()
-          let new_rhs_delims = rhs_delims.pop().unwrap()
-          if !lhs_delims.is_empty() || !new_rhs_delims.is_empty() {
-            entered = entered.push(
-              EnteredDelimiter::PopEither(lhs_delims, new_rhs_delims),
-            )
-          }
-          Some((rhs_delim, entered))
+      if rhs_delims.peek() is Some(rhs_delim) {
+        let mut entered = entered.pop().unwrap()
+        let new_rhs_delims = rhs_delims.pop().unwrap()
+        if !lhs_delims.is_empty() || !new_rhs_delims.is_empty() {
+          entered = entered.push(
+            EnteredDelimiter::PopEither(lhs_delims, new_rhs_delims),
+          )
         }
-        None => None
+        Some((rhs_delim, entered))
+      } else {
+        None
       }
     _ => None
   }
@@ -309,33 +307,30 @@ fn Edge::cost(self : Edge) -> UInt {
 
 ///|UUID(2898523a-ab3c-40d8-83a2-2815eae2e728)
 fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex {
-  match seen.get(v) {
-    Some(existing) => {
-      // Don't explore more than two possible parenthesis
-      // nestings for each syntax node pair.
-      if existing.last() is Some(allocated) && existing.length() >= 2 {
-        return allocated
-      }
+  if seen.get(v) is Some(existing) {
+    // Don't explore more than two possible parenthesis
+    // nestings for each syntax node pair.
+    if existing.last() is Some(allocated) && existing.length() >= 2 {
+      return allocated
+    }
 
-      // Otherwise, reuse an exact parenthesis-matching state when we have one.
-      for existing_node in existing {
-        if existing_node.parents == v.parents {
-          return existing_node
-        }
+    // Otherwise, reuse an exact parenthesis-matching state when we have one.
+    for existing_node in existing {
+      if existing_node.parents == v.parents {
+        return existing_node
       }
-      existing.push(v)
-      v
     }
-    None => {
-      // use a array to enable experiments with the value
-      // of how many possible parenthesis nestings to explore.
-      // 
-      // never have more than 2 nodes
-      let existing = Array::new(capacity=2)
-      existing.push(v)
-      seen[v] = existing
-      v
-    }
+    existing.push(v)
+    v
+  } else {
+    // use a array to enable experiments with the value
+    // of how many possible parenthesis nestings to explore.
+    //
+    // never have more than 2 nodes
+    let existing = Array::new(capacity=2)
+    existing.push(v)
+    seen[v] = existing
+    v
   }
 }
 

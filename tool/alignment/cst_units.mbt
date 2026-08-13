@@ -158,18 +158,16 @@ fn first_descendant_text(
   node : @cst.CstNode,
   wanted : String,
 ) -> String? {
-  match first_child_text(source, node, wanted) {
-    Some(text) => Some(text)
-    None => {
-      for entry in node.children {
-        let (_, child) = entry
-        match first_descendant_text(source, child, wanted) {
-          Some(text) => return Some(text)
-          None => ()
-        }
+  if first_child_text(source, node, wanted) is Some(text) {
+    Some(text)
+  } else {
+    for entry in node.children {
+      let (_, child) = entry
+      if first_descendant_text(source, child, wanted) is Some(text) {
+        return Some(text)
       }
-      None
     }
+    None
   }
 }
 
@@ -196,19 +194,18 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
     }
     @cst.Impl_Function => {
       let name = labelled_span_text(source, item, "name")
-      match first_child_text(source, item, "method") {
-        Some(method_name) => {
-          let receiver_prefix = if first_child_text(source, item, "op") ==
-            Some("&") {
-            "&"
-          } else {
-            ""
-          }
-          name.map(fn(receiver) {
-            "fn:\{receiver_prefix}\{receiver}::\{method_name}"
-          })
+      if first_child_text(source, item, "method") is Some(method_name) {
+        let receiver_prefix = if first_child_text(source, item, "op") ==
+          Some("&") {
+          "&"
+        } else {
+          ""
         }
-        None => name.map(fn(name) { "fn:::\{name}" })
+        name.map(fn(receiver) {
+          "fn:\{receiver_prefix}\{receiver}::\{method_name}"
+        })
+      } else {
+        name.map(fn(name) { "fn:::\{name}" })
       }
     }
     @cst.Impl_TypeAbstract
@@ -224,16 +221,18 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
     @cst.Impl_Trait =>
       first_child_text(source, item, "name").map(fn(name) { "trait:\{name}" })
     @cst.Impl_Let => {
-      let name = match first_child_text(source, item, "pattern") {
-        Some(name) => Some(name)
-        None => first_child_text(source, item, "name")
+      let name = if first_child_text(source, item, "pattern") is Some(name) {
+        Some(name)
+      } else {
+        first_child_text(source, item, "name")
       }
       name.map(fn(name) { "let:\{name}" })
     }
     @cst.Impl_Const => {
-      let name = match first_child_text(source, item, "pattern") {
-        Some(name) => Some(name)
-        None => first_child_text(source, item, "name")
+      let name = if first_child_text(source, item, "pattern") is Some(name) {
+        Some(name)
+      } else {
+        first_child_text(source, item, "name")
       }
       name.map(fn(name) { "const:\{name}" })
     }
@@ -242,15 +241,14 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
     @cst.Impl_ImplMethod | @cst.Impl_ImplRelation => {
       let trait_name = labelled_span_text(source, item, "name").unwrap_or("")
       let self_type = child_text_or_empty(source, item, "type")
-      match first_child_text(source, item, "method") {
-        Some(method_text) => {
-          let method_node = first_child_node(item, "method")
-          let method_name = method_node
-            .bind(fn(node) { first_descendant_text(source, node, "name") })
-            .unwrap_or(method_text)
-          Some("impl-fn:\{self_type}:\{trait_name}::\{method_name}")
-        }
-        None => Some("impl:\{self_type}:\{trait_name}")
+      if first_child_text(source, item, "method") is Some(method_text) {
+        let method_node = first_child_node(item, "method")
+        let method_name = method_node
+          .bind(fn(node) { first_descendant_text(source, node, "name") })
+          .unwrap_or(method_text)
+        Some("impl-fn:\{self_type}:\{trait_name}::\{method_name}")
+      } else {
+        Some("impl:\{self_type}:\{trait_name}")
       }
     }
     @cst.Impl_EnumView => {

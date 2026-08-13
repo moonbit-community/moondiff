@@ -327,9 +327,8 @@ fn CstElabCtx::elab_node(
           self.append_gap(children, cursor, child.source_span.0)
         }
         if Some(i) != open_index && Some(i) != close_index {
-          match self.elab_node(child, type_context) {
-            Some(child) => children.push(child)
-            None => ()
+          if self.elab_node(child, type_context) is Some(child) {
+            children.push(child)
           }
         }
         if child.source_span.1 > cursor {
@@ -339,13 +338,15 @@ fn CstElabCtx::elab_node(
       if node.source_span.1 > cursor {
         self.append_gap(children, cursor, node.source_span.1)
       }
-      let (open_content, open_position) = match open_index {
-        Some(i) => self.delimiter(node.children[i].1)
-        None => ("", [])
+      let (open_content, open_position) = if open_index is Some(i) {
+        self.delimiter(node.children[i].1)
+      } else {
+        ("", [])
       }
-      let (close_content, close_position) = match close_index {
-        Some(i) => self.delimiter(node.children[i].1)
-        None => ("", [])
+      let (close_content, close_position) = if close_index is Some(i) {
+        self.delimiter(node.children[i].1)
+      } else {
+        ("", [])
       }
       if children.is_empty() &&
         open_content.is_empty() &&
@@ -374,9 +375,8 @@ fn CstElabCtx::elab_nodes(
 ) -> Syntax {
   let children = Array::new()
   for node in nodes {
-    match self.elab_node(node, false) {
-      Some(node) => children.push(node)
-      None => ()
+    if self.elab_node(node, false) is Some(node) {
+      children.push(node)
     }
   }
   Syntax::simple_list(open_position=[], children~, close_position=[])

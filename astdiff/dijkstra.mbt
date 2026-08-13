@@ -111,9 +111,10 @@ fn edge_between(before : Vertex, after : Vertex) -> Edge {
       // If there are multiple edges that can take us to `next`,
       // prefer the shortest.
       if next == after {
-        let is_shorter = match shortest_edge {
-          Some(prev_edge) => edge.cost() < prev_edge.cost()
-          None => true
+        let is_shorter = if shortest_edge is Some(prev_edge) {
+          edge.cost() < prev_edge.cost()
+        } else {
+          true
         }
         if is_shorter {
           shortest_edge = Some(edge)
@@ -181,10 +182,7 @@ fn[T] Option::succ(self : T?, f : (T) -> T?) -> Iter[T] {
   let mut curr = self
   Iter::new(() => {
     let prev = curr
-    curr = match curr {
-      Some(x) => f(x)
-      None => None
-    }
+    curr = if curr is Some(x) { f(x) } else { None }
     return prev
   })
 }

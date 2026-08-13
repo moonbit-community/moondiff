@@ -12,9 +12,10 @@ fn align_impl_units_by_uuid(
 ) -> Array[ImplEdit] {
   let new_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([])
   for i in 0..<new_units.length() {
-    match new_units[i].uuid {
-      Some(uuid) => new_positions.get_or_init(uuid, fn() { [] }).push(i)
-      None => panic()
+    if new_units[i].uuid is Some(uuid) {
+      new_positions.get_or_init(uuid, fn() { [] }).push(i)
+    } else {
+      panic()
     }
   }
 
@@ -23,23 +24,22 @@ fn align_impl_units_by_uuid(
   let edits = Array::new()
 
   for old_unit in old_units {
-    match old_unit.uuid {
-      Some(uuid) =>
-        match new_positions.get(uuid) {
-          Some(indices) => {
-            let offset = new_offsets.get(uuid).unwrap_or(0)
-            if offset < indices.length() {
-              let new_index = indices[offset]
-              new_offsets[uuid] = offset + 1
-              used_new.set(new_index, true)
-              edits.push(Replace(old=old_unit, new=new_units[new_index]))
-            } else {
-              edits.push(Delete(old_unit))
-            }
-          }
-          None => edits.push(Delete(old_unit))
+    if old_unit.uuid is Some(uuid) {
+      if new_positions.get(uuid) is Some(indices) {
+        let offset = new_offsets.get(uuid).unwrap_or(0)
+        if offset < indices.length() {
+          let new_index = indices[offset]
+          new_offsets[uuid] = offset + 1
+          used_new.set(new_index, true)
+          edits.push(Replace(old=old_unit, new=new_units[new_index]))
+        } else {
+          edits.push(Delete(old_unit))
         }
-      None => panic()
+      } else {
+        edits.push(Delete(old_unit))
+      }
+    } else {
+      panic()
     }
   }
 
@@ -71,26 +71,20 @@ fn align_impl_units_by_key(
   let new_uuid_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
   )
   for i in 0..<new_units.length() {
-    match new_units[i].uuid {
-      Some(uuid) => new_uuid_positions.get_or_init(uuid, fn() { [] }).push(i)
-      None => ()
+    if new_units[i].uuid is Some(uuid) {
+      new_uuid_positions.get_or_init(uuid, fn() { [] }).push(i)
     }
   }
   let uuid_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
   for i in 0..<old_units.length() {
-    match old_units[i].uuid {
-      Some(uuid) =>
-        match new_uuid_positions.get(uuid) {
-          Some(indices) => {
-            let offset = uuid_offsets.get(uuid).unwrap_or(0)
-            if offset < indices.length() {
-              uuid_offsets[uuid] = offset + 1
-              pair(i, indices[offset])
-            }
-          }
-          None => ()
+    if old_units[i].uuid is Some(uuid) {
+      if new_uuid_positions.get(uuid) is Some(indices) {
+        let offset = uuid_offsets.get(uuid).unwrap_or(0)
+        if offset < indices.length() {
+          uuid_offsets[uuid] = offset + 1
+          pair(i, indices[offset])
         }
-      None => ()
+      }
     }
   }
 
@@ -98,28 +92,22 @@ fn align_impl_units_by_key(
   )
   for i in 0..<new_units.length() {
     if !new_used.contains(i) {
-      match new_units[i].semantic_key {
-        Some(key) => new_key_positions.get_or_init(key, fn() { [] }).push(i)
-        None => ()
+      if new_units[i].semantic_key is Some(key) {
+        new_key_positions.get_or_init(key, fn() { [] }).push(i)
       }
     }
   }
   let key_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
   for i in 0..<old_units.length() {
     if !old_used.contains(i) {
-      match old_units[i].semantic_key {
-        Some(key) =>
-          match new_key_positions.get(key) {
-            Some(indices) => {
-              let offset = key_offsets.get(key).unwrap_or(0)
-              if offset < indices.length() {
-                key_offsets[key] = offset + 1
-                pair(i, indices[offset])
-              }
-            }
-            None => ()
+      if old_units[i].semantic_key is Some(key) {
+        if new_key_positions.get(key) is Some(indices) {
+          let offset = key_offsets.get(key).unwrap_or(0)
+          if offset < indices.length() {
+            key_offsets[key] = offset + 1
+            pair(i, indices[offset])
           }
-        None => ()
+        }
       }
     }
   }
@@ -149,9 +137,9 @@ fn align_impl_units_by_key(
     if !old_used.contains(i) {
       let content_id = old_units[i].root.content_id()
       if old_content_counts.get(content_id).unwrap_or(0) == 1 {
-        match new_content_positions.get(content_id) {
-          Some(indices) => if indices.length() == 1 { pair(i, indices[0]) }
-          None => ()
+        if new_content_positions.get(content_id) is Some(indices) &&
+          indices.length() == 1 {
+          pair(i, indices[0])
         }
       }
     }
@@ -159,10 +147,10 @@ fn align_impl_units_by_key(
 
   let edits = Array::new()
   for i in 0..<old_units.length() {
-    match replacements.get(i) {
-      Some(new_index) =>
-        edits.push(Replace(old=old_units[i], new=new_units[new_index]))
-      None => edits.push(Delete(old_units[i]))
+    if replacements.get(i) is Some(new_index) {
+      edits.push(Replace(old=old_units[i], new=new_units[new_index]))
+    } else {
+      edits.push(Delete(old_units[i]))
     }
   }
 
@@ -176,17 +164,19 @@ fn align_impl_units_by_key(
 
 ///|UUID(efd8452b-7521-4f76-9171-86843cf72de6)
 fn format_impl_label(label : String, unit : ImplUnit?) -> String {
-  match unit {
-    Some(unit) => "\{label}: line \{unit.start_line}"
-    None => label
+  if unit is Some(unit) {
+    "\{label}: line \{unit.start_line}"
+  } else {
+    label
   }
 }
 
 ///|UUID(d1d2c663-315a-4d00-8815-7ff7d1244b40)
 fn impl_line_base(unit : ImplUnit?) -> Int {
-  match unit {
-    Some(unit) => unit.start_line
-    None => 1
+  if unit is Some(unit) {
+    unit.start_line
+  } else {
+    1
   }
 }
 
@@ -194,9 +184,10 @@ fn impl_line_base(unit : ImplUnit?) -> Int {
 // Return the source text cached while collecting implementation units. The
 // corresponding line base keeps hunk headers referring to original file lines.
 fn source_slice(unit : ImplUnit?) -> String {
-  match unit {
-    None => ""
-    Some(unit) => unit.source
+  if unit is Some(unit) {
+    unit.source
+  } else {
+    ""
   }
 }
 
@@ -284,13 +275,11 @@ fn render_impl_edit(
   let new_line_base = impl_line_base(new_unit)
   let lhs_roots = Array::new()
   let rhs_roots = Array::new()
-  match old_unit {
-    Some(unit) => lhs_roots.push(unit.root)
-    None => ()
+  if old_unit is Some(unit) {
+    lhs_roots.push(unit.root)
   }
-  match new_unit {
-    Some(unit) => rhs_roots.push(unit.root)
-    None => ()
+  if new_unit is Some(unit) {
+    rhs_roots.push(unit.root)
   }
 
   @syntax.init_all_info(lhs_roots, rhs_roots)
@@ -433,15 +422,12 @@ fn render_impl_edits(
           render_options,
         )
     }
-    match rendered {
-      Some(rendered) => {
-        if wrote {
-          buf.write_char('\n')
-        }
-        buf.write_string(rendered)
-        wrote = true
+    if rendered is Some(rendered) {
+      if wrote {
+        buf.write_char('\n')
       }
-      None => ()
+      buf.write_string(rendered)
+      wrote = true
     }
   }
   if wrote {
@@ -568,18 +554,16 @@ pub fn render_aligned_cst_diffs(
       old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
       render_options,
     )
+  } else if render_key_aligned_impl_diffs(
+      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
+      render_options,
+    )
+    is Some(rendered) {
+    rendered
   } else {
-    match
-      render_key_aligned_impl_diffs(
-        old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
-        render_options,
-      ) {
-      Some(rendered) => rendered
-      None =>
-        render_root_list_diff(
-          old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
-          render_options,
-        )
-    }
+    render_root_list_diff(
+      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
+      render_options,
+    )
   }
 }

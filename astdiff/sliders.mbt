@@ -7,9 +7,8 @@ fn first_line_span(node : Syntax) -> SingleLineSpan? {
         return Some(open_position[0])
       }
       for child in children {
-        match first_line_span(child) {
-          Some(position) => return Some(position)
-          None => ()
+        if first_line_span(child) is Some(position) {
+          return Some(position)
         }
       }
       close_position.get(0)
@@ -26,9 +25,8 @@ fn last_line_span(node : Syntax) -> SingleLineSpan? {
         return Some(last)
       }
       for child in children.rev_iter() {
-        match last_line_span(child) {
-          Some(position) => return Some(position)
-          None => ()
+        if last_line_span(child) is Some(position) {
+          return Some(position)
         }
       }
       open_position.last()
@@ -140,10 +138,7 @@ fn push_unchanged_to_ancestor(
   inner : Syntax,
   change_map : ChangeMap,
 ) -> Unit {
-  let inner_change = match change_map.get(inner) {
-    Some(change) => change
-    None => return
-  }
+  guard change_map.get(inner) is Some(inner_change) else { return }
   let delimiters_match = match (root, inner) {
     (
       Syntax::List(
@@ -176,10 +171,7 @@ fn push_unchanged_to_descendant(
   inner : Syntax,
   change_map : ChangeMap,
 ) -> Unit {
-  let root_change = match change_map.get(root) {
-    Some(change) => change
-    None => return
-  }
+  guard change_map.get(root) is Some(root_change) else { return }
   let delimiters_match = match (root, inner) {
     (
       Syntax::List(
