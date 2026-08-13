@@ -2,6 +2,7 @@ import {
   "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tokdiff/html" @tokdiff_html,
   "moonbit-community/moondiff/tokdiff/text" @tokdiff_text,
+  "moonbit-community/moondiff/tool/alignment",
   "moonbit-community/rabbita",
   "moonbit-community/rabbita/clipboard",
   "moonbit-community/rabbita/cmd",

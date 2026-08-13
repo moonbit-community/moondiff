@@ -294,6 +294,27 @@ test "align_impl_units_by_key distinguishes methods on the same type" {
 }
 
 ///|
+test "unique content hashes align anonymous units but duplicate hashes do not" {
+  let old_named = parse_units("fn first() {}\nfn second() {}")
+  let new_named = parse_units("fn second() {}\nfn first() {}")
+  let old = old_named.map(unit => { ..unit, uuid: None, semantic_key: None })
+  let new = new_named.map(unit => { ..unit, uuid: None, semantic_key: None })
+  @debug.assert_eq(align_impl_units_by_key(old, new).map(edit_line_summary), [
+    "Replace(1->2)", "Replace(2->1)",
+  ])
+
+  let duplicate_named = parse_units("fn same() {}\nfn same() {}")
+  let duplicate = duplicate_named.map(unit => {
+    ..unit,
+    uuid: None,
+    semantic_key: None,
+  })
+  let duplicate_edits = align_impl_units_by_key(duplicate, duplicate)
+  assert_false(impl_edits_have_replacement(duplicate_edits))
+  assert_true(top_level_plan(duplicate, duplicate) is RootList(..))
+}
+
+///|
 fn find_atom(node : @syntax.Syntax, content : String) -> @syntax.Syntax? {
   match node {
     @syntax.Syntax::Atom(content=actual, ..) =>
@@ -350,4 +371,205 @@ test "CST wrappers do not hide inserted sibling statements" {
       @debug.assert_eq(opposite.content_id(), lhs_string.content_id())
     _ => panic()
   }
+}
+
+///|
+fn changed_segment_text(document : @tokdiff.DiffDocument) -> String {
+  let buf = StringBuilder::new()
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      match block {
+        ContextBlock(_) => ()
+        ChangeBlock(rows) =>
+          for row in rows {
+            match row {
+              Paired(old_line, new_line) =>
+                for line in [old_line, new_line] {
+                  for segment in line.segments {
+                    if segment.kind is Changed {
+                      buf.write_string(segment.text)
+                    }
+                  }
+                }
+              OldOnly(line) | NewOnly(line) =>
+                for segment in line.segments {
+                  if segment.kind is Changed {
+                    buf.write_string(segment.text)
+                  }
+                }
+            }
+          }
+      }
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn ast_segment_summary(
+  segments : ArrayView[@tokdiff.DiffSegment],
+) -> Array[String] {
+  segments.map(segment => {
+    let kind = match segment.kind {
+      Changed => "changed"
+      Unchanged => "unchanged"
+    }
+    "\{kind}:\{segment.text}"
+  })
+}
+
+///|
+test "AST segments bridge only internal whitespace between changes" {
+  @debug.assert_eq(
+    ast_segment_summary(
+      ast_line_segments("  left \t right  ", Some([(3, 7), (10, 15)])),
+    ),
+    ["unchanged:  ", "changed:left \t right", "unchanged:  "],
+  )
+
+  @debug.assert_eq(
+    ast_segment_summary(
+      ast_line_segments("left, right", Some([(1, 5), (7, 12)])),
+    ),
+    ["changed:left", "unchanged:, ", "changed:right"],
+  )
+
+  @debug.assert_eq(
+    ast_segment_summary(ast_line_segments("  unchanged  ", None)),
+    ["unchanged:  unchanged  "],
+  )
+}
+
+///|
+test "top-level plan applies one pairing strategy to reordered declarations" {
+  let old_units = parse_units("fn first() {}\nfn second() {}")
+  let new_units = parse_units("fn second() {}\nfn first() {}")
+  guard top_level_plan(old_units, new_units) is PerUnit(edits) else {
+    fail("expected reliable semantic pairs")
+  }
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->2)", "Replace(2->1)",
+  ])
+
+  let unmatched_old = parse_units("/// trailing old")
+  let unmatched_new = parse_units("/// trailing new")
+  assert_true(top_level_plan(unmatched_old, unmatched_new) is RootList(..))
+}
+
+///|
+test "lexical aligned documents preserve original line numbers" {
+  let old_source =
+    #|fn keep() {}
+    #|fn target() {
+    #|  old_value()
+    #|}
+  let new_source =
+    #|fn inserted() {}
+    #|fn keep() {}
+    #|fn target() {
+    #|  new_value()
+    #|}
+  let result = diff_document(old_source, new_source, Lexical, context=0)
+  assert_true(result.outcome is Rendered)
+  assert_true(result.document.hunks.length() >= 2)
+  let changed = result.document.hunks[0]
+  @debug.assert_eq((changed.old_start, changed.new_start), (2, 3))
+  @debug.assert_eq(changed.header, "@@ -3 +4 @@")
+
+  let ast_result = diff_document(old_source, new_source, Ast, context=0)
+  assert_true(ast_result.outcome is Rendered)
+  assert_true(ast_result.document.hunks.length() >= 2)
+  let ast_changed = ast_result.document.hunks[0]
+  @debug.assert_eq((ast_changed.old_start, ast_changed.new_start), (1, 2))
+  @debug.assert_eq(ast_changed.header, "@@ -2,3 +3,3 @@")
+}
+
+///|
+test "lexical pure reorder falls back to a whole-file document" {
+  let result = diff_document(
+    "fn first() {}\nfn second() {}",
+    "fn second() {}\nfn first() {}",
+    Lexical,
+    context=0,
+  )
+  guard result.outcome is Fallback(reason) else {
+    fail("expected reorder fallback")
+  }
+  assert_true(reason.contains("reordering"))
+  assert_false(result.document.hunks.is_empty())
+}
+
+///|
+test "AST documents mark only novel source spans as changed" {
+  let result = diff_document(
+    "fn target() {\n  old_value()\n}",
+    "fn target() {\n  new_value()\n}",
+    Ast,
+    context=0,
+  )
+  assert_true(result.outcome is Rendered)
+  assert_false(result.document.hunks.is_empty())
+  let changed = changed_segment_text(result.document)
+  assert_true(changed.contains("old_value"), msg=changed)
+  assert_true(changed.contains("new_value"), msg=changed)
+  assert_false(changed.contains("fn target"), msg=changed)
+}
+
+///|
+test "AST formatting and top-level reorder are structural empty states" {
+  let formatting = diff_document(
+    "fn format() { 1 }",
+    "fn format() {\n  1\n}",
+    Ast,
+  )
+  assert_true(formatting.outcome is NoStructuralChanges)
+  assert_true(formatting.document.hunks.is_empty())
+
+  let reordered = diff_document(
+    "fn first() {}\nfn second() {}",
+    "fn second() {}\nfn first() {}",
+    Ast,
+  )
+  assert_true(reordered.outcome is NoStructuralChanges)
+  assert_true(reordered.document.hunks.is_empty())
+}
+
+///|
+test "aligned documents distinguish complete and partial lexical fallbacks" {
+  let invalid = diff_document("fn broken( {", "fn broken() {}", Ast, context=0)
+  guard invalid.outcome is Fallback(parse_reason) else {
+    fail("expected parser fallback")
+  }
+  assert_true(parse_reason.contains("old:"), msg=parse_reason)
+  assert_false(invalid.document.hunks.is_empty())
+
+  let limited = diff_document(
+    "fn target() { old_value() }",
+    "fn target() { new_value() }",
+    Ast,
+    context=0,
+    graph_limit=0,
+  )
+  guard limited.outcome is PartialFallback([limit_reason]) else {
+    fail("expected partial graph fallback")
+  }
+  assert_true(limit_reason.contains("graph limit exceeded"), msg=limit_reason)
+  assert_true(limit_reason.contains("old line 1, new line 1"), msg=limit_reason)
+  assert_false(limited.document.hunks.is_empty())
+
+  let root_list_limited = diff_document(
+    "/// trailing old",
+    "/// trailing new",
+    Ast,
+    context=0,
+    graph_limit=0,
+  )
+  guard root_list_limited.outcome is Fallback(root_list_reason) else {
+    fail("expected whole-document graph fallback")
+  }
+  assert_true(
+    root_list_reason.contains("graph limit exceeded"),
+    msg=root_list_reason,
+  )
+  assert_false(root_list_limited.document.hunks.is_empty())
 }

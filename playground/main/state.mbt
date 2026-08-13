@@ -13,6 +13,12 @@ priv enum ViewMode {
 } derive(Eq)
 
 ///|
+priv enum DiffAlgorithm {
+  LexicalAlgorithm
+  AstAlgorithm
+} derive(Eq)
+
+///|
 priv enum SourceSide {
   Old
   New
@@ -28,12 +34,25 @@ priv enum SideLoad {
 } derive(Eq)
 
 ///|
+priv struct DiffCache {
+  line : @alignment.AlignedDiffResult?
+  lexical : @alignment.AlignedDiffResult?
+  ast : @alignment.AlignedDiffResult?
+} derive(Eq)
+
+///|
+fn empty_diff_cache() -> DiffCache {
+  { line: None, lexical: None, ast: None }
+}
+
+///|
 priv struct FileState {
   file : ApiFile
   diff_mode : FileDiffMode
   expanded : Bool
   old_side : SideLoad
   new_side : SideLoad
+  diff_cache : DiffCache
 } derive(Eq)
 
 ///|
@@ -73,6 +92,7 @@ priv struct Model {
   input : String
   generation : Int
   view_mode : ViewMode
+  diff_algorithm : DiffAlgorithm
   phase : Phase
   route : CommitRef?
   share_url : String?
@@ -87,6 +107,7 @@ fn initial_model() -> Model {
     input: "",
     generation: 0,
     view_mode: Split,
+    diff_algorithm: LexicalAlgorithm,
     phase: Idle,
     route: None,
     share_url: None,
@@ -102,6 +123,7 @@ priv enum Msg {
   Submit
   RouteChanged(@url.Url)
   ToggleView
+  SelectDiffAlgorithm(DiffAlgorithm)
   CopyShareLink
   ShareCopied
   ShareCopyFailed(String)
@@ -211,6 +233,7 @@ fn finish_commit(
       expanded,
       old_side: initial_side(pair.old_url, expanded),
       new_side: initial_side(pair.new_url, expanded),
+      diff_cache: empty_diff_cache(),
     })
     if expanded {
       for
@@ -268,6 +291,7 @@ fn with_phase(model : Model, phase : Phase) -> Model {
     input: model.input,
     generation: model.generation,
     view_mode: model.view_mode,
+    diff_algorithm: model.diff_algorithm,
     phase,
     route: model.route,
     share_url: model.share_url,
@@ -283,6 +307,7 @@ fn with_backend_status(model : Model, backend_status : BackendStatus) -> Model {
     input: model.input,
     generation: model.generation,
     view_mode: model.view_mode,
+    diff_algorithm: model.diff_algorithm,
     phase: model.phase,
     route: model.route,
     share_url: model.share_url,
@@ -301,6 +326,7 @@ fn with_analysis_status(
     input: model.input,
     generation: model.generation,
     view_mode: model.view_mode,
+    diff_algorithm: model.diff_algorithm,
     phase: model.phase,
     route: model.route,
     share_url: model.share_url,
@@ -322,6 +348,7 @@ fn begin_commit_load(
       input: canonical_github_url(reference),
       generation,
       view_mode: model.view_mode,
+      diff_algorithm: model.diff_algorithm,
       phase: LoadingCommit(reference~, page=1, first=None, files=[]),
       route: Some(reference),
       share_url: Some(playground_share_url(reference)),
@@ -392,6 +419,7 @@ fn prepare_all_sources(
       expanded: file.expanded,
       old_side,
       new_side,
+      diff_cache: file.diff_cache,
     }
   }
   (
@@ -432,14 +460,26 @@ fn continue_analysis(
   if sources_pending(view) {
     return (model, @rabbita.none)
   }
-  match build_analysis_request(view) {
+  let ready_view = ensure_all_file_documents(view, model.diff_algorithm)
+  let ready_model = with_phase(model, Showing(ready_view))
+  match build_analysis_request(ready_view, model.diff_algorithm) {
     Err(message) =>
-      (with_analysis_status(model, AnalysisFailed(message)), @rabbita.none)
-    Ok((payload, _)) =>
       (
-        with_analysis_status(model, Analyzing),
-        analyze_request(payload, model.generation, emit),
+        with_analysis_status(ready_model, AnalysisFailed(message)),
+        @rabbita.none,
       )
+    Ok((payload, skipped)) =>
+      if payload.hunks.is_empty() {
+        (
+          with_analysis_status(ready_model, AnalysisNoHunks(skipped)),
+          @rabbita.none,
+        )
+      } else {
+        (
+          with_analysis_status(ready_model, Analyzing),
+          analyze_request(payload, model.generation, emit),
+        )
+      }
   }
 }
 
@@ -456,6 +496,7 @@ fn update(
           input: value,
           generation: model.generation,
           view_mode: model.view_mode,
+          diff_algorithm: model.diff_algorithm,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -475,6 +516,7 @@ fn update(
           } else {
             Split
           },
+          diff_algorithm: model.diff_algorithm,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -484,6 +526,31 @@ fn update(
         },
         @rabbita.none,
       )
+    SelectDiffAlgorithm(algorithm) => {
+      if algorithm == model.diff_algorithm {
+        return (model, @rabbita.none)
+      }
+      let phase = match model.phase {
+        Showing(view) =>
+          Showing(ensure_expanded_file_documents(view, algorithm))
+        other => other
+      }
+      (
+        {
+          input: model.input,
+          generation: model.generation,
+          view_mode: model.view_mode,
+          diff_algorithm: algorithm,
+          phase,
+          route: model.route,
+          share_url: model.share_url,
+          copy_status: model.copy_status,
+          backend_status: model.backend_status,
+          analysis_status: AnalysisIdle,
+        },
+        @rabbita.none,
+      )
+    }
     Submit =>
       match parse_commit_url(model.input) {
         Err(message) =>
@@ -492,6 +559,7 @@ fn update(
               input: model.input,
               generation: model.generation + 1,
               view_mode: model.view_mode,
+              diff_algorithm: model.diff_algorithm,
               phase: LoadFailed(message),
               route: model.route,
               share_url: model.share_url,
@@ -520,6 +588,7 @@ fn update(
               input: "",
               generation: model.generation + 1,
               view_mode: model.view_mode,
+              diff_algorithm: model.diff_algorithm,
               phase: LoadFailed(message),
               route: None,
               share_url: None,
@@ -535,6 +604,7 @@ fn update(
               input: "",
               generation: model.generation + 1,
               view_mode: model.view_mode,
+              diff_algorithm: model.diff_algorithm,
               phase: Idle,
               route: None,
               share_url: None,
@@ -568,6 +638,7 @@ fn update(
           input: model.input,
           generation: model.generation,
           view_mode: model.view_mode,
+          diff_algorithm: model.diff_algorithm,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -583,6 +654,7 @@ fn update(
           input: model.input,
           generation: model.generation,
           view_mode: model.view_mode,
+          diff_algorithm: model.diff_algorithm,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -657,7 +729,8 @@ fn update(
           guard model.phase is Showing(view) else {
             return (model, @rabbita.none)
           }
-          let skipped = match build_analysis_request(view) {
+          let skipped = match
+            build_analysis_request(view, model.diff_algorithm) {
             Ok((_, skipped)) => skipped
             Err(_) => []
           }
@@ -720,7 +793,15 @@ fn update(
             let (view, command) = finish_commit(
               reference, first_commit, accumulated, generation, emit,
             )
-            (with_phase(model, Showing(view)), command)
+            (
+              with_phase(
+                model,
+                Showing(
+                  ensure_expanded_file_documents(view, model.diff_algorithm),
+                ),
+              ),
+              command,
+            )
           }
         }
       }
@@ -739,6 +820,7 @@ fn update(
           expanded: false,
           old_side: file.old_side,
           new_side: file.new_side,
+          diff_cache: file.diff_cache,
         }
         (
           with_phase(model, Showing(set_file_state(view, index, changed))),
@@ -767,6 +849,7 @@ fn update(
           } else {
             file.new_side
           },
+          diff_cache: file.diff_cache,
         }
         let command = if first_load {
           @rabbita.batch(
@@ -784,7 +867,16 @@ fn update(
           @rabbita.none
         }
         (
-          with_phase(model, Showing(set_file_state(view, index, changed))),
+          with_phase(
+            model,
+            Showing(
+              set_file_state(
+                view,
+                index,
+                ensure_file_document(changed, model.diff_algorithm),
+              ),
+            ),
+          ),
           command,
         )
       }
@@ -823,6 +915,7 @@ fn update(
         expanded: true,
         old_side,
         new_side,
+        diff_cache: empty_diff_cache(),
       }
       (
         with_phase(model, Showing(set_file_state(view, index, changed))),
@@ -845,6 +938,7 @@ fn update(
             expanded: file.expanded,
             old_side: loaded,
             new_side: file.new_side,
+            diff_cache: empty_diff_cache(),
           }
         New =>
           {
@@ -853,7 +947,13 @@ fn update(
             expanded: file.expanded,
             old_side: file.old_side,
             new_side: loaded,
+            diff_cache: empty_diff_cache(),
           }
+      }
+      let changed = if changed.expanded {
+        ensure_file_document(changed, model.diff_algorithm)
+      } else {
+        changed
       }
       let changed_model = with_phase(
         model,

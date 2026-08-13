@@ -127,6 +127,36 @@ test "select MoonBit diff only when either path ends with lowercase mbt" {
 }
 
 ///|
+test "diff notices distinguish whole-file and partial lexical fallbacks" {
+  guard diff_notice(@alignment.AlignedDiffOutcome::Fallback("old: parse error"))
+    is Some(complete) else {
+    fail("expected a complete fallback notice")
+  }
+  assert_eq(complete.class_name, "diff-notice fallback")
+  assert_eq(complete.label, "Lexical fallback")
+  assert_true(complete.message.contains("this entire file"))
+  assert_true(complete.message.contains("old: parse error"))
+
+  guard diff_notice(
+      @alignment.AlignedDiffOutcome::PartialFallback([
+        "graph limit exceeded (3000000) at old line 724, new line 768",
+      ]),
+    )
+    is Some(partial) else {
+    fail("expected a partial fallback notice")
+  }
+  assert_eq(partial.class_name, "diff-notice partial-fallback")
+  assert_eq(partial.label, "Partial lexical fallback")
+  assert_true(partial.message.contains("AST diff was used for the rest"))
+  assert_true(partial.message.contains("old line 724, new line 768"))
+
+  assert_true(diff_notice(@alignment.AlignedDiffOutcome::Rendered) is None)
+  assert_true(
+    diff_notice(@alignment.AlignedDiffOutcome::NoStructuralChanges) is None,
+  )
+}
+
+///|
 test "raw content URLs percent-encode each path byte" {
   let reference = CommitRef::{
     owner: "moonbit-community",
@@ -254,6 +284,7 @@ test "stale commit responses are discarded by generation" {
     input: "https://github.com/a/b/commit/abcdef1",
     generation: 2,
     view_mode: Split,
+    diff_algorithm: LexicalAlgorithm,
     phase: Idle,
     route: None,
     share_url: None,
@@ -330,6 +361,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     input: "",
     generation: 7,
     view_mode: Split,
+    diff_algorithm: LexicalAlgorithm,
     phase: Showing(view),
     route: Some(reference),
     share_url: None,
@@ -370,6 +402,7 @@ fn analysis_test_model(
     input: "",
     generation: 9,
     view_mode: Split,
+    diff_algorithm: LexicalAlgorithm,
     phase: Showing(view),
     route: Some(view.reference),
     share_url: None,
@@ -427,6 +460,7 @@ test "analysis rejects file and source limits before making a partial conclusion
         "Cannot render: one side is larger than 1 MiB.", false,
       ),
       new_side: Ready(["new"]),
+      diff_cache: empty_diff_cache(),
     },
   )
   let (limited, _) = update(
@@ -446,8 +480,11 @@ test "analysis rejects file and source limits before making a partial conclusion
     expanded: false,
     old_side: Ready(["a".repeat(MAX_ANALYSIS_PATCH_BYTES)]),
     new_side: Ready(["b".repeat(MAX_ANALYSIS_PATCH_BYTES)]),
+    diff_cache: empty_diff_cache(),
   })
-  guard build_analysis_request(patch_view) is Err(patch_message) else {
+  let patch_view = ensure_all_file_documents(patch_view, LexicalAlgorithm)
+  guard build_analysis_request(patch_view, LexicalAlgorithm)
+    is Err(patch_message) else {
     fail("expected patch byte limit failure")
   }
   assert_true(patch_message.contains("256 KiB"))
@@ -470,8 +507,10 @@ test "analysis rejects file and source limits before making a partial conclusion
     expanded: false,
     old_side: Ready(old),
     new_side: Ready(new),
+    diff_cache: empty_diff_cache(),
   })
-  guard build_analysis_request(hunk_view) is Err(hunk_message) else {
+  let hunk_view = ensure_all_file_documents(hunk_view, LexicalAlgorithm)
+  guard build_analysis_request(hunk_view, LexicalAlgorithm) is Err(hunk_message) else {
     fail("expected hunk count limit failure")
   }
   assert_true(hunk_message.contains("more than 200 text hunks"))
@@ -491,6 +530,7 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
     expanded: false,
     old_side: Ready(["old"]),
     new_side: Ready(["new"]),
+    diff_cache: empty_diff_cache(),
   })
   view = set_file_state(view, 1, {
     file: files[1],
@@ -502,6 +542,7 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
     new_side: CannotRender(
       "Cannot render: the file is binary or is not valid UTF-8.", true,
     ),
+    diff_cache: empty_diff_cache(),
   })
   view = set_file_state(view, 2, {
     file: files[2],
@@ -509,8 +550,10 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
     expanded: false,
     old_side: Ready(["before"]),
     new_side: Ready(["after"]),
+    diff_cache: empty_diff_cache(),
   })
-  guard build_analysis_request(view) is Ok((payload, skipped)) else {
+  view = ensure_all_file_documents(view, LexicalAlgorithm)
+  guard build_analysis_request(view, LexicalAlgorithm) is Ok((payload, skipped)) else {
     fail("expected analysis request")
   }
   assert_eq(payload.hunks.map(hunk => hunk.id), ["f0-h0", "f2-h0"])
@@ -536,8 +579,11 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
     expanded: false,
     old_side: Ready([]),
     new_side: Ready(["root"]),
+    diff_cache: empty_diff_cache(),
   })
-  guard build_analysis_request(root_ready) is Ok((root_payload, _)) else {
+  let root_ready = ensure_all_file_documents(root_ready, LexicalAlgorithm)
+  guard build_analysis_request(root_ready, LexicalAlgorithm)
+    is Ok((root_payload, _)) else {
     fail("expected root analysis request")
   }
   assert_true(
@@ -551,8 +597,11 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
     expanded: false,
     old_side: Ready(["old"]),
     new_side: Ready(["new"]),
+    diff_cache: empty_diff_cache(),
   })
-  guard build_analysis_request(renamed_view) is Ok((renamed_payload, _)) else {
+  let renamed_view = ensure_all_file_documents(renamed_view, LexicalAlgorithm)
+  guard build_analysis_request(renamed_view, LexicalAlgorithm)
+    is Ok((renamed_payload, _)) else {
     fail("expected renamed analysis request")
   }
   let renamed_json = ToJson::to_json(renamed_payload).stringify()
@@ -569,6 +618,7 @@ test "failed source preparation retries and advances only after all sides load" 
     expanded: false,
     old_side: LoadFailed("temporary failure"),
     new_side: Ready(["new"]),
+    diff_cache: empty_diff_cache(),
   })
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (retrying, _) = update(analysis_test_model(view), AnalyzeChanges, emit)
@@ -623,6 +673,7 @@ test "stale analysis responses are discarded by commit generation" {
     expanded: false,
     old_side: Ready(["old"]),
     new_side: Ready(["new"]),
+    diff_cache: empty_diff_cache(),
   })
   let model = analysis_test_model(view, status=Analyzing)
   let response = AnalysisResponse::{
@@ -653,6 +704,7 @@ test "analysis groups open the most important result first and toggle independen
     expanded: false,
     old_side: Ready(["old"]),
     new_side: Ready(["new"]),
+    diff_cache: empty_diff_cache(),
   })
   let model = analysis_test_model(view, status=Analyzing)
   let response = AnalysisResponse::{
@@ -692,4 +744,159 @@ test "analysis groups open the most important result first and toggle independen
   assert_eq(changed, [false, true])
   let (out_of_range, _) = update(collapsed, ToggleAnalysisGroup(10), emit)
   assert_true(out_of_range == collapsed)
+}
+
+///|
+fn ready_test_file(
+  file : ApiFile,
+  old : Array[String],
+  new : Array[String],
+  expanded? : Bool = true,
+) -> FileState {
+  {
+    file,
+    diff_mode: file_diff_mode(file),
+    expanded,
+    old_side: Ready(old),
+    new_side: Ready(new),
+    diff_cache: empty_diff_cache(),
+  }
+}
+
+///|
+test "Lexical is the default and algorithm selection is not part of routes" {
+  let model = initial_model()
+  assert_true(model.diff_algorithm is LexicalAlgorithm)
+  let reference = CommitRef::{ owner: "owner", repo: "repo", sha: "abcdef1" }
+  assert_eq(playground_route(reference), "#/owner/repo/commit/abcdef1")
+  assert_false(playground_route(reference).contains("algorithm"))
+}
+
+///|
+test "algorithm switching fills the second cache and clears analysis state" {
+  let file = fixture_file("src/format.mbt", "modified")
+  let lexical_file = ensure_file_document(
+    ready_test_file(file, ["fn format() { 1 }"], ["fn format() {", "  1", "}"]),
+    LexicalAlgorithm,
+  )
+  assert_true(lexical_file.diff_cache.lexical is Some(_))
+  assert_true(lexical_file.diff_cache.ast is None)
+  let view = set_file_state(analysis_test_view([file]), 0, lexical_file)
+  let response = AnalysisResult::{ summary: "done", groups: [] }
+  let statuses : Array[AnalysisStatus] = [
+    Analyzing,
+    AnalysisFailed("failed"),
+    AnalysisDone(response, [], []),
+  ]
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for status in statuses {
+    let current = analysis_test_model(view, status~)
+    let (switched, _) = update(current, SelectDiffAlgorithm(AstAlgorithm), emit)
+    assert_true(switched.diff_algorithm is AstAlgorithm)
+    assert_true(switched.analysis_status is AnalysisIdle)
+    guard switched.phase is Showing(changed_view) else {
+      fail("expected commit to remain visible")
+    }
+    let changed = changed_view.files[0]
+    assert_true(changed.diff_cache.lexical is Some(_))
+    guard changed.diff_cache.ast is Some(ast) else {
+      fail("expected AST cache")
+    }
+    assert_true(
+      ast.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges,
+    )
+  }
+}
+
+///|
+test "late analysis response is discarded after an algorithm switch" {
+  let file = fixture_file("src/change.mbt", "modified")
+  let view = set_file_state(
+    analysis_test_view([file]),
+    0,
+    ensure_file_document(
+      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
+      LexicalAlgorithm,
+    ),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (switched, _) = update(
+    analysis_test_model(view, status=Analyzing),
+    SelectDiffAlgorithm(AstAlgorithm),
+    emit,
+  )
+  let response = AnalysisResponse::{
+    version: ANALYSIS_VERSION,
+    ok: true,
+    analysis: { summary: "late", groups: [] },
+  }
+  let (after, _) = update(
+    switched,
+    AnalysisLoaded(switched.generation, Ok(response)),
+    emit,
+  )
+  assert_true(after == switched)
+}
+
+///|
+test "new source invalidates both MoonBit algorithm caches" {
+  let file = fixture_file("src/change.mbt", "modified")
+  let cached = ensure_file_document(
+    ensure_file_document(
+      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
+      LexicalAlgorithm,
+    ),
+    AstAlgorithm,
+  )
+  assert_true(cached.diff_cache.lexical is Some(_))
+  assert_true(cached.diff_cache.ast is Some(_))
+  let view = set_file_state(analysis_test_view([file]), 0, cached)
+  let model = { ..analysis_test_model(view), diff_algorithm: AstAlgorithm }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (updated, _) = update(
+    model,
+    SourceLoaded(
+      model.generation,
+      0,
+      New,
+      Ok(("text/plain", @utf8.encode("fn f() { newest() }"))),
+    ),
+    emit,
+  )
+  guard updated.phase is Showing(updated_view) else { fail("expected commit") }
+  assert_true(updated_view.files[0].diff_cache.lexical is None)
+  assert_true(updated_view.files[0].diff_cache.ast is Some(_))
+}
+
+///|
+test "non-MoonBit line document is shared across algorithm switches" {
+  let file = fixture_file("README.md", "modified")
+  let cached = ensure_file_document(
+    ready_test_file(file, ["old"], ["new"]),
+    LexicalAlgorithm,
+  )
+  guard cached.diff_cache.line is Some(before) else {
+    fail("expected line cache")
+  }
+  let after = ensure_file_document(cached, AstAlgorithm)
+  assert_true(after.diff_cache.line == Some(before))
+  assert_true(after.diff_cache.lexical is None)
+  assert_true(after.diff_cache.ast is None)
+}
+
+///|
+test "AST structural empty files are skipped without starting backend analysis" {
+  let file = fixture_file("src/format.mbt", "modified")
+  let state = ready_test_file(file, ["fn format() { 1 }"], [
+    "fn format() {", "  1", "}",
+  ])
+  let view = set_file_state(analysis_test_view([file]), 0, state)
+  let model = { ..analysis_test_model(view), diff_algorithm: AstAlgorithm }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (after, _) = update(model, AnalyzeChanges, emit)
+  guard after.analysis_status is AnalysisNoHunks(skipped) else {
+    fail("expected local no-hunks result")
+  }
+  assert_eq(skipped.map(item => item.path), ["src/format.mbt"])
+  assert_true(skipped[0].reason.contains("No structural changes"))
 }

@@ -32,6 +32,16 @@ priv enum ImplEdit {
 }
 
 ///|
+// The single top-level alignment decision shared by terminal rendering and
+// renderer-neutral document calculation. Reliable UUID/key/hash matches are
+// compared unit-by-unit; otherwise both engines compare the root lists/files
+// as a whole.
+priv enum TopLevelPlan {
+  PerUnit(Array[ImplEdit])
+  RootList(old~ : Array[ImplUnit], new~ : Array[ImplUnit])
+}
+
+///|
 fn is_uuid_char(ch : Char) -> Bool {
   (ch >= '0' && ch <= '9') ||
   (ch >= 'a' && ch <= 'z') ||

@@ -380,6 +380,23 @@ fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
   })
 }
 
+///|
+fn top_level_plan(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+) -> TopLevelPlan {
+  if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
+    PerUnit(align_impl_units_by_uuid(old_units, new_units))
+  } else {
+    let edits = align_impl_units_by_key(old_units, new_units)
+    if impl_edits_have_replacement(edits) {
+      PerUnit(edits)
+    } else {
+      RootList(old=old_units.to_owned(), new=new_units.to_owned())
+    }
+  }
+}
+
 ///|UUID(85a087f2-92d2-4240-8b75-a5c086d18e14)
 fn render_impl_edits(
   old_label : String,
@@ -437,52 +454,6 @@ fn render_impl_edits(
   } else {
     ""
   }
-}
-
-///|UUID(5904eab2-e4fe-4ce5-b9bc-b437e4d7191f)
-// UUID alignment diffs top-level units independently. This makes moved or
-// reordered declarations easier to read and limits graph size per comparison.
-fn render_uuid_aligned_impl_diffs(
-  old_label : String,
-  old_source : String,
-  old_units : ArrayView[ImplUnit],
-  new_label : String,
-  new_source : String,
-  new_units : ArrayView[ImplUnit],
-  graph_limit : UInt,
-  render_options : @render.RenderOptions,
-) -> String {
-  render_impl_edits(
-    old_label,
-    old_source,
-    new_label,
-    new_source,
-    align_impl_units_by_uuid(old_units, new_units),
-    graph_limit,
-    render_options,
-  )
-}
-
-///|UUID(8d173f23-17f9-43af-a67e-f7a7592399e5)
-fn render_key_aligned_impl_diffs(
-  old_label : String,
-  old_source : String,
-  old_units : ArrayView[ImplUnit],
-  new_label : String,
-  new_source : String,
-  new_units : ArrayView[ImplUnit],
-  graph_limit : UInt,
-  render_options : @render.RenderOptions,
-) -> String? {
-  let edits = align_impl_units_by_key(old_units, new_units)
-  if !impl_edits_have_replacement(edits) {
-    return None
-  }
-  Some(
-    render_impl_edits(
-      old_label, old_source, new_label, new_source, edits, graph_limit, render_options,
-    ),
-  )
 }
 
 ///|UUID(109a4d3f-cbaa-42e9-a5d5-5680327e8e55)
@@ -549,21 +520,14 @@ pub fn render_aligned_cst_diffs(
 ) -> String {
   let old_units = collect_impl_units(old_source, old_root)
   let new_units = collect_impl_units(new_source, new_root)
-  if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
-    render_uuid_aligned_impl_diffs(
-      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
-      render_options,
-    )
-  } else if render_key_aligned_impl_diffs(
-      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
-      render_options,
-    )
-    is Some(rendered) {
-    rendered
-  } else {
-    render_root_list_diff(
-      old_label, old_source, old_units, new_label, new_source, new_units, graph_limit,
-      render_options,
-    )
+  match top_level_plan(old_units, new_units) {
+    PerUnit(edits) =>
+      render_impl_edits(
+        old_label, old_source, new_label, new_source, edits, graph_limit, render_options,
+      )
+    RootList(old~, new~) =>
+      render_root_list_diff(
+        old_label, old_source, old, new_label, new_source, new, graph_limit, render_options,
+      )
   }
 }
