@@ -4,6 +4,7 @@ import {
   "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",
   "moonbit-community/moondiff/syntax",
+  "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tool/hunks",
 }
 

@@ -7,6 +7,7 @@ priv struct CliOptions {
   new_path : String
   graph_limit_text : String
   use_color : Bool
+  ignore_comments : Bool
 }
 
 ///|UUID(9d8d9872-ee94-460e-99e1-8590c4ea178f)
@@ -57,7 +58,7 @@ fn moondiff_command() -> @argparse.Command {
       @argparse.OptionArg(
         "graph-limit",
         short='g',
-        about="Maximum syntax graph size before falling back to line diff",
+        about="Maximum syntax graph size before falling back to tokdiff",
         default_values=[default_graph_limit_text],
       ),
     ],
@@ -66,6 +67,11 @@ fn moondiff_command() -> @argparse.Command {
         "no-color",
         about="Disable ANSI colors",
         action=@argparse.FlagAction::SetFalse,
+      ),
+      @argparse.FlagArg(
+        "ignore-comments",
+        about="Ignore MoonBit comment-only differences",
+        action=@argparse.FlagAction::SetTrue,
       ),
     ],
     positionals=[
@@ -91,6 +97,7 @@ fn parse_cli_args(argv : ArrayView[String]) -> CliOptions raise {
     new_path: single_value(matches, "new-file"),
     graph_limit_text: single_value(matches, "graph-limit"),
     use_color: matches.flags.get("no-color").unwrap_or(true),
+    ignore_comments: matches.flags.get("ignore-comments").unwrap_or(false),
   }
 }
 
@@ -121,6 +128,7 @@ fn render_cli_diff(
         graph_limit~,
         context_lines=3,
         use_color=options.use_color,
+        ignore_comments=options.ignore_comments,
       ),
     ).rendered
   } else {

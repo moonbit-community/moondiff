@@ -276,6 +276,294 @@ fn render_hunk_line(
   render_line_body(line, ranges, style, use_color, plain_context_line)
 }
 
+///|
+fn document_line_has_change(line : @tokdiff.DiffLine) -> Bool {
+  line.segments.any(segment => segment.kind is Changed)
+}
+
+///|
+fn render_document_line_body(
+  line : @tokdiff.DiffLine,
+  changed_style : LineStyle,
+  use_color : Bool,
+) -> String {
+  if !use_color {
+    return line.text()
+  }
+  let buf = StringBuilder::new()
+  for segment in line.segments {
+    buf.write_string(
+      style_text(
+        segment.text,
+        if segment.kind is Changed {
+          changed_style
+        } else {
+          Context
+        },
+        true,
+      ),
+    )
+  }
+  buf.to_string()
+}
+
+///|
+fn append_document_change_line(
+  buf : StringBuilder,
+  line : @tokdiff.DiffLine,
+  old_side : Bool,
+  old_width : Int,
+  new_width : Int,
+  use_color : Bool,
+) -> Unit {
+  let changed_style = if old_side { Deleted } else { Added }
+  let number_style = if line.segments.is_empty() ||
+    document_line_has_change(line) {
+    changed_style
+  } else {
+    Context
+  }
+  buf.write_string(
+    line_prefix(
+      if old_side {
+        "-"
+      } else {
+        "+"
+      },
+      if old_side {
+        Some(line.index)
+      } else {
+        None
+      },
+      old_width,
+      1,
+      if old_side {
+        None
+      } else {
+        Some(line.index)
+      },
+      new_width,
+      1,
+      number_style,
+      use_color,
+    ) +
+    " " +
+    render_document_line_body(line, changed_style, use_color),
+  )
+  buf.write_char('\n')
+}
+
+///|
+fn append_document_context_line(
+  buf : StringBuilder,
+  old_index : Int?,
+  new_index : Int?,
+  text : String,
+  old_width : Int,
+  new_width : Int,
+  use_color : Bool,
+) -> Unit {
+  buf.write_string(
+    render_hunk_line(
+      " ",
+      old_index,
+      old_width,
+      1,
+      new_index,
+      new_width,
+      1,
+      text,
+      None,
+      Context,
+      use_color,
+      true,
+    ),
+  )
+  buf.write_char('\n')
+}
+
+///|
+fn append_document_change_row(
+  buf : StringBuilder,
+  row : @tokdiff.DiffRow,
+  old_width : Int,
+  new_width : Int,
+  use_color : Bool,
+) -> Unit {
+  match row {
+    Paired(old_line, new_line) => {
+      append_document_change_line(
+        buf, old_line, true, old_width, new_width, use_color,
+      )
+      append_document_change_line(
+        buf, new_line, false, old_width, new_width, use_color,
+      )
+    }
+    OldOnly(line) =>
+      append_document_change_line(
+        buf, line, true, old_width, new_width, use_color,
+      )
+    NewOnly(line) =>
+      append_document_change_line(
+        buf, line, false, old_width, new_width, use_color,
+      )
+  }
+}
+
+///|
+fn append_document_ignored_row(
+  buf : StringBuilder,
+  row : @tokdiff.DiffRow,
+  old_width : Int,
+  new_width : Int,
+  use_color : Bool,
+) -> Unit {
+  match row {
+    Paired(old_line, new_line) =>
+      if old_line.text() == new_line.text() {
+        append_document_context_line(
+          buf,
+          Some(old_line.index),
+          Some(new_line.index),
+          old_line.text(),
+          old_width,
+          new_width,
+          use_color,
+        )
+      } else {
+        append_document_context_line(
+          buf,
+          Some(old_line.index),
+          None,
+          old_line.text(),
+          old_width,
+          new_width,
+          use_color,
+        )
+        append_document_context_line(
+          buf,
+          None,
+          Some(new_line.index),
+          new_line.text(),
+          old_width,
+          new_width,
+          use_color,
+        )
+      }
+    OldOnly(line) =>
+      append_document_context_line(
+        buf,
+        Some(line.index),
+        None,
+        line.text(),
+        old_width,
+        new_width,
+        use_color,
+      )
+    NewOnly(line) =>
+      append_document_context_line(
+        buf,
+        None,
+        Some(line.index),
+        line.text(),
+        old_width,
+        new_width,
+        use_color,
+      )
+  }
+}
+
+///|
+fn update_document_max_line(max_line : Ref[Int], index : Int) -> Unit {
+  max_line.val = @cmp.maximum(max_line.val, index + 1)
+}
+
+///|
+fn document_line_widths(document : @tokdiff.DiffDocument) -> (Int, Int) {
+  let old_max = Ref(1)
+  let new_max = Ref(1)
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      match block {
+        ContextBlock(lines) =>
+          for line in lines {
+            update_document_max_line(old_max, line.old_index)
+            update_document_max_line(new_max, line.new_index)
+          }
+        ChangeBlock(rows) | IgnoredBlock(rows) =>
+          for row in rows {
+            match row {
+              Paired(old_line, new_line) => {
+                update_document_max_line(old_max, old_line.index)
+                update_document_max_line(new_max, new_line.index)
+              }
+              OldOnly(line) => update_document_max_line(old_max, line.index)
+              NewOnly(line) => update_document_max_line(new_max, line.index)
+            }
+          }
+      }
+    }
+  }
+  (old_max.val.to_string().length(), new_max.val.to_string().length())
+}
+
+///|
+/// Render a calculated diff document with the terminal renderer's file
+/// headers, two line-number columns, and optional ANSI highlighting. An empty
+/// document renders only its file headers so the caller can choose the most
+/// accurate empty-state message.
+pub fn render_diff_document(
+  old_label : String,
+  new_label : String,
+  document : @tokdiff.DiffDocument,
+  options : RenderOptions,
+) -> String {
+  let (old_width, new_width) = document_line_widths(document)
+  let buf = StringBuilder::new()
+  buf.write_string(render_file_headers(old_label, new_label, options.use_color))
+  for hunk in document.hunks {
+    buf.write_string(hunk.header)
+    buf.write_char('\n')
+    for block in hunk.blocks {
+      match block {
+        ContextBlock(lines) =>
+          for line in lines {
+            append_document_context_line(
+              buf,
+              Some(line.old_index),
+              Some(line.new_index),
+              line.text,
+              old_width,
+              new_width,
+              options.use_color,
+            )
+          }
+        ChangeBlock(rows) =>
+          for row in rows {
+            append_document_change_row(
+              buf,
+              row,
+              old_width,
+              new_width,
+              options.use_color,
+            )
+          }
+        IgnoredBlock(rows) =>
+          for row in rows {
+            append_document_ignored_row(
+              buf,
+              row,
+              old_width,
+              new_width,
+              options.use_color,
+            )
+          }
+      }
+    }
+  }
+  buf.to_string()
+}
+
 ///|UUID(d0d1ad18-199b-4b66-b233-b6a36da07412)
 // Format a unified-diff range. Empty ranges are displayed at the preceding
 // line, as required for pure insertions/deletions.
@@ -690,9 +978,9 @@ pub fn render_ast_diff(
 }
 
 ///|UUID(e282663c-5f0b-4f1d-8b46-5463657976a4)
-// Plain line-oriented fallback used for parser failures, graph-limit failures,
-// and callers that only have text-level highlights. When highlight maps are
-// provided here, their keys are one-based line numbers in the supplied text.
+// Plain line-oriented diff retained for non-MoonBit inputs and callers that
+// only have text-level highlights. When highlight maps are provided here,
+// their keys are one-based line numbers in the supplied text.
 pub fn render_line_diff(
   old_label : String,
   old_source : String,

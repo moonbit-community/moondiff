@@ -232,9 +232,9 @@ fn rebase_matched_positions(
 }
 
 ///|UUID(2d9e21e9-c8cc-40cf-b572-5e163bf3b4b8)
-// If the tree graph grows beyond the configured limit for a single unit, show a
-// regular line diff for just that unit instead of abandoning the whole file.
-fn render_impl_line_fallback(
+// If the tree graph grows beyond the configured limit for a single unit, show
+// tokdiff for just that unit instead of abandoning the whole file.
+fn render_impl_tokdiff_fallback(
   reason : String,
   old_label : String,
   old_unit : ImplUnit?,
@@ -246,17 +246,18 @@ fn render_impl_line_fallback(
   let new_slice = source_slice(new_unit)
   let old_line_base = impl_line_base(old_unit)
   let new_line_base = impl_line_base(new_unit)
-  "note: fallback to line diff (\{reason})\n" +
-  @render.render_line_diff(
+  let document = @tokdiff.diff(
+    old=document_lines(old_slice),
+    new=document_lines(new_slice),
+    context=render_options.context_lines,
+    line_cleanup=true,
+  ).rebase(old_line_base - 1, new_line_base - 1)
+  "note: fallback to tokdiff (\{reason})\n" +
+  @render.render_diff_document(
     format_impl_label(old_label, old_unit),
-    old_slice,
     format_impl_label(new_label, new_unit),
-    new_slice,
-    None,
-    None,
+    document,
     render_options,
-    old_line_base~,
-    new_line_base~,
   )
 }
 
@@ -290,8 +291,8 @@ fn render_impl_edit(
   @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, graph_limit) catch {
     _ =>
       return Some(
-        render_impl_line_fallback(
-          "graph limit exceeded (\{graph_limit})",
+        render_impl_tokdiff_fallback(
+          graph_fallback_reason(graph_limit, old_unit, new_unit),
           old_label,
           old_unit,
           new_label,
@@ -353,7 +354,7 @@ fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
 }
 
 ///|UUID(86aa7e88-7f7a-4232-baf0-b765d970f8f2)
-fn render_root_list_line_fallback(
+fn render_root_list_tokdiff_fallback(
   reason : String,
   old_label : String,
   old_source : String,
@@ -361,16 +362,70 @@ fn render_root_list_line_fallback(
   new_source : String,
   render_options : @render.RenderOptions,
 ) -> String {
-  "note: fallback to line diff (\{reason})\n" +
-  @render.render_line_diff(
-    old_label,
-    old_source,
-    new_label,
-    new_source,
-    None,
-    None,
-    render_options,
+  let document = @tokdiff.diff(
+    old=document_lines(old_source),
+    new=document_lines(new_source),
+    context=render_options.context_lines,
+    line_cleanup=true,
   )
+  "note: fallback to tokdiff (\{reason})\n" +
+  @render.render_diff_document(old_label, new_label, document, render_options)
+}
+
+///|
+fn render_aligned_document_result(
+  old_label : String,
+  old_source : String,
+  new_label : String,
+  new_source : String,
+  result : AlignedDiffResult,
+  render_options : @render.RenderOptions,
+) -> String {
+  match result.outcome {
+    NoNonCommentChanges =>
+      @render.render_file_headers(
+        old_label,
+        new_label,
+        render_options.use_color,
+      ) +
+      "No non-comment changes.\n"
+    NoStructuralChanges =>
+      if old_source == new_source {
+        render_no_changes(old_label, new_label, render_options)
+      } else {
+        ""
+      }
+    Rendered =>
+      @render.render_diff_document(
+        old_label,
+        new_label,
+        result.document,
+        render_options,
+      )
+    Fallback(reason) =>
+      "note: fallback to tokdiff (\{reason})\n" +
+      @render.render_diff_document(
+        old_label,
+        new_label,
+        result.document,
+        render_options,
+      )
+    PartialFallback(reasons) => {
+      let buf = StringBuilder::new()
+      for reason in reasons {
+        buf.write_string("note: fallback to tokdiff (\{reason})\n")
+      }
+      buf.write_string(
+        @render.render_diff_document(
+          old_label,
+          new_label,
+          result.document,
+          render_options,
+        ),
+      )
+      buf.to_string()
+    }
+  }
 }
 
 ///|UUID(97bfcfe4-80de-498e-a147-90d250e6c93e)
@@ -485,7 +540,7 @@ fn render_root_list_diff(
   let change_map = @syntax.ChangeMap::new()
   @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, graph_limit) catch {
     _ =>
-      return render_root_list_line_fallback(
+      return render_root_list_tokdiff_fallback(
         "graph limit exceeded (\{graph_limit})",
         old_label,
         old_source,
@@ -527,7 +582,35 @@ pub fn render_aligned_cst_diffs(
   new_root : @cst.CstNode,
   graph_limit : UInt,
   render_options : @render.RenderOptions,
+  ignore_comments? : Bool = false,
 ) -> String {
+  if ignore_comments {
+    let context = @cmp.maximum(render_options.context_lines, 0)
+    let result = if initial_diff_document_result(
+        old_source,
+        new_source,
+        Ast,
+        context,
+        true,
+      )
+      is Some(result) {
+      result
+    } else {
+      diff_document_from_parsed_roots(
+        old_source,
+        new_source,
+        old_root,
+        new_root,
+        Ast,
+        context,
+        graph_limit,
+        true,
+      )
+    }
+    return render_aligned_document_result(
+      old_label, old_source, new_label, new_source, result, render_options,
+    )
+  }
   let old_units = collect_impl_units(old_source, old_root)
   let new_units = collect_impl_units(new_source, new_root)
   match top_level_plan(old_units, new_units) {

@@ -1,6 +1,6 @@
 ///|UUID(418e4bf6-de65-4cf2-a04e-b5e635f0f368)
 // Collapse parser diagnostics into the short reason printed before a fallback
-// line diff. Multiple diagnostics are intentionally summarized so the diff
+// token diff. Multiple diagnostics are intentionally summarized so the diff
 // output stays readable.
 fn parse_report_summary(
   label : String,
@@ -16,7 +16,16 @@ fn parse_report_summary(
 }
 
 ///|UUID(fb09927f-8d77-415f-9b0e-b40809807775)
-// Parser failures should still produce a useful textual diff. Match
+fn tokdiff_lines(source : String) -> Array[String] {
+  if source == "" {
+    []
+  } else {
+    @render.split_lines(source)
+  }
+}
+
+///|
+// Parser failures should still produce a useful token diff. Match
 // difftastic's behavior by making the fallback explicit in the output.
 fn render_text_fallback(
   reason : String,
@@ -26,21 +35,30 @@ fn render_text_fallback(
   new_source : String,
   options : DiffOptions,
 ) -> String {
-  "note: fallback to line diff (\{reason})\n" +
-  @render.render_line_diff(
-    old_label,
-    old_source,
-    new_label,
-    new_source,
-    None,
-    None,
-    options.render_options(),
+  let document = @tokdiff.diff(
+    old=tokdiff_lines(old_source),
+    new=tokdiff_lines(new_source),
+    context=options.context_lines,
+    line_cleanup=true,
+    ignore_comments=options.ignore_comments,
   )
+  if options.ignore_comments && document.hunks.is_empty() {
+    @render.render_file_headers(old_label, new_label, options.use_color) +
+    "No non-comment changes.\n"
+  } else {
+    "note: fallback to tokdiff (\{reason})\n" +
+    @render.render_diff_document(
+      old_label,
+      new_label,
+      document,
+      options.render_options(),
+    )
+  }
 }
 
 ///|UUID(4dc6c7bd-e552-4ca2-b156-8b254afe1200)
 // Parse both inputs, render a CST-aware diff when possible, and fall back to a
-// plain line diff when either side cannot be parsed.
+// tokdiff when either side cannot be parsed.
 pub fn diff_text(
   old_label : String,
   old_source : String,
@@ -94,6 +112,7 @@ pub fn diff_text(
     new_parse.root(),
     options.graph_limit,
     options.render_options(),
+    ignore_comments=options.ignore_comments,
   )
   DiffResult::{ kind: Ast, rendered, has_changes }
 }
