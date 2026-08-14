@@ -1,0 +1,13 @@
+[34m--- cli_test/source/ignore_comments.old.mbt[39m
+[34m+++ cli_test/source/ignore_comments.new.mbt[39m
+@@ -1,5 +1,6 @@
+[90m.[39m [90m1[39m ///|
+[90m1[39m [90m.[39m ///|UUID(old-id)
+[90m.[39m [90m2[39m ///|UUID(new-id)
+[90m2[39m [90m.[39m /// Old documentation.
+[90m.[39m [90m3[39m /// New documentation.
+[90m3[39m [90m4[39m fn value() -> Int {
+[31m4[39m [90m.[39m [90m  [39m[31m[1mold_value[22m[39m[90m()[39m[90m // old explanation[39m
+[90m.[39m [32m5[39m [90m  [39m[32m[1mnew_value[22m[39m[90m()[39m[90m // new explanation[39m
+[90m5[39m [90m6[39m }
+

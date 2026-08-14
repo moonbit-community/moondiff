@@ -332,12 +332,12 @@ test "diff_text does not highlight unchanged trailing delimiter at line end" {
 }
 
 ///|UUID(88eea529-4e99-40c4-9ef4-0f7083393a0f)
-test "diff_text falls back to line diff on parser errors" {
+test "diff_text falls back to tokdiff on parser errors" {
   let old_source = "fn broken("
   let new_source = "fn fixed() -> Int { 1 }"
   let result = diff_text("old.mbt", old_source, "new.mbt", new_source)
   assert_true(result.kind is TextFallback(_))
-  assert_true(result.rendered.has_prefix("note: fallback to line diff"))
+  assert_true(result.rendered.has_prefix("note: fallback to tokdiff"))
   assert_true(result.rendered.contains("--- old.mbt"))
   assert_true(result.rendered.contains("+++ new.mbt"))
 }
@@ -406,7 +406,7 @@ test "diff_text matches no-UUID top-level roots after insertion" {
 }
 
 ///|UUID(9a2b04b5-4a30-486c-8dc0-58806c525b56)
-test "diff_text falls back to single-definition line diff for graph limit" {
+test "diff_text falls back to single-definition tokdiff for graph limit" {
   let old_source =
     #|fn keep() {}
     #|fn target() {
@@ -429,12 +429,154 @@ test "diff_text falls back to single-definition line diff for graph limit" {
   assert_true(result.kind is Ast)
   assert_true(
     result.rendered.has_prefix(
-      "note: fallback to line diff (graph limit exceeded (0))\n--- old.mbt: line 2\n+++ new.mbt: line 3\n",
+      "note: fallback to tokdiff (graph limit exceeded (0) at old line 2, new line 3)\n--- old.mbt: line 2\n+++ new.mbt: line 3\n",
     ),
   )
   assert_true(result.rendered.contains("--- old.mbt\n+++ new.mbt: line 1"))
   assert_true(result.rendered.contains("fn inserted() {}"))
   assert_true(result.rendered.contains("foo(baz(bar))"))
+}
+
+///|
+test "diff_text uses whole-document tokdiff for root graph limit" {
+  let result = diff_text(
+    "old.mbt",
+    "test {\n  inspect(old_value)\n}",
+    "new.mbt",
+    "test {\n  inspect(new_value)\n}",
+    options=DiffOptions::new(graph_limit=0),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(
+    result.rendered.has_prefix(
+      "note: fallback to tokdiff (graph limit exceeded (0))\n--- old.mbt\n+++ new.mbt\n",
+    ),
+  )
+  assert_true(result.rendered.contains("2 .   inspect(old_value)"))
+  assert_true(result.rendered.contains(". 2   inspect(new_value)"))
+}
+
+///|
+test "diff_text reports pure comment changes as empty when ignored" {
+  let old_source =
+    #|/// old docs
+    #|fn value() -> Int { 1 } // old trailing
+  let new_source =
+    #|/// new docs
+    #|fn value() -> Int { 1 } // new trailing
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(ignore_comments=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(result.has_changes)
+  assert_eq(
+    result.rendered,
+    "--- old.mbt\n+++ new.mbt\nNo non-comment changes.\n",
+  )
+}
+
+///|
+test "diff_text keeps ignored comments neutral around code changes" {
+  let old_source =
+    #|/// old docs
+    #|fn value() -> Int {
+    #|  old_value() // old explanation
+    #|}
+  let new_source =
+    #|/// new docs
+    #|fn value() -> Int {
+    #|  new_value()  // new explanation
+    #|}
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(ignore_comments=true, use_color=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains("old docs"), msg=result.rendered)
+  assert_true(result.rendered.contains("new docs"), msg=result.rendered)
+  assert_true(result.rendered.contains("old explanation"), msg=result.rendered)
+  assert_true(result.rendered.contains("new explanation"), msg=result.rendered)
+  assert_true(
+    result.rendered.contains("\u{1b}[31m\u{1b}[1mold_value\u{1b}[22m\u{1b}[39m"),
+    msg=result.rendered,
+  )
+  assert_true(
+    result.rendered.contains("\u{1b}[32m\u{1b}[1mnew_value\u{1b}[22m\u{1b}[39m"),
+    msg=result.rendered,
+  )
+  assert_false(
+    result.rendered.contains("\u{1b}[31m\u{1b}[1mold explanation"),
+    msg=result.rendered,
+  )
+  assert_false(
+    result.rendered.contains("\u{1b}[32m\u{1b}[1mnew explanation"),
+    msg=result.rendered,
+  )
+}
+
+///|
+test "diff_text does not treat slashes inside strings as comments" {
+  let result = diff_text(
+    "old.mbt",
+    "fn url() -> String { \"https://old.example/a//b\" }",
+    "new.mbt",
+    "fn url() -> String { \"https://new.example/a//b\" }",
+    options=DiffOptions::new(ignore_comments=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_false(result.rendered.contains("No non-comment changes."))
+  assert_true(result.rendered.contains("https://old.example/a//b"))
+  assert_true(result.rendered.contains("https://new.example/a//b"))
+}
+
+///|
+test "diff_text ignores UUID and block separator comment changes" {
+  let old_source =
+    #|///|UUID(old-id)
+    #|fn value() -> Int { 1 }
+  let new_source =
+    #|///|
+    #|///|UUID(new-id)
+    #|fn value() -> Int { 1 }
+  let result = diff_text(
+    "old.mbt",
+    old_source,
+    "new.mbt",
+    new_source,
+    options=DiffOptions::new(ignore_comments=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(result.rendered.contains("No non-comment changes."))
+}
+
+///|
+test "parser fallback applies comment filtering in tokdiff" {
+  let result = diff_text(
+    "old.mbt",
+    "fn broken( { old_value // old comment",
+    "new.mbt",
+    "fn broken( { new_value // new comment",
+    options=DiffOptions::new(ignore_comments=true, use_color=true),
+  )
+  assert_true(result.kind is TextFallback(_))
+  assert_true(result.rendered.has_prefix("note: fallback to tokdiff"))
+  assert_true(result.rendered.contains("old comment"), msg=result.rendered)
+  assert_true(result.rendered.contains("new comment"), msg=result.rendered)
+  assert_false(
+    result.rendered.contains("\u{1b}[31m\u{1b}[1mold comment"),
+    msg=result.rendered,
+  )
+  assert_false(
+    result.rendered.contains("\u{1b}[32m\u{1b}[1mnew comment"),
+    msg=result.rendered,
+  )
 }
 
 ///|UUID(3b45c1da-9379-4be0-a59c-75f685ff3dce)

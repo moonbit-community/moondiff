@@ -1,12 +1,18 @@
 ///|UUID(8bf07bdd-6cbd-4d64-8b82-a40f69970b25)
-test "parse_cli_args handles graph limit color flag and files" {
-  let options = parse_cli_args(["-g", "42", "--no-color", "old.mbt", "new.mbt"]) catch {
+test "parse_cli_args handles graph limit color comment flags and files" {
+  let options = parse_cli_args([
+    "-g", "42", "--no-color", "--ignore-comments", "old.mbt", "new.mbt",
+  ]) catch {
     _ => panic()
   }
   assert_true(options.graph_limit_text == "42")
   assert_true(options.use_color == false)
+  assert_true(options.ignore_comments)
   assert_true(options.old_path == "old.mbt")
   assert_true(options.new_path == "new.mbt")
+
+  let defaults = parse_cli_args(["old.mbt", "new.mbt"]) catch { _ => panic() }
+  assert_false(defaults.ignore_comments)
 }
 
 ///|
@@ -41,6 +47,8 @@ test "moondiff command help uses README command name" {
     help.has_prefix("Usage: moondiff [options] <old-file> <new-file>"),
   )
   assert_false(help.contains("Usage: astdiff"))
+  assert_true(help.contains("--ignore-comments"))
+  assert_true(help.contains("Ignore MoonBit comment-only differences"))
 }
 
 ///|UUID(f4c874ad-006a-41cb-ab86-0013549f7845)
@@ -57,9 +65,11 @@ test "render_cli_diff uses regular line diff for non-mbt paths" {
     new_path: "new.txt",
     graph_limit_text: "0",
     use_color: false,
+    ignore_comments: true,
   }
   let rendered = render_cli_diff(options, "plain old\n", "plain new\n", 0)
   assert_false(rendered.has_prefix("note: fallback to line diff"))
+  assert_false(rendered.has_prefix("note: fallback to tokdiff"))
   assert_true(rendered.has_prefix("--- old.txt\n+++ new.txt\n@@ -1"))
   assert_true(rendered.contains("1 . plain old"))
   assert_true(rendered.contains(". 1 plain new"))
