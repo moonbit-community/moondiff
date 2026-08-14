@@ -18,21 +18,6 @@
 
 ## Medium Priority
 
-- [ ] Match renamed top-level declarations before finalizing `PerUnit` delete/insert edits.
-  - Problem: method semantic keys include the complete method name, while `content_id` represents exact syntax identity rather than similarity. A rename such as `JobHandle::spawn_unix` to `JobHandle::spawn_unix_ffi`, especially when its signature also changes, therefore misses both matching mechanisms.
-  - Root cause: when any other declaration in the file produces a `Replace`, `top_level_plan` selects `PerUnit`. The unmatched old and new declarations are then finalized as separate `Delete` and `Insert` edits before the AST matcher can compare them, so the structural similarity algorithm never sees the intended pair.
-  - Expected behavior: a sufficiently similar renamed declaration should be rendered as one paired modification hunk, while genuinely unrelated or ambiguous declarations must remain separate delete/insert edits.
-  - Affected areas: `tool/alignment/cst_units.mbt`, `tool/alignment/root_alignment.mbt`, and `tool/alignment/diff_document.mbt`.
-  - [ ] Keep UUID, semantic-key, and unique exact-`content_id` matches as reliable anchors; the fuzzy pass must not replace or override these higher-confidence matches.
-  - [ ] Partition unmatched declarations into gaps between adjacent anchors before fuzzy matching. This prevents a local rename from crossing stable declarations or being mistaken for an unrelated top-level move elsewhere in the file.
-  - [ ] Within each gap, run a constrained second matching pass. Limit candidates by compatible declaration kind and, for methods, by receiver so that structurally similar methods on different types cannot be paired.
-  - [ ] Combine name similarity with syntax similarity computed independently of the declared name. Removing the name from the structural score lets renames remain comparable, while retaining a separate name score helps distinguish several methods under the same receiver.
-  - [ ] Accept only unique mutual-best candidates above a documented threshold. Keep ties, low-confidence candidates, and other ambiguous cases as delete/insert pairs to avoid inventing misleading edits.
-  - [ ] Generate the final `PerUnit` edit sequence only after the second matching pass, then pass every accepted pair to the normal Lexical or AST comparison instead of comparing either side with an empty unit.
-  - [ ] Add focused regression tests for the stable-declaration-plus-rename cliff, multiple simultaneous changes under one receiver, cross-receiver lookalikes, reordered declarations, both Lexical and AST modes, and UUID precedence.
-  - [ ] Use CLI fixture `20260814` as the end-to-end acceptance test. After the fix, update `cli_test/snapshot/20260814.txt` so `JobHandle::spawn_unix` and `JobHandle::spawn_unix_ffi` appear as one paired modification hunk—not one full deletion followed by one full insertion—and verify that the fixture has no parser fallback.
-  - [ ] Run `bash scripts/cli_test.sh && git diff --exit-code cli_test`; the `20260814` case should return to the expected passing state together with the existing CLI regression suite.
-
 - [ ] Ensure real textual changes never result in empty CLI output.
   - Affected areas: `tool/alignment/root_alignment.mbt`, `tool/diff_text.mbt`, and `main.mbt`.
   - [ ] Define and implement an explicit output contract for `has_changes && rendered.is_empty()`.

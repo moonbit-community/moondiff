@@ -315,6 +315,275 @@ test "unique content hashes align anonymous units but duplicate hashes do not" {
 }
 
 ///|
+test "fuzzy metadata replaces only the declaration name" {
+  let units = parse_units(
+    "fn &JobHandle::spawn_unix(path : String) { launch(path) }",
+  )
+  guard units is [{ fuzzy: Some(info), .. }] else {
+    fail("expected fuzzy declaration metadata")
+  }
+  assert_eq(info.name, "spawn_unix")
+  assert_eq(info.owner, "method:&JobHandle")
+  assert_true(find_atom(info.root, impl_fuzzy_name_marker) is Some(_))
+  assert_true(find_atom(info.root, "JobHandle") is Some(_))
+  assert_true(find_atom(info.root, "path") is Some(_))
+
+  let excluded = [
+    "import { \"pkg/core\" }", "extend @pkg.Type with @pkg.Trait::{method}", "using @pkg { method }",
+    "/// trailing comment",
+  ]
+  for source in excluded {
+    let units = parse_units(source)
+    assert_true(units.length() == 1)
+    assert_true(units[0].fuzzy is None)
+  }
+}
+
+///|
+test "fuzzy alignment pairs a renamed method beside a stable anchor" {
+  let old_source =
+    #|fn stable() {}
+    #|fn JobHandle::spawn_unix(path : String) {
+    #|  launch(path)
+    #|}
+  let new_source =
+    #|fn stable() {}
+    #|fn JobHandle::spawn_unix_ffi(path : String) {
+    #|  launch(path)
+    #|}
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->1)", "Replace(2->2)",
+  ])
+}
+
+///|
+test "fuzzy alignment uniquely pairs several changes under one receiver" {
+  let old_source =
+    #|fn stable() {}
+    #|fn Worker::read_unix(path : String) { read(path) }
+    #|fn Worker::write_unix(path : String) { write(path) }
+  let new_source =
+    #|fn stable() {}
+    #|fn Worker::read_unix_ffi(path : String) { read(path) }
+    #|fn Worker::write_unix_ffi(path : String) { write(path) }
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->1)", "Replace(2->2)", "Replace(3->3)",
+  ])
+}
+
+///|
+test "fuzzy alignment rejects tied best candidates" {
+  let old_source =
+    #|fn stable() {}
+    #|fn Worker::old_name() { body() }
+  let new_source =
+    #|fn stable() {}
+    #|fn Worker::new_name() { body() }
+    #|fn Worker::new_name() { body() }
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->1)", "Delete(2)", "Insert(2)", "Insert(3)",
+  ])
+}
+
+///|
+test "fuzzy alignment keeps a split helper as delete and inserts" {
+  let old_source =
+    #|fn inspect_parse(input : String, expected : String) -> Unit raise {
+    #|  match parse_program(input) {
+    #|    Ok(exprs) => inspect(exprs[0], content=expected)
+    #|    Err(diagnostic) => inspect(diagnostic, content=expected)
+    #|  }
+    #|}
+    #|fn stable() {}
+  let new_source =
+    #|fn expect_parse_ok(input : String, expected : String) -> Unit raise {
+    #|  match parse_program(input) {
+    #|    Ok(exprs) => if exprs.is_empty() { abort("empty") } else { inspect(exprs[0], content=expected) }
+    #|    Err(diagnostic) => abort("unexpected diagnostic")
+    #|  }
+    #|}
+    #|fn expect_parse_err(input : String, expected : String) -> Unit raise {
+    #|  match parse_program(input) {
+    #|    Ok(_) => abort("expected diagnostic")
+    #|    Err(diagnostic) => inspect(diagnostic, content=expected)
+    #|  }
+    #|}
+    #|fn stable() {}
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  assert_true(
+    edits is [Delete(_), Replace(..), Insert(_), Insert(_)],
+    msg=edits.map(edit_line_summary).join(", "),
+  )
+}
+
+///|
+test "fuzzy alignment does not cross receivers or reference ownership" {
+  let cases = [
+    (
+      "fn stable() {}\nfn First::run_unix() { body() }", "fn stable() {}\nfn Second::run_unix_ffi() { body() }",
+    ),
+    (
+      "fn stable() {}\nfn &Worker::run_unix() { body() }", "fn stable() {}\nfn Worker::run_unix_ffi() { body() }",
+    ),
+  ]
+  for sources in cases {
+    let (old_source, new_source) = sources
+    let edits = align_impl_units_by_key(
+      parse_units(old_source),
+      parse_units(new_source),
+    )
+    @debug.assert_eq(edits.map(edit_line_summary), [
+      "Replace(1->1)", "Delete(2)", "Insert(2)",
+    ])
+  }
+}
+
+///|
+test "fuzzy impl methods include receiver and trait in their owner" {
+  let units = parse_units("impl Eq for Worker with equal(self, other) { true }")
+  guard units is [{ fuzzy: Some(info), .. }] else {
+    fail("expected impl-method fuzzy metadata")
+  }
+  assert_eq(info.name, "equal")
+  assert_eq(info.owner, "impl:Worker:Eq")
+
+  let edits = align_impl_units_by_key(
+    parse_units(
+      "fn stable() {}\nimpl Eq for Worker with equal_old(self, other) { true }",
+    ),
+    parse_units(
+      "fn stable() {}\nimpl Ord for Worker with equal_new(self, other) { true }",
+    ),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->1)", "Delete(2)", "Insert(2)",
+  ])
+}
+
+///|
+test "fuzzy alignment stays inside gaps between reliable anchors" {
+  let old_source =
+    #|fn Worker::run_unix() { body() }
+    #|fn stable() {}
+  let new_source =
+    #|fn stable() {}
+    #|fn Worker::run_unix_ffi() { body() }
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Delete(1)", "Replace(2->1)", "Insert(2)",
+  ])
+}
+
+///|
+test "fuzzy alignment supports free functions and exact type declaration kinds" {
+  let old_source =
+    #|fn stable() {}
+    #|fn parse_config(text : String) -> Int { parse(text) }
+    #|struct ConfigRecord { value : Int }
+  let new_source =
+    #|fn stable() {}
+    #|fn parse_configuration(text : String) -> Int { parse(text) }
+    #|struct ConfigurationRecord { value : Int }
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_line_summary), [
+    "Replace(1->1)", "Replace(2->2)", "Replace(3->3)",
+  ])
+
+  let incompatible = align_impl_units_by_key(
+    parse_units("fn stable() {}\nstruct Shape { value : Int }"),
+    parse_units("fn stable() {}\nenum ShapeKind { Value(Int) }"),
+  )
+  @debug.assert_eq(incompatible.map(edit_line_summary), [
+    "Replace(1->1)", "Delete(2)", "Insert(2)",
+  ])
+}
+
+///|
+test "UUID anchors keep priority and conflicting UUIDs forbid fuzzy pairing" {
+  let same_uuid_old =
+    #|fn stable() {}
+    #|///|UUID(target-id)
+    #|fn Worker::old_name() { old_body() }
+  let same_uuid_new =
+    #|fn stable() {}
+    #|///|UUID(target-id)
+    #|fn Worker::completely_different() { new_body() }
+  @debug.assert_eq(
+    align_impl_units_by_key(
+      parse_units(same_uuid_old),
+      parse_units(same_uuid_new),
+    ).map(edit_line_summary),
+    ["Replace(1->1)", "Replace(2->2)"],
+  )
+
+  let old_source =
+    #|fn stable() {}
+    #|///|UUID(old-id)
+    #|fn Worker::run_unix() { body() }
+  let new_source =
+    #|fn stable() {}
+    #|///|UUID(new-id)
+    #|fn Worker::run_unix_ffi() { body() }
+  @debug.assert_eq(
+    align_impl_units_by_key(parse_units(old_source), parse_units(new_source)).map(
+      edit_line_summary,
+    ),
+    ["Replace(1->1)", "Delete(2)", "Insert(2)"],
+  )
+  @debug.assert_eq(
+    align_impl_units_by_key(
+      parse_units(old_source),
+      parse_units(new_source),
+      use_uuid=false,
+    ).map(edit_line_summary),
+    ["Replace(1->1)", "Replace(2->2)"],
+  )
+}
+
+///|
+test "renamed declarations render one paired hunk in lexical and AST modes" {
+  let old_source =
+    #|fn stable() {}
+    #|fn JobHandle::spawn_unix(path : String) {
+    #|  launch(path)
+    #|}
+  let new_source =
+    #|fn stable() {}
+    #|fn JobHandle::spawn_unix_ffi(path : String) {
+    #|  launch(path)
+    #|}
+  for mode in [Lexical, Ast] {
+    let result = diff_document(old_source, new_source, mode, context=0)
+    assert_true(result.outcome is Rendered)
+    assert_eq(result.document.hunks.length(), 1)
+    let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+    assert_true(patch.contains("spawn_unix"), msg=patch)
+    assert_true(patch.contains("spawn_unix_ffi"), msg=patch)
+  }
+}
+
+///|
 fn find_atom(node : @syntax.Syntax, content : String) -> @syntax.Syntax? {
   match node {
     @syntax.Syntax::Atom(content=actual, ..) =>
