@@ -2,6 +2,17 @@
 using @syntax {type MatchKind, type MatchedPos}
 
 ///|
+// Private metadata for the conservative rename pass. The syntax root is a
+// deep copy whose declaration-name atom has been replaced by a fixed marker,
+// so its content ids can be compared independently of the spelling change.
+priv struct ImplFuzzyInfo {
+  kind : @cst.NodeKind
+  name : String
+  owner : String
+  root : @syntax.Syntax
+}
+
+///|
 // One top-level CST item plus any source-faithful leading trivia needed to
 // render it independently. UUIDs, semantic keys, and unique root hashes let us
 // align moved items before running the structural diff.
@@ -9,6 +20,7 @@ priv struct ImplUnit {
   root : @syntax.Syntax
   uuid : String?
   semantic_key : String?
+  fuzzy : ImplFuzzyInfo?
   start_line : Int
   source : String
 }
@@ -23,8 +35,9 @@ priv struct ImplUnitInput {
 }
 
 ///|
-// The top-level edit script used when all units carry UUIDs. Replacement means
-// "diff these two roots"; delete/insert compare a real root with an empty side.
+// The top-level edit script produced after reliable and fuzzy pairing.
+// Replacement means "diff these two roots"; delete/insert compare a real root
+// with an empty side.
 priv enum ImplEdit {
   Replace(old~ : ImplUnit, new~ : ImplUnit)
   Delete(ImplUnit)
@@ -297,6 +310,7 @@ fn make_impl_unit(
     root,
     uuid: nodes_uuid(source, nodes),
     semantic_key: item.bind(fn(item) { impl_semantic_key(source, item) }),
+    fuzzy: item.bind(fn(item) { impl_fuzzy_info(source, item, root) }),
     start_line: first.loc.start.lnum,
     source: source_lines_slice(
       source_lines,

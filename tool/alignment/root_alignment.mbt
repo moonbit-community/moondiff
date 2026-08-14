@@ -148,6 +148,17 @@ fn align_impl_units_by_key(
     }
   }
 
+  // Reliable UUID, semantic-key, and exact-content pairs are fixed anchors.
+  // Only after all three passes do we compare unmatched declarations inside
+  // the same anchor gap for a conservative rename pairing.
+  let fuzzy_pairs = align_fuzzy_impl_units(
+    old_units, new_units, old_used, new_used, replacements, use_uuid,
+  )
+  for fuzzy_pair in fuzzy_pairs {
+    let (old_index, new_index) = fuzzy_pair
+    pair(old_index, new_index)
+  }
+
   let edits = Array::new()
   for i in 0..<old_units.length() {
     if replacements.get(i) is Some(new_index) {
