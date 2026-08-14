@@ -1,0 +1,36 @@
+[34m--- cli_test/source/20260814.old.mbt: line 6[39m
+[34m+++ cli_test/source/20260814.new.mbt[39m
+@@ -6,16 +1,0 @@
+ [31m6[39m [90m.[39m [31m[1m///|[22m[39m
+ [31m7[39m [90m.[39m [31m[1m#unsafe_skip_stub_check[22m[39m
+ [31m8[39m [90m.[39m [31m[1m#borrow(path, cwd)[22m[39m
+ [31m9[39m [90m.[39m [31m[1mfn[22m[39m[90m [39m[31m[1mJobHandle::spawn_unix([22m[39m
+[31m10[39m [90m.[39m [90m  [39m[31m[1mpath[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1m@os_string.OsString,[22m[39m
+[31m11[39m [90m.[39m [90m  [39m[31m[1mpath_len?[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mInt[22m[39m[90m [39m[31m[1m=[22m[39m[90m [39m[31m[1mpath.to_string().length(),[22m[39m
+[31m12[39m [90m.[39m [90m  [39m[31m[1margs[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mUInt64,[22m[39m
+[31m13[39m [90m.[39m [90m  [39m[31m[1menv~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mUInt64,[22m[39m
+[31m14[39m [90m.[39m [90m  [39m[31m[1minherited_env_entry_count~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mInt,[22m[39m
+[31m15[39m [90m.[39m [90m  [39m[31m[1mstdin~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1m@fd_util.Fd,[22m[39m
+[31m16[39m [90m.[39m [90m  [39m[31m[1mstdout~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1m@fd_util.Fd,[22m[39m
+[31m17[39m [90m.[39m [90m  [39m[31m[1mstderr~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1m@fd_util.Fd,[22m[39m
+[31m18[39m [90m.[39m [90m  [39m[31m[1mcwd~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1m@os_string.OsString,[22m[39m
+[31m19[39m [90m.[39m [90m  [39m[31m[1mcwd_len?[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mInt[22m[39m[90m [39m[31m[1m=[22m[39m[90m [39m[31m[1mcwd.to_string().length(),[22m[39m
+[31m20[39m [90m.[39m [90m  [39m[31m[1mhas_cwd~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mBool,[22m[39m
+[31m21[39m [90m.[39m [31m[1m)[22m[39m[90m [39m[31m[1m->[22m[39m[90m [39m[31m[1mJobHandle[22m[39m[90m [39m[31m[1m=[22m[39m[90m [39m[31m[1m"moonbitlang/async"[22m[39m[90m [39m[31m[1m"thread_pool/make_spawn_job/unix"[22m[39m
+
+[34m--- cli_test/source/20260814.old.mbt[39m
+[34m+++ cli_test/source/20260814.new.mbt: line 6[39m
+@@ -1,0 +6,12 @@
+[90m.[39m  [32m6[39m [32m[1m///|[22m[39m
+[90m.[39m  [32m7[39m [32m[1m#unsafe_skip_stub_check[22m[39m
+[90m.[39m  [32m8[39m [32m[1m#borrow(path)[22m[39m
+[90m.[39m  [32m9[39m [32m[1mfn[22m[39m[90m [39m[32m[1mJobHandle::spawn_unix_ffi([22m[39m
+[90m.[39m [32m10[39m [90m  [39m[32m[1mpath[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1m@os_string.OsString,[22m[39m
+[90m.[39m [32m11[39m [90m  [39m[32m[1mpath_len?[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mInt[22m[39m[90m [39m[32m[1m=[22m[39m[90m [39m[32m[1mpath.to_string().length(),[22m[39m
+[90m.[39m [32m12[39m [90m  [39m[32m[1margs[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mUInt64,[22m[39m
+[90m.[39m [32m13[39m [90m  [39m[32m[1menv~[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mUInt64,[22m[39m
+[90m.[39m [32m14[39m [90m  [39m[32m[1mstdin~[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1m@fd_util.Fd,[22m[39m
+[90m.[39m [32m15[39m [90m  [39m[32m[1mstdout~[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1m@fd_util.Fd,[22m[39m
+[90m.[39m [32m16[39m [90m  [39m[32m[1mstderr~[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1m@fd_util.Fd,[22m[39m
+[90m.[39m [32m17[39m [32m[1m)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mJobHandle[22m[39m[90m [39m[32m[1m=[22m[39m[90m [39m[32m[1m"moonbitlang/async"[22m[39m[90m [39m[32m[1m"thread_pool/spawn_job/unix"[22m[39m
+
