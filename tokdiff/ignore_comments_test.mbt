@@ -17,6 +17,8 @@ test "ignore comments defaults off and removes comment-only hunks" {
     pair in [
       (["// old"], ["// new"]),
       (["/// old docs"], ["/// new docs"]),
+      (["///|"], []),
+      ([], ["///|"]),
       (["///|UUID(old)"], ["///|UUID(new)"]),
       (["fn f() {}"], ["// inserted", "fn f() {}"]),
       (["// deleted", "fn f() {}"], ["fn f() {}"]),

@@ -341,11 +341,6 @@ priv struct CommentProjection {
 }
 
 ///|
-fn is_uuid_comment_line(line : String) -> Bool {
-  line.length() > 10 && line.has_prefix("///|UUID(") && line.has_suffix(")")
-}
-
-///|
 // The real lexer is intentionally skipped for extremely complex external
 // lines to protect JS/Wasm stacks. Mirror just enough quote handling here to
 // retain the comment contract in that safety path.
@@ -382,15 +377,13 @@ fn fallback_source_comment_start(line : String) -> Int? {
 // particular, `//` inside a string remains part of the `Str` token and is not
 // mistaken for a comment delimiter.
 fn source_comment_start(line : String) -> Int? {
-  if is_uuid_comment_line(line) {
-    return Some(0)
-  }
   if !lexer_complexity_within_limit(line) {
     return fallback_source_comment_start(line)
   }
   let mut offset = 0
   for token in tokenize_line(line) {
-    if token.kind is Filler && token.text.has_prefix("//") {
+    if token.kind is Marker ||
+      (token.kind is Filler && token.text.has_prefix("//")) {
       return Some(offset)
     }
     offset += token.text.length()

@@ -599,6 +599,28 @@ test "aligned documents ignore comments in both modes" {
 }
 
 ///|
+test "aligned documents ignore block separators in both modes" {
+  let old_source =
+    #|fn first() {}
+    #|fn second() {}
+  let new_source =
+    #|///|
+    #|fn first() {}
+    #|///|
+    #|fn second() {}
+  for mode in [Lexical, Ast] {
+    let result = diff_document(
+      old_source,
+      new_source,
+      mode,
+      ignore_comments=true,
+    )
+    assert_true(result.outcome is NoNonCommentChanges)
+    assert_true(result.document.hunks.is_empty())
+  }
+}
+
+///|
 test "AST comment filtering retains neutral source around code changes" {
   let old_source =
     #|///|UUID(old-id)
