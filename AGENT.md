@@ -1,7 +1,7 @@
 ## Test
 
 ```
-bash scripts/regular_test.sh
+moon test --target all
 ```
 
 ## E2E Test
