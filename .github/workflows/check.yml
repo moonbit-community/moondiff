@@ -38,5 +38,22 @@ jobs:
         run: |
           bash scripts/regular_test.sh
           bash scripts/cli_test.sh && git diff --exit-code cli_test
-      
-      
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: playground/package-lock.json
+
+      - name: Install playground dependencies
+        working-directory: playground
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: playground
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright integration tests
+        working-directory: playground
+        run: npm run test:e2e
