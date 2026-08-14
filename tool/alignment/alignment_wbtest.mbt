@@ -379,7 +379,7 @@ fn changed_segment_text(document : @tokdiff.DiffDocument) -> String {
   for hunk in document.hunks {
     for block in hunk.blocks {
       match block {
-        ContextBlock(_) => ()
+        ContextBlock(_) | IgnoredBlock(_) => ()
         ChangeBlock(rows) =>
           for row in rows {
             match row {
@@ -413,6 +413,7 @@ fn ast_segment_summary(
     let kind = match segment.kind {
       Changed => "changed"
       Unchanged => "unchanged"
+      Ignored => "ignored"
     }
     "\{kind}:\{segment.text}"
   })
@@ -572,4 +573,82 @@ test "aligned documents distinguish complete and partial lexical fallbacks" {
     msg=root_list_reason,
   )
   assert_false(root_list_limited.document.hunks.is_empty())
+}
+
+///|
+test "aligned documents ignore comments in both modes" {
+  let old_source =
+    #|/// old docs
+    #|fn value() -> Int { 1 // old trailing }
+  let new_source =
+    #|/// new docs
+    #|fn value() -> Int { 1  // new trailing }
+  for mode in [Lexical, Ast] {
+    let result = diff_document(
+      old_source,
+      new_source,
+      mode,
+      ignore_comments=true,
+    )
+    assert_true(result.outcome is NoNonCommentChanges)
+    assert_true(result.document.hunks.is_empty())
+  }
+  assert_false(
+    diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
+  )
+}
+
+///|
+test "AST comment filtering retains neutral source around code changes" {
+  let old_source =
+    #|///|UUID(old-id)
+    #|fn value() -> Int {
+    #|  old_value() // old explanation
+    #|}
+  let new_source =
+    #|///|UUID(new-id)
+    #|fn value() -> Int {
+    #|  new_value()  // new explanation
+    #|}
+  let result = diff_document(
+    old_source,
+    new_source,
+    Ast,
+    context=1,
+    ignore_comments=true,
+  )
+  let outcome_name = match result.outcome {
+    Rendered => "rendered"
+    Fallback(_) => "fallback"
+    PartialFallback(_) => "partial fallback"
+    NoStructuralChanges => "no structural changes"
+    NoNonCommentChanges => "no non-comment changes"
+  }
+  assert_eq(outcome_name, "rendered")
+  assert_false(result.document.hunks.is_empty())
+  let changed = changed_segment_text(result.document)
+  assert_true(changed.contains("old_value"), msg=changed)
+  assert_true(changed.contains("new_value"), msg=changed)
+  assert_false(changed.contains("explanation"), msg=changed)
+  assert_false(changed.contains("old-id"), msg=changed)
+  let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+  assert_true(patch.contains("old explanation"), msg=patch)
+  assert_true(patch.contains("new explanation"), msg=patch)
+}
+
+///|
+test "parse failure fallback applies comment filtering" {
+  let result = diff_document(
+    "fn broken( { old_value // old comment",
+    "fn broken( { new_value // new comment",
+    Ast,
+    context=0,
+    ignore_comments=true,
+  )
+  assert_true(result.outcome is Fallback(_))
+  assert_false(result.document.hunks.is_empty())
+  let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+  assert_true(patch.contains("old comment"), msg=patch)
+  assert_true(patch.contains("new comment"), msg=patch)
+  assert_false(changed_segment_text(result.document).contains("comment"))
 }

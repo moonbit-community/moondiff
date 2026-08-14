@@ -45,6 +45,56 @@ const formattingNew = [
 const structuralOld = 'fn structural() { old_call("<script>&safe") }';
 const structuralNew = 'fn structural() { new_call("<script>&safe") }';
 
+const commentsSha = "4444444444444444444444444444444444444444";
+const commentsUrl = `https://github.com/example/comments/commit/${commentsSha}`;
+const mixedCommentsOld = [
+  "/// old docs",
+  "fn value() -> Int {",
+  "  old_value() // old trailing",
+  "}",
+].join("\n");
+const mixedCommentsNew = [
+  "/// new docs",
+  "fn value() -> Int {",
+  "  new_value()  // new trailing",
+  "}",
+].join("\n");
+const commentsOnlyOld = "fn stable() -> Int {\n  1 // old note\n}";
+const commentsOnlyNew = "fn stable() -> Int {\n  1  // new note\n}";
+const plainCommentsOld = "// old plain-text note";
+const plainCommentsNew = "// new plain-text note";
+
+const commentsCommit = {
+  sha: commentsSha,
+  html_url: commentsUrl,
+  commit: { message: "Update code and comments" },
+  parents: [{ sha: parentSha }],
+  stats: { additions: 4, deletions: 4, total: 8 },
+  files: [
+    {
+      filename: "src/mixed.mbt",
+      status: "modified",
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+    },
+    {
+      filename: "src/comments_only.mbt",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+    {
+      filename: "notes.txt",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+  ],
+};
+
 const algorithmCommit = {
   sha: algorithmSha,
   html_url: algorithmUrl,
@@ -186,6 +236,43 @@ async function loadAlgorithmCommit(page, options) {
   await installAlgorithmRoutes(page, options);
   await page.goto("/");
   await page.getByLabel("Public GitHub commit URL").fill(algorithmUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page.locator("table.split").first()).toBeVisible();
+}
+
+async function installCommentsRoutes(page) {
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    headers: { "access-control-allow-origin": "*" },
+    body: JSON.stringify(commentsCommit),
+  }));
+  await page.route("https://raw.githubusercontent.com/**", async route => {
+    const parts = new URL(route.request().url()).pathname.split("/");
+    const revision = parts[3];
+    const filename = decodeURIComponent(parts.slice(4).join("/"));
+    let body;
+    if (filename === "src/mixed.mbt") {
+      body = revision === parentSha ? mixedCommentsOld : mixedCommentsNew;
+    } else if (filename === "src/comments_only.mbt") {
+      body = revision === parentSha ? commentsOnlyOld : commentsOnlyNew;
+    } else {
+      body = revision === parentSha ? plainCommentsOld : plainCommentsNew;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+}
+
+async function loadCommentsCommit(page) {
+  await installCommentsRoutes(page);
+  await page.goto("/");
+  await page.getByLabel("Public GitHub commit URL").fill(commentsUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split").first()).toBeVisible();
 }
@@ -438,6 +525,71 @@ test("narrow viewport scrolls only the diff and keeps controls usable", async ({
   expect(unifiedOverflow.scrollWidth).toBeGreaterThan(unifiedOverflow.clientWidth);
 });
 
+test("Ignore comments works across algorithms and layouts without changing plain text", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await loadCommentsCommit(page);
+
+  const toggle = page.getByRole("button", { name: "Ignore comments" });
+  const mixedCard = page.locator(".file-card").filter({ hasText: "src/mixed.mbt" });
+  const commentsOnlyCard = page.locator(".file-card").filter({ hasText: "src/comments_only.mbt" });
+  const plainCard = page.locator(".file-card").filter({ hasText: "notes.txt" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(commentsOnlyCard.locator("table.split")).toBeVisible();
+
+  await plainCard.getByRole("button", { name: "Expand" }).click();
+  await expect(plainCard.locator("td.del")).toContainText("// old plain-text note");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(commentsOnlyCard).toContainText(
+    "No non-comment changes found. Turn off Ignore comments",
+  );
+  await expect(commentsOnlyCard.locator("table")).toHaveCount(0);
+  await expect(mixedCard.locator("td.ctx.ignored")).toHaveCount(2);
+  await expect(mixedCard.locator("td.ctx.ignored").first()).toContainText("/// old docs");
+  await expect(mixedCard.locator(".ignored-context")).toContainText([
+    "/// old docs",
+    "/// new docs",
+    " // old trailing",
+    "  // new trailing",
+  ]);
+  await expect(mixedCard.locator("b.wd")).toContainText("old_value");
+  await expect(mixedCard.locator("b.wa")).toContainText("new_value");
+  await expect(plainCard.locator("td.del")).toContainText("// old plain-text note");
+  await expect(plainCard.locator("td.add")).toContainText("// new plain-text note");
+
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(commentsOnlyCard).toContainText(
+    "No structural non-comment changes found",
+  );
+  await expect(mixedCard.locator("b.wd")).toContainText("old_value");
+  await expect(
+    mixedCard.locator(".ignored-context").filter({ hasText: "old trailing" }),
+  ).toHaveCount(1);
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(mixedCard.locator("table.unified")).toBeVisible();
+  await expect(mixedCard.locator("td.ctx.ignored")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Lexical" }).click();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(commentsOnlyCard.locator("table.unified")).toBeVisible();
+
+  await page.setViewportSize({ width: 420, height: 900 });
+  const compactToggle = await toggle.evaluate(button => ({
+    left: button.getBoundingClientRect().left,
+    right: button.getBoundingClientRect().right,
+    width: button.getBoundingClientRect().width,
+    labelDisplay: getComputedStyle(button.querySelector(".ignore-comments-label")).display,
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(compactToggle.left).toBeGreaterThanOrEqual(0);
+  expect(compactToggle.right).toBeLessThanOrEqual(420);
+  expect(compactToggle.width).toBeLessThanOrEqual(36);
+  expect(compactToggle.labelDisplay).toBe("none");
+  expect(compactToggle.pageWidth).toBeLessThanOrEqual(compactToggle.viewportWidth);
+});
+
 test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await loadAlgorithmCommit(page);
@@ -512,14 +664,17 @@ test("AST structural empty analysis is handled locally without a backend request
 test("the selected algorithm survives later commit navigation without entering the URL", async ({ page }) => {
   await loadAlgorithmCommit(page);
   await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Ignore comments" }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
   await page.getByLabel("Public GitHub commit URL").fill(nextUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".structural-empty")).toBeVisible();
   await expect(page).toHaveURL(`/#/example/algorithms/commit/${nextSha}`);
   expect(new URL(page.url()).search).toBe("");
+  expect(page.url()).not.toContain("ignore");
 });
 
 test("parse failures show their lexical fallback reason above both layouts", async ({ page }) => {

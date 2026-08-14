@@ -40,9 +40,17 @@ fn line_html(line : @tokdiff.DiffLine, changed_class : String) -> String {
     match segment.kind {
       Unchanged => buf <+ "\{esc(segment.text)}"
       Changed => buf <+ "<b class=\"\{changed_class}\">\{esc(segment.text)}</b>"
+      Ignored =>
+        buf <+ "<span class=\"ignored-context\">\{esc(segment.text)}</span>"
     }
   }
   buf.to_string()
+}
+
+///|
+fn line_is_ignored(line : @tokdiff.DiffLine) -> Bool {
+  !line.segments.is_empty() &&
+  line.segments.all(segment => segment.kind is Ignored)
 }
 
 ///|
@@ -96,6 +104,49 @@ fn split_row(
 }
 
 ///|
+fn split_ignored_row(
+  buf : StringBuilder,
+  row : @tokdiff.DiffRow,
+  line_numbers : Bool,
+) -> Unit {
+  match row {
+    Paired(old_line, new_line) =>
+      split_row(
+        buf,
+        Some(old_line.index + 1),
+        "ctx ignored",
+        line_html(old_line, "wd"),
+        Some(new_line.index + 1),
+        "ctx ignored",
+        line_html(new_line, "wa"),
+        line_numbers,
+      )
+    OldOnly(old_line) =>
+      split_row(
+        buf,
+        Some(old_line.index + 1),
+        "ctx ignored",
+        line_html(old_line, "wd"),
+        None,
+        "empty",
+        "",
+        line_numbers,
+      )
+    NewOnly(new_line) =>
+      split_row(
+        buf,
+        None,
+        "empty",
+        "",
+        Some(new_line.index + 1),
+        "ctx ignored",
+        line_html(new_line, "wa"),
+        line_numbers,
+      )
+  }
+}
+
+///|
 fn append_split_hunk(
   buf : StringBuilder,
   hunk : @tokdiff.DiffHunk,
@@ -135,10 +186,18 @@ fn append_split_hunk(
               split_row(
                 buf,
                 Some(old_line.index + 1),
-                "del",
+                if line_is_ignored(old_line) {
+                  "ctx ignored"
+                } else {
+                  "del"
+                },
                 line_html(old_line, "wd"),
                 Some(new_line.index + 1),
-                "add",
+                if line_is_ignored(new_line) {
+                  "ctx ignored"
+                } else {
+                  "add"
+                },
                 line_html(new_line, "wa"),
                 line_numbers,
               )
@@ -146,7 +205,11 @@ fn append_split_hunk(
               split_row(
                 buf,
                 Some(old_line.index + 1),
-                "del",
+                if line_is_ignored(old_line) {
+                  "ctx ignored"
+                } else {
+                  "del"
+                },
                 line_html(old_line, "wd"),
                 None,
                 "empty",
@@ -160,11 +223,19 @@ fn append_split_hunk(
                 "empty",
                 "",
                 Some(new_line.index + 1),
-                "add",
+                if line_is_ignored(new_line) {
+                  "ctx ignored"
+                } else {
+                  "add"
+                },
                 line_html(new_line, "wa"),
                 line_numbers,
               )
           }
+        }
+      IgnoredBlock(rows) =>
+        for row in rows {
+          split_ignored_row(buf, row, line_numbers)
         }
     }
   }
@@ -233,6 +304,10 @@ fn unified_old_line(
   line : @tokdiff.DiffLine,
   line_numbers : Bool,
 ) -> Unit {
+  if line_is_ignored(line) {
+    unified_ignored_line(buf, line, Some(line.index + 1), None, line_numbers)
+    return
+  }
   let body = line_html(line, "wd")
   if line_numbers {
     unified_numbered_line(buf, "del", "-", Some(line.index + 1), None, body)
@@ -247,11 +322,82 @@ fn unified_new_line(
   line : @tokdiff.DiffLine,
   line_numbers : Bool,
 ) -> Unit {
+  if line_is_ignored(line) {
+    unified_ignored_line(buf, line, None, Some(line.index + 1), line_numbers)
+    return
+  }
   let body = line_html(line, "wa")
   if line_numbers {
     unified_numbered_line(buf, "add", "+", None, Some(line.index + 1), body)
   } else {
     unified_text_line(buf, "add", "+", body)
+  }
+}
+
+///|
+fn unified_ignored_line(
+  buf : StringBuilder,
+  line : @tokdiff.DiffLine,
+  old_number : Int?,
+  new_number : Int?,
+  line_numbers : Bool,
+) -> Unit {
+  let body = line_html(line, "wa")
+  if line_numbers {
+    unified_numbered_line(buf, "ctx ignored", " ", old_number, new_number, body)
+  } else {
+    unified_text_line(buf, "ctx ignored", " ", body)
+  }
+}
+
+///|
+fn append_unified_ignored_row(
+  buf : StringBuilder,
+  row : @tokdiff.DiffRow,
+  line_numbers : Bool,
+) -> Unit {
+  match row {
+    Paired(old_line, new_line) =>
+      if old_line.text() == new_line.text() {
+        unified_ignored_line(
+          buf,
+          old_line,
+          Some(old_line.index + 1),
+          Some(new_line.index + 1),
+          line_numbers,
+        )
+      } else {
+        unified_ignored_line(
+          buf,
+          old_line,
+          Some(old_line.index + 1),
+          None,
+          line_numbers,
+        )
+        unified_ignored_line(
+          buf,
+          new_line,
+          None,
+          Some(new_line.index + 1),
+          line_numbers,
+        )
+      }
+    OldOnly(old_line) =>
+      unified_ignored_line(
+        buf,
+        old_line,
+        Some(old_line.index + 1),
+        None,
+        line_numbers,
+      )
+    NewOnly(new_line) =>
+      unified_ignored_line(
+        buf,
+        new_line,
+        None,
+        Some(new_line.index + 1),
+        line_numbers,
+      )
   }
 }
 
@@ -309,6 +455,10 @@ fn append_unified_hunk(
           }
         }
       }
+      IgnoredBlock(rows) =>
+        for row in rows {
+          append_unified_ignored_row(buf, row, line_numbers)
+        }
     }
   }
 }
@@ -372,9 +522,10 @@ pub fn side_by_side_html(
   line_cleanup? : Bool = false,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
+  ignore_comments? : Bool = false,
 ) -> String {
   render_side_by_side(
-    @tokdiff.diff(old~, new~, context~, line_cleanup~),
+    @tokdiff.diff(old~, new~, context~, line_cleanup~, ignore_comments~),
     line_numbers~,
     hunk_notes~,
   )
@@ -389,9 +540,10 @@ pub fn side_by_side_hunks_html(
   line_cleanup? : Bool = false,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
+  ignore_comments? : Bool = false,
 ) -> Array[String] {
   render_side_by_side_hunks(
-    @tokdiff.diff(old~, new~, context~, line_cleanup~),
+    @tokdiff.diff(old~, new~, context~, line_cleanup~, ignore_comments~),
     line_numbers~,
     hunk_notes~,
   )
@@ -406,9 +558,10 @@ pub fn unified_html(
   line_cleanup? : Bool = false,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
+  ignore_comments? : Bool = false,
 ) -> String {
   render_unified(
-    @tokdiff.diff(old~, new~, context~, line_cleanup~),
+    @tokdiff.diff(old~, new~, context~, line_cleanup~, ignore_comments~),
     line_numbers~,
     hunk_notes~,
   )
@@ -423,9 +576,10 @@ pub fn unified_hunks_html(
   line_cleanup? : Bool = false,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
+  ignore_comments? : Bool = false,
 ) -> Array[String] {
   render_unified_hunks(
-    @tokdiff.diff(old~, new~, context~, line_cleanup~),
+    @tokdiff.diff(old~, new~, context~, line_cleanup~, ignore_comments~),
     line_numbers~,
     hunk_notes~,
   )
@@ -508,6 +662,7 @@ pub fn html_page(title~ : String, body : String) -> String {
   buf <+ "td.empty { background: #fafafa; }\n"
   buf <+ "b.wd { background: #f8b4b4; font-weight: normal; }\n"
   buf <+ "b.wa { background: #97e0a0; font-weight: normal; }\n"
+  buf <+ ".ignored-context { background: white; font-weight: normal; }\n"
   buf <+ "pre.unified span { display: block; }\n"
   buf <+
     "table.split, table.unified { border-collapse: collapse; width: 100%; }\n"

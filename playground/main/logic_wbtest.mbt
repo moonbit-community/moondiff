@@ -285,6 +285,7 @@ test "stale commit responses are discarded by generation" {
     generation: 2,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
+    ignore_comments: false,
     phase: Idle,
     route: None,
     share_url: None,
@@ -362,6 +363,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     generation: 7,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
+    ignore_comments: false,
     phase: Showing(view),
     route: Some(reference),
     share_url: None,
@@ -403,6 +405,7 @@ fn analysis_test_model(
     generation: 9,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
+    ignore_comments: false,
     phase: Showing(view),
     route: Some(view.reference),
     share_url: None,
@@ -767,9 +770,11 @@ fn ready_test_file(
 test "Lexical is the default and algorithm selection is not part of routes" {
   let model = initial_model()
   assert_true(model.diff_algorithm is LexicalAlgorithm)
+  assert_false(model.ignore_comments)
   let reference = CommitRef::{ owner: "owner", repo: "repo", sha: "abcdef1" }
   assert_eq(playground_route(reference), "#/owner/repo/commit/abcdef1")
   assert_false(playground_route(reference).contains("algorithm"))
+  assert_false(playground_route(reference).contains("ignore"))
 }
 
 ///|
@@ -806,6 +811,123 @@ test "algorithm switching fills the second cache and clears analysis state" {
       ast.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges,
     )
   }
+}
+
+///|
+test "ignore comments has independent algorithm caches and clears analysis" {
+  let file = fixture_file("src/comments.mbt", "modified")
+  let ready = ready_test_file(
+    file,
+    ["fn value() -> Int {", "  1 // old", "}"],
+    ["fn value() -> Int {", "  1 // new", "}"],
+  )
+  let cached = ensure_file_document(
+    ensure_file_document(
+      ensure_file_document(
+        ensure_file_document(ready, LexicalAlgorithm),
+        LexicalAlgorithm,
+        ignore_comments=true,
+      ),
+      AstAlgorithm,
+    ),
+    AstAlgorithm,
+    ignore_comments=true,
+  )
+  assert_true(cached.diff_cache.lexical is Some(_))
+  assert_true(cached.diff_cache.lexical_ignoring_comments is Some(_))
+  assert_true(cached.diff_cache.ast is Some(_))
+  assert_true(cached.diff_cache.ast_ignoring_comments is Some(_))
+  guard cached.diff_cache.lexical_ignoring_comments is Some(filtered) else {
+    fail("expected filtered lexical cache")
+  }
+  assert_true(filtered.document.hunks.is_empty())
+
+  let view = set_file_state(analysis_test_view([file]), 0, cached)
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (toggled, _) = update(
+    analysis_test_model(view, status=Analyzing),
+    ToggleIgnoreComments,
+    emit,
+  )
+  assert_true(toggled.ignore_comments)
+  assert_true(toggled.diff_algorithm is LexicalAlgorithm)
+  assert_true(toggled.analysis_status is AnalysisIdle)
+  guard toggled.phase is Showing(toggled_view) else {
+    fail("expected commit to remain visible")
+  }
+  assert_true(
+    toggled_view.files[0].diff_cache.lexical_ignoring_comments is Some(_),
+  )
+}
+
+///|
+test "ignore comments survives commit navigation but stays out of routes" {
+  let reference = CommitRef::{ owner: "owner", repo: "repo", sha: "abcdef1" }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let fixture = decode_commit(
+    read_fixture("playground/main/fixtures/root_commit.json"),
+  )
+  let loading = {
+    ..initial_model(),
+    generation: 1,
+    ignore_comments: true,
+    route: Some(reference),
+    phase: LoadingCommit(reference~, page=1, first=None, files=[]),
+  }
+  let (loaded, _) = update(loading, CommitPageLoaded(1, 1, Ok(fixture)), emit)
+  assert_true(loaded.ignore_comments)
+  assert_true(loaded.phase is Showing(_))
+  assert_false(playground_route(reference).contains("ignore"))
+}
+
+///|
+test "comment-only filtered analysis is handled locally" {
+  let file = fixture_file("src/comments.mbt", "modified")
+  let view = set_file_state(
+    analysis_test_view([file]),
+    0,
+    ready_test_file(file, ["fn value() -> Int {", "  1 // old", "}"], [
+      "fn value() -> Int {", "  1 // new", "}",
+    ]),
+  )
+  let model = { ..analysis_test_model(view), ignore_comments: true }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (after, _) = update(model, AnalyzeChanges, emit)
+  guard after.analysis_status is AnalysisNoHunks([skipped]) else {
+    fail("expected local no-hunks result")
+  }
+  assert_eq(skipped.path, "src/comments.mbt")
+  assert_true(skipped.reason.contains("turn off Ignore comments"))
+}
+
+///|
+test "late analysis response is discarded after toggling comments" {
+  let file = fixture_file("src/change.mbt", "modified")
+  let view = set_file_state(
+    analysis_test_view([file]),
+    0,
+    ensure_file_document(
+      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
+      LexicalAlgorithm,
+    ),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (switched, _) = update(
+    analysis_test_model(view, status=Analyzing),
+    ToggleIgnoreComments,
+    emit,
+  )
+  let response = AnalysisResponse::{
+    version: ANALYSIS_VERSION,
+    ok: true,
+    analysis: { summary: "late", groups: [] },
+  }
+  let (after, _) = update(
+    switched,
+    AnalysisLoaded(switched.generation, Ok(response)),
+    emit,
+  )
+  assert_true(after == switched)
 }
 
 ///|

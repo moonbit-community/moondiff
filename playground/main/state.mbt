@@ -37,12 +37,20 @@ priv enum SideLoad {
 priv struct DiffCache {
   line : @alignment.AlignedDiffResult?
   lexical : @alignment.AlignedDiffResult?
+  lexical_ignoring_comments : @alignment.AlignedDiffResult?
   ast : @alignment.AlignedDiffResult?
+  ast_ignoring_comments : @alignment.AlignedDiffResult?
 } derive(Eq)
 
 ///|
 fn empty_diff_cache() -> DiffCache {
-  { line: None, lexical: None, ast: None }
+  {
+    line: None,
+    lexical: None,
+    lexical_ignoring_comments: None,
+    ast: None,
+    ast_ignoring_comments: None,
+  }
 }
 
 ///|
@@ -93,6 +101,7 @@ priv struct Model {
   generation : Int
   view_mode : ViewMode
   diff_algorithm : DiffAlgorithm
+  ignore_comments : Bool
   phase : Phase
   route : CommitRef?
   share_url : String?
@@ -108,6 +117,7 @@ fn initial_model() -> Model {
     generation: 0,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
+    ignore_comments: false,
     phase: Idle,
     route: None,
     share_url: None,
@@ -124,6 +134,7 @@ priv enum Msg {
   RouteChanged(@url.Url)
   ToggleView
   SelectDiffAlgorithm(DiffAlgorithm)
+  ToggleIgnoreComments
   CopyShareLink
   ShareCopied
   ShareCopyFailed(String)
@@ -292,6 +303,7 @@ fn with_phase(model : Model, phase : Phase) -> Model {
     generation: model.generation,
     view_mode: model.view_mode,
     diff_algorithm: model.diff_algorithm,
+    ignore_comments: model.ignore_comments,
     phase,
     route: model.route,
     share_url: model.share_url,
@@ -308,6 +320,7 @@ fn with_backend_status(model : Model, backend_status : BackendStatus) -> Model {
     generation: model.generation,
     view_mode: model.view_mode,
     diff_algorithm: model.diff_algorithm,
+    ignore_comments: model.ignore_comments,
     phase: model.phase,
     route: model.route,
     share_url: model.share_url,
@@ -327,6 +340,7 @@ fn with_analysis_status(
     generation: model.generation,
     view_mode: model.view_mode,
     diff_algorithm: model.diff_algorithm,
+    ignore_comments: model.ignore_comments,
     phase: model.phase,
     route: model.route,
     share_url: model.share_url,
@@ -349,6 +363,7 @@ fn begin_commit_load(
       generation,
       view_mode: model.view_mode,
       diff_algorithm: model.diff_algorithm,
+      ignore_comments: model.ignore_comments,
       phase: LoadingCommit(reference~, page=1, first=None, files=[]),
       route: Some(reference),
       share_url: Some(playground_share_url(reference)),
@@ -460,9 +475,18 @@ fn continue_analysis(
   if sources_pending(view) {
     return (model, @rabbita.none)
   }
-  let ready_view = ensure_all_file_documents(view, model.diff_algorithm)
+  let ready_view = ensure_all_file_documents(
+    view,
+    model.diff_algorithm,
+    ignore_comments=model.ignore_comments,
+  )
   let ready_model = with_phase(model, Showing(ready_view))
-  match build_analysis_request(ready_view, model.diff_algorithm) {
+  match
+    build_analysis_request(
+      ready_view,
+      model.diff_algorithm,
+      ignore_comments=model.ignore_comments,
+    ) {
     Err(message) =>
       (
         with_analysis_status(ready_model, AnalysisFailed(message)),
@@ -497,6 +521,7 @@ fn update(
           generation: model.generation,
           view_mode: model.view_mode,
           diff_algorithm: model.diff_algorithm,
+          ignore_comments: model.ignore_comments,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -517,6 +542,7 @@ fn update(
             Split
           },
           diff_algorithm: model.diff_algorithm,
+          ignore_comments: model.ignore_comments,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -532,7 +558,13 @@ fn update(
       }
       let phase = match model.phase {
         Showing(view) =>
-          Showing(ensure_expanded_file_documents(view, algorithm))
+          Showing(
+            ensure_expanded_file_documents(
+              view,
+              algorithm,
+              ignore_comments=model.ignore_comments,
+            ),
+          )
         other => other
       }
       (
@@ -541,6 +573,7 @@ fn update(
           generation: model.generation,
           view_mode: model.view_mode,
           diff_algorithm: algorithm,
+          ignore_comments: model.ignore_comments,
           phase,
           route: model.route,
           share_url: model.share_url,
@@ -548,6 +581,24 @@ fn update(
           backend_status: model.backend_status,
           analysis_status: AnalysisIdle,
         },
+        @rabbita.none,
+      )
+    }
+    ToggleIgnoreComments => {
+      let ignore_comments = !model.ignore_comments
+      let phase = match model.phase {
+        Showing(view) =>
+          Showing(
+            ensure_expanded_file_documents(
+              view,
+              model.diff_algorithm,
+              ignore_comments~,
+            ),
+          )
+        other => other
+      }
+      (
+        { ..model, ignore_comments, phase, analysis_status: AnalysisIdle },
         @rabbita.none,
       )
     }
@@ -560,6 +611,7 @@ fn update(
               generation: model.generation + 1,
               view_mode: model.view_mode,
               diff_algorithm: model.diff_algorithm,
+              ignore_comments: model.ignore_comments,
               phase: LoadFailed(message),
               route: model.route,
               share_url: model.share_url,
@@ -589,6 +641,7 @@ fn update(
               generation: model.generation + 1,
               view_mode: model.view_mode,
               diff_algorithm: model.diff_algorithm,
+              ignore_comments: model.ignore_comments,
               phase: LoadFailed(message),
               route: None,
               share_url: None,
@@ -605,6 +658,7 @@ fn update(
               generation: model.generation + 1,
               view_mode: model.view_mode,
               diff_algorithm: model.diff_algorithm,
+              ignore_comments: model.ignore_comments,
               phase: Idle,
               route: None,
               share_url: None,
@@ -639,6 +693,7 @@ fn update(
           generation: model.generation,
           view_mode: model.view_mode,
           diff_algorithm: model.diff_algorithm,
+          ignore_comments: model.ignore_comments,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -655,6 +710,7 @@ fn update(
           generation: model.generation,
           view_mode: model.view_mode,
           diff_algorithm: model.diff_algorithm,
+          ignore_comments: model.ignore_comments,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -730,7 +786,11 @@ fn update(
             return (model, @rabbita.none)
           }
           let skipped = match
-            build_analysis_request(view, model.diff_algorithm) {
+            build_analysis_request(
+              view,
+              model.diff_algorithm,
+              ignore_comments=model.ignore_comments,
+            ) {
             Ok((_, skipped)) => skipped
             Err(_) => []
           }
@@ -797,7 +857,11 @@ fn update(
               with_phase(
                 model,
                 Showing(
-                  ensure_expanded_file_documents(view, model.diff_algorithm),
+                  ensure_expanded_file_documents(
+                    view,
+                    model.diff_algorithm,
+                    ignore_comments=model.ignore_comments,
+                  ),
                 ),
               ),
               command,
@@ -873,7 +937,11 @@ fn update(
               set_file_state(
                 view,
                 index,
-                ensure_file_document(changed, model.diff_algorithm),
+                ensure_file_document(
+                  changed,
+                  model.diff_algorithm,
+                  ignore_comments=model.ignore_comments,
+                ),
               ),
             ),
           ),
@@ -951,7 +1019,11 @@ fn update(
           }
       }
       let changed = if changed.expanded {
-        ensure_file_document(changed, model.diff_algorithm)
+        ensure_file_document(
+          changed,
+          model.diff_algorithm,
+          ignore_comments=model.ignore_comments,
+        )
       } else {
         changed
       }

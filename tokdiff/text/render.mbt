@@ -26,6 +26,31 @@ fn append_diff_line(
 }
 
 ///|
+fn append_change_line(
+  buf : StringBuilder,
+  prefix : String,
+  line : @tokdiff.DiffLine,
+) -> Unit {
+  let ignored = !line.segments.is_empty() &&
+    line.segments.all(segment => segment.kind is Ignored)
+  append_diff_line(buf, if ignored { " " } else { prefix }, line)
+}
+
+///|
+fn append_ignored_row(buf : StringBuilder, row : @tokdiff.DiffRow) -> Unit {
+  match row {
+    Paired(old_line, new_line) =>
+      if old_line.text() == new_line.text() {
+        append_diff_line(buf, " ", old_line)
+      } else {
+        append_diff_line(buf, " ", old_line)
+        append_diff_line(buf, " ", new_line)
+      }
+    OldOnly(line) | NewOnly(line) => append_diff_line(buf, " ", line)
+  }
+}
+
+///|
 fn render_hunk(hunk : @tokdiff.DiffHunk) -> String {
   let buf = StringBuilder::new()
   buf <+ "\{hunk.header}\n"
@@ -39,18 +64,22 @@ fn render_hunk(hunk : @tokdiff.DiffHunk) -> String {
         for row in rows {
           match row {
             Paired(old_line, _) | OldOnly(old_line) =>
-              append_diff_line(buf, "-", old_line)
+              append_change_line(buf, "-", old_line)
             NewOnly(_) => ()
           }
         }
         for row in rows {
           match row {
             Paired(_, new_line) | NewOnly(new_line) =>
-              append_diff_line(buf, "+", new_line)
+              append_change_line(buf, "+", new_line)
             OldOnly(_) => ()
           }
         }
       }
+      IgnoredBlock(rows) =>
+        for row in rows {
+          append_ignored_row(buf, row)
+        }
     }
   }
   buf.to_string()
@@ -69,8 +98,11 @@ pub fn unified_hunks(
   new~ : ArrayView[String],
   context? : Int = 3,
   line_cleanup? : Bool = false,
+  ignore_comments? : Bool = false,
 ) -> Array[String] {
-  render_unified_hunks(@tokdiff.diff(old~, new~, context~, line_cleanup~))
+  render_unified_hunks(
+    @tokdiff.diff(old~, new~, context~, line_cleanup~, ignore_comments~),
+  )
 }
 
 ///|

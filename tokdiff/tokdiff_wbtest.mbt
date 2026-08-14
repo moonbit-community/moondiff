@@ -144,6 +144,7 @@ fn diff_segment_signature(segments : ArrayView[DiffSegment]) -> String {
     match segment.kind {
       Unchanged => buf <+ "U[\{segment.text}]"
       Changed => buf <+ "C[\{segment.text}]"
+      Ignored => buf <+ "I[\{segment.text}]"
     }
   }
   buf.to_string()
