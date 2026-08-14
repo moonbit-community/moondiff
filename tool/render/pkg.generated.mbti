@@ -3,11 +3,14 @@ package "moonbit-community/moondiff/tool/render"
 
 import {
   "moonbit-community/moondiff/syntax",
+  "moonbit-community/moondiff/tokdiff",
   "moonbitlang/core/hashmap",
 }
 
 // Values
 pub fn render_ast_diff(String, String, String, String, ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos], RenderOptions, old_line_base? : Int, new_line_base? : Int) -> String
+
+pub fn render_diff_document(String, String, @tokdiff.DiffDocument, RenderOptions) -> String
 
 pub fn render_file_headers(String, String, Bool) -> String
 

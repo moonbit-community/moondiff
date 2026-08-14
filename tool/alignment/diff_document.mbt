@@ -659,51 +659,47 @@ fn parser_fallback_reason(
 }
 
 ///|
-/// Calculate a MoonBit-aware renderer-neutral diff using the same top-level
-/// alignment plan as the terminal AST renderer.
-pub fn diff_document(
+fn initial_diff_document_result(
   old_source : String,
   new_source : String,
   mode : AlignedDiffMode,
-  context? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  ignore_comments? : Bool = false,
-) -> AlignedDiffResult {
-  let context = @cmp.maximum(context, 0)
+  context : Int,
+  ignore_comments : Bool,
+) -> AlignedDiffResult? {
   if old_source == new_source {
-    return {
+    return Some({
       document: empty_document(),
       outcome: if mode is Ast {
         NoStructuralChanges
       } else {
         Rendered
       },
-    }
+    })
   }
   if ignore_comments {
     let filtered = lexical_source_document(
       old_source, new_source, context, true,
     )
     if filtered.hunks.is_empty() {
-      return { document: filtered, outcome: NoNonCommentChanges }
+      return Some({ document: filtered, outcome: NoNonCommentChanges })
     }
   }
-  let old_parse = @cst.parse_structure(old_source, name="old")
-  let new_parse = @cst.parse_structure(new_source, name="new")
-  if parser_fallback_reason(
-      old_parse.diagnostics_view(),
-      new_parse.diagnostics_view(),
-    )
-    is Some(reason) {
-    return {
-      document: lexical_source_document(
-        old_source, new_source, context, ignore_comments,
-      ),
-      outcome: Fallback(reason),
-    }
-  }
-  let old_units = collect_impl_units(old_source, old_parse.root())
-  let new_units = collect_impl_units(new_source, new_parse.root())
+  None
+}
+
+///|
+fn diff_document_from_parsed_roots(
+  old_source : String,
+  new_source : String,
+  old_root : @cst.CstNode,
+  new_root : @cst.CstNode,
+  mode : AlignedDiffMode,
+  context : Int,
+  graph_limit : UInt,
+  ignore_comments : Bool,
+) -> AlignedDiffResult {
+  let old_units = collect_impl_units(old_source, old_root)
+  let new_units = collect_impl_units(new_source, new_root)
   let plan = top_level_plan(old_units, new_units, ignore_uuid=ignore_comments)
   match mode {
     Lexical =>
@@ -732,4 +728,48 @@ pub fn diff_document(
       }
     }
   }
+}
+
+///|
+/// Calculate a MoonBit-aware renderer-neutral diff using the same top-level
+/// alignment plan as the terminal AST renderer.
+pub fn diff_document(
+  old_source : String,
+  new_source : String,
+  mode : AlignedDiffMode,
+  context? : Int = 3,
+  graph_limit? : UInt = 3_000_000,
+  ignore_comments? : Bool = false,
+) -> AlignedDiffResult {
+  let context = @cmp.maximum(context, 0)
+  if initial_diff_document_result(
+      old_source, new_source, mode, context, ignore_comments,
+    )
+    is Some(result) {
+    return result
+  }
+  let old_parse = @cst.parse_structure(old_source, name="old")
+  let new_parse = @cst.parse_structure(new_source, name="new")
+  if parser_fallback_reason(
+      old_parse.diagnostics_view(),
+      new_parse.diagnostics_view(),
+    )
+    is Some(reason) {
+    return {
+      document: lexical_source_document(
+        old_source, new_source, context, ignore_comments,
+      ),
+      outcome: Fallback(reason),
+    }
+  }
+  diff_document_from_parsed_roots(
+    old_source,
+    new_source,
+    old_parse.root(),
+    new_parse.root(),
+    mode,
+    context,
+    graph_limit,
+    ignore_comments,
+  )
 }
