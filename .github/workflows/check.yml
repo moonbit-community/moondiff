@@ -36,7 +36,7 @@ jobs:
       
       - name: run test
         run: |
-          bash scripts/regular_test.sh
+          moon test --target all
           bash scripts/cli_test.sh && git diff --exit-code cli_test
 
       - name: Set up Node.js

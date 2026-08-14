@@ -10,6 +10,6 @@ import {
   "moonbit-community/moondiff/tool/render",
 }
 
-supported_targets = "wasm"
+supported_targets = "wasm+native"
 
 pkgtype(kind: "executable")
