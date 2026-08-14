@@ -506,6 +506,23 @@ button.algorithm-option.active {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
+button.ignore-comments-toggle {
+  width: auto;
+  padding: 0 0.5rem;
+}
+
+button.ignore-comments-toggle.active {
+  color: var(--foreground);
+  background: var(--surface-subtle);
+}
+
+.ignore-comments-icon {
+  color: #8064c8;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .source-icon {
   margin-top: -0.06rem;
   font-size: 1rem;
@@ -1308,6 +1325,12 @@ button.copy-button.copied {
   background: var(--add);
 }
 
+.diff-scroll .ignored-context {
+  color: var(--code-foreground);
+  background: var(--surface);
+  font-weight: inherit;
+}
+
 .diff-scroll .empty {
   background-color: var(--surface-subtle);
   background-image: repeating-linear-gradient(
@@ -1428,6 +1451,15 @@ footer {
 
   .status-label {
     display: none;
+  }
+
+  .ignore-comments-label {
+    display: none;
+  }
+
+  button.ignore-comments-toggle {
+    width: 2rem;
+    padding: 0;
   }
 }
 

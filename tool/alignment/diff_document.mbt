@@ -18,6 +18,8 @@ pub(all) enum AlignedDiffOutcome {
   /// edits still use the structural diff.
   PartialFallback(Array[String])
   NoStructuralChanges
+  /// The inputs differ only in comments excluded by the caller.
+  NoNonCommentChanges
 } derive(Eq)
 
 ///|
@@ -55,10 +57,11 @@ fn lexical_source_document(
   old_source : String,
   new_source : String,
   context : Int,
+  ignore_comments : Bool,
 ) -> @tokdiff.DiffDocument {
   let old = document_lines(old_source)
   let new = document_lines(new_source)
-  @tokdiff.diff(old~, new~, context~, line_cleanup=true)
+  @tokdiff.diff(old~, new~, context~, line_cleanup=true, ignore_comments~)
 }
 
 ///|
@@ -74,11 +77,13 @@ fn lexical_edit_document(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
   context : Int,
+  ignore_comments : Bool,
 ) -> @tokdiff.DiffDocument {
   lexical_source_document(
     source_slice(old_unit),
     source_slice(new_unit),
     context,
+    ignore_comments,
   ).rebase(impl_line_base(old_unit) - 1, impl_line_base(new_unit) - 1)
 }
 
@@ -88,10 +93,13 @@ fn lexical_plan_document(
   old_source : String,
   new_source : String,
   context : Int,
+  ignore_comments : Bool,
 ) -> AlignedDiffResult {
   match plan {
     RootList(..) => {
-      let document = lexical_source_document(old_source, new_source, context)
+      let document = lexical_source_document(
+        old_source, new_source, context, ignore_comments,
+      )
       { document, outcome: Rendered }
     }
     PerUnit(edits) => {
@@ -99,15 +107,24 @@ fn lexical_plan_document(
       for edit in edits {
         let document = match edit {
           Replace(old~, new~) =>
-            lexical_edit_document(Some(old), Some(new), context)
-          Delete(old) => lexical_edit_document(Some(old), None, context)
-          Insert(new) => lexical_edit_document(None, Some(new), context)
+            lexical_edit_document(
+              Some(old),
+              Some(new),
+              context,
+              ignore_comments,
+            )
+          Delete(old) =>
+            lexical_edit_document(Some(old), None, context, ignore_comments)
+          Insert(new) =>
+            lexical_edit_document(None, Some(new), context, ignore_comments)
         }
         append_document(hunks, document)
       }
       if hunks.is_empty() && old_source != new_source {
         {
-          document: lexical_source_document(old_source, new_source, context),
+          document: lexical_source_document(
+            old_source, new_source, context, ignore_comments,
+          ),
           outcome: Fallback(
             "top-level reordering has no changes inside aligned declarations",
           ),
@@ -458,6 +475,7 @@ fn ast_edit_document(
   new_unit : ImplUnit?,
   context : Int,
   graph_limit : UInt,
+  ignore_comments : Bool,
 ) -> UnitDocumentResult {
   let old_source = source_slice(old_unit)
   let new_source = source_slice(new_unit)
@@ -477,9 +495,9 @@ fn ast_edit_document(
     _ => {
       let reason = graph_fallback_reason(graph_limit, old_unit, new_unit)
       return {
-        document: lexical_source_document(old_source, new_source, context).rebase(
-          old_offset, new_offset,
-        ),
+        document: lexical_source_document(
+          old_source, new_source, context, ignore_comments,
+        ).rebase(old_offset, new_offset),
         fallback_reason: Some(reason),
       }
     }
@@ -512,6 +530,7 @@ fn ast_root_list_document(
   new_units : ArrayView[ImplUnit],
   context : Int,
   graph_limit : UInt,
+  ignore_comments : Bool,
 ) -> AlignedDiffResult {
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
@@ -521,7 +540,9 @@ fn ast_root_list_document(
     _ => {
       let reason = "graph limit exceeded (\{graph_limit})"
       return {
-        document: lexical_source_document(old_source, new_source, context),
+        document: lexical_source_document(
+          old_source, new_source, context, ignore_comments,
+        ),
         outcome: Fallback(reason),
       }
     }
@@ -552,11 +573,12 @@ fn ast_plan_document(
   new_source : String,
   context : Int,
   graph_limit : UInt,
+  ignore_comments : Bool,
 ) -> AlignedDiffResult {
   match plan {
     RootList(old~, new~) =>
       ast_root_list_document(
-        old_source, new_source, old, new, context, graph_limit,
+        old_source, new_source, old, new, context, graph_limit, ignore_comments,
       )
     PerUnit(edits) => {
       let hunks : Array[@tokdiff.DiffHunk] = []
@@ -564,11 +586,29 @@ fn ast_plan_document(
       for edit in edits {
         let result = match edit {
           Replace(old~, new~) =>
-            ast_edit_document(Some(old), Some(new), context, graph_limit)
+            ast_edit_document(
+              Some(old),
+              Some(new),
+              context,
+              graph_limit,
+              ignore_comments,
+            )
           Delete(old) =>
-            ast_edit_document(Some(old), None, context, graph_limit)
+            ast_edit_document(
+              Some(old),
+              None,
+              context,
+              graph_limit,
+              ignore_comments,
+            )
           Insert(new) =>
-            ast_edit_document(None, Some(new), context, graph_limit)
+            ast_edit_document(
+              None,
+              Some(new),
+              context,
+              graph_limit,
+              ignore_comments,
+            )
         }
         append_document(hunks, result.document)
         if result.fallback_reason is Some(reason) {
@@ -627,6 +667,7 @@ pub fn diff_document(
   mode : AlignedDiffMode,
   context? : Int = 3,
   graph_limit? : UInt = 3_000_000,
+  ignore_comments? : Bool = false,
 ) -> AlignedDiffResult {
   let context = @cmp.maximum(context, 0)
   if old_source == new_source {
@@ -639,6 +680,14 @@ pub fn diff_document(
       },
     }
   }
+  if ignore_comments {
+    let filtered = lexical_source_document(
+      old_source, new_source, context, true,
+    )
+    if filtered.hunks.is_empty() {
+      return { document: filtered, outcome: NoNonCommentChanges }
+    }
+  }
   let old_parse = @cst.parse_structure(old_source, name="old")
   let new_parse = @cst.parse_structure(new_source, name="new")
   if parser_fallback_reason(
@@ -647,15 +696,40 @@ pub fn diff_document(
     )
     is Some(reason) {
     return {
-      document: lexical_source_document(old_source, new_source, context),
+      document: lexical_source_document(
+        old_source, new_source, context, ignore_comments,
+      ),
       outcome: Fallback(reason),
     }
   }
   let old_units = collect_impl_units(old_source, old_parse.root())
   let new_units = collect_impl_units(new_source, new_parse.root())
-  let plan = top_level_plan(old_units, new_units)
+  let plan = top_level_plan(old_units, new_units, ignore_uuid=ignore_comments)
   match mode {
-    Lexical => lexical_plan_document(plan, old_source, new_source, context)
-    Ast => ast_plan_document(plan, old_source, new_source, context, graph_limit)
+    Lexical =>
+      lexical_plan_document(
+        plan, old_source, new_source, context, ignore_comments,
+      )
+    Ast => {
+      let result = ast_plan_document(
+        plan, old_source, new_source, context, graph_limit, ignore_comments,
+      )
+      if !ignore_comments {
+        return result
+      }
+      let document = result.document.ignore_comments(
+        old=document_lines(old_source),
+        new=document_lines(new_source),
+      )
+      {
+        document,
+        outcome: if document.hunks.is_empty() &&
+          !(result.outcome is (Fallback(_) | PartialFallback(_))) {
+          NoStructuralChanges
+        } else {
+          result.outcome
+        },
+      }
+    }
   }
 }

@@ -328,3 +328,86 @@ pub fn tokenize_line(line : String) -> Array[Tok] {
   }
   toks
 }
+
+///|
+// A source-faithful projection used by comment-insensitive diffs. `code`
+// excludes both the comment and the separating whitespace immediately before
+// it; `ignored_suffix` keeps those exact bytes so renderers can reconstruct
+// the original line.
+priv struct CommentProjection {
+  code : String
+  ignored_suffix : String
+  ignored_only : Bool
+}
+
+///|
+fn is_uuid_comment_line(line : String) -> Bool {
+  line.length() > 10 && line.has_prefix("///|UUID(") && line.has_suffix(")")
+}
+
+///|
+// The real lexer is intentionally skipped for extremely complex external
+// lines to protect JS/Wasm stacks. Mirror just enough quote handling here to
+// retain the comment contract in that safety path.
+fn fallback_source_comment_start(line : String) -> Int? {
+  let trimmed = line.trim_start()
+  if trimmed.has_prefix("#|") || trimmed.has_prefix("$|") {
+    return None
+  }
+  let mut quote : Char? = None
+  let mut escaped = false
+  let mut offset = 0
+  while offset < line.length() {
+    guard line.get_char(offset) is Some(char) else { break }
+    if quote is Some(delimiter) {
+      if escaped {
+        escaped = false
+      } else if char == '\\' {
+        escaped = true
+      } else if char == delimiter {
+        quote = None
+      }
+    } else if char is ('"' | '\'') {
+      quote = Some(char)
+    } else if char == '/' && line.get_char(offset + 1) == Some('/') {
+      return Some(offset)
+    }
+    offset += char.utf16_len()
+  }
+  None
+}
+
+///|
+// Locate a real MoonBit line comment from lexer-classified tokens. In
+// particular, `//` inside a string remains part of the `Str` token and is not
+// mistaken for a comment delimiter.
+fn source_comment_start(line : String) -> Int? {
+  if is_uuid_comment_line(line) {
+    return Some(0)
+  }
+  if !lexer_complexity_within_limit(line) {
+    return fallback_source_comment_start(line)
+  }
+  let mut offset = 0
+  for token in tokenize_line(line) {
+    if token.kind is Filler && token.text.has_prefix("//") {
+      return Some(offset)
+    }
+    offset += token.text.length()
+  }
+  None
+}
+
+///|
+fn project_comments(line : String) -> CommentProjection {
+  guard source_comment_start(line) is Some(comment_start) else {
+    return { code: line, ignored_suffix: "", ignored_only: false }
+  }
+  let prefix = line.view(end_offset=comment_start).to_owned()
+  let code = prefix.trim_end().to_owned()
+  {
+    code,
+    ignored_suffix: line.view(start_offset=code.length()).to_owned(),
+    ignored_only: code.is_empty(),
+  }
+}

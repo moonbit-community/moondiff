@@ -55,6 +55,7 @@ fn align_impl_units_by_uuid(
 fn align_impl_units_by_key(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
+  use_uuid? : Bool = true,
 ) -> Array[ImplEdit] {
   let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
@@ -68,21 +69,23 @@ fn align_impl_units_by_key(
     }
   }
 
-  let new_uuid_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
-  )
-  for i in 0..<new_units.length() {
-    if new_units[i].uuid is Some(uuid) {
-      new_uuid_positions.get_or_init(uuid, fn() { [] }).push(i)
+  if use_uuid {
+    let new_uuid_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
+    )
+    for i in 0..<new_units.length() {
+      if new_units[i].uuid is Some(uuid) {
+        new_uuid_positions.get_or_init(uuid, fn() { [] }).push(i)
+      }
     }
-  }
-  let uuid_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
-  for i in 0..<old_units.length() {
-    if old_units[i].uuid is Some(uuid) {
-      if new_uuid_positions.get(uuid) is Some(indices) {
-        let offset = uuid_offsets.get(uuid).unwrap_or(0)
-        if offset < indices.length() {
-          uuid_offsets[uuid] = offset + 1
-          pair(i, indices[offset])
+    let uuid_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+    for i in 0..<old_units.length() {
+      if old_units[i].uuid is Some(uuid) {
+        if new_uuid_positions.get(uuid) is Some(indices) {
+          let offset = uuid_offsets.get(uuid).unwrap_or(0)
+          if offset < indices.length() {
+            uuid_offsets[uuid] = offset + 1
+            pair(i, indices[offset])
+          }
         }
       }
     }
@@ -384,11 +387,18 @@ fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
 fn top_level_plan(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
+  ignore_uuid? : Bool = false,
 ) -> TopLevelPlan {
-  if all_units_have_uuid(old_units) && all_units_have_uuid(new_units) {
+  if !ignore_uuid &&
+    all_units_have_uuid(old_units) &&
+    all_units_have_uuid(new_units) {
     PerUnit(align_impl_units_by_uuid(old_units, new_units))
   } else {
-    let edits = align_impl_units_by_key(old_units, new_units)
+    let edits = align_impl_units_by_key(
+      old_units,
+      new_units,
+      use_uuid=!ignore_uuid,
+    )
     if impl_edits_have_replacement(edits) {
       PerUnit(edits)
     } else {

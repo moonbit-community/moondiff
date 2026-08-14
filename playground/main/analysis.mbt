@@ -238,13 +238,16 @@ fn aligned_mode(algorithm : DiffAlgorithm) -> @alignment.AlignedDiffMode {
 fn cached_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
 ) -> @alignment.AlignedDiffResult? {
   match file.diff_mode {
     LineDiff => file.diff_cache.line
     MoonBitDiff =>
-      match algorithm {
-        LexicalAlgorithm => file.diff_cache.lexical
-        AstAlgorithm => file.diff_cache.ast
+      match (algorithm, ignore_comments) {
+        (LexicalAlgorithm, false) => file.diff_cache.lexical
+        (LexicalAlgorithm, true) => file.diff_cache.lexical_ignoring_comments
+        (AstAlgorithm, false) => file.diff_cache.ast
+        (AstAlgorithm, true) => file.diff_cache.ast_ignoring_comments
       }
   }
 }
@@ -253,6 +256,7 @@ fn cached_file_document(
 fn calculate_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
 ) -> @alignment.AlignedDiffResult? {
   guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
     return None
@@ -271,6 +275,7 @@ fn calculate_file_document(
           aligned_mode(algorithm),
           context=3,
           graph_limit=3_000_000,
+          ignore_comments~,
         ),
       )
   }
@@ -280,11 +285,13 @@ fn calculate_file_document(
 fn ensure_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
 ) -> FileState {
-  if cached_file_document(file, algorithm) is Some(_) {
+  if cached_file_document(file, algorithm, ignore_comments~) is Some(_) {
     return file
   }
-  guard calculate_file_document(file, algorithm) is Some(result) else {
+  guard calculate_file_document(file, algorithm, ignore_comments~)
+    is Some(result) else {
     return file
   }
   let cache = match file.diff_mode {
@@ -292,21 +299,43 @@ fn ensure_file_document(
       {
         line: Some(result),
         lexical: file.diff_cache.lexical,
+        lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
         ast: file.diff_cache.ast,
+        ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
       }
     MoonBitDiff =>
-      match algorithm {
-        LexicalAlgorithm =>
+      match (algorithm, ignore_comments) {
+        (LexicalAlgorithm, false) =>
           {
             line: file.diff_cache.line,
             lexical: Some(result),
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
             ast: file.diff_cache.ast,
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
           }
-        AstAlgorithm =>
+        (LexicalAlgorithm, true) =>
           {
             line: file.diff_cache.line,
             lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: Some(result),
+            ast: file.diff_cache.ast,
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+          }
+        (AstAlgorithm, false) =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
             ast: Some(result),
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+          }
+        (AstAlgorithm, true) =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            ast: file.diff_cache.ast,
+            ast_ignoring_comments: Some(result),
           }
       }
   }
@@ -324,11 +353,12 @@ fn ensure_file_document(
 fn ensure_expanded_file_documents(
   view : CommitView,
   algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
 ) -> CommitView {
   let files = view.files.copy()
   for index, file in files {
     if file.expanded {
-      files[index] = ensure_file_document(file, algorithm)
+      files[index] = ensure_file_document(file, algorithm, ignore_comments~)
     }
   }
   {
@@ -347,10 +377,11 @@ fn ensure_expanded_file_documents(
 fn ensure_all_file_documents(
   view : CommitView,
   algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
 ) -> CommitView {
   let files = view.files.copy()
   for index, file in files {
-    files[index] = ensure_file_document(file, algorithm)
+    files[index] = ensure_file_document(file, algorithm, ignore_comments~)
   }
   {
     reference: view.reference,
@@ -365,8 +396,14 @@ fn ensure_all_file_documents(
 }
 
 ///|
-fn file_hunks(file : FileState, algorithm : DiffAlgorithm) -> Array[String] {
-  guard cached_file_document(file, algorithm) is Some(result) else { return [] }
+fn file_hunks(
+  file : FileState,
+  algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
+) -> Array[String] {
+  guard cached_file_document(file, algorithm, ignore_comments~) is Some(result) else {
+    return []
+  }
   @tokdiff_text.render_unified_hunks(result.document)
 }
 
@@ -409,6 +446,7 @@ fn sources_pending(view : CommitView) -> Bool {
 fn build_analysis_request(
   view : CommitView,
   algorithm : DiffAlgorithm,
+  ignore_comments? : Bool = false,
 ) -> Result[(AnalysisRequest, Array[SkippedFile]), String] {
   let hunks : Array[AnalysisHunkInput] = []
   let skipped : Array[SkippedFile] = []
@@ -421,10 +459,22 @@ fn build_analysis_request(
       skipped.push({ path: state.file.filename, reason })
       continue
     }
-    guard cached_file_document(state, algorithm) is Some(diff) else {
+    guard cached_file_document(state, algorithm, ignore_comments~) is Some(diff) else {
       return Err(
         "Could not prepare \{state.file.filename}: diff is unavailable",
       )
+    }
+    if state.diff_mode is MoonBitDiff &&
+      diff.outcome is @alignment.AlignedDiffOutcome::NoNonCommentChanges {
+      skipped.push({
+        path: state.file.filename,
+        reason: if algorithm is AstAlgorithm {
+          "No structural non-comment changes were found; turn off Ignore comments to analyze comment changes."
+        } else {
+          "No non-comment changes were found; turn off Ignore comments to analyze comment changes."
+        },
+      })
+      continue
     }
     if state.diff_mode is MoonBitDiff &&
       algorithm is AstAlgorithm &&
@@ -435,7 +485,7 @@ fn build_analysis_request(
       })
       continue
     }
-    for hunk_index, patch in file_hunks(state, algorithm) {
+    for hunk_index, patch in file_hunks(state, algorithm, ignore_comments~) {
       patch_bytes += @utf8.encode(patch).length()
       if hunks.length() + 1 > MAX_ANALYSIS_HUNKS {
         return Err(

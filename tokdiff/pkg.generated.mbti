@@ -2,7 +2,7 @@
 package "moonbit-community/moondiff/tokdiff"
 
 // Values
-pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool) -> DiffDocument
+pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, ignore_comments? : Bool) -> DiffDocument
 
 pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> DiffDocument
 
@@ -22,11 +22,13 @@ pub(all) struct ContextLine {
 pub(all) enum DiffBlock {
   ContextBlock(Array[ContextLine])
   ChangeBlock(Array[DiffRow])
+  IgnoredBlock(Array[DiffRow])
 } derive(Eq)
 
 pub(all) struct DiffDocument {
   hunks : Array[DiffHunk]
 } derive(Eq)
+pub fn DiffDocument::ignore_comments(Self, old~ : ArrayView[String], new~ : ArrayView[String]) -> Self
 pub fn DiffDocument::rebase(Self, Int, Int) -> Self
 
 pub(all) struct DiffHunk {
@@ -58,6 +60,7 @@ pub(all) struct DiffSegment {
 pub(all) enum DiffSegmentKind {
   Unchanged
   Changed
+  Ignored
 } derive(Eq)
 
 pub struct Tok {

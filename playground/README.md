@@ -16,12 +16,21 @@ reordering become an explicit no-structural-changes state. Parser failures and
 whole-file graph-limit failures show a lexical fallback reason; when only one
 aligned top-level declaration exceeds the graph limit, the playground labels
 that declaration as a partial lexical fallback and keeps AST diffing the rest
-of the file. Other valid UTF-8 text files always use a plain line diff. The
-selected algorithm survives later
-commit navigation in the open app but is not written into share URLs. The
-first 20 MoonBit diffs open automatically, while all other files load on
-demand. Calculated documents are cached independently by algorithm, so layout
-switches and analysis rendering reuse the same hunks.
+of the file. The default-off **Ignore comments** control applies to MoonBit
+files in both Lexical and AST mode. It ignores ordinary and documentation
+comments, generated `///|UUID(...)` markers, and the separating whitespace
+before a comment while keeping strings such as `"//not a comment"` intact.
+Pure comment changes produce no hunks. When nearby code also changes, both
+original comments remain visible as neutral context without addition,
+deletion, or intraline highlighting. Other valid UTF-8 text files always use a
+plain line diff and are unaffected by the control.
+
+The selected algorithm and comment setting survive later commit navigation in
+the open app but are not written into share URLs; a refresh restores Lexical
+mode with comment filtering off. The first 20 MoonBit diffs open automatically,
+while all other files load on demand. Calculated documents are cached
+independently for every algorithm/comment-setting combination, so layout
+switches and analysis rendering reuse the same stable hunks.
 
 Each downloaded side is limited to 1 MiB and 20,000 lines. Invalid UTF-8,
 NUL-containing, binary, and over-limit content keeps its file card and shows
@@ -33,10 +42,12 @@ apply.
 When the playground is served by its optional local Node backend, an
 **Analyze changes** action appears. It loads both sides of every changed file
 without expanding file cards, uses the current algorithm's cached `context=3`
-hunks, and asks OpenSeek to group them by cross-file function in descending
-review importance. AST files with no structural changes are listed as skipped;
-if the commit has no analyzable hunks, the browser reports that locally without
-calling the backend. After analysis, the ordered groups replace the file list:
+hunks (including the current comment setting), and asks OpenSeek to group them
+by cross-file function in descending review importance. AST files with no
+structural changes and MoonBit files containing only ignored comment changes
+are listed as skipped; if the commit has no analyzable hunks, the browser
+reports that locally without calling the backend. After analysis, the ordered
+groups replace the file list:
 the most important group opens first, later groups stay collapsed until
 requested, and each hunk keeps its file path, highlighted diff, and dedicated
 explanation.

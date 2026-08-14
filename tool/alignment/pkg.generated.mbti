@@ -8,7 +8,7 @@ import {
 }
 
 // Values
-pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt) -> AlignedDiffResult
+pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> AlignedDiffResult
 
 pub fn render_aligned_cst_diffs(String, String, @untyped_cst.CstNode, String, String, @untyped_cst.CstNode, UInt, @render.RenderOptions) -> String
 
@@ -25,6 +25,7 @@ pub(all) enum AlignedDiffOutcome {
   Fallback(String)
   PartialFallback(Array[String])
   NoStructuralChanges
+  NoNonCommentChanges
 } derive(Eq)
 
 pub(all) struct AlignedDiffResult {
