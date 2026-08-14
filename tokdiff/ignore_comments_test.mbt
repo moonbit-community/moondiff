@@ -1,7 +1,3 @@
-// Copyright 2026 International Digital Economy Academy
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-
 ///|
 test "ignore comments defaults off and removes comment-only hunks" {
   let old = ["fn value() -> Int {", "  1 // old", "}"]

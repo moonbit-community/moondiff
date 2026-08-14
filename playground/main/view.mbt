@@ -1,11 +1,3 @@
-// Copyright 2026 International Digital Economy Academy
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-
 ///|
 fn status_label(status : String) -> String {
   match status {
@@ -431,13 +423,13 @@ fn file_diff_view(
       // `rendered` is the only raw HTML accepted by the application. tokdiff
       // has already escaped every source line and hunk header.
       @html.fragment([
-        match diff_notice(result.outcome) {
-          Some(notice) =>
-            @html.div(class=notice.class_name, [
-              @html.strong(notice.label),
-              @html.span(notice.message),
-            ])
-          None => @html.nothing
+        if diff_notice(result.outcome) is Some(notice) {
+          @html.div(class=notice.class_name, [
+            @html.strong(notice.label),
+            @html.span(notice.message),
+          ])
+        } else {
+          @html.nothing
         },
         @html.div(
           class="diff-scroll",
