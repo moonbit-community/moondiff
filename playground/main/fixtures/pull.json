@@ -1,0 +1,13 @@
+{
+  "title": "Aggregate the whole pull request",
+  "html_url": "https://github.com/moonbitlang/core/pull/4082",
+  "base": {
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "head": {
+    "sha": "cccccccccccccccccccccccccccccccccccccccc"
+  },
+  "additions": 7,
+  "deletions": 3,
+  "changed_files": 2
+}

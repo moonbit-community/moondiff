@@ -1,0 +1,16 @@
+[
+  {
+    "filename": "src/first.mbt",
+    "status": "modified",
+    "additions": 4,
+    "deletions": 2,
+    "changes": 6
+  },
+  {
+    "filename": "README.md",
+    "status": "added",
+    "additions": 3,
+    "deletions": 1,
+    "changes": 4
+  }
+]

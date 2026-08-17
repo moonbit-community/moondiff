@@ -56,7 +56,7 @@ priv struct FileState {
 } derive(Eq)
 
 ///|
-priv struct CommitView {
+priv struct ChangeView {
   reference : CommitRef
   sha : String
   parent_sha : String?
@@ -76,8 +76,24 @@ priv enum Phase {
     first~ : ApiCommit?,
     files~ : Array[ApiFile]
   )
+  LoadingPullMetadata(reference~ : CommitRef, attempt~ : Int)
+  LoadingPullSnapshot(
+    reference~ : CommitRef,
+    attempt~ : Int,
+    metadata~ : ApiPull,
+    compare~ : ApiCompare?,
+    page~ : Int,
+    files~ : Array[ApiFile]
+  )
+  ValidatingPullSnapshot(
+    reference~ : CommitRef,
+    attempt~ : Int,
+    metadata~ : ApiPull,
+    compare~ : ApiCompare,
+    files~ : Array[ApiFile]
+  )
   LoadFailed(String)
-  Showing(CommitView)
+  Showing(ChangeView)
 } derive(Eq)
 
 ///|
@@ -138,6 +154,10 @@ priv enum Msg {
   AnalyzeChanges
   AnalysisLoaded(Int, Result[AnalysisResponse, String])
   ToggleAnalysisGroup(Int)
+  PullMetadataLoaded(Int, Int, Result[ApiPull, Error])
+  PullCompareLoaded(Int, Int, Result[ApiCompare, Error])
+  PullFilesPageLoaded(Int, Int, Int, Result[Array[ApiFile], Error])
+  PullValidationLoaded(Int, Int, Result[ApiPull, Error])
 }
 
 ///|
@@ -146,11 +166,77 @@ fn error_message(error : Error, api : Bool) -> String {
   if api && detail.contains("HTTP 403") {
     "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later."
   } else if api && detail.contains("HTTP 404") {
-    "GitHub could not find that public repository or commit."
+    "GitHub could not find that public repository, commit, or pull request."
   } else {
     detail
   }
 }
+
+///|
+priv suberror GitHubRequestError {
+  GitHubRequestError(String)
+}
+
+///|
+impl Show for GitHubRequestError with fn output(self, logger) {
+  match self {
+    GitHubRequestError(detail) => logger.write_string(detail)
+  }
+}
+
+///|
+fn[T : FromJson] fresh_json_get(
+  url : String,
+  msg : @rabbita.Emit[Result[T, Error]],
+) -> @rabbita.Cmd {
+  @cmd.custom_cmd(scheduler => {
+    send_fresh_json_get(
+      url,
+      completed=(ok, status, status_text, response_body) => {
+        let result : Result[T, Error] = if ok {
+          try @json.from_json(@json.parse(response_body)) catch {
+            error => Err(GitHubRequestError(error.to_string()))
+          } noraise {
+            value => Ok(value)
+          }
+        } else {
+          let suffix = if status_text.trim().is_empty() {
+            ""
+          } else {
+            " \{status_text}"
+          }
+          Err(GitHubRequestError("Http request failed:HTTP \{status}\{suffix}"))
+        }
+        scheduler.add(msg(result))
+      },
+      failed=detail => {
+        scheduler.add(
+          msg(Err(GitHubRequestError("Http request failed:\{detail}"))),
+        )
+      },
+    )
+  })
+}
+
+///|
+extern "js" fn send_fresh_json_get(
+  url : String,
+  completed~ : (Bool, Int, String, String) -> Unit,
+  failed~ : (String) -> Unit,
+) =
+  #| (url, completed, failed) => {
+  #|   fetch(url, { method: "GET", cache: "no-cache" })
+  #|     .then((response) => {
+  #|       if (!response.ok) {
+  #|         completed(false, response.status, response.statusText || "", "");
+  #|         return;
+  #|       }
+  #|       return response.text().then((body) => {
+  #|         completed(true, response.status, response.statusText || "", body);
+  #|       });
+  #|     })
+  #|     .catch((error) => failed(error.toString()));
+  #| }
 
 ///|
 fn commit_request(
@@ -161,6 +247,57 @@ fn commit_request(
 ) -> @rabbita.Cmd {
   @http.get(commit_api_url(reference, page)).expect_json(result => {
     emit(CommitPageLoaded(generation, page, result))
+  })
+}
+
+///|
+fn pull_metadata_request(
+  reference : CommitRef,
+  generation : Int,
+  attempt : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  fresh_json_get(pull_api_url(reference), result => {
+    emit(PullMetadataLoaded(generation, attempt, result))
+  })
+}
+
+///|
+fn pull_compare_request(
+  reference : CommitRef,
+  base_sha : String,
+  head_sha : String,
+  generation : Int,
+  attempt : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  @http.get(compare_api_url(reference, base_sha, head_sha)).expect_json(result => {
+    emit(PullCompareLoaded(generation, attempt, result))
+  })
+}
+
+///|
+fn pull_files_request(
+  reference : CommitRef,
+  generation : Int,
+  attempt : Int,
+  page : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  fresh_json_get(pull_files_api_url(reference, page), result => {
+    emit(PullFilesPageLoaded(generation, attempt, page, result))
+  })
+}
+
+///|
+fn pull_validation_request(
+  reference : CommitRef,
+  generation : Int,
+  attempt : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  fresh_json_get(pull_api_url(reference), result => {
+    emit(PullValidationLoaded(generation, attempt, result))
   })
 }
 
@@ -212,14 +349,17 @@ fn commands_for_file(
 }
 
 ///|
-fn finish_commit(
+fn finish_change(
   reference : CommitRef,
-  first : ApiCommit,
+  sha : String,
+  parent_sha : String?,
+  message : String,
+  html_url : String,
+  stats : ApiStats,
   all_files : Array[ApiFile],
   generation : Int,
   emit : @rabbita.Emit[Msg],
-) -> (CommitView, @rabbita.Cmd) {
-  let parent_sha = first_parent(first)
+) -> (ChangeView, @rabbita.Cmd) {
   let states : Array[FileState] = []
   let commands : Array[@rabbita.Cmd] = []
   let mut moonbit_file_count = 0
@@ -229,7 +369,7 @@ fn finish_commit(
     if diff_mode is MoonBitDiff {
       moonbit_file_count += 1
     }
-    let pair = source_pair(reference, first.sha, parent_sha, file)
+    let pair = source_pair(reference, sha, parent_sha, file)
     states.push({
       file,
       diff_mode,
@@ -241,13 +381,7 @@ fn finish_commit(
     if expanded {
       for
         command in commands_for_file(
-          file,
-          reference,
-          first.sha,
-          parent_sha,
-          generation,
-          index,
-          emit,
+          file, reference, sha, parent_sha, generation, index, emit,
         ) {
         commands.push(command)
       }
@@ -256,11 +390,11 @@ fn finish_commit(
   (
     {
       reference,
-      sha: first.sha,
+      sha,
       parent_sha,
-      message: first.commit.message,
-      html_url: first.html_url,
-      stats: first.stats,
+      message,
+      html_url,
+      stats,
       total_files: all_files.length(),
       files: states,
     },
@@ -269,11 +403,60 @@ fn finish_commit(
 }
 
 ///|
+fn finish_commit(
+  reference : CommitRef,
+  first : ApiCommit,
+  all_files : Array[ApiFile],
+  generation : Int,
+  emit : @rabbita.Emit[Msg],
+) -> (ChangeView, @rabbita.Cmd) {
+  finish_change(
+    reference,
+    first.sha,
+    first_parent(first),
+    first.commit.message,
+    first.html_url,
+    first.stats,
+    all_files,
+    generation,
+    emit,
+  )
+}
+
+///|
+fn finish_pull(
+  reference : CommitRef,
+  pull : ApiPull,
+  compare : ApiCompare,
+  all_files : Array[ApiFile],
+  generation : Int,
+  emit : @rabbita.Emit[Msg],
+) -> Result[(ChangeView, @rabbita.Cmd), String] {
+  match validate_pull_files(pull, all_files) {
+    Err(message) => Err(message)
+    Ok(_) =>
+      Ok(
+        finish_change(
+          reference,
+          pull.head.sha,
+          Some(pull_merge_base(compare)),
+          pull.title,
+          pull.html_url,
+          pull_stats(pull),
+          all_files,
+          generation,
+          emit,
+        ),
+      )
+  }
+}
+
+///|
 fn set_file_state(
-  view : CommitView,
+  view : ChangeView,
   index : Int,
   state : FileState,
-) -> CommitView {
+) -> ChangeView {
   let files = view.files.copy()
   files[index] = state
   {
@@ -343,12 +526,160 @@ fn with_analysis_status(
 }
 
 ///|
-fn begin_commit_load(
+const PULL_CHANGED_ERROR : String = "This pull request changed while it was loading. Please try again."
+
+///|
+const MAX_PULL_LOAD_ATTEMPT : Int = 1
+
+///|
+fn show_pull(
+  model : Model,
+  reference : CommitRef,
+  pull : ApiPull,
+  compare : ApiCompare,
+  files : Array[ApiFile],
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  match finish_pull(reference, pull, compare, files, model.generation, emit) {
+    Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
+    Ok((view, command)) =>
+      (
+        with_phase(
+          model,
+          Showing(
+            ensure_expanded_file_documents(
+              view,
+              model.diff_algorithm,
+              ignore_comments=model.ignore_comments,
+            ),
+          ),
+        ),
+        command,
+      )
+  }
+}
+
+///|
+fn start_pull_snapshot(
+  model : Model,
+  reference : CommitRef,
+  attempt : Int,
+  metadata : ApiPull,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  if metadata.changed_files > MAX_PULL_FILES {
+    return (with_phase(model, LoadFailed(PULL_FILE_LIMIT_ERROR)), @rabbita.none)
+  }
+  (
+    with_phase(
+      model,
+      LoadingPullSnapshot(
+        reference~,
+        attempt~,
+        metadata~,
+        compare=None,
+        page=1,
+        files=[],
+      ),
+    ),
+    @rabbita.batch([
+      pull_compare_request(
+        reference,
+        metadata.base.sha,
+        metadata.head.sha,
+        model.generation,
+        attempt,
+        emit,
+      ),
+      pull_files_request(reference, model.generation, attempt, 1, emit),
+    ]),
+  )
+}
+
+///|
+fn continue_pull_snapshot(
+  model : Model,
+  reference : CommitRef,
+  attempt : Int,
+  metadata : ApiPull,
+  compare : ApiCompare?,
+  page : Int,
+  files : Array[ApiFile],
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let loading = LoadingPullSnapshot(
+    reference~,
+    attempt~,
+    metadata~,
+    compare~,
+    page~,
+    files~,
+  )
+  guard compare is Some(loaded_compare) && page == 0 else {
+    return (with_phase(model, loading), @rabbita.none)
+  }
+  (
+    with_phase(
+      model,
+      ValidatingPullSnapshot(
+        reference~,
+        attempt~,
+        metadata~,
+        compare=loaded_compare,
+        files~,
+      ),
+    ),
+    pull_validation_request(reference, model.generation, attempt, emit),
+  )
+}
+
+///|
+fn validate_or_retry_pull_snapshot(
+  model : Model,
+  reference : CommitRef,
+  attempt : Int,
+  metadata : ApiPull,
+  compare : ApiCompare,
+  files : Array[ApiFile],
+  verified : ApiPull,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  if !same_pull_snapshot(metadata, verified) {
+    if attempt < MAX_PULL_LOAD_ATTEMPT {
+      return start_pull_snapshot(model, reference, attempt + 1, verified, emit)
+    }
+    return (with_phase(model, LoadFailed(PULL_CHANGED_ERROR)), @rabbita.none)
+  }
+  match validate_pull_files(verified, files) {
+    Err(message) =>
+      if attempt < MAX_PULL_LOAD_ATTEMPT {
+        start_pull_snapshot(model, reference, attempt + 1, verified, emit)
+      } else {
+        (with_phase(model, LoadFailed(message)), @rabbita.none)
+      }
+    Ok(_) => show_pull(model, reference, verified, compare, files, emit)
+  }
+}
+
+///|
+fn begin_change_load(
   model : Model,
   reference : CommitRef,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   let generation = model.generation + 1
+  let (phase, command) = match reference.target {
+    Commit(_) =>
+      (
+        LoadingCommit(reference~, page=1, first=None, files=[]),
+        commit_request(reference, generation, 1, emit),
+      )
+    PullRequest(_) =>
+      (
+        LoadingPullMetadata(reference~, attempt=0),
+        pull_metadata_request(reference, generation, 0, emit),
+      )
+  }
   (
     {
       input: canonical_github_url(reference),
@@ -356,14 +687,14 @@ fn begin_commit_load(
       view_mode: model.view_mode,
       diff_algorithm: model.diff_algorithm,
       ignore_comments: model.ignore_comments,
-      phase: LoadingCommit(reference~, page=1, first=None, files=[]),
+      phase,
       route: Some(reference),
       share_url: Some(playground_share_url(reference)),
       copy_status: CopyReady,
       backend_status: model.backend_status,
       analysis_status: AnalysisIdle,
     },
-    commit_request(reference, generation, 1, emit),
+    command,
   )
 }
 
@@ -372,7 +703,7 @@ fn app_init(emit : @rabbita.Emit[Msg]) -> (Model, @rabbita.Cmd) {
   let model = initial_model()
   let (next, command) = match
     reference_from_playground_url(browser_current_url()) {
-    Ok(Some(reference)) => begin_commit_load(model, reference, emit)
+    Ok(Some(reference)) => begin_change_load(model, reference, emit)
     Ok(None) => (model, @rabbita.none)
     Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
   }
@@ -398,10 +729,10 @@ fn side_from_result(result : Result[(String, Bytes), Error]) -> SideLoad {
 
 ///|
 fn prepare_all_sources(
-  view : CommitView,
+  view : ChangeView,
   generation : Int,
   emit : @rabbita.Emit[Msg],
-) -> (CommitView, Array[@rabbita.Cmd]) {
+) -> (ChangeView, Array[@rabbita.Cmd]) {
   let files = view.files.copy()
   let commands : Array[@rabbita.Cmd] = []
   for index, file in files {
@@ -595,7 +926,7 @@ fn update(
       )
     }
     Submit =>
-      match parse_commit_url(model.input) {
+      match parse_change_url(model.input) {
         Err(message) =>
           (
             {
@@ -615,7 +946,7 @@ fn update(
           )
         Ok(reference) => {
           let already_at_route = model.route == Some(reference)
-          let (next, request) = begin_commit_load(model, reference, emit)
+          let (next, request) = begin_change_load(model, reference, emit)
           let navigation = if already_at_route {
             @rabbita.none
           } else {
@@ -664,7 +995,7 @@ fn update(
           if model.route == Some(reference) {
             (model, @rabbita.none)
           } else {
-            begin_commit_load(model, reference, emit)
+            begin_change_load(model, reference, emit)
           }
       }
     CopyShareLink =>
@@ -730,7 +1061,7 @@ fn update(
           with_analysis_status(
             model,
             AnalysisFailed(
-              "This commit has more than 50 files and cannot be analyzed in one request.",
+              "This change has more than 50 files and cannot be analyzed in one request.",
             ),
           ),
           @rabbita.none,
@@ -807,6 +1138,141 @@ fn update(
               ),
             ),
             @rabbita.none,
+          )
+      }
+    }
+    PullMetadataLoaded(generation, attempt, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase
+        is LoadingPullMetadata(reference~, attempt=expected_attempt) &&
+        attempt == expected_attempt else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            with_phase(model, LoadFailed(error_message(error, true))),
+            @rabbita.none,
+          )
+        Ok(metadata) =>
+          start_pull_snapshot(model, reference, attempt, metadata, emit)
+      }
+    }
+    PullCompareLoaded(generation, attempt, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase
+        is LoadingPullSnapshot(
+          reference~,
+          attempt=expected_attempt,
+          metadata~,
+          compare=_,
+          page~,
+          files~
+        ) &&
+        attempt == expected_attempt else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            with_phase(model, LoadFailed(error_message(error, true))),
+            @rabbita.none,
+          )
+        Ok(compare) =>
+          continue_pull_snapshot(
+            model,
+            reference,
+            attempt,
+            metadata,
+            Some(compare),
+            page,
+            files,
+            emit,
+          )
+      }
+    }
+    PullFilesPageLoaded(generation, attempt, page, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase
+        is LoadingPullSnapshot(
+          reference~,
+          attempt=expected_attempt,
+          metadata~,
+          compare~,
+          page=expected_page,
+          files~
+        ) &&
+        attempt == expected_attempt &&
+        page == expected_page &&
+        page > 0 else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            with_phase(model, LoadFailed(error_message(error, true))),
+            @rabbita.none,
+          )
+        Ok(response) => {
+          let accumulated = merge_file_pages(files, response)
+          if should_fetch_next_pull_page(
+              page,
+              response.length(),
+              accumulated.length(),
+              Some(metadata.changed_files),
+            ) {
+            (
+              with_phase(
+                model,
+                LoadingPullSnapshot(
+                  reference~,
+                  attempt~,
+                  metadata~,
+                  compare~,
+                  page=page + 1,
+                  files=accumulated,
+                ),
+              ),
+              pull_files_request(reference, generation, attempt, page + 1, emit),
+            )
+          } else {
+            continue_pull_snapshot(
+              model, reference, attempt, metadata, compare, 0, accumulated, emit,
+            )
+          }
+        }
+      }
+    }
+    PullValidationLoaded(generation, attempt, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase
+        is ValidatingPullSnapshot(
+          reference~,
+          attempt=expected_attempt,
+          metadata~,
+          compare~,
+          files~
+        ) &&
+        attempt == expected_attempt else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            with_phase(model, LoadFailed(error_message(error, true))),
+            @rabbita.none,
+          )
+        Ok(verified) =>
+          validate_or_retry_pull_snapshot(
+            model, reference, attempt, metadata, compare, files, verified, emit,
           )
       }
     }

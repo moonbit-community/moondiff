@@ -343,10 +343,10 @@ fn ensure_file_document(
 
 ///|
 fn ensure_expanded_file_documents(
-  view : CommitView,
+  view : ChangeView,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
-) -> CommitView {
+) -> ChangeView {
   let files = view.files.copy()
   for index, file in files {
     if file.expanded {
@@ -367,10 +367,10 @@ fn ensure_expanded_file_documents(
 
 ///|
 fn ensure_all_file_documents(
-  view : CommitView,
+  view : ChangeView,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
-) -> CommitView {
+) -> ChangeView {
   let files = view.files.copy()
   for index, file in files {
     files[index] = ensure_file_document(file, algorithm, ignore_comments~)
@@ -424,7 +424,7 @@ fn blocking_source_problem(file : FileState) -> String? {
 }
 
 ///|
-fn sources_pending(view : CommitView) -> Bool {
+fn sources_pending(view : ChangeView) -> Bool {
   for file in view.files {
     if file.old_side is (NotRequested | Loading) ||
       file.new_side is (NotRequested | Loading) {
@@ -436,7 +436,7 @@ fn sources_pending(view : CommitView) -> Bool {
 
 ///|
 fn build_analysis_request(
-  view : CommitView,
+  view : ChangeView,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
 ) -> Result[(AnalysisRequest, Array[SkippedFile]), String] {
@@ -481,7 +481,7 @@ fn build_analysis_request(
       patch_bytes += @utf8.encode(patch).length()
       if hunks.length() + 1 > MAX_ANALYSIS_HUNKS {
         return Err(
-          "This commit has more than 200 text hunks and cannot be analyzed in one request.",
+          "This change has more than 200 text hunks and cannot be analyzed in one request.",
         )
       }
       if patch_bytes > MAX_ANALYSIS_PATCH_BYTES {
