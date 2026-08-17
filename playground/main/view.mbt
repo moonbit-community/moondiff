@@ -52,13 +52,17 @@ fn brand_view() -> @rabbita.Html {
 ///|
 fn commit_form(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
   @html.form(on_submit=emit(Submit), class="commit-form", [
-    @html.label(for_="commit-url", class="sr-only", "Public GitHub commit URL"),
+    @html.label(
+      for_="commit-url",
+      class="sr-only",
+      "Public GitHub commit or pull request URL",
+    ),
     @html.div(class="input-row", [
       @html.input(
         id="commit-url",
         input_type=Url,
         value=model.input,
-        placeholder="https://github.com/owner/repo/commit/sha",
+        placeholder="https://github.com/owner/repo/pull/123",
         required=true,
         on_input=value => emit(InputChanged(value)),
       ),
@@ -75,11 +79,11 @@ fn route_example() -> @rabbita.Html {
   @html.div(class="route-example", [
     @html.code(class="route-old", [
       @html.span(class="route-prefix", "− github"),
-      @html.span(".com/owner/repo/commit/sha"),
+      @html.span(".com/owner/repo/pull/number"),
     ]),
     @html.code(class="route-new", [
       @html.span(class="route-prefix", "+ playground"),
-      @html.span("/#/owner/repo/commit/sha"),
+      @html.span("/#/owner/repo/pull/number"),
     ]),
   ])
 }
@@ -96,6 +100,10 @@ fn landing_details() -> @rabbita.Html {
       @html.ul([
         @html.li([
           @html.span(class="list-arrow", "→"),
+          @html.code("github.com/owner/repo/pull/number[/files]"),
+        ]),
+        @html.li([
+          @html.span(class="list-arrow", "→"),
           @html.code("github.com/owner/repo/commit/sha"),
         ]),
         @html.li([
@@ -104,7 +112,7 @@ fn landing_details() -> @rabbita.Html {
         ]),
       ]),
       @html.p(
-        "Opening the generated playground URL restores the same commit automatically.",
+        "Commit links stay fixed to their SHA. Pull request links load the latest PR head whenever they are opened.",
       ),
     ]),
   ])
@@ -122,7 +130,7 @@ fn hero_view(
         brand_view(),
         @html.p(
           class="lede",
-          "Review text changes from a public GitHub commit and share the exact playground URL with anyone.",
+          "Review a public GitHub commit or an entire pull request, then share the playground URL with anyone.",
         ),
         route_example(),
       ]),
@@ -273,6 +281,10 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
         Split => "Use unified view"
         Unified => "Use split view"
       }
+      let source_label = match commit.reference.target {
+        Commit(_) => "Open commit on GitHub"
+        PullRequest(_) => "Open pull request on GitHub"
+      }
       @html.nav(
         class="workspace-actions",
         attrs=@html.Attrs::build().aria_label("Diff actions"),
@@ -282,8 +294,8 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
             target=Blank,
             rel="noopener noreferrer",
             class="toolbar-button source-button",
-            title="Open commit on GitHub",
-            attrs=@html.Attrs::build().aria_label("Open commit on GitHub"),
+            title=source_label,
+            attrs=@html.Attrs::build().aria_label(source_label),
             @html.span(class="source-icon", "↗"),
           ),
           if model.backend_status is BackendReady {
@@ -494,14 +506,14 @@ fn file_card(
 
 ///|
 fn file_list_view(
-  commit : CommitView,
+  commit : ChangeView,
   model : Model,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   if commit.files.length() == 0 {
     return @html.div(
       class="empty-state",
-      "No changed files were returned for this commit.",
+      "No changed files were returned for this change.",
     )
   }
   let file_views : Array[@rabbita.Html] = []
@@ -582,7 +594,7 @@ fn analysis_wants_file(wanted : Map[String, Unit], file_index : Int) -> Bool {
 
 ///|
 fn rendered_analysis_hunks(
-  commit : CommitView,
+  commit : ChangeView,
   result : AnalysisResult,
   expanded : ArrayView[Bool],
   mode : ViewMode,
@@ -712,7 +724,7 @@ fn analysis_skipped_view(skipped : ArrayView[SkippedFile]) -> @rabbita.Html {
 
 ///|
 fn analysis_overview(
-  commit : CommitView,
+  commit : ChangeView,
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
@@ -736,7 +748,7 @@ fn analysis_overview(
         @html.span(class="spinner", ""),
         @html.div([
           @html.h2("Analyzing changes"),
-          @html.p("OpenSeek is grouping the commit's hunks by function."),
+          @html.p("OpenSeek is grouping the loaded diff hunks by function."),
         ]),
       ])
     AnalysisFailed(message) =>
@@ -794,30 +806,47 @@ fn analysis_overview(
 }
 
 ///|
-fn commit_view(
-  commit : CommitView,
+fn change_view(
+  commit : ChangeView,
   model : Model,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
+  let section_label = match commit.reference.target {
+    Commit(_) => "Public commit"
+    PullRequest(_) => "Public pull request"
+  }
+  let identity = match commit.reference.target {
+    Commit(_) =>
+      "\{commit.reference.owner}/\{commit.reference.repo}@\{commit.sha}"
+    PullRequest(number) =>
+      "\{commit.reference.owner}/\{commit.reference.repo}#\{number}"
+  }
+  let comparison = match commit.reference.target {
+    Commit(_) =>
+      if commit.parent_sha is Some(parent) {
+        "Compared with first parent \{parent}."
+      } else {
+        "Root commit; compared with an empty tree."
+      }
+    PullRequest(_) =>
+      if commit.parent_sha is Some(parent) {
+        "Compared merge base \{parent} with head \{commit.sha}."
+      } else {
+        "Compared the pull request base with head \{commit.sha}."
+      }
+  }
   @html.section(class="results", [
     @html.div(class="commit-card", [
       @html.div(class="commit-title", [
         @html.div(class="commit-identity", [
-          @html.p(class="section-label", "Public commit"),
+          @html.p(class="section-label", section_label),
           @html.a(
             href=commit.html_url,
             target=Blank,
             rel="noopener noreferrer",
-            "\{commit.reference.owner}/\{commit.reference.repo}@\{commit.sha}",
+            identity,
           ),
-          @html.p(
-            class="parent",
-            if commit.parent_sha is Some(parent) {
-              "Compared with first parent \{parent}."
-            } else {
-              "Root commit; compared with an empty tree."
-            },
-          ),
+          @html.p(class="parent", comparison),
         ]),
         @html.pre(class="commit-message", commit.message),
       ]),
@@ -848,6 +877,27 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
           "Loading commit metadata (page \{page}, up to 100 files per page)…",
         ),
       ])
+    LoadingPullMetadata(..) =>
+      @html.div(class="empty-state loading", [
+        @html.span(class="spinner", ""),
+        @html.span("Loading pull request metadata…"),
+      ])
+    LoadingPullSnapshot(page~, ..) =>
+      @html.div(class="empty-state loading", [
+        @html.span(class="spinner", ""),
+        @html.span(
+          if page > 0 {
+            "Loading pinned comparison and changed files (page \{page})…"
+          } else {
+            "Finishing the pinned comparison…"
+          },
+        ),
+      ])
+    ValidatingPullSnapshot(..) =>
+      @html.div(class="empty-state loading", [
+        @html.span(class="spinner", ""),
+        @html.span("Checking that the pull request stayed unchanged…"),
+      ])
     LoadFailed(message) =>
       @html.div(class="empty-state error", [
         @html.p(message),
@@ -858,7 +908,7 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
           "Try again",
         ),
       ])
-    Showing(commit) => commit_view(commit, model, emit)
+    Showing(commit) => change_view(commit, model, emit)
   }
 }
 

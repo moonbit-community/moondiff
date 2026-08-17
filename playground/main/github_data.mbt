@@ -36,8 +36,47 @@ priv struct ApiCommit {
 } derive(Eq, FromJson)
 
 ///|
+priv struct ApiPullBranch {
+  sha : String
+} derive(Eq, FromJson)
+
+///|
+priv struct ApiPull {
+  title : String
+  html_url : String
+  base : ApiPullBranch
+  head : ApiPullBranch
+  additions : Int
+  deletions : Int
+  changed_files : Int
+} derive(Eq, FromJson)
+
+///|
+priv struct ApiCompare {
+  merge_base_commit : ApiParent
+} derive(Eq, FromJson)
+
+///|
 #warnings("-unused_value")
 fn decode_commit(body : String) -> ApiCommit raise {
+  @json.from_json(@json.parse(body))
+}
+
+///|
+#warnings("-unused_value")
+fn decode_pull(body : String) -> ApiPull raise {
+  @json.from_json(@json.parse(body))
+}
+
+///|
+#warnings("-unused_value")
+fn decode_compare(body : String) -> ApiCompare raise {
+  @json.from_json(@json.parse(body))
+}
+
+///|
+#warnings("-unused_value")
+fn decode_pull_files(body : String) -> Array[ApiFile] raise {
   @json.from_json(@json.parse(body))
 }
 
@@ -78,8 +117,64 @@ fn should_fetch_next_page(page : Int, file_count : Int) -> Bool {
 }
 
 ///|
+const MAX_PULL_FILES : Int = 3_000
+
+///|
+const PULL_FILE_LIMIT_ERROR : String = "This pull request changes more than GitHub's 3,000-file API limit, so its complete diff cannot be loaded."
+
+///|
+fn should_fetch_next_pull_page(
+  page : Int,
+  page_file_count : Int,
+  accumulated_file_count : Int,
+  expected_file_count : Int?,
+) -> Bool {
+  if expected_file_count is Some(expected) && accumulated_file_count >= expected {
+    return false
+  }
+  page_file_count == 100 && page < 30
+}
+
+///|
+fn validate_pull_files(
+  pull : ApiPull,
+  files : ArrayView[ApiFile],
+) -> Result[Unit, String] {
+  if pull.changed_files > MAX_PULL_FILES {
+    return Err(PULL_FILE_LIMIT_ERROR)
+  }
+  if files.length() != pull.changed_files {
+    return Err(
+      "GitHub returned \{files.length()} files, but the pull request metadata reports \{pull.changed_files}; the complete diff cannot be shown.",
+    )
+  }
+  Ok(())
+}
+
+///|
 fn first_parent(commit : ApiCommit) -> String? {
   commit.parents.get(0).map(parent => parent.sha)
+}
+
+///|
+fn pull_merge_base(compare : ApiCompare) -> String {
+  compare.merge_base_commit.sha
+}
+
+///|
+fn same_pull_snapshot(initial : ApiPull, verified : ApiPull) -> Bool {
+  initial.base.sha == verified.base.sha &&
+  initial.head.sha == verified.head.sha &&
+  initial.changed_files == verified.changed_files
+}
+
+///|
+fn pull_stats(pull : ApiPull) -> ApiStats {
+  {
+    additions: pull.additions,
+    deletions: pull.deletions,
+    total: pull.additions + pull.deletions,
+  }
 }
 
 ///|

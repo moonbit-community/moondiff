@@ -1,11 +1,20 @@
 ///|
 fn canonical_github_url(reference : CommitRef) -> String {
-  "https://github.com/\{reference.owner}/\{reference.repo}/commit/\{reference.sha}"
+  match reference.target {
+    Commit(sha) =>
+      "https://github.com/\{reference.owner}/\{reference.repo}/commit/\{sha}"
+    PullRequest(number) =>
+      "https://github.com/\{reference.owner}/\{reference.repo}/pull/\{number}"
+  }
 }
 
 ///|
 fn playground_route(reference : CommitRef) -> String {
-  "#/\{reference.owner}/\{reference.repo}/commit/\{reference.sha}"
+  match reference.target {
+    Commit(sha) => "#/\{reference.owner}/\{reference.repo}/commit/\{sha}"
+    PullRequest(number) =>
+      "#/\{reference.owner}/\{reference.repo}/pull/\{number}"
+  }
 }
 
 ///|
@@ -17,12 +26,18 @@ fn reference_from_route(fragment : String?) -> Result[CommitRef?, String] {
     .collect()
   let reference = match parts {
     ["", owner, repo, "commit", sha] | [owner, repo, "commit", sha] =>
-      CommitRef::{ owner, repo, sha }
+      commit_reference(owner, repo, sha)
+    ["", owner, repo, "pull", number] | [owner, repo, "pull", number] =>
+      pull_reference(owner, repo, number)
     _ => return Err("This shared playground link is not valid.")
+  }
+  let valid_target = match reference.target {
+    Commit(sha) => valid_sha(sha)
+    PullRequest(number) => valid_pull_number(number)
   }
   if !valid_owner(reference.owner) ||
     !valid_repo(reference.repo) ||
-    !valid_sha(reference.sha) {
+    !valid_target {
     return Err("This shared playground link is not valid.")
   }
   Ok(Some(reference))

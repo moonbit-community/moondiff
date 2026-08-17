@@ -178,6 +178,149 @@ const apiCommit = {
   ],
 };
 
+const pullNumber = 4082;
+const pullUrl = `https://github.com/example/project/pull/${pullNumber}`;
+const pullFilesUrl = `${pullUrl}/files`;
+const pullMergeBaseOne = "7777777777777777777777777777777777777777";
+const pullMergeBaseTwo = "6666666666666666666666666666666666666666";
+const pullBaseSha = "8888888888888888888888888888888888888888";
+const pullHeadOne = "9999999999999999999999999999999999999999";
+const pullHeadTwo = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const pullFirstPage = Array.from({ length: 100 }, (_, index) => ({
+  filename: `notes/change_${String(index).padStart(3, "0")}.txt`,
+  status: "modified",
+  additions: 1,
+  deletions: 1,
+  changes: 2,
+}));
+const pullSecondPage = [{
+  filename: "src/from_second_commit.mbt",
+  status: "modified",
+  additions: 2,
+  deletions: 1,
+  changes: 3,
+}];
+function pullMetadata(head) {
+  return {
+    title: head === pullHeadTwo
+      ? "Aggregate the latest PR snapshot"
+      : "Aggregate changes from both PR commits",
+    html_url: pullUrl,
+    base: { sha: pullBaseSha },
+    head: { sha: head },
+    additions: head === pullHeadTwo ? 103 : 102,
+    deletions: 101,
+    changed_files: 101,
+  };
+}
+
+function mergeBaseForHead(head) {
+  return head === pullHeadTwo ? pullMergeBaseTwo : pullMergeBaseOne;
+}
+
+async function installFetchCacheRecorder(page) {
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    window.__moondiffFetchCalls = [];
+    window.fetch = function(input, init) {
+      const request = input instanceof Request ? input : null;
+      const url = request?.url ?? new URL(String(input), window.location.href).href;
+      window.__moondiffFetchCalls.push({
+        url,
+        cache: init?.cache ?? request?.cache ?? "default",
+      });
+      return originalFetch.call(this, input, init);
+    };
+  });
+}
+
+async function installPullRoutes(page, { heads = [pullHeadOne] } = {}) {
+  let metadataCalls = 0;
+  const apiRequests = [];
+  const mutableApiRequests = [];
+  const rawRequests = [];
+  await installFetchCacheRecorder(page);
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    apiRequests.push(url.toString());
+    let body;
+    if (url.pathname.includes("/compare/")) {
+      const comparison = url.pathname.split("/compare/")[1];
+      const [base, head] = comparison.split("...");
+      expect(base).toBe(pullBaseSha);
+      body = { merge_base_commit: { sha: mergeBaseForHead(head) } };
+    } else if (url.pathname.endsWith(`/pulls/${pullNumber}/files`)) {
+      mutableApiRequests.push({
+        url: url.toString(),
+        headers: await request.allHeaders(),
+      });
+      body = url.searchParams.get("page") === "2"
+        ? pullSecondPage
+        : pullFirstPage;
+    } else {
+      mutableApiRequests.push({
+        url: url.toString(),
+        headers: await request.allHeaders(),
+      });
+      const head = heads[Math.min(metadataCalls, heads.length - 1)];
+      metadataCalls += 1;
+      body = pullMetadata(head);
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: {
+        "access-control-allow-origin": "*",
+        "cache-control": "public, max-age=60",
+      },
+      body: JSON.stringify(body),
+    });
+  });
+  await page.route("https://raw.githubusercontent.com/**", async route => {
+    const rawUrl = route.request().url();
+    rawRequests.push(rawUrl);
+    const parts = new URL(rawUrl).pathname.split("/");
+    const revision = parts[3];
+    const body = revision === pullMergeBaseOne
+      ? "fn aggregate() -> String { \"merge base one\" }"
+      : revision === pullMergeBaseTwo
+        ? "fn aggregate() -> String { \"merge base two\" }"
+      : revision === pullHeadTwo
+        ? "fn aggregate() -> String { \"head two\" }"
+        : "fn aggregate() -> String { \"head one\" }";
+    await route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+  return {
+    apiRequests,
+    mutableApiRequests,
+    rawRequests,
+    fetchCalls: () => page.evaluate(() => window.__moondiffFetchCalls),
+    metadataCalls: () => metadataCalls,
+  };
+}
+
+function expectRevalidatingRequests(requests, fetchCalls) {
+  expect(requests.length).toBeGreaterThan(0);
+  expect(fetchCalls).toHaveLength(requests.length);
+  for (const [index, request] of requests.entries()) {
+    expect(fetchCalls[index].url).toBe(request.url);
+    expect(fetchCalls[index].cache).toBe("no-cache");
+    // Playwright routing disables its HTTP cache, so a cold mocked request can
+    // omit Chromium's derived Cache-Control header. Validate it when present.
+    const cacheControl = request.headers["cache-control"] ?? "";
+    if (cacheControl !== "") {
+      expect(cacheControl).toMatch(/max-age=0|no-cache/i);
+    }
+  }
+}
+
 async function installMockRoutes(page) {
   await page.route("https://**", route => route.abort("blockedbyclient"));
   await page.route("https://api.github.com/**", async route => {
@@ -256,7 +399,7 @@ async function installAlgorithmRoutes(
 async function loadAlgorithmCommit(page, options) {
   await installAlgorithmRoutes(page, options);
   await page.goto("/");
-  await page.getByLabel("Public GitHub commit URL").fill(algorithmUrl);
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(algorithmUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split").first()).toBeVisible();
 }
@@ -304,7 +447,7 @@ async function installCommentsRoutes(
 async function loadCommentsCommit(page, options) {
   await installCommentsRoutes(page, options);
   await page.goto("/");
-  await page.getByLabel("Public GitHub commit URL").fill(commentsUrl);
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(commentsUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split").first()).toBeVisible();
 }
@@ -312,7 +455,7 @@ async function loadCommentsCommit(page, options) {
 async function loadMockedCommit(page) {
   await installMockRoutes(page);
   await page.goto("/");
-  await page.getByLabel("Public GitHub commit URL").fill(commitUrl);
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(commitUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split")).toBeVisible();
   await expect(page.getByRole("button", { name: "Lexical" })).toHaveAttribute("aria-pressed", "true");
@@ -489,7 +632,7 @@ test("a shared playground URL restores the commit and can be copied", async ({ p
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await openMockedShareLink(page);
 
-  await expect(page.getByLabel("Public GitHub commit URL")).toHaveValue(commitUrl);
+  await expect(page.getByLabel("Public GitHub commit or pull request URL")).toHaveValue(commitUrl);
   await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
   await page.getByRole("button", { name: "Copy link" }).click();
   await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
@@ -497,6 +640,164 @@ test("a shared playground URL restores the commit and can be copied", async ({ p
 
   await page.reload();
   await expect(page.locator("table.split")).toBeVisible();
+});
+
+test("a PR URL loads every paginated file and preserves the PR share route", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const requests = await installPullRoutes(page);
+  await page.goto("/");
+  await page
+    .getByLabel("Public GitHub commit or pull request URL")
+    .fill(pullFilesUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+
+  const aggregateCard = page.locator(".file-card").filter({
+    hasText: "src/from_second_commit.mbt",
+  });
+  await expect(aggregateCard.locator("table.split")).toBeVisible();
+  await expect(page).toHaveURL(`/#/example/project/pull/${pullNumber}`);
+  await expect(
+    page.getByLabel("Public GitHub commit or pull request URL"),
+  ).toHaveValue(pullUrl);
+  await expect(page.locator(".file-card")).toHaveCount(101);
+  await expect(page.getByText("Public pull request", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: `example/project#${pullNumber}` }),
+  ).toHaveAttribute("href", pullUrl);
+  await expect(page.locator(".commit-message")).toHaveText(
+    "Aggregate changes from both PR commits",
+  );
+  await expect(page.locator(".parent")).toContainText(pullMergeBaseOne);
+  await expect(page.locator(".parent")).toContainText(pullHeadOne);
+  await expect(
+    page.getByRole("link", { name: "Open pull request on GitHub" }),
+  ).toHaveAttribute("href", pullUrl);
+  await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
+  expect(requests.apiRequests).toContain(
+    `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadOne}`,
+  );
+  expect(requests.apiRequests.some(url => url.includes("/commits?"))).toBe(false);
+  expect(requests.apiRequests.some(url => url.includes("/files?per_page=100&page=1"))).toBe(true);
+  expect(requests.apiRequests.some(url => url.includes("/files?per_page=100&page=2"))).toBe(true);
+  expect(requests.metadataCalls()).toBe(2);
+  const metadataRequests = requests.mutableApiRequests.filter(({ url }) =>
+    new URL(url).pathname.endsWith(`/pulls/${pullNumber}`)
+  );
+  const fileRequests = requests.mutableApiRequests.filter(({ url }) =>
+    new URL(url).pathname.endsWith(`/pulls/${pullNumber}/files`)
+  );
+  expect(metadataRequests).toHaveLength(2);
+  expect(fileRequests).toHaveLength(2);
+  const fetchCalls = await requests.fetchCalls();
+  expectRevalidatingRequests(
+    metadataRequests,
+    fetchCalls.filter(({ url }) =>
+      new URL(url).pathname.endsWith(`/pulls/${pullNumber}`)
+    ),
+  );
+  expectRevalidatingRequests(
+    fileRequests,
+    fetchCalls.filter(({ url }) =>
+      new URL(url).pathname.endsWith(`/pulls/${pullNumber}/files`)
+    ),
+  );
+
+  await page.getByRole("button", { name: "Copy link" }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
+});
+
+test("opening the same PR share route refreshes its head", async ({ page }) => {
+  const requests = await installPullRoutes(page, {
+    heads: [pullHeadOne, pullHeadOne, pullHeadTwo, pullHeadTwo],
+  });
+  const sharePath = `/#/example/project/pull/${pullNumber}`;
+  await page.goto(sharePath);
+  const aggregateCard = page.locator(".file-card").filter({
+    hasText: "src/from_second_commit.mbt",
+  });
+  await expect(aggregateCard.locator("table.split")).toBeVisible();
+  await expect(page.locator(".parent")).toContainText(pullHeadOne);
+  await expect(aggregateCard).toContainText("head one");
+  const firstUrl = page.url();
+
+  await page.reload();
+  await expect(aggregateCard.locator("table.split")).toBeVisible();
+  await expect(page.locator(".parent")).toContainText(pullHeadTwo);
+  await expect(page.locator(".parent")).toContainText(pullMergeBaseTwo);
+  await expect(aggregateCard).toContainText("head two");
+  expect(page.url()).toBe(firstUrl);
+  expect(requests.metadataCalls()).toBe(4);
+  expect(requests.apiRequests).toContain(
+    `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadOne}`,
+  );
+  expect(requests.apiRequests).toContain(
+    `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadTwo}`,
+  );
+});
+
+test("a PR updated while loading retries and only shows the latest snapshot", async ({ page }) => {
+  const requests = await installPullRoutes(page, {
+    heads: [pullHeadOne, pullHeadTwo, pullHeadTwo],
+  });
+  await page.goto(`/#/example/project/pull/${pullNumber}`);
+
+  const aggregateCard = page.locator(".file-card").filter({
+    hasText: "src/from_second_commit.mbt",
+  });
+  await expect(aggregateCard.locator("table.split")).toBeVisible();
+  await expect(page.locator(".parent")).toContainText(pullMergeBaseTwo);
+  await expect(page.locator(".parent")).toContainText(pullHeadTwo);
+  await expect(page.locator(".commit-message")).toHaveText(
+    "Aggregate the latest PR snapshot",
+  );
+  await expect(aggregateCard).toContainText("head two");
+  await expect(aggregateCard).toContainText("merge base two");
+
+  expect(requests.metadataCalls()).toBe(3);
+  expect(requests.apiRequests).toContain(
+    `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadOne}`,
+  );
+  expect(requests.apiRequests).toContain(
+    `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadTwo}`,
+  );
+  expect(requests.rawRequests.some(url => url.includes(`/${pullHeadOne}/`))).toBe(false);
+});
+
+test("a PR metadata 403 keeps the anonymous rate-limit guidance", async ({ page }) => {
+  const metadataRequests = [];
+  await installFetchCacheRecorder(page);
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", async route => {
+    const request = route.request();
+    metadataRequests.push({
+      url: request.url(),
+      headers: await request.allHeaders(),
+    });
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      headers: {
+        "access-control-allow-origin": "*",
+        "cache-control": "public, max-age=60",
+      },
+      body: JSON.stringify({ message: "API rate limit exceeded" }),
+    });
+  });
+
+  await page.goto(`/#/example/project/pull/${pullNumber}`);
+
+  await expect(page.locator(".empty-state.error")).toContainText(
+    "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later.",
+  );
+  expect(metadataRequests).toHaveLength(1);
+  const fetchCalls = await page.evaluate(() => window.__moondiffFetchCalls);
+  expectRevalidatingRequests(
+    metadataRequests,
+    fetchCalls.filter(({ url }) =>
+      new URL(url).pathname.endsWith(`/pulls/${pullNumber}`)
+    ),
+  );
 });
 
 test("narrow viewport scrolls only the diff and keeps controls usable", async ({ page }) => {
@@ -770,7 +1071,7 @@ test("the selected algorithm survives later commit navigation without entering t
   await page.getByRole("button", { name: "Ignore comments" }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
-  await page.getByLabel("Public GitHub commit URL").fill(nextUrl);
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "true");

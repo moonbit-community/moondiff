@@ -1,9 +1,25 @@
 ///|
+priv enum ChangeTarget {
+  Commit(String)
+  PullRequest(String)
+} derive(Eq)
+
+///|
 priv struct CommitRef {
   owner : String
   repo : String
-  sha : String
+  target : ChangeTarget
 } derive(Eq)
+
+///|
+fn commit_reference(owner : String, repo : String, sha : String) -> CommitRef {
+  { owner, repo, target: Commit(sha) }
+}
+
+///|
+fn pull_reference(owner : String, repo : String, number : String) -> CommitRef {
+  { owner, repo, target: PullRequest(number) }
+}
 
 ///|
 fn ascii_alphanumeric(c : Char) -> Bool {
@@ -67,9 +83,9 @@ fn valid_pull_number(number : String) -> Bool {
 }
 
 ///|
-fn parse_commit_url(input : String) -> Result[CommitRef, String] {
+fn parse_change_url(input : String) -> Result[CommitRef, String] {
   let parsed = try @url.parse(input.trim().to_owned()) catch {
-    _ => return Err("Enter a valid GitHub commit URL.")
+    _ => return Err("Enter a valid GitHub commit or pull request URL.")
   } noraise {
     parsed => parsed
   }
@@ -80,26 +96,65 @@ fn parse_commit_url(input : String) -> Result[CommitRef, String] {
   }
   let parts = parsed.path.split("/").map(StringView::to_owned).collect()
   let reference = match parts {
-    [owner, repo, "commit", sha] => { owner, repo, sha }
+    [owner, repo, "commit", sha] => {
+      if !valid_sha(sha) {
+        return Err(
+          "The commit SHA must contain 7 to 64 hexadecimal characters.",
+        )
+      }
+      commit_reference(owner, repo, sha)
+    }
+    [owner, repo, "pull", number] | [owner, repo, "pull", number, "files"] => {
+      if !valid_pull_number(number) {
+        return Err("The pull request number is invalid.")
+      }
+      pull_reference(owner, repo, number)
+    }
     [owner, repo, "pull", number, "changes", sha] => {
       if !valid_pull_number(number) {
         return Err("The pull request number is invalid.")
       }
-      { owner, repo, sha }
+      if !valid_sha(sha) {
+        return Err(
+          "The commit SHA must contain 7 to 64 hexadecimal characters.",
+        )
+      }
+      commit_reference(owner, repo, sha)
     }
     _ =>
-      return Err("Use a GitHub commit URL or /pull/{number}/changes/{sha} URL.")
+      return Err(
+        "Use a GitHub /commit/{sha}, /pull/{number}, or /pull/{number}/files URL.",
+      )
   }
   if !valid_owner(reference.owner) || !valid_repo(reference.repo) {
     return Err("The repository owner or name is invalid.")
-  }
-  if !valid_sha(reference.sha) {
-    return Err("The commit SHA must contain 7 to 64 hexadecimal characters.")
   }
   Ok(reference)
 }
 
 ///|
 fn commit_api_url(reference : CommitRef, page : Int) -> String {
-  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/commits/\{reference.sha}?per_page=100&page=\{page}"
+  guard reference.target is Commit(sha) else { return "" }
+  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/commits/\{sha}?per_page=100&page=\{page}"
+}
+
+///|
+fn pull_api_url(reference : CommitRef) -> String {
+  guard reference.target is PullRequest(number) else { return "" }
+  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/pulls/\{number}"
+}
+
+///|
+fn compare_api_url(
+  reference : CommitRef,
+  base_sha : String,
+  head_sha : String,
+) -> String {
+  guard reference.target is PullRequest(_) else { return "" }
+  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/compare/\{base_sha}...\{head_sha}"
+}
+
+///|
+fn pull_files_api_url(reference : CommitRef, page : Int) -> String {
+  "\{pull_api_url(reference)}/files?per_page=100&page=\{page}"
 }

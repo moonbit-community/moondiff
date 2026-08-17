@@ -19,8 +19,8 @@ fn fixture_file(
 }
 
 ///|
-test "parse supported GitHub commit URL forms" {
-  guard parse_commit_url(
+test "parse supported GitHub commit and pull request URL forms" {
+  guard parse_change_url(
       "https://github.com/moonbit-community/moondiff/commit/aBcDeF1?diff=split#files",
     )
     is Ok(commit) else {
@@ -28,9 +28,9 @@ test "parse supported GitHub commit URL forms" {
   }
   assert_eq(commit.owner, "moonbit-community")
   assert_eq(commit.repo, "moondiff")
-  assert_eq(commit.sha, "aBcDeF1")
+  assert_true(commit.target is Commit("aBcDeF1"))
 
-  guard parse_commit_url(
+  guard parse_change_url(
       "https://github.com/moonbitlang/core/pull/42/changes/0123456789abcdef",
     )
     is Ok(pr) else {
@@ -38,16 +38,28 @@ test "parse supported GitHub commit URL forms" {
   }
   assert_eq(pr.owner, "moonbitlang")
   assert_eq(pr.repo, "core")
-  assert_eq(pr.sha, "0123456789abcdef")
+  assert_true(pr.target is Commit("0123456789abcdef"))
+  assert_eq(
+    canonical_github_url(pr),
+    "https://github.com/moonbitlang/core/commit/0123456789abcdef",
+  )
+
+  for
+    url in [
+      "https://github.com/moonbitlang/core/pull/4082", "https://github.com/moonbitlang/core/pull/4082/files?diff=split#discussion_r1",
+    ] {
+    guard parse_change_url(url) is Ok(reference) else {
+      fail("expected pull request URL to parse: \{url}")
+    }
+    assert_eq(reference.owner, "moonbitlang")
+    assert_eq(reference.repo, "core")
+    assert_true(reference.target is PullRequest("4082"))
+  }
 }
 
 ///|
 test "shared playground routes round-trip to canonical GitHub commit URLs" {
-  let reference = CommitRef::{
-    owner: "moonbit-community",
-    repo: "moondiff",
-    sha: "aBcDeF1",
-  }
+  let reference = commit_reference("moonbit-community", "moondiff", "aBcDeF1")
   assert_eq(
     playground_route(reference),
     "#/moonbit-community/moondiff/commit/aBcDeF1",
@@ -63,12 +75,25 @@ test "shared playground routes round-trip to canonical GitHub commit URLs" {
     fail("expected the shared route to parse")
   }
   assert_true(parsed == reference)
+  let pull = pull_reference("moonbitlang", "core", "4082")
+  assert_eq(playground_route(pull), "#/moonbitlang/core/pull/4082")
+  assert_eq(
+    canonical_github_url(pull),
+    "https://github.com/moonbitlang/core/pull/4082",
+  )
+  guard reference_from_playground_url(
+      "https://example.github.io/moondiff/#/moonbitlang/core/pull/4082",
+    )
+    is Ok(Some(parsed_pull)) else {
+    fail("expected the shared pull request route to parse")
+  }
+  assert_true(parsed_pull == pull)
   assert_true(
     reference_from_playground_url("https://example.com/moondiff/") is Ok(None),
   )
   assert_true(
     reference_from_playground_url(
-      "https://example.com/moondiff/#/moonbit-community/moondiff/pull/1",
+      "https://example.com/moondiff/#/moonbit-community/moondiff/pull/0",
     )
     is Err(_),
   )
@@ -85,13 +110,14 @@ test "reject unsupported or malformed URLs" {
   for
     url in [
       "http://github.com/a/b/commit/abcdef1", "https://git.example.com/a/b/commit/abcdef1",
-      "https://github.example.com/a/b/commit/abcdef1", "https://github.com/a/b/pull/1/files",
+      "https://github.example.com/a/b/commit/abcdef1", "https://github.com/a/b/pull/1/commits",
       "https://github.com/a/b/compare/abcdef1...abcdef2", "https://github.com/-bad/b/commit/abcdef1",
       "https://github.com/a/bad%2Frepo/commit/abcdef1", "https://github.com/a/b/commit/abcdef",
       "https://github.com/a/b/pull/nope/changes/abcdef1", "https://github.com/a/b/pull/0/changes/abcdef1",
+      "https://github.com/a/b/pull/nope", "https://github.com/a/b/pull/0/files",
       "https://github.com:443/a/b/commit/abcdef1",
     ] {
-    assert_true(parse_commit_url(url) is Err(_), msg=url)
+    assert_true(parse_change_url(url) is Err(_), msg=url)
   }
 }
 
@@ -150,11 +176,7 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
 
 ///|
 test "raw content URLs percent-encode each path byte" {
-  let reference = CommitRef::{
-    owner: "moonbit-community",
-    repo: "moondiff",
-    sha: "abcdef1",
-  }
+  let reference = commit_reference("moonbit-community", "moondiff", "abcdef1")
   assert_eq(
     raw_url(reference, "abcdef1", "src/a b#中?.mbt"),
     "https://raw.githubusercontent.com/moonbit-community/moondiff/abcdef1/src/a%20b%23%E4%B8%AD%3F.mbt",
@@ -187,6 +209,43 @@ test "decode local GitHub fixtures and select the first merge parent" {
 }
 
 ///|
+test "decode pull request metadata and choose merge base and head" {
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let compare = decode_compare(
+    read_fixture("playground/main/fixtures/pull_compare.json"),
+  )
+  let files = decode_pull_files(
+    read_fixture("playground/main/fixtures/pull_files.json"),
+  )
+  assert_eq(pull.title, "Aggregate the whole pull request")
+  assert_eq(pull.head.sha, "cccccccccccccccccccccccccccccccccccccccc")
+  assert_eq(
+    pull_merge_base(compare),
+    "9999999999999999999999999999999999999999",
+  )
+  assert_true(same_pull_snapshot(pull, pull))
+  assert_false(
+    same_pull_snapshot(pull, {
+      ..pull,
+      head: { sha: "dddddddddddddddddddddddddddddddddddddddd" },
+    }),
+  )
+  assert_false(
+    same_pull_snapshot(pull, {
+      ..pull,
+      base: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
+    }),
+  )
+  assert_false(same_pull_snapshot(pull, { ..pull, changed_files: 3 }))
+  let stats = pull_stats(pull)
+  assert_eq(stats.additions, 7)
+  assert_eq(stats.deletions, 3)
+  assert_eq(stats.total, 10)
+  assert_eq(files.map(file => file.filename), ["src/first.mbt", "README.md"])
+  assert_true(validate_pull_files(pull, files) is Ok(_))
+}
+
+///|
 test "pagination appends file metadata and stops at GitHub's 30-page cap" {
   let first = [fixture_file("a.mbt", "modified")]
   let second = [fixture_file("b.mbt", "added")]
@@ -196,15 +255,51 @@ test "pagination appends file metadata and stops at GitHub's 30-page cap" {
   assert_false(should_fetch_next_page(1, 99))
   assert_false(should_fetch_next_page(30, 100))
   assert_true(
-    commit_api_url({ owner: "a", repo: "b", sha: "abcdef1" }, 30).has_suffix(
+    commit_api_url(commit_reference("a", "b", "abcdef1"), 30).has_suffix(
       "?per_page=100&page=30",
     ),
   )
+  let pull = pull_reference("moonbitlang", "core", "4082")
+  assert_eq(
+    pull_api_url(pull),
+    "https://api.github.com/repos/moonbitlang/core/pulls/4082",
+  )
+  assert_eq(
+    compare_api_url(
+      pull, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cccccccccccccccccccccccccccccccccccccccc",
+    ),
+    "https://api.github.com/repos/moonbitlang/core/compare/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...cccccccccccccccccccccccccccccccccccccccc",
+  )
+  assert_true(
+    pull_files_api_url(pull, 2).has_suffix("/files?per_page=100&page=2"),
+  )
+  assert_true(should_fetch_next_pull_page(1, 100, 100, Some(101)))
+  assert_false(should_fetch_next_pull_page(1, 100, 100, Some(100)))
+  assert_false(should_fetch_next_pull_page(1, 99, 99, Some(101)))
+  assert_false(should_fetch_next_pull_page(30, 100, 3_000, Some(3_001)))
+}
+
+///|
+test "pull request files must be complete and within GitHub's limit" {
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let files = decode_pull_files(
+    read_fixture("playground/main/fixtures/pull_files.json"),
+  )
+  guard validate_pull_files({ ..pull, changed_files: 3_001 }, files)
+    is Err(over_limit) else {
+    fail("expected the 3,000-file limit to be rejected")
+  }
+  assert_true(over_limit.contains("3,000-file API limit"))
+  guard validate_pull_files(pull, files[:1]) is Err(incomplete) else {
+    fail("expected an incomplete file response to be rejected")
+  }
+  assert_true(incomplete.contains("returned 1 files"))
+  assert_true(incomplete.contains("metadata reports 2"))
 }
 
 ///|
 test "added deleted renamed merge and root commits choose the correct raw sides" {
-  let reference = CommitRef::{ owner: "owner", repo: "repo", sha: "abcdef1" }
+  let reference = commit_reference("owner", "repo", "abcdef1")
   let parent = Some("1111111")
   let added = source_pair(
     reference,
@@ -294,6 +389,392 @@ test "stale commit responses are discarded by generation" {
 }
 
 ///|
+fn pull_test_model(
+  reference : CommitRef,
+  generation : Int,
+  phase : Phase,
+) -> Model {
+  {
+    input: canonical_github_url(reference),
+    generation,
+    view_mode: Split,
+    diff_algorithm: LexicalAlgorithm,
+    ignore_comments: false,
+    phase,
+    route: Some(reference),
+    share_url: None,
+    copy_status: CopyReady,
+    backend_status: BackendMissing,
+    analysis_status: AnalysisIdle,
+  }
+}
+
+///|
+test "pull metadata starts a pinned snapshot and enforces the file limit" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let loading = pull_test_model(
+    reference,
+    8,
+    LoadingPullMetadata(reference~, attempt=0),
+  )
+  let (stale_generation, _) = update(
+    loading,
+    PullMetadataLoaded(7, 0, Ok(pull)),
+    emit,
+  )
+  assert_true(stale_generation == loading)
+  let (stale_attempt, _) = update(
+    loading,
+    PullMetadataLoaded(8, 1, Ok(pull)),
+    emit,
+  )
+  assert_true(stale_attempt == loading)
+  let (started, _) = update(loading, PullMetadataLoaded(8, 0, Ok(pull)), emit)
+  guard started.phase
+    is LoadingPullSnapshot(
+      attempt=0,
+      metadata=pinned,
+      compare=None,
+      page=1,
+      files=[],
+      ..
+    ) else {
+    fail("expected a pinned pull request snapshot")
+  }
+  assert_eq(pinned.base.sha, pull.base.sha)
+  assert_eq(pinned.head.sha, pull.head.sha)
+
+  let (over_limit, _) = update(
+    loading,
+    PullMetadataLoaded(8, 0, Ok({ ..pull, changed_files: 3_001 })),
+    emit,
+  )
+  guard over_limit.phase is LoadFailed(limit_message) else {
+    fail("expected an over-limit pull request to fail")
+  }
+  assert_true(limit_message.contains("3,000-file API limit"))
+}
+
+///|
+test "pull compare and files can arrive out of order but wait for validation" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let compare = decode_compare(
+    read_fixture("playground/main/fixtures/pull_compare.json"),
+  )
+  let files = decode_pull_files(
+    read_fixture("playground/main/fixtures/pull_files.json"),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let loading = pull_test_model(
+    reference,
+    7,
+    LoadingPullSnapshot(
+      reference~,
+      attempt=0,
+      metadata=pull,
+      compare=None,
+      page=1,
+      files=[],
+    ),
+  )
+  let (wrong_page, _) = update(
+    loading,
+    PullFilesPageLoaded(7, 0, 2, Ok(files)),
+    emit,
+  )
+  assert_true(wrong_page == loading)
+  let (wrong_attempt, _) = update(
+    loading,
+    PullCompareLoaded(7, 1, Ok(compare)),
+    emit,
+  )
+  assert_true(wrong_attempt == loading)
+  let (after_files, _) = update(
+    loading,
+    PullFilesPageLoaded(7, 0, 1, Ok(files)),
+    emit,
+  )
+  guard after_files.phase
+    is LoadingPullSnapshot(page=0, compare=None, files=loaded_files, ..) else {
+    fail("expected files to wait for the compare response")
+  }
+  assert_eq(loaded_files.map(file => file.filename), [
+    "src/first.mbt", "README.md",
+  ])
+  let (early_validation, _) = update(
+    after_files,
+    PullValidationLoaded(7, 0, Ok(pull)),
+    emit,
+  )
+  assert_true(early_validation == after_files)
+  let (validating, _) = update(
+    after_files,
+    PullCompareLoaded(7, 0, Ok(compare)),
+    emit,
+  )
+  assert_true(validating.phase is ValidatingPullSnapshot(attempt=0, ..))
+  let verified = { ..pull, title: "Verified pull title", additions: 11 }
+  let (shown, _) = update(
+    validating,
+    PullValidationLoaded(7, 0, Ok(verified)),
+    emit,
+  )
+  guard shown.phase is Showing(view) else {
+    fail("expected the validated pull request to be shown")
+  }
+  assert_eq(view.sha, "cccccccccccccccccccccccccccccccccccccccc")
+  assert_eq(view.parent_sha, Some("9999999999999999999999999999999999999999"))
+  assert_eq(view.message, "Verified pull title")
+  assert_eq(view.stats.additions, 11)
+  assert_eq(view.total_files, 2)
+  assert_eq(view.files.map(file => file.file.filename), [
+    "src/first.mbt", "README.md",
+  ])
+}
+
+///|
+test "a changed pull head retries once and discards the old attempt" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let compare = decode_compare(
+    read_fixture("playground/main/fixtures/pull_compare.json"),
+  )
+  let files = decode_pull_files(
+    read_fixture("playground/main/fixtures/pull_files.json"),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let validating = pull_test_model(
+    reference,
+    9,
+    ValidatingPullSnapshot(
+      reference~,
+      attempt=0,
+      metadata=pull,
+      compare~,
+      files~,
+    ),
+  )
+  let latest = {
+    ..pull,
+    title: "Latest pull title",
+    head: { sha: "dddddddddddddddddddddddddddddddddddddddd" },
+    additions: 13,
+  }
+  assert_eq(latest.changed_files, pull.changed_files)
+  let (retrying, _) = update(
+    validating,
+    PullValidationLoaded(9, 0, Ok(latest)),
+    emit,
+  )
+  guard retrying.phase
+    is LoadingPullSnapshot(
+      attempt=1,
+      metadata=retry_metadata,
+      compare=None,
+      page=1,
+      files=[],
+      ..
+    ) else {
+    fail("expected the latest metadata to start one retry")
+  }
+  assert_eq(retry_metadata.head.sha, latest.head.sha)
+  let (stale_generation, _) = update(
+    retrying,
+    PullCompareLoaded(8, 1, Ok(compare)),
+    emit,
+  )
+  assert_true(stale_generation == retrying)
+  let (stale_compare, _) = update(
+    retrying,
+    PullCompareLoaded(9, 0, Ok(compare)),
+    emit,
+  )
+  assert_true(stale_compare == retrying)
+  let (stale_files, _) = update(
+    retrying,
+    PullFilesPageLoaded(9, 0, 1, Ok(files)),
+    emit,
+  )
+  assert_true(stale_files == retrying)
+  let (stale_files_generation, _) = update(
+    retrying,
+    PullFilesPageLoaded(8, 1, 1, Ok(files)),
+    emit,
+  )
+  assert_true(stale_files_generation == retrying)
+  let (stale_validation, _) = update(
+    retrying,
+    PullValidationLoaded(9, 0, Ok(latest)),
+    emit,
+  )
+  assert_true(stale_validation == retrying)
+
+  let latest_compare : ApiCompare = {
+    merge_base_commit: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
+  }
+  let (with_compare, _) = update(
+    retrying,
+    PullCompareLoaded(9, 1, Ok(latest_compare)),
+    emit,
+  )
+  let (validating_latest, _) = update(
+    with_compare,
+    PullFilesPageLoaded(9, 1, 1, Ok(files)),
+    emit,
+  )
+  assert_true(validating_latest.phase is ValidatingPullSnapshot(attempt=1, ..))
+  let (stale_validation_generation, _) = update(
+    validating_latest,
+    PullValidationLoaded(8, 1, Ok(latest)),
+    emit,
+  )
+  assert_true(stale_validation_generation == validating_latest)
+  let (shown, _) = update(
+    validating_latest,
+    PullValidationLoaded(9, 1, Ok(latest)),
+    emit,
+  )
+  guard shown.phase is Showing(view) else {
+    fail("expected the retried snapshot to be shown")
+  }
+  assert_eq(view.sha, latest.head.sha)
+  assert_eq(view.parent_sha, Some(latest_compare.merge_base_commit.sha))
+  assert_eq(view.message, "Latest pull title")
+  assert_eq(view.stats.additions, 13)
+}
+
+///|
+test "a pull request that changes during both attempts fails explicitly" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let compare = decode_compare(
+    read_fixture("playground/main/fixtures/pull_compare.json"),
+  )
+  let files = decode_pull_files(
+    read_fixture("playground/main/fixtures/pull_files.json"),
+  )
+  let validating = pull_test_model(
+    reference,
+    10,
+    ValidatingPullSnapshot(
+      reference~,
+      attempt=1,
+      metadata=pull,
+      compare~,
+      files~,
+    ),
+  )
+  let changed_again = {
+    ..pull,
+    base: { sha: "ffffffffffffffffffffffffffffffffffffffff" },
+  }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (failed, _) = update(
+    validating,
+    PullValidationLoaded(10, 1, Ok(changed_again)),
+    emit,
+  )
+  assert_true(failed.phase is LoadFailed(PULL_CHANGED_ERROR))
+}
+
+///|
+test "incomplete pull pagination retries once then keeps the incomplete error" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let compare = decode_compare(
+    read_fixture("playground/main/fixtures/pull_compare.json"),
+  )
+  let files = decode_pull_files(
+    read_fixture("playground/main/fixtures/pull_files.json"),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let loading = pull_test_model(
+    reference,
+    11,
+    LoadingPullSnapshot(
+      reference~,
+      attempt=0,
+      metadata=pull,
+      compare=Some(compare),
+      page=1,
+      files=[],
+    ),
+  )
+  let (validating, _) = update(
+    loading,
+    PullFilesPageLoaded(11, 0, 1, Ok([files[0]])),
+    emit,
+  )
+  assert_true(validating.phase is ValidatingPullSnapshot(attempt=0, ..))
+  let (retrying, _) = update(
+    validating,
+    PullValidationLoaded(11, 0, Ok(pull)),
+    emit,
+  )
+  assert_true(retrying.phase is LoadingPullSnapshot(attempt=1, ..))
+
+  let final_validation = {
+    ..retrying,
+    phase: ValidatingPullSnapshot(
+      reference~,
+      attempt=1,
+      metadata=pull,
+      compare~,
+      files=[files[0]],
+    ),
+  }
+  let (incomplete, _) = update(
+    final_validation,
+    PullValidationLoaded(11, 1, Ok(pull)),
+    emit,
+  )
+  guard incomplete.phase is LoadFailed(message) else {
+    fail("expected a stable incomplete snapshot to fail")
+  }
+  assert_true(message.contains("returned 1 files"))
+  assert_true(message.contains("metadata reports 2"))
+}
+
+///|
+test "pull request analysis keeps the v1 commit-shaped payload" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let file = fixture_file("src/analysis.mbt", "modified")
+  let ready_file = ensure_file_document(
+    ready_test_file(file, ["fn value() -> Int { 1 }"], [
+      "fn value() -> Int { 2 }",
+    ]),
+    LexicalAlgorithm,
+  )
+  let view = ChangeView::{
+    reference,
+    sha: pull.head.sha,
+    parent_sha: Some("9999999999999999999999999999999999999999"),
+    message: pull.title,
+    html_url: pull.html_url,
+    stats: pull_stats(pull),
+    total_files: 1,
+    files: [ready_file],
+  }
+  guard build_analysis_request(view, LexicalAlgorithm) is Ok((payload, _)) else {
+    fail("expected a PR analysis payload")
+  }
+  assert_eq(payload.version, 1)
+  assert_eq(payload.commit.owner, "moonbitlang")
+  assert_eq(payload.commit.repo, "core")
+  assert_eq(payload.commit.sha, pull.head.sha)
+  assert_eq(
+    payload.commit.parent_sha.stringify(),
+    "\"9999999999999999999999999999999999999999\"",
+  )
+  assert_eq(payload.commit.message, pull.title)
+  assert_eq(payload.commit.html_url, pull.html_url)
+}
+
+///|
 test "all files remain listed but only the first twenty MoonBit diffs auto-load" {
   let fixture = decode_commit(
     read_fixture("playground/main/fixtures/root_commit.json"),
@@ -317,11 +798,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     }
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let reference = CommitRef::{
-    owner: "example",
-    repo: "root",
-    sha: fixture.sha,
-  }
+  let reference = commit_reference("example", "root", fixture.sha)
   let (view, _) = finish_commit(reference, fixture, files, 7, emit)
   assert_eq(view.files.length(), files.length())
   assert_eq(
@@ -372,13 +849,13 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
 }
 
 ///|
-fn analysis_test_view(files : Array[ApiFile]) -> CommitView raise {
+fn analysis_test_view(files : Array[ApiFile]) -> ChangeView raise {
   let fixture = decode_commit(
     read_fixture("playground/main/fixtures/commit_page1.json"),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (view, _) = finish_commit(
-    { owner: "example", repo: "project", sha: fixture.sha },
+    commit_reference("example", "project", fixture.sha),
     fixture,
     files,
     9,
@@ -389,7 +866,7 @@ fn analysis_test_view(files : Array[ApiFile]) -> CommitView raise {
 
 ///|
 fn analysis_test_model(
-  view : CommitView,
+  view : ChangeView,
   status? : AnalysisStatus = AnalysisIdle,
 ) -> Model {
   {
@@ -562,7 +1039,7 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (root_view, _) = finish_commit(
-    { owner: "example", repo: "root", sha: root.sha },
+    commit_reference("example", "root", root.sha),
     root,
     [fixture_file("root.txt", "added")],
     9,
@@ -763,7 +1240,7 @@ test "Lexical is the default and algorithm selection is not part of routes" {
   let model = initial_model()
   assert_true(model.diff_algorithm is LexicalAlgorithm)
   assert_false(model.ignore_comments)
-  let reference = CommitRef::{ owner: "owner", repo: "repo", sha: "abcdef1" }
+  let reference = commit_reference("owner", "repo", "abcdef1")
   assert_eq(playground_route(reference), "#/owner/repo/commit/abcdef1")
   assert_false(playground_route(reference).contains("algorithm"))
   assert_false(playground_route(reference).contains("ignore"))
@@ -854,7 +1331,7 @@ test "ignore comments has independent algorithm caches and clears analysis" {
 
 ///|
 test "ignore comments survives commit navigation but stays out of routes" {
-  let reference = CommitRef::{ owner: "owner", repo: "repo", sha: "abcdef1" }
+  let reference = commit_reference("owner", "repo", "abcdef1")
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let fixture = decode_commit(
     read_fixture("playground/main/fixtures/root_commit.json"),

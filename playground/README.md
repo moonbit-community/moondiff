@@ -1,14 +1,31 @@
 # Moondiff playground
 
-The static Rabbita playground accepts either of these public GitHub URLs:
+The static Rabbita playground accepts these public GitHub URLs:
 
 ```text
 https://github.com/{owner}/{repo}/commit/{sha}
+https://github.com/{owner}/{repo}/pull/{number}
+https://github.com/{owner}/{repo}/pull/{number}/files
 https://github.com/{owner}/{repo}/pull/{number}/changes/{sha}
 ```
 
-Both forms compare the commit with its first parent (or an empty old side for
-a root commit). Every changed file receives a card in GitHub's order. Files
+Commit URLs and `pull/{number}/changes/{sha}` URLs compare one commit with its
+first parent (or an empty old side for a root commit). Pull request URLs load
+the PR's current head and aggregate the complete **Files changed** result. The
+old revision is `merge_base_commit.sha` from the
+[Compare API](https://docs.github.com/en/rest/commits/commits#compare-two-commits)
+response for pinned `base.sha...head.sha`, matching GitHub's merge-base-to-head
+[three-dot comparison](https://docs.github.com/en/pull-requests/reference/branches#three-dot-and-two-dot-git-diff-comparisons).
+The playground captures PR metadata before loading the comparison and paginated
+files, then fetches metadata again before showing or downloading any source. If
+the base, head, or changed-file count moved—or the first files response was
+incomplete—it automatically retries once using the latest metadata. A PR that
+changes again fails explicitly; a stable but still incomplete response keeps
+the incomplete-files error.
+The files endpoint is fetched in 100-file pages. GitHub caps that endpoint at
+[3,000 files](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files),
+so larger or incomplete responses fail explicitly instead of showing a partial
+PR. Every changed file receives a card in GitHub's order. Files
 whose old or new path ends in `.mbt` use the bundled `tokdiff` engine's
 MoonBit-aware lexical diff by default. The global **Lexical / AST** control
 switches those files to structural diffing; pure formatting and top-level
@@ -27,7 +44,7 @@ and blank lines remain visible as neutral context without addition, deletion,
 or intraline highlighting. Other valid UTF-8 text files always use a plain line
 diff and are unaffected by the control.
 
-The selected algorithm and comment setting survive later commit navigation in
+The selected algorithm and comment setting survive later change navigation in
 the open app but are not written into share URLs; a refresh restores Lexical
 mode with comment filtering off. The first 20 MoonBit diffs open automatically,
 while all other files load on demand. Calculated documents are cached
@@ -47,13 +64,16 @@ without expanding file cards, uses the current algorithm's cached `context=3`
 hunks (including the current comment setting), and asks OpenSeek to group them
 by cross-file function in descending review importance. AST files with no
 structural changes and MoonBit files containing only ignored comment or
-blank-line changes are listed as skipped; if the commit has no analyzable
+blank-line changes are listed as skipped; if the change has no analyzable
 hunks, the browser reports that locally without calling the backend. After
 analysis, the ordered groups replace the file list:
 the most important group opens first, later groups stay collapsed until
 requested, and each hunk keeps its file path, highlighted diff, and dedicated
 explanation.
-Commits over 50 files, 200 text hunks, or 256 KiB of UTF-8 patch data are
+The analysis service remains on payload version 1: a pull request is represented
+by `sha = head`, `parent_sha = merge base`, and `message = PR title` in the
+existing commit-shaped field.
+Changes over 50 files, 200 text hunks, or 256 KiB of UTF-8 patch data are
 rejected as a whole. Invalid UTF-8, NUL-containing, and binary files are listed
 as skipped; download failures and the existing 1 MiB/20,000-line source limits
 stop the analysis.
@@ -66,12 +86,14 @@ route:
 
 ```text
 https://{playground-host}/{base}/#/owner/repo/commit/sha
+https://{playground-host}/{base}/#/owner/repo/pull/number
 ```
 
-Opening that URL restores and loads the same commit automatically. The result
-page also exposes the full URL in a read-only field with a one-click copy
-button. Hash routing keeps shared links working on GitHub Pages without a
-server-side rewrite rule.
+Opening a commit route restores the same SHA automatically. Opening a pull
+request route fetches that PR again, so the same shared URL follows its latest
+head. The result page also exposes the full URL in a read-only field with a
+one-click copy button. Hash routing keeps shared links working on GitHub Pages
+without a server-side rewrite rule.
 
 ## Local backend and OpenSeek
 
