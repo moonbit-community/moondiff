@@ -4,19 +4,12 @@ Difftool that aware MoonBit language syntax.
 
 Inspired by [difftastic](https://github.com/Wilfred/difftastic)
 
-## install
+Try it in playground: https://moonbit-community.github.io/moondiff/
 
-```shell
-mkdir -p "$HOME/.local/share/moondiff"
-curl -fsSL \
-  -o "$HOME/.local/share/moondiff/moondiff_git_wrapper.sh" \
-  "https://raw.githubusercontent.com/myfreess/moondiff/main/scripts/moondiff_git_wrapper.sh"
-curl -fsSL \
-  -o "$HOME/.local/share/moondiff/moondiff.wasm" \
-  "https://github.com/myfreess/moondiff/releases/latest/download/moondiff.wasm"
-```
+## install (unfinish)
 
-## Use Moondiff in Git Repository
+
+## Use Moondiff in Git Repository (unfinish)
 
 configure git to use the installed wasm as an optional diff tool within that repository:
 
