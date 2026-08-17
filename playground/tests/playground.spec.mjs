@@ -51,25 +51,32 @@ const mixedCommentsOld = [
   "/// old docs",
   "fn value() -> Int {",
   "  old_value() // old trailing",
+  "",
+  "\t",
   "}",
 ].join("\n");
 const mixedCommentsNew = [
   "/// new docs",
   "fn value() -> Int {",
   "  new_value()  // new trailing",
+  "  ",
   "}",
 ].join("\n");
 const commentsOnlyOld = "fn stable() -> Int {\n  1 // old note\n}";
 const commentsOnlyNew = "fn stable() -> Int {\n  1  // new note\n}";
+const blankLinesOnlyOld = "fn blank_lines() -> Int {\n  1\n}";
+const blankLinesOnlyNew = "\nfn blank_lines() -> Int {\n\u2003\n  1\n\t\n}\n";
 const plainCommentsOld = "// old plain-text note";
 const plainCommentsNew = "// new plain-text note";
+const plainBlankLinesOld = "first plain line\nsecond plain line";
+const plainBlankLinesNew = "first plain line\n\nsecond plain line";
 
 const commentsCommit = {
   sha: commentsSha,
   html_url: commentsUrl,
   commit: { message: "Update code and comments" },
   parents: [{ sha: parentSha }],
-  stats: { additions: 4, deletions: 4, total: 8 },
+  stats: { additions: 12, deletions: 5, total: 17 },
   files: [
     {
       filename: "src/mixed.mbt",
@@ -86,11 +93,25 @@ const commentsCommit = {
       changes: 2,
     },
     {
+      filename: "src/blank_lines_only.mbt",
+      status: "modified",
+      additions: 6,
+      deletions: 1,
+      changes: 7,
+    },
+    {
       filename: "notes.txt",
       status: "modified",
       additions: 1,
       deletions: 1,
       changes: 2,
+    },
+    {
+      filename: "blank_lines.txt",
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      changes: 1,
     },
   ],
 };
@@ -240,13 +261,20 @@ async function loadAlgorithmCommit(page, options) {
   await expect(page.locator("table.split").first()).toBeVisible();
 }
 
-async function installCommentsRoutes(page) {
+async function installCommentsRoutes(
+  page,
+  { blankOnly = false, health = false } = {},
+) {
+  if (health) await installAnalysisHealth(page);
+  const commit = blankOnly
+    ? { ...commentsCommit, files: [commentsCommit.files[2]] }
+    : commentsCommit;
   await page.route("https://**", route => route.abort("blockedbyclient"));
   await page.route("https://api.github.com/**", route => route.fulfill({
     status: 200,
     contentType: "application/json",
     headers: { "access-control-allow-origin": "*" },
-    body: JSON.stringify(commentsCommit),
+    body: JSON.stringify(commit),
   }));
   await page.route("https://raw.githubusercontent.com/**", async route => {
     const parts = new URL(route.request().url()).pathname.split("/");
@@ -257,6 +285,10 @@ async function installCommentsRoutes(page) {
       body = revision === parentSha ? mixedCommentsOld : mixedCommentsNew;
     } else if (filename === "src/comments_only.mbt") {
       body = revision === parentSha ? commentsOnlyOld : commentsOnlyNew;
+    } else if (filename === "src/blank_lines_only.mbt") {
+      body = revision === parentSha ? blankLinesOnlyOld : blankLinesOnlyNew;
+    } else if (filename === "blank_lines.txt") {
+      body = revision === parentSha ? plainBlankLinesOld : plainBlankLinesNew;
     } else {
       body = revision === parentSha ? plainCommentsOld : plainCommentsNew;
     }
@@ -269,8 +301,8 @@ async function installCommentsRoutes(page) {
   });
 }
 
-async function loadCommentsCommit(page) {
-  await installCommentsRoutes(page);
+async function loadCommentsCommit(page, options) {
+  await installCommentsRoutes(page, options);
   await page.goto("/");
   await page.getByLabel("Public GitHub commit URL").fill(commentsUrl);
   await page.getByRole("button", { name: "View diff" }).click();
@@ -532,19 +564,43 @@ test("Ignore comments works across algorithms and layouts without changing plain
   const toggle = page.getByRole("button", { name: "Ignore comments" });
   const mixedCard = page.locator(".file-card").filter({ hasText: "src/mixed.mbt" });
   const commentsOnlyCard = page.locator(".file-card").filter({ hasText: "src/comments_only.mbt" });
+  const blankLinesOnlyCard = page.locator(".file-card").filter({ hasText: "src/blank_lines_only.mbt" });
   const plainCard = page.locator(".file-card").filter({ hasText: "notes.txt" });
+  const plainBlankLinesCard = page.locator(".file-card").filter({ hasText: "blank_lines.txt" });
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toHaveAttribute(
+    "title",
+    "Ignore MoonBit comment and blank-line changes",
+  );
   await expect(commentsOnlyCard.locator("table.split")).toBeVisible();
+  await expect(blankLinesOnlyCard.locator("table.split")).toBeVisible();
 
   await plainCard.getByRole("button", { name: "Expand" }).click();
+  await plainBlankLinesCard.getByRole("button", { name: "Expand" }).click();
   await expect(plainCard.locator("td.del")).toContainText("// old plain-text note");
+  const plainBlankLineNumber = plainBlankLinesCard
+    .locator("td.new-line-number")
+    .filter({ hasText: /^2$/ });
+  const plainBlankSplitRow = plainBlankLineNumber.locator("xpath=..");
+  await expect(plainBlankLineNumber).toHaveCount(1);
+  await expect(plainBlankSplitRow.locator("td.old-line-number")).toHaveText("");
+  await expect(plainBlankSplitRow.locator("td").nth(3)).toHaveText("");
+  const plainBlankSplitHtml = await plainBlankLinesCard.locator(".diff-scroll").innerHTML();
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toHaveAttribute(
+    "title",
+    "Show comment and blank-line changes",
+  );
   await expect(commentsOnlyCard).toContainText(
-    "No non-comment changes found. Turn off Ignore comments",
+    "No changes besides comments or blank lines found. Turn off Ignore comments",
   );
   await expect(commentsOnlyCard.locator("table")).toHaveCount(0);
-  await expect(mixedCard.locator("td.ctx.ignored")).toHaveCount(2);
+  await expect(blankLinesOnlyCard).toContainText(
+    "No changes besides comments or blank lines found. Turn off Ignore comments",
+  );
+  await expect(blankLinesOnlyCard.locator("table")).toHaveCount(0);
+  expect(await mixedCard.locator("td.ctx.ignored").count()).toBeGreaterThan(2);
   await expect(mixedCard.locator("td.ctx.ignored").first()).toContainText("/// old docs");
   await expect(mixedCard.locator(".ignored-context")).toContainText([
     "/// old docs",
@@ -556,10 +612,17 @@ test("Ignore comments works across algorithms and layouts without changing plain
   await expect(mixedCard.locator("b.wa")).toContainText("new_value");
   await expect(plainCard.locator("td.del")).toContainText("// old plain-text note");
   await expect(plainCard.locator("td.add")).toContainText("// new plain-text note");
+  await expect(plainBlankLinesCard.locator(".diff-scroll")).toHaveJSProperty(
+    "innerHTML",
+    plainBlankSplitHtml,
+  );
 
   await page.getByRole("button", { name: "AST" }).click();
   await expect(commentsOnlyCard).toContainText(
-    "No structural non-comment changes found",
+    "No structural changes besides comments or blank lines found",
+  );
+  await expect(blankLinesOnlyCard).toContainText(
+    "No structural changes besides comments or blank lines found",
   );
   await expect(mixedCard.locator("b.wd")).toContainText("old_value");
   await expect(
@@ -567,12 +630,21 @@ test("Ignore comments works across algorithms and layouts without changing plain
   ).toHaveCount(1);
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(mixedCard.locator("table.unified")).toBeVisible();
-  await expect(mixedCard.locator("td.ctx.ignored")).toHaveCount(2);
+  expect(await mixedCard.locator("td.ctx.ignored").count()).toBeGreaterThan(2);
+  await expect(blankLinesOnlyCard.locator("table")).toHaveCount(0);
+  const unifiedPlainBlankLineNumber = plainBlankLinesCard
+    .locator("td.new-line-number")
+    .filter({ hasText: /^2$/ });
+  await expect(unifiedPlainBlankLineNumber).toHaveCount(1);
+  await expect(
+    unifiedPlainBlankLineNumber.locator("xpath=..").locator("td.old-line-number"),
+  ).toHaveText("");
 
   await page.getByRole("button", { name: "Lexical" }).click();
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(commentsOnlyCard.locator("table.unified")).toBeVisible();
+  await expect(blankLinesOnlyCard.locator("table.unified")).toBeVisible();
 
   await page.setViewportSize({ width: 420, height: 900 });
   const compactToggle = await toggle.evaluate(button => ({
@@ -588,6 +660,37 @@ test("Ignore comments works across algorithms and layouts without changing plain
   expect(compactToggle.width).toBeLessThanOrEqual(36);
   expect(compactToggle.labelDisplay).toBe("none");
   expect(compactToggle.pageWidth).toBeLessThanOrEqual(compactToggle.viewportWidth);
+});
+
+test("Ignore comments skips blank-line-only MoonBit changes during analysis", async ({ page }) => {
+  let analyzeCalls = 0;
+  await page.route("**/api/analyze", async route => {
+    analyzeCalls += 1;
+    await route.fulfill({ status: 500, body: "unexpected" });
+  });
+  await loadCommentsCommit(page, { blankOnly: true, health: true });
+  const blankCard = page.locator(".file-card").filter({ hasText: "src/blank_lines_only.mbt" });
+  await page.getByRole("button", { name: "Ignore comments" }).click();
+  await expect(blankCard).toContainText(
+    "No changes besides comments or blank lines found",
+  );
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.getByRole("heading", { name: "Nothing to analyze" })).toBeVisible();
+  await expect(page.locator(".analysis-skipped")).toContainText("src/blank_lines_only.mbt");
+  await expect(page.locator(".analysis-skipped")).toContainText(
+    "No changes besides comments or blank lines were found",
+  );
+  expect(analyzeCalls).toBe(0);
+
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(blankCard).toContainText(
+    "No structural changes besides comments or blank lines found",
+  );
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.locator(".analysis-skipped")).toContainText(
+    "No structural changes besides comments or blank lines were found",
+  );
+  expect(analyzeCalls).toBe(0);
 });
 
 test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {

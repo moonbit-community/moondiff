@@ -18,7 +18,7 @@ pub(all) enum AlignedDiffOutcome {
   /// edits still use the structural diff.
   PartialFallback(Array[String])
   NoStructuralChanges
-  /// The inputs differ only in comments excluded by the caller.
+  /// The inputs differ only in comments or blank lines excluded by the caller.
   NoNonCommentChanges
 } derive(Eq)
 

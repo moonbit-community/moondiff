@@ -461,9 +461,9 @@ fn build_analysis_request(
       skipped.push({
         path: state.file.filename,
         reason: if algorithm is AstAlgorithm {
-          "No structural non-comment changes were found; turn off Ignore comments to analyze comment changes."
+          "No structural changes besides comments or blank lines were found; turn off Ignore comments to analyze comment and blank-line changes."
         } else {
-          "No non-comment changes were found; turn off Ignore comments to analyze comment changes."
+          "No changes besides comments or blank lines were found; turn off Ignore comments to analyze comment and blank-line changes."
         },
       })
       continue

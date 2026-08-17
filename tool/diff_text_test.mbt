@@ -475,7 +475,41 @@ test "diff_text reports pure comment changes as empty when ignored" {
   assert_true(result.has_changes)
   assert_eq(
     result.rendered,
-    "--- old.mbt\n+++ new.mbt\nNo non-comment changes.\n",
+    "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
+  )
+}
+
+///|
+test "diff_text reports blank-line and final-newline changes as empty when ignored" {
+  let result = diff_text(
+    "old.mbt",
+    "fn stable() -> Int { 1 }",
+    "new.mbt",
+    "fn stable() -> Int { 1 }\n\n\t\n\u{2003}",
+    options=DiffOptions::new(ignore_comments=true),
+  )
+  assert_true(result.kind is Ast)
+  assert_true(result.has_changes)
+  assert_eq(
+    result.rendered,
+    "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
+  )
+}
+
+///|
+test "parser fallback reports ignored blank-line changes with the shared empty state" {
+  let result = diff_text(
+    "old.mbt",
+    "fn broken( {\n",
+    "new.mbt",
+    "fn broken( {\n\u{3000}\n",
+    options=DiffOptions::new(ignore_comments=true),
+  )
+  assert_true(result.kind is TextFallback(_))
+  assert_true(result.has_changes)
+  assert_eq(
+    result.rendered,
+    "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
   )
 }
 
@@ -531,7 +565,9 @@ test "diff_text does not treat slashes inside strings as comments" {
     options=DiffOptions::new(ignore_comments=true),
   )
   assert_true(result.kind is Ast)
-  assert_false(result.rendered.contains("No non-comment changes."))
+  assert_false(
+    result.rendered.contains("No changes besides comments or blank lines."),
+  )
   assert_true(result.rendered.contains("https://old.example/a//b"))
   assert_true(result.rendered.contains("https://new.example/a//b"))
 }
@@ -553,7 +589,9 @@ test "diff_text ignores UUID and block separator comment changes" {
     options=DiffOptions::new(ignore_comments=true),
   )
   assert_true(result.kind is Ast)
-  assert_true(result.rendered.contains("No non-comment changes."))
+  assert_true(
+    result.rendered.contains("No changes besides comments or blank lines."),
+  )
 }
 
 ///|

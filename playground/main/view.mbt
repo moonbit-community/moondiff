@@ -250,9 +250,9 @@ fn ignore_comments_control(
       "toolbar-button ignore-comments-toggle"
     },
     title=if ignore_comments {
-      "Show comment changes"
+      "Show comment and blank-line changes"
     } else {
-      "Ignore MoonBit comment changes"
+      "Ignore MoonBit comment and blank-line changes"
     },
     attrs=@html.Attrs::build()
       .aria_label("Ignore comments")
@@ -400,9 +400,9 @@ fn file_diff_view(
         return @html.div(class="file-message comment-empty", [
           @html.p(
             if algorithm is AstAlgorithm {
-              "No structural non-comment changes found. Turn off Ignore comments to view comment changes."
+              "No structural changes besides comments or blank lines found. Turn off Ignore comments to view comment and blank-line changes."
             } else {
-              "No non-comment changes found. Turn off Ignore comments to view comment changes."
+              "No changes besides comments or blank lines found. Turn off Ignore comments to view comment and blank-line changes."
             },
           ),
         ])

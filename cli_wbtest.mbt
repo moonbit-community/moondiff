@@ -48,7 +48,9 @@ test "moondiff command help uses README command name" {
   )
   assert_false(help.contains("Usage: astdiff"))
   assert_true(help.contains("--ignore-comments"))
-  assert_true(help.contains("Ignore MoonBit comment-only differences"))
+  assert_true(
+    help.contains("Ignore MoonBit comment-only and blank-line-only differences"),
+  )
 }
 
 ///|UUID(f4c874ad-006a-41cb-ab86-0013549f7845)
@@ -73,4 +75,21 @@ test "render_cli_diff uses regular line diff for non-mbt paths" {
   assert_true(rendered.has_prefix("--- old.txt\n+++ new.txt\n@@ -1"))
   assert_true(rendered.contains("1 . plain old"))
   assert_true(rendered.contains(". 1 plain new"))
+}
+
+///|
+test "render_cli_diff reports ignored MoonBit blank-line changes" {
+  let options = CliOptions::{
+    old_path: "old.mbt",
+    new_path: "new.mbt",
+    graph_limit_text: "0",
+    use_color: false,
+    ignore_comments: true,
+  }
+  let rendered = render_cli_diff(
+    options, "fn stable() {}", "fn stable() {}\n\n\u{2003}", 0,
+  )
+  assert_eq(
+    rendered, "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
+  )
 }

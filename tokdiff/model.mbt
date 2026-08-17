@@ -646,10 +646,10 @@ fn ignored_diff_line(index : Int, line : CommentProjection) -> DiffLine {
 }
 
 ///|
-// Retain calculated code segments while replacing the excluded suffix with a
+// Retain calculated code segments while replacing excluded source text with a
 // renderer-neutral `Ignored` segment. This also works for AST lines whose
-// original segments still covered the comment: everything after `code` is
-// deliberately discarded and re-appended exactly once.
+// original segments still covered a comment or whitespace-only line:
+// everything after `code` is deliberately discarded and re-appended once.
 fn neutralize_comment_suffix(
   line : DiffLine,
   projection : CommentProjection,
@@ -690,7 +690,8 @@ fn neutralize_comment_suffix(
 }
 
 ///|
-// Return the source-faithful row and whether it is excluded from comparison.
+// Return the source-faithful row and whether it is excluded from comparison as
+// a comment-only or whitespace-only change.
 fn project_comment_row(
   row : DiffRow,
   old_lines : ArrayView[CommentProjection],
@@ -813,8 +814,17 @@ fn append_ignored_source_gap(
   let new_len = new_end - new_start
   let row_count = if old_len > new_len { old_len } else { new_len }
   for offset in 0..<row_count {
-    match
-      (old_lines.get(old_start + offset), new_lines.get(new_start + offset)) {
+    let old_line = if offset < old_len {
+      old_lines.get(old_start + offset)
+    } else {
+      None
+    }
+    let new_line = if offset < new_len {
+      new_lines.get(new_start + offset)
+    } else {
+      None
+    }
+    match (old_line, new_line) {
       (Some(old_line), Some(new_line)) =>
         rows.push(
           Paired(
@@ -1123,9 +1133,9 @@ fn comment_aware_diff(
 }
 
 ///|
-/// Return a copy of an existing document whose comment-only rows are neutral
-/// context and whose comment-only hunks are removed. This is primarily used
-/// to apply the same comment policy to structural diff documents.
+/// Return a copy of an existing document whose comment-only and blank-line-only
+/// rows are neutral context and whose corresponding hunks are removed. This is
+/// primarily used to apply the same policy to structural diff documents.
 pub fn DiffDocument::ignore_comments(
   self : DiffDocument,
   old~ : ArrayView[String],
@@ -1156,6 +1166,8 @@ pub fn DiffDocument::ignore_comments(
 
 ///|
 /// Calculate a MoonBit-aware diff and all renderer-neutral intraline changes.
+/// When `ignore_comments` is enabled, comment-only and blank-line-only
+/// differences are excluded from comparison but retained beside code changes.
 pub fn diff(
   old~ : ArrayView[String],
   new~ : ArrayView[String],

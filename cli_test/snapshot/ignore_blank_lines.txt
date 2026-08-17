@@ -1,0 +1,4 @@
+[34m--- cli_test/source/ignore_blank_lines.old.mbt[39m
+[34m+++ cli_test/source/ignore_blank_lines.new.mbt[39m
+No changes besides comments or blank lines.
+

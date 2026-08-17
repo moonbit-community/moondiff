@@ -70,7 +70,7 @@ fn moondiff_command() -> @argparse.Command {
       ),
       @argparse.FlagArg(
         "ignore-comments",
-        about="Ignore MoonBit comment-only differences",
+        about="Ignore MoonBit comment-only and blank-line-only differences",
         action=@argparse.FlagAction::SetTrue,
       ),
     ],

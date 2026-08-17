@@ -44,7 +44,7 @@ fn render_text_fallback(
   )
   if options.ignore_comments && document.hunks.is_empty() {
     @render.render_file_headers(old_label, new_label, options.use_color) +
-    "No non-comment changes.\n"
+    "No changes besides comments or blank lines.\n"
   } else {
     "note: fallback to tokdiff (\{reason})\n" +
     @render.render_diff_document(

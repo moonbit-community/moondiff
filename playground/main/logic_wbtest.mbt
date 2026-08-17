@@ -893,6 +893,30 @@ test "comment-only filtered analysis is handled locally" {
 }
 
 ///|
+test "blank-line-only filtered analysis uses the shared skipped reason" {
+  let file = fixture_file("src/blank-lines.mbt", "modified")
+  let view = set_file_state(
+    analysis_test_view([file]),
+    0,
+    ready_test_file(file, ["fn value() -> Int {", "  1", "}"], [
+      "", "fn value() -> Int {", "\u{2003}", "  1", "\t", "}", "",
+    ]),
+  )
+  let model = { ..analysis_test_model(view), ignore_comments: true }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (after, _) = update(model, AnalyzeChanges, emit)
+  guard after.analysis_status is AnalysisNoHunks([skipped]) else {
+    fail("expected local no-hunks result")
+  }
+  assert_eq(skipped.path, "src/blank-lines.mbt")
+  assert_true(
+    skipped.reason.contains(
+      "No changes besides comments or blank lines were found",
+    ),
+  )
+}
+
+///|
 test "late analysis response is discarded after toggling comments" {
   let file = fixture_file("src/change.mbt", "modified")
   let view = set_file_state(

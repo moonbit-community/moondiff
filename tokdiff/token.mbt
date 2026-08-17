@@ -316,14 +316,24 @@ pub fn tokenize_line(line : String) -> Array[Tok] {
 }
 
 ///|
-// A source-faithful projection used by comment-insensitive diffs. `code`
-// excludes both the comment and the separating whitespace immediately before
-// it; `ignored_suffix` keeps those exact bytes so renderers can reconstruct
-// the original line.
+// A source-faithful projection used by comment-and-blank-insensitive diffs.
+// `code` excludes a whole whitespace-only line, or both a comment and the
+// separating whitespace immediately before it. `ignored_suffix` keeps the
+// excluded text exactly so renderers can reconstruct the original line.
 priv struct CommentProjection {
   code : String
   ignored_suffix : String
   ignored_only : Bool
+}
+
+///|
+fn whitespace_only_line(line : String) -> Bool {
+  for char in line {
+    if !char.is_whitespace() {
+      return false
+    }
+  }
+  true
 }
 
 ///|
@@ -379,6 +389,9 @@ fn source_comment_start(line : String) -> Int? {
 
 ///|
 fn project_comments(line : String) -> CommentProjection {
+  if whitespace_only_line(line) {
+    return { code: "", ignored_suffix: line, ignored_only: true }
+  }
   guard source_comment_start(line) is Some(comment_start) else {
     return { code: line, ignored_suffix: "", ignored_only: false }
   }

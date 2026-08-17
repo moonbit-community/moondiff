@@ -19,11 +19,13 @@ that declaration as a partial lexical fallback and keeps AST diffing the rest
 of the file. The default-off **Ignore comments** control applies to MoonBit
 files in both Lexical and AST mode. It ignores ordinary and documentation
 comments, generated `///|UUID(...)` markers, and the separating whitespace
-before a comment while keeping strings such as `"//not a comment"` intact.
-Pure comment changes produce no hunks. When nearby code also changes, both
-original comments remain visible as neutral context without addition,
-deletion, or intraline highlighting. Other valid UTF-8 text files always use a
-plain line diff and are unaffected by the control.
+before a comment while keeping strings such as `"//not a comment"` intact. It
+also ignores empty lines, lines containing only Unicode whitespace, blank-line
+count changes, and a missing or added final newline. Pure comment and blank-line
+changes produce no hunks. When nearby code also changes, the original comments
+and blank lines remain visible as neutral context without addition, deletion,
+or intraline highlighting. Other valid UTF-8 text files always use a plain line
+diff and are unaffected by the control.
 
 The selected algorithm and comment setting survive later commit navigation in
 the open app but are not written into share URLs; a refresh restores Lexical
@@ -44,10 +46,10 @@ When the playground is served by its optional local Node backend, an
 without expanding file cards, uses the current algorithm's cached `context=3`
 hunks (including the current comment setting), and asks OpenSeek to group them
 by cross-file function in descending review importance. AST files with no
-structural changes and MoonBit files containing only ignored comment changes
-are listed as skipped; if the commit has no analyzable hunks, the browser
-reports that locally without calling the backend. After analysis, the ordered
-groups replace the file list:
+structural changes and MoonBit files containing only ignored comment or
+blank-line changes are listed as skipped; if the commit has no analyzable
+hunks, the browser reports that locally without calling the backend. After
+analysis, the ordered groups replace the file list:
 the most important group opens first, later groups stay collapsed until
 requested, and each hunk keeps its file path, highlighted diff, and dedicated
 explanation.

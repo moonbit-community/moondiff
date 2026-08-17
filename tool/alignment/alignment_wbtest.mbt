@@ -868,6 +868,49 @@ test "aligned documents ignore comments in both modes" {
 }
 
 ///|
+test "aligned documents ignore blank lines and final newlines in both modes" {
+  for
+    sources in [
+      ("fn stable() {}", "fn stable() {}\n"),
+      ("fn stable() {}\n\n\t\n\u{2003}", "fn stable() {}\n \n\u{3000}"),
+      ("", "\n"),
+    ] {
+    let (old_source, new_source) = sources
+    for mode in [Lexical, Ast] {
+      let result = diff_document(
+        old_source,
+        new_source,
+        mode,
+        ignore_comments=true,
+      )
+      assert_true(result.outcome is NoNonCommentChanges)
+      assert_true(result.document.hunks.is_empty())
+    }
+    assert_false(
+      diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
+    )
+  }
+}
+
+///|
+test "parse-invalid blank-only changes are classified before lexical fallback" {
+  let old_source = "fn broken( {\n"
+  let new_source = "fn broken( {\n\u{2003}\n"
+  let unfiltered = diff_document(old_source, new_source, Ast)
+  assert_true(unfiltered.outcome is Fallback(_))
+  assert_false(unfiltered.document.hunks.is_empty())
+
+  let filtered = diff_document(
+    old_source,
+    new_source,
+    Ast,
+    ignore_comments=true,
+  )
+  assert_true(filtered.outcome is NoNonCommentChanges)
+  assert_true(filtered.document.hunks.is_empty())
+}
+
+///|
 test "aligned documents ignore block separators in both modes" {
   let old_source =
     #|fn first() {}

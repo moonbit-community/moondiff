@@ -132,3 +132,101 @@ test "ignored comment lines do not split code hunks" {
   assert_eq(old_comment.text(), "// old bridge")
   assert_eq(new_comment.text(), "// new bridge")
 }
+
+///|
+test "ignore comments also ignores empty and Unicode whitespace-only lines" {
+  for blank in ["", "   ", "\t", "\u{a0}\u{2003}\u{3000}"] {
+    assert_false(@tokdiff.diff(old=[], new=[blank]).hunks.is_empty())
+    assert_true(
+      @tokdiff.diff(old=[], new=[blank], ignore_comments=true).hunks.is_empty(),
+    )
+  }
+
+  assert_true(
+    @tokdiff.diff(
+      old=["fn stable() {}", "", "\t", "\u{2003}"],
+      new=["fn stable() {}", "  "],
+      ignore_comments=true,
+    ).hunks.is_empty(),
+  )
+  assert_true(
+    @tokdiff.diff(
+      old=["fn stable() {}"],
+      new=["fn stable() {}", ""],
+      ignore_comments=true,
+    ).hunks.is_empty(),
+  )
+  assert_true(
+    @tokdiff.diff(
+      old=["fn stable() {}", "\u{2003}"],
+      new=["fn stable() {}", "// explanation"],
+      ignore_comments=true,
+    ).hunks.is_empty(),
+  )
+}
+
+///|
+test "ignore comments retains trailing whitespace on code lines" {
+  let document = @tokdiff.diff(
+    old=["let value = 1"],
+    new=["let value = 1\t"],
+    ignore_comments=true,
+  )
+  assert_false(document.hunks.is_empty())
+}
+
+///|
+test "blank lines beside code changes are neutral source-faithful context" {
+  let document = @tokdiff.diff(
+    old=["fn value() {", "  old()", "", "\t", "}"],
+    new=["fn value() {", "  new()", "  ", "}"],
+    context=0,
+    ignore_comments=true,
+  )
+  guard document.hunks
+    is [
+      {
+        old_start: 1,
+        old_len: 3,
+        new_start: 1,
+        new_len: 2,
+        blocks: [
+          ChangeBlock([Paired(_, _)]),
+          IgnoredBlock([Paired(old_empty, new_spaces), OldOnly(old_tab)]),
+        ],
+        ..,
+      },
+    ] else {
+    fail("expected changed code followed by neutral blank-line context")
+  }
+  assert_eq((old_empty.index, old_empty.text()), (2, ""))
+  assert_eq((new_spaces.index, new_spaces.text()), (2, "  "))
+  assert_eq((old_tab.index, old_tab.text()), (3, "\t"))
+  assert_true(new_spaces.segments.all(segment => segment.kind is Ignored))
+  assert_true(old_tab.segments.all(segment => segment.kind is Ignored))
+
+  let split = @tokdiff_html.render_side_by_side(document, line_numbers=true)
+  assert_true(split.contains("class=\"ctx ignored\""), msg=split)
+  assert_false(split.contains("class=\"del\"><span class=\"ignored-context\">"))
+  assert_false(split.contains("class=\"add\"><span class=\"ignored-context\">"))
+
+  let unified = @tokdiff_html.render_unified(document, line_numbers=true)
+  assert_true(unified.contains("class=\"ctx ignored\""), msg=unified)
+  assert_false(
+    unified.contains("class=\"del\"><span class=\"ignored-context\">"),
+  )
+  assert_false(
+    unified.contains("class=\"add\"><span class=\"ignored-context\">"),
+  )
+
+  let patch = @tokdiff_text.render_unified_hunks(document).join("")
+  assert_true(patch.contains("-  old()\n+  new()\n \n   \n \t\n"), msg=patch)
+}
+
+///|
+test "plain line diff still reports blank-line changes" {
+  assert_false(
+    @tokdiff.line_diff(old=["plain text"], new=["plain text", ""]).hunks.is_empty(),
+  )
+  assert_false(@tokdiff.line_diff(old=[], new=["\u{2003}"]).hunks.is_empty())
+}

@@ -399,7 +399,7 @@ fn render_aligned_document_result(
         new_label,
         render_options.use_color,
       ) +
-      "No non-comment changes.\n"
+      "No changes besides comments or blank lines.\n"
     NoStructuralChanges =>
       if old_source == new_source {
         render_no_changes(old_label, new_label, render_options)
