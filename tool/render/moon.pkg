@@ -1,7 +1,7 @@
 import {
   "moonbit-community/chalk",
-  "moonbit-community/piediff",
   "moonbitlang/core/cmp",
+  "moonbitlang/core/diff",
   "moonbitlang/core/hashmap",
   "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/tokdiff",
