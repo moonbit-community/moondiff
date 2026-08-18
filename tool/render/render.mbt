@@ -36,17 +36,7 @@ priv enum LineStyle {
 // Split on LF and CRLF. This intentionally returns a non-empty array and keeps
 // a trailing empty line, unlike APIs that treat `foo\n` as one line.
 pub fn split_lines(source : String) -> Array[String] {
-  let lines = Array::new()
-  for line in source.split("\n") {
-    let chars = line.to_array()
-    if chars.last() is Some('\r') {
-      lines.push(String::from_array(chars[:chars.length() - 1].to_owned()))
-    } else {
-      lines.push(line.to_owned())
-    }
-  } nobreak {
-    lines
-  }
+  @source_text.split_lines(source)
 }
 
 ///|UUID(534e9df8-b623-4a6b-a906-d4e565976377)
@@ -512,17 +502,34 @@ fn document_line_widths(document : @tokdiff.DiffDocument) -> (Int, Int) {
 /// headers, two line-number columns, and optional ANSI highlighting. An empty
 /// document renders only its file headers so the caller can choose the most
 /// accurate empty-state message.
-pub fn render_diff_document(
+fn render_diff_document_impl(
   old_label : String,
   new_label : String,
   document : @tokdiff.DiffDocument,
   options : RenderOptions,
+  old_max_line : Int?,
+  new_max_line : Int?,
 ) -> String {
-  let (old_width, new_width) = document_line_widths(document)
+  let (document_old_width, document_new_width) = document_line_widths(document)
+  let old_width = old_max_line
+    .map(line => @cmp.maximum(line, 1).to_string().length())
+    .map(width => @cmp.maximum(width, document_old_width))
+    .unwrap_or(document_old_width)
+  let new_width = new_max_line
+    .map(line => @cmp.maximum(line, 1).to_string().length())
+    .map(width => @cmp.maximum(width, document_new_width))
+    .unwrap_or(document_new_width)
   let buf = StringBuilder::new()
   buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   for hunk in document.hunks {
-    buf.write_string(hunk.header)
+    buf.write_string(
+      @common.hunk_header(
+        hunk.old_start,
+        hunk.old_len,
+        hunk.new_start,
+        hunk.new_len,
+      ),
+    )
     buf.write_char('\n')
     for block in hunk.blocks {
       match block {
@@ -562,6 +569,39 @@ pub fn render_diff_document(
     }
   }
   buf.to_string()
+}
+
+///|
+/// Render a calculated diff document with widths inferred from its rows.
+pub fn render_diff_document(
+  old_label : String,
+  new_label : String,
+  document : @tokdiff.DiffDocument,
+  options : RenderOptions,
+) -> String {
+  render_diff_document_impl(old_label, new_label, document, options, None, None)
+}
+
+///|
+/// Render a document while reserving line-number widths for complete source
+/// sections. This preserves the historical terminal layout when a calculated
+/// hunk covers only part of a top-level declaration.
+pub fn render_diff_document_with_max_lines(
+  old_label : String,
+  new_label : String,
+  document : @tokdiff.DiffDocument,
+  options : RenderOptions,
+  old_max_line : Int,
+  new_max_line : Int,
+) -> String {
+  render_diff_document_impl(
+    old_label,
+    new_label,
+    document,
+    options,
+    Some(old_max_line),
+    Some(new_max_line),
+  )
 }
 
 ///|UUID(d0d1ad18-199b-4b66-b233-b6a36da07412)
@@ -933,6 +973,9 @@ pub fn render_ast_diff(
 // Plain line-oriented diff retained for non-MoonBit inputs and callers that
 // only have text-level highlights. When highlight maps are provided here,
 // their keys are one-based line numbers in the supplied text.
+const CORE_LINE_DIFF_CUTOFF : Int = 4_096
+
+///|
 pub fn render_line_diff(
   old_label : String,
   old_source : String,
@@ -952,7 +995,11 @@ pub fn render_line_diff(
   let new_line_no_width = max_display_line(new_line_base, new_lines.length())
     .to_string()
     .length()
-  let diff = @diff.Diff(old=old_lines[:], new=new_lines[:])
+  let diff = @diff.Diff(
+    old=old_lines[:],
+    new=new_lines[:],
+    cutoff=CORE_LINE_DIFF_CUTOFF,
+  )
   let hunks = diff.group(context=options.context_lines)
 
   let buf = StringBuilder::new()

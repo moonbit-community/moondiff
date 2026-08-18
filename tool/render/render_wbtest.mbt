@@ -157,7 +157,6 @@ test "render_diff_document highlights changes and keeps ignored text neutral" {
   let document : @tokdiff.DiffDocument = {
     hunks: [
       {
-        header: "@@ -1,3 +1,3 @@",
         old_start: 0,
         old_len: 3,
         new_start: 0,

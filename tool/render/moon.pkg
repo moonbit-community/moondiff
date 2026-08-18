@@ -6,6 +6,8 @@ import {
   "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tool/hunks",
+  "moonbit-community/moondiff/internal/source_text",
+  "moonbit-community/moondiff/render/common",
 }
 
 import {

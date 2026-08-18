@@ -1,3 +1,4 @@
 import {
   "moonbit-community/moondiff/tokdiff",
+  "moonbit-community/moondiff/render/common",
 }
