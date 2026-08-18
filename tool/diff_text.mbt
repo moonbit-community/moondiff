@@ -219,7 +219,7 @@ fn render_sectioned_document(
       @render.render_diff_document_with_max_lines(
         section_label(old_label, section.old),
         section_label(new_label, section.new),
-        { hunks: rendered_hunks },
+        { hunks: rendered_hunks[:] },
         options.render_options(),
         section_max_line(section.old),
         section_max_line(section.new),
@@ -240,7 +240,7 @@ fn render_sectioned_document(
       @render.render_diff_document(
         old_label,
         new_label,
-        { hunks: unassigned },
+        { hunks: unassigned[:] },
         options.render_options(),
       ),
     )

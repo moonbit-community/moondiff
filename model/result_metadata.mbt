@@ -24,8 +24,10 @@ pub(all) enum ComputationStage {
 
 ///|
 /// The typed reason that structural diffing degraded to a lexical result.
+/// Parse-error sides are exposed as a zero-copy read-only view with stable
+/// backing storage.
 pub(all) enum FallbackReason {
-  ParseError(sides~ : Array[DiffSide], detail~ : String)
+  ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
 } derive(Debug, Eq)

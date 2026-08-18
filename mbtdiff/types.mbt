@@ -77,11 +77,13 @@ pub type FallbackInfo = @model.FallbackInfo
 
 ///|
 /// A calculated document plus classification and typed degradation metadata.
-/// Its representation is private; use the accessor methods below.
+/// Its representation is private; use the accessor methods below. Document
+/// collections and fallback metadata are returned as zero-copy read-only views
+/// whose backing storage is never mutated after this result is published.
 struct DiffResult {
   document : DiffDocument
   status : DiffStatus
-  fallbacks : Array[FallbackInfo]
+  fallbacks : ArrayView[FallbackInfo]
 }
 
 ///|
@@ -95,8 +97,8 @@ pub fn DiffResult::status(self : DiffResult) -> DiffStatus {
 }
 
 ///|
-pub fn DiffResult::fallbacks(self : DiffResult) -> Array[FallbackInfo] {
-  self.fallbacks.copy()
+pub fn DiffResult::fallbacks(self : DiffResult) -> ArrayView[FallbackInfo] {
+  self.fallbacks
 }
 
 ///|

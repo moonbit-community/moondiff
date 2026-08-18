@@ -60,11 +60,12 @@ pub type FallbackInfo = @model.FallbackInfo
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
 /// through the `mbtdiff` facade; the legacy result below is retained as a
-/// compatibility projection.
+/// compatibility projection. `fallbacks` is a zero-copy read-only view whose
+/// backing storage is never mutated after this result is published.
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : DiffStatus
-  fallbacks : Array[FallbackInfo]
+  fallbacks : ArrayView[FallbackInfo]
 } derive(Eq)
 
 ///|
@@ -198,7 +199,7 @@ fn lexical_plan_document(
           ),
         }
       } else {
-        { document: { hunks, }, outcome: Rendered }
+        { document: { hunks: hunks[:] }, outcome: Rendered }
       }
     }
   }
@@ -354,10 +355,12 @@ fn ast_diff_line(
   ranges : NovelRangeMap,
   bridge_whitespace : Bool,
 ) -> @model.DiffLine {
-  {
-    index,
-    segments: ast_line_segments_impl(text, ranges.get(index), bridge_whitespace),
-  }
+  let segments = ast_line_segments_impl(
+    text,
+    ranges.get(index),
+    bridge_whitespace,
+  )
+  { index, segments: segments[:] }
 }
 
 ///|
@@ -432,21 +435,21 @@ fn ast_hunk_blocks(
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
   bridge_whitespace : Bool,
-) -> Array[@model.DiffBlock] {
+) -> ArrayView[@model.DiffBlock] {
   let blocks : Array[@model.DiffBlock] = []
   let context_lines : Array[@model.ContextLine] = []
   let change_rows : Array[@model.DiffRow] = []
   for pair in pairs {
     if ast_pair_is_context(pair, hunk, old_lines, new_lines) {
       if !change_rows.is_empty() {
-        blocks.push(ChangeBlock(change_rows.copy()))
+        blocks.push(ChangeBlock(change_rows.copy()[:]))
         change_rows.clear()
       }
       guard pair is (Some(old_index), Some(new_index)) else { panic() }
       context_lines.push({ old_index, new_index, text: old_lines[old_index] })
     } else {
       if !context_lines.is_empty() {
-        blocks.push(ContextBlock(context_lines.copy()))
+        blocks.push(ContextBlock(context_lines.copy()[:]))
         context_lines.clear()
       }
       change_rows.push(
@@ -457,12 +460,12 @@ fn ast_hunk_blocks(
     }
   }
   if !context_lines.is_empty() {
-    blocks.push(ContextBlock(context_lines))
+    blocks.push(ContextBlock(context_lines[:]))
   }
   if !change_rows.is_empty() {
-    blocks.push(ChangeBlock(change_rows))
+    blocks.push(ChangeBlock(change_rows[:]))
   }
-  blocks
+  blocks[:]
 }
 
 ///|
@@ -630,7 +633,7 @@ fn ast_document_from_positions(
       ),
     })
   }
-  { hunks, }
+  { hunks: hunks[:] }
 }
 
 ///|
@@ -1045,7 +1048,7 @@ fn detailed_ast_plan_document(
           }
         }
       }
-      let document : @model.DiffDocument = { hunks, }
+      let document : @model.DiffDocument = { hunks: hunks[:] }
       {
         document,
         status: if document.hunks.is_empty() {
@@ -1053,7 +1056,7 @@ fn detailed_ast_plan_document(
         } else {
           Changed
         },
-        fallbacks,
+        fallbacks: fallbacks[:],
       }
     }
   }
@@ -1108,7 +1111,7 @@ fn ast_plan_document(
           fallback_reasons.push(reason)
         }
       }
-      let document : @model.DiffDocument = { hunks, }
+      let document : @model.DiffDocument = { hunks: hunks[:] }
       let outcome = if !fallback_reasons.is_empty() {
         PartialFallback(fallback_reasons)
       } else if document.hunks.is_empty() {
@@ -1155,7 +1158,7 @@ fn parser_fallback_reason(
 fn parse_error_sides(
   old_reports : ArrayView[@basic.Report],
   new_reports : ArrayView[@basic.Report],
-) -> Array[DiffSide] {
+) -> ArrayView[DiffSide] {
   let sides : Array[DiffSide] = []
   if !old_reports.is_empty() {
     sides.push(Old)
@@ -1163,7 +1166,7 @@ fn parse_error_sides(
   if !new_reports.is_empty() {
     sides.push(New)
   }
-  sides
+  sides[:]
 }
 
 ///|

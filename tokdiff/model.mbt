@@ -181,12 +181,12 @@ fn projected_line_segments(
 
 ///|
 fn make_diff_line(index : Int, segments : Array[DiffSegment]) -> DiffLine {
-  { index, segments }
+  { index, segments: segments[:] }
 }
 
 ///|
 fn make_plain_diff_line(index : Int, text : String) -> DiffLine {
-  { index, segments: plain_segments(text) }
+  make_diff_line(index, plain_segments(text))
 }
 
 ///|
@@ -198,7 +198,7 @@ fn semantic_change_rows(
   new_lines : ArrayView[ComparableLine],
   old_start : Int,
   new_start : Int,
-) -> Array[DiffRow] {
+) -> ArrayView[DiffRow] {
   let rows : Array[DiffRow] = []
   if alignment_tokens(old_lines, new_lines, line => line.text) is Some(tokens) {
     let changes = window_changes(tokens.olds, tokens.news)
@@ -269,7 +269,7 @@ fn semantic_change_rows(
       rows.push(NewOnly(make_plain_diff_line(new_start + offset, line.text)))
     }
   }
-  rows
+  rows[:]
 }
 
 ///|
@@ -278,7 +278,7 @@ fn plain_change_rows(
   new_lines : ArrayView[String],
   old_start : Int,
   new_start : Int,
-) -> Array[DiffRow] {
+) -> ArrayView[DiffRow] {
   let rows : Array[DiffRow] = []
   let row_count = if old_lines.length() > new_lines.length() {
     old_lines.length()
@@ -301,7 +301,7 @@ fn plain_change_rows(
       (None, None) => ()
     }
   }
-  rows
+  rows[:]
 }
 
 ///|
@@ -344,7 +344,7 @@ fn semantic_hunk(hunk : @diff.Hunk[ComparableLine]) -> DiffHunk {
             text: old_view[old_index + offset].text,
           })
         }
-        blocks.push(ContextBlock(lines))
+        blocks.push(ContextBlock(lines[:]))
         index += 1
       }
       Delete(old_index~, old_len~, ..) => {
@@ -355,7 +355,7 @@ fn semantic_hunk(hunk : @diff.Hunk[ComparableLine]) -> DiffHunk {
             OldOnly(make_plain_diff_line(old_index + offset, line.text)),
           )
         }
-        blocks.push(ChangeBlock(rows))
+        blocks.push(ChangeBlock(rows[:]))
         index += 1
       }
       Insert(new_index~, new_len~, ..) => {
@@ -366,13 +366,13 @@ fn semantic_hunk(hunk : @diff.Hunk[ComparableLine]) -> DiffHunk {
             NewOnly(make_plain_diff_line(new_index + offset, line.text)),
           )
         }
-        blocks.push(ChangeBlock(rows))
+        blocks.push(ChangeBlock(rows[:]))
         index += 1
       }
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { old_start, old_len, new_start, new_len, blocks }
+  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
 }
 
 ///|
@@ -408,7 +408,7 @@ fn plain_hunk(hunk : @diff.Hunk[String]) -> DiffHunk {
             text: old_view[old_index + offset],
           })
         }
-        blocks.push(ContextBlock(lines))
+        blocks.push(ContextBlock(lines[:]))
         index += 1
       }
       Delete(old_index~, old_len~, ..) => {
@@ -423,7 +423,7 @@ fn plain_hunk(hunk : @diff.Hunk[String]) -> DiffHunk {
             ),
           )
         }
-        blocks.push(ChangeBlock(rows))
+        blocks.push(ChangeBlock(rows[:]))
         index += 1
       }
       Insert(new_index~, new_len~, ..) => {
@@ -438,13 +438,13 @@ fn plain_hunk(hunk : @diff.Hunk[String]) -> DiffHunk {
             ),
           )
         }
-        blocks.push(ChangeBlock(rows))
+        blocks.push(ChangeBlock(rows[:]))
         index += 1
       }
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { old_start, old_len, new_start, new_len, blocks }
+  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
 }
 
 ///|
@@ -488,7 +488,7 @@ fn ignored_diff_line(index : Int, line : CommentProjection) -> DiffLine {
   let segments : Array[DiffSegment] = []
   push_diff_segment(segments, Unchanged, line.code)
   push_diff_segment(segments, Ignored, line.ignored_suffix)
-  { index, segments }
+  { index, segments: segments[:] }
 }
 
 ///|
@@ -532,7 +532,7 @@ fn neutralize_comment_suffix(
     )
   }
   push_diff_segment(segments, Ignored, projection.ignored_suffix)
-  { index: line.index, segments }
+  { index: line.index, segments: segments[:] }
 }
 
 ///|
@@ -598,24 +598,24 @@ fn append_projected_rows(
     let (projected, is_ignored) = project_comment_row(row, old_lines, new_lines)
     if is_ignored {
       if !changes.is_empty() {
-        blocks.push(ChangeBlock(changes.copy()))
+        blocks.push(ChangeBlock(changes.copy()[:]))
         changes.clear()
       }
       ignored.push(projected)
     } else {
       has_change = true
       if !ignored.is_empty() {
-        blocks.push(IgnoredBlock(ignored.copy()))
+        blocks.push(IgnoredBlock(ignored.copy()[:]))
         ignored.clear()
       }
       changes.push(projected)
     }
   }
   if !changes.is_empty() {
-    blocks.push(ChangeBlock(changes))
+    blocks.push(ChangeBlock(changes[:]))
   }
   if !ignored.is_empty() {
-    blocks.push(IgnoredBlock(ignored))
+    blocks.push(IgnoredBlock(ignored[:]))
   }
   has_change
 }
@@ -686,7 +686,7 @@ fn append_ignored_source_gap(
     }
   }
   if !rows.is_empty() {
-    blocks.push(IgnoredBlock(rows))
+    blocks.push(IgnoredBlock(rows[:]))
   }
 }
 
@@ -718,7 +718,7 @@ fn append_mapped_change_rows(
     }
     if old_cursor < old_target || new_cursor < new_target {
       if !changes.is_empty() {
-        blocks.push(ChangeBlock(changes.copy()))
+        blocks.push(ChangeBlock(changes.copy()[:]))
         changes.clear()
       }
       append_ignored_source_gap(
@@ -767,7 +767,7 @@ fn append_mapped_change_rows(
     )
   }
   if !changes.is_empty() {
-    blocks.push(ChangeBlock(changes))
+    blocks.push(ChangeBlock(changes[:]))
   }
   (old_cursor, new_cursor)
 }
@@ -794,7 +794,7 @@ fn append_mapped_equal_lines(
     if old_position < old_entry.source_index ||
       new_position < new_entry.source_index {
       if !context.is_empty() {
-        blocks.push(ContextBlock(context.copy()))
+        blocks.push(ContextBlock(context.copy()[:]))
         context.clear()
       }
       append_ignored_source_gap(
@@ -817,7 +817,7 @@ fn append_mapped_equal_lines(
       })
     } else {
       if !context.is_empty() {
-        blocks.push(ContextBlock(context.copy()))
+        blocks.push(ContextBlock(context.copy()[:]))
         context.clear()
       }
       blocks.push(
@@ -833,7 +833,7 @@ fn append_mapped_equal_lines(
     new_position = new_entry.source_index + 1
   }
   if !context.is_empty() {
-    blocks.push(ContextBlock(context))
+    blocks.push(ContextBlock(context[:]))
   }
   (old_position, new_position)
 }
@@ -946,7 +946,7 @@ fn comment_hunk(
   )
   let old_len = old_end - old_start
   let new_len = new_end - new_start
-  { old_start, old_len, new_start, new_len, blocks }
+  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
 }
 
 ///|
@@ -968,7 +968,7 @@ fn comment_aware_diff(
       comment_hunk(hunk, old_projected, new_projected, old_lines, new_lines),
     )
   }
-  { hunks, }
+  { hunks: hunks[:] }
 }
 
 ///|
@@ -988,19 +988,19 @@ pub fn ignore_comments(
     let mut has_change = false
     for block in hunk.blocks {
       match block {
-        ContextBlock(lines) => blocks.push(ContextBlock(lines.copy()))
+        ContextBlock(lines) => blocks.push(ContextBlock(lines))
         ChangeBlock(rows) =>
           if append_projected_rows(blocks, rows, old_lines, new_lines) {
             has_change = true
           }
-        IgnoredBlock(rows) => blocks.push(IgnoredBlock(rows.copy()))
+        IgnoredBlock(rows) => blocks.push(IgnoredBlock(rows))
       }
     }
     if has_change {
-      hunks.push({ ..hunk, blocks, })
+      hunks.push({ ..hunk, blocks: blocks[:] })
     }
   }
-  { hunks, }
+  { hunks: hunks[:] }
 }
 
 ///|
@@ -1021,7 +1021,7 @@ pub fn diff(
   for hunk in rendering_diff(old, new, line_cleanup).group(context~) {
     hunks.push(semantic_hunk(hunk))
   }
-  { hunks, }
+  { hunks: hunks[:] }
 }
 
 ///|
@@ -1042,5 +1042,5 @@ pub fn line_diff(
     ).group(context~) {
     hunks.push(plain_hunk(hunk))
   }
-  { hunks, }
+  { hunks: hunks[:] }
 }

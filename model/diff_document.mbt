@@ -19,9 +19,11 @@ pub(all) struct DiffSegment {
 
 ///|
 /// One changed source line. `index` is zero-based in its original input.
+/// `segments` is a zero-copy read-only view whose backing storage is never
+/// mutated after the line is published.
 pub(all) struct DiffLine {
   index : Int
-  segments : Array[DiffSegment]
+  segments : ArrayView[DiffSegment]
 } derive(Eq)
 
 ///|
@@ -56,34 +58,37 @@ pub(all) enum DiffRow {
 /// unified renderer can emit all deletions before all insertions while a split
 /// renderer consumes the aligned rows directly.
 pub(all) enum DiffBlock {
-  ContextBlock(Array[ContextLine])
-  ChangeBlock(Array[DiffRow])
+  ContextBlock(ArrayView[ContextLine])
+  ChangeBlock(ArrayView[DiffRow])
   /// Rows whose source text differs only in content excluded from comparison.
   /// Renderers keep their original text and line numbers without presenting
   /// them as additions or deletions.
-  IgnoredBlock(Array[DiffRow])
+  IgnoredBlock(ArrayView[DiffRow])
 } derive(Eq)
 
 ///|
 /// One grouped diff hunk. Starts are zero-based cursors and lengths are source
 /// line counts. Renderers derive display headers from these numeric ranges.
+/// `blocks` is a zero-copy read-only view with stable backing storage.
 pub(all) struct DiffHunk {
   old_start : Int
   old_len : Int
   new_start : Int
   new_len : Int
-  blocks : Array[DiffBlock]
+  blocks : ArrayView[DiffBlock]
 } derive(Eq)
 
 ///|
-/// A fully calculated, renderer-neutral diff document.
+/// A fully calculated, renderer-neutral diff document. Its recursively nested
+/// collections are zero-copy read-only views; their backing storage is never
+/// mutated after the document is published.
 pub(all) struct DiffDocument {
-  hunks : Array[DiffHunk]
+  hunks : ArrayView[DiffHunk]
 } derive(Eq)
 
 ///|
 fn DiffLine::rebase_index(self : DiffLine, offset : Int) -> DiffLine {
-  { index: self.index + offset, segments: self.segments.copy() }
+  { index: self.index + offset, segments: self.segments }
 }
 
 ///|
@@ -102,7 +107,7 @@ fn DiffBlock::rebase_indexes(
           text: line.text,
         })
       }
-      ContextBlock(rebased)
+      ContextBlock(rebased[:])
     }
     ChangeBlock(rows) | IgnoredBlock(rows) => {
       let rebased : Array[DiffRow] = []
@@ -120,9 +125,9 @@ fn DiffBlock::rebase_indexes(
         )
       }
       if self is ChangeBlock(_) {
-        ChangeBlock(rebased)
+        ChangeBlock(rebased[:])
       } else {
-        IgnoredBlock(rebased)
+        IgnoredBlock(rebased[:])
       }
     }
   }
@@ -150,8 +155,8 @@ pub fn DiffDocument::rebase(
       old_len: hunk.old_len,
       new_start,
       new_len: hunk.new_len,
-      blocks,
+      blocks: blocks[:],
     })
   }
-  { hunks, }
+  { hunks: hunks[:] }
 }

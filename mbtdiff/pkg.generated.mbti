@@ -17,7 +17,7 @@ pub impl Default for DiffOptions
 
 type DiffResult
 pub fn DiffResult::document(Self) -> @model.DiffDocument
-pub fn DiffResult::fallbacks(Self) -> Array[@model.FallbackInfo]
+pub fn DiffResult::fallbacks(Self) -> ArrayView[@model.FallbackInfo]
 pub fn DiffResult::has_fallback(Self) -> Bool
 pub fn DiffResult::status(Self) -> @model.DiffStatus
 
