@@ -7,8 +7,8 @@ import {
   "moonbit-community/chalk@0.0.1",
   "moonbit-community/piediff@0.0.10",
   "moonbit-community/rabbita@0.14.2",
-  "moonbitlang/lexer@0.3.14",
-  "moonbitlang/parser@0.3.14",
+  "moonbitlang/lexer@0.3.15",
+  "moonbitlang/parser@0.3.17",
   "moonbitlang/async@0.20.3",
 }
 
