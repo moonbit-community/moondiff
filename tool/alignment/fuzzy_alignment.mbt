@@ -278,7 +278,14 @@ fn impl_fuzzy_syntax_similarity(
 }
 
 ///|
-fn impl_fuzzy_levenshtein(lhs : ArrayView[Char], rhs : ArrayView[Char]) -> Int {
+fn impl_fuzzy_levenshtein(
+  lhs : ArrayView[Char],
+  rhs : ArrayView[Char],
+  budget : @computation.Budget?,
+) -> Int raise @computation.LimitExceeded {
+  if budget is Some(budget) {
+    budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, TopLevelAlignment)
+  }
   let rows : Array[Array[Int]] = [
     Array::make(rhs.length() + 1, 0),
     Array::make(rhs.length() + 1, 0),
@@ -304,14 +311,18 @@ fn impl_fuzzy_levenshtein(lhs : ArrayView[Char], rhs : ArrayView[Char]) -> Int {
 }
 
 ///|
-fn impl_fuzzy_name_similarity(old_name : String, new_name : String) -> Int {
+fn impl_fuzzy_name_similarity(
+  old_name : String,
+  new_name : String,
+  budget : @computation.Budget?,
+) -> Int raise @computation.LimitExceeded {
   let old_chars = old_name.to_array()
   let new_chars = new_name.to_array()
   let max_length = @cmp.maximum(old_chars.length(), new_chars.length())
   if max_length == 0 {
     return 1000
   }
-  let distance = impl_fuzzy_levenshtein(old_chars, new_chars)
+  let distance = impl_fuzzy_levenshtein(old_chars, new_chars, budget)
   1000 * (max_length - distance) / max_length
 }
 
@@ -321,9 +332,10 @@ fn impl_fuzzy_score(
   old_content : ImplFuzzyContent,
   new_info : ImplFuzzyInfo,
   new_content : ImplFuzzyContent,
-) -> Int {
+  budget : @computation.Budget?,
+) -> Int raise @computation.LimitExceeded {
   let syntax = impl_fuzzy_syntax_similarity(old_content, new_content)
-  let name = impl_fuzzy_name_similarity(old_info.name, new_info.name)
+  let name = impl_fuzzy_name_similarity(old_info.name, new_info.name, budget)
   // Keep the score integral and deterministic: (3 * syntax + name) / 4.
   (3 * syntax + name) / 4
 }
@@ -375,7 +387,8 @@ fn impl_fuzzy_candidate_score(
   old_contents : ArrayView[ImplFuzzyContent?],
   new_contents : ArrayView[ImplFuzzyContent?],
   use_uuid : Bool,
-) -> Int? {
+  budget : @computation.Budget?,
+) -> Int? raise @computation.LimitExceeded {
   if old_gaps[old_index] != new_gaps[new_index] ||
     (
       use_uuid &&
@@ -393,7 +406,9 @@ fn impl_fuzzy_candidate_score(
     (Some(old_info), Some(old_content), Some(new_info), Some(new_content)) if old_info.kind ==
       new_info.kind &&
       old_info.owner == new_info.owner =>
-      Some(impl_fuzzy_score(old_info, old_content, new_info, new_content))
+      Some(
+        impl_fuzzy_score(old_info, old_content, new_info, new_content, budget),
+      )
     _ => None
   }
 }
@@ -406,7 +421,8 @@ fn align_fuzzy_impl_units(
   new_used : @hashmap.HashMap[Int, Bool],
   reliable : @hashmap.HashMap[Int, Int],
   use_uuid : Bool,
-) -> Array[(Int, Int)] {
+  budget : @computation.Budget?,
+) -> Array[(Int, Int)] raise @computation.LimitExceeded {
   if reliable.is_empty() {
     return []
   }
@@ -469,7 +485,7 @@ fn align_fuzzy_impl_units(
       if !new_used.contains(new_index) &&
         impl_fuzzy_candidate_score(
           old_index, new_index, old_units, new_units, old_gaps, new_gaps, old_contents,
-          new_contents, use_uuid,
+          new_contents, use_uuid, budget,
         )
         is Some(score) {
         if score > best_score {
@@ -497,7 +513,7 @@ fn align_fuzzy_impl_units(
       if !old_used.contains(old_index) &&
         impl_fuzzy_candidate_score(
           old_index, new_index, old_units, new_units, old_gaps, new_gaps, old_contents,
-          new_contents, use_uuid,
+          new_contents, use_uuid, budget,
         )
         is Some(score) {
         if score > best_score {

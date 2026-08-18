@@ -41,3 +41,29 @@ test "change_positions narrows replaced string to changed word" {
   assert_true(novel_width(positions) > 0)
   assert_true(novel_width(positions) < "alpha zeta gamma".length())
 }
+
+///|
+test "relative content positions account for CRLF and CR terminators" {
+  guard relative_region_positions(
+      "alpha\r\nbeta",
+      [test_span(1, 0, 5), test_span(2, 0, 4)],
+      0,
+      7,
+      11,
+    )
+    is [crlf_span] else {
+    fail("expected one CRLF-relative span")
+  }
+  assert_eq((crlf_span.line, crlf_span.start_col, crlf_span.end_col), (2, 0, 4))
+  guard relative_region_positions(
+      "alpha\rbeta",
+      [test_span(1, 0, 5), test_span(2, 0, 4)],
+      0,
+      6,
+      10,
+    )
+    is [cr_span] else {
+    fail("expected one CR-relative span")
+  }
+  assert_eq((cr_span.line, cr_span.start_col, cr_span.end_col), (2, 0, 4))
+}

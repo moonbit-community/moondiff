@@ -372,7 +372,7 @@ fn collect_impl_units(source : String, root : @cst.CstNode) -> Array[ImplUnit] {
     node_groups.push(input.nodes)
   }
   let roots = @elab.elab_cst_node_groups(source, node_groups)
-  let source_lines = @render.split_lines(source)
+  let source_lines = @source_text.split_lines(source)
   let units = Array::new()
   for i in 0..<inputs.length() {
     let input = inputs[i]

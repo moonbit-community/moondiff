@@ -4,6 +4,7 @@ import {
   "moonbitlang/core/priority_queue",
   "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/span",
+  "moonbit-community/moondiff/internal/computation",
 }
 
 import {

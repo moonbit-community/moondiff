@@ -2,6 +2,7 @@
 package "moonbit-community/moondiff/syntax"
 
 import {
+  "moonbit-community/moondiff/internal/computation",
   "moonbit-community/moondiff/span",
   "moonbit-community/prettyprinter",
   "moonbitlang/core/hashmap",
@@ -10,6 +11,8 @@ import {
 
 // Values
 pub fn change_positions(ArrayView[Syntax], ChangeMap) -> Array[MatchedPos]
+
+pub fn change_positions_with_budget(ArrayView[Syntax], ChangeMap, @computation.Budget) -> Array[MatchedPos] raise @computation.LimitExceeded
 
 pub fn init_all_info(ArrayView[Syntax], ArrayView[Syntax]) -> Unit
 

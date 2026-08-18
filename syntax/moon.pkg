@@ -5,4 +5,6 @@ import {
   "moonbitlang/core/uint",
   "moonbitlang/parser/untyped_cst" @cst,
   "moonbit-community/moondiff/span",
+  "moonbit-community/moondiff/internal/computation",
+  "moonbit-community/moondiff/internal/source_text",
 }

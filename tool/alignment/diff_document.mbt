@@ -30,9 +30,97 @@ pub(all) struct AlignedDiffResult {
 } derive(Eq)
 
 ///|
+/// High-level result classification used by the renderer-free public facade.
+pub(all) enum DiffStatus {
+  Identical
+  Changed
+  NoStructuralChanges
+  IgnoredOnly
+} derive(Debug, Eq)
+
+///|
+pub(all) enum DiffSide {
+  Old
+  New
+} derive(Debug, Eq)
+
+///|
+pub(all) enum ComputationStage {
+  TopLevelAlignment
+  SyntaxMatching
+  IntralineMatching
+} derive(Debug, Eq)
+
+///|
+pub(all) enum FallbackReason {
+  ParseError(sides~ : Array[DiffSide], detail~ : String)
+  GraphLimitExceeded(limit~ : UInt)
+  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+} derive(Debug, Eq)
+
+///|
+/// A zero-based source range.
+pub(all) struct LineRange {
+  start : Int
+  len : Int
+} derive(Debug, Eq)
+
+///|
+pub(all) enum FallbackScope {
+  WholeFile
+  Region(old~ : LineRange?, new~ : LineRange?)
+} derive(Debug, Eq)
+
+///|
+pub(all) struct FallbackInfo {
+  reason : FallbackReason
+  scope : FallbackScope
+} derive(Debug, Eq)
+
+///|
+/// Detailed renderer-neutral alignment output. Public callers consume this
+/// through the `mbtdiff` facade; the legacy result below is retained as a
+/// compatibility projection.
+pub(all) struct DetailedDiffResult {
+  document : @tokdiff.DiffDocument
+  status : DiffStatus
+  fallbacks : Array[FallbackInfo]
+} derive(Eq)
+
+///|
+/// Renderer-neutral top-level section metadata used by compatibility
+/// consumers that retain per-declaration file labels.
+pub(all) struct DiffSection {
+  old : LineRange?
+  new : LineRange?
+} derive(Eq)
+
+///|
+pub(all) enum DiffLayout {
+  WholeDocument
+  TopLevelSections(Array[DiffSection])
+} derive(Eq)
+
+///|
+/// One shared calculation consumed by both the renderer-free facade and the
+/// command-line compatibility renderer.
+pub(all) struct DiffCalculation {
+  result : DetailedDiffResult
+  layout : DiffLayout
+  parser_reason : String?
+}
+
+///|
 priv struct UnitDocumentResult {
   document : @tokdiff.DiffDocument
   fallback_reason : String?
+}
+
+///|
+priv struct DetailedUnitResult {
+  document : @tokdiff.DiffDocument
+  fallback : FallbackInfo?
+  computation_exhausted : Bool
 }
 
 ///|
@@ -48,7 +136,7 @@ fn document_lines(source : String) -> Array[String] {
   if source == "" {
     []
   } else {
-    @render.split_lines(source)
+    @source_text.split_lines(source)
   }
 }
 
@@ -220,9 +308,10 @@ fn bridge_ast_changed_whitespace(
 }
 
 ///|
-fn ast_line_segments(
+fn ast_line_segments_impl(
   text : String,
   line_ranges : Array[(Int, Int)]?,
+  bridge_whitespace : Bool,
 ) -> Array[@tokdiff.DiffSegment] {
   let chars = text.to_array()
   if chars.is_empty() {
@@ -253,7 +342,9 @@ fn ast_line_segments(
       }
     }
   }
-  bridge_ast_changed_whitespace(chars, mask)
+  if bridge_whitespace {
+    bridge_ast_changed_whitespace(chars, mask)
+  }
   let segments : Array[@tokdiff.DiffSegment] = []
   let mut start = 0
   while start < chars.length() {
@@ -281,8 +372,12 @@ fn ast_diff_line(
   index : Int,
   text : String,
   ranges : NovelRangeMap,
+  bridge_whitespace : Bool,
 ) -> @tokdiff.DiffLine {
-  { index, segments: ast_line_segments(text, ranges.get(index)) }
+  {
+    index,
+    segments: ast_line_segments_impl(text, ranges.get(index), bridge_whitespace),
+  }
 }
 
 ///|
@@ -308,17 +403,42 @@ fn ast_change_row(
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
+  bridge_whitespace : Bool,
 ) -> @tokdiff.DiffRow {
   match pair {
     (Some(old_line), Some(new_line)) =>
       Paired(
-        ast_diff_line(old_line, old_lines[old_line], old_ranges),
-        ast_diff_line(new_line, new_lines[new_line], new_ranges),
+        ast_diff_line(
+          old_line,
+          old_lines[old_line],
+          old_ranges,
+          bridge_whitespace,
+        ),
+        ast_diff_line(
+          new_line,
+          new_lines[new_line],
+          new_ranges,
+          bridge_whitespace,
+        ),
       )
     (Some(old_line), None) =>
-      OldOnly(ast_diff_line(old_line, old_lines[old_line], old_ranges))
+      OldOnly(
+        ast_diff_line(
+          old_line,
+          old_lines[old_line],
+          old_ranges,
+          bridge_whitespace,
+        ),
+      )
     (None, Some(new_line)) =>
-      NewOnly(ast_diff_line(new_line, new_lines[new_line], new_ranges))
+      NewOnly(
+        ast_diff_line(
+          new_line,
+          new_lines[new_line],
+          new_ranges,
+          bridge_whitespace,
+        ),
+      )
     (None, None) => panic()
   }
 }
@@ -331,6 +451,7 @@ fn ast_hunk_blocks(
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
+  bridge_whitespace : Bool,
 ) -> Array[@tokdiff.DiffBlock] {
   let blocks : Array[@tokdiff.DiffBlock] = []
   let context_lines : Array[@tokdiff.ContextLine] = []
@@ -349,7 +470,9 @@ fn ast_hunk_blocks(
         context_lines.clear()
       }
       change_rows.push(
-        ast_change_row(pair, old_lines, new_lines, old_ranges, new_ranges),
+        ast_change_row(
+          pair, old_lines, new_lines, old_ranges, new_ranges, bridge_whitespace,
+        ),
       )
     }
   }
@@ -360,6 +483,99 @@ fn ast_hunk_blocks(
     blocks.push(ChangeBlock(change_rows))
   }
   blocks
+}
+
+///|
+fn ast_line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
+  line is Some(line) && novel_lines.contains(line)
+}
+
+///|
+fn ast_pair_side_is_changed(
+  line : Int?,
+  opposite : Int?,
+  novel_lines : @hunks.LineSet,
+) -> Bool {
+  ast_line_is_novel(line, novel_lines) || (line is Some(_) && opposite is None)
+}
+
+///|
+fn ast_pair_has_change(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
+  ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) ||
+  ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
+}
+
+///|
+fn ast_should_render_as_block_replacement(
+  segment : ArrayView[(Int?, Int?)],
+  hunk : @hunks.AstHunk,
+) -> Bool {
+  let lhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
+  let rhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
+  let mut all_present_sides_are_novel = true
+  for pair in segment {
+    let lhs_novel = ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs)
+    let rhs_novel = ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
+    if pair.0 is Some(line) {
+      if lhs_novel {
+        lhs_lines[line] = true
+      } else {
+        all_present_sides_are_novel = false
+      }
+    }
+    if pair.1 is Some(line) {
+      if rhs_novel {
+        rhs_lines[line] = true
+      } else {
+        all_present_sides_are_novel = false
+      }
+    }
+  }
+  all_present_sides_are_novel &&
+  lhs_lines.length() >= 2 &&
+  rhs_lines.length() >= 2
+}
+
+///|
+fn append_ast_segment_lines(
+  output : Array[(Int?, Int?)],
+  segment : ArrayView[(Int?, Int?)],
+  hunk : @hunks.AstHunk,
+) -> Unit {
+  if ast_should_render_as_block_replacement(segment, hunk) {
+    for pair in segment {
+      if ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) {
+        output.push((pair.0, None))
+      }
+    }
+    for pair in segment {
+      if ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs) {
+        output.push((None, pair.1))
+      }
+    }
+  } else {
+    output.push_iter(segment.iter())
+  }
+}
+
+///|
+fn reduce_ast_sparse_replacements(
+  lines : ArrayView[(Int?, Int?)],
+  hunk : @hunks.AstHunk,
+) -> Array[(Int?, Int?)] {
+  let output : Array[(Int?, Int?)] = []
+  let segment : Array[(Int?, Int?)] = []
+  for pair in lines {
+    if ast_pair_has_change(pair, hunk) {
+      segment.push(pair)
+    } else {
+      append_ast_segment_lines(output, segment, hunk)
+      segment.clear()
+      output.push(pair)
+    }
+  }
+  append_ast_segment_lines(output, segment, hunk)
+  output
 }
 
 ///|
@@ -389,33 +605,14 @@ fn ast_hunk_side_range(
 }
 
 ///|
-fn ast_range_text(start : Int, len : Int) -> String {
-  if len == 1 {
-    (start + 1).to_string()
-  } else if len == 0 {
-    "\{start},0"
-  } else {
-    "\{start + 1},\{len}"
-  }
-}
-
-///|
-fn ast_hunk_header(
-  old_start : Int,
-  old_len : Int,
-  new_start : Int,
-  new_len : Int,
-) -> String {
-  "@@ -\{ast_range_text(old_start, old_len)} +\{ast_range_text(new_start, new_len)} @@"
-}
-
-///|
 fn ast_document_from_positions(
   old_source : String,
   new_source : String,
   lhs_positions : ArrayView[MatchedPos],
   rhs_positions : ArrayView[MatchedPos],
   context : Int,
+  reduce_sparse : Bool,
+  bridge_whitespace : Bool,
 ) -> @tokdiff.DiffDocument {
   let old_lines = document_lines(old_source)
   let new_lines = document_lines(new_source)
@@ -436,17 +633,20 @@ fn ast_document_from_positions(
       matched_lines,
       context + 1,
     )
-    let pairs = matched_lines[start:end_]
+    let pairs = if reduce_sparse {
+      reduce_ast_sparse_replacements(matched_lines[start:end_], hunk)
+    } else {
+      matched_lines[start:end_].to_owned()
+    }
     let (old_start, old_len) = ast_hunk_side_range(pairs, true)
     let (new_start, new_len) = ast_hunk_side_range(pairs, false)
     hunks.push({
-      header: ast_hunk_header(old_start, old_len, new_start, new_len),
       old_start,
       old_len,
       new_start,
       new_len,
       blocks: ast_hunk_blocks(
-        pairs, hunk, old_lines, new_lines, old_ranges, new_ranges,
+        pairs, hunk, old_lines, new_lines, old_ranges, new_ranges, bridge_whitespace,
       ),
     })
   }
@@ -467,6 +667,168 @@ fn graph_fallback_reason(
     (None, None) => "file"
   }
   "graph limit exceeded (\{graph_limit}) at \{location}"
+}
+
+///|
+fn computation_stage(stage : @computation.Stage) -> ComputationStage {
+  match stage {
+    @computation.TopLevelAlignment => TopLevelAlignment
+    @computation.SyntaxMatching => SyntaxMatching
+    @computation.IntralineMatching => IntralineMatching
+  }
+}
+
+///|
+fn unit_line_range(unit : ImplUnit?) -> LineRange? {
+  if unit is Some(unit) {
+    Some({
+      start: unit.start_line - 1,
+      len: document_lines(unit.source).length(),
+    })
+  } else {
+    None
+  }
+}
+
+///|
+fn unit_fallback(
+  reason : FallbackReason,
+  old_unit : ImplUnit?,
+  new_unit : ImplUnit?,
+) -> FallbackInfo {
+  {
+    reason,
+    scope: Region(old=unit_line_range(old_unit), new=unit_line_range(new_unit)),
+  }
+}
+
+///|
+fn layout_from_top_level_plan(plan : TopLevelPlan) -> DiffLayout {
+  match plan {
+    RootList(..) => WholeDocument
+    PerUnit(edits) => {
+      let sections : Array[DiffSection] = []
+      for edit in edits {
+        sections.push(
+          match edit {
+            Replace(old~, new~) =>
+              {
+                old: unit_line_range(Some(old)),
+                new: unit_line_range(Some(new)),
+              }
+            Delete(old) => { old: unit_line_range(Some(old)), new: None }
+            Insert(new) => { old: None, new: unit_line_range(Some(new)) }
+          },
+        )
+      }
+      TopLevelSections(sections)
+    }
+  }
+}
+
+///|
+fn ast_unit_document_with_budget(
+  old_unit : ImplUnit?,
+  new_unit : ImplUnit?,
+  context : Int,
+  graph_limit : UInt,
+  preserve_legacy_document : Bool,
+  budget : @computation.Budget,
+) -> @tokdiff.DiffDocument raise {
+  let old_source = source_slice(old_unit)
+  let new_source = source_slice(new_unit)
+  let old_offset = impl_line_base(old_unit) - 1
+  let new_offset = impl_line_base(new_unit) - 1
+  let lhs_roots : Array[@syntax.Syntax] = []
+  let rhs_roots : Array[@syntax.Syntax] = []
+  if old_unit is Some(unit) {
+    lhs_roots.push(unit.root)
+  }
+  if new_unit is Some(unit) {
+    rhs_roots.push(unit.root)
+  }
+  @syntax.init_all_info(lhs_roots, rhs_roots)
+  let change_map = @syntax.ChangeMap::new()
+  @diff.mark_syntax_roots_with_budget(
+    lhs_roots, rhs_roots, change_map, graph_limit, budget,
+  )
+  @diff.fix_all_sliders(lhs_roots, change_map)
+  @diff.fix_all_sliders(rhs_roots, change_map)
+  let lhs_positions = rebase_matched_positions(
+    @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
+    old_offset,
+    new_offset,
+  )
+  let rhs_positions = rebase_matched_positions(
+    @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
+    new_offset,
+    old_offset,
+  )
+  ast_document_from_positions(
+    old_source,
+    new_source,
+    lhs_positions,
+    rhs_positions,
+    context,
+    !preserve_legacy_document,
+    preserve_legacy_document,
+  ).rebase(old_offset, new_offset)
+}
+
+///|
+fn detailed_ast_edit_document(
+  old_unit : ImplUnit?,
+  new_unit : ImplUnit?,
+  context : Int,
+  graph_limit : UInt,
+  ignore_comments : Bool,
+  budget : @computation.Budget,
+) -> DetailedUnitResult {
+  let document = ast_unit_document_with_budget(
+    old_unit, new_unit, context, graph_limit, ignore_comments, budget,
+  ) catch {
+    @computation.LimitExceeded(stage~, limit~) => {
+      let reason = ComputationLimitExceeded(
+        stage=computation_stage(stage),
+        limit~,
+      )
+      return {
+        document: lexical_edit_document(
+          old_unit, new_unit, context, ignore_comments,
+        ),
+        fallback: Some(unit_fallback(reason, old_unit, new_unit)),
+        computation_exhausted: true,
+      }
+    }
+    _ => {
+      let reason = GraphLimitExceeded(limit=graph_limit)
+      return {
+        document: lexical_edit_document(
+          old_unit, new_unit, context, ignore_comments,
+        ),
+        fallback: Some(unit_fallback(reason, old_unit, new_unit)),
+        computation_exhausted: false,
+      }
+    }
+  }
+  { document, fallback: None, computation_exhausted: false }
+}
+
+///|
+fn lexical_detailed_unit(
+  old_unit : ImplUnit?,
+  new_unit : ImplUnit?,
+  context : Int,
+  ignore_comments : Bool,
+  reason : FallbackReason,
+) -> DetailedUnitResult {
+  {
+    document: lexical_edit_document(
+      old_unit, new_unit, context, ignore_comments,
+    ),
+    fallback: Some(unit_fallback(reason, old_unit, new_unit)),
+    computation_exhausted: true,
+  }
 }
 
 ///|
@@ -516,7 +878,7 @@ fn ast_edit_document(
   )
   {
     document: ast_document_from_positions(
-      old_source, new_source, lhs_positions, rhs_positions, context,
+      old_source, new_source, lhs_positions, rhs_positions, context, false, true,
     ).rebase(old_offset, new_offset),
     fallback_reason: None,
   }
@@ -555,6 +917,8 @@ fn ast_root_list_document(
     @syntax.change_positions(lhs_roots, change_map),
     @syntax.change_positions(rhs_roots, change_map),
     context,
+    false,
+    true,
   )
   {
     document,
@@ -563,6 +927,155 @@ fn ast_root_list_document(
     } else {
       Rendered
     },
+  }
+}
+
+///|
+fn ast_root_document_with_budget(
+  old_source : String,
+  new_source : String,
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  context : Int,
+  graph_limit : UInt,
+  preserve_legacy_document : Bool,
+  budget : @computation.Budget,
+) -> @tokdiff.DiffDocument raise {
+  let lhs_roots = impl_roots(old_units)
+  let rhs_roots = impl_roots(new_units)
+  @syntax.init_all_info(lhs_roots, rhs_roots)
+  let change_map = @syntax.ChangeMap::new()
+  @diff.mark_syntax_roots_with_budget(
+    lhs_roots, rhs_roots, change_map, graph_limit, budget,
+  )
+  @diff.fix_all_sliders(lhs_roots, change_map)
+  @diff.fix_all_sliders(rhs_roots, change_map)
+  ast_document_from_positions(
+    old_source,
+    new_source,
+    @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
+    @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
+    context,
+    !preserve_legacy_document,
+    preserve_legacy_document,
+  )
+}
+
+///|
+fn whole_file_fallback(
+  old_source : String,
+  new_source : String,
+  context : Int,
+  ignore_comments : Bool,
+  reason : FallbackReason,
+) -> DetailedDiffResult {
+  {
+    document: lexical_source_document(
+      old_source, new_source, context, ignore_comments,
+    ),
+    status: Changed,
+    fallbacks: [{ reason, scope: WholeFile }],
+  }
+}
+
+///|
+fn detailed_ast_root_list_document(
+  old_source : String,
+  new_source : String,
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  context : Int,
+  graph_limit : UInt,
+  ignore_comments : Bool,
+  budget : @computation.Budget,
+) -> DetailedDiffResult {
+  let document = ast_root_document_with_budget(
+    old_source, new_source, old_units, new_units, context, graph_limit, ignore_comments,
+    budget,
+  ) catch {
+    @computation.LimitExceeded(stage~, limit~) =>
+      return whole_file_fallback(
+        old_source,
+        new_source,
+        context,
+        ignore_comments,
+        ComputationLimitExceeded(stage=computation_stage(stage), limit~),
+      )
+    _ =>
+      return whole_file_fallback(
+        old_source,
+        new_source,
+        context,
+        ignore_comments,
+        GraphLimitExceeded(limit=graph_limit),
+      )
+  }
+  {
+    document,
+    status: if document.hunks.is_empty() {
+      NoStructuralChanges
+    } else {
+      Changed
+    },
+    fallbacks: [],
+  }
+}
+
+///|
+fn detailed_ast_plan_document(
+  plan : TopLevelPlan,
+  old_source : String,
+  new_source : String,
+  context : Int,
+  graph_limit : UInt,
+  ignore_comments : Bool,
+  budget : @computation.Budget,
+) -> DetailedDiffResult {
+  match plan {
+    RootList(old~, new~) =>
+      detailed_ast_root_list_document(
+        old_source, new_source, old, new, context, graph_limit, ignore_comments,
+        budget,
+      )
+    PerUnit(edits) => {
+      let hunks : Array[@tokdiff.DiffHunk] = []
+      let fallbacks : Array[FallbackInfo] = []
+      let exhausted_reason : Ref[FallbackReason?] = Ref(None)
+      for edit in edits {
+        let (old_unit, new_unit) = match edit {
+          Replace(old~, new~) => (Some(old), Some(new))
+          Delete(old) => (Some(old), None)
+          Insert(new) => (None, Some(new))
+        }
+        let result = match exhausted_reason.val {
+          Some(reason) =>
+            lexical_detailed_unit(
+              old_unit, new_unit, context, ignore_comments, reason,
+            )
+          None =>
+            detailed_ast_edit_document(
+              old_unit, new_unit, context, graph_limit, ignore_comments, budget,
+            )
+        }
+        append_document(hunks, result.document)
+        if result.fallback is Some(fallback) {
+          fallbacks.push(fallback)
+          if result.computation_exhausted && exhausted_reason.val is None {
+            exhausted_reason.val = Some(fallback.reason)
+          }
+        }
+      }
+      let document : @tokdiff.DiffDocument = { hunks, }
+      {
+        document,
+        status: if document.hunks.is_empty() {
+          NoStructuralChanges
+        } else {
+          Changed
+        },
+        fallbacks,
+      }
+    }
   }
 }
 
@@ -659,6 +1172,21 @@ fn parser_fallback_reason(
 }
 
 ///|
+fn parse_error_sides(
+  old_reports : ArrayView[@basic.Report],
+  new_reports : ArrayView[@basic.Report],
+) -> Array[DiffSide] {
+  let sides : Array[DiffSide] = []
+  if !old_reports.is_empty() {
+    sides.push(Old)
+  }
+  if !new_reports.is_empty() {
+    sides.push(New)
+  }
+  sides
+}
+
+///|
 fn initial_diff_document_result(
   old_source : String,
   new_source : String,
@@ -731,6 +1259,226 @@ fn diff_document_from_parsed_roots(
 }
 
 ///|
+fn calculate_diff_document_with_limit(
+  old_source : String,
+  new_source : String,
+  old_name : String,
+  new_name : String,
+  context : Int,
+  graph_limit : UInt,
+  ignore_comments : Bool,
+  computation_limit : UInt,
+) -> DiffCalculation {
+  let context = @cmp.maximum(context, 0)
+  if old_source == new_source {
+    return {
+      result: { document: empty_document(), status: Identical, fallbacks: [] },
+      layout: WholeDocument,
+      parser_reason: None,
+    }
+  }
+  let old_parse = @cst.parse_structure(old_source, name=old_name)
+  let new_parse = @cst.parse_structure(new_source, name=new_name)
+  let old_reports = old_parse.diagnostics_view()
+  let new_reports = new_parse.diagnostics_view()
+  let parser_reason = parser_fallback_reason(old_reports, new_reports)
+  let ignored_document = if ignore_comments {
+    Some(lexical_source_document(old_source, new_source, context, true))
+  } else {
+    None
+  }
+  if ignored_document is Some(document) && document.hunks.is_empty() {
+    return {
+      result: { document, status: IgnoredOnly, fallbacks: [] },
+      layout: WholeDocument,
+      parser_reason,
+    }
+  }
+  if parser_reason is Some(detail) {
+    return {
+      result: {
+        document: match ignored_document {
+          Some(document) => document
+          None =>
+            lexical_source_document(old_source, new_source, context, false)
+        },
+        status: Changed,
+        fallbacks: [
+          {
+            reason: ParseError(
+              sides=parse_error_sides(old_reports, new_reports),
+              detail~,
+            ),
+            scope: WholeFile,
+          },
+        ],
+      },
+      layout: WholeDocument,
+      parser_reason,
+    }
+  }
+  let old_units = collect_impl_units(old_source, old_parse.root())
+  let new_units = collect_impl_units(new_source, new_parse.root())
+  let budget = @computation.Budget::new(computation_limit)
+  let plan = top_level_plan_with_budget(
+    old_units,
+    new_units,
+    budget,
+    ignore_uuid=ignore_comments,
+  ) catch {
+    @computation.LimitExceeded(stage~, limit~) =>
+      return {
+        result: whole_file_fallback(
+          old_source,
+          new_source,
+          context,
+          ignore_comments,
+          ComputationLimitExceeded(stage=computation_stage(stage), limit~),
+        ),
+        layout: WholeDocument,
+        parser_reason,
+      }
+  }
+  let layout = layout_from_top_level_plan(plan)
+  let result = detailed_ast_plan_document(
+    plan, old_source, new_source, context, graph_limit, ignore_comments, budget,
+  )
+  let result = if ignore_comments {
+    let document = result.document.ignore_comments(
+      old=document_lines(old_source),
+      new=document_lines(new_source),
+    )
+    {
+      document,
+      status: if document.hunks.is_empty() && result.fallbacks.is_empty() {
+        NoStructuralChanges
+      } else {
+        result.status
+      },
+      fallbacks: result.fallbacks,
+    }
+  } else {
+    result
+  }
+  { result, layout, parser_reason }
+}
+
+///|
+/// Calculate the AST-first renderer-neutral diff, its presentation layout,
+/// and parser diagnostics from one parse and one top-level alignment plan.
+pub fn calculate_diff_document(
+  old_source : String,
+  new_source : String,
+  old_name? : String = "old",
+  new_name? : String = "new",
+  context? : Int = 3,
+  graph_limit? : UInt = 3_000_000,
+  ignore_comments? : Bool = false,
+) -> DiffCalculation {
+  calculate_diff_document_with_limit(
+    old_source,
+    new_source,
+    old_name,
+    new_name,
+    context,
+    graph_limit,
+    ignore_comments,
+    @computation.default_limit(),
+  )
+}
+
+///|
+/// Calculate the AST-first renderer-neutral diff and typed fallback metadata.
+/// The computation limit is deliberately fixed as an implementation detail.
+pub fn diff_document_detailed(
+  old_source : String,
+  new_source : String,
+  context? : Int = 3,
+  graph_limit? : UInt = 3_000_000,
+  ignore_comments? : Bool = false,
+) -> DetailedDiffResult {
+  calculate_diff_document(
+    old_source,
+    new_source,
+    context~,
+    graph_limit~,
+    ignore_comments~,
+  ).result
+}
+
+///|
+fn computation_stage_text(stage : ComputationStage) -> String {
+  match stage {
+    TopLevelAlignment => "top-level alignment"
+    SyntaxMatching => "syntax matching"
+    IntralineMatching => "intraline matching"
+  }
+}
+
+///|
+fn scope_location(scope : FallbackScope) -> String {
+  match scope {
+    WholeFile => ""
+    Region(old~, new~) => {
+      let parts : Array[String] = []
+      if old is Some(range) {
+        parts.push("old line \{range.start + 1}")
+      }
+      if new is Some(range) {
+        parts.push("new line \{range.start + 1}")
+      }
+      if parts.is_empty() {
+        "file"
+      } else {
+        parts.join(", ")
+      }
+    }
+  }
+}
+
+///|
+fn fallback_reason_text(fallback : FallbackInfo) -> String {
+  match fallback.reason {
+    ParseError(detail~, ..) => detail
+    GraphLimitExceeded(limit~) => {
+      let base = "graph limit exceeded (\{limit})"
+      let location = scope_location(fallback.scope)
+      if location.is_empty() {
+        base
+      } else {
+        "\{base} at \{location}"
+      }
+    }
+    ComputationLimitExceeded(stage~, limit~) => {
+      let base = "computation limit exceeded (\{limit}) during \{computation_stage_text(stage)}"
+      let location = scope_location(fallback.scope)
+      if location.is_empty() {
+        base
+      } else {
+        "\{base} at \{location}"
+      }
+    }
+  }
+}
+
+///|
+fn detailed_compat_result(result : DetailedDiffResult) -> AlignedDiffResult {
+  let outcome = if result.fallbacks.is_empty() {
+    match result.status {
+      Identical | NoStructuralChanges => AlignedDiffOutcome::NoStructuralChanges
+      IgnoredOnly => AlignedDiffOutcome::NoNonCommentChanges
+      Changed => AlignedDiffOutcome::Rendered
+    }
+  } else if result.fallbacks.length() == 1 &&
+    result.fallbacks[0].scope is WholeFile {
+    Fallback(fallback_reason_text(result.fallbacks[0]))
+  } else {
+    PartialFallback(result.fallbacks.map(fallback_reason_text))
+  }
+  { document: result.document, outcome }
+}
+
+///|
 /// Calculate a MoonBit-aware renderer-neutral diff using the same top-level
 /// alignment plan as the terminal AST renderer.
 pub fn diff_document(
@@ -741,6 +1489,17 @@ pub fn diff_document(
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
 ) -> AlignedDiffResult {
+  if mode is Ast {
+    return detailed_compat_result(
+      diff_document_detailed(
+        old_source,
+        new_source,
+        context~,
+        graph_limit~,
+        ignore_comments~,
+      ),
+    )
+  }
   let context = @cmp.maximum(context, 0)
   if initial_diff_document_result(
       old_source, new_source, mode, context, ignore_comments,

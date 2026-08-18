@@ -4,11 +4,16 @@ package "moonbit-community/moondiff/tool/alignment"
 import {
   "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tool/render",
+  "moonbitlang/core/debug",
   "moonbitlang/parser/untyped_cst",
 }
 
 // Values
+pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> DiffCalculation
+
 pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> AlignedDiffResult
+
+pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> DetailedDiffResult
 
 pub fn render_aligned_cst_diffs(String, String, @untyped_cst.CstNode, String, String, @untyped_cst.CstNode, UInt, @render.RenderOptions, ignore_comments? : Bool) -> String
 
@@ -32,6 +37,67 @@ pub(all) struct AlignedDiffResult {
   document : @tokdiff.DiffDocument
   outcome : AlignedDiffOutcome
 } derive(Eq)
+
+pub(all) enum ComputationStage {
+  TopLevelAlignment
+  SyntaxMatching
+  IntralineMatching
+} derive(Eq, @debug.Debug)
+
+pub(all) struct DetailedDiffResult {
+  document : @tokdiff.DiffDocument
+  status : DiffStatus
+  fallbacks : Array[FallbackInfo]
+} derive(Eq)
+
+pub(all) struct DiffCalculation {
+  result : DetailedDiffResult
+  layout : DiffLayout
+  parser_reason : String?
+}
+
+pub(all) enum DiffLayout {
+  WholeDocument
+  TopLevelSections(Array[DiffSection])
+} derive(Eq)
+
+pub(all) struct DiffSection {
+  old : LineRange?
+  new : LineRange?
+} derive(Eq)
+
+pub(all) enum DiffSide {
+  Old
+  New
+} derive(Eq, @debug.Debug)
+
+pub(all) enum DiffStatus {
+  Identical
+  Changed
+  NoStructuralChanges
+  IgnoredOnly
+} derive(Eq, @debug.Debug)
+
+pub(all) struct FallbackInfo {
+  reason : FallbackReason
+  scope : FallbackScope
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FallbackReason {
+  ParseError(sides~ : Array[DiffSide], detail~ : String)
+  GraphLimitExceeded(limit~ : UInt)
+  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FallbackScope {
+  WholeFile
+  Region(old~ : LineRange?, new~ : LineRange?)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct LineRange {
+  start : Int
+  len : Int
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 
