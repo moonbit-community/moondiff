@@ -66,9 +66,8 @@ pub(all) enum DiffBlock {
 
 ///|
 /// One grouped diff hunk. Starts are zero-based cursors and lengths are source
-/// line counts. `header` preserves the canonical core-diff range spelling.
+/// line counts. Renderers derive display headers from these numeric ranges.
 pub(all) struct DiffHunk {
-  header : String
   old_start : Int
   old_len : Int
   new_start : Int
@@ -81,27 +80,6 @@ pub(all) struct DiffHunk {
 pub(all) struct DiffDocument {
   hunks : Array[DiffHunk]
 } derive(Eq)
-
-///|
-fn rebased_range_text(start : Int, len : Int) -> String {
-  if len == 1 {
-    (start + 1).to_string()
-  } else if len == 0 {
-    "\{start},0"
-  } else {
-    "\{start + 1},\{len}"
-  }
-}
-
-///|
-fn rebased_hunk_header(
-  old_start : Int,
-  old_len : Int,
-  new_start : Int,
-  new_len : Int,
-) -> String {
-  "@@ -\{rebased_range_text(old_start, old_len)} +\{rebased_range_text(new_start, new_len)} @@"
-}
 
 ///|
 fn DiffLine::rebase_index(self : DiffLine, offset : Int) -> DiffLine {
@@ -152,8 +130,8 @@ fn DiffBlock::rebase_indexes(
 
 ///|
 /// Return a new document whose zero-based source indexes are shifted by the
-/// supplied offsets. Hunk ranges, canonical headers, context indexes, and
-/// changed-line indexes are rebased together.
+/// supplied offsets. Hunk ranges, context indexes, and changed-line indexes
+/// are rebased together.
 pub fn DiffDocument::rebase(
   self : DiffDocument,
   old_line_offset : Int,
@@ -168,12 +146,6 @@ pub fn DiffDocument::rebase(
       blocks.push(block.rebase_indexes(old_line_offset, new_line_offset))
     }
     hunks.push({
-      header: rebased_hunk_header(
-        old_start,
-        hunk.old_len,
-        new_start,
-        hunk.new_len,
-      ),
       old_start,
       old_len: hunk.old_len,
       new_start,
@@ -526,7 +498,7 @@ fn semantic_hunk(hunk : @diff.Hunk[ComparableLine]) -> DiffHunk {
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { header: hunk.header(), old_start, old_len, new_start, new_len, blocks }
+  { old_start, old_len, new_start, new_len, blocks }
 }
 
 ///|
@@ -598,7 +570,7 @@ fn plain_hunk(hunk : @diff.Hunk[String]) -> DiffHunk {
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { header: hunk.header(), old_start, old_len, new_start, new_len, blocks }
+  { old_start, old_len, new_start, new_len, blocks }
 }
 
 ///|
@@ -1100,14 +1072,7 @@ fn comment_hunk(
   )
   let old_len = old_end - old_start
   let new_len = new_end - new_start
-  {
-    header: rebased_hunk_header(old_start, old_len, new_start, new_len),
-    old_start,
-    old_len,
-    new_start,
-    new_len,
-    blocks,
-  }
+  { old_start, old_len, new_start, new_len, blocks }
 }
 
 ///|
@@ -1194,7 +1159,13 @@ pub fn line_diff(
   context? : Int = 3,
 ) -> DiffDocument {
   let hunks : Array[DiffHunk] = []
-  for hunk in @diff.Diff(old~, new~, algorithm=Patience).group(context~) {
+  for
+    hunk in @diff.Diff(
+      old~,
+      new~,
+      cutoff=CORE_LINE_DIFF_CUTOFF,
+      algorithm=Patience,
+    ).group(context~) {
     hunks.push(plain_hunk(hunk))
   }
   { hunks, }

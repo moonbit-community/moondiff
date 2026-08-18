@@ -12,6 +12,8 @@ pub fn render_ast_diff(String, String, String, String, ArrayView[@syntax.Matched
 
 pub fn render_diff_document(String, String, @tokdiff.DiffDocument, RenderOptions) -> String
 
+pub fn render_diff_document_with_max_lines(String, String, @tokdiff.DiffDocument, RenderOptions, Int, Int) -> String
+
 pub fn render_file_headers(String, String, Bool) -> String
 
 pub fn render_line_diff(String, String, String, String, @hashmap.HashMap[Int, Array[(Int, Int)]]?, @hashmap.HashMap[Int, Array[(Int, Int)]]?, RenderOptions, old_line_base? : Int, new_line_base? : Int) -> String

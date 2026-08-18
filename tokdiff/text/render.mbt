@@ -39,7 +39,8 @@ fn append_ignored_row(buf : StringBuilder, row : @tokdiff.DiffRow) -> Unit {
 ///|
 fn render_hunk(hunk : @tokdiff.DiffHunk) -> String {
   let buf = StringBuilder::new()
-  buf <+ "\{hunk.header}\n"
+  buf <+
+    "\{@common.hunk_header(hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len)}\n"
   for block in hunk.blocks {
     match block {
       ContextBlock(lines) =>

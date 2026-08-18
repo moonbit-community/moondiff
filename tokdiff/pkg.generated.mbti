@@ -32,7 +32,6 @@ pub fn DiffDocument::ignore_comments(Self, old~ : ArrayView[String], new~ : Arra
 pub fn DiffDocument::rebase(Self, Int, Int) -> Self
 
 pub(all) struct DiffHunk {
-  header : String
   old_start : Int
   old_len : Int
   new_start : Int

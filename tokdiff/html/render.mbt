@@ -140,12 +140,18 @@ fn append_split_hunk(
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
 ) -> Unit {
+  let header = @common.hunk_header(
+    hunk.old_start,
+    hunk.old_len,
+    hunk.new_start,
+    hunk.new_len,
+  )
   if line_numbers {
     buf <+
-      "<tr><td class=\"hunk-header\" colspan=\"4\">\{esc(hunk.header)}</td></tr>\n"
+      "<tr><td class=\"hunk-header\" colspan=\"4\">\{esc(header)}</td></tr>\n"
   } else {
     buf <+
-      "<tr><td class=\"hunk-header\" colspan=\"2\">\{esc(hunk.header)}</td></tr>\n"
+      "<tr><td class=\"hunk-header\" colspan=\"2\">\{esc(header)}</td></tr>\n"
   }
   if hunk_note_at(hunk_notes, hunk_index) is Some(note) {
     table_hunk_note(buf, note, if line_numbers { 4 } else { 2 })
@@ -395,11 +401,17 @@ fn append_unified_hunk(
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
 ) -> Unit {
+  let header = @common.hunk_header(
+    hunk.old_start,
+    hunk.old_len,
+    hunk.new_start,
+    hunk.new_len,
+  )
   if line_numbers {
     buf <+
-      "<tr><td class=\"hunk-header\" colspan=\"3\">\{esc(hunk.header)}</td></tr>\n"
+      "<tr><td class=\"hunk-header\" colspan=\"3\">\{esc(header)}</td></tr>\n"
   } else {
-    buf <+ "<span class=\"hunk-header\">\{esc(hunk.header)}</span>\n"
+    buf <+ "<span class=\"hunk-header\">\{esc(header)}</span>\n"
   }
   if hunk_note_at(hunk_notes, hunk_index) is Some(note) {
     if line_numbers {

@@ -6,7 +6,6 @@ test "public IR retains hunk ranges, block boundaries, and source text" {
     context=1,
   )
   guard document.hunks is [hunk] else { fail("expected one hunk") }
-  assert_eq(hunk.header, "@@ -1,3 +1,3 @@")
   assert_eq(
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
     (0, 3, 0, 3),
@@ -41,7 +40,6 @@ test "public IR retains hunk ranges, block boundaries, and source text" {
 test "public IR distinguishes blank inserted lines from a missing old side" {
   let document = @tokdiff.line_diff(old=[], new=["x", ""], context=0)
   guard document.hunks is [hunk] else { fail("expected one insertion hunk") }
-  assert_eq(hunk.header, "@@ -0,0 +1,2 @@")
   assert_eq(
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
     (0, 0, 0, 2),
@@ -95,7 +93,7 @@ test "calculation IR retains raw text without renderer markup or escaping" {
 }
 
 ///|
-test "DiffDocument rebase updates headers ranges context and changed indexes" {
+test "DiffDocument rebase updates ranges context and changed indexes" {
   let original = @tokdiff.diff(
     old=["before", "let old = 1", "after"],
     new=["before", "let new = 2", "after"],
@@ -103,7 +101,6 @@ test "DiffDocument rebase updates headers ranges context and changed indexes" {
   )
   let rebased = original.rebase(10, 20)
   guard rebased.hunks is [hunk] else { fail("expected one rebased hunk") }
-  assert_eq(hunk.header, "@@ -11,3 +21,3 @@")
   assert_eq(
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
     (10, 3, 20, 3),
@@ -126,7 +123,6 @@ test "DiffDocument rebase updates headers ranges context and changed indexes" {
   guard insertion.hunks is [insert_hunk] else {
     fail("expected one insertion hunk")
   }
-  assert_eq(insert_hunk.header, "@@ -7,0 +13 @@")
   guard insert_hunk.blocks is [ChangeBlock([NewOnly(inserted)])] else {
     fail("expected one inserted line")
   }

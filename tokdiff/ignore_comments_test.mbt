@@ -122,7 +122,6 @@ test "ignored comment lines do not split code hunks" {
           IgnoredBlock([Paired(old_comment, new_comment)]),
           ChangeBlock([Paired(_, _)]),
         ],
-        ..,
       },
     ] else {
     fail("expected one code-driven hunk with neutral comment context")
@@ -194,7 +193,6 @@ test "blank lines beside code changes are neutral source-faithful context" {
           ChangeBlock([Paired(_, _)]),
           IgnoredBlock([Paired(old_empty, new_spaces), OldOnly(old_tab)]),
         ],
-        ..,
       },
     ] else {
     fail("expected changed code followed by neutral blank-line context")

@@ -5,6 +5,12 @@
 // group/hunk the intended script without accidentally matching duplicate text.
 
 ///|
+// Keep the core line-diff budget stable across core-library releases. Beyond
+// this edit distance the core implementation remains correct and deliberately
+// uses its conservative heuristic result.
+const CORE_LINE_DIFF_CUTOFF : Int = 4_096
+
+///|
 priv struct ComparableLine {
   text : String
   key : (Int, Int)
@@ -123,7 +129,12 @@ fn cleaned_diff_lines(
   for i, text in new {
     new_lines.push({ text, key: (1, i) })
   }
-  let raw = @diff.Diff(old~, new~, algorithm=Patience)
+  let raw = @diff.Diff(
+    old~,
+    new~,
+    cutoff=CORE_LINE_DIFF_CUTOFF,
+    algorithm=Patience,
+  )
   let edits = raw.edits()
   let soft = soft_equal_edits(edits, old, new)
   let mut next_anchor = 0
@@ -197,8 +208,17 @@ fn rendering_diff(
 ) -> @diff.Diff[ComparableLine] {
   if line_cleanup {
     let (old_lines, new_lines) = cleaned_diff_lines(old, new)
-    Diff(old=old_lines, new=new_lines, algorithm=Patience)
+    Diff(
+      old=old_lines,
+      new=new_lines,
+      cutoff=CORE_LINE_DIFF_CUTOFF,
+      algorithm=Patience,
+    )
   } else {
-    Diff(old=original_diff_lines(old), new=original_diff_lines(new))
+    Diff(
+      old=original_diff_lines(old),
+      new=original_diff_lines(new),
+      cutoff=CORE_LINE_DIFF_CUTOFF,
+    )
   }
 }

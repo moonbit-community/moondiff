@@ -744,14 +744,12 @@ test "lexical aligned documents preserve original line numbers" {
   assert_true(result.document.hunks.length() >= 2)
   let changed = result.document.hunks[0]
   @debug.assert_eq((changed.old_start, changed.new_start), (2, 3))
-  @debug.assert_eq(changed.header, "@@ -3 +4 @@")
 
   let ast_result = diff_document(old_source, new_source, Ast, context=0)
   assert_true(ast_result.outcome is Rendered)
   assert_true(ast_result.document.hunks.length() >= 2)
   let ast_changed = ast_result.document.hunks[0]
   @debug.assert_eq((ast_changed.old_start, ast_changed.new_start), (1, 2))
-  @debug.assert_eq(ast_changed.header, "@@ -2,3 +3,3 @@")
 }
 
 ///|
