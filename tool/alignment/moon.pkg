@@ -9,7 +9,6 @@ import {
   "moonbit-community/moondiff/span",
   "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tool/hunks",
-  "moonbit-community/moondiff/tool/render",
   "moonbit-community/moondiff/internal/source_text",
   "moonbit-community/moondiff/internal/computation",
 }

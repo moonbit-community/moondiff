@@ -1,6 +1,5 @@
 import {
-  "moonbitlang/lexer/basic",
-  "moonbitlang/parser/untyped_cst" @cst,
+  "moonbitlang/core/cmp",
   "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tool/alignment",
   "moonbit-community/moondiff/tool/render",
