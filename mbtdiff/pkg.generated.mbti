@@ -1,0 +1,56 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/mbtdiff"
+
+import {
+  "moonbit-community/moondiff/tokdiff",
+  "moonbit-community/moondiff/tool/alignment",
+}
+
+// Values
+pub fn diff(String, String, options? : DiffOptions) -> DiffResult
+
+// Errors
+
+// Types and methods
+type DiffOptions
+pub fn DiffOptions::new(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> Self
+pub impl Default for DiffOptions
+
+type DiffResult
+pub fn DiffResult::document(Self) -> @tokdiff.DiffDocument
+pub fn DiffResult::fallbacks(Self) -> Array[@alignment.FallbackInfo]
+pub fn DiffResult::has_fallback(Self) -> Bool
+pub fn DiffResult::status(Self) -> @alignment.DiffStatus
+
+// Type aliases
+pub using @alignment {type ComputationStage}
+
+pub using @tokdiff {type ContextLine}
+
+pub using @tokdiff {type DiffBlock}
+
+pub using @tokdiff {type DiffDocument}
+
+pub using @tokdiff {type DiffHunk}
+
+pub using @tokdiff {type DiffLine}
+
+pub using @tokdiff {type DiffRow}
+
+pub using @tokdiff {type DiffSegment}
+
+pub using @tokdiff {type DiffSegmentKind}
+
+pub using @alignment {type DiffSide}
+
+pub using @alignment {type DiffStatus}
+
+pub using @alignment {type FallbackInfo}
+
+pub using @alignment {type FallbackReason}
+
+pub using @alignment {type FallbackScope}
+
+pub using @alignment {type LineRange}
+
+// Traits

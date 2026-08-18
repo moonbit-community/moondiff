@@ -30,6 +30,12 @@
   - [ ] Apply the two-state limit only when no exact parent-stack state exists.
   - [ ] Add a regression test covering reuse of the first state after two states have been stored for the same graph key.
 
+- [ ] Make the `mbtdiff.DiffResult` ownership and mutability contract explicit.
+  - Affected areas: `mbtdiff/types.mbt` and `tokdiff/model.mbt`.
+  - [ ] Decide whether returned documents and fallback metadata are immutable views or independently mutable snapshots.
+  - [ ] If the result is immutable, avoid exposing shared mutable arrays through `document()` and deep-copy nested arrays such as `ParseError.sides` in `fallbacks()`.
+  - [ ] Add a consumer regression test that mutates an accessor result and verifies that later accessor calls cannot observe unintended changes.
+
 ## Testing and Engineering
 
 - [ ] Prevent the pre-commit script from staging changes that were originally unstaged.
