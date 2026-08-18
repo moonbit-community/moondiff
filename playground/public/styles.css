@@ -1381,6 +1381,270 @@ button.copy-button.copied {
   font-weight: inherit;
 }
 
+.review-gutter {
+  position: relative;
+}
+
+.line-comment-button {
+  position: absolute;
+  inset: 0.08rem auto auto 0.12rem;
+  display: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 0;
+  border-radius: 0.22rem;
+  padding: 0;
+  color: #fff;
+  background: #0969da;
+  font: 700 0.8rem/1.15rem -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-align: center;
+  cursor: pointer;
+}
+
+.review-gutter:hover .line-comment-button,
+.line-comment-button:focus-visible {
+  display: block;
+}
+
+.extension-panel .line-comment-button {
+  display: block;
+}
+
+.review-gutter:hover .line-number-value {
+  opacity: 0;
+}
+
+.diff-scroll .inline-comment-editor-row > td {
+  width: auto;
+  max-width: none;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 0.75rem;
+  white-space: normal;
+  background: var(--surface-subtle);
+}
+
+.comment-editor {
+  display: grid;
+  gap: 0.55rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+.comment-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.62rem 0.68rem;
+  color: var(--foreground);
+  background: var(--surface);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.comment-textarea:focus {
+  border-color: #0969da;
+  outline: 2px solid color-mix(in srgb, #0969da 22%, transparent);
+}
+
+.comment-editor-actions,
+.auth-controls,
+.comments-toolbar > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.48rem;
+}
+
+.comment-submit {
+  border: 1px solid #1f883d;
+  border-radius: 0.42rem;
+  padding: 0.46rem 0.72rem;
+  color: #fff;
+  background: #1f883d;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.comment-submit:disabled {
+  cursor: default;
+  opacity: 0.56;
+}
+
+.comment-error {
+  margin: 0;
+  color: var(--red);
+  white-space: normal;
+}
+
+.comments-overview,
+.file-discussions {
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: var(--surface);
+}
+
+.comments-overview {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.comments-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.comments-toolbar h2,
+.file-discussions h3 {
+  margin: 0;
+}
+
+.auth-status,
+.auth-controls,
+.comments-loading,
+.outdated-discussions > p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.device-authorization {
+  display: grid;
+  width: min(100%, 28rem);
+  gap: 0.55rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.62rem;
+  padding: 0.72rem;
+  color: var(--foreground);
+  background: var(--surface-subtle);
+  text-align: left;
+}
+
+.device-authorization > p {
+  margin: 0;
+}
+
+.device-code-row,
+.device-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.device-user-code {
+  border: 1px solid var(--border);
+  border-radius: 0.42rem;
+  padding: 0.48rem 0.62rem;
+  background: var(--surface);
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+
+.device-code-copy.copied {
+  border-color: #1f883d;
+  color: #1a7f37;
+}
+
+.device-auth-actions {
+  justify-content: space-between;
+}
+
+.device-auth-hint {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.overall-comments,
+.active-discussions,
+.outdated-discussions,
+.review-thread {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.github-comment {
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.55rem;
+  background: var(--surface);
+}
+
+.github-comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem 0.7rem;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 0.45rem 0.58rem;
+  color: var(--muted);
+  background: var(--surface-subtle);
+  font-size: 0.7rem;
+}
+
+.github-comment-meta a {
+  margin-left: auto;
+}
+
+.github-comment-body {
+  margin: 0;
+  padding: 0.68rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.review-thread .github-comment + .github-comment {
+  margin-left: 0.8rem;
+}
+
+.comment-reply-button {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  color: #0969da;
+  background: transparent;
+  cursor: pointer;
+}
+
+.outdated-discussions {
+  border-top: 1px dashed var(--border);
+  margin-top: 0.25rem;
+  padding-top: 0.7rem;
+  opacity: 0.84;
+}
+
+.file-discussions:empty {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .shell {
+    width: calc(100% - 1rem);
+  }
+
+  .hero-workspace,
+  .commit-title,
+  .comments-toolbar {
+    align-items: stretch;
+  }
+
+  .diff-scroll table.split {
+    min-width: 48rem;
+  }
+
+  .diff-scroll table.unified {
+    min-width: 34rem;
+  }
+}
+
 footer {
   width: 100%;
   padding: 1.5rem 0 0.35rem;

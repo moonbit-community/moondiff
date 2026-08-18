@@ -2,6 +2,7 @@
 priv enum ChangeTarget {
   Commit(String)
   PullRequest(String)
+  PullCommit(String, String)
 } derive(Eq)
 
 ///|
@@ -19,6 +20,16 @@ fn commit_reference(owner : String, repo : String, sha : String) -> CommitRef {
 ///|
 fn pull_reference(owner : String, repo : String, number : String) -> CommitRef {
   { owner, repo, target: PullRequest(number) }
+}
+
+///|
+fn pull_commit_reference(
+  owner : String,
+  repo : String,
+  number : String,
+  sha : String,
+) -> CommitRef {
+  { owner, repo, target: PullCommit(number, sha) }
 }
 
 ///|
@@ -104,13 +115,16 @@ fn parse_change_url(input : String) -> Result[CommitRef, String] {
       }
       commit_reference(owner, repo, sha)
     }
-    [owner, repo, "pull", number] | [owner, repo, "pull", number, "files"] => {
+    [owner, repo, "pull", number]
+    | [owner, repo, "pull", number, "files"]
+    | [owner, repo, "pull", number, "commits"] => {
       if !valid_pull_number(number) {
         return Err("The pull request number is invalid.")
       }
       pull_reference(owner, repo, number)
     }
-    [owner, repo, "pull", number, "changes", sha] => {
+    [owner, repo, "pull", number, "changes", sha]
+    | [owner, repo, "pull", number, "commits", sha] => {
       if !valid_pull_number(number) {
         return Err("The pull request number is invalid.")
       }
@@ -119,11 +133,11 @@ fn parse_change_url(input : String) -> Result[CommitRef, String] {
           "The commit SHA must contain 7 to 64 hexadecimal characters.",
         )
       }
-      commit_reference(owner, repo, sha)
+      pull_commit_reference(owner, repo, number, sha)
     }
     _ =>
       return Err(
-        "Use a GitHub /commit/{sha}, /pull/{number}, or /pull/{number}/files URL.",
+        "Use a GitHub /commit/{sha}, /pull/{number}, or /pull/{number}/commits/{sha} URL.",
       )
   }
   if !valid_owner(reference.owner) || !valid_repo(reference.repo) {
@@ -133,18 +147,26 @@ fn parse_change_url(input : String) -> Result[CommitRef, String] {
 }
 
 ///|
+#warnings("-unused_value")
 fn commit_api_url(reference : CommitRef, page : Int) -> String {
-  guard reference.target is Commit(sha) else { return "" }
+  let sha = match reference.target {
+    Commit(sha) | PullCommit(_, sha) => sha
+    PullRequest(_) => return ""
+  }
   "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/commits/\{sha}?per_page=100&page=\{page}"
 }
 
 ///|
 fn pull_api_url(reference : CommitRef) -> String {
-  guard reference.target is PullRequest(number) else { return "" }
+  let number = match reference.target {
+    PullRequest(number) | PullCommit(number, _) => number
+    Commit(_) => return ""
+  }
   "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/pulls/\{number}"
 }
 
 ///|
+#warnings("-unused_value")
 fn compare_api_url(
   reference : CommitRef,
   base_sha : String,
@@ -155,6 +177,7 @@ fn compare_api_url(
 }
 
 ///|
+#warnings("-unused_value")
 fn pull_files_api_url(reference : CommitRef, page : Int) -> String {
   "\{pull_api_url(reference)}/files?per_page=100&page=\{page}"
 }

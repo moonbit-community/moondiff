@@ -284,6 +284,7 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
       let source_label = match commit.reference.target {
         Commit(_) => "Open commit on GitHub"
         PullRequest(_) => "Open pull request on GitHub"
+        PullCommit(_, _) => "Open pull request commit on GitHub"
       }
       @html.nav(
         class="workspace-actions",
@@ -371,7 +372,6 @@ fn diff_notice(outcome : @alignment.AlignedDiffOutcome) -> DiffNotice? {
 }
 
 ///|
-#warnings("-alert_xss_vulnerable")
 fn file_diff_view(
   file : FileState,
   generation : Int,
@@ -379,6 +379,7 @@ fn file_diff_view(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let problem = if source_problem(file.old_side) is Some(message) {
@@ -426,14 +427,6 @@ fn file_diff_view(
           ),
         ])
       }
-      let rendered = match mode {
-        Split =>
-          @tokdiff_html.render_side_by_side(result.document, line_numbers=true)
-        Unified =>
-          @tokdiff_html.render_unified(result.document, line_numbers=true)
-      }
-      // `rendered` is the only raw HTML accepted by the application. tokdiff
-      // has already escaped every source line and hunk header.
       @html.fragment([
         if diff_notice(result.outcome) is Some(notice) {
           @html.div(class=notice.class_name, [
@@ -443,11 +436,7 @@ fn file_diff_view(
         } else {
           @html.nothing
         },
-        @html.div(
-          class="diff-scroll",
-          attrs=@html.Attrs::build().inner_html(rendered),
-          ([] : Array[@rabbita.Html]),
-        ),
+        safe_review_diff(file.file, index, result.document, mode, review, emit),
       ])
     }
     (Loading, _) | (_, Loading) =>
@@ -464,6 +453,7 @@ fn file_card(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let toggle_label = if file.expanded { "Collapse" } else { "Expand" }
@@ -495,7 +485,7 @@ fn file_card(
       ]),
       if file.expanded {
         file_diff_view(
-          file, generation, index, mode, algorithm, ignore_comments, emit,
+          file, generation, index, mode, algorithm, ignore_comments, review, emit,
         )
       } else {
         @html.nothing
@@ -526,9 +516,11 @@ fn file_list_view(
         model.view_mode,
         model.diff_algorithm,
         model.ignore_comments,
+        model.review,
         emit,
       ),
     )
+    file_views.push(file_discussions_view(commit, index, model.review, emit))
   }
   @html.div(class="file-list", file_views)
 }
@@ -811,15 +803,22 @@ fn change_view(
   model : Model,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  let section_label = match commit.reference.target {
-    Commit(_) => "Public commit"
-    PullRequest(_) => "Public pull request"
+  let section_label = match
+    (extension_host_enabled(), commit.reference.target) {
+    (true, Commit(_)) => "GitHub commit"
+    (true, PullRequest(_)) => "GitHub pull request"
+    (true, PullCommit(_, _)) => "GitHub pull request commit"
+    (false, Commit(_)) => "Public commit"
+    (false, PullRequest(_)) => "Public pull request"
+    (false, PullCommit(_, _)) => "Public pull request commit"
   }
   let identity = match commit.reference.target {
     Commit(_) =>
       "\{commit.reference.owner}/\{commit.reference.repo}@\{commit.sha}"
     PullRequest(number) =>
       "\{commit.reference.owner}/\{commit.reference.repo}#\{number}"
+    PullCommit(number, _) =>
+      "\{commit.reference.owner}/\{commit.reference.repo}#\{number}@\{commit.sha}"
   }
   let comparison = match commit.reference.target {
     Commit(_) =>
@@ -833,6 +832,12 @@ fn change_view(
         "Compared merge base \{parent} with head \{commit.sha}."
       } else {
         "Compared the pull request base with head \{commit.sha}."
+      }
+    PullCommit(_, _) =>
+      if commit.parent_sha is Some(parent) {
+        "Compared PR commit \{commit.sha} with first parent \{parent}."
+      } else {
+        "PR root commit; compared with an empty tree."
       }
   }
   @html.section(class="results", [
@@ -851,6 +856,7 @@ fn change_view(
         @html.pre(class="commit-message", commit.message),
       ]),
     ]),
+    comments_overview(commit, model.review, emit),
     analysis_overview(
       commit,
       model.view_mode,
@@ -882,6 +888,11 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
         @html.span(class="spinner", ""),
         @html.span("Loading pull request metadata…"),
       ])
+    LoadingPullCommitMetadata(..) =>
+      @html.div(class="empty-state loading", [
+        @html.span(class="spinner", ""),
+        @html.span("Loading pull request commit metadata…"),
+      ])
     LoadingPullSnapshot(page~, ..) =>
       @html.div(class="empty-state loading", [
         @html.span(class="spinner", ""),
@@ -901,6 +912,11 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
     LoadFailed(message) =>
       @html.div(class="empty-state error", [
         @html.p(message),
+        if extension_host_enabled() {
+          auth_controls(model.review, emit)
+        } else {
+          @html.nothing
+        },
         @html.button(
           type_="button",
           class="secondary",

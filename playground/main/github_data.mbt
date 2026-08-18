@@ -23,6 +23,7 @@ priv struct ApiFile {
   additions : Int
   deletions : Int
   changes : Int
+  patch : String?
 } derive(Eq, FromJson)
 
 ///|
@@ -36,8 +37,14 @@ priv struct ApiCommit {
 } derive(Eq, FromJson)
 
 ///|
+priv struct ApiRepository {
+  full_name : String
+} derive(Eq, FromJson)
+
+///|
 priv struct ApiPullBranch {
   sha : String
+  repo : ApiRepository?
 } derive(Eq, FromJson)
 
 ///|
@@ -165,6 +172,8 @@ fn pull_merge_base(compare : ApiCompare) -> String {
 fn same_pull_snapshot(initial : ApiPull, verified : ApiPull) -> Bool {
   initial.base.sha == verified.base.sha &&
   initial.head.sha == verified.head.sha &&
+  initial.base.repo == verified.base.repo &&
+  initial.head.repo == verified.head.repo &&
   initial.changed_files == verified.changed_files
 }
 
@@ -207,35 +216,166 @@ fn percent_encode_path(path : String) -> String {
 }
 
 ///|
+priv struct RepositoryRef {
+  owner : String
+  repo : String
+} derive(Eq)
+
+///|
+priv struct Revision {
+  repository : RepositoryRef
+  sha : String
+} derive(Eq)
+
+///|
+fn reference_repository(reference : CommitRef) -> RepositoryRef {
+  { owner: reference.owner, repo: reference.repo }
+}
+
+///|
+fn repository_from_full_name(full_name : String) -> RepositoryRef? {
+  match full_name.split("/").map(StringView::to_owned).collect() {
+    [owner, repo] if valid_owner(owner) && valid_repo(repo) =>
+      Some({ owner, repo })
+    _ => None
+  }
+}
+
+///|
+fn branch_repository(
+  branch : ApiPullBranch,
+  fallback : RepositoryRef,
+) -> RepositoryRef {
+  match branch.repo {
+    Some(repository) =>
+      repository_from_full_name(repository.full_name).unwrap_or(fallback)
+    None => fallback
+  }
+}
+
+///|
+fn commit_revisions(
+  reference : CommitRef,
+  sha : String,
+  parent_sha : String?,
+) -> (Revision?, Revision) {
+  let repository = reference_repository(reference)
+  (parent_sha.map(parent => { repository, sha: parent }), { repository, sha })
+}
+
+///|
+fn repository_commit_revisions(
+  repository : RepositoryRef,
+  sha : String,
+  parent_sha : String?,
+) -> (Revision?, Revision) {
+  (parent_sha.map(parent => { repository, sha: parent }), { repository, sha })
+}
+
+///|
+fn pull_revisions(
+  reference : CommitRef,
+  pull : ApiPull,
+  compare : ApiCompare,
+) -> (Revision?, Revision) {
+  let fallback = reference_repository(reference)
+  (
+    Some({
+      repository: branch_repository(pull.base, fallback),
+      sha: pull_merge_base(compare),
+    }),
+    { repository: branch_repository(pull.head, fallback), sha: pull.head.sha },
+  )
+}
+
+///|
+fn raw_url_for_repository(
+  repository : RepositoryRef,
+  revision : String,
+  path : String,
+) -> String {
+  "https://raw.githubusercontent.com/\{repository.owner}/\{repository.repo}/\{revision}/\{percent_encode_path(path)}"
+}
+
+///|
+#warnings("-unused_value")
 fn raw_url(reference : CommitRef, revision : String, path : String) -> String {
-  "https://raw.githubusercontent.com/\{reference.owner}/\{reference.repo}/\{revision}/\{percent_encode_path(path)}"
+  raw_url_for_repository(reference_repository(reference), revision, path)
+}
+
+///|
+priv struct SourceLocation {
+  repository : RepositoryRef
+  revision : String
+  path : String
 }
 
 ///|
 priv struct SourcePair {
   old_url : String?
   new_url : String?
+  old_location : SourceLocation?
+  new_location : SourceLocation?
 }
 
 ///|
+fn source_pair_for_revisions(
+  old_revision : Revision?,
+  new_revision : Revision,
+  file : ApiFile,
+) -> SourcePair {
+  let old_path = file.previous_filename.unwrap_or(file.filename)
+  let old_location = if file.status == "added" || old_revision is None {
+    None
+  } else {
+    let revision = old_revision.unwrap()
+    Some({
+      repository: revision.repository,
+      revision: revision.sha,
+      path: old_path,
+    })
+  }
+  let new_location = if file.status == "removed" {
+    None
+  } else {
+    Some({
+      repository: new_revision.repository,
+      revision: new_revision.sha,
+      path: file.filename,
+    })
+  }
+  {
+    old_url: old_location.map(location => {
+      raw_url_for_repository(
+        location.repository,
+        location.revision,
+        location.path,
+      )
+    }),
+    new_url: new_location.map(location => {
+      raw_url_for_repository(
+        location.repository,
+        location.revision,
+        location.path,
+      )
+    }),
+    old_location,
+    new_location,
+  }
+}
+
+///|
+#warnings("-unused_value")
 fn source_pair(
   reference : CommitRef,
   commit_sha : String,
   parent_sha : String?,
   file : ApiFile,
 ) -> SourcePair {
-  let old_path = file.previous_filename.unwrap_or(file.filename)
-  let old_url = if file.status == "added" || parent_sha is None {
-    None
-  } else {
-    Some(raw_url(reference, parent_sha.unwrap(), old_path))
-  }
-  let new_url = if file.status == "removed" {
-    None
-  } else {
-    Some(raw_url(reference, commit_sha, file.filename))
-  }
-  { old_url, new_url }
+  let (old_revision, new_revision) = commit_revisions(
+    reference, commit_sha, parent_sha,
+  )
+  source_pair_for_revisions(old_revision, new_revision, file)
 }
 
 ///|
