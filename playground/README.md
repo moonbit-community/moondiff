@@ -7,11 +7,14 @@ https://github.com/{owner}/{repo}/commit/{sha}
 https://github.com/{owner}/{repo}/pull/{number}
 https://github.com/{owner}/{repo}/pull/{number}/files
 https://github.com/{owner}/{repo}/pull/{number}/changes/{sha}
+https://github.com/{owner}/{repo}/pull/{number}/commits/{sha}
 ```
 
-Commit URLs and `pull/{number}/changes/{sha}` URLs compare one commit with its
-first parent (or an empty old side for a root commit). Pull request URLs load
-the PR's current head and aggregate the complete **Files changed** result. The
+GitHub may rewrite PR commit-detail URLs between the `changes/{sha}` and
+`commits/{sha}` forms; the playground accepts both and treats them equivalently.
+Commit URLs and either PR commit-detail form compare one commit with its first
+parent (or an empty old side for a root commit). Pull request URLs load the PR's
+current head and aggregate the complete **Files changed** result. The
 old revision is `merge_base_commit.sha` from the
 [Compare API](https://docs.github.com/en/rest/commits/commits#compare-two-commits)
 response for pinned `base.sha...head.sha`, matching GitHub's merge-base-to-head
@@ -87,7 +90,11 @@ route:
 ```text
 https://{playground-host}/{base}/#/owner/repo/commit/sha
 https://{playground-host}/{base}/#/owner/repo/pull/number
+https://{playground-host}/{base}/#/owner/repo/pull/number/commits/sha
 ```
+
+The playground normalizes either GitHub PR commit-detail form to its
+`pull/number/commits/sha` hash route.
 
 Opening a commit route restores the same SHA automatically. Opening a pull
 request route fetches that PR again, so the same shared URL follows its latest
