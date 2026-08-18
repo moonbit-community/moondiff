@@ -5,6 +5,7 @@ import {
   "moonbitlang/parser/untyped_cst" @cst,
   "moonbit-community/moondiff/astdiff" @diff,
   "moonbit-community/moondiff/elab",
+  "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/syntax",
   "moonbit-community/moondiff/span",
   "moonbit-community/moondiff/tokdiff",

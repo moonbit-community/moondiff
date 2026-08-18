@@ -79,18 +79,23 @@ test "consumer traverses and matches every public renderer-free IR type" {
               Paired(old_line, new_line) => {
                 let _ : @mbtdiff.DiffLine = old_line
                 let _ : @mbtdiff.DiffLine = new_line
+                let _ = (old_line.text(), new_line.text())
               }
-              OldOnly(line) | NewOnly(line) =>
+              OldOnly(line) | NewOnly(line) => {
+                let _ = line.text()
                 for segment in line.segments {
                   let _ : @mbtdiff.DiffSegment = segment
                   let _ : @mbtdiff.DiffSegmentKind = segment.kind
                   let _ = (segment_name(segment.kind), segment.text)
                 }
+              }
             }
           }
       }
     }
   }
+  let rebased : @mbtdiff.DiffDocument = document.rebase(0, 0)
+  assert_true(rebased == document)
   for fallback in result.fallbacks() {
     let _ : @mbtdiff.FallbackInfo = fallback
     let _ : @mbtdiff.FallbackReason = fallback.reason

@@ -25,64 +25,44 @@ pub(all) enum AlignedDiffOutcome {
 ///|
 /// A renderer-neutral aligned diff and the outcome callers should present.
 pub(all) struct AlignedDiffResult {
-  document : @tokdiff.DiffDocument
+  document : @model.DiffDocument
   outcome : AlignedDiffOutcome
 } derive(Eq)
 
 ///|
-/// High-level result classification used by the renderer-free public facade.
-pub(all) enum DiffStatus {
-  Identical
-  Changed
-  NoStructuralChanges
-  IgnoredOnly
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type DiffStatus = @model.DiffStatus
 
 ///|
-pub(all) enum DiffSide {
-  Old
-  New
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type DiffSide = @model.DiffSide
 
 ///|
-pub(all) enum ComputationStage {
-  TopLevelAlignment
-  SyntaxMatching
-  IntralineMatching
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type ComputationStage = @model.ComputationStage
 
 ///|
-pub(all) enum FallbackReason {
-  ParseError(sides~ : Array[DiffSide], detail~ : String)
-  GraphLimitExceeded(limit~ : UInt)
-  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type FallbackReason = @model.FallbackReason
 
 ///|
-/// A zero-based source range.
-pub(all) struct LineRange {
-  start : Int
-  len : Int
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type LineRange = @model.LineRange
 
 ///|
-pub(all) enum FallbackScope {
-  WholeFile
-  Region(old~ : LineRange?, new~ : LineRange?)
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type FallbackScope = @model.FallbackScope
 
 ///|
-pub(all) struct FallbackInfo {
-  reason : FallbackReason
-  scope : FallbackScope
-} derive(Debug, Eq)
+/// Compatibility alias for the public renderer-neutral model type.
+pub type FallbackInfo = @model.FallbackInfo
 
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
 /// through the `mbtdiff` facade; the legacy result below is retained as a
 /// compatibility projection.
 pub(all) struct DetailedDiffResult {
-  document : @tokdiff.DiffDocument
+  document : @model.DiffDocument
   status : DiffStatus
   fallbacks : Array[FallbackInfo]
 } derive(Eq)
@@ -112,13 +92,13 @@ pub(all) struct DiffCalculation {
 
 ///|
 priv struct UnitDocumentResult {
-  document : @tokdiff.DiffDocument
+  document : @model.DiffDocument
   fallback_reason : String?
 }
 
 ///|
 priv struct DetailedUnitResult {
-  document : @tokdiff.DiffDocument
+  document : @model.DiffDocument
   fallback : FallbackInfo?
   computation_exhausted : Bool
 }
@@ -127,7 +107,7 @@ priv struct DetailedUnitResult {
 type NovelRangeMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|
-fn empty_document() -> @tokdiff.DiffDocument {
+fn empty_document() -> @model.DiffDocument {
   { hunks: [] }
 }
 
@@ -146,7 +126,7 @@ fn lexical_source_document(
   new_source : String,
   context : Int,
   ignore_comments : Bool,
-) -> @tokdiff.DiffDocument {
+) -> @model.DiffDocument {
   let old = document_lines(old_source)
   let new = document_lines(new_source)
   @tokdiff.diff(old~, new~, context~, line_cleanup=true, ignore_comments~)
@@ -154,8 +134,8 @@ fn lexical_source_document(
 
 ///|
 fn append_document(
-  hunks : Array[@tokdiff.DiffHunk],
-  document : @tokdiff.DiffDocument,
+  hunks : Array[@model.DiffHunk],
+  document : @model.DiffDocument,
 ) -> Unit {
   hunks.push_iter(document.hunks.iter())
 }
@@ -166,7 +146,7 @@ fn lexical_edit_document(
   new_unit : ImplUnit?,
   context : Int,
   ignore_comments : Bool,
-) -> @tokdiff.DiffDocument {
+) -> @model.DiffDocument {
   lexical_source_document(
     source_slice(old_unit),
     source_slice(new_unit),
@@ -191,7 +171,7 @@ fn lexical_plan_document(
       { document, outcome: Rendered }
     }
     PerUnit(edits) => {
-      let hunks : Array[@tokdiff.DiffHunk] = []
+      let hunks : Array[@model.DiffHunk] = []
       for edit in edits {
         let document = match edit {
           Replace(old~, new~) =>
@@ -254,8 +234,8 @@ fn collect_novel_ranges(positions : ArrayView[MatchedPos]) -> NovelRangeMap {
 
 ///|
 fn push_ast_segment(
-  segments : Array[@tokdiff.DiffSegment],
-  kind : @tokdiff.DiffSegmentKind,
+  segments : Array[@model.DiffSegment],
+  kind : @model.DiffSegmentKind,
   text : String,
 ) -> Unit {
   if text == "" {
@@ -312,7 +292,7 @@ fn ast_line_segments_impl(
   text : String,
   line_ranges : Array[(Int, Int)]?,
   bridge_whitespace : Bool,
-) -> Array[@tokdiff.DiffSegment] {
+) -> Array[@model.DiffSegment] {
   let chars = text.to_array()
   if chars.is_empty() {
     return []
@@ -345,7 +325,7 @@ fn ast_line_segments_impl(
   if bridge_whitespace {
     bridge_ast_changed_whitespace(chars, mask)
   }
-  let segments : Array[@tokdiff.DiffSegment] = []
+  let segments : Array[@model.DiffSegment] = []
   let mut start = 0
   while start < chars.length() {
     let changed = mask[start]
@@ -373,7 +353,7 @@ fn ast_diff_line(
   text : String,
   ranges : NovelRangeMap,
   bridge_whitespace : Bool,
-) -> @tokdiff.DiffLine {
+) -> @model.DiffLine {
   {
     index,
     segments: ast_line_segments_impl(text, ranges.get(index), bridge_whitespace),
@@ -404,7 +384,7 @@ fn ast_change_row(
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
   bridge_whitespace : Bool,
-) -> @tokdiff.DiffRow {
+) -> @model.DiffRow {
   match pair {
     (Some(old_line), Some(new_line)) =>
       Paired(
@@ -452,10 +432,10 @@ fn ast_hunk_blocks(
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
   bridge_whitespace : Bool,
-) -> Array[@tokdiff.DiffBlock] {
-  let blocks : Array[@tokdiff.DiffBlock] = []
-  let context_lines : Array[@tokdiff.ContextLine] = []
-  let change_rows : Array[@tokdiff.DiffRow] = []
+) -> Array[@model.DiffBlock] {
+  let blocks : Array[@model.DiffBlock] = []
+  let context_lines : Array[@model.ContextLine] = []
+  let change_rows : Array[@model.DiffRow] = []
   for pair in pairs {
     if ast_pair_is_context(pair, hunk, old_lines, new_lines) {
       if !change_rows.is_empty() {
@@ -613,7 +593,7 @@ fn ast_document_from_positions(
   context : Int,
   reduce_sparse : Bool,
   bridge_whitespace : Bool,
-) -> @tokdiff.DiffDocument {
+) -> @model.DiffDocument {
   let old_lines = document_lines(old_source)
   let new_lines = document_lines(new_source)
   let matched_lines = @hunks.all_matched_lines_filled(
@@ -626,7 +606,7 @@ fn ast_document_from_positions(
   )
   let old_ranges = collect_novel_ranges(lhs_positions)
   let new_ranges = collect_novel_ranges(rhs_positions)
-  let hunks : Array[@tokdiff.DiffHunk] = []
+  let hunks : Array[@model.DiffHunk] = []
   for hunk in ast_hunks {
     let (start, end_) = @hunks.contextual_index_range_for_hunk(
       hunk,
@@ -734,7 +714,7 @@ fn ast_unit_document_with_budget(
   graph_limit : UInt,
   preserve_legacy_document : Bool,
   budget : @computation.Budget,
-) -> @tokdiff.DiffDocument raise {
+) -> @model.DiffDocument raise {
   let old_source = source_slice(old_unit)
   let new_source = source_slice(new_unit)
   let old_offset = impl_line_base(old_unit) - 1
@@ -788,7 +768,7 @@ fn detailed_ast_edit_document(
     old_unit, new_unit, context, graph_limit, ignore_comments, budget,
   ) catch {
     @computation.LimitExceeded(stage~, limit~) => {
-      let reason = ComputationLimitExceeded(
+      let reason : FallbackReason = ComputationLimitExceeded(
         stage=computation_stage(stage),
         limit~,
       )
@@ -801,7 +781,7 @@ fn detailed_ast_edit_document(
       }
     }
     _ => {
-      let reason = GraphLimitExceeded(limit=graph_limit)
+      let reason : FallbackReason = GraphLimitExceeded(limit=graph_limit)
       return {
         document: lexical_edit_document(
           old_unit, new_unit, context, ignore_comments,
@@ -940,7 +920,7 @@ fn ast_root_document_with_budget(
   graph_limit : UInt,
   preserve_legacy_document : Bool,
   budget : @computation.Budget,
-) -> @tokdiff.DiffDocument raise {
+) -> @model.DiffDocument raise {
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
   @syntax.init_all_info(lhs_roots, rhs_roots)
@@ -1038,7 +1018,7 @@ fn detailed_ast_plan_document(
         budget,
       )
     PerUnit(edits) => {
-      let hunks : Array[@tokdiff.DiffHunk] = []
+      let hunks : Array[@model.DiffHunk] = []
       let fallbacks : Array[FallbackInfo] = []
       let exhausted_reason : Ref[FallbackReason?] = Ref(None)
       for edit in edits {
@@ -1065,7 +1045,7 @@ fn detailed_ast_plan_document(
           }
         }
       }
-      let document : @tokdiff.DiffDocument = { hunks, }
+      let document : @model.DiffDocument = { hunks, }
       {
         document,
         status: if document.hunks.is_empty() {
@@ -1094,7 +1074,7 @@ fn ast_plan_document(
         old_source, new_source, old, new, context, graph_limit, ignore_comments,
       )
     PerUnit(edits) => {
-      let hunks : Array[@tokdiff.DiffHunk] = []
+      let hunks : Array[@model.DiffHunk] = []
       let fallback_reasons : Array[String] = []
       for edit in edits {
         let result = match edit {
@@ -1128,7 +1108,7 @@ fn ast_plan_document(
           fallback_reasons.push(reason)
         }
       }
-      let document : @tokdiff.DiffDocument = { hunks, }
+      let document : @model.DiffDocument = { hunks, }
       let outcome = if !fallback_reasons.is_empty() {
         PartialFallback(fallback_reasons)
       } else if document.hunks.is_empty() {
@@ -1241,7 +1221,8 @@ fn diff_document_from_parsed_roots(
       if !ignore_comments {
         return result
       }
-      let document = result.document.ignore_comments(
+      let document = @tokdiff.ignore_comments(
+        result.document,
         old=document_lines(old_source),
         new=document_lines(new_source),
       )
@@ -1344,7 +1325,8 @@ fn calculate_diff_document_with_limit(
     plan, old_source, new_source, context, graph_limit, ignore_comments, budget,
   )
   let result = if ignore_comments {
-    let document = result.document.ignore_comments(
+    let document = @tokdiff.ignore_comments(
+      result.document,
       old=document_lines(old_source),
       new=document_lines(new_source),
     )

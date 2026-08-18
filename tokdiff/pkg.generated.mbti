@@ -1,10 +1,16 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moonbit-community/moondiff/tokdiff"
 
-// Values
-pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, ignore_comments? : Bool) -> DiffDocument
+import {
+  "moonbit-community/moondiff/model",
+}
 
-pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> DiffDocument
+// Values
+pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, ignore_comments? : Bool) -> @model.DiffDocument
+
+pub fn ignore_comments(@model.DiffDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.DiffDocument
+
+pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> @model.DiffDocument
 
 pub fn similarity(String, String) -> Int
 
@@ -13,55 +19,6 @@ pub fn tokenize_line(String) -> Array[Tok]
 // Errors
 
 // Types and methods
-pub(all) struct ContextLine {
-  old_index : Int
-  new_index : Int
-  text : String
-} derive(Eq)
-
-pub(all) enum DiffBlock {
-  ContextBlock(Array[ContextLine])
-  ChangeBlock(Array[DiffRow])
-  IgnoredBlock(Array[DiffRow])
-} derive(Eq)
-
-pub(all) struct DiffDocument {
-  hunks : Array[DiffHunk]
-} derive(Eq)
-pub fn DiffDocument::ignore_comments(Self, old~ : ArrayView[String], new~ : ArrayView[String]) -> Self
-pub fn DiffDocument::rebase(Self, Int, Int) -> Self
-
-pub(all) struct DiffHunk {
-  old_start : Int
-  old_len : Int
-  new_start : Int
-  new_len : Int
-  blocks : Array[DiffBlock]
-} derive(Eq)
-
-pub(all) struct DiffLine {
-  index : Int
-  segments : Array[DiffSegment]
-} derive(Eq)
-pub fn DiffLine::text(Self) -> String
-
-pub(all) enum DiffRow {
-  Paired(DiffLine, DiffLine)
-  OldOnly(DiffLine)
-  NewOnly(DiffLine)
-} derive(Eq)
-
-pub(all) struct DiffSegment {
-  kind : DiffSegmentKind
-  text : String
-} derive(Eq)
-
-pub(all) enum DiffSegmentKind {
-  Unchanged
-  Changed
-  Ignored
-} derive(Eq)
-
 pub struct Tok {
   kind : TokKind
   text : String
@@ -80,5 +37,20 @@ pub(all) enum TokKind {
 } derive(Eq)
 
 // Type aliases
+pub using @model {type ContextLine}
+
+pub using @model {type DiffBlock}
+
+pub using @model {type DiffDocument}
+
+pub using @model {type DiffHunk}
+
+pub using @model {type DiffLine}
+
+pub using @model {type DiffRow}
+
+pub using @model {type DiffSegment}
+
+pub using @model {type DiffSegmentKind}
 
 // Traits

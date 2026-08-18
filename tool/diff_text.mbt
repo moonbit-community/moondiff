@@ -1,5 +1,5 @@
 ///|UUID(fb09927f-8d77-415f-9b0e-b40809807775)
-fn computation_stage_text(stage : @alignment.ComputationStage) -> String {
+fn computation_stage_text(stage : @model.ComputationStage) -> String {
   match stage {
     TopLevelAlignment => "top-level alignment"
     SyntaxMatching => "syntax matching"
@@ -8,7 +8,7 @@ fn computation_stage_text(stage : @alignment.ComputationStage) -> String {
 }
 
 ///|
-fn fallback_location(scope : @alignment.FallbackScope) -> String {
+fn fallback_location(scope : @model.FallbackScope) -> String {
   match scope {
     WholeFile => ""
     Region(old~, new~) => {
@@ -30,7 +30,7 @@ fn fallback_location(scope : @alignment.FallbackScope) -> String {
 
 ///|
 fn fallback_reason_text(
-  fallback : @alignment.FallbackInfo,
+  fallback : @model.FallbackInfo,
   parser_reason : String?,
 ) -> String {
   match fallback.reason {
@@ -57,7 +57,7 @@ fn fallback_reason_text(
 }
 
 ///|
-fn section_label(label : String, range : @alignment.LineRange?) -> String {
+fn section_label(label : String, range : @model.LineRange?) -> String {
   match range {
     None => label
     Some(range) => "\{label}: line \{range.start + 1}"
@@ -66,7 +66,7 @@ fn section_label(label : String, range : @alignment.LineRange?) -> String {
 
 ///|
 fn range_overlaps_hunk(
-  range : @alignment.LineRange?,
+  range : @model.LineRange?,
   start : Int,
   len : Int,
 ) -> Bool {
@@ -84,10 +84,7 @@ fn range_overlaps_hunk(
 }
 
 ///|
-fn ranges_overlap(
-  left : @alignment.LineRange?,
-  right : @alignment.LineRange?,
-) -> Bool {
+fn ranges_overlap(left : @model.LineRange?, right : @model.LineRange?) -> Bool {
   match (left, right) {
     (Some(left), Some(right)) =>
       if left.len == 0 || right.len == 0 {
@@ -103,7 +100,7 @@ fn ranges_overlap(
 
 ///|
 fn fallback_matches_section(
-  fallback : @alignment.FallbackInfo,
+  fallback : @model.FallbackInfo,
   section : @alignment.DiffSection,
 ) -> Bool {
   match fallback.scope {
@@ -115,7 +112,7 @@ fn fallback_matches_section(
 
 ///|
 fn hunk_matches_section(
-  hunk : @tokdiff.DiffHunk,
+  hunk : @model.DiffHunk,
   section : @alignment.DiffSection,
 ) -> Bool {
   if hunk.old_len == 0 && hunk.new_len > 0 {
@@ -129,7 +126,7 @@ fn hunk_matches_section(
 }
 
 ///|
-fn section_max_line(range : @alignment.LineRange?) -> Int {
+fn section_max_line(range : @model.LineRange?) -> Int {
   match range {
     None => 1
     Some(range) => @cmp.maximum(range.start + range.len, 1)
@@ -138,10 +135,10 @@ fn section_max_line(range : @alignment.LineRange?) -> Int {
 
 ///|
 fn legacy_empty_side_hunks(
-  hunks : ArrayView[@tokdiff.DiffHunk],
+  hunks : ArrayView[@model.DiffHunk],
   old_missing : Bool,
   new_missing : Bool,
-) -> Array[@tokdiff.DiffHunk] {
+) -> Array[@model.DiffHunk] {
   hunks.map(fn(hunk) {
     {
       ..hunk,
@@ -176,8 +173,8 @@ fn append_rendered_section(
 fn render_sectioned_document(
   old_label : String,
   new_label : String,
-  document : @tokdiff.DiffDocument,
-  fallbacks : ArrayView[@alignment.FallbackInfo],
+  document : @model.DiffDocument,
+  fallbacks : ArrayView[@model.FallbackInfo],
   parser_reason : String?,
   options : DiffOptions,
   sections : ArrayView[@alignment.DiffSection],
@@ -187,7 +184,7 @@ fn render_sectioned_document(
   let used_fallbacks = Array::make(fallbacks.length(), false)
   let wrote = Ref(false)
   for section in sections {
-    let section_hunks : Array[@tokdiff.DiffHunk] = []
+    let section_hunks : Array[@model.DiffHunk] = []
     for index, hunk in document.hunks {
       if !used_hunks[index] && hunk_matches_section(hunk, section) {
         section_hunks.push(hunk)
@@ -230,7 +227,7 @@ fn render_sectioned_document(
     )
     append_rendered_section(buf, wrote, section_buf.to_string())
   }
-  let unassigned : Array[@tokdiff.DiffHunk] = []
+  let unassigned : Array[@model.DiffHunk] = []
   for index, hunk in document.hunks {
     if !used_hunks[index] {
       unassigned.push(hunk)
@@ -257,7 +254,7 @@ fn render_legacy_whole_ast_document(
   old_source : String,
   new_label : String,
   new_source : String,
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   options : DiffOptions,
 ) -> String {
   let hunks = legacy_empty_side_hunks(

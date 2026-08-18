@@ -20,7 +20,7 @@ fn esc(text : String) -> String {
 }
 
 ///|
-fn line_html(line : @tokdiff.DiffLine, changed_class : String) -> String {
+fn line_html(line : @model.DiffLine, changed_class : String) -> String {
   let buf = StringBuilder::new()
   for segment in line.segments {
     match segment.kind {
@@ -34,7 +34,7 @@ fn line_html(line : @tokdiff.DiffLine, changed_class : String) -> String {
 }
 
 ///|
-fn line_is_ignored(line : @tokdiff.DiffLine) -> Bool {
+fn line_is_ignored(line : @model.DiffLine) -> Bool {
   !line.segments.is_empty() &&
   line.segments.all(segment => segment.kind is Ignored)
 }
@@ -92,7 +92,7 @@ fn split_row(
 ///|
 fn split_ignored_row(
   buf : StringBuilder,
-  row : @tokdiff.DiffRow,
+  row : @model.DiffRow,
   line_numbers : Bool,
 ) -> Unit {
   match row {
@@ -135,7 +135,7 @@ fn split_ignored_row(
 ///|
 fn append_split_hunk(
   buf : StringBuilder,
-  hunk : @tokdiff.DiffHunk,
+  hunk : @model.DiffHunk,
   hunk_index : Int,
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
@@ -236,7 +236,7 @@ fn append_split_hunk(
 ///|
 /// Render a calculated diff as a GitHub-style side-by-side HTML table.
 pub fn render_side_by_side(
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> String {
@@ -252,7 +252,7 @@ pub fn render_side_by_side(
 ///|
 /// Render every calculated hunk as its own side-by-side HTML table.
 pub fn render_side_by_side_hunks(
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> Array[String] {
@@ -293,7 +293,7 @@ fn unified_numbered_line(
 ///|
 fn unified_old_line(
   buf : StringBuilder,
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
   line_numbers : Bool,
 ) -> Unit {
   if line_is_ignored(line) {
@@ -311,7 +311,7 @@ fn unified_old_line(
 ///|
 fn unified_new_line(
   buf : StringBuilder,
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
   line_numbers : Bool,
 ) -> Unit {
   if line_is_ignored(line) {
@@ -329,7 +329,7 @@ fn unified_new_line(
 ///|
 fn unified_ignored_line(
   buf : StringBuilder,
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
   old_number : Int?,
   new_number : Int?,
   line_numbers : Bool,
@@ -345,7 +345,7 @@ fn unified_ignored_line(
 ///|
 fn append_unified_ignored_row(
   buf : StringBuilder,
-  row : @tokdiff.DiffRow,
+  row : @model.DiffRow,
   line_numbers : Bool,
 ) -> Unit {
   match row {
@@ -396,7 +396,7 @@ fn append_unified_ignored_row(
 ///|
 fn append_unified_hunk(
   buf : StringBuilder,
-  hunk : @tokdiff.DiffHunk,
+  hunk : @model.DiffHunk,
   hunk_index : Int,
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
@@ -464,7 +464,7 @@ fn append_unified_hunk(
 ///|
 /// Render a calculated diff as unified HTML.
 pub fn render_unified(
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> String {
@@ -488,7 +488,7 @@ pub fn render_unified(
 ///|
 /// Render every calculated hunk as its own unified HTML block.
 pub fn render_unified_hunks(
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> Array[String] {
