@@ -1,7 +1,7 @@
 ///|UUID(0b68f529-4c5b-42fe-8a34-07ecd4f883ef)
 /// Implements Dijkstra's algorithm for shortest path, to find an
 /// optimal and readable diff between two ASTs.
-suberror ExceededGraphLimit {
+priv suberror ExceededGraphLimit {
   ExceededGraphLimit
 }
 
@@ -23,7 +23,8 @@ fn shortest_vertex_path(
   start : Vertex,
   size_hint : Int,
   graph_limit : Int,
-) -> Array[Vertex] raise ExceededGraphLimit {
+  budget : @computation.Budget?,
+) -> Array[Vertex] raise {
   // We want to visit nodes with the shortest distance first, but
   // PriorityQueue is a max-heap. Ensure nodes are wrapped with
   // @cmp.Reverse to flip comparisons.
@@ -36,7 +37,7 @@ fn shortest_vertex_path(
         if current.is_end() {
           break current
         }
-        set_neighbours(current, seen)
+        set_neighbours(current, seen, budget)
         for neighbor in current.neighbours.val.unwrap() {
           let (edge, next) = neighbor
           let distance_to_next = distance + edge.cost()
@@ -97,8 +98,24 @@ pub fn shortest_path(
   start : Vertex,
   size_hint : Int,
   graph_limit : Int,
-) -> Array[(Edge, Vertex)] raise ExceededGraphLimit {
-  let vertex_path = shortest_vertex_path(start, size_hint, graph_limit)
+) -> Array[(Edge, Vertex)] raise {
+  let vertex_path = shortest_vertex_path(start, size_hint, graph_limit, None)
+  shortest_path_with_edges(vertex_path)
+}
+
+///|
+fn shortest_path_with_budget(
+  start : Vertex,
+  size_hint : Int,
+  graph_limit : Int,
+  budget : @computation.Budget,
+) -> Array[(Edge, Vertex)] raise {
+  let vertex_path = shortest_vertex_path(
+    start,
+    size_hint,
+    graph_limit,
+    Some(budget),
+  )
   shortest_path_with_edges(vertex_path)
 }
 
@@ -154,7 +171,7 @@ pub fn mark_syntax(
   rhs_syntax : Syntax?,
   change_map : ChangeMap,
   graph_limit : UInt,
-) -> Unit raise ExceededGraphLimit {
+) -> Unit raise {
   let lhs_node_count = node_count(lhs_syntax)
   let rhs_node_count = node_count(rhs_syntax)
 
@@ -174,6 +191,27 @@ pub fn mark_syntax(
   let size_hint = @cmp.minimum(lhs_node_count * rhs_node_count, graph_limit).reinterpret_as_int()
   let start = Vertex::new(lhs=lhs_syntax, rhs=rhs_syntax)
   let route = shortest_path(start, size_hint, graph_limit.reinterpret_as_int())
+  populate_change_map(route, change_map)
+}
+
+///|
+fn mark_syntax_with_budget(
+  lhs_syntax : Syntax?,
+  rhs_syntax : Syntax?,
+  change_map : ChangeMap,
+  graph_limit : UInt,
+  budget : @computation.Budget,
+) -> Unit raise {
+  let lhs_node_count = node_count(lhs_syntax)
+  let rhs_node_count = node_count(rhs_syntax)
+  let size_hint = @cmp.minimum(lhs_node_count * rhs_node_count, graph_limit).reinterpret_as_int()
+  let start = Vertex::new(lhs=lhs_syntax, rhs=rhs_syntax)
+  let route = shortest_path_with_budget(
+    start,
+    size_hint,
+    graph_limit.reinterpret_as_int(),
+    budget,
+  )
   populate_change_map(route, change_map)
 }
 

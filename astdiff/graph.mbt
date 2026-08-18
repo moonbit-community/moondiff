@@ -405,7 +405,11 @@ fn pop_all_parents(
 ///|UUID(7be0974c-4087-481f-8d2c-ccd2665fcdef)
 /// Compute the neighbours of `v` if we haven't previously done so,
 /// and write them to the .neighbours cell inside `v`.
-fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
+fn set_neighbours(
+  v : Vertex,
+  seen : HashMap[Vertex, Array[Vertex]],
+  budget : @computation.Budget?,
+) -> Unit raise @computation.LimitExceeded {
   if v.neighbours.val is Some(_) {
     return
   }
@@ -511,13 +515,16 @@ fn set_neighbours(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Unit {
       // gets a replacement edge; the edit distance becomes part of the edge
       // cost instead of a construction-time threshold.
       if lhs_kind == rhs_kind && lhs_content != rhs_content {
-        let levenshtein_pct = (normalized_levenshtein(
-            lhs=lhs_content,
-            rhs=rhs_content,
-          ) *
-          100.0)
-          .round()
-          .to_uint()
+        let similarity = match budget {
+          Some(budget) =>
+            normalized_levenshtein_with_budget(
+              lhs=lhs_content,
+              rhs=rhs_content,
+              budget,
+            )
+          None => normalized_levenshtein(lhs=lhs_content, rhs=rhs_content)
+        }
+        let levenshtein_pct = (similarity * 100.0).round().to_uint()
         let edge = if lhs_kind is Comment {
           Edge::ReplacedComment(levenshtein_pct~)
         } else {

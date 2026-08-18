@@ -36,12 +36,16 @@ fn same_root_content(lhs : Syntax, rhs : Syntax) -> Bool {
   lhs_content_id != 0 && lhs_content_id == rhs.content_id()
 }
 
-///|UUID(7421325a-ce98-4d22-9c09-fcfeb5617292)
-fn root_matches(
+///|
+fn root_matches_impl(
   lhs : ArrayView[Syntax],
   rhs : ArrayView[Syntax],
-) -> Array[(Int, Int)] {
+  budget : @computation.Budget?,
+) -> Array[(Int, Int)] raise @computation.LimitExceeded {
   let width = rhs.length() + 1
+  if budget is Some(budget) {
+    budget.charge_matrix(lhs.length() + 1, width, TopLevelAlignment)
+  }
   let dp = Array::make((lhs.length() + 1) * width, 0)
   let index = fn(i : Int, j : Int) { i * width + j }
 
@@ -82,7 +86,8 @@ fn mark_root_segments(
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-) -> Unit raise ExceededGraphLimit {
+  budget : @computation.Budget?,
+) -> Unit raise {
   match (lhs_roots.length(), rhs_roots.length()) {
     (0, 0) => ()
     (_, 0) =>
@@ -99,9 +104,10 @@ fn mark_root_segments(
         Some(rhs_roots[0]),
         change_map,
         graph_limit,
+        budget,
       )
     _ => {
-      let matches = root_matches(lhs_roots, rhs_roots)
+      let matches = root_matches_impl(lhs_roots, rhs_roots, budget)
       if matches.is_empty() {
         let paired = @cmp.minimum(lhs_roots.length(), rhs_roots.length())
         for i in 0..<paired {
@@ -110,6 +116,7 @@ fn mark_root_segments(
             Some(rhs_roots[i]),
             change_map,
             graph_limit,
+            budget,
           )
         }
         for i in paired..<lhs_roots.length() {
@@ -130,6 +137,7 @@ fn mark_root_segments(
           rhs_roots[rhs_start:rhs_i],
           change_map,
           graph_limit,
+          budget,
         )
         change_map.insert_deep_unchanged(
           node=lhs_roots[lhs_i],
@@ -147,6 +155,7 @@ fn mark_root_segments(
         rhs_roots[rhs_start:rhs_roots.length()],
         change_map,
         graph_limit,
+        budget,
       )
     }
   }
@@ -158,7 +167,8 @@ fn mark_syntax_subtree(
   rhs_root : Syntax?,
   change_map : ChangeMap,
   graph_limit : UInt,
-) -> Unit raise ExceededGraphLimit {
+  budget : @computation.Budget?,
+) -> Unit raise {
   match (lhs_root, rhs_root) {
     (None, None) => ()
     (Some(lhs), None) => change_map.insert_deep_novel(lhs)
@@ -192,26 +202,49 @@ fn mark_syntax_subtree(
             if has_matching_explicit_delimiters {
               change_map.insert(lhs, Unchanged(rhs))
               change_map.insert(rhs, Unchanged(lhs))
-              mark_syntax_roots(
-                lhs_children, rhs_children, change_map, graph_limit,
+              mark_syntax_roots_impl(
+                lhs_children, rhs_children, change_map, graph_limit, budget,
               )
             } else {
-              mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
+              match budget {
+                Some(budget) =>
+                  mark_syntax_with_budget(
+                    Some(lhs),
+                    Some(rhs),
+                    change_map,
+                    graph_limit,
+                    budget,
+                  )
+                None =>
+                  mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
+              }
             }
           }
-          _ => mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
+          _ =>
+            match budget {
+              Some(budget) =>
+                mark_syntax_with_budget(
+                  Some(lhs),
+                  Some(rhs),
+                  change_map,
+                  graph_limit,
+                  budget,
+                )
+              None => mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
+            }
         }
       }
   }
 }
 
 ///|UUID(dc6a7582-0628-4439-9af2-199e79557cf1)
-pub fn mark_syntax_roots(
+fn mark_syntax_roots_impl(
   lhs_roots : ArrayView[Syntax],
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-) -> Unit raise ExceededGraphLimit {
+  budget : @computation.Budget?,
+) -> Unit raise {
   let prefix_len = shared_prefix_len(lhs_roots, rhs_roots)
   for i in 0..<prefix_len {
     change_map.insert_deep_unchanged(
@@ -239,5 +272,33 @@ pub fn mark_syntax_roots(
     rhs_roots[prefix_len:rhs_suffix_start],
     change_map,
     graph_limit,
+    budget,
+  )
+}
+
+///|
+pub fn mark_syntax_roots(
+  lhs_roots : ArrayView[Syntax],
+  rhs_roots : ArrayView[Syntax],
+  change_map : ChangeMap,
+  graph_limit : UInt,
+) -> Unit raise {
+  mark_syntax_roots_impl(lhs_roots, rhs_roots, change_map, graph_limit, None)
+}
+
+///|
+pub fn mark_syntax_roots_with_budget(
+  lhs_roots : ArrayView[Syntax],
+  rhs_roots : ArrayView[Syntax],
+  change_map : ChangeMap,
+  graph_limit : UInt,
+  budget : @computation.Budget,
+) -> Unit raise {
+  mark_syntax_roots_impl(
+    lhs_roots,
+    rhs_roots,
+    change_map,
+    graph_limit,
+    Some(budget),
   )
 }

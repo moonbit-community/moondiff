@@ -36,6 +36,17 @@ fn parse_units(source : String) -> Array[ImplUnit] {
 }
 
 ///|
+fn align_impl_units_by_key(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  use_uuid? : Bool = true,
+) -> Array[ImplEdit] {
+  align_impl_units_by_key_impl(old_units, new_units, None, use_uuid~) catch {
+    @computation.LimitExceeded(..) => panic()
+  }
+}
+
+///|
 test "implementation units cache their source slices" {
   let source =
     #|/// leading a
@@ -692,20 +703,24 @@ fn ast_segment_summary(
 test "AST segments bridge only internal whitespace between changes" {
   @debug.assert_eq(
     ast_segment_summary(
-      ast_line_segments("  left \t right  ", Some([(3, 7), (10, 15)])),
+      ast_line_segments_impl(
+        "  left \t right  ",
+        Some([(3, 7), (10, 15)]),
+        true,
+      ),
     ),
     ["unchanged:  ", "changed:left \t right", "unchanged:  "],
   )
 
   @debug.assert_eq(
     ast_segment_summary(
-      ast_line_segments("left, right", Some([(1, 5), (7, 12)])),
+      ast_line_segments_impl("left, right", Some([(1, 5), (7, 12)]), true),
     ),
     ["changed:left", "unchanged:, ", "changed:right"],
   )
 
   @debug.assert_eq(
-    ast_segment_summary(ast_line_segments("  unchanged  ", None)),
+    ast_segment_summary(ast_line_segments_impl("  unchanged  ", None, true)),
     ["unchanged:  unchanged  "],
   )
 }
@@ -983,4 +998,165 @@ test "parse failure fallback applies comment filtering" {
   assert_true(patch.contains("old comment"), msg=patch)
   assert_true(patch.contains("new comment"), msg=patch)
   assert_false(changed_segment_text(result.document).contains("comment"))
+}
+
+///|
+test "shared calculation keeps sections aligned with hunks and fallbacks" {
+  let calculation = calculate_diff_document(
+    "fn first() { old_one() }\nfn second() { old_two() }",
+    "fn first() { new_one() }\nfn second() { new_two() }",
+    context=0,
+    graph_limit=0,
+  )
+  guard calculation.layout is TopLevelSections(sections) else {
+    fail("expected one sectioned top-level layout")
+  }
+  assert_eq(sections.length(), 2)
+  assert_eq(calculation.result.document.hunks.length(), sections.length())
+  assert_eq(calculation.result.fallbacks.length(), sections.length())
+  for index, section in sections {
+    guard (section.old, section.new) is (Some(old_range), Some(new_range)) else {
+      fail("expected paired section ranges")
+    }
+    let hunk = calculation.result.document.hunks[index]
+    assert_true(hunk.old_start >= old_range.start)
+    assert_true(
+      hunk.old_start + hunk.old_len <= old_range.start + old_range.len,
+    )
+    assert_true(hunk.new_start >= new_range.start)
+    assert_true(
+      hunk.new_start + hunk.new_len <= new_range.start + new_range.len,
+    )
+    guard calculation.result.fallbacks[index].scope is Region(old~, new~) else {
+      fail("expected a regional fallback")
+    }
+    assert_true(old == section.old)
+    assert_true(new == section.new)
+  }
+}
+
+///|
+test "shared calculation retains caller parser names" {
+  let calculation = calculate_diff_document(
+    "fn broken( {",
+    "fn okay() {}",
+    old_name="before.mbt",
+    new_name="after.mbt",
+  )
+  guard calculation.result.fallbacks
+    is [{ reason: ParseError(detail~, ..), scope: WholeFile }] else {
+    fail("expected a whole-file parse fallback")
+  }
+  assert_true(detail.contains("before.mbt"), msg=detail)
+  guard calculation.parser_reason is Some(parser_reason) else {
+    fail("expected parser diagnostics")
+  }
+  assert_true(parser_reason.contains("before.mbt"), msg=parser_reason)
+  assert_true(calculation.layout is WholeDocument)
+}
+
+///|
+test "invalid ignored-only calculation retains private parser diagnostics" {
+  let calculation = calculate_diff_document(
+    "fn broken( {\n",
+    "fn broken( {\n\u{3000}\n",
+    old_name="before.mbt",
+    new_name="after.mbt",
+    ignore_comments=true,
+  )
+  assert_true(calculation.result.status is IgnoredOnly)
+  assert_true(calculation.result.document.hunks.is_empty())
+  assert_true(calculation.result.fallbacks.is_empty())
+  guard calculation.parser_reason is Some(parser_reason) else {
+    fail("expected parser diagnostics to remain available to the CLI")
+  }
+  assert_true(parser_reason.contains("before.mbt"), msg=parser_reason)
+  assert_true(parser_reason.contains("after.mbt"), msg=parser_reason)
+  assert_true(calculation.layout is WholeDocument)
+}
+
+///|
+test "file budget stops top-level DP before allocation" {
+  let calculation = calculate_diff_document_with_limit(
+    "fn stable() {}\nfn Worker::old_name() { body() }", "fn stable() {}\nfn Worker::new_name() { body() }",
+    "old", "new", 0, 3_000_000, false, 0,
+  )
+  let result = calculation.result
+  guard result.fallbacks
+    is [
+      {
+        reason: ComputationLimitExceeded(stage=TopLevelAlignment, limit=0),
+        scope: WholeFile,
+      },
+    ] else {
+    fail("expected a whole-file top-level computation fallback")
+  }
+  assert_false(result.document.hunks.is_empty())
+  assert_true(calculation.layout is WholeDocument)
+}
+
+///|
+test "syntax budget exhaustion lexically falls back through later units" {
+  let calculation = calculate_diff_document_with_limit(
+    "fn first() { \"alpha beta gamma\" }\nfn second() { 1 }", "fn first() { \"alpha zeta gamma\" }\nfn second() { 2 }",
+    "old", "new", 0, 3_000_000, false, 0,
+  )
+  let result = calculation.result
+  guard result.fallbacks
+    is [
+      {
+        reason: ComputationLimitExceeded(stage=SyntaxMatching, limit=0),
+        scope: Region(
+          old=Some({ start: 0, len: 1 }),
+          new=Some({ start: 0, len: 1 })
+        ),
+      },
+      {
+        reason: ComputationLimitExceeded(stage=SyntaxMatching, limit=0),
+        scope: Region(
+          old=Some({ start: 1, len: 1 }),
+          new=Some({ start: 1, len: 1 })
+        ),
+      },
+    ] else {
+    fail("expected ordered current-and-later syntax fallbacks")
+  }
+  assert_false(result.document.hunks.is_empty())
+  guard calculation.layout is TopLevelSections(sections) else {
+    fail("expected syntax exhaustion to retain the shared layout")
+  }
+  assert_eq(sections.length(), 2)
+}
+
+///|
+test "intraline budget exhaustion is a local typed fallback" {
+  let calculation = calculate_diff_document_with_limit(
+    "fn first() { \"alpha beta gamma\" }\nfn second() { 1 }", "fn first() { \"alpha zeta gamma\" }\nfn second() { 2 }",
+    "old", "new", 0, 3_000_000, false, 1_100,
+  )
+  let result = calculation.result
+  guard result.fallbacks
+    is [
+      {
+        reason: ComputationLimitExceeded(stage=IntralineMatching, limit=1_100),
+        scope: Region(
+          old=Some({ start: 0, len: 1 }),
+          new=Some({ start: 0, len: 1 })
+        ),
+      },
+      {
+        reason: ComputationLimitExceeded(stage=IntralineMatching, limit=1_100),
+        scope: Region(
+          old=Some({ start: 1, len: 1 }),
+          new=Some({ start: 1, len: 1 })
+        ),
+      },
+    ] else {
+    fail("expected ordered current-and-later intraline fallbacks")
+  }
+  assert_false(result.document.hunks.is_empty())
+  guard calculation.layout is TopLevelSections(sections) else {
+    fail("expected intraline exhaustion to retain the shared layout")
+  }
+  assert_eq(sections.length(), 2)
 }

@@ -109,16 +109,6 @@ fn split_word_parts(content : String) -> Array[WordPart] {
   parts
 }
 
-///|UUID(922e5dfd-d764-4b59-b9cf-44d82348922b)
-fn split_content_lines(content : String) -> Array[String] {
-  let lines = Array::new()
-  for line in content.split("\n") {
-    lines.push(line.to_owned())
-  } nobreak {
-    lines
-  }
-}
-
 ///|UUID(0c244b2b-aaee-44ee-a6ed-4221fa07f7b8)
 fn relative_region_positions(
   content : String,
@@ -130,16 +120,14 @@ fn relative_region_positions(
   if start >= end_ {
     return []
   }
-  let content_lines = split_content_lines(content)
-  if content_lines.length() != positions.length() {
+  let line_ranges = @source_text.line_ranges(content)
+  if line_ranges.length() != positions.length() {
     return []
   }
 
   let spans = Array::new()
-  let mut line_start = 0
-  for i in 0..<content_lines.length() {
-    let line_text = content_lines[i]
-    let line_end = line_start + line_text.length()
+  for i in 0..<line_ranges.length() {
+    let (line_start, line_end) = line_ranges[i]
     let overlap_start = @cmp.maximum(start, line_start)
     let overlap_end = @cmp.minimum(end_, line_end)
     if overlap_start < overlap_end {
@@ -151,7 +139,6 @@ fn relative_region_positions(
         end_col: base.start_col + padding + (overlap_end - line_start),
       })
     }
-    line_start = line_end + 1
   }
   spans
 }
@@ -243,11 +230,15 @@ fn is_all_whitespace_text(text : String) -> Bool {
 }
 
 ///|UUID(1020e47f-950a-4f0b-8447-3f899f416b20)
-fn word_diffs(
+fn word_diffs_impl(
   lhs_parts : ArrayView[WordPart],
   rhs_parts : ArrayView[WordPart],
-) -> Array[WordDiff] {
+  budget : @computation.Budget?,
+) -> Array[WordDiff] raise @computation.LimitExceeded {
   let width = rhs_parts.length() + 1
+  if budget is Some(budget) {
+    budget.charge_matrix(lhs_parts.length() + 1, width, IntralineMatching)
+  }
   let dp = Array::make((lhs_parts.length() + 1) * width, 0)
   let index = fn(i : Int, j : Int) { i * width + j }
 
@@ -318,7 +309,8 @@ fn has_common_words(diffs : ArrayView[WordDiff]) -> Bool {
 fn split_replaced_atom_positions(
   change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
-) -> Array[MatchedPos] {
+  budget : @computation.Budget?,
+) -> Array[MatchedPos] raise @computation.LimitExceeded {
   let (self_node, opposite_node) = match change {
     ChangeKind::ReplacedComment(lhs~, rhs~) => (lhs, rhs)
     ChangeKind::ReplacedString(lhs~, rhs~) => (lhs, rhs)
@@ -351,7 +343,7 @@ fn split_replaced_atom_positions(
     return whole_novel_positions(positions)
   }
 
-  let diffs = word_diffs(self_parts, opposite_parts)
+  let diffs = word_diffs_impl(self_parts, opposite_parts, budget)
   if !has_common_words(diffs) {
     return whole_novel_positions(positions)
   }
@@ -447,12 +439,13 @@ fn matched_positions_for(
   change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
   is_close_delim : Bool,
-) -> Array[MatchedPos] {
+  budget : @computation.Budget?,
+) -> Array[MatchedPos] raise @computation.LimitExceeded {
   let positions = filter_empty_ends(positions)
   match change {
     ChangeKind::Novel => whole_novel_positions(positions)
     ChangeKind::ReplacedComment(..) | ChangeKind::ReplacedString(..) =>
-      split_replaced_atom_positions(change, positions)
+      split_replaced_atom_positions(change, positions, budget)
     ChangeKind::Unchanged(_) => {
       let opposite_pos = opposite_positions_for(change, is_close_delim)
       unchanged_positions(positions, opposite_pos)
@@ -461,27 +454,28 @@ fn matched_positions_for(
 }
 
 ///|UUID(b48e6514-1f58-46da-a6cb-783370a7f41c)
-pub fn change_positions(
+fn change_positions_impl(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-) -> Array[MatchedPos] {
+  budget : @computation.Budget?,
+) -> Array[MatchedPos] raise @computation.LimitExceeded {
   let positions = Array::new()
-  fn walk(node : Syntax) -> Unit {
+  fn walk(node : Syntax) -> Unit raise @computation.LimitExceeded {
     let change = change_map.get(node).unwrap_or_else(() => panic())
     match node {
       Syntax::Atom(position~, ..) =>
         positions.push_iter(
-          matched_positions_for(change, position, false).iter(),
+          matched_positions_for(change, position, false, budget).iter(),
         )
       Syntax::List(open_position~, children~, close_position~, ..) => {
         positions.push_iter(
-          matched_positions_for(change, open_position, false).iter(),
+          matched_positions_for(change, open_position, false, budget).iter(),
         )
         for child in children {
           walk(child)
         }
         positions.push_iter(
-          matched_positions_for(change, close_position, true).iter(),
+          matched_positions_for(change, close_position, true, budget).iter(),
         )
       }
     }
@@ -491,4 +485,23 @@ pub fn change_positions(
   } nobreak {
     positions
   }
+}
+
+///|
+pub fn change_positions(
+  nodes : ArrayView[Syntax],
+  change_map : ChangeMap,
+) -> Array[MatchedPos] {
+  change_positions_impl(nodes, change_map, None) catch {
+    @computation.LimitExceeded(..) => panic()
+  }
+}
+
+///|
+pub fn change_positions_with_budget(
+  nodes : ArrayView[Syntax],
+  change_map : ChangeMap,
+  budget : @computation.Budget,
+) -> Array[MatchedPos] raise @computation.LimitExceeded {
+  change_positions_impl(nodes, change_map, Some(budget))
 }

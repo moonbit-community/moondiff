@@ -52,11 +52,12 @@ fn align_impl_units_by_uuid(
 }
 
 ///|UUID(218731b6-e35d-469a-b7a9-a31dcc3b1c70)
-fn align_impl_units_by_key(
+fn align_impl_units_by_key_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
+  budget : @computation.Budget?,
   use_uuid? : Bool = true,
-) -> Array[ImplEdit] {
+) -> Array[ImplEdit] raise @computation.LimitExceeded {
   let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let replacements : @hashmap.HashMap[Int, Int] = @hashmap.HashMap([])
@@ -152,7 +153,7 @@ fn align_impl_units_by_key(
   // Only after all three passes do we compare unmatched declarations inside
   // the same anchor gap for a conservative rename pairing.
   let fuzzy_pairs = align_fuzzy_impl_units(
-    old_units, new_units, old_used, new_used, replacements, use_uuid,
+    old_units, new_units, old_used, new_used, replacements, use_uuid, budget,
   )
   for fuzzy_pair in fuzzy_pairs {
     let (old_index, new_index) = fuzzy_pair
@@ -450,19 +451,21 @@ fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
 }
 
 ///|
-fn top_level_plan(
+fn top_level_plan_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
+  budget : @computation.Budget?,
   ignore_uuid? : Bool = false,
-) -> TopLevelPlan {
+) -> TopLevelPlan raise @computation.LimitExceeded {
   if !ignore_uuid &&
     all_units_have_uuid(old_units) &&
     all_units_have_uuid(new_units) {
     PerUnit(align_impl_units_by_uuid(old_units, new_units))
   } else {
-    let edits = align_impl_units_by_key(
+    let edits = align_impl_units_by_key_impl(
       old_units,
       new_units,
+      budget,
       use_uuid=!ignore_uuid,
     )
     if impl_edits_have_replacement(edits) {
@@ -471,6 +474,27 @@ fn top_level_plan(
       RootList(old=old_units.to_owned(), new=new_units.to_owned())
     }
   }
+}
+
+///|
+fn top_level_plan(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  ignore_uuid? : Bool = false,
+) -> TopLevelPlan {
+  top_level_plan_impl(old_units, new_units, None, ignore_uuid~) catch {
+    @computation.LimitExceeded(..) => panic()
+  }
+}
+
+///|
+fn top_level_plan_with_budget(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  budget : @computation.Budget,
+  ignore_uuid? : Bool = false,
+) -> TopLevelPlan raise @computation.LimitExceeded {
+  top_level_plan_impl(old_units, new_units, Some(budget), ignore_uuid~)
 }
 
 ///|UUID(85a087f2-92d2-4240-8b75-a5c086d18e14)

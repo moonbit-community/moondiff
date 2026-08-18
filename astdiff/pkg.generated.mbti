@@ -2,6 +2,7 @@
 package "moonbit-community/moondiff/astdiff"
 
 import {
+  "moonbit-community/moondiff/internal/computation",
   "moonbit-community/moondiff/syntax",
   "moonbitlang/core/debug",
   "moonbitlang/core/ref",
@@ -10,16 +11,17 @@ import {
 // Values
 pub fn fix_all_sliders(ArrayView[@syntax.Syntax], @syntax.ChangeMap) -> Unit
 
-pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, @syntax.ChangeMap, UInt) -> Unit raise ExceededGraphLimit
+pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, @syntax.ChangeMap, UInt) -> Unit raise
 
-pub fn mark_syntax_roots(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt) -> Unit raise ExceededGraphLimit
+pub fn mark_syntax_roots(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt) -> Unit raise
 
-pub fn shortest_path(Vertex, Int, Int) -> Array[(Edge, Vertex)] raise ExceededGraphLimit
+pub fn mark_syntax_roots_with_budget(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt, @computation.Budget) -> Unit raise
+
+pub fn shortest_path(Vertex, Int, Int) -> Array[(Edge, Vertex)] raise
 
 pub fn tree_count(@syntax.Syntax?) -> UInt
 
 // Errors
-type ExceededGraphLimit
 
 // Types and methods
 pub enum Edge {
