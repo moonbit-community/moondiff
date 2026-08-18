@@ -8,7 +8,10 @@
     "start": "node server.mjs",
     "server-test": "node --test tests/server.test.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "build:extension": "node ../extension/scripts/build.mjs",
+    "test:extension": "node --test ../extension/tests/*.test.mjs && ./node_modules/.bin/playwright test --config ../extension/playwright.config.mjs",
+    "package:extension": "node ../extension/scripts/package.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"
