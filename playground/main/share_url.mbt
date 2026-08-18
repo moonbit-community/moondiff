@@ -5,6 +5,8 @@ fn canonical_github_url(reference : CommitRef) -> String {
       "https://github.com/\{reference.owner}/\{reference.repo}/commit/\{sha}"
     PullRequest(number) =>
       "https://github.com/\{reference.owner}/\{reference.repo}/pull/\{number}"
+    PullCommit(number, sha) =>
+      "https://github.com/\{reference.owner}/\{reference.repo}/pull/\{number}/commits/\{sha}"
   }
 }
 
@@ -14,6 +16,8 @@ fn playground_route(reference : CommitRef) -> String {
     Commit(sha) => "#/\{reference.owner}/\{reference.repo}/commit/\{sha}"
     PullRequest(number) =>
       "#/\{reference.owner}/\{reference.repo}/pull/\{number}"
+    PullCommit(number, sha) =>
+      "#/\{reference.owner}/\{reference.repo}/pull/\{number}/commits/\{sha}"
   }
 }
 
@@ -29,11 +33,15 @@ fn reference_from_route(fragment : String?) -> Result[CommitRef?, String] {
       commit_reference(owner, repo, sha)
     ["", owner, repo, "pull", number] | [owner, repo, "pull", number] =>
       pull_reference(owner, repo, number)
+    ["", owner, repo, "pull", number, "commits", sha]
+    | [owner, repo, "pull", number, "commits", sha] =>
+      pull_commit_reference(owner, repo, number, sha)
     _ => return Err("This shared playground link is not valid.")
   }
   let valid_target = match reference.target {
     Commit(sha) => valid_sha(sha)
     PullRequest(number) => valid_pull_number(number)
+    PullCommit(number, sha) => valid_pull_number(number) && valid_sha(sha)
   }
   if !valid_owner(reference.owner) ||
     !valid_repo(reference.repo) ||
@@ -54,10 +62,10 @@ fn reference_from_playground_url(input : String) -> Result[CommitRef?, String] {
 }
 
 ///|
-extern "js" fn browser_current_url() -> String = "() => window.location.href"
+extern "js" fn browser_current_url() -> String = "() => globalThis.window?.location?.href || 'http://localhost/'"
 
 ///|
-extern "js" fn browser_base_url() -> String = "() => window.location.origin + window.location.pathname"
+extern "js" fn browser_base_url() -> String = "() => globalThis.window?.location ? window.location.origin + window.location.pathname : 'http://localhost/'"
 
 ///|
 fn playground_share_url(reference : CommitRef) -> String {

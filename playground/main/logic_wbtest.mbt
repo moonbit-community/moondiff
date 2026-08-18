@@ -15,6 +15,7 @@ fn fixture_file(
     additions: 1,
     deletions: 2,
     changes: 3,
+    patch: None,
   }
 }
 
@@ -38,10 +39,10 @@ test "parse supported GitHub commit and pull request URL forms" {
   }
   assert_eq(pr.owner, "moonbitlang")
   assert_eq(pr.repo, "core")
-  assert_true(pr.target is Commit("0123456789abcdef"))
+  assert_true(pr.target is PullCommit("42", "0123456789abcdef"))
   assert_eq(
     canonical_github_url(pr),
-    "https://github.com/moonbitlang/core/commit/0123456789abcdef",
+    "https://github.com/moonbitlang/core/pull/42/commits/0123456789abcdef",
   )
 
   for
@@ -110,12 +111,11 @@ test "reject unsupported or malformed URLs" {
   for
     url in [
       "http://github.com/a/b/commit/abcdef1", "https://git.example.com/a/b/commit/abcdef1",
-      "https://github.example.com/a/b/commit/abcdef1", "https://github.com/a/b/pull/1/commits",
-      "https://github.com/a/b/compare/abcdef1...abcdef2", "https://github.com/-bad/b/commit/abcdef1",
-      "https://github.com/a/bad%2Frepo/commit/abcdef1", "https://github.com/a/b/commit/abcdef",
-      "https://github.com/a/b/pull/nope/changes/abcdef1", "https://github.com/a/b/pull/0/changes/abcdef1",
-      "https://github.com/a/b/pull/nope", "https://github.com/a/b/pull/0/files",
-      "https://github.com:443/a/b/commit/abcdef1",
+      "https://github.example.com/a/b/commit/abcdef1", "https://github.com/a/b/compare/abcdef1...abcdef2",
+      "https://github.com/-bad/b/commit/abcdef1", "https://github.com/a/bad%2Frepo/commit/abcdef1",
+      "https://github.com/a/b/commit/abcdef", "https://github.com/a/b/pull/nope/changes/abcdef1",
+      "https://github.com/a/b/pull/0/changes/abcdef1", "https://github.com/a/b/pull/nope",
+      "https://github.com/a/b/pull/0/files", "https://github.com:443/a/b/commit/abcdef1",
     ] {
     assert_true(parse_change_url(url) is Err(_), msg=url)
   }
@@ -227,13 +227,13 @@ test "decode pull request metadata and choose merge base and head" {
   assert_false(
     same_pull_snapshot(pull, {
       ..pull,
-      head: { sha: "dddddddddddddddddddddddddddddddddddddddd" },
+      head: { sha: "dddddddddddddddddddddddddddddddddddddddd", repo: None },
     }),
   )
   assert_false(
     same_pull_snapshot(pull, {
       ..pull,
-      base: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
+      base: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", repo: None },
     }),
   )
   assert_false(same_pull_snapshot(pull, { ..pull, changed_files: 3 }))
@@ -379,6 +379,7 @@ test "stale commit responses are discarded by generation" {
     copy_status: CopyReady,
     backend_status: BackendMissing,
     analysis_status: AnalysisIdle,
+    review: initial_review_state(),
   }
   let fixture = decode_commit(
     read_fixture("playground/main/fixtures/root_commit.json"),
@@ -406,6 +407,7 @@ fn pull_test_model(
     copy_status: CopyReady,
     backend_status: BackendMissing,
     analysis_status: AnalysisIdle,
+    review: initial_review_state(),
   }
 }
 
@@ -560,7 +562,7 @@ test "a changed pull head retries once and discards the old attempt" {
   let latest = {
     ..pull,
     title: "Latest pull title",
-    head: { sha: "dddddddddddddddddddddddddddddddddddddddd" },
+    head: { sha: "dddddddddddddddddddddddddddddddddddddddd", repo: None },
     additions: 13,
   }
   assert_eq(latest.changed_files, pull.changed_files)
@@ -669,7 +671,7 @@ test "a pull request that changes during both attempts fails explicitly" {
   )
   let changed_again = {
     ..pull,
-    base: { sha: "ffffffffffffffffffffffffffffffffffffffff" },
+    base: { sha: "ffffffffffffffffffffffffffffffffffffffff", repo: None },
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (failed, _) = update(
@@ -753,6 +755,14 @@ test "pull request analysis keeps the v1 commit-shaped payload" {
     reference,
     sha: pull.head.sha,
     parent_sha: Some("9999999999999999999999999999999999999999"),
+    old_revision: Some({
+      repository: reference_repository(reference),
+      sha: "9999999999999999999999999999999999999999",
+    }),
+    new_revision: {
+      repository: reference_repository(reference),
+      sha: pull.head.sha,
+    },
     message: pull.title,
     html_url: pull.html_url,
     stats: pull_stats(pull),
@@ -799,7 +809,14 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let reference = commit_reference("example", "root", fixture.sha)
-  let (view, _) = finish_commit(reference, fixture, files, 7, emit)
+  let (view, _) = finish_commit(
+    reference,
+    reference_repository(reference),
+    fixture,
+    files,
+    7,
+    emit,
+  )
   assert_eq(view.files.length(), files.length())
   assert_eq(
     view.files.map(state => state.file.filename),
@@ -839,6 +856,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     copy_status: CopyReady,
     backend_status: BackendMissing,
     analysis_status: AnalysisIdle,
+    review: initial_review_state(),
   }
   let (after, _) = update(
     model,
@@ -856,6 +874,7 @@ fn analysis_test_view(files : Array[ApiFile]) -> ChangeView raise {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (view, _) = finish_commit(
     commit_reference("example", "project", fixture.sha),
+    { owner: "example", repo: "project" },
     fixture,
     files,
     9,
@@ -881,6 +900,7 @@ fn analysis_test_model(
     copy_status: CopyReady,
     backend_status: BackendReady,
     analysis_status: status,
+    review: initial_review_state(),
   }
 }
 
@@ -1040,6 +1060,7 @@ test "non-text files are skipped while text hunk ids retain file indexes" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (root_view, _) = finish_commit(
     commit_reference("example", "root", root.sha),
+    { owner: "example", repo: "root" },
     root,
     [fixture_file("root.txt", "added")],
     9,
@@ -1341,7 +1362,13 @@ test "ignore comments survives commit navigation but stays out of routes" {
     generation: 1,
     ignore_comments: true,
     route: Some(reference),
-    phase: LoadingCommit(reference~, page=1, first=None, files=[]),
+    phase: LoadingCommit(
+      reference~,
+      repository=reference_repository(reference),
+      page=1,
+      first=None,
+      files=[],
+    ),
   }
   let (loaded, _) = update(loading, CommitPageLoaded(1, 1, Ok(fixture)), emit)
   assert_true(loaded.ignore_comments)

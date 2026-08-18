@@ -60,6 +60,8 @@ priv struct ChangeView {
   reference : CommitRef
   sha : String
   parent_sha : String?
+  old_revision : Revision?
+  new_revision : Revision
   message : String
   html_url : String
   stats : ApiStats
@@ -72,11 +74,13 @@ priv enum Phase {
   Idle
   LoadingCommit(
     reference~ : CommitRef,
+    repository~ : RepositoryRef,
     page~ : Int,
     first~ : ApiCommit?,
     files~ : Array[ApiFile]
   )
   LoadingPullMetadata(reference~ : CommitRef, attempt~ : Int)
+  LoadingPullCommitMetadata(reference~ : CommitRef)
   LoadingPullSnapshot(
     reference~ : CommitRef,
     attempt~ : Int,
@@ -116,6 +120,7 @@ priv struct Model {
   copy_status : CopyStatus
   backend_status : BackendStatus
   analysis_status : AnalysisStatus
+  review : ReviewState
 } derive(Eq)
 
 ///|
@@ -132,6 +137,7 @@ fn initial_model() -> Model {
     copy_status: CopyReady,
     backend_status: BackendProbing,
     analysis_status: AnalysisIdle,
+    review: initial_review_state(),
   }
 }
 
@@ -158,15 +164,55 @@ priv enum Msg {
   PullCompareLoaded(Int, Int, Result[ApiCompare, Error])
   PullFilesPageLoaded(Int, Int, Int, Result[Array[ApiFile], Error])
   PullValidationLoaded(Int, Int, Result[ApiPull, Error])
+  PullCommitMetadataLoaded(Int, Result[ApiPull, Error])
+  AuthStatusLoaded(Result[ApiAuthStatus, Error])
+  StartDeviceAuthorization
+  DeviceAuthorizationStarted(Result[ApiAuthStatus, Error])
+  PollDeviceAuthorization(String)
+  DeviceAuthorizationPolled(String, Result[ApiAuthStatus, Error])
+  CancelDeviceAuthorization(String)
+  DeviceAuthorizationCancelled(String, Result[ApiAuthStatus, Error])
+  CopyDeviceCode
+  DeviceCodeCopied(String)
+  DeviceCodeCopyFailed(String, String)
+  Logout
+  AuthLogoutFinished(Result[ApiAuthStatus, Error])
+  RefreshComments
+  CommentsLoaded(Int, Result[ApiCommentBundle, Error])
+  VisibilityChanged(Bool)
+  OpenOverallDraft
+  OpenInlineDraft(Int, ReviewAnchor)
+  OpenReplyDraft(Int64)
+  DraftBodyChanged(String)
+  CancelDraft
+  SubmitDraft
+  CommentHeadChecked(Int, ReviewAnchor, Result[ApiPull, Error])
+  IssueCommentCreated(Int, Result[ApiIssueComment, Error])
+  ReviewCommentCreated(Int, Result[ApiReviewComment, Error])
+  CommitCommentCreated(Int, Result[ApiCommitComment, Error])
+  ReviewReplyCreated(Int, Result[ApiReviewComment, Error])
 }
 
 ///|
 fn error_message(error : Error, api : Bool) -> String {
   let detail = error.to_string()
-  if api && detail.contains("HTTP 403") {
-    "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later."
+  let lower = detail.to_lower()
+  if api && extension_host_enabled() && lower.contains("rate limit") {
+    "GitHub API rate limit exceeded. Sign in or try again after the reset time."
+  } else if api && detail.contains("HTTP 401") && extension_host_enabled() {
+    "Your GitHub session expired. Sign in again."
+  } else if api && detail.contains("HTTP 403") {
+    if extension_host_enabled() {
+      "GitHub denied this request. Install the app for this repository and check its permissions."
+    } else {
+      "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later."
+    }
   } else if api && detail.contains("HTTP 404") {
-    "GitHub could not find that public repository, commit, or pull request."
+    if extension_host_enabled() {
+      "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
+    } else {
+      "GitHub could not find that public repository, commit, or pull request."
+    }
   } else {
     detail
   }
@@ -185,69 +231,47 @@ impl Show for GitHubRequestError with fn output(self, logger) {
 }
 
 ///|
-fn[T : FromJson] fresh_json_get(
-  url : String,
-  msg : @rabbita.Emit[Result[T, Error]],
-) -> @rabbita.Cmd {
-  @cmd.custom_cmd(scheduler => {
-    send_fresh_json_get(
-      url,
-      completed=(ok, status, status_text, response_body) => {
-        let result : Result[T, Error] = if ok {
-          try @json.from_json(@json.parse(response_body)) catch {
-            error => Err(GitHubRequestError(error.to_string()))
-          } noraise {
-            value => Ok(value)
-          }
-        } else {
-          let suffix = if status_text.trim().is_empty() {
-            ""
-          } else {
-            " \{status_text}"
-          }
-          Err(GitHubRequestError("Http request failed:HTTP \{status}\{suffix}"))
-        }
-        scheduler.add(msg(result))
-      },
-      failed=detail => {
-        scheduler.add(
-          msg(Err(GitHubRequestError("Http request failed:\{detail}"))),
-        )
-      },
-    )
-  })
-}
-
-///|
-extern "js" fn send_fresh_json_get(
-  url : String,
-  completed~ : (Bool, Int, String, String) -> Unit,
-  failed~ : (String) -> Unit,
-) =
-  #| (url, completed, failed) => {
-  #|   fetch(url, { method: "GET", cache: "no-cache" })
-  #|     .then((response) => {
-  #|       if (!response.ok) {
-  #|         completed(false, response.status, response.statusText || "", "");
-  #|         return;
-  #|       }
-  #|       return response.text().then((body) => {
-  #|         completed(true, response.status, response.statusText || "", body);
-  #|       });
-  #|     })
-  #|     .catch((error) => failed(error.toString()));
-  #| }
-
-///|
 fn commit_request(
   reference : CommitRef,
+  repository : RepositoryRef,
   generation : Int,
   page : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  @http.get(commit_api_url(reference, page)).expect_json(result => {
-    emit(CommitPageLoaded(generation, page, result))
-  })
+  let sha = match reference.target {
+    Commit(sha) | PullCommit(_, sha) => sha
+    PullRequest(_) => ""
+  }
+  gateway_json_request(
+    "github.commit.get",
+    repository,
+    sha,
+    "",
+    page,
+    generation,
+    result => emit(CommitPageLoaded(generation, page, result)),
+  )
+}
+
+///|
+fn pull_commit_metadata_request(
+  reference : CommitRef,
+  generation : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  let number = match reference.target {
+    PullCommit(number, _) => number
+    _ => ""
+  }
+  gateway_json_request(
+    "github.pull.get",
+    reference_repository(reference),
+    number,
+    "",
+    0,
+    generation,
+    result => emit(PullCommitMetadataLoaded(generation, result)),
+  )
 }
 
 ///|
@@ -257,9 +281,19 @@ fn pull_metadata_request(
   attempt : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  fresh_json_get(pull_api_url(reference), result => {
-    emit(PullMetadataLoaded(generation, attempt, result))
-  })
+  let number = match reference.target {
+    PullRequest(number) => number
+    _ => ""
+  }
+  gateway_json_request(
+    "github.pull.get",
+    reference_repository(reference),
+    number,
+    "",
+    0,
+    generation,
+    result => emit(PullMetadataLoaded(generation, attempt, result)),
+  )
 }
 
 ///|
@@ -271,9 +305,15 @@ fn pull_compare_request(
   attempt : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  @http.get(compare_api_url(reference, base_sha, head_sha)).expect_json(result => {
-    emit(PullCompareLoaded(generation, attempt, result))
-  })
+  gateway_json_request(
+    "github.compare.get",
+    reference_repository(reference),
+    base_sha,
+    head_sha,
+    0,
+    generation,
+    result => emit(PullCompareLoaded(generation, attempt, result)),
+  )
 }
 
 ///|
@@ -284,9 +324,19 @@ fn pull_files_request(
   page : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  fresh_json_get(pull_files_api_url(reference, page), result => {
-    emit(PullFilesPageLoaded(generation, attempt, page, result))
-  })
+  let number = match reference.target {
+    PullRequest(number) => number
+    _ => ""
+  }
+  gateway_json_request(
+    "github.pull.files",
+    reference_repository(reference),
+    number,
+    "",
+    page,
+    generation,
+    result => emit(PullFilesPageLoaded(generation, attempt, page, result)),
+  )
 }
 
 ///|
@@ -296,22 +346,19 @@ fn pull_validation_request(
   attempt : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  fresh_json_get(pull_api_url(reference), result => {
-    emit(PullValidationLoaded(generation, attempt, result))
-  })
-}
-
-///|
-fn source_request(
-  url : String,
-  generation : Int,
-  index : Int,
-  side : SourceSide,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Cmd {
-  @http.get(url).expect_bytes(result => {
-    emit(SourceLoaded(generation, index, side, result))
-  })
+  let number = match reference.target {
+    PullRequest(number) => number
+    _ => ""
+  }
+  gateway_json_request(
+    "github.pull.get",
+    reference_repository(reference),
+    number,
+    "",
+    0,
+    generation,
+    result => emit(PullValidationLoaded(generation, attempt, result)),
+  )
 }
 
 ///|
@@ -330,20 +377,23 @@ fn initial_side(url : String?, expanded : Bool) -> SideLoad {
 ///|
 fn commands_for_file(
   file : ApiFile,
-  reference : CommitRef,
-  sha : String,
-  parent_sha : String?,
+  old_revision : Revision?,
+  new_revision : Revision,
   generation : Int,
   index : Int,
   emit : @rabbita.Emit[Msg],
 ) -> Array[@rabbita.Cmd] {
-  let pair = source_pair(reference, sha, parent_sha, file)
+  let pair = source_pair_for_revisions(old_revision, new_revision, file)
   let commands : Array[@rabbita.Cmd] = []
-  if pair.old_url is Some(url) {
-    commands.push(source_request(url, generation, index, Old, emit))
+  if pair.old_location is Some(location) {
+    commands.push(
+      gateway_source_request(location, generation, index, Old, emit),
+    )
   }
-  if pair.new_url is Some(url) {
-    commands.push(source_request(url, generation, index, New, emit))
+  if pair.new_location is Some(location) {
+    commands.push(
+      gateway_source_request(location, generation, index, New, emit),
+    )
   }
   commands
 }
@@ -351,8 +401,8 @@ fn commands_for_file(
 ///|
 fn finish_change(
   reference : CommitRef,
-  sha : String,
-  parent_sha : String?,
+  old_revision : Revision?,
+  new_revision : Revision,
   message : String,
   html_url : String,
   stats : ApiStats,
@@ -369,7 +419,7 @@ fn finish_change(
     if diff_mode is MoonBitDiff {
       moonbit_file_count += 1
     }
-    let pair = source_pair(reference, sha, parent_sha, file)
+    let pair = source_pair_for_revisions(old_revision, new_revision, file)
     states.push({
       file,
       diff_mode,
@@ -381,7 +431,7 @@ fn finish_change(
     if expanded {
       for
         command in commands_for_file(
-          file, reference, sha, parent_sha, generation, index, emit,
+          file, old_revision, new_revision, generation, index, emit,
         ) {
         commands.push(command)
       }
@@ -390,8 +440,10 @@ fn finish_change(
   (
     {
       reference,
-      sha,
-      parent_sha,
+      sha: new_revision.sha,
+      parent_sha: old_revision.map(revision => revision.sha),
+      old_revision,
+      new_revision,
       message,
       html_url,
       stats,
@@ -405,15 +457,21 @@ fn finish_change(
 ///|
 fn finish_commit(
   reference : CommitRef,
+  repository : RepositoryRef,
   first : ApiCommit,
   all_files : Array[ApiFile],
   generation : Int,
   emit : @rabbita.Emit[Msg],
 ) -> (ChangeView, @rabbita.Cmd) {
-  finish_change(
-    reference,
+  let (old_revision, new_revision) = repository_commit_revisions(
+    repository,
     first.sha,
     first_parent(first),
+  )
+  finish_change(
+    reference,
+    old_revision,
+    new_revision,
     first.commit.message,
     first.html_url,
     first.stats,
@@ -434,12 +492,15 @@ fn finish_pull(
 ) -> Result[(ChangeView, @rabbita.Cmd), String] {
   match validate_pull_files(pull, all_files) {
     Err(message) => Err(message)
-    Ok(_) =>
+    Ok(_) => {
+      let (old_revision, new_revision) = pull_revisions(
+        reference, pull, compare,
+      )
       Ok(
         finish_change(
           reference,
-          pull.head.sha,
-          Some(pull_merge_base(compare)),
+          old_revision,
+          new_revision,
           pull.title,
           pull.html_url,
           pull_stats(pull),
@@ -448,6 +509,7 @@ fn finish_pull(
           emit,
         ),
       )
+    }
   }
 }
 
@@ -463,6 +525,8 @@ fn set_file_state(
     reference: view.reference,
     sha: view.sha,
     parent_sha: view.parent_sha,
+    old_revision: view.old_revision,
+    new_revision: view.new_revision,
     message: view.message,
     html_url: view.html_url,
     stats: view.stats,
@@ -485,6 +549,7 @@ fn with_phase(model : Model, phase : Phase) -> Model {
     copy_status: model.copy_status,
     backend_status: model.backend_status,
     analysis_status: model.analysis_status,
+    review: model.review,
   }
 }
 
@@ -502,6 +567,7 @@ fn with_backend_status(model : Model, backend_status : BackendStatus) -> Model {
     copy_status: model.copy_status,
     backend_status,
     analysis_status: model.analysis_status,
+    review: model.review,
   }
 }
 
@@ -522,7 +588,145 @@ fn with_analysis_status(
     copy_status: model.copy_status,
     backend_status: model.backend_status,
     analysis_status,
+    review: model.review,
   }
+}
+
+///|
+fn with_review(model : Model, review : ReviewState) -> Model {
+  { ..model, review, }
+}
+
+///|
+fn update_draft(
+  model : Model,
+  body? : String,
+  submitting? : Bool,
+  error? : String?,
+) -> Model {
+  guard model.review.draft is Some(draft) else { return model }
+  with_review(
+    model,
+    review_state_with_draft(
+      model.review,
+      Some({
+        kind: draft.kind,
+        body: body.unwrap_or(draft.body),
+        submitting: submitting.unwrap_or(draft.submitting),
+        error: if error is Some(value) {
+          value
+        } else {
+          draft.error
+        },
+      }),
+    ),
+  )
+}
+
+///|
+fn comment_failure_message(error : Error) -> String {
+  let detail = error_message(error, true)
+  if detail.contains("HTTP 401") {
+    "Your GitHub session expired. Sign in again, then retry."
+  } else if detail.contains("HTTP 403") {
+    "GitHub denied this action. Install the app for this repository and check its Pull requests permission."
+  } else if detail.contains("HTTP 404") {
+    "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
+  } else if detail.contains("HTTP 422") {
+    "GitHub rejected this comment anchor. Refresh the diff and choose the line again."
+  } else {
+    detail
+  }
+}
+
+///|
+fn finish_comment_submission(
+  model : Model,
+  generation : Int,
+  error : Error?,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  if generation != model.generation {
+    return (model, @rabbita.none)
+  }
+  if error is Some(error) {
+    return (
+      update_draft(
+        model,
+        submitting=false,
+        error=Some(comment_failure_message(error)),
+      ),
+      @rabbita.none,
+    )
+  }
+  guard model.route is Some(reference) else { return (model, @rabbita.none) }
+  (
+    with_review(model, {
+      auth: model.review.auth,
+      // Keep the object returned by GitHub visible while the authoritative
+      // comment list refresh runs in the background.
+      comments: model.review.comments,
+      draft: None,
+    }),
+    @rabbita.batch([
+      comments_request(reference, generation, emit),
+      notify_github_page_command(),
+    ]),
+  )
+}
+
+///|
+fn insert_issue_comment(model : Model, comment : ApiIssueComment) -> Model {
+  guard model.review.comments is CommentsReady(bundle) else { return model }
+  let comments = bundle.issue_comments.copy()
+  comments.push(comment)
+  with_review(
+    model,
+    review_state_with_comments(
+      model.review,
+      CommentsReady({
+        issue_comments: comments,
+        review_comments: bundle.review_comments,
+        commit_comments: bundle.commit_comments,
+      }),
+    ),
+  )
+}
+
+///|
+fn insert_review_comment(model : Model, comment : ApiReviewComment) -> Model {
+  guard model.review.comments is CommentsReady(bundle) else { return model }
+  let comments = bundle.review_comments.copy()
+  comments.push(comment)
+  with_review(
+    model,
+    review_state_with_comments(
+      model.review,
+      CommentsReady({
+        issue_comments: bundle.issue_comments,
+        review_comments: comments,
+        commit_comments: bundle.commit_comments,
+      }),
+    ),
+  )
+}
+
+///|
+fn insert_commit_comment(model : Model, comment : ApiCommitComment) -> Model {
+  guard model.review.comments is CommentsReady(bundle) else { return model }
+  let comments = bundle.commit_comments.copy()
+  comments.push(comment)
+  with_review(
+    model,
+    review_state_with_comments(
+      model.review,
+      CommentsReady({
+        issue_comments: bundle.issue_comments,
+        review_comments: bundle.review_comments,
+        commit_comments: comments,
+      }),
+    ),
+  )
 }
 
 ///|
@@ -669,15 +873,22 @@ fn begin_change_load(
 ) -> (Model, @rabbita.Cmd) {
   let generation = model.generation + 1
   let (phase, command) = match reference.target {
-    Commit(_) =>
+    Commit(_) => {
+      let repository = reference_repository(reference)
       (
-        LoadingCommit(reference~, page=1, first=None, files=[]),
-        commit_request(reference, generation, 1, emit),
+        LoadingCommit(reference~, repository~, page=1, first=None, files=[]),
+        commit_request(reference, repository, generation, 1, emit),
       )
+    }
     PullRequest(_) =>
       (
         LoadingPullMetadata(reference~, attempt=0),
         pull_metadata_request(reference, generation, 0, emit),
+      )
+    PullCommit(_, _) =>
+      (
+        LoadingPullCommitMetadata(reference~),
+        pull_commit_metadata_request(reference, generation, emit),
       )
   }
   (
@@ -693,8 +904,17 @@ fn begin_change_load(
       copy_status: CopyReady,
       backend_status: model.backend_status,
       analysis_status: AnalysisIdle,
+      review: if extension_host_enabled() {
+        { auth: model.review.auth, comments: CommentsLoading, draft: None }
+      } else {
+        model.review
+      },
     },
-    command,
+    if extension_host_enabled() {
+      @rabbita.batch([command, comments_request(reference, generation, emit)])
+    } else {
+      command
+    },
   )
 }
 
@@ -707,12 +927,23 @@ fn app_init(emit : @rabbita.Emit[Msg]) -> (Model, @rabbita.Cmd) {
     Ok(None) => (model, @rabbita.none)
     Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
   }
-  (next, @rabbita.batch([health_request(emit), command]))
+  if extension_host_enabled() {
+    (next, @rabbita.batch([auth_status_request(emit), command]))
+  } else {
+    (next, @rabbita.batch([health_request(emit), command]))
+  }
 }
 
 ///|
 fn app_subscriptions(_model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
-  @sub.on_url_changed(url => emit(RouteChanged(url)))
+  if extension_host_enabled() {
+    @sub.batch([
+      @sub.on_url_changed(url => emit(RouteChanged(url))),
+      @sub.on_visibility_change(hidden => emit(VisibilityChanged(hidden))),
+    ])
+  } else {
+    @sub.on_url_changed(url => emit(RouteChanged(url)))
+  }
 }
 
 ///|
@@ -736,17 +967,25 @@ fn prepare_all_sources(
   let files = view.files.copy()
   let commands : Array[@rabbita.Cmd] = []
   for index, file in files {
-    let pair = source_pair(view.reference, view.sha, view.parent_sha, file.file)
-    let old_side = match (file.old_side, pair.old_url) {
-      (NotRequested | LoadFailed(_), Some(url)) => {
-        commands.push(source_request(url, generation, index, Old, emit))
+    let pair = source_pair_for_revisions(
+      view.old_revision,
+      view.new_revision,
+      file.file,
+    )
+    let old_side = match (file.old_side, pair.old_location) {
+      (NotRequested | LoadFailed(_), Some(location)) => {
+        commands.push(
+          gateway_source_request(location, generation, index, Old, emit),
+        )
         Loading
       }
       (side, _) => side
     }
-    let new_side = match (file.new_side, pair.new_url) {
-      (NotRequested | LoadFailed(_), Some(url)) => {
-        commands.push(source_request(url, generation, index, New, emit))
+    let new_side = match (file.new_side, pair.new_location) {
+      (NotRequested | LoadFailed(_), Some(location)) => {
+        commands.push(
+          gateway_source_request(location, generation, index, New, emit),
+        )
         Loading
       }
       (side, _) => side
@@ -765,6 +1004,8 @@ fn prepare_all_sources(
       reference: view.reference,
       sha: view.sha,
       parent_sha: view.parent_sha,
+      old_revision: view.old_revision,
+      new_revision: view.new_revision,
       message: view.message,
       html_url: view.html_url,
       stats: view.stats,
@@ -831,12 +1072,555 @@ fn continue_analysis(
 }
 
 ///|
+fn apply_auth_status(
+  model : Model,
+  status : ApiAuthStatus,
+  preserve_device_copy : Bool,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let auth = if preserve_device_copy {
+    auth_status_from_api_preserving(status, model.review.auth)
+  } else {
+    auth_status_from_api(status)
+  }
+  let next = with_review(model, review_state_with_auth(model.review, auth))
+  match auth {
+    DeviceAuthorizing(device) =>
+      (next, schedule_device_poll(device.flow_id, device.poll_after, emit))
+    _ => (next, @rabbita.none)
+  }
+}
+
+///|
+fn finish_device_sign_in(
+  model : Model,
+  status : ApiAuthStatus,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let next = with_review(
+    model,
+    review_state_with_auth(model.review, auth_status_from_api(status)),
+  )
+  guard model.route is Some(reference) else { return (next, @rabbita.none) }
+  if model.phase is LoadFailed(_) {
+    return begin_change_load(next, reference, emit)
+  }
+  (
+    with_review(next, review_state_with_comments(next.review, CommentsLoading)),
+    comments_request(reference, model.generation, emit),
+  )
+}
+
+///|
+fn device_flow_is_current(model : Model, flow_id : String) -> Bool {
+  match model.review.auth {
+    DeviceAuthorizing(device) | DeviceCancelling(device) =>
+      device.flow_id == flow_id
+    _ => false
+  }
+}
+
+///|
+fn device_flow_is_cancelling(model : Model, flow_id : String) -> Bool {
+  model.review.auth is DeviceCancelling(device) && device.flow_id == flow_id
+}
+
+///|
+fn device_flow_is_authorizing(model : Model, flow_id : String) -> Bool {
+  model.review.auth is DeviceAuthorizing(device) && device.flow_id == flow_id
+}
+
+///|
 fn update(
   model : Model,
   msg : Msg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   match msg {
+    AuthStatusLoaded(result) =>
+      match result {
+        Ok(status) => apply_auth_status(model, status, true, emit)
+        Err(error) =>
+          (
+            with_review(
+              model,
+              review_state_with_auth(
+                model.review,
+                AuthFailed(comment_failure_message(error)),
+              ),
+            ),
+            @rabbita.none,
+          )
+      }
+    StartDeviceAuthorization =>
+      if extension_host_enabled() {
+        (
+          with_review(model, review_state_with_auth(model.review, AuthChecking)),
+          auth_device_start_request(emit),
+        )
+      } else {
+        (model, @rabbita.none)
+      }
+    DeviceAuthorizationStarted(result) =>
+      match result {
+        Ok(status) if status.authenticated =>
+          finish_device_sign_in(model, status, emit)
+        Ok(status) => apply_auth_status(model, status, false, emit)
+        Err(error) =>
+          (
+            with_review(
+              model,
+              review_state_with_auth(
+                model.review,
+                AuthFailed(comment_failure_message(error)),
+              ),
+            ),
+            @rabbita.none,
+          )
+      }
+    PollDeviceAuthorization(flow_id) =>
+      if extension_host_enabled() && device_flow_is_authorizing(model, flow_id) {
+        (model, auth_device_poll_request(flow_id, emit))
+      } else {
+        (model, @rabbita.none)
+      }
+    DeviceAuthorizationPolled(flow_id, result) => {
+      if !device_flow_is_current(model, flow_id) {
+        return (model, @rabbita.none)
+      }
+      if device_flow_is_cancelling(model, flow_id) {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Ok(status) if status.authenticated =>
+          finish_device_sign_in(model, status, emit)
+        Ok(status) => {
+          guard status.device_flow is Some(flow) && flow.flow_id == flow_id else {
+            return (model, @rabbita.none)
+          }
+          apply_auth_status(model, status, true, emit)
+        }
+        Err(error) =>
+          (
+            with_review(
+              model,
+              review_state_with_auth(
+                model.review,
+                AuthFailed(comment_failure_message(error)),
+              ),
+            ),
+            @rabbita.none,
+          )
+      }
+    }
+    CancelDeviceAuthorization(flow_id) => {
+      guard extension_host_enabled() &&
+        model.review.auth is DeviceAuthorizing(device) &&
+        device.flow_id == flow_id else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(
+          model,
+          review_state_with_auth(model.review, DeviceCancelling(device)),
+        ),
+        auth_device_cancel_request(flow_id, emit),
+      )
+    }
+    DeviceAuthorizationCancelled(flow_id, result) => {
+      if !device_flow_is_cancelling(model, flow_id) {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Ok(status) => apply_auth_status(model, status, false, emit)
+        Err(error) =>
+          (
+            with_review(
+              model,
+              review_state_with_auth(
+                model.review,
+                AuthFailed(comment_failure_message(error)),
+              ),
+            ),
+            @rabbita.none,
+          )
+      }
+    }
+    CopyDeviceCode => {
+      guard model.review.auth is DeviceAuthorizing(device) else {
+        return (model, @rabbita.none)
+      }
+      (
+        model,
+        @clipboard.copy(
+          Text(device.user_code),
+          copied=emit(DeviceCodeCopied(device.flow_id)),
+          failed=message => emit(DeviceCodeCopyFailed(device.flow_id, message)),
+        ),
+      )
+    }
+    DeviceCodeCopied(flow_id) => {
+      guard model.review.auth is DeviceAuthorizing(device) &&
+        device.flow_id == flow_id else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(
+          model,
+          review_state_with_auth(
+            model.review,
+            DeviceAuthorizing({ ..device, copy_status: DeviceCodeCopyDone }),
+          ),
+        ),
+        @rabbita.none,
+      )
+    }
+    DeviceCodeCopyFailed(flow_id, message) => {
+      guard model.review.auth is DeviceAuthorizing(device) &&
+        device.flow_id == flow_id else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(
+          model,
+          review_state_with_auth(
+            model.review,
+            DeviceAuthorizing({
+              ..device,
+              copy_status: DeviceCodeCopyError(message),
+            }),
+          ),
+        ),
+        @rabbita.none,
+      )
+    }
+    Logout =>
+      if extension_host_enabled() {
+        (
+          with_review(model, review_state_with_auth(model.review, AuthChecking)),
+          auth_logout_request(emit),
+        )
+      } else {
+        (model, @rabbita.none)
+      }
+    AuthLogoutFinished(result) =>
+      match result {
+        Ok(status) =>
+          (
+            with_review(model, {
+              auth: auth_status_from_api(status),
+              comments: model.review.comments,
+              draft: None,
+            }),
+            @rabbita.none,
+          )
+        Err(error) =>
+          (
+            with_review(
+              model,
+              review_state_with_auth(
+                model.review,
+                AuthFailed(comment_failure_message(error)),
+              ),
+            ),
+            @rabbita.none,
+          )
+      }
+    RefreshComments => {
+      guard extension_host_enabled() && model.route is Some(reference) else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(
+          model,
+          review_state_with_comments(model.review, CommentsLoading),
+        ),
+        comments_request(reference, model.generation, emit),
+      )
+    }
+    VisibilityChanged(hidden) => {
+      guard !hidden &&
+        extension_host_enabled() &&
+        model.route is Some(reference) else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(
+          model,
+          review_state_with_comments(model.review, CommentsLoading),
+        ),
+        comments_request(reference, model.generation, emit),
+      )
+    }
+    CommentsLoaded(generation, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      let comments = match result {
+        Ok(bundle) => CommentsReady(bundle)
+        Err(error) => CommentsFailed(comment_failure_message(error))
+      }
+      (
+        with_review(model, review_state_with_comments(model.review, comments)),
+        @rabbita.none,
+      )
+    }
+    OpenOverallDraft =>
+      (
+        with_review(
+          model,
+          review_state_with_draft(
+            model.review,
+            Some({
+              kind: OverallDraft,
+              body: "",
+              submitting: false,
+              error: None,
+            }),
+          ),
+        ),
+        @rabbita.none,
+      )
+    OpenInlineDraft(file_index, anchor) =>
+      (
+        with_review(
+          model,
+          review_state_with_draft(
+            model.review,
+            Some({
+              kind: InlineDraft(file_index, anchor),
+              body: "",
+              submitting: false,
+              error: None,
+            }),
+          ),
+        ),
+        @rabbita.none,
+      )
+    OpenReplyDraft(comment_id) =>
+      (
+        with_review(
+          model,
+          review_state_with_draft(
+            model.review,
+            Some({
+              kind: ReplyDraft(comment_id),
+              body: "",
+              submitting: false,
+              error: None,
+            }),
+          ),
+        ),
+        @rabbita.none,
+      )
+    DraftBodyChanged(body) => {
+      guard model.review.draft is Some(draft) && !draft.submitting else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(
+          model,
+          review_state_with_draft(
+            model.review,
+            Some({ kind: draft.kind, body, submitting: false, error: None }),
+          ),
+        ),
+        @rabbita.none,
+      )
+    }
+    CancelDraft => {
+      guard model.review.draft is Some(draft) && !draft.submitting else {
+        return (model, @rabbita.none)
+      }
+      (
+        with_review(model, review_state_with_draft(model.review, None)),
+        @rabbita.none,
+      )
+    }
+    SubmitDraft => {
+      guard model.review.draft is Some(draft) &&
+        !draft.submitting &&
+        model.phase is Showing(view) else {
+        return (model, @rabbita.none)
+      }
+      guard model.review.auth is SignedIn(_) else {
+        return (
+          update_draft(
+            model,
+            submitting=false,
+            error=Some("Sign in with GitHub before posting a comment."),
+          ),
+          @rabbita.none,
+        )
+      }
+      let body = draft.body.trim().to_owned()
+      if body.is_empty() {
+        return (
+          update_draft(
+            model,
+            submitting=false,
+            error=Some("Enter a comment before posting."),
+          ),
+          @rabbita.none,
+        )
+      }
+      let submitting = with_review(
+        model,
+        review_state_with_draft(
+          model.review,
+          Some({ kind: draft.kind, body, submitting: true, error: None }),
+        ),
+      )
+      let command = match (view.reference.target, draft.kind) {
+        (PullRequest(number), OverallDraft) =>
+          create_issue_comment_request(
+            view.reference,
+            number,
+            body,
+            model.generation,
+            emit,
+          )
+        (PullRequest(number), InlineDraft(_, anchor)) =>
+          comment_head_request(
+            view.reference,
+            number,
+            anchor,
+            model.generation,
+            emit,
+          )
+        (Commit(sha), InlineDraft(_, anchor))
+        | (PullCommit(_, sha), InlineDraft(_, anchor)) =>
+          create_commit_comment_request(
+            view.reference,
+            sha,
+            anchor,
+            body,
+            model.generation,
+            emit,
+          )
+        (PullRequest(number), ReplyDraft(comment_id)) =>
+          create_review_reply_request(
+            view.reference,
+            number,
+            comment_id,
+            body,
+            model.generation,
+            emit,
+          )
+        _ => @rabbita.none
+      }
+      (submitting, command)
+    }
+    CommentHeadChecked(generation, anchor, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.review.draft is Some(draft) &&
+        draft.kind is InlineDraft(_, selected) &&
+        selected == anchor &&
+        model.phase is Showing(view) &&
+        view.reference.target is PullRequest(number) else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            update_draft(
+              model,
+              submitting=false,
+              error=Some(comment_failure_message(error)),
+            ),
+            @rabbita.none,
+          )
+        Ok(pull) if pull.head.sha != view.sha => {
+          let (refreshed, command) = begin_change_load(
+            model,
+            view.reference,
+            emit,
+          )
+          (
+            with_review(refreshed, {
+              auth: model.review.auth,
+              comments: CommentsLoading,
+              draft: Some({
+                kind: draft.kind,
+                body: draft.body,
+                submitting: false,
+                error: Some(
+                  "The pull request head changed. Moondiff refreshed the snapshot; review the new diff before retrying.",
+                ),
+              }),
+            }),
+            command,
+          )
+        }
+        Ok(_) =>
+          (
+            model,
+            create_review_comment_request(
+              view.reference,
+              number,
+              view.sha,
+              anchor,
+              draft.body,
+              generation,
+              emit,
+            ),
+          )
+      }
+    }
+    IssueCommentCreated(generation, result) =>
+      finish_comment_submission(
+        match result {
+          Ok(comment) => insert_issue_comment(model, comment)
+          Err(_) => model
+        },
+        generation,
+        match result {
+          Ok(_) => None
+          Err(error) => Some(error)
+        },
+        emit,
+      )
+    ReviewCommentCreated(generation, result) =>
+      finish_comment_submission(
+        match result {
+          Ok(comment) => insert_review_comment(model, comment)
+          Err(_) => model
+        },
+        generation,
+        match result {
+          Ok(_) => None
+          Err(error) => Some(error)
+        },
+        emit,
+      )
+    CommitCommentCreated(generation, result) =>
+      finish_comment_submission(
+        match result {
+          Ok(comment) => insert_commit_comment(model, comment)
+          Err(_) => model
+        },
+        generation,
+        match result {
+          Ok(_) => None
+          Err(error) => Some(error)
+        },
+        emit,
+      )
+    ReviewReplyCreated(generation, result) =>
+      finish_comment_submission(
+        match result {
+          Ok(comment) => insert_review_comment(model, comment)
+          Err(_) => model
+        },
+        generation,
+        match result {
+          Ok(_) => None
+          Err(error) => Some(error)
+        },
+        emit,
+      )
     InputChanged(value) =>
       (
         {
@@ -851,6 +1635,7 @@ fn update(
           copy_status: CopyReady,
           backend_status: model.backend_status,
           analysis_status: model.analysis_status,
+          review: model.review,
         },
         @rabbita.none,
       )
@@ -872,6 +1657,7 @@ fn update(
           copy_status: model.copy_status,
           backend_status: model.backend_status,
           analysis_status: model.analysis_status,
+          review: model.review,
         },
         @rabbita.none,
       )
@@ -903,6 +1689,7 @@ fn update(
           copy_status: model.copy_status,
           backend_status: model.backend_status,
           analysis_status: AnalysisIdle,
+          review: model.review,
         },
         @rabbita.none,
       )
@@ -941,6 +1728,7 @@ fn update(
               copy_status: CopyReady,
               backend_status: model.backend_status,
               analysis_status: AnalysisIdle,
+              review: model.review,
             },
             @rabbita.none,
           )
@@ -971,6 +1759,7 @@ fn update(
               copy_status: CopyReady,
               backend_status: model.backend_status,
               analysis_status: AnalysisIdle,
+              review: model.review,
             },
             @rabbita.none,
           )
@@ -988,6 +1777,7 @@ fn update(
               copy_status: CopyReady,
               backend_status: model.backend_status,
               analysis_status: AnalysisIdle,
+              review: model.review,
             },
             @rabbita.none,
           )
@@ -1023,6 +1813,7 @@ fn update(
           copy_status: Copied,
           backend_status: model.backend_status,
           analysis_status: model.analysis_status,
+          review: model.review,
         },
         @rabbita.none,
       )
@@ -1040,6 +1831,7 @@ fn update(
           copy_status: CopyError(message),
           backend_status: model.backend_status,
           analysis_status: model.analysis_status,
+          review: model.review,
         },
         @rabbita.none,
       )
@@ -1158,6 +1950,34 @@ fn update(
           )
         Ok(metadata) =>
           start_pull_snapshot(model, reference, attempt, metadata, emit)
+      }
+    }
+    PullCommitMetadataLoaded(generation, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase is LoadingPullCommitMetadata(reference~) else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            with_phase(model, LoadFailed(error_message(error, true))),
+            @rabbita.none,
+          )
+        Ok(pull) => {
+          let repository = branch_repository(
+            pull.head,
+            reference_repository(reference),
+          )
+          (
+            with_phase(
+              model,
+              LoadingCommit(reference~, repository~, page=1, first=None, files=[]),
+            ),
+            commit_request(reference, repository, generation, 1, emit),
+          )
+        }
       }
     }
     PullCompareLoaded(generation, attempt, result) => {
@@ -1281,7 +2101,7 @@ fn update(
         return (model, @rabbita.none)
       }
       guard model.phase
-        is LoadingCommit(reference~, page=expected, first~, files~) &&
+        is LoadingCommit(reference~, repository~, page=expected, first~, files~) &&
         page == expected else {
         return (model, @rabbita.none)
       }
@@ -1300,16 +2120,17 @@ fn update(
                 model,
                 LoadingCommit(
                   reference~,
+                  repository~,
                   page=page + 1,
                   first=Some(first_commit),
                   files=accumulated,
                 ),
               ),
-              commit_request(reference, generation, page + 1, emit),
+              commit_request(reference, repository, generation, page + 1, emit),
             )
           } else {
             let (view, command) = finish_commit(
-              reference, first_commit, accumulated, generation, emit,
+              reference, repository, first_commit, accumulated, generation, emit,
             )
             (
               with_phase(
@@ -1349,10 +2170,9 @@ fn update(
           @rabbita.none,
         )
       } else {
-        let pair = source_pair(
-          view.reference,
-          view.sha,
-          view.parent_sha,
+        let pair = source_pair_for_revisions(
+          view.old_revision,
+          view.new_revision,
           file.file,
         )
         let first_load = file.old_side is NotRequested ||
@@ -1377,9 +2197,8 @@ fn update(
           @rabbita.batch(
             commands_for_file(
               file.file,
-              view.reference,
-              view.sha,
-              view.parent_sha,
+              view.old_revision,
+              view.new_revision,
               generation,
               index,
               emit,
@@ -1414,23 +2233,26 @@ fn update(
       guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
         return (model, @rabbita.none)
       }
-      let pair = source_pair(
-        view.reference,
-        view.sha,
-        view.parent_sha,
+      let pair = source_pair_for_revisions(
+        view.old_revision,
+        view.new_revision,
         file.file,
       )
       let commands : Array[@rabbita.Cmd] = []
       let old_side = if file.old_side is LoadFailed(_) &&
-        pair.old_url is Some(url) {
-        commands.push(source_request(url, generation, index, Old, emit))
+        pair.old_location is Some(location) {
+        commands.push(
+          gateway_source_request(location, generation, index, Old, emit),
+        )
         Loading
       } else {
         file.old_side
       }
       let new_side = if file.new_side is LoadFailed(_) &&
-        pair.new_url is Some(url) {
-        commands.push(source_request(url, generation, index, New, emit))
+        pair.new_location is Some(location) {
+        commands.push(
+          gateway_source_request(location, generation, index, New, emit),
+        )
         Loading
       } else {
         file.new_side

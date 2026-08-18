@@ -1,4 +1,5 @@
 import {
+  "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/tokdiff",
   "moonbit-community/moondiff/tokdiff/html" @tokdiff_html,
   "moonbit-community/moondiff/tokdiff/text" @tokdiff_text,

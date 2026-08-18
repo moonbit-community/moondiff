@@ -22,4 +22,3 @@ keywords = [ "diff", "astdiff" ]
 description = "Difftool that aware MoonBit language syntax"
 
 preferred_target = "wasm"
-
