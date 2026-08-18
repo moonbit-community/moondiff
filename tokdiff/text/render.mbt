@@ -2,7 +2,7 @@
 fn append_diff_line(
   buf : StringBuilder,
   prefix : String,
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
 ) -> Unit {
   buf <+ "\{prefix}"
   for segment in line.segments {
@@ -15,7 +15,7 @@ fn append_diff_line(
 fn append_change_line(
   buf : StringBuilder,
   prefix : String,
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
 ) -> Unit {
   let ignored = !line.segments.is_empty() &&
     line.segments.all(segment => segment.kind is Ignored)
@@ -23,7 +23,7 @@ fn append_change_line(
 }
 
 ///|
-fn append_ignored_row(buf : StringBuilder, row : @tokdiff.DiffRow) -> Unit {
+fn append_ignored_row(buf : StringBuilder, row : @model.DiffRow) -> Unit {
   match row {
     Paired(old_line, new_line) =>
       if old_line.text() == new_line.text() {
@@ -37,7 +37,7 @@ fn append_ignored_row(buf : StringBuilder, row : @tokdiff.DiffRow) -> Unit {
 }
 
 ///|
-fn render_hunk(hunk : @tokdiff.DiffHunk) -> String {
+fn render_hunk(hunk : @model.DiffHunk) -> String {
   let buf = StringBuilder::new()
   buf <+
     "\{@common.hunk_header(hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len)}\n"
@@ -74,7 +74,7 @@ fn render_hunk(hunk : @tokdiff.DiffHunk) -> String {
 
 ///|
 /// Render every hunk in a calculated diff as unified patch text.
-pub fn render_unified_hunks(document : @tokdiff.DiffDocument) -> Array[String] {
+pub fn render_unified_hunks(document : @model.DiffDocument) -> Array[String] {
   document.hunks.map(render_hunk)
 }
 

@@ -130,7 +130,7 @@ test "display_line_no colors missing placeholder dots gray for every line style"
 
 ///|
 test "render_diff_document highlights changes and keeps ignored text neutral" {
-  let old_line : @tokdiff.DiffLine = {
+  let old_line : @model.DiffLine = {
     index: 1,
     segments: [
       { kind: Unchanged, text: "let value = " },
@@ -138,7 +138,7 @@ test "render_diff_document highlights changes and keeps ignored text neutral" {
       { kind: Ignored, text: " // old explanation" },
     ],
   }
-  let new_line : @tokdiff.DiffLine = {
+  let new_line : @model.DiffLine = {
     index: 1,
     segments: [
       { kind: Unchanged, text: "let value = " },
@@ -146,15 +146,15 @@ test "render_diff_document highlights changes and keeps ignored text neutral" {
       { kind: Ignored, text: " // new explanation" },
     ],
   }
-  let old_comment : @tokdiff.DiffLine = {
+  let old_comment : @model.DiffLine = {
     index: 2,
     segments: [{ kind: Ignored, text: "// old docs" }],
   }
-  let new_comment : @tokdiff.DiffLine = {
+  let new_comment : @model.DiffLine = {
     index: 2,
     segments: [{ kind: Ignored, text: "// new docs" }],
   }
-  let document : @tokdiff.DiffDocument = {
+  let document : @model.DiffDocument = {
     hunks: [
       {
         old_start: 0,

@@ -1,0 +1,102 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/model"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum ComputationStage {
+  TopLevelAlignment
+  SyntaxMatching
+  IntralineMatching
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ContextLine {
+  old_index : Int
+  new_index : Int
+  text : String
+} derive(Eq)
+
+pub(all) enum DiffBlock {
+  ContextBlock(Array[ContextLine])
+  ChangeBlock(Array[DiffRow])
+  IgnoredBlock(Array[DiffRow])
+} derive(Eq)
+
+pub(all) struct DiffDocument {
+  hunks : Array[DiffHunk]
+} derive(Eq)
+pub fn DiffDocument::rebase(Self, Int, Int) -> Self
+
+pub(all) struct DiffHunk {
+  old_start : Int
+  old_len : Int
+  new_start : Int
+  new_len : Int
+  blocks : Array[DiffBlock]
+} derive(Eq)
+
+pub(all) struct DiffLine {
+  index : Int
+  segments : Array[DiffSegment]
+} derive(Eq)
+pub fn DiffLine::text(Self) -> String
+
+pub(all) enum DiffRow {
+  Paired(DiffLine, DiffLine)
+  OldOnly(DiffLine)
+  NewOnly(DiffLine)
+} derive(Eq)
+
+pub(all) struct DiffSegment {
+  kind : DiffSegmentKind
+  text : String
+} derive(Eq)
+
+pub(all) enum DiffSegmentKind {
+  Unchanged
+  Changed
+  Ignored
+} derive(Eq)
+
+pub(all) enum DiffSide {
+  Old
+  New
+} derive(Eq, @debug.Debug)
+
+pub(all) enum DiffStatus {
+  Identical
+  Changed
+  NoStructuralChanges
+  IgnoredOnly
+} derive(Eq, @debug.Debug)
+
+pub(all) struct FallbackInfo {
+  reason : FallbackReason
+  scope : FallbackScope
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FallbackReason {
+  ParseError(sides~ : Array[DiffSide], detail~ : String)
+  GraphLimitExceeded(limit~ : UInt)
+  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FallbackScope {
+  WholeFile
+  Region(old~ : LineRange?, new~ : LineRange?)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct LineRange {
+  start : Int
+  len : Int
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

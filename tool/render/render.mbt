@@ -267,13 +267,13 @@ fn render_hunk_line(
 }
 
 ///|
-fn document_line_has_change(line : @tokdiff.DiffLine) -> Bool {
+fn document_line_has_change(line : @model.DiffLine) -> Bool {
   line.segments.any(segment => segment.kind is Changed)
 }
 
 ///|
 fn render_document_line_body(
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
   changed_style : LineStyle,
   use_color : Bool,
 ) -> String {
@@ -300,7 +300,7 @@ fn render_document_line_body(
 ///|
 fn append_document_change_line(
   buf : StringBuilder,
-  line : @tokdiff.DiffLine,
+  line : @model.DiffLine,
   old_side : Bool,
   old_width : Int,
   new_width : Int,
@@ -375,7 +375,7 @@ fn append_document_context_line(
 ///|
 fn append_document_change_row(
   buf : StringBuilder,
-  row : @tokdiff.DiffRow,
+  row : @model.DiffRow,
   old_width : Int,
   new_width : Int,
   use_color : Bool,
@@ -403,7 +403,7 @@ fn append_document_change_row(
 ///|
 fn append_document_ignored_row(
   buf : StringBuilder,
-  row : @tokdiff.DiffRow,
+  row : @model.DiffRow,
   old_width : Int,
   new_width : Int,
   use_color : Bool,
@@ -469,7 +469,7 @@ fn update_document_max_line(max_line : Ref[Int], index : Int) -> Unit {
 }
 
 ///|
-fn document_line_widths(document : @tokdiff.DiffDocument) -> (Int, Int) {
+fn document_line_widths(document : @model.DiffDocument) -> (Int, Int) {
   let old_max = Ref(1)
   let new_max = Ref(1)
   for hunk in document.hunks {
@@ -505,7 +505,7 @@ fn document_line_widths(document : @tokdiff.DiffDocument) -> (Int, Int) {
 fn render_diff_document_impl(
   old_label : String,
   new_label : String,
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   options : RenderOptions,
   old_max_line : Int?,
   new_max_line : Int?,
@@ -576,7 +576,7 @@ fn render_diff_document_impl(
 pub fn render_diff_document(
   old_label : String,
   new_label : String,
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   options : RenderOptions,
 ) -> String {
   render_diff_document_impl(old_label, new_label, document, options, None, None)
@@ -589,7 +589,7 @@ pub fn render_diff_document(
 pub fn render_diff_document_with_max_lines(
   old_label : String,
   new_label : String,
-  document : @tokdiff.DiffDocument,
+  document : @model.DiffDocument,
   options : RenderOptions,
   old_max_line : Int,
   new_max_line : Int,

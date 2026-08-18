@@ -2,6 +2,7 @@ import {
   "moonbitlang/core/diff",
   "moonbitlang/lexer",
   "moonbitlang/lexer/tokens",
+  "moonbit-community/moondiff/model",
 }
 
 import {

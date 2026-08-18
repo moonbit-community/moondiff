@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/cmp",
-  "moonbit-community/moondiff/tokdiff",
+  "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/tool/alignment",
   "moonbit-community/moondiff/tool/render",
 }

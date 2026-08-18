@@ -31,49 +31,49 @@ pub impl Default for DiffOptions with fn default() {
 }
 
 ///|
-pub type DiffDocument = @tokdiff.DiffDocument
+pub type DiffDocument = @model.DiffDocument
 
 ///|
-pub type DiffHunk = @tokdiff.DiffHunk
+pub type DiffHunk = @model.DiffHunk
 
 ///|
-pub type DiffBlock = @tokdiff.DiffBlock
+pub type DiffBlock = @model.DiffBlock
 
 ///|
-pub type DiffRow = @tokdiff.DiffRow
+pub type DiffRow = @model.DiffRow
 
 ///|
-pub type DiffLine = @tokdiff.DiffLine
+pub type DiffLine = @model.DiffLine
 
 ///|
-pub type DiffSegment = @tokdiff.DiffSegment
+pub type DiffSegment = @model.DiffSegment
 
 ///|
-pub type DiffSegmentKind = @tokdiff.DiffSegmentKind
+pub type DiffSegmentKind = @model.DiffSegmentKind
 
 ///|
-pub type ContextLine = @tokdiff.ContextLine
+pub type ContextLine = @model.ContextLine
 
 ///|
-pub type DiffStatus = @alignment.DiffStatus
+pub type DiffStatus = @model.DiffStatus
 
 ///|
-pub type DiffSide = @alignment.DiffSide
+pub type DiffSide = @model.DiffSide
 
 ///|
-pub type ComputationStage = @alignment.ComputationStage
+pub type ComputationStage = @model.ComputationStage
 
 ///|
-pub type FallbackReason = @alignment.FallbackReason
+pub type FallbackReason = @model.FallbackReason
 
 ///|
-pub type LineRange = @alignment.LineRange
+pub type LineRange = @model.LineRange
 
 ///|
-pub type FallbackScope = @alignment.FallbackScope
+pub type FallbackScope = @model.FallbackScope
 
 ///|
-pub type FallbackInfo = @alignment.FallbackInfo
+pub type FallbackInfo = @model.FallbackInfo
 
 ///|
 /// A calculated document plus classification and typed degradation metadata.

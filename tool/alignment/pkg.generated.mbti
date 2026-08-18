@@ -2,8 +2,7 @@
 package "moonbit-community/moondiff/tool/alignment"
 
 import {
-  "moonbit-community/moondiff/tokdiff",
-  "moonbitlang/core/debug",
+  "moonbit-community/moondiff/model",
 }
 
 // Values
@@ -30,20 +29,14 @@ pub(all) enum AlignedDiffOutcome {
 } derive(Eq)
 
 pub(all) struct AlignedDiffResult {
-  document : @tokdiff.DiffDocument
+  document : @model.DiffDocument
   outcome : AlignedDiffOutcome
 } derive(Eq)
 
-pub(all) enum ComputationStage {
-  TopLevelAlignment
-  SyntaxMatching
-  IntralineMatching
-} derive(Eq, @debug.Debug)
-
 pub(all) struct DetailedDiffResult {
-  document : @tokdiff.DiffDocument
-  status : DiffStatus
-  fallbacks : Array[FallbackInfo]
+  document : @model.DiffDocument
+  status : @model.DiffStatus
+  fallbacks : Array[@model.FallbackInfo]
 } derive(Eq)
 
 pub(all) struct DiffCalculation {
@@ -58,43 +51,23 @@ pub(all) enum DiffLayout {
 } derive(Eq)
 
 pub(all) struct DiffSection {
-  old : LineRange?
-  new : LineRange?
+  old : @model.LineRange?
+  new : @model.LineRange?
 } derive(Eq)
 
-pub(all) enum DiffSide {
-  Old
-  New
-} derive(Eq, @debug.Debug)
-
-pub(all) enum DiffStatus {
-  Identical
-  Changed
-  NoStructuralChanges
-  IgnoredOnly
-} derive(Eq, @debug.Debug)
-
-pub(all) struct FallbackInfo {
-  reason : FallbackReason
-  scope : FallbackScope
-} derive(Eq, @debug.Debug)
-
-pub(all) enum FallbackReason {
-  ParseError(sides~ : Array[DiffSide], detail~ : String)
-  GraphLimitExceeded(limit~ : UInt)
-  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
-} derive(Eq, @debug.Debug)
-
-pub(all) enum FallbackScope {
-  WholeFile
-  Region(old~ : LineRange?, new~ : LineRange?)
-} derive(Eq, @debug.Debug)
-
-pub(all) struct LineRange {
-  start : Int
-  len : Int
-} derive(Eq, @debug.Debug)
-
 // Type aliases
+pub using @model {type ComputationStage}
+
+pub using @model {type DiffSide}
+
+pub using @model {type DiffStatus}
+
+pub using @model {type FallbackInfo}
+
+pub using @model {type FallbackReason}
+
+pub using @model {type FallbackScope}
+
+pub using @model {type LineRange}
 
 // Traits

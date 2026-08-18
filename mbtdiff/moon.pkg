@@ -1,4 +1,4 @@
 import {
-  "moonbit-community/moondiff/tokdiff",
+  "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/tool/alignment",
 }

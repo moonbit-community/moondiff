@@ -31,7 +31,7 @@
   - [ ] Add a regression test covering reuse of the first state after two states have been stored for the same graph key.
 
 - [ ] Make the `mbtdiff.DiffResult` ownership and mutability contract explicit.
-  - Affected areas: `mbtdiff/types.mbt` and `tokdiff/model.mbt`.
+  - Affected areas: `mbtdiff/types.mbt`, `model/diff_document.mbt`, and `model/result_metadata.mbt`.
   - [ ] Decide whether returned documents and fallback metadata are immutable views or independently mutable snapshots.
   - [ ] If the result is immutable, avoid exposing shared mutable arrays through `document()` and deep-copy nested arrays such as `ParseError.sides` in `fallbacks()`.
   - [ ] Add a consumer regression test that mutates an accessor result and verifies that later accessor calls cannot observe unintended changes.

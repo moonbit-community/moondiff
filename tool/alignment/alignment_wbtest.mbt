@@ -654,7 +654,7 @@ test "CST wrappers do not hide inserted sibling statements" {
 }
 
 ///|
-fn changed_segment_text(document : @tokdiff.DiffDocument) -> String {
+fn changed_segment_text(document : @model.DiffDocument) -> String {
   let buf = StringBuilder::new()
   for hunk in document.hunks {
     for block in hunk.blocks {
@@ -687,7 +687,7 @@ fn changed_segment_text(document : @tokdiff.DiffDocument) -> String {
 
 ///|
 fn ast_segment_summary(
-  segments : ArrayView[@tokdiff.DiffSegment],
+  segments : ArrayView[@model.DiffSegment],
 ) -> Array[String] {
   segments.map(segment => {
     let kind = match segment.kind {
