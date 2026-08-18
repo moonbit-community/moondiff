@@ -118,9 +118,9 @@ test "ignored comment lines do not split code hunks" {
         new_start: 0,
         new_len: 3,
         blocks: [
-          ChangeBlock([Paired(_, _)]),
+          ChangeBlock([Paired(first_old, first_new)]),
           IgnoredBlock([Paired(old_comment, new_comment)]),
-          ChangeBlock([Paired(_, _)]),
+          ChangeBlock([Paired(second_old, second_new)]),
         ],
       },
     ] else {
@@ -130,6 +130,14 @@ test "ignored comment lines do not split code hunks" {
   assert_eq(new_comment.index, 1)
   assert_eq(old_comment.text(), "// old bridge")
   assert_eq(new_comment.text(), "// new bridge")
+  assert_eq(
+    (first_old.text(), first_new.text()),
+    ("let first = 1", "let first = 2"),
+  )
+  assert_eq(
+    (second_old.text(), second_new.text()),
+    ("let second = 1", "let second = 2"),
+  )
 }
 
 ///|

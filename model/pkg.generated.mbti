@@ -23,13 +23,13 @@ pub(all) struct ContextLine {
 } derive(Eq)
 
 pub(all) enum DiffBlock {
-  ContextBlock(Array[ContextLine])
-  ChangeBlock(Array[DiffRow])
-  IgnoredBlock(Array[DiffRow])
+  ContextBlock(ArrayView[ContextLine])
+  ChangeBlock(ArrayView[DiffRow])
+  IgnoredBlock(ArrayView[DiffRow])
 } derive(Eq)
 
 pub(all) struct DiffDocument {
-  hunks : Array[DiffHunk]
+  hunks : ArrayView[DiffHunk]
 } derive(Eq)
 pub fn DiffDocument::rebase(Self, Int, Int) -> Self
 
@@ -38,12 +38,12 @@ pub(all) struct DiffHunk {
   old_len : Int
   new_start : Int
   new_len : Int
-  blocks : Array[DiffBlock]
+  blocks : ArrayView[DiffBlock]
 } derive(Eq)
 
 pub(all) struct DiffLine {
   index : Int
-  segments : Array[DiffSegment]
+  segments : ArrayView[DiffSegment]
 } derive(Eq)
 pub fn DiffLine::text(Self) -> String
 
@@ -82,7 +82,7 @@ pub(all) struct FallbackInfo {
 } derive(Eq, @debug.Debug)
 
 pub(all) enum FallbackReason {
-  ParseError(sides~ : Array[DiffSide], detail~ : String)
+  ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
 } derive(Eq, @debug.Debug)

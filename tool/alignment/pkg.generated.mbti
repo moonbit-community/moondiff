@@ -36,7 +36,7 @@ pub(all) struct AlignedDiffResult {
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : @model.DiffStatus
-  fallbacks : Array[@model.FallbackInfo]
+  fallbacks : ArrayView[@model.FallbackInfo]
 } derive(Eq)
 
 pub(all) struct DiffCalculation {

@@ -1011,6 +1011,7 @@ test "shared calculation keeps sections aligned with hunks and fallbacks" {
   guard calculation.layout is TopLevelSections(sections) else {
     fail("expected one sectioned top-level layout")
   }
+  let _ : ArrayView[@model.FallbackInfo] = calculation.result.fallbacks
   assert_eq(sections.length(), 2)
   assert_eq(calculation.result.document.hunks.length(), sections.length())
   assert_eq(calculation.result.fallbacks.length(), sections.length())
