@@ -3,9 +3,7 @@ package "moonbit-community/moondiff/tool/alignment"
 
 import {
   "moonbit-community/moondiff/tokdiff",
-  "moonbit-community/moondiff/tool/render",
   "moonbitlang/core/debug",
-  "moonbitlang/parser/untyped_cst",
 }
 
 // Values
@@ -14,8 +12,6 @@ pub fn calculate_diff_document(String, String, old_name? : String, new_name? : S
 pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> AlignedDiffResult
 
 pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> DetailedDiffResult
-
-pub fn render_aligned_cst_diffs(String, String, @untyped_cst.CstNode, String, String, @untyped_cst.CstNode, UInt, @render.RenderOptions, ignore_comments? : Bool) -> String
 
 // Errors
 
