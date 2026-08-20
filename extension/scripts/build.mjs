@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { createHash, createPublicKey } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -22,8 +21,14 @@ export const outputRoot = join(extensionRoot, "dist");
 const TEST_DEFAULTS = Object.freeze({
   clientId: "Iv1.moondiff-test-client",
   installUrl: "https://github.com/apps/moondiff-test/installations/new",
-  publicKey: "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCxg/H5NgkuRAmxqcQb+/XD2G5vPDn6qyfTmLIQ/rJHAzWdVDvRneC0DLNRFXrSZy3roPBv/w4xyjnH8EjCI897HCI5qkMbvdJ6r6979tTLDmZCDDPr8TFE/1ZO0FL97FDX7ncwTbIYMLCm9UMiz3medk9ng4uiQVBiQVQndfYYlwIDAQAB",
 });
+const TEST_INSTALL_URL = new URL(TEST_DEFAULTS.installUrl);
+
+function validateMode(mode) {
+  if (mode !== "development" && mode !== "webstore") {
+    throw new Error(`Unknown extension build mode: ${mode}.`);
+  }
+}
 
 function required(env, key, label, fallback) {
   const value = String(env[key] || fallback || "").trim();
@@ -31,44 +36,33 @@ function required(env, key, label, fallback) {
   return value;
 }
 
-function normalizePublicKey(value) {
-  const normalized = value
-    .replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----/gu, "")
-    .replace(/\s+/gu, "");
-  if (!/^[A-Za-z0-9+/]+={0,2}$/u.test(normalized)) {
-    throw new Error("MOONDIFF_EXTENSION_PUBLIC_KEY must be a base64 DER public key or PEM public key.");
-  }
-  const decoded = Buffer.from(normalized, "base64");
-  if (decoded.length < 32) throw new Error("MOONDIFF_EXTENSION_PUBLIC_KEY is too short.");
-  try {
-    createPublicKey({ key: decoded, format: "der", type: "spki" });
-  } catch {
-    throw new Error("MOONDIFF_EXTENSION_PUBLIC_KEY must contain a valid DER SubjectPublicKeyInfo public key.");
-  }
-  return normalized;
+function sameEndpoint(left, right) {
+  const leftPath = left.pathname.replace(/\/+$/u, "");
+  const rightPath = right.pathname.replace(/\/+$/u, "");
+  return left.origin === right.origin && leftPath === rightPath;
 }
 
-export function readBuildConfig(env = process.env) {
+export function readBuildConfig(env = process.env, mode = "development") {
+  validateMode(mode);
   const allowTest = env.MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG === "1";
+  if (mode === "webstore" && allowTest) {
+    throw new Error("MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG is not allowed in webstore builds.");
+  }
   const defaults = allowTest ? TEST_DEFAULTS : {};
   const clientId = required(env, "MOONDIFF_GITHUB_CLIENT_ID", "GitHub App client ID", defaults.clientId);
   const installUrl = required(env, "MOONDIFF_GITHUB_INSTALL_URL", "GitHub App installation URL", defaults.installUrl);
-  const publicKey = normalizePublicKey(required(env, "MOONDIFF_EXTENSION_PUBLIC_KEY", "Chrome manifest public key", defaults.publicKey));
   if (!/^[A-Za-z0-9._-]{6,200}$/u.test(clientId)) throw new Error("MOONDIFF_GITHUB_CLIENT_ID is invalid.");
   const parsedInstall = new URL(installUrl);
   if (parsedInstall.protocol !== "https:" || parsedInstall.hostname !== "github.com") {
     throw new Error("MOONDIFF_GITHUB_INSTALL_URL must be an HTTPS github.com URL.");
   }
-  return { clientId, installUrl: parsedInstall.toString(), publicKey };
-}
-
-export function extensionIdFromPublicKey(publicKey) {
-  const digest = createHash("sha256").update(Buffer.from(normalizePublicKey(publicKey), "base64")).digest();
-  let id = "";
-  for (const byte of digest.subarray(0, 16)) {
-    id += String.fromCharCode(97 + (byte >> 4), 97 + (byte & 15));
+  if (mode === "webstore" && clientId === TEST_DEFAULTS.clientId) {
+    throw new Error("The built-in test GitHub App client ID is not allowed in webstore builds.");
   }
-  return id;
+  if (mode === "webstore" && sameEndpoint(parsedInstall, TEST_INSTALL_URL)) {
+    throw new Error("The built-in test GitHub App installation URL is not allowed in webstore builds.");
+  }
+  return { clientId, installUrl: parsedInstall.toString() };
 }
 
 function crc32(buffer) {
@@ -153,7 +147,7 @@ function rasterIcon(size) {
   ]);
 }
 
-function manifest(config) {
+function manifest() {
   const icons = {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -166,7 +160,6 @@ function manifest(config) {
     description: "Review and comment on GitHub pull requests and commits with MoonBit-aware diffs.",
     version: "0.0.1",
     minimum_chrome_version: "116",
-    key: config.publicKey,
     permissions: ["sidePanel", "storage"],
     host_permissions: [
       "https://api.github.com/*",
@@ -190,8 +183,8 @@ function manifest(config) {
   };
 }
 
-export function buildExtension({ env = process.env, log = process.stdout } = {}) {
-  const buildConfig = readBuildConfig(env);
+export function buildExtension({ env = process.env, log = process.stdout, mode = "development" } = {}) {
+  const buildConfig = readBuildConfig(env, mode);
   const targetRoot = mkdtempSync(join(tmpdir(), "moondiff-extension-build-"));
   const stagingRoot = mkdtempSync(join(extensionRoot, ".dist-"));
   try {
@@ -217,17 +210,15 @@ export function buildExtension({ env = process.env, log = process.stdout } = {})
     for (const size of [16, 32, 48, 128]) {
       writeFileSync(join(stagingRoot, "icons", `icon-${size}.png`), rasterIcon(size));
     }
-    writeFileSync(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest(buildConfig), null, 2)}\n`);
+    writeFileSync(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest(), null, 2)}\n`);
     writeFileSync(join(stagingRoot, "config.js"), `globalThis.MoondiffConfig = Object.freeze(${JSON.stringify({
       clientId: buildConfig.clientId,
       installUrl: buildConfig.installUrl,
     })});\n`);
     rmSync(outputRoot, { recursive: true, force: true });
     renameSync(stagingRoot, outputRoot);
-    const extensionId = extensionIdFromPublicKey(buildConfig.publicKey);
     log.write(`Built ${outputRoot}\n`);
-    log.write(`Extension ID: ${extensionId}\n`);
-    return { outputRoot, extensionId };
+    return { outputRoot };
   } finally {
     rmSync(targetRoot, { recursive: true, force: true });
     rmSync(stagingRoot, { recursive: true, force: true });

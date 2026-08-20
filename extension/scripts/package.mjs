@@ -6,7 +6,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { buildExtension, extensionRoot, outputRoot } from "./build.mjs";
@@ -102,10 +102,12 @@ export function createZip(source, destination) {
 }
 
 export function packageExtension(options = {}) {
-  buildExtension(options);
-  const artifacts = join(extensionRoot, "artifacts");
-  mkdirSync(artifacts, { recursive: true });
-  const destination = join(artifacts, "moondiff-chrome-0.0.1.zip");
+  const {
+    destination = join(extensionRoot, "artifacts", "moondiff-chrome-0.0.1.zip"),
+    ...buildOptions
+  } = options;
+  buildExtension({ ...buildOptions, mode: "webstore" });
+  mkdirSync(dirname(destination), { recursive: true });
   rmSync(destination, { force: true });
   const entries = createZip(outputRoot, destination);
   process.stdout.write(`Packaged ${destination} (${entries.length} files)\n`);

@@ -5,12 +5,31 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
-  buildExtension,
-  extensionIdFromPublicKey,
   outputRoot,
   readBuildConfig,
 } from "../scripts/build.mjs";
-import { createZip } from "../scripts/package.mjs";
+import { packageExtension } from "../scripts/package.mjs";
+
+const PRODUCTION_BUILD_ENV = Object.freeze({
+  MOONDIFF_GITHUB_CLIENT_ID: "Iv1.production-shaped-client",
+  MOONDIFF_GITHUB_INSTALL_URL: "https://github.com/apps/moondiff-production/installations/new",
+});
+
+function readStoredZipEntry(archivePath, expectedName) {
+  const archive = readFileSync(archivePath);
+  let offset = 0;
+  while (offset + 30 <= archive.length && archive.readUInt32LE(offset) === 0x04034b50) {
+    const compressedSize = archive.readUInt32LE(offset + 18);
+    const nameLength = archive.readUInt16LE(offset + 26);
+    const extraLength = archive.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = archive.toString("utf8", nameStart, nameStart + nameLength);
+    if (name === expectedName) return archive.subarray(dataStart, dataStart + compressedSize);
+    offset = dataStart + compressedSize;
+  }
+  throw new Error(`ZIP entry not found: ${expectedName}`);
+}
 
 function storageArea(initial = {}) {
   const values = { ...initial };
@@ -571,58 +590,78 @@ test("comment RPC normalizes GitHub ids and nullable fields for MoonBit", () => 
   });
 });
 
-test("formal builds require config and derive a stable Chrome extension id", () => {
+test("build config requires valid GitHub App values", () => {
   assert.throws(() => readBuildConfig({}), /Missing MOONDIFF_GITHUB_CLIENT_ID/u);
   assert.throws(() => readBuildConfig({
     MOONDIFF_GITHUB_CLIENT_ID: "Iv1.formal-client",
   }), /Missing MOONDIFF_GITHUB_INSTALL_URL/u);
-  assert.throws(() => readBuildConfig({
-    MOONDIFF_GITHUB_CLIENT_ID: "Iv1.formal-client",
-    MOONDIFF_GITHUB_INSTALL_URL: "https://github.com/apps/moondiff/installations/new",
-  }), /Missing MOONDIFF_EXTENSION_PUBLIC_KEY/u);
-  assert.throws(() => readBuildConfig({
-    MOONDIFF_GITHUB_CLIENT_ID: "Iv1.invalid-key-test",
-    MOONDIFF_GITHUB_INSTALL_URL: "https://github.com/apps/moondiff/installations/new",
-    MOONDIFF_EXTENSION_PUBLIC_KEY: Buffer.alloc(64, 1).toString("base64"),
-  }), /valid DER SubjectPublicKeyInfo/u);
-  const fixture = readBuildConfig({ MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG: "1" });
-  const config = readBuildConfig({
-    MOONDIFF_GITHUB_CLIENT_ID: "Iv1.formal-client",
-    MOONDIFF_GITHUB_INSTALL_URL: "https://github.com/apps/moondiff/installations/new",
-    MOONDIFF_EXTENSION_PUBLIC_KEY: fixture.publicKey,
+  assert.deepEqual(readBuildConfig(PRODUCTION_BUILD_ENV), {
+    clientId: PRODUCTION_BUILD_ENV.MOONDIFF_GITHUB_CLIENT_ID,
+    installUrl: PRODUCTION_BUILD_ENV.MOONDIFF_GITHUB_INSTALL_URL,
   });
-  assert.deepEqual(Object.keys(config).sort(), ["clientId", "installUrl", "publicKey"]);
-  const first = extensionIdFromPublicKey(config.publicKey);
-  assert.match(first, /^[a-p]{32}$/u);
-  assert.equal(extensionIdFromPublicKey(config.publicKey), first);
+  assert.throws(() => readBuildConfig(PRODUCTION_BUILD_ENV, "release"), /Unknown extension build mode/u);
 });
 
-test("extension package is MV3-local, least-privilege, and source-map free", () => {
-  let buildLog = "";
-  buildExtension({
-    env: { MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG: "1" },
-    log: { write(value) { buildLog += value; } },
-  });
-  assert.doesNotMatch(buildLog, /callback|chromiumapp\.org/iu);
-  const manifest = JSON.parse(readFileSync(join(outputRoot, "manifest.json"), "utf8"));
-  assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.minimum_chrome_version, "116");
-  assert.deepEqual(manifest.permissions, ["sidePanel", "storage"]);
-  assert.deepEqual(manifest.host_permissions, [
-    "https://api.github.com/*",
-    "https://github.com/login/device/code",
-    "https://github.com/login/oauth/access_token",
-  ]);
-  assert.equal(manifest.permissions.includes("identity"), false);
-  assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/u);
-  const configSource = readFileSync(join(outputRoot, "config.js"), "utf8");
-  assert.doesNotMatch(configSource, /clientSecret|client_secret|MOONDIFF_GITHUB_CLIENT_SECRET/u);
+test("Web Store packaging rejects every form of the built-in test GitHub App config", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "moondiff-package-rejection-test-"));
+  const destination = join(temporary, "extension.zip");
+  try {
+    assert.throws(() => packageExtension({
+      destination,
+      env: { MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG: "1" },
+      log: { write() {} },
+    }), /ALLOW_TEST_CONFIG is not allowed in webstore builds/u);
+    assert.throws(() => packageExtension({
+      destination,
+      env: {
+        ...PRODUCTION_BUILD_ENV,
+        MOONDIFF_GITHUB_CLIENT_ID: "Iv1.moondiff-test-client",
+      },
+      log: { write() {} },
+    }), /test GitHub App client ID is not allowed/u);
+    for (const installUrl of [
+      "https://github.com/apps/moondiff-test/installations/new",
+      "https://github.com/apps/moondiff-test/installations/new/?from=fixture",
+    ]) {
+      assert.throws(() => packageExtension({
+        destination,
+        env: {
+          ...PRODUCTION_BUILD_ENV,
+          MOONDIFF_GITHUB_INSTALL_URL: installUrl,
+        },
+        log: { write() {} },
+      }), /test GitHub App installation URL is not allowed/u);
+    }
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("Web Store package remains MV3-local and source-map free", () => {
   const temporary = mkdtempSync(join(tmpdir(), "moondiff-zip-test-"));
   try {
-    const entries = createZip(outputRoot, join(temporary, "extension.zip"));
+    const destination = join(temporary, "nested", "extension.zip");
+    const { entries } = packageExtension({
+      destination,
+      env: PRODUCTION_BUILD_ENV,
+      log: { write() {} },
+    });
     assert.ok(entries.includes("manifest.json"));
     assert.ok(entries.includes("icons/icon-128.png"));
     assert.ok(entries.every(name => !name.endsWith(".map") && !name.includes(".dist-")));
+    const manifest = JSON.parse(readStoredZipEntry(destination, "manifest.json").toString("utf8"));
+    assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.minimum_chrome_version, "116");
+    assert.deepEqual(manifest.permissions, ["sidePanel", "storage"]);
+    assert.deepEqual(manifest.host_permissions, [
+      "https://api.github.com/*",
+      "https://github.com/login/device/code",
+      "https://github.com/login/oauth/access_token",
+    ]);
+    assert.equal(manifest.permissions.includes("identity"), false);
+    assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/u);
+    const configSource = readFileSync(join(outputRoot, "config.js"), "utf8");
+    assert.doesNotMatch(configSource, /clientSecret|client_secret|MOONDIFF_GITHUB_CLIENT_SECRET/u);
     for (const name of entries.filter(name => name.endsWith(".js") || name.endsWith(".html"))) {
       const source = readFileSync(join(outputRoot, name), "utf8");
       assert.doesNotMatch(source, /\beval\s*\(|new\s+Function\b|sourceMappingURL/u, name);

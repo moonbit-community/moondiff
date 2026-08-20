@@ -54,6 +54,9 @@ jobs:
         working-directory: playground
         run: npx playwright install --with-deps chromium
 
+      - name: Run extension tests
+        run: npm run test:extension
+
       - name: Run Playwright integration tests
         working-directory: playground
         run: npm run test:e2e
