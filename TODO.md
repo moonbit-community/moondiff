@@ -18,13 +18,6 @@
 
 ## Medium Priority
 
-- [ ] Preserve implementation-content continuity when one top-level declaration is split into a same-name wrapper and a new helper.
-  - Reproduction: `cli_test/source/20260820.{old,new}.mbt`, taken from [`moonbitlang/core@f3c9815`](https://github.com/moonbitlang/core/commit/f3c981586a4fd7cbcec6c5960b971c211d180830).
-  - Current behavior: the semantic-key pass irrevocably pairs the old `remove_duplicates` method with the new thin wrapper, so the body-bearing `remove_duplicates_with_seen` method is rendered as a fresh insertion even though it is the stronger content match.
-  - Affected areas: `tool/alignment/root_alignment.mbt` and `tool/alignment/fuzzy_alignment.mbt`.
-  - [ ] Decide how to represent this one-to-many declaration split while preserving both declaration identity and moved-body continuity.
-  - [ ] Either make weak semantic-key anchors contestable or add cross-unit moved-body matching without regressing ordinary same-name edits.
-
 - [ ] Ensure real textual changes never result in empty CLI output.
   - Affected areas: `tool/alignment/root_alignment.mbt`, `tool/diff_text.mbt`, and `main.mbt`.
   - [ ] Define and implement an explicit output contract for `has_changes && rendered.is_empty()`.

@@ -2,14 +2,50 @@
 using @syntax {type MatchKind, type MatchedPos}
 
 ///|
-// Private metadata for the conservative rename pass. The syntax root is a
-// deep copy whose declaration-name atom has been replaced by a fixed marker,
-// so its content ids can be compared independently of the spelling change.
+// One normalized body trigram. Keeping the three tokens as an exact hash key
+// avoids making extraction continuity depend on syntax-tree content ids.
+priv struct ImplBodyTrigram {
+  first : String
+  second : String
+  third : String
+} derive(Eq, Hash)
+
+///|
+// Comment-free token trigrams for one function body. Mass counts duplicate
+// trigrams as well as unique ones so coverage remains asymmetric.
+priv struct ImplFuzzyBody {
+  trigrams : @hashmap.HashMap[ImplBodyTrigram, Int]
+  mass : Int
+}
+
+///|
+// Shared source and CST references needed to build one body fingerprint.
+// Keeping this input lightweight avoids allocating token/trigram collections
+// for declarations that never reach the extraction challenge.
+priv struct ImplFuzzyBodyInput {
+  source : String
+  node : @cst.CstNode
+  declaration_name : String
+}
+
+///|
+priv struct ImplTailDelegate {
+  target : String
+  through_self : Bool
+}
+
+///|
+// Private metadata for the conservative rename and extraction passes. The
+// syntax root is a deep copy whose declaration-name atom has been replaced by
+// a fixed marker, so its content ids can be compared independently of the
+// spelling change.
 priv struct ImplFuzzyInfo {
   kind : @cst.NodeKind
   name : String
   owner : String
   root : @syntax.Syntax
+  body_input : ImplFuzzyBodyInput?
+  tail_delegate : ImplTailDelegate?
 }
 
 ///|
