@@ -92,6 +92,22 @@ fn align_impl_units_by_key_impl(
     }
   }
 
+  let old_key_counts : @hashmap.HashMap[String, Int] = HashMap([])
+  let new_key_counts : @hashmap.HashMap[String, Int] = HashMap([])
+  for unit in old_units {
+    if unit.semantic_key is Some(key) {
+      old_key_counts[key] = old_key_counts.get(key).unwrap_or(0) + 1
+    }
+  }
+  for unit in new_units {
+    if unit.semantic_key is Some(key) {
+      new_key_counts[key] = new_key_counts.get(key).unwrap_or(0) + 1
+    }
+  }
+
+  // Keep non-UUID semantic matches provisional until the extraction
+  // challenge has inspected every key occupant. Duplicate keys retain their
+  // original occurrence-order pairing and are never contestable.
   let new_key_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
   )
   for i in 0..<new_units.length() {
@@ -102,6 +118,8 @@ fn align_impl_units_by_key_impl(
     }
   }
   let key_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  let semantic_pairs : Array[ImplSemanticPair] = []
+  let new_semantic_used : @hashmap.HashMap[Int, Bool] = HashMap([])
   for i in 0..<old_units.length() {
     if !old_used.contains(i) {
       if old_units[i].semantic_key is Some(key) {
@@ -109,10 +127,42 @@ fn align_impl_units_by_key_impl(
           let offset = key_offsets.get(key).unwrap_or(0)
           if offset < indices.length() {
             key_offsets[key] = offset + 1
-            pair(i, indices[offset])
+            let new_index = indices[offset]
+            semantic_pairs.push({
+              old_index: i,
+              new_index,
+              unique_key: old_key_counts.get(key) == Some(1) &&
+              new_key_counts.get(key) == Some(1),
+            })
+            new_semantic_used[new_index] = true
           }
         }
       }
+    }
+  }
+
+  let new_challenge_used : @hashmap.HashMap[Int, Bool] = HashMap([])
+  let new_excluded_from_matching : @hashmap.HashMap[Int, Bool] = HashMap([])
+  let old_body_cache : Array[ImplFuzzyBody?] = Array::make(
+    old_units.length(),
+    None,
+  )
+  let new_body_cache : Array[ImplFuzzyBody?] = Array::make(
+    new_units.length(),
+    None,
+  )
+  let old_competitors = impl_old_body_competitors_by_owner(old_units)
+  for semantic_pair in semantic_pairs {
+    if impl_semantic_challenge_helper(
+        semantic_pair, old_units, new_units, old_body_cache, new_body_cache, old_competitors,
+        use_uuid, new_used, new_semantic_used, new_challenge_used, budget,
+      )
+      is Some(helper_index) {
+      new_challenge_used[helper_index] = true
+      new_excluded_from_matching[semantic_pair.new_index] = true
+      pair(semantic_pair.old_index, helper_index)
+    } else {
+      pair(semantic_pair.old_index, semantic_pair.new_index)
     }
   }
 
@@ -132,7 +182,7 @@ fn align_impl_units_by_key_impl(
   let new_content_positions : @hashmap.HashMap[UInt, Array[Int]] = @hashmap.HashMap([],
   )
   for i in 0..<new_units.length() {
-    if !new_used.contains(i) {
+    if !new_used.contains(i) && !new_excluded_from_matching.contains(i) {
       let content_id = new_units[i].root.content_id()
       new_content_positions.get_or_init(content_id, fn() { [] }).push(i)
     }
@@ -149,11 +199,14 @@ fn align_impl_units_by_key_impl(
     }
   }
 
-  // Reliable UUID, semantic-key, and exact-content pairs are fixed anchors.
-  // Only after all three passes do we compare unmatched declarations inside
-  // the same anchor gap for a conservative rename pairing.
+  // UUID, final semantic-key/challenge, and exact-content pairs are fixed
+  // anchors. Displaced wrappers cannot re-enter through exact or fuzzy
+  // matching. This deliberately prioritizes implementation-body continuity
+  // and does not guarantee continuity for documentation attached to the
+  // displaced wrapper; the final pass renders the whole wrapper as an insert.
   let fuzzy_pairs = align_fuzzy_impl_units(
-    old_units, new_units, old_used, new_used, replacements, use_uuid, budget,
+    old_units, new_units, old_used, new_used, new_excluded_from_matching, replacements,
+    use_uuid, budget,
   )
   for fuzzy_pair in fuzzy_pairs {
     let (old_index, new_index) = fuzzy_pair
@@ -285,8 +338,10 @@ fn top_level_plan(
   new_units : ArrayView[ImplUnit],
   ignore_uuid? : Bool = false,
 ) -> TopLevelPlan {
-  top_level_plan_impl(old_units, new_units, None, ignore_uuid~) catch {
-    @computation.LimitExceeded(..) => panic()
+  let budget = @computation.Budget::new(@computation.default_limit())
+  top_level_plan_impl(old_units, new_units, Some(budget), ignore_uuid~) catch {
+    @computation.LimitExceeded(..) =>
+      RootList(old=old_units.to_owned(), new=new_units.to_owned())
   }
 }
 

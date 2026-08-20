@@ -1,6 +1,6 @@
 ///|
-/// The dynamic-programming phase that requested work from a file-level
-/// computation budget.
+/// The structural-diff phase that requested work from a file-level computation
+/// budget.
 pub(all) enum Stage {
   TopLevelAlignment
   SyntaxMatching

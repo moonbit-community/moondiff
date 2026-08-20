@@ -1,80 +1,75 @@
-note: fallback to tokdiff (computation limit exceeded (2000000) during syntax matching at old line 1, new line 1)
 [34m--- cli_test/source/20260820.old.mbt: line 1[39m
-[34m+++ cli_test/source/20260820.new.mbt: line 1[39m
-@@ -16,31 +16,13 @@
-[90m16[39m [90m16[39m /// again — so the continuation would be matched twice over. Keeping the
-[90m17[39m [90m17[39m /// thread at `Eps` also leaves `ts_seq` able to collapse a sequence whose
-[90m18[39m [90m18[39m /// first part has come down to a single finished thread.
-[90m..[39m [90m19[39m [90m///[39m
-[90m..[39m [90m20[39m [90m/// One `seen` set is shared across the whole nested thread tree. Equivalent[39m
-[90m..[39m [90m21[39m [90m/// futures can occur under different `Seq` wrappers when a repeated body[39m
-[90m..[39m [90m22[39m [90m/// consumes a variable number of characters; limiting deduplication to each[39m
-[90m..[39m [90m23[39m [90m/// wrapper separately retains one thread per partition of the input and[39m
-[90m..[39m [90m24[39m [90m/// makes the set grow exponentially.[39m
-[90m19[39m [90m25[39m fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {
-[90m20[39m [90m26[39m   let seen = @hashset.HashSet([])
-[31m21[39m [90m..[39m [90m  [39m[31m[1mfor thread in self; result = ts_empty {[22m[39m
-[31m22[39m [90m..[39m [90m    [39m[31m[1mmatch thread {[22m[39m
-[31m23[39m [90m..[39m [90m      [39m[31m[1mEnd(_) => break result + ts_one(thread)[22m[39m
-[31m24[39m [90m..[39m [90m      [39m[31m[1mExp(_, { def: Eps, .. }) =>[22m[39m
-[31m25[39m [90m..[39m [90m        [39m[31m[1mif !seen.contains(next.id) {[22m[39m
-[31m26[39m [90m..[39m [90m          [39m[31m[1mseen[22m[39m[90m.[39m[31m[1madd[22m[39m[90m(next[39m[31m[1m.id[22m[39m[90m)[39m
-[90m..[39m [32m27[39m [90m  [39m[32m[1mself[22m[39m[90m.[39m[32m[1mremove_duplicates_with_seen[22m[39m[90m(next[39m[32m[1m, seen[22m[39m[90m)[39m
-[31m27[39m [90m..[39m [90m          [39m[31m[1mcontinue result + ts_one(thread)[22m[39m
-[31m28[39m [90m..[39m [90m        [39m[31m[1m} else {[22m[39m
-[31m29[39m [90m..[39m [90m          [39m[31m[1mcontinue result[22m[39m
-[31m30[39m [90m..[39m [90m        [39m[31m[1m}[22m[39m
-[31m31[39m [90m..[39m [90m      [39m[31m[1mExp(_, { id, .. }) =>[22m[39m
-[31m32[39m [90m..[39m [90m        [39m[31m[1mif !seen.contains(id) {[22m[39m
-[31m33[39m [90m..[39m [90m          [39m[31m[1mseen.add(id)[22m[39m
-[31m34[39m [90m..[39m [90m          [39m[31m[1mcontinue result + ts_one(thread)[22m[39m
-[31m35[39m [90m..[39m [90m        [39m[31m[1m} else {[22m[39m
-[31m36[39m [90m..[39m [90m          [39m[31m[1mcontinue result[22m[39m
-[31m37[39m [90m..[39m [90m        [39m[31m[1m}[22m[39m
-[31m38[39m [90m..[39m [90m      [39m[31m[1mSeq(pref, first, next) => {[22m[39m
-[31m39[39m [90m..[39m [90m        [39m[31m[1mlet first_dedup = first.remove_duplicates(next)[22m[39m
-[31m40[39m [90m..[39m [90m        [39m[31m[1mcontinue result + ts_seq(pref, first_dedup, next)[22m[39m
-[31m41[39m [90m..[39m [90m      [39m[31m[1m}[22m[39m
-[31m42[39m [90m..[39m [90m    [39m[31m[1m}[22m[39m
-[31m43[39m [90m..[39m [90m  [39m[31m[1m} nobreak {[22m[39m
-[31m44[39m [90m..[39m [90m    [39m[31m[1mresult[22m[39m
-[31m45[39m [90m..[39m [90m  [39m[31m[1m}[22m[39m
-[90m46[39m [90m28[39m }
-
-note: fallback to tokdiff (computation limit exceeded (2000000) during syntax matching at new line 30)
-[34m--- cli_test/source/20260820.old.mbt[39m
 [34m+++ cli_test/source/20260820.new.mbt: line 30[39m
-@@ -0,0 +30,32 @@
-[90m.[39m [90m30[39m [90m///|[39m
-[90m.[39m [90m31[39m [90mfn ThreadSet::remove_duplicates_with_seen([39m
-[90m.[39m [90m32[39m [90m  self : ThreadSet,[39m
-[90m.[39m [90m33[39m [90m  next : Expr,[39m
-[90m.[39m [90m34[39m [90m  seen : @hashset.HashSet[ExprId],[39m
-[90m.[39m [90m35[39m [90m) -> ThreadSet {[39m
-[90m.[39m [90m36[39m [90m  for thread in self; result = ts_empty {[39m
-[90m.[39m [90m37[39m [90m    match thread {[39m
-[90m.[39m [90m38[39m [90m      End(_) => break result + ts_one(thread)[39m
-[90m.[39m [90m39[39m [90m      Exp(_, { def: Eps, .. }) =>[39m
-[90m.[39m [90m40[39m [90m        if !seen.contains(next.id) {[39m
-[90m.[39m [90m41[39m [90m          seen.add(next.id)[39m
-[90m.[39m [90m42[39m [90m          continue result + ts_one(thread)[39m
-[90m.[39m [90m43[39m [90m        } else {[39m
-[90m.[39m [90m44[39m [90m          continue result[39m
-[90m.[39m [90m45[39m [90m        }[39m
-[90m.[39m [90m46[39m [90m      Exp(_, { id, .. }) =>[39m
-[90m.[39m [90m47[39m [90m        if !seen.contains(id) {[39m
-[90m.[39m [90m48[39m [90m          seen.add(id)[39m
-[90m.[39m [90m49[39m [90m          continue result + ts_one(thread)[39m
-[90m.[39m [90m50[39m [90m        } else {[39m
-[90m.[39m [90m51[39m [90m          continue result[39m
-[90m.[39m [90m52[39m [90m        }[39m
-[90m.[39m [90m53[39m [90m      Seq(pref, first, next) => {[39m
-[90m.[39m [90m54[39m [90m        let first_dedup = first.remove_duplicates_with_seen(next, seen)[39m
-[90m.[39m [90m55[39m [90m        continue result + ts_seq(pref, first_dedup, next)[39m
-[90m.[39m [90m56[39m [90m      }[39m
-[90m.[39m [90m57[39m [90m    }[39m
-[90m.[39m [90m58[39m [90m  } nobreak {[39m
-[90m.[39m [90m59[39m [90m    result[39m
-[90m.[39m [90m60[39m [90m  }[39m
-[90m.[39m [90m61[39m [90m}[39m
+@@ -1,23 +30,9 @@
+ [90m1[39m [90m30[39m ///|
+ [31m2[39m [90m..[39m [31m[1m/// Drops threads that cannot contribute anything an earlier thread does not[22m[39m
+ [31m3[39m [90m..[39m [31m[1m/// already cover: two threads with the same future differ only in priority,[22m[39m
+ [31m4[39m [90m..[39m [31m[1m/// so the later one can go.[22m[39m
+ [31m5[39m [90m..[39m [31m[1m///[22m[39m
+ [31m6[39m [90m..[39m [31m[1m/// Threads in `self` all continue with `next` once they finish, which is[22m[39m
+ [31m7[39m [90m..[39m [31m[1m/// what makes a thread that has *already* finished — one sitting at `Eps` —[22m[39m
+ [31m8[39m [90m..[39m [31m[1m/// equivalent to a thread sitting at `next` itself. Both are keyed by[22m[39m
+ [31m9[39m [90m..[39m [31m[1m/// `next.id` so that the pair collapses to one; without that, a sequence[22m[39m
+[31m10[39m [90m..[39m [31m[1m/// whose first part can both finish and continue doubles its thread set on[22m[39m
+[31m11[39m [90m..[39m [31m[1m/// every character.[22m[39m
+[31m12[39m [90m..[39m [31m[1m///[22m[39m
+[31m13[39m [90m..[39m [31m[1m/// The equivalence is used as a dedup key only. Rewriting the finished[22m[39m
+[31m14[39m [90m..[39m [31m[1m/// thread to `Exp(marks, next)` would *look* like the same statement, but[22m[39m
+[31m15[39m [90m..[39m [31m[1m/// the caller wraps the result in `ts_seq(.., next)`, which appends `next`[22m[39m
+[31m16[39m [90m..[39m [31m[1m/// again — so the continuation would be matched twice over. Keeping the[22m[39m
+[31m17[39m [90m..[39m [31m[1m/// thread at `Eps` also leaves `ts_seq` able to collapse a sequence whose[22m[39m
+[31m18[39m [90m..[39m [31m[1m/// first part has come down to a single finished thread.[22m[39m
+[31m19[39m [90m..[39m [90mfn ThreadSet::[39m[31m[1mremove_duplicates[22m[39m[90m(self : ThreadSet, next : Expr) -> ThreadSet {[39m
+[31m20[39m [90m..[39m [90m  [39m[31m[1mlet[22m[39m[90m [39m[31m[1mseen[22m[39m[90m [39m[31m[1m=[22m[39m[90m [39m[31m[1m@hashset.HashSet([])[22m[39m
+[90m..[39m [32m31[39m [90mfn ThreadSet::[39m[32m[1mremove_duplicates_with_seen[22m[39m[90m([39m
+[90m..[39m [90m32[39m [90m  self : ThreadSet,[39m
+[90m..[39m [32m33[39m [90m  next : Expr[39m[32m[1m,[22m[39m
+[90m..[39m [32m34[39m [90m  [39m[32m[1mseen[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1m@hashset.HashSet[ExprId],[22m[39m
+[90m..[39m [90m35[39m [90m) -> ThreadSet {[39m
+[90m21[39m [90m36[39m   for thread in self; result = ts_empty {
+[90m22[39m [90m37[39m     match thread {
+[90m23[39m [90m38[39m       End(_) => break result + ts_one(thread)
+@@ -35,9 +50,9 @@
+[90m35[39m [90m50[39m         } else {
+[90m36[39m [90m51[39m           continue result
+[90m37[39m [90m52[39m         }
+[90m38[39m [90m53[39m       Seq(pref, first, next) => {
+[31m39[39m [90m..[39m [90m        let first_dedup = first.[39m[31m[1mremove_duplicates[22m[39m[90m(next)[39m
+[90m..[39m [32m54[39m [90m        let first_dedup = first.[39m[32m[1mremove_duplicates_with_seen[22m[39m[90m(next[39m[32m[1m,[22m[39m[90m [39m[32m[1mseen[22m[39m[90m)[39m
+[90m40[39m [90m55[39m         continue result + ts_seq(pref, first_dedup, next)
+[90m41[39m [90m56[39m       }
+[90m42[39m [90m57[39m     }
+[90m43[39m [90m58[39m   } nobreak {
+
+[34m--- cli_test/source/20260820.old.mbt[39m
+[34m+++ cli_test/source/20260820.new.mbt: line 1[39m
+@@ -1,0 +1,28 @@
+[90m.[39m  [32m1[39m [32m[1m///|[22m[39m
+[90m.[39m  [32m2[39m [32m[1m/// Drops threads that cannot contribute anything an earlier thread does not[22m[39m
+[90m.[39m  [32m3[39m [32m[1m/// already cover: two threads with the same future differ only in priority,[22m[39m
+[90m.[39m  [32m4[39m [32m[1m/// so the later one can go.[22m[39m
+[90m.[39m  [32m5[39m [32m[1m///[22m[39m
+[90m.[39m  [32m6[39m [32m[1m/// Threads in `self` all continue with `next` once they finish, which is[22m[39m
+[90m.[39m  [32m7[39m [32m[1m/// what makes a thread that has *already* finished — one sitting at `Eps` —[22m[39m
+[90m.[39m  [32m8[39m [32m[1m/// equivalent to a thread sitting at `next` itself. Both are keyed by[22m[39m
+[90m.[39m  [32m9[39m [32m[1m/// `next.id` so that the pair collapses to one; without that, a sequence[22m[39m
+[90m.[39m [32m10[39m [32m[1m/// whose first part can both finish and continue doubles its thread set on[22m[39m
+[90m.[39m [32m11[39m [32m[1m/// every character.[22m[39m
+[90m.[39m [32m12[39m [32m[1m///[22m[39m
+[90m.[39m [32m13[39m [32m[1m/// The equivalence is used as a dedup key only. Rewriting the finished[22m[39m
+[90m.[39m [32m14[39m [32m[1m/// thread to `Exp(marks, next)` would *look* like the same statement, but[22m[39m
+[90m.[39m [32m15[39m [32m[1m/// the caller wraps the result in `ts_seq(.., next)`, which appends `next`[22m[39m
+[90m.[39m [32m16[39m [32m[1m/// again — so the continuation would be matched twice over. Keeping the[22m[39m
+[90m.[39m [32m17[39m [32m[1m/// thread at `Eps` also leaves `ts_seq` able to collapse a sequence whose[22m[39m
+[90m.[39m [32m18[39m [32m[1m/// first part has come down to a single finished thread.[22m[39m
+[90m.[39m [32m19[39m [32m[1m///[22m[39m
+[90m.[39m [32m20[39m [32m[1m/// One `seen` set is shared across the whole nested thread tree. Equivalent[22m[39m
+[90m.[39m [32m21[39m [32m[1m/// futures can occur under different `Seq` wrappers when a repeated body[22m[39m
+[90m.[39m [32m22[39m [32m[1m/// consumes a variable number of characters; limiting deduplication to each[22m[39m
+[90m.[39m [32m23[39m [32m[1m/// wrapper separately retains one thread per partition of the input and[22m[39m
+[90m.[39m [32m24[39m [32m[1m/// makes the set grow exponentially.[22m[39m
+[90m.[39m [32m25[39m [32m[1mfn[22m[39m[90m [39m[32m[1mThreadSet::remove_duplicates(self[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mThreadSet,[22m[39m[90m [39m[32m[1mnext[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mExpr)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mThreadSet[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m [32m26[39m [90m  [39m[32m[1mlet[22m[39m[90m [39m[32m[1mseen[22m[39m[90m [39m[32m[1m=[22m[39m[90m [39m[32m[1m@hashset.HashSet([])[22m[39m
+[90m.[39m [32m27[39m [90m  [39m[32m[1mself.remove_duplicates_with_seen(next,[22m[39m[90m [39m[32m[1mseen)[22m[39m
+[90m.[39m [32m28[39m [32m[1m}[22m[39m
 

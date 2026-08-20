@@ -26,6 +26,19 @@ fn edit_line_summary(edit : ImplEdit) -> String {
   }
 }
 
+///|
+fn edit_declaration_summary(edit : ImplEdit) -> String {
+  fn name(unit : ImplUnit) -> String {
+    unit.fuzzy.map(info => info.name).unwrap_or("none")
+  }
+
+  match edit {
+    Replace(old~, new~) => "Replace(\{name(old)}->\{name(new)})"
+    Delete(old) => "Delete(\{name(old)})"
+    Insert(new) => "Insert(\{name(new)})"
+  }
+}
+
 ///|UUID(1bfc1fdd-7d6e-45d9-9a3d-12672bcd26bd)
 fn parse_units(source : String) -> Array[ImplUnit] {
   let result = @cst.parse_structure(source)
@@ -44,6 +57,73 @@ fn align_impl_units_by_key(
   align_impl_units_by_key_impl(old_units, new_units, None, use_uuid~) catch {
     @computation.LimitExceeded(..) => panic()
   }
+}
+
+///|
+fn long_free_declaration(name : String, finish? : String = "finish") -> String {
+  let source =
+    $|fn \{name}(input : Input) -> Output {
+    $|  let first = step_one(input)
+    $|  let second = step_two(first)
+    $|  let third = step_three(second)
+    $|  let fourth = step_four(third)
+    $|  let fifth = step_five(fourth)
+    $|  \{finish}(first, second, third, fourth, fifth)
+    $|}
+  source
+}
+
+///|
+fn long_method_declaration(receiver : String, name : String) -> String {
+  let source =
+    $|fn \{receiver}::\{name}(self : Worker, input : Input) -> Output {
+    $|  let first = step_one(input)
+    $|  let second = step_two(first)
+    $|  let third = step_three(second)
+    $|  let fourth = step_four(third)
+    $|  let fifth = step_five(fourth)
+    $|  finish(first, second, third, fourth, fifth)
+    $|}
+  source
+}
+
+///|
+fn distinct_long_free_declaration(name : String, marker : String) -> String {
+  let source =
+    $|fn \{name}(input : Input) -> Output {
+    $|  let \{marker}_first = \{marker}_step_one(input)
+    $|  let \{marker}_second = \{marker}_step_two(\{marker}_first)
+    $|  let \{marker}_third = \{marker}_step_three(\{marker}_second)
+    $|  let \{marker}_fourth = \{marker}_step_four(\{marker}_third)
+    $|  let \{marker}_fifth = \{marker}_step_five(\{marker}_fourth)
+    $|  \{marker}_finish(
+    $|    \{marker}_first,
+    $|    \{marker}_second,
+    $|    \{marker}_third,
+    $|    \{marker}_fourth,
+    $|    \{marker}_fifth,
+    $|  )
+    $|}
+  source
+}
+
+///|
+fn many_independent_extraction_sources(count : Int) -> (String, String) {
+  let old_declarations : Array[String] = []
+  let new_declarations : Array[String] = []
+  for i in 0..<count {
+    let name = "target_\{i}"
+    let helper = "\{name}_helper"
+    let marker = "body_\{i}"
+    old_declarations.push(distinct_long_free_declaration(name, marker))
+    let wrapper =
+      $|fn \{name}(input : Input) -> Output {
+      $|  \{helper}(input)
+      $|}
+    new_declarations.push(wrapper)
+    new_declarations.push(distinct_long_free_declaration(helper, marker))
+  }
+  (old_declarations.join("\n"), new_declarations.join("\n"))
 }
 
 ///|
@@ -348,6 +428,635 @@ test "fuzzy metadata replaces only the declaration name" {
     assert_true(units.length() == 1)
     assert_true(units[0].fuzzy is None)
   }
+}
+
+///|
+test "body trigrams ignore comments and normalize recursive call names" {
+  let old_source =
+    #|fn walk(input : Input) -> Output {
+    #|  let first = step_one(input)
+    #|  let second = step_two(first)
+    #|  // old explanation
+    #|  let third = step_three(second)
+    #|  walk(third)
+    #|}
+  let new_source =
+    #|fn walk_with_state(input : Input, state : State) -> Output {
+    #|  let first = step_one(input)
+    #|  // new explanation
+    #|  let second = step_two(first)
+    #|  let third = step_three(second)
+    #|  walk_with_state(third)
+    #|}
+  guard parse_units(old_source)[0].fuzzy is Some(old_info) &&
+    old_info.body_input is Some(old_input) &&
+    parse_units(new_source)[0].fuzzy is Some(new_info) &&
+    new_info.body_input is Some(new_input) else {
+    fail("expected function body metadata")
+  }
+  let old_body = make_impl_fuzzy_body(old_input)
+  let new_body = make_impl_fuzzy_body(new_input)
+  assert_true(old_body.mass >= impl_extraction_min_body_mass)
+  assert_eq(old_body.mass, new_body.mass)
+  assert_eq(impl_body_continuity(old_body, new_body), 1000)
+}
+
+///|
+test "body fingerprints are charged and cached once per alignment" {
+  let units = parse_units(long_free_declaration("target"))
+  guard units[0].fuzzy is Some(info) && info.body_input is Some(input) else {
+    fail("expected function body input")
+  }
+  let work = @cmp.maximum(
+    input.node.source_span.1 - input.node.source_span.0,
+    0,
+  ).reinterpret_as_uint()
+  assert_true(work > 0)
+  let rejected_cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
+  let insufficient = @computation.Budget::new(work - 1)
+  try impl_fuzzy_body_at(units, 0, rejected_cache, Some(insufficient)) catch {
+    @computation.LimitExceeded(stage~, limit~) => {
+      assert_true(stage is TopLevelAlignment)
+      assert_eq(limit, work - 1)
+      assert_true(rejected_cache[0] is None)
+    }
+  } noraise {
+    _ => fail("expected construction to be rejected before caching")
+  }
+  let cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
+  let budget = @computation.Budget::new(work)
+  guard impl_fuzzy_body_at(units, 0, cache, Some(budget)) is Some(first) &&
+    impl_fuzzy_body_at(units, 0, cache, Some(budget)) is Some(second) else {
+    fail("expected cached body fingerprints")
+  }
+  assert_eq(first.mass, second.mass)
+  try budget.charge(1U, TopLevelAlignment) catch {
+    @computation.LimitExceeded(stage~, limit~) => {
+      assert_true(stage is TopLevelAlignment)
+      assert_eq(limit, work)
+    }
+  } noraise {
+    _ => fail("expected the body fingerprint charge to exhaust the budget")
+  }
+}
+
+///|
+test "semantic extraction filters missing helpers before body fingerprint work" {
+  let old_source = long_free_declaration("target")
+  let new_source = long_free_declaration("target", finish="finish_changed")
+  let budget = @computation.Budget::new(0)
+  let edits = align_impl_units_by_key_impl(
+    parse_units(old_source),
+    parse_units(new_source),
+    Some(budget),
+  )
+  @debug.assert_eq(edits.map(edit_declaration_summary), [
+    "Replace(target->target)",
+  ])
+}
+
+///|
+test "direct self delegates include return-self cascade calls" {
+  fn inspect_delegate(source : String) -> (String?, String?) raise {
+    let parsed = @cst.parse_structure(source)
+    guard parsed.diagnostics_view().is_empty() &&
+      first_child_node(parsed.root(), "item") is Some(wrapper_node) &&
+      impl_function_body(wrapper_node) is Some(wrapper_body) &&
+      final_impl_body_expression(wrapper_body) is Some(wrapper_tail) else {
+      fail("expected a valid wrapper tail expression")
+    }
+    (
+      first_child_text(source, wrapper_tail, "op"),
+      direct_self_delegate(source, wrapper_tail),
+    )
+  }
+
+  let dot_source = "fn Worker::wrapper(self : Worker) { self.helper() }"
+  let cascade_source = "fn Worker::wrapper(self : Worker) { self..helper() }"
+  @debug.assert_eq(inspect_delegate(dot_source), (None, Some("helper")))
+  @debug.assert_eq(
+    inspect_delegate(cascade_source),
+    (Some(".."), Some("helper")),
+  )
+}
+
+///|
+test "semantic extraction pairs an old method with an adjacent helper" {
+  let old_source =
+    #|fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {
+    #|  let seen = @hashset.HashSet([])
+    #|  for thread in self; result = ts_empty {
+    #|    match thread {
+    #|      End(_) => break result + ts_one(thread)
+    #|      Exp(_, { def: Eps, .. }) =>
+    #|        if !seen.contains(next.id) {
+    #|          seen.add(next.id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Exp(_, { id, .. }) =>
+    #|        if !seen.contains(id) {
+    #|          seen.add(id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Seq(pref, first, next) => {
+    #|        let first_dedup = first.remove_duplicates(next)
+    #|        continue result + ts_seq(pref, first_dedup, next)
+    #|      }
+    #|    }
+    #|  } nobreak {
+    #|    result
+    #|  }
+    #|}
+  let new_source =
+    #|fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {
+    #|  let seen = @hashset.HashSet([])
+    #|  self.remove_duplicates_with_seen(next, seen)
+    #|}
+    #|fn ThreadSet::remove_duplicates_with_seen(
+    #|  self : ThreadSet,
+    #|  next : Expr,
+    #|  seen : @hashset.HashSet[ExprId],
+    #|) -> ThreadSet {
+    #|  for thread in self; result = ts_empty {
+    #|    match thread {
+    #|      End(_) => break result + ts_one(thread)
+    #|      Exp(_, { def: Eps, .. }) =>
+    #|        if !seen.contains(next.id) {
+    #|          seen.add(next.id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Exp(_, { id, .. }) =>
+    #|        if !seen.contains(id) {
+    #|          seen.add(id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Seq(pref, first, next) => {
+    #|        let first_dedup = first.remove_duplicates_with_seen(next, seen)
+    #|        continue result + ts_seq(pref, first_dedup, next)
+    #|      }
+    #|    }
+    #|  } nobreak {
+    #|    result
+    #|  }
+    #|}
+  let old = parse_units(old_source)
+  let new = parse_units(new_source)
+  let parsed_new = @cst.parse_structure(new_source)
+  guard first_child_node(parsed_new.root(), "item") is Some(wrapper_node) &&
+    impl_function_body(wrapper_node) is Some(wrapper_body_node) &&
+    final_impl_body_expression(wrapper_body_node) is Some(wrapper_tail) else {
+    fail("expected wrapper tail expression")
+  }
+  assert_eq(
+    direct_self_delegate(new_source, wrapper_tail),
+    Some("remove_duplicates_with_seen"),
+    msg="tail kind=\{Repr(wrapper_tail.kind)}, text=\{cst_node_text(new_source, wrapper_tail)}, " +
+      "receiver=\{first_child_node(wrapper_tail, "self").map(node => cst_node_text(new_source, node)).unwrap_or("missing")}, " +
+      "token=\{Repr(first_child_text(new_source, wrapper_tail, "token"))}, " +
+      "delegate=\{Repr(direct_self_delegate(new_source, wrapper_tail))}",
+  )
+  guard old[0].fuzzy is Some(old_info) &&
+    old_info.body_input is Some(old_input) &&
+    new[0].fuzzy is Some(wrapper_info) &&
+    wrapper_info.body_input is Some(wrapper_input) &&
+    new[1].fuzzy is Some(helper_info) &&
+    helper_info.body_input is Some(helper_input) else {
+    fail("expected method body metadata")
+  }
+  let old_body = make_impl_fuzzy_body(old_input)
+  let wrapper_body = make_impl_fuzzy_body(wrapper_input)
+  let helper_body = make_impl_fuzzy_body(helper_input)
+  let edits = align_impl_units_by_key(old, new)
+  assert_true(
+    edits.map(edit_declaration_summary) ==
+    [
+      "Replace(remove_duplicates->remove_duplicates_with_seen)", "Insert(remove_duplicates)",
+    ],
+    msg="old=\{old_body.mass}, wrapper=\{wrapper_body.mass}, helper=\{helper_body.mass}, " +
+      "tail=\{wrapper_info.tail_delegate.map(delegate => delegate.target).unwrap_or("none")}, helper_score=\{impl_body_continuity(old_body, helper_body)}, " +
+      "wrapper_score=\{impl_body_continuity(old_body, wrapper_body)}, edits=\{edits.map(edit_declaration_summary).join(", ")}",
+  )
+}
+
+///|
+test "semantic extraction accepts a return-self cascade wrapper" {
+  let old_source =
+    #|fn Worker::target(self : Worker, input : Input) -> Worker {
+    #|  let first = step_one(input)
+    #|  let second = step_two(first)
+    #|  let third = step_three(second)
+    #|  let fourth = step_four(third)
+    #|  let fifth = step_five(fourth)
+    #|  finish(first, second, third, fourth, fifth)
+    #|  self
+    #|}
+  let wrapper =
+    #|fn Worker::target(self : Worker, input : Input) -> Worker {
+    #|  self..target_helper(input)
+    #|}
+  let helper =
+    #|fn Worker::target_helper(self : Worker, input : Input) -> Unit {
+    #|  let first = step_one(input)
+    #|  let second = step_two(first)
+    #|  let third = step_three(second)
+    #|  let fourth = step_four(third)
+    #|  let fifth = step_five(fourth)
+    #|  finish(first, second, third, fourth, fifth)
+    #|}
+  let new_source = wrapper + "\n" + helper
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_declaration_summary), [
+    "Replace(target->target_helper)", "Insert(target)",
+  ])
+}
+
+///|
+test "semantic extraction supports a preceding free helper and explicit return" {
+  let old_source =
+    #|fn remove_duplicates(threads : ThreadSet, next : Expr) -> ThreadSet {
+    #|  let seen = @hashset.HashSet([])
+    #|  for thread in threads; result = ts_empty {
+    #|    match thread {
+    #|      End(_) => break result + ts_one(thread)
+    #|      Exp(_, { def: Eps, .. }) =>
+    #|        if !seen.contains(next.id) {
+    #|          seen.add(next.id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Exp(_, { id, .. }) =>
+    #|        if !seen.contains(id) {
+    #|          seen.add(id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Seq(pref, first, next) => {
+    #|        let first_dedup = remove_duplicates(first, next)
+    #|        continue result + ts_seq(pref, first_dedup, next)
+    #|      }
+    #|    }
+    #|  } nobreak {
+    #|    result
+    #|  }
+    #|}
+  let new_source =
+    #|fn remove_duplicates_with_seen(
+    #|  threads : ThreadSet,
+    #|  next : Expr,
+    #|  seen : @hashset.HashSet[ExprId],
+    #|) -> ThreadSet {
+    #|  for thread in threads; result = ts_empty {
+    #|    match thread {
+    #|      End(_) => break result + ts_one(thread)
+    #|      Exp(_, { def: Eps, .. }) =>
+    #|        if !seen.contains(next.id) {
+    #|          seen.add(next.id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Exp(_, { id, .. }) =>
+    #|        if !seen.contains(id) {
+    #|          seen.add(id)
+    #|          continue result + ts_one(thread)
+    #|        } else {
+    #|          continue result
+    #|        }
+    #|      Seq(pref, first, next) => {
+    #|        let first_dedup = remove_duplicates_with_seen(first, next, seen)
+    #|        continue result + ts_seq(pref, first_dedup, next)
+    #|      }
+    #|    }
+    #|  } nobreak {
+    #|    result
+    #|  }
+    #|}
+    #|fn remove_duplicates(threads : ThreadSet, next : Expr) -> ThreadSet {
+    #|  let seen = @hashset.HashSet([])
+    #|  return remove_duplicates_with_seen(threads, next, seen)
+    #|}
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  @debug.assert_eq(edits.map(edit_declaration_summary), [
+    "Replace(remove_duplicates->remove_duplicates_with_seen)", "Insert(remove_duplicates)",
+  ])
+}
+
+///|
+test "semantic extraction rejects weak or partial split evidence" {
+  let old_long = long_free_declaration("target")
+  let helper_long = long_free_declaration("target_helper")
+  let unrelated_wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  unrelated(input)
+    #|}
+  let delegating_wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let retained_wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  let first = step_one(input)
+    #|  let second = step_two(first)
+    #|  let third = step_three(second)
+    #|  target_helper(third)
+    #|}
+  let conditional_wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  if enabled() { target_helper(input) } else { fallback(input) }
+    #|}
+  let tiny_split =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+    #|fn target_helper(input : Input) -> Output { step_one(input) }
+  let cases : Array[(String, String, String)] = [
+    (
+      "ordinary same-name edit",
+      old_long,
+      long_free_declaration("target", finish="finish_changed"),
+    ),
+    (
+      "wrapper calls an unrelated helper",
+      old_long,
+      unrelated_wrapper + "\n" + helper_long,
+    ),
+    (
+      "helper is not adjacent",
+      old_long,
+      delegating_wrapper + "\nfn stable() {}\n" + helper_long,
+    ),
+    (
+      "wrapper retains too much old body",
+      old_long,
+      retained_wrapper + "\n" + helper_long,
+    ),
+    (
+      "wrapper delegates conditionally",
+      old_long,
+      conditional_wrapper + "\n" + helper_long,
+    ),
+    (
+      "old body is too small", "fn target(input : Input) -> Output { step_one(input) }",
+      tiny_split,
+    ),
+  ]
+  for entry in cases {
+    let (label, old_source, new_source) = entry
+    let edits = align_impl_units_by_key(
+      parse_units(old_source),
+      parse_units(new_source),
+    )
+    let summaries = edits.map(edit_declaration_summary)
+    assert_true(
+      !summaries.is_empty() && summaries[0] == "Replace(target->target)",
+      msg="\{label}: \{summaries.join(", ")}",
+    )
+    assert_false(
+      summaries.contains("Replace(target->target_helper)"),
+      msg="\{label}: \{summaries.join(", ")}",
+    )
+  }
+}
+
+///|
+test "semantic extraction requires compatible ownership and a unique self delegate" {
+  let ref_old = long_method_declaration("&Worker", "target")
+  let ref_wrapper =
+    #|fn &Worker::target(self : Worker, input : Input) -> Output {
+    #|  self.target_helper(input)
+    #|}
+  let value_helper = long_method_declaration("Worker", "target_helper")
+  let value_old = long_method_declaration("Worker", "target")
+  let other_wrapper =
+    #|fn Worker::target(self : Worker, input : Input) -> Output {
+    #|  other.target_helper(input)
+    #|}
+  let bare_method_wrapper =
+    #|fn Worker::target(self : Worker, input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let value_helper_same_owner = long_method_declaration(
+    "Worker", "target_helper",
+  )
+  let ambiguous_helper = long_free_declaration("target_helper")
+  let ambiguous_wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let cases : Array[(String, String, String)] = [
+    ("reference owner differs", ref_old, ref_wrapper + "\n" + value_helper),
+    (
+      "method receiver is not self",
+      value_old,
+      other_wrapper + "\n" + value_helper_same_owner,
+    ),
+    (
+      "method helper is called without self",
+      value_old,
+      bare_method_wrapper + "\n" + value_helper_same_owner,
+    ),
+    (
+      "two adjacent helpers satisfy the delegate name",
+      long_free_declaration("target"),
+      ambiguous_helper + "\n" + ambiguous_wrapper + "\n" + ambiguous_helper,
+    ),
+  ]
+  for entry in cases {
+    let (label, old_source, new_source) = entry
+    let summaries = align_impl_units_by_key(
+      parse_units(old_source),
+      parse_units(new_source),
+    ).map(edit_declaration_summary)
+    assert_true(
+      !summaries.is_empty() && summaries[0] == "Replace(target->target)",
+      msg="\{label}: \{summaries.join(", ")}",
+    )
+  }
+}
+
+///|
+test "semantic extraction requires an unoccupied helper with one clear old owner" {
+  let wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let tied_old = long_free_declaration("target") +
+    "\n" +
+    long_free_declaration("competitor")
+  let tied_new = wrapper +
+    "\n" +
+    long_free_declaration("target_helper") +
+    "\n" +
+    long_free_declaration("competitor")
+  @debug.assert_eq(
+    align_impl_units_by_key(parse_units(tied_old), parse_units(tied_new)).map(
+      edit_declaration_summary,
+    ),
+    [
+      "Replace(target->target)", "Replace(competitor->competitor)", "Insert(target_helper)",
+    ],
+  )
+
+  let occupied_old = long_free_declaration("target") +
+    "\n" +
+    long_free_declaration("target_helper")
+  let occupied_new = wrapper +
+    "\n" +
+    long_free_declaration("target_helper", finish="finish_changed")
+  @debug.assert_eq(
+    align_impl_units_by_key(
+      parse_units(occupied_old),
+      parse_units(occupied_new),
+    ).map(edit_declaration_summary),
+    ["Replace(target->target)", "Replace(target_helper->target_helper)"],
+  )
+}
+
+///|
+test "semantic extraction ambiguity work uses the file budget" {
+  let extraction_count = 24
+  let (old_source, new_source) = many_independent_extraction_sources(
+    extraction_count,
+  )
+  let edits = align_impl_units_by_key(
+    parse_units(old_source),
+    parse_units(new_source),
+  )
+  let mut replacements = 0
+  let mut insertions = 0
+  for edit in edits {
+    match edit {
+      Replace(old~, new~) => {
+        guard old.fuzzy is Some(old_info) && new.fuzzy is Some(new_info) else {
+          fail("expected fuzzy declaration metadata")
+        }
+        assert_eq(new_info.name, "\{old_info.name}_helper")
+        replacements += 1
+      }
+      Insert(_) => insertions += 1
+      Delete(_) =>
+        fail("independent extractions must retain every old declaration")
+    }
+  }
+  assert_eq(replacements, extraction_count)
+  assert_eq(insertions, extraction_count)
+
+  let calculation = calculate_diff_document_with_limit(
+    old_source, new_source, "old", "new", 0, 3_000_000, false, 1,
+  )
+  guard calculation.result.fallbacks
+    is [
+      {
+        reason: ComputationLimitExceeded(stage=TopLevelAlignment, limit=1),
+        scope: WholeFile,
+      },
+    ] else {
+    fail("expected extraction ambiguity work to use the top-level budget")
+  }
+  assert_true(calculation.layout is WholeDocument)
+  assert_false(calculation.result.document.hunks.is_empty())
+}
+
+///|
+test "duplicate semantic keys and UUID anchors cannot be challenged" {
+  let duplicate_old = long_free_declaration("dup") +
+    "\n" +
+    long_free_declaration("dup")
+  let duplicate_wrapper =
+    #|fn dup(input : Input) -> Output {
+    #|  dup_helper(input)
+    #|}
+  let duplicate_new = duplicate_wrapper +
+    "\n" +
+    long_free_declaration("dup_helper") +
+    "\n" +
+    long_free_declaration("dup", finish="finish_changed")
+  @debug.assert_eq(
+    align_impl_units_by_key(
+      parse_units(duplicate_old),
+      parse_units(duplicate_new),
+    ).map(edit_declaration_summary),
+    ["Replace(dup->dup)", "Replace(dup->dup)", "Insert(dup_helper)"],
+  )
+
+  let uuid_old = "///|UUID(extraction-target)\n" +
+    long_free_declaration("target")
+  let uuid_wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let uuid_new = "///|UUID(extraction-target)\n" +
+    uuid_wrapper +
+    "\n" +
+    long_free_declaration("target_helper")
+  @debug.assert_eq(
+    align_impl_units_by_key(parse_units(uuid_old), parse_units(uuid_new)).map(
+      edit_declaration_summary,
+    ),
+    ["Replace(target->target)", "Insert(target_helper)"],
+  )
+}
+
+///|
+test "semantic extraction respects conflicting helper UUIDs" {
+  let old_source = "///|UUID(old-target)\n" + long_free_declaration("target")
+  let wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let new_source = wrapper +
+    "\n///|UUID(new-helper)\n" +
+    long_free_declaration("target_helper")
+  @debug.assert_eq(
+    align_impl_units_by_key(parse_units(old_source), parse_units(new_source)).map(
+      edit_summary,
+    ),
+    ["Replace(old-target->none)", "Insert(new-helper)"],
+  )
+  @debug.assert_eq(
+    align_impl_units_by_key(
+      parse_units(old_source),
+      parse_units(new_source),
+      use_uuid=false,
+    ).map(edit_summary),
+    ["Replace(old-target->new-helper)", "Insert(none)"],
+  )
+}
+
+///|
+test "a displaced wrapper cannot reenter exact or fuzzy matching" {
+  let other =
+    #|fn other(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let old_source = other + "\n" + long_free_declaration("target")
+  let wrapper =
+    #|fn target(input : Input) -> Output {
+    #|  target_helper(input)
+    #|}
+  let new_source = wrapper + "\n" + long_free_declaration("target_helper")
+  @debug.assert_eq(
+    align_impl_units_by_key(parse_units(old_source), parse_units(new_source)).map(
+      edit_declaration_summary,
+    ),
+    ["Delete(other)", "Replace(target->target_helper)", "Insert(target)"],
+  )
 }
 
 ///|
