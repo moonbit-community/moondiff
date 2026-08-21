@@ -169,10 +169,7 @@ function manifest() {
     background: { service_worker: "service-worker.js" },
     side_panel: { default_path: "panel.html" },
     content_scripts: [{
-      matches: [
-        "https://github.com/*/*/commit/*",
-        "https://github.com/*/*/pull/*",
-      ],
+      matches: ["https://github.com/*"],
       js: ["target.js", "content-script.js"],
       run_at: "document_idle",
     }],
