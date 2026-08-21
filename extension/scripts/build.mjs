@@ -169,6 +169,8 @@ function manifest() {
     background: { service_worker: "service-worker.js" },
     side_panel: { default_path: "panel.html" },
     content_scripts: [{
+      // GitHub can SPA-navigate into a PR or commit without creating a new document,
+      // so the route watcher must already be present before that transition.
       matches: ["https://github.com/*"],
       js: ["target.js", "content-script.js"],
       run_at: "document_idle",
