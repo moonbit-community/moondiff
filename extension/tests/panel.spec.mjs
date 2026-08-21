@@ -418,7 +418,7 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
   });
 }
 
-test("content script follows GitHub SPA routes and exposes the refresh notice in Shadow DOM", async ({ page }) => {
+test("content script activates when GitHub SPA navigation first enters a pull request", async ({ page }) => {
   await page.route("https://github.com/**", route => route.fulfill({
     status: 200,
     contentType: "text/html",
@@ -434,19 +434,29 @@ test("content script follows GitHub SPA routes and exposes the refresh notice in
       },
     };
   });
-  await page.goto("https://github.com/acme/widgets/pull/7/files");
+  await page.goto("https://github.com/acme/widgets");
   await page.addScriptTag({ path: resolve(extensionRoot, "src/target.js") });
   await page.addScriptTag({ path: resolve(extensionRoot, "src/content-script.js") });
 
   const buttonText = () => page.evaluate(() => document
     .getElementById("moondiff-extension-root")
     ?.shadowRoot?.querySelector("button")?.textContent);
+  const hasButtonRoot = () => page.evaluate(() => Boolean(document.getElementById("moondiff-extension-root")));
+
+  await expect.poll(hasButtonRoot).toBe(false);
+  await page.evaluate(() => window.__content.listeners[0]({ v: 1, op: "page.comments.changed" }));
+  await expect.poll(hasButtonRoot).toBe(false);
+
+  await page.evaluate(() => {
+    history.pushState(null, "", "/acme/widgets/pull/7/files");
+    dispatchEvent(new Event("turbo:load"));
+  });
   await expect.poll(buttonText).toBe("Open in Moondiff");
   await page.evaluate(() => {
     history.pushState(null, "", "/acme/widgets/issues/7");
     dispatchEvent(new PopStateEvent("popstate"));
   });
-  await expect.poll(() => page.evaluate(() => Boolean(document.getElementById("moondiff-extension-root")))).toBe(false);
+  await expect.poll(hasButtonRoot).toBe(false);
 
   await page.evaluate(() => {
     history.pushState(null, "", "/acme/widgets/pull/8/commits/abcdef1");

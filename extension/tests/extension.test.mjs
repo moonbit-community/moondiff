@@ -658,6 +658,11 @@ test("Web Store package remains MV3-local and source-map free", () => {
       "https://github.com/login/device/code",
       "https://github.com/login/oauth/access_token",
     ]);
+    assert.deepEqual(manifest.content_scripts, [{
+      matches: ["https://github.com/*"],
+      js: ["target.js", "content-script.js"],
+      run_at: "document_idle",
+    }]);
     assert.equal(manifest.permissions.includes("identity"), false);
     assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'/u);
     const configSource = readFileSync(join(outputRoot, "config.js"), "utf8");

@@ -78,6 +78,8 @@
 
   chrome.runtime.onMessage.addListener(message => {
     if (message?.v === 1 && message?.op === "page.comments.changed") {
+      const target = globalThis.MoondiffTarget?.parseGitHubTarget(location.href);
+      if (!target) return;
       dirty = true;
       ensureButton();
       renderButton();
