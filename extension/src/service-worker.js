@@ -314,6 +314,8 @@ if (typeof importScripts === "function") {
     } else if (response.status === 401) {
       code = "authentication_required";
       message = "Your GitHub session expired. Sign in again.";
+    } else if (response.status === 403) {
+      code = "permission_denied";
     } else if (response.status === 404) {
       code = "not_found_or_not_installed";
       message = "GitHub could not find this resource. For private repositories, sign in and install the GitHub App.";
@@ -727,11 +729,12 @@ if (typeof importScripts === "function") {
       };
     }
     if (operation === "github.comments.list") {
-      exactKeys(args, ["owner", "repo", "kind", "number", "sha"]);
+      exactKeys(args, ["owner", "repo", "kind"], ["number", "sha"]);
       const base = repositoryPath(args);
       if (!["pull", "commit", "pull_commit"].includes(args.kind)) throw new RpcError(400, "invalid_target", "The comment target is invalid.");
       if (args.kind === "pull") {
-        if (!validNumber(args.number) || args.sha !== null) throw new RpcError(400, "invalid_target", "The pull request comment target is invalid.");
+        exactKeys(args, ["owner", "repo", "kind", "number"]);
+        if (!validNumber(args.number)) throw new RpcError(400, "invalid_target", "The pull request comment target is invalid.");
         const [issue_comments, review_comments] = await Promise.all([
           githubJsonPages(`${base}/issues/${args.number}/comments`, signal),
           githubJsonPages(`${base}/pulls/${args.number}/comments`, signal),
@@ -742,9 +745,13 @@ if (typeof importScripts === "function") {
           commit_comments: [],
         };
       }
-      if (!validSha(args.sha)) throw new RpcError(400, "invalid_target", "The commit comment target is invalid.");
-      if (args.kind === "commit" && args.number !== null) throw new RpcError(400, "invalid_target", "The commit comment target is invalid.");
-      if (args.kind === "pull_commit" && !validNumber(args.number)) throw new RpcError(400, "invalid_target", "The pull commit target is invalid.");
+      if (args.kind === "commit") {
+        exactKeys(args, ["owner", "repo", "kind", "sha"]);
+        if (!validSha(args.sha)) throw new RpcError(400, "invalid_target", "The commit comment target is invalid.");
+      } else {
+        exactKeys(args, ["owner", "repo", "kind", "number", "sha"]);
+        if (!validNumber(args.number) || !validSha(args.sha)) throw new RpcError(400, "invalid_target", "The pull commit target is invalid.");
+      }
       const commit_comments = await githubJsonPages(`${base}/commits/${encodeURIComponent(args.sha)}/comments`, signal);
       return {
         issue_comments: [],

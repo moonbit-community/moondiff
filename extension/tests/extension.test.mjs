@@ -632,6 +632,106 @@ test("comment RPC normalizes GitHub ids and nullable fields for MoonBit", () => 
   });
 });
 
+test("comment list RPC accepts only the exact fields for each target kind", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const requests = [];
+  globalThis.fetch = async input => {
+    requests.push(String(input));
+    return Response.json([]);
+  };
+  const repository = { owner: "acme", repo: "widgets" };
+  const cases = [{
+    args: { ...repository, kind: "pull", number: "17" },
+    expected: [
+      "https://api.github.com/repos/acme/widgets/issues/17/comments?per_page=100&page=1",
+      "https://api.github.com/repos/acme/widgets/pulls/17/comments?per_page=100&page=1",
+    ],
+  }, {
+    args: { ...repository, kind: "commit", sha: "abcdef1" },
+    expected: [
+      "https://api.github.com/repos/acme/widgets/commits/abcdef1/comments?per_page=100&page=1",
+    ],
+  }, {
+    args: { ...repository, kind: "pull_commit", number: "17", sha: "abcdef1" },
+    expected: [
+      "https://api.github.com/repos/acme/widgets/commits/abcdef1/comments?per_page=100&page=1",
+    ],
+  }];
+
+  for (const { args, expected } of cases) {
+    requests.length = 0;
+    assert.deepEqual(await Worker.dispatchGithub("github.comments.list", args), {
+      issue_comments: [],
+      review_comments: [],
+      commit_comments: [],
+    });
+    assert.deepEqual(requests.sort(), expected.sort());
+  }
+});
+
+test("comment list RPC rejects null, missing, mistyped, cross-kind, and unknown fields before fetch", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return Response.json([]);
+  };
+  const repository = { owner: "acme", repo: "widgets" };
+  const invalid = [
+    { ...repository, kind: "pull", number: "17", sha: "abcdef1" },
+    { ...repository, kind: "pull", number: "17", sha: null },
+    { ...repository, kind: "commit", sha: "abcdef1", number: "17" },
+    { ...repository, kind: "commit", sha: "abcdef1", number: null },
+    { ...repository, kind: "pull" },
+    { ...repository, kind: "commit" },
+    { ...repository, kind: "pull_commit", number: "17" },
+    { ...repository, kind: "pull_commit", sha: "abcdef1" },
+    { ...repository, kind: "pull", number: null },
+    { ...repository, kind: "commit", sha: null },
+    { ...repository, kind: "pull_commit", number: null, sha: "abcdef1" },
+    { ...repository, kind: "pull_commit", number: "17", sha: null },
+    { ...repository, kind: "pull", number: 17 },
+    { ...repository, kind: "commit", sha: 1234567 },
+    { ...repository, kind: "pull", number: "0" },
+    { ...repository, kind: "commit", sha: "not-a-sha" },
+    { ...repository, kind: "pull_commit", number: "0", sha: "abcdef1" },
+    { ...repository, kind: null, number: "17" },
+    { ...repository, kind: "tag", sha: "abcdef1" },
+    { ...repository, kind: "pull", number: "17", extra: true },
+    { owner: "acme", kind: "pull", number: "17" },
+    { repo: "widgets", kind: "pull", number: "17" },
+    { ...repository, number: "17" },
+    { owner: null, repo: "widgets", kind: "pull", number: "17" },
+    { owner: "acme", repo: null, kind: "pull", number: "17" },
+  ];
+
+  for (const args of invalid) {
+    await assert.rejects(
+      Worker.dispatchGithub("github.comments.list", args),
+      error => error.status === 400,
+      JSON.stringify(args),
+    );
+  }
+  assert.equal(fetchCalls, 0);
+});
+
+test("GitHub permission failures use a stable extension error code", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => Response.json(
+    { message: "Resource not accessible by integration" },
+    { status: 403, statusText: "Forbidden" },
+  );
+  await assert.rejects(
+    Worker.dispatchGithub("github.comments.list", {
+      owner: "acme", repo: "widgets", kind: "commit", sha: "abcdef1",
+    }),
+    error => error.status === 403 && error.code === "permission_denied",
+  );
+});
+
 test("build config requires valid GitHub App values", () => {
   assert.throws(() => readBuildConfig({}), /Missing MOONDIFF_GITHUB_CLIENT_ID/u);
   assert.throws(() => readBuildConfig({

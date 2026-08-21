@@ -224,6 +224,12 @@ async function installHost(page, target = pullTarget(), options = {}) {
       if (op === "github.commit.get") return commit();
       if (op === "github.content.get") return content(args.ref);
       if (op === "github.comments.list") {
+        if (options.commentListError) {
+          throw Object.assign(new Error(options.commentListError.detail), {
+            status: options.commentListError.status,
+            code: options.commentListError.code,
+          });
+        }
         if (options.privateUntilAuth && !state.authenticated) {
           throw Object.assign(new Error("Sign in and install the GitHub App for private repositories."), { status: 404, code: "not_found_or_not_installed" });
         }
@@ -300,12 +306,31 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.getByText("Existing inline comment")).toBeVisible();
   await expect(page.getByText("Outdated inline comment")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Outdated discussion" })).toBeVisible();
+  const commentArgs = await page.evaluate(() => window.__fake.calls
+    .find(call => call.op === "github.comments.list").args);
+  expect(commentArgs).toEqual({ owner: "upstream", repo: "project", kind: "pull", number: "17" });
+  expect(Object.values(commentArgs)).not.toContain(null);
   await expect(page.locator("table.split.review-diff")).toBeVisible();
   await expect(page.getByRole("button", { name: /Analyze/u })).toHaveCount(0);
   await expect(page.locator(".diff-scroll [innerhtml]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-button")).toHaveCount(0);
+});
+
+test("extension validation failures use a neutral Moondiff error message", async ({ page }) => {
+  await installHost(page, pullTarget(), {
+    commentListError: {
+      status: 400,
+      code: "invalid_arguments",
+      detail: "Missing RPC argument: sha",
+    },
+  });
+  await page.goto("/panel.html");
+  await expect(page.getByText("Fork PR")).toBeVisible();
+  await expect(page.getByText(
+    "Moondiff extension request failed (status 400, invalid_arguments): Missing RPC argument: sha",
+  )).toBeVisible();
 });
 
 test("device sign-in displays and copies the code and only opens GitHub from the explicit link", async ({ page, context }) => {
@@ -442,6 +467,10 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
     await page.goto(`/panel.html?kind=${target.kind}`);
     await waitForSignedInComments(page);
     await expect(page.getByText("Existing commit comment")).toBeVisible();
+    const commentArgs = await page.evaluate(() => window.__fake.calls
+      .find(call => call.op === "github.comments.list").args);
+    expect(commentArgs).toEqual(target);
+    expect(Object.values(commentArgs)).not.toContain(null);
     await openNewLineComment(page, 2);
     await page.locator(".inline-comment-editor-row textarea").fill(`Comment for ${target.kind}`);
     await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();

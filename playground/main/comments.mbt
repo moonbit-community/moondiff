@@ -275,23 +275,38 @@ fn[T : FromJson] extension_rpc_json(
       operation,
       args_json,
       generation,
-      completed=(ok, status, status_text, response_body) => {
+      completed=(ok, status, code, detail, response_body) => {
         let result : Result[T, Error] = if ok {
           try @json.from_json(@json.parse(response_body)) catch {
-            error => Err(GitHubRequestError(error.to_string()))
+            error =>
+              Err(
+                ExtensionRequestError(
+                  status=200,
+                  code="invalid_extension_response",
+                  detail=error.to_string(),
+                ),
+              )
           } noraise {
             value => Ok(value)
           }
         } else {
-          Err(
-            GitHubRequestError(
-              "GitHub request failed: HTTP \{status} \{status_text}",
-            ),
-          )
+          Err(ExtensionRequestError(status~, code~, detail~))
         }
         scheduler.add(msg(result))
       },
-      failed=detail => scheduler.add(msg(Err(GitHubRequestError(detail)))),
+      failed=detail => {
+        scheduler.add(
+          msg(
+            Err(
+              ExtensionRequestError(
+                status=0,
+                code="extension_bridge_error",
+                detail~,
+              ),
+            ),
+          ),
+        )
+      },
     )
   })
 }
@@ -301,7 +316,7 @@ extern "js" fn send_extension_rpc(
   operation : String,
   args_json : String,
   generation : Int,
-  completed~ : (Bool, Int, String, String) -> Unit,
+  completed~ : (Bool, Int, String, String, String) -> Unit,
   failed~ : (String) -> Unit,
 ) =
   #| (operation, argsJson, generation, completed, failed) => {
@@ -316,10 +331,11 @@ extern "js" fn send_extension_rpc(
   #|     return;
   #|   }
   #|   host.request(operation, args, { generation })
-  #|     .then((value) => completed(true, 200, "", JSON.stringify(value)))
+  #|     .then((value) => completed(true, 200, "", "", JSON.stringify(value)))
   #|     .catch((error) => completed(
   #|       false,
   #|       Number.isInteger(error?.status) ? error.status : 0,
+  #|       typeof error?.code === "string" ? error.code : "extension_error",
   #|       error?.message || String(error),
   #|       "",
   #|     ));
