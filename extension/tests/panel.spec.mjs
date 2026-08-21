@@ -281,17 +281,22 @@ async function signInAndWaitForComments(page) {
   await waitForSignedInComments(page);
 }
 
-function newLineCommentButton(page, line) {
+function newLineCommentGutter(page, line) {
   const lineNumber = page.locator(".line-number-value", {
     hasText: new RegExp(`^${line}$`),
   });
-  return page.locator(".review-gutter.new-line-number", { has: lineNumber })
+  return page.locator(".review-gutter.new-line-number", { has: lineNumber });
+}
+
+function newLineCommentButton(page, line) {
+  return newLineCommentGutter(page, line)
     .getByRole("button", { name: `Comment on line ${line}` });
 }
 
 async function openNewLineComment(page, line) {
+  await newLineCommentGutter(page, line).hover();
   const button = newLineCommentButton(page, line);
-  await expect(button).toBeVisible();
+  await expect(button).toHaveCSS("opacity", "1");
   await button.click();
   await expect(page.locator(".inline-comment-editor-row textarea")).toBeVisible();
 }
@@ -408,6 +413,16 @@ test("login, overall comment, inline comment, reply, focus refresh, and view tog
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-button")).toHaveCount(0);
   await signInAndWaitForComments(page);
+
+  const lineCommentButton = newLineCommentButton(page, 2);
+  await expect(lineCommentButton).toHaveCSS("opacity", "0");
+  await newLineCommentGutter(page, 2).hover();
+  await expect(lineCommentButton).toHaveCSS("opacity", "1");
+  const [buttonBox, gutterBox] = await Promise.all([
+    lineCommentButton.boundingBox(),
+    newLineCommentGutter(page, 2).boundingBox(),
+  ]);
+  expect(buttonBox.height).toBeLessThanOrEqual(gutterBox.height);
 
   await page.getByRole("button", { name: "Add overall comment" }).click();
   await page.locator(".comment-editor textarea").fill("New overall comment");
