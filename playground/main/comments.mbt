@@ -132,6 +132,11 @@ fn initial_review_state() -> ReviewState {
 }
 
 ///|
+fn review_can_comment(review : ReviewState) -> Bool {
+  review.auth is SignedIn(_)
+}
+
+///|
 fn auth_status_from_api(status : ApiAuthStatus) -> AuthStatus {
   if status.authenticated {
     SignedIn(status.login)
