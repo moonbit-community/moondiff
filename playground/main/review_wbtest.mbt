@@ -319,6 +319,15 @@ fn review_test_model(auth : AuthStatus) -> Model {
 }
 
 ///|
+fn authentication_required_error() -> Error {
+  ExtensionRequestError(
+    status=401,
+    code="authentication_required",
+    detail="Bad credentials",
+  )
+}
+
+///|
 fn review_test_device_authorization() -> DeviceAuthorization {
   {
     flow_id: "flow-1",
@@ -409,6 +418,44 @@ test "submitting a retained draft still requires sign-in" {
   }
   assert_false(draft.submitting)
   assert_true(draft.error.unwrap().contains("Sign in with GitHub"))
+}
+
+///|
+test "comment loading authentication failure signs out and preserves the draft" {
+  let model = review_test_model(SignedIn(Some("reviewer")))
+  let draft = CommentDraft::{
+    kind: OverallDraft,
+    body: "keep this draft",
+    submitting: false,
+    error: None,
+  }
+  let with_draft = with_review(
+    model,
+    review_state_with_draft(model.review, Some(draft)),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (failed, _) = update(
+    with_draft,
+    CommentsLoaded(5, Err(authentication_required_error())),
+    emit,
+  )
+  guard failed.review.auth is AuthFailed(auth_message) else {
+    fail("expected comment loading to invalidate authentication")
+  }
+  assert_true(auth_message.contains("expired"))
+  assert_false(review_can_comment(failed.review))
+  guard failed.review.comments is CommentsFailed(comments_message) else {
+    fail("expected comment loading to retain its failure")
+  }
+  assert_true(comments_message.contains("expired"))
+  assert_true(failed.review.draft == Some(draft))
+
+  let (stale, _) = update(
+    with_draft,
+    CommentsLoaded(4, Err(authentication_required_error())),
+    emit,
+  )
+  assert_true(stale == with_draft)
 }
 
 ///|
@@ -565,6 +612,44 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
 }
 
 ///|
+test "PR comment head authentication failure signs out and preserves the draft" {
+  let view = review_test_view()
+  let anchor = canonical_anchor(
+    parse_canonical_patch("src/main.mbt", view.files[0].file.patch),
+    Right,
+    2,
+  ).unwrap()
+  let base = review_test_model(SignedIn(Some("reviewer")))
+  let original = CommentDraft::{
+    kind: InlineDraft(0, anchor),
+    body: "keep this line draft",
+    submitting: true,
+    error: None,
+  }
+  let model = with_review(
+    base,
+    review_state_with_draft(base.review, Some(original)),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (failed, _) = update(
+    model,
+    CommentHeadChecked(5, anchor, Err(authentication_required_error())),
+    emit,
+  )
+  guard failed.review.auth is AuthFailed(message) else {
+    fail("expected the head check to invalidate authentication")
+  }
+  assert_true(message.contains("expired"))
+  guard failed.review.draft is Some(draft) else {
+    fail("expected the line draft to survive the authentication failure")
+  }
+  assert_true(draft.kind == original.kind)
+  assert_eq(draft.body, original.body)
+  assert_false(draft.submitting)
+  assert_true(draft.error.unwrap().contains("expired"))
+}
+
+///|
 test "comment completion inserts GitHub response and failures retain the draft" {
   let view = review_test_view()
   let draft = CommentDraft::{
@@ -630,4 +715,42 @@ test "comment completion inserts GitHub response and failures retain the draft" 
   assert_eq(retained.body, "new comment")
   assert_false(retained.submitting)
   assert_true(retained.error.unwrap().contains("anchor"))
+  assert_true(failed.review.auth is SignedIn(Some("reviewer")))
+}
+
+///|
+test "comment creation authentication failures sign out and retain the draft" {
+  let base = review_test_model(SignedIn(Some("reviewer")))
+  let original = CommentDraft::{
+    kind: OverallDraft,
+    body: "keep this comment",
+    submitting: true,
+    error: None,
+  }
+  let model = with_review(
+    base,
+    review_state_with_draft(base.review, Some(original)),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for
+    msg in [
+      IssueCommentCreated(5, Err(authentication_required_error())),
+      ReviewCommentCreated(5, Err(authentication_required_error())),
+      CommitCommentCreated(5, Err(authentication_required_error())),
+      ReviewReplyCreated(5, Err(authentication_required_error())),
+    ] {
+    let (failed, _) = update(model, msg, emit)
+    guard failed.review.auth is AuthFailed(message) else {
+      fail("expected comment creation to invalidate authentication")
+    }
+    assert_true(message.contains("expired"))
+    assert_false(review_can_comment(failed.review))
+    guard failed.review.draft is Some(draft) else {
+      fail("expected the comment draft to survive authentication failure")
+    }
+    assert_true(draft.kind == original.kind)
+    assert_eq(draft.body, original.body)
+    assert_false(draft.submitting)
+    assert_true(draft.error.unwrap().contains("expired"))
+  }
 }

@@ -687,6 +687,21 @@ fn comment_failure_message(error : Error) -> String {
 }
 
 ///|
+fn model_with_comment_auth_failure(model : Model, error : Error) -> Model {
+  match extension_error_code(error) {
+    Some("authentication_required") =>
+      with_review(
+        model,
+        review_state_with_auth(
+          model.review,
+          AuthFailed(comment_failure_message(error)),
+        ),
+      )
+    _ => model
+  }
+}
+
+///|
 fn finish_comment_submission(
   model : Model,
   generation : Int,
@@ -697,14 +712,12 @@ fn finish_comment_submission(
     return (model, @rabbita.none)
   }
   if error is Some(error) {
-    return (
-      update_draft(
-        model,
-        submitting=false,
-        error=Some(comment_failure_message(error)),
-      ),
-      @rabbita.none,
+    let failed = update_draft(
+      model,
+      submitting=false,
+      error=Some(comment_failure_message(error)),
     )
+    return (model_with_comment_auth_failure(failed, error), @rabbita.none)
   }
   guard model.route is Some(reference) else { return (model, @rabbita.none) }
   (
@@ -1403,14 +1416,26 @@ fn update(
       if generation != model.generation {
         return (model, @rabbita.none)
       }
-      let comments = match result {
-        Ok(bundle) => CommentsReady(bundle)
-        Err(error) => CommentsFailed(comment_failure_message(error))
+      match result {
+        Ok(bundle) =>
+          (
+            with_review(
+              model,
+              review_state_with_comments(model.review, CommentsReady(bundle)),
+            ),
+            @rabbita.none,
+          )
+        Err(error) => {
+          let failed = with_review(
+            model,
+            review_state_with_comments(
+              model.review,
+              CommentsFailed(comment_failure_message(error)),
+            ),
+          )
+          (model_with_comment_auth_failure(failed, error), @rabbita.none)
+        }
       }
-      (
-        with_review(model, review_state_with_comments(model.review, comments)),
-        @rabbita.none,
-      )
     }
     OpenOverallDraft => {
       guard review_can_comment(model.review) else {
@@ -1582,15 +1607,14 @@ fn update(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            update_draft(
-              model,
-              submitting=false,
-              error=Some(comment_failure_message(error)),
-            ),
-            @rabbita.none,
+        Err(error) => {
+          let failed = update_draft(
+            model,
+            submitting=false,
+            error=Some(comment_failure_message(error)),
           )
+          (model_with_comment_auth_failure(failed, error), @rabbita.none)
+        }
         Ok(pull) if pull.head.sha != view.sha => {
           let (refreshed, command) = begin_change_load(
             model,
