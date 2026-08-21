@@ -33,7 +33,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
     const state = {
       target,
       calls: [],
-      authenticated: Boolean(savedAuth.authenticated),
+      authenticated: options.authenticated ?? Boolean(savedAuth.authenticated),
       deviceFlow: savedAuth.deviceFlow || null,
       deviceStartCalls: savedAuth.deviceStartCalls || 0,
       devicePollCalls: savedAuth.devicePollCalls || 0,
@@ -265,6 +265,31 @@ async function installHost(page, target = pullTarget(), options = {}) {
   }, { target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch });
 }
 
+async function waitForSignedInComments(page) {
+  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
+}
+
+async function signInAndWaitForComments(page) {
+  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+  await waitForSignedInComments(page);
+}
+
+function newLineCommentButton(page, line) {
+  const lineNumber = page.locator(".line-number-value", {
+    hasText: new RegExp(`^${line}$`),
+  });
+  return page.locator(".review-gutter.new-line-number", { has: lineNumber })
+    .getByRole("button", { name: `Comment on line ${line}` });
+}
+
+async function openNewLineComment(page, line) {
+  const button = newLineCommentButton(page, line);
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(page.locator(".inline-comment-editor-row textarea")).toBeVisible();
+}
+
 test("anonymous public PR loads comments and a safe narrow diff without Analyze", async ({ page }) => {
   await installHost(page);
   await page.setViewportSize({ width: 420, height: 900 });
@@ -278,6 +303,9 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.locator("table.split.review-diff")).toBeVisible();
   await expect(page.getByRole("button", { name: /Analyze/u })).toHaveCount(0);
   await expect(page.locator(".diff-scroll [innerhtml]")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
+  await expect(page.locator(".line-comment-button")).toHaveCount(0);
 });
 
 test("device sign-in displays and copies the code and only opens GitHub from the explicit link", async ({ page, context }) => {
@@ -291,6 +319,10 @@ test("device sign-in displays and copies the code and only opens GitHub from the
   await page.goto("/panel.html");
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.locator(".device-user-code")).toHaveText("ABCD-EFGH");
+  await expect(page.locator("table.split.review-diff")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
+  await expect(page.locator(".line-comment-button")).toHaveCount(0);
   expect(context.pages()).toHaveLength(1);
 
   await page.getByRole("button", { name: "Copy code" }).click();
@@ -345,15 +377,19 @@ for (const terminalError of ["denied", "expired"]) {
 test("login, overall comment, inline comment, reply, focus refresh, and view toggle", async ({ page }) => {
   await installHost(page);
   await page.goto("/panel.html");
-  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByText("Existing inline comment")).toBeVisible();
+  await expect(page.locator("table.split.review-diff")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
+  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+  await signInAndWaitForComments(page);
 
   await page.getByRole("button", { name: "Add overall comment" }).click();
   await page.locator(".comment-editor textarea").fill("New overall comment");
   await page.getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("New overall comment")).toBeVisible();
 
-  await page.locator(".line-comment-button").nth(2).click({ force: true });
+  await openNewLineComment(page, 2);
   await page.locator(".inline-comment-editor-row textarea").fill("New inline comment");
   await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("New inline comment")).toBeVisible();
@@ -388,10 +424,10 @@ test("private PR prompts for GitHub App access and retries after login", async (
 });
 
 test("PR head race preserves the draft and refreshes the snapshot without posting", async ({ page }) => {
-  await installHost(page);
+  await installHost(page, pullTarget(), { authenticated: true });
   await page.goto("/panel.html");
-  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
-  await page.locator(".line-comment-button").nth(2).click({ force: true });
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
   await page.locator(".inline-comment-editor-row textarea").fill("Keep this draft");
   await page.evaluate(() => { window.__fake.headRace = true; });
   await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();
@@ -402,11 +438,11 @@ test("PR head race preserves the draft and refreshes the snapshot without postin
 
 for (const target of [commitTarget(), pullCommitTarget()]) {
   test(`${target.kind} posts canonical position comments to the URL repository`, async ({ page }) => {
-    await installHost(page, target);
+    await installHost(page, target, { authenticated: true });
     await page.goto(`/panel.html?kind=${target.kind}`);
-    await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+    await waitForSignedInComments(page);
     await expect(page.getByText("Existing commit comment")).toBeVisible();
-    await page.locator(".line-comment-button").nth(2).click({ force: true });
+    await openNewLineComment(page, 2);
     await page.locator(".inline-comment-editor-row textarea").fill(`Comment for ${target.kind}`);
     await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();
     const call = await page.evaluate(() => window.__fake.calls.find(entry => entry.op === "github.commit.comment.create"));
