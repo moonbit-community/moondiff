@@ -30,7 +30,9 @@ fn inline_draft_for_anchor(
   review : ReviewState,
   anchor : ReviewAnchor?,
 ) -> CommentDraft? {
-  guard anchor is Some(anchor) && review.draft is Some(draft) else {
+  guard review_can_comment(review) &&
+    anchor is Some(anchor) &&
+    review.draft is Some(draft) else {
     return None
   }
   match draft.kind {
@@ -45,6 +47,7 @@ fn review_gutter(
   number : Int?,
   anchor : ReviewAnchor?,
   class_name : String,
+  review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   @html.td(class="line-number review-gutter \{class_name}", [
@@ -52,7 +55,7 @@ fn review_gutter(
       class="line-number-value",
       number.map(value => value.to_string()).unwrap_or(""),
     ),
-    if extension_host_enabled() && anchor is Some(anchor) {
+    if review_can_comment(review) && anchor is Some(anchor) {
       @html.button(
         type_="button",
         class="line-comment-button",
@@ -163,6 +166,7 @@ fn split_review_line(
         row.old_line,
         row.old_anchor,
         "old-line-number",
+        review,
         emit,
       ),
       @html.td(
@@ -174,6 +178,7 @@ fn split_review_line(
         row.new_line,
         row.new_anchor,
         "new-line-number",
+        review,
         emit,
       ),
       @html.td(
@@ -215,6 +220,7 @@ fn unified_source_line(
           None
         },
         "old-line-number",
+        review,
         emit,
       ),
       review_gutter(
@@ -226,6 +232,7 @@ fn unified_source_line(
           None
         },
         "new-line-number",
+        review,
         emit,
       ),
       @html.td(
@@ -423,6 +430,7 @@ fn review_thread_view(
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
+  let can_comment = review_can_comment(review)
   let comments : Array[@rabbita.Html] = [
     comment_body_view(
       author_label(thread.root.user),
@@ -441,15 +449,18 @@ fn review_thread_view(
       ),
     )
   }
-  comments.push(
-    @html.button(
-      type_="button",
-      class="comment-reply-button",
-      on_click=emit(OpenReplyDraft(thread.root.id)),
-      "Reply",
-    ),
-  )
-  if review.draft is Some(draft) &&
+  if can_comment {
+    comments.push(
+      @html.button(
+        type_="button",
+        class="comment-reply-button",
+        on_click=emit(OpenReplyDraft(thread.root.id)),
+        "Reply",
+      ),
+    )
+  }
+  if can_comment &&
+    review.draft is Some(draft) &&
     draft.kind is ReplyDraft(id) &&
     id == thread.root.id {
     comments.push(comment_editor(draft, emit))
@@ -713,15 +724,19 @@ fn comments_overview(
     if view.reference.target is PullRequest(_) {
       @html.div(class="overall-comments", [
         @html.div(issue_views),
-        if review.draft is Some(draft) && draft.kind is OverallDraft {
-          comment_editor(draft, emit)
+        if review_can_comment(review) {
+          if review.draft is Some(draft) && draft.kind is OverallDraft {
+            comment_editor(draft, emit)
+          } else {
+            @html.button(
+              type_="button",
+              class="secondary add-overall-comment",
+              on_click=emit(OpenOverallDraft),
+              "Add overall comment",
+            )
+          }
         } else {
-          @html.button(
-            type_="button",
-            class="secondary add-overall-comment",
-            on_click=emit(OpenOverallDraft),
-            "Add overall comment",
-          )
+          @html.nothing
         },
       ])
     } else {

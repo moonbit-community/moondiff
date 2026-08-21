@@ -1365,7 +1365,10 @@ fn update(
         @rabbita.none,
       )
     }
-    OpenOverallDraft =>
+    OpenOverallDraft => {
+      guard review_can_comment(model.review) else {
+        return (model, @rabbita.none)
+      }
       (
         with_review(
           model,
@@ -1381,7 +1384,11 @@ fn update(
         ),
         @rabbita.none,
       )
-    OpenInlineDraft(file_index, anchor) =>
+    }
+    OpenInlineDraft(file_index, anchor) => {
+      guard review_can_comment(model.review) else {
+        return (model, @rabbita.none)
+      }
       (
         with_review(
           model,
@@ -1397,7 +1404,11 @@ fn update(
         ),
         @rabbita.none,
       )
-    OpenReplyDraft(comment_id) =>
+    }
+    OpenReplyDraft(comment_id) => {
+      guard review_can_comment(model.review) else {
+        return (model, @rabbita.none)
+      }
       (
         with_review(
           model,
@@ -1413,6 +1424,7 @@ fn update(
         ),
         @rabbita.none,
       )
+    }
     DraftBodyChanged(body) => {
       guard model.review.draft is Some(draft) && !draft.submitting else {
         return (model, @rabbita.none)
@@ -1443,7 +1455,7 @@ fn update(
         model.phase is Showing(view) else {
         return (model, @rabbita.none)
       }
-      guard model.review.auth is SignedIn(_) else {
+      guard review_can_comment(model.review) else {
         return (
           update_draft(
             model,

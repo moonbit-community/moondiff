@@ -184,6 +184,121 @@ fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
 }
 
 ///|
+fn review_test_model(auth : AuthStatus) -> Model {
+  let view = review_test_view()
+  {
+    ..initial_model(),
+    input: canonical_github_url(view.reference),
+    generation: 5,
+    phase: Showing(view),
+    route: Some(view.reference),
+    backend_status: BackendMissing,
+    review: {
+      auth,
+      comments: CommentsReady({
+        issue_comments: [],
+        review_comments: [],
+        commit_comments: [],
+      }),
+      draft: None,
+    },
+  }
+}
+
+///|
+fn review_test_device_authorization() -> DeviceAuthorization {
+  {
+    flow_id: "flow-1",
+    user_code: "ABCD-EFGH",
+    verification_uri: "https://github.com/login/device",
+    expires_in: 900,
+    poll_after: 1,
+    install_url: None,
+    copy_status: DeviceCodeCopyReady,
+  }
+}
+
+///|
+test "only signed-in reviews can open comment drafts" {
+  let view = review_test_view()
+  let anchor = canonical_anchor(
+    parse_canonical_patch("src/main.mbt", view.files[0].file.patch),
+    Right,
+    2,
+  ).unwrap()
+  let device = review_test_device_authorization()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for
+    auth in [
+      WebReadOnly,
+      AuthChecking,
+      Anonymous(None),
+      DeviceAuthorizing(device),
+      DeviceCancelling(device),
+      AuthFailed("authentication failed"),
+    ] {
+    let model = review_test_model(auth)
+    assert_false(review_can_comment(model.review))
+    for
+      msg in [
+        OpenOverallDraft,
+        OpenInlineDraft(0, anchor),
+        OpenReplyDraft(Int64::from_int(20)),
+      ] {
+      let (blocked, _) = update(model, msg, emit)
+      assert_true(blocked == model)
+    }
+  }
+
+  let signed_in = review_test_model(SignedIn(Some("reviewer")))
+  assert_true(review_can_comment(signed_in.review))
+  let (overall, _) = update(signed_in, OpenOverallDraft, emit)
+  guard overall.review.draft is Some(overall_draft) else {
+    fail("expected an overall draft")
+  }
+  assert_true(overall_draft.kind is OverallDraft)
+  let (inline, _) = update(signed_in, OpenInlineDraft(0, anchor), emit)
+  guard inline.review.draft is Some(inline_draft) else {
+    fail("expected an inline draft")
+  }
+  assert_true(
+    inline_draft.kind is InlineDraft(0, selected) && selected == anchor,
+  )
+  let comment_id = Int64::from_int(20)
+  let (reply, _) = update(signed_in, OpenReplyDraft(comment_id), emit)
+  guard reply.review.draft is Some(reply_draft) else {
+    fail("expected a reply draft")
+  }
+  assert_true(
+    reply_draft.kind is ReplyDraft(selected) && selected == comment_id,
+  )
+}
+
+///|
+test "submitting a retained draft still requires sign-in" {
+  let model = review_test_model(Anonymous(None))
+  let with_draft = with_review(
+    model,
+    review_state_with_draft(
+      model.review,
+      Some({
+        kind: OverallDraft,
+        body: "comment body",
+        submitting: false,
+        error: None,
+      }),
+    ),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (blocked, _) = update(with_draft, SubmitDraft, emit)
+  guard blocked.review.draft is Some(draft) else {
+    fail("expected the blocked draft to be retained")
+  }
+  assert_false(draft.submitting)
+  assert_true(draft.error.unwrap().contains("Sign in with GitHub"))
+}
+
+///|
 fn review_comment_fixture(
   id : Int,
   line? : Int = 2,
