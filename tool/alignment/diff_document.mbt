@@ -292,7 +292,6 @@ fn bridge_ast_changed_whitespace(
 fn ast_line_segments_impl(
   text : String,
   line_ranges : Array[(Int, Int)]?,
-  bridge_whitespace : Bool,
 ) -> Array[@model.DiffSegment] {
   let chars = text.to_array()
   if chars.is_empty() {
@@ -323,9 +322,7 @@ fn ast_line_segments_impl(
       }
     }
   }
-  if bridge_whitespace {
-    bridge_ast_changed_whitespace(chars, mask)
-  }
+  bridge_ast_changed_whitespace(chars, mask)
   let segments : Array[@model.DiffSegment] = []
   let mut start = 0
   while start < chars.length() {
@@ -353,13 +350,8 @@ fn ast_diff_line(
   index : Int,
   text : String,
   ranges : NovelRangeMap,
-  bridge_whitespace : Bool,
 ) -> @model.DiffLine {
-  let segments = ast_line_segments_impl(
-    text,
-    ranges.get(index),
-    bridge_whitespace,
-  )
+  let segments = ast_line_segments_impl(text, ranges.get(index))
   { index, segments: segments[:] }
 }
 
@@ -386,42 +378,17 @@ fn ast_change_row(
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
-  bridge_whitespace : Bool,
 ) -> @model.DiffRow {
   match pair {
     (Some(old_line), Some(new_line)) =>
       Paired(
-        ast_diff_line(
-          old_line,
-          old_lines[old_line],
-          old_ranges,
-          bridge_whitespace,
-        ),
-        ast_diff_line(
-          new_line,
-          new_lines[new_line],
-          new_ranges,
-          bridge_whitespace,
-        ),
+        ast_diff_line(old_line, old_lines[old_line], old_ranges),
+        ast_diff_line(new_line, new_lines[new_line], new_ranges),
       )
     (Some(old_line), None) =>
-      OldOnly(
-        ast_diff_line(
-          old_line,
-          old_lines[old_line],
-          old_ranges,
-          bridge_whitespace,
-        ),
-      )
+      OldOnly(ast_diff_line(old_line, old_lines[old_line], old_ranges))
     (None, Some(new_line)) =>
-      NewOnly(
-        ast_diff_line(
-          new_line,
-          new_lines[new_line],
-          new_ranges,
-          bridge_whitespace,
-        ),
-      )
+      NewOnly(ast_diff_line(new_line, new_lines[new_line], new_ranges))
     (None, None) => panic()
   }
 }
@@ -434,7 +401,6 @@ fn ast_hunk_blocks(
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
-  bridge_whitespace : Bool,
 ) -> ArrayView[@model.DiffBlock] {
   let blocks : Array[@model.DiffBlock] = []
   let context_lines : Array[@model.ContextLine] = []
@@ -453,9 +419,7 @@ fn ast_hunk_blocks(
         context_lines.clear()
       }
       change_rows.push(
-        ast_change_row(
-          pair, old_lines, new_lines, old_ranges, new_ranges, bridge_whitespace,
-        ),
+        ast_change_row(pair, old_lines, new_lines, old_ranges, new_ranges),
       )
     }
   }
@@ -595,7 +559,6 @@ fn ast_document_from_positions(
   rhs_positions : ArrayView[MatchedPos],
   context : Int,
   reduce_sparse : Bool,
-  bridge_whitespace : Bool,
 ) -> @model.DiffDocument {
   let old_lines = document_lines(old_source)
   let new_lines = document_lines(new_source)
@@ -629,7 +592,7 @@ fn ast_document_from_positions(
       new_start,
       new_len,
       blocks: ast_hunk_blocks(
-        pairs, hunk, old_lines, new_lines, old_ranges, new_ranges, bridge_whitespace,
+        pairs, hunk, old_lines, new_lines, old_ranges, new_ranges,
       ),
     })
   }
@@ -754,7 +717,6 @@ fn ast_unit_document_with_budget(
     rhs_positions,
     context,
     !preserve_legacy_document,
-    preserve_legacy_document,
   ).rebase(old_offset, new_offset)
 }
 
@@ -861,7 +823,7 @@ fn ast_edit_document(
   )
   {
     document: ast_document_from_positions(
-      old_source, new_source, lhs_positions, rhs_positions, context, false, true,
+      old_source, new_source, lhs_positions, rhs_positions, context, false,
     ).rebase(old_offset, new_offset),
     fallback_reason: None,
   }
@@ -901,7 +863,6 @@ fn ast_root_list_document(
     @syntax.change_positions(rhs_roots, change_map),
     context,
     false,
-    true,
   )
   {
     document,
@@ -940,7 +901,6 @@ fn ast_root_document_with_budget(
     @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
     context,
     !preserve_legacy_document,
-    preserve_legacy_document,
   )
 }
 

@@ -1,4 +1,30 @@
 ///|
+fn document_has_changed_segment_containing(
+  document : @mbtdiff.DiffDocument,
+  expected : String,
+) -> Bool {
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      guard block is ChangeBlock(rows) else { continue }
+      for row in rows {
+        let lines = match row {
+          Paired(old_line, new_line) => [old_line, new_line]
+          OldOnly(line) | NewOnly(line) => [line]
+        }
+        for line in lines {
+          for segment in line.segments {
+            if segment.kind is Changed && segment.text.contains(expected) {
+              return true
+            }
+          }
+        }
+      }
+    }
+  }
+  false
+}
+
+///|
 test "public status contract" {
   let identical = @mbtdiff.diff("fn broken(", "fn broken(")
   assert_true(identical.status() is Identical)
@@ -20,6 +46,29 @@ test "public status contract" {
   )
   assert_true(ignored.status() is IgnoredOnly)
   assert_true(ignored.document().hunks.is_empty())
+}
+
+///|
+test "AST diff always bridges internal whitespace in inserted and deleted units" {
+  let stable = "fn stable() {}"
+  let added = "fn inserted() { let total = 1 }"
+  let with_insertion = "\{stable}\n\{added}"
+  for ignore_comments in [false, true] {
+    let options = @mbtdiff.DiffOptions::new(ignore_comments~)
+    let inserted = @mbtdiff.diff(stable, with_insertion, options~)
+    assert_true(inserted.status() is Changed)
+    assert_true(
+      document_has_changed_segment_containing(inserted.document(), "let total"),
+      msg="inserted AST whitespace was not bridged when ignore_comments=\{ignore_comments}",
+    )
+
+    let deleted = @mbtdiff.diff(with_insertion, stable, options~)
+    assert_true(deleted.status() is Changed)
+    assert_true(
+      document_has_changed_segment_containing(deleted.document(), "let total"),
+      msg="deleted AST whitespace was not bridged when ignore_comments=\{ignore_comments}",
+    )
+  }
 }
 
 ///|

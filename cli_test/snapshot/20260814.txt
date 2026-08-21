@@ -11,13 +11,13 @@
 [90m11[39m [90m11[39m   path_len? : Int = path.to_string().length(),
 [90m12[39m [90m12[39m   args : UInt64,
 [90m13[39m [90m13[39m   env~ : UInt64,
-[31m14[39m [90m..[39m [90m  [39m[31m[1minherited_env_entry_count~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mInt,[22m[39m
+[31m14[39m [90m..[39m [90m  [39m[31m[1minherited_env_entry_count~ : Int,[22m[39m
 [90m15[39m [90m14[39m   stdin~ : @fd_util.Fd,
 [90m16[39m [90m15[39m   stdout~ : @fd_util.Fd,
 [90m17[39m [90m16[39m   stderr~ : @fd_util.Fd,
-[31m18[39m [90m..[39m [90m  [39m[31m[1mcwd~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1m@os_string.OsString,[22m[39m
-[31m19[39m [90m..[39m [90m  [39m[31m[1mcwd_len?[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mInt[22m[39m[90m [39m[31m[1m=[22m[39m[90m [39m[31m[1mcwd.to_string().length(),[22m[39m
-[31m20[39m [90m..[39m [90m  [39m[31m[1mhas_cwd~[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mBool,[22m[39m
+[31m18[39m [90m..[39m [90m  [39m[31m[1mcwd~ : @os_string.OsString,[22m[39m
+[31m19[39m [90m..[39m [90m  [39m[31m[1mcwd_len? : Int = cwd.to_string().length(),[22m[39m
+[31m20[39m [90m..[39m [90m  [39m[31m[1mhas_cwd~ : Bool,[22m[39m
 [31m21[39m [90m..[39m [90m) -> JobHandle = "moonbitlang/async" "thread_pool/[39m[31m[1mmake_spawn_job[22m[39m[90m/unix"[39m
 [90m..[39m [32m17[39m [90m) -> JobHandle = "moonbitlang/async" "thread_pool/[39m[32m[1mspawn_job[22m[39m[90m/unix"[39m
 

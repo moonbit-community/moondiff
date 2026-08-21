@@ -121,19 +121,21 @@ async function installHost(page, target = pullTarget(), options = {}) {
         html_url: "https://github.com/upstream/project/pull/17",
         base: { sha: base, repo: { full_name: "upstream/project" } },
         head: { sha: state.currentHead, repo: { full_name: "contributor/project-fork" } },
-        additions: 1,
-        deletions: 1,
+        additions: options.additions ?? 1,
+        deletions: options.deletions ?? 1,
         changed_files: 1,
       };
     }
     function file() {
+      const additions = options.additions ?? 1;
+      const deletions = options.deletions ?? 1;
       return {
         filename: "src/main.mbt",
         status: "modified",
-        additions: 1,
-        deletions: 1,
-        changes: 2,
-        patch,
+        additions,
+        deletions,
+        changes: additions + deletions,
+        patch: options.patch ?? patch,
       };
     }
     function commit() {
@@ -147,9 +149,9 @@ async function installHost(page, target = pullTarget(), options = {}) {
       };
     }
     function content(ref) {
-      const text = ref === mergeBase || ref === parentSha
-        ? "context\nold value\ntail"
-        : "context\nnew value\ntail";
+      const oldSource = options.oldSource ?? "context\nold value\ntail";
+      const newSource = options.newSource ?? "context\nnew value\ntail";
+      const text = ref === mergeBase || ref === parentSha ? oldSource : newSource;
       return { base64: btoa(text), size: text.length, contentType: "text/plain" };
     }
     async function dispatch(message) {
@@ -321,6 +323,36 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-button")).toHaveCount(0);
+});
+
+test("AST highlights inserted internal whitespace continuously in split and unified views", async ({ page }) => {
+  const stable = "fn stable() {}";
+  const added = "fn inserted() { let total = 1 }";
+  await installHost(page, pullTarget(), {
+    additions: 1,
+    deletions: 0,
+    oldSource: stable,
+    newSource: `${stable}\n${added}`,
+    patch: `@@ -1 +1,2 @@\n ${stable}\n+${added}`,
+  });
+  await page.goto("/panel.html");
+
+  const ast = page.getByRole("button", { name: "AST", exact: true });
+  await ast.click();
+  await expect(ast).toHaveAttribute("aria-pressed", "true");
+
+  const splitHighlight = page.locator("table.split.review-diff b.wa", {
+    hasText: "let total",
+  });
+  await expect(splitHighlight).toHaveCount(1);
+  await expect(splitHighlight).toContainText("let total");
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  const unifiedHighlight = page.locator("table.unified.review-diff b.wa", {
+    hasText: "let total",
+  });
+  await expect(unifiedHighlight).toHaveCount(1);
+  await expect(unifiedHighlight).toContainText("let total");
 });
 
 test("extension validation failures use a neutral Moondiff error message", async ({ page }) => {

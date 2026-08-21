@@ -20,11 +20,11 @@
 [31m17[39m [90m..[39m [31m[1m/// thread at `Eps` also leaves `ts_seq` able to collapse a sequence whose[22m[39m
 [31m18[39m [90m..[39m [31m[1m/// first part has come down to a single finished thread.[22m[39m
 [31m19[39m [90m..[39m [90mfn ThreadSet::[39m[31m[1mremove_duplicates[22m[39m[90m(self : ThreadSet, next : Expr) -> ThreadSet {[39m
-[31m20[39m [90m..[39m [90m  [39m[31m[1mlet[22m[39m[90m [39m[31m[1mseen[22m[39m[90m [39m[31m[1m=[22m[39m[90m [39m[31m[1m@hashset.HashSet([])[22m[39m
+[31m20[39m [90m..[39m [90m  [39m[31m[1mlet seen = @hashset.HashSet([])[22m[39m
 [90m..[39m [32m31[39m [90mfn ThreadSet::[39m[32m[1mremove_duplicates_with_seen[22m[39m[90m([39m
 [90m..[39m [90m32[39m [90m  self : ThreadSet,[39m
 [90m..[39m [32m33[39m [90m  next : Expr[39m[32m[1m,[22m[39m
-[90m..[39m [32m34[39m [90m  [39m[32m[1mseen[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1m@hashset.HashSet[ExprId],[22m[39m
+[90m..[39m [32m34[39m [90m  [39m[32m[1mseen : @hashset.HashSet[ExprId],[22m[39m
 [90m..[39m [90m35[39m [90m) -> ThreadSet {[39m
 [90m21[39m [90m36[39m   for thread in self; result = ts_empty {
 [90m22[39m [90m37[39m     match thread {
@@ -35,7 +35,7 @@
 [90m37[39m [90m52[39m         }
 [90m38[39m [90m53[39m       Seq(pref, first, next) => {
 [31m39[39m [90m..[39m [90m        let first_dedup = first.[39m[31m[1mremove_duplicates[22m[39m[90m(next)[39m
-[90m..[39m [32m54[39m [90m        let first_dedup = first.[39m[32m[1mremove_duplicates_with_seen[22m[39m[90m(next[39m[32m[1m,[22m[39m[90m [39m[32m[1mseen[22m[39m[90m)[39m
+[90m..[39m [32m54[39m [90m        let first_dedup = first.[39m[32m[1mremove_duplicates_with_seen[22m[39m[90m(next[39m[32m[1m, seen[22m[39m[90m)[39m
 [90m40[39m [90m55[39m         continue result + ts_seq(pref, first_dedup, next)
 [90m41[39m [90m56[39m       }
 [90m42[39m [90m57[39m     }
@@ -68,8 +68,8 @@
 [90m.[39m [32m22[39m [32m[1m/// consumes a variable number of characters; limiting deduplication to each[22m[39m
 [90m.[39m [32m23[39m [32m[1m/// wrapper separately retains one thread per partition of the input and[22m[39m
 [90m.[39m [32m24[39m [32m[1m/// makes the set grow exponentially.[22m[39m
-[90m.[39m [32m25[39m [32m[1mfn[22m[39m[90m [39m[32m[1mThreadSet::remove_duplicates(self[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mThreadSet,[22m[39m[90m [39m[32m[1mnext[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mExpr)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mThreadSet[22m[39m[90m [39m[32m[1m{[22m[39m
-[90m.[39m [32m26[39m [90m  [39m[32m[1mlet[22m[39m[90m [39m[32m[1mseen[22m[39m[90m [39m[32m[1m=[22m[39m[90m [39m[32m[1m@hashset.HashSet([])[22m[39m
-[90m.[39m [32m27[39m [90m  [39m[32m[1mself.remove_duplicates_with_seen(next,[22m[39m[90m [39m[32m[1mseen)[22m[39m
+[90m.[39m [32m25[39m [32m[1mfn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {[22m[39m
+[90m.[39m [32m26[39m [90m  [39m[32m[1mlet seen = @hashset.HashSet([])[22m[39m
+[90m.[39m [32m27[39m [90m  [39m[32m[1mself.remove_duplicates_with_seen(next, seen)[22m[39m
 [90m.[39m [32m28[39m [32m[1m}[22m[39m
 
