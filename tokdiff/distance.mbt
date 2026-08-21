@@ -233,13 +233,13 @@ priv enum GapKind {
 
 ///|
 priv enum PairMode {
-  Legacy
+  PerLine
   Window
 }
 
 ///|
 /// Traceback steps use source indices so the same four-state kernel can feed
-/// both the legacy public-token operations and the window projection.
+/// both the independent per-line token operations and the window projection.
 priv enum PairStep {
   PairEqual(Int, Int)
   PairSub(Int, Int)
@@ -368,7 +368,7 @@ fn window_stream(lines : ArrayView[Array[Tok]]) -> WindowStream {
 }
 
 ///|
-fn legacy_pair_stream(tokens : ArrayView[Tok]) -> WindowStream {
+fn per_line_pair_stream(tokens : ArrayView[Tok]) -> WindowStream {
   let atoms : Array[WindowAtom] = []
   for token_index, token in tokens {
     atoms.push({ token, line: 0, token_index, gap_before: "" })
@@ -427,9 +427,9 @@ fn pair_changed_state(
 
 ///|
 /// Naturalness of the boundary between atoms `index - 1` and `index`.
-/// Window gaps replace legacy `Space` tokens: a newline is a real line edge,
-/// horizontal whitespace is a soft boundary, and an empty gap falls back to
-/// the adjacent token kinds.
+/// Window gaps replace the explicit `Space` atoms in the per-line stream: a
+/// newline is a real line edge, horizontal whitespace is a soft boundary, and
+/// an empty gap falls back to the adjacent token kinds.
 fn pair_boundary(
   atoms : ArrayView[WindowAtom],
   trailing_gap : String,
@@ -437,7 +437,7 @@ fn pair_boundary(
   mode : PairMode,
 ) -> Int {
   match mode {
-    Legacy => {
+    PerLine => {
       let left = if index == 0 { None } else { Some(atoms[index - 1].token) }
       let right = if index == atoms.length() {
         None
@@ -568,7 +568,7 @@ fn pair_diagonal_gap_score(
   new_index : Int,
 ) -> Int {
   match mode {
-    Legacy => 0
+    PerLine => 0
     Window => gap_layout_score(a[old_index].gap_before, b[new_index].gap_before)
   }
 }
@@ -576,7 +576,7 @@ fn pair_diagonal_gap_score(
 ///|
 fn pair_high_exact_evidence(token : Tok, mode : PairMode) -> Int {
   match mode {
-    Legacy => 0
+    PerLine => 0
     Window =>
       if token.kind is (Word | Str | Marker) {
         alignment_weight(token)
@@ -639,7 +639,7 @@ fn pair_finish_score(
     boundary += pair_close_boundary(b, b_trailing_gap, b.length(), mode)
   }
   let trailing_layout = match mode {
-    Legacy => 0
+    PerLine => 0
     Window => gap_layout_score(a_trailing_gap, b_trailing_gap)
   }
   { ..score, gap: score.gap + trailing_layout, boundary }
@@ -688,8 +688,9 @@ fn pair_consider(
 /// Shared global minimum-cost traceback. Equal-cost paths are selected by
 /// high-weight exact matches, total exact evidence, changed-run count, gap
 /// layout, natural boundaries, and rightmost changed-token placement, then
-/// diagonal > insert > delete. Legacy mode zeros the two new tie-break fields
-/// and therefore retains the historical byte-for-byte operation sequence.
+/// diagonal > insert > delete. `PerLine` mode zeros the two window-only
+/// tie-break fields and therefore retains the deterministic per-line operation
+/// sequence.
 fn pair_trace(a : WindowStream, b : WindowStream, mode : PairMode) -> PairTrace {
   let m = a.atoms.length()
   let n = b.atoms.length()
@@ -938,10 +939,15 @@ fn pair_trace(a : WindowStream, b : WindowStream, mode : PairMode) -> PairTrace 
 }
 
 ///|
-/// Legacy wrapper retained for white-box compatibility and for proving that
-/// the shared kernel still reconstructs the minimum-cost per-line script.
+/// Adapt the shared traceback to per-line token operations. White-box tests
+/// also use this wrapper to prove that the kernel reconstructs the minimum-cost
+/// per-line script.
 fn pair_ops_min(a : ArrayView[Tok], b : ArrayView[Tok]) -> Array[Op] {
-  let trace = pair_trace(legacy_pair_stream(a), legacy_pair_stream(b), Legacy)
+  let trace = pair_trace(
+    per_line_pair_stream(a),
+    per_line_pair_stream(b),
+    PerLine,
+  )
   trace.steps.map(step => {
     match step {
       PairEqual(old_index, _) => OEq(a[old_index])
@@ -990,7 +996,7 @@ fn high_quality_kind(kind : TokKind) -> Bool {
 /// Attempt one semantic traceback over the complete replacement window. A
 /// result is returned only when cross-line exact evidence, overall weighted
 /// similarity, high-quality Dice coverage, and the traceback budget all prove
-/// that the global projection is safer than the legacy per-line fallback.
+/// that the global projection is safer than the independent per-line fallback.
 fn window_changes(
   olds : Array[Array[Tok]],
   news : Array[Array[Tok]],
