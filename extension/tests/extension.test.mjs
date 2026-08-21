@@ -105,6 +105,33 @@ function storedDeviceFlow(flowId = "a".repeat(43), overrides = {}) {
   };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(resolvePromise => { resolve = resolvePromise; });
+  return { promise, resolve };
+}
+
+async function waitForTestSignal(promise, label) {
+  let timer;
+  try {
+    await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out waiting for ${label}.`)), 2_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function assertReportedRemainingSeconds(reported, deadline, maximum) {
+  const remainingNow = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  assert.ok(Number.isSafeInteger(reported), `Expected an integer remaining time, received ${reported}.`);
+  assert.ok(reported >= remainingNow, `Reported ${reported}s, but the deadline still has ${remainingNow}s remaining.`);
+  assert.ok(reported <= maximum, `Reported ${reported}s, exceeding the expected maximum of ${maximum}s.`);
+}
+
 async function resetAuthentication() {
   await session.remove(authenticationKeys);
   await local.remove(["github_refresh_token", "github_refresh_expires_at"]);
@@ -211,7 +238,11 @@ test("device authorization requests only the client id and keeps the device code
   assert.equal(status.authenticated, false);
   assert.equal(status.device_flow.user_code, "ABCD-EFGH");
   assert.equal(status.device_flow.verification_uri, "https://github.com/login/device");
-  assert.equal(status.device_flow.poll_after, 7);
+  assertReportedRemainingSeconds(
+    status.device_flow.poll_after,
+    session.values.github_device_flow.nextPollAt,
+    7,
+  );
   assert.match(status.device_flow.flow_id, /^[A-Za-z0-9_-]{43}$/u);
   assert.doesNotMatch(JSON.stringify(status), /0123456789012345678901234567890123456789/u);
   assert.equal(session.values.github_device_flow.deviceCode, "0123456789012345678901234567890123456789");
@@ -226,8 +257,8 @@ test("auth.status restores a live device authorization and removes an expired on
   await session.set({ github_device_flow: live });
   const restored = await Worker.handleMessage({ v: 1, op: "auth.status", args: {} }, panelSender);
   assert.equal(restored.device_flow.flow_id, live.flowId);
-  assert.ok(restored.device_flow.expires_in >= 124 && restored.device_flow.expires_in <= 125);
-  assert.ok(restored.device_flow.poll_after >= 11 && restored.device_flow.poll_after <= 12);
+  assertReportedRemainingSeconds(restored.device_flow.expires_in, live.expiresAt, 125);
+  assertReportedRemainingSeconds(restored.device_flow.poll_after, live.nextPollAt, 12);
   assert.doesNotMatch(JSON.stringify(restored), /device-code-secret/u);
 
   await session.set({ github_device_flow: storedDeviceFlow("c".repeat(43), { expiresAt: Date.now() - 1 }) });
@@ -248,7 +279,7 @@ test("an early device poll returns the remaining wait without contacting GitHub"
     args: { flow_id: flow.flowId },
   }, panelSender);
   assert.equal(status.device_flow.flow_id, flow.flowId);
-  assert.ok(status.device_flow.poll_after >= 19 && status.device_flow.poll_after <= 20);
+  assertReportedRemainingSeconds(status.device_flow.poll_after, flow.nextPollAt, 20);
 });
 
 test("authorization_pending advances the server-owned poll deadline", async t => {
@@ -264,14 +295,16 @@ test("authorization_pending advances the server-owned poll deadline", async t =>
     assert.equal(body.get("grant_type"), "urn:ietf:params:oauth:grant-type:device_code");
     return Response.json({ error: "authorization_pending" });
   };
+  const pollStartedAt = Date.now();
   const status = await Worker.handleMessage({
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
   }, panelSender);
   assert.equal(status.device_flow.flow_id, flow.flowId);
-  assert.ok(status.device_flow.poll_after >= 4);
-  assert.ok(session.values.github_device_flow.nextPollAt > Date.now());
+  const deadline = session.values.github_device_flow.nextPollAt;
+  assert.ok(deadline >= pollStartedAt + flow.intervalSeconds * 1000);
+  assertReportedRemainingSeconds(status.device_flow.poll_after, deadline, flow.intervalSeconds);
 });
 
 test("slow_down raises the interval by at least five seconds", async t => {
@@ -280,13 +313,16 @@ test("slow_down raises the interval by at least five seconds", async t => {
   const flow = storedDeviceFlow("f".repeat(43), { intervalSeconds: 5, nextPollAt: Date.now() - 1 });
   await session.set({ github_device_flow: flow });
   globalThis.fetch = async () => Response.json({ error: "slow_down", interval: 8 });
+  const pollStartedAt = Date.now();
   const status = await Worker.handleMessage({
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
   }, panelSender);
-  assert.equal(session.values.github_device_flow.intervalSeconds, 10);
-  assert.ok(status.device_flow.poll_after >= 9);
+  const stored = session.values.github_device_flow;
+  assert.equal(stored.intervalSeconds, 10);
+  assert.ok(stored.nextPollAt >= pollStartedAt + stored.intervalSeconds * 1000);
+  assertReportedRemainingSeconds(status.device_flow.poll_after, stored.nextPollAt, stored.intervalSeconds);
 });
 
 test("expired, denied, invalid, and disabled device flows fail stably and are cleared", async t => {
@@ -321,11 +357,13 @@ test("concurrent device polls share one GitHub request", async t => {
   t.after(() => { globalThis.fetch = originalFetch; });
   const flow = storedDeviceFlow("k".repeat(43), { nextPollAt: Date.now() - 1 });
   await session.set({ github_device_flow: flow });
-  let resolveFetch;
+  const fetchStarted = deferred();
+  const fetchResponse = deferred();
   let calls = 0;
   globalThis.fetch = async () => {
     calls += 1;
-    return new Promise(resolve => { resolveFetch = resolve; });
+    fetchStarted.resolve();
+    return fetchResponse.promise;
   };
   const message = {
     v: 1,
@@ -334,9 +372,9 @@ test("concurrent device polls share one GitHub request", async t => {
   };
   const left = Worker.handleMessage(message, panelSender);
   const right = Worker.handleMessage(message, panelSender);
-  await new Promise(resolve => setImmediate(resolve));
+  await waitForTestSignal(fetchStarted.promise, "the shared device poll request");
   assert.equal(calls, 1);
-  resolveFetch(Response.json({ error: "authorization_pending" }));
+  fetchResponse.resolve(Response.json({ error: "authorization_pending" }));
   const [first, second] = await Promise.all([left, right]);
   assert.deepEqual(first, second);
 });
@@ -346,10 +384,12 @@ test("cancelling an in-flight poll prevents a late token response from being sto
   t.after(() => { globalThis.fetch = originalFetch; });
   const flow = storedDeviceFlow("l".repeat(43), { nextPollAt: Date.now() - 1 });
   await session.set({ github_device_flow: flow });
-  let resolveToken;
+  const tokenRequestStarted = deferred();
+  const tokenResponse = deferred();
   globalThis.fetch = async input => {
     if (String(input) === "https://github.com/login/oauth/access_token") {
-      return new Promise(resolve => { resolveToken = resolve; });
+      tokenRequestStarted.resolve();
+      return tokenResponse.promise;
     }
     return Response.json({ login: "too-late" });
   };
@@ -358,14 +398,14 @@ test("cancelling an in-flight poll prevents a late token response from being sto
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
   }, panelSender);
-  while (!resolveToken) await new Promise(resolve => setImmediate(resolve));
+  await waitForTestSignal(tokenRequestStarted.promise, "the cancellable device token request");
   const cancelled = await Worker.handleMessage({
     v: 1,
     op: "auth.device.cancel",
     args: { flow_id: flow.flowId },
   }, panelSender);
   assert.equal(cancelled.authenticated, false);
-  resolveToken(Response.json({
+  tokenResponse.resolve(Response.json({
     access_token: "late-access",
     expires_in: 3600,
     refresh_token: "late-refresh",
@@ -381,11 +421,13 @@ test("starting a replacement flow prevents the old poll from storing a late toke
   t.after(() => { globalThis.fetch = originalFetch; });
   const oldFlow = storedDeviceFlow("q".repeat(43), { nextPollAt: Date.now() - 1 });
   await session.set({ github_device_flow: oldFlow });
-  let resolveOldToken;
+  const oldTokenRequestStarted = deferred();
+  const oldTokenResponse = deferred();
   globalThis.fetch = async input => {
     const url = String(input);
     if (url === "https://github.com/login/oauth/access_token") {
-      return new Promise(resolve => { resolveOldToken = resolve; });
+      oldTokenRequestStarted.resolve();
+      return oldTokenResponse.promise;
     }
     if (url === "https://github.com/login/device/code") {
       return Response.json({
@@ -402,13 +444,13 @@ test("starting a replacement flow prevents the old poll from storing a late toke
     op: "auth.device.poll",
     args: { flow_id: oldFlow.flowId },
   }, panelSender);
-  while (!resolveOldToken) await new Promise(resolve => setImmediate(resolve));
+  await waitForTestSignal(oldTokenRequestStarted.promise, "the replaceable device token request");
   const replacement = await Worker.handleMessage(
     { v: 1, op: "auth.device.start", args: {} },
     panelSender,
   );
   assert.notEqual(replacement.device_flow.flow_id, oldFlow.flowId);
-  resolveOldToken(Response.json({
+  oldTokenResponse.resolve(Response.json({
     access_token: "old-access",
     expires_in: 3600,
     refresh_token: "old-refresh",
