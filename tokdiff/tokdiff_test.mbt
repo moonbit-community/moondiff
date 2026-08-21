@@ -263,7 +263,7 @@ test "unified view mirrors the split alignment" {
 }
 
 ///|
-test "line numbers are opt-in and preserve legacy HTML when disabled" {
+test "line numbers are opt-in and explicit false matches default HTML" {
   let old = ["a", "old", "same", "gone", "z"]
   let new = ["a", "new", "same", "added", "z"]
   assert_eq(
