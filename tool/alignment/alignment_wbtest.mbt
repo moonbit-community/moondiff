@@ -1412,24 +1412,34 @@ fn ast_segment_summary(
 test "AST segments bridge only internal whitespace between changes" {
   @debug.assert_eq(
     ast_segment_summary(
-      ast_line_segments_impl(
-        "  left \t right  ",
-        Some([(3, 7), (10, 15)]),
-        true,
-      ),
+      ast_line_segments_impl("left right", Some([(1, 5), (6, 11)])),
+    ),
+    ["changed:left right"],
+  )
+
+  @debug.assert_eq(
+    ast_segment_summary(
+      ast_line_segments_impl("left\tright", Some([(1, 5), (6, 11)])),
+    ),
+    ["changed:left\tright"],
+  )
+
+  @debug.assert_eq(
+    ast_segment_summary(
+      ast_line_segments_impl("  left \t right  ", Some([(3, 7), (10, 15)])),
     ),
     ["unchanged:  ", "changed:left \t right", "unchanged:  "],
   )
 
   @debug.assert_eq(
     ast_segment_summary(
-      ast_line_segments_impl("left, right", Some([(1, 5), (7, 12)]), true),
+      ast_line_segments_impl("left, right", Some([(1, 5), (7, 12)])),
     ),
     ["changed:left", "unchanged:, ", "changed:right"],
   )
 
   @debug.assert_eq(
-    ast_segment_summary(ast_line_segments_impl("  unchanged  ", None, true)),
+    ast_segment_summary(ast_line_segments_impl("  unchanged  ", None)),
     ["unchanged:  unchanged  "],
   )
 }

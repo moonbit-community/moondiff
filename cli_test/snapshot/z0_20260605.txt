@@ -2,10 +2,10 @@
 [34m+++ cli_test/source/z0_20260605.new.mbt[39m
 @@ -1,7 +1,0 @@
 [31m1[39m [90m.[39m [31m[1m///|[22m[39m
-[31m2[39m [90m.[39m [31m[1mfn[22m[39m[90m [39m[31m[1minspect_parse(input[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mString,[22m[39m[90m [39m[31m[1mexpected[22m[39m[90m [39m[31m[1m:[22m[39m[90m [39m[31m[1mString)[22m[39m[90m [39m[31m[1m->[22m[39m[90m [39m[31m[1mUnit[22m[39m[90m [39m[31m[1mraise[22m[39m[90m [39m[31m[1m{[22m[39m
-[31m3[39m [90m.[39m [90m  [39m[31m[1mmatch[22m[39m[90m [39m[31m[1mparse_program(input)[22m[39m[90m [39m[31m[1m{[22m[39m
-[31m4[39m [90m.[39m [90m    [39m[31m[1mOk(exprs)[22m[39m[90m [39m[31m[1m=>[22m[39m[90m [39m[31m[1minspect(exprs[0],[22m[39m[90m [39m[31m[1mcontent=expected)[22m[39m
-[31m5[39m [90m.[39m [90m    [39m[31m[1mErr(diagnostic)[22m[39m[90m [39m[31m[1m=>[22m[39m[90m [39m[31m[1minspect(diagnostic,[22m[39m[90m [39m[31m[1mcontent=expected)[22m[39m
+[31m2[39m [90m.[39m [31m[1mfn inspect_parse(input : String, expected : String) -> Unit raise {[22m[39m
+[31m3[39m [90m.[39m [90m  [39m[31m[1mmatch parse_program(input) {[22m[39m
+[31m4[39m [90m.[39m [90m    [39m[31m[1mOk(exprs) => inspect(exprs[0], content=expected)[22m[39m
+[31m5[39m [90m.[39m [90m    [39m[31m[1mErr(diagnostic) => inspect(diagnostic, content=expected)[22m[39m
 [31m6[39m [90m.[39m [90m  [39m[31m[1m}[22m[39m
 [31m7[39m [90m.[39m [31m[1m}[22m[39m
 
@@ -71,15 +71,15 @@
 [34m+++ cli_test/source/z0_20260605.new.mbt: line 1[39m
 @@ -1,0 +1,13 @@
 [90m.[39m  [32m1[39m [32m[1m///|[22m[39m
-[90m.[39m  [32m2[39m [32m[1mfn[22m[39m[90m [39m[32m[1mexpect_parse_ok(input[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString,[22m[39m[90m [39m[32m[1mexpected[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mUnit[22m[39m[90m [39m[32m[1mraise[22m[39m[90m [39m[32m[1m{[22m[39m
-[90m.[39m  [32m3[39m [90m  [39m[32m[1mmatch[22m[39m[90m [39m[32m[1mparse_program(input)[22m[39m[90m [39m[32m[1m{[22m[39m
-[90m.[39m  [32m4[39m [90m    [39m[32m[1mOk(exprs)[22m[39m[90m [39m[32m[1m=>[22m[39m
-[90m.[39m  [32m5[39m [90m      [39m[32m[1mif[22m[39m[90m [39m[32m[1mexprs.length()[22m[39m[90m [39m[32m[1m==[22m[39m[90m [39m[32m[1m0[22m[39m[90m [39m[32m[1m{[22m[39m
+[90m.[39m  [32m2[39m [32m[1mfn expect_parse_ok(input : String, expected : String) -> Unit raise {[22m[39m
+[90m.[39m  [32m3[39m [90m  [39m[32m[1mmatch parse_program(input) {[22m[39m
+[90m.[39m  [32m4[39m [90m    [39m[32m[1mOk(exprs) =>[22m[39m
+[90m.[39m  [32m5[39m [90m      [39m[32m[1mif exprs.length() == 0 {[22m[39m
 [90m.[39m  [32m6[39m [90m        [39m[32m[1mabort("expected parsed expression")[22m[39m
-[90m.[39m  [32m7[39m [90m      [39m[32m[1m}[22m[39m[90m [39m[32m[1melse[22m[39m[90m [39m[32m[1m{[22m[39m
-[90m.[39m  [32m8[39m [90m        [39m[32m[1minspect(exprs[0],[22m[39m[90m [39m[32m[1mcontent=expected)[22m[39m
+[90m.[39m  [32m7[39m [90m      [39m[32m[1m} else {[22m[39m
+[90m.[39m  [32m8[39m [90m        [39m[32m[1minspect(exprs[0], content=expected)[22m[39m
 [90m.[39m  [32m9[39m [90m      [39m[32m[1m}[22m[39m
-[90m.[39m [32m10[39m [90m    [39m[32m[1mErr(diagnostic)[22m[39m[90m [39m[32m[1m=>[22m[39m
+[90m.[39m [32m10[39m [90m    [39m[32m[1mErr(diagnostic) =>[22m[39m
 [90m.[39m [32m11[39m [90m      [39m[32m[1mabort("unexpected parse diagnostic: \{diagnostic.format()}")[22m[39m
 [90m.[39m [32m12[39m [90m  [39m[32m[1m}[22m[39m
 [90m.[39m [32m13[39m [32m[1m}[22m[39m
@@ -88,11 +88,11 @@
 [34m+++ cli_test/source/z0_20260605.new.mbt: line 15[39m
 @@ -1,0 +15,8 @@
 [90m.[39m [32m15[39m [32m[1m///|[22m[39m
-[90m.[39m [32m16[39m [32m[1mfn[22m[39m[90m [39m[32m[1mexpect_parse_err(input[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString,[22m[39m[90m [39m[32m[1mexpected[22m[39m[90m [39m[32m[1m:[22m[39m[90m [39m[32m[1mString)[22m[39m[90m [39m[32m[1m->[22m[39m[90m [39m[32m[1mUnit[22m[39m[90m [39m[32m[1mraise[22m[39m[90m [39m[32m[1m{[22m[39m
-[90m.[39m [32m17[39m [90m  [39m[32m[1mmatch[22m[39m[90m [39m[32m[1mparse_program(input)[22m[39m[90m [39m[32m[1m{[22m[39m
-[90m.[39m [32m18[39m [90m    [39m[32m[1mOk(exprs)[22m[39m[90m [39m[32m[1m=>[22m[39m
+[90m.[39m [32m16[39m [32m[1mfn expect_parse_err(input : String, expected : String) -> Unit raise {[22m[39m
+[90m.[39m [32m17[39m [90m  [39m[32m[1mmatch parse_program(input) {[22m[39m
+[90m.[39m [32m18[39m [90m    [39m[32m[1mOk(exprs) =>[22m[39m
 [90m.[39m [32m19[39m [90m      [39m[32m[1mabort("expected parse diagnostic, got \{exprs.length()} expression(s)")[22m[39m
-[90m.[39m [32m20[39m [90m    [39m[32m[1mErr(diagnostic)[22m[39m[90m [39m[32m[1m=>[22m[39m[90m [39m[32m[1minspect(diagnostic,[22m[39m[90m [39m[32m[1mcontent=expected)[22m[39m
+[90m.[39m [32m20[39m [90m    [39m[32m[1mErr(diagnostic) => inspect(diagnostic, content=expected)[22m[39m
 [90m.[39m [32m21[39m [90m  [39m[32m[1m}[22m[39m
 [90m.[39m [32m22[39m [32m[1m}[22m[39m
 
