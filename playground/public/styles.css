@@ -1391,6 +1391,7 @@ button.copy-button.copied {
   display: none;
   width: 1.15rem;
   height: 1.15rem;
+  min-height: 1.15rem;
   border: 0;
   border-radius: 0.22rem;
   padding: 0;
@@ -1408,9 +1409,18 @@ button.copy-button.copied {
 
 .extension-panel .line-comment-button {
   display: block;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.review-gutter:hover .line-number-value {
+.extension-panel .review-gutter:hover .line-comment-button,
+.extension-panel .line-comment-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.review-gutter:hover .line-number-value,
+.extension-panel .review-gutter:focus-within .line-number-value {
   opacity: 0;
 }
 
