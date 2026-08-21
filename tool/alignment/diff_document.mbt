@@ -59,9 +59,10 @@ pub type FallbackInfo = @model.FallbackInfo
 
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
-/// through the `mbtdiff` facade; the legacy result below is retained as a
-/// compatibility projection. `fallbacks` is a zero-copy read-only view whose
-/// backing storage is never mutated after this result is published.
+/// through the `mbtdiff` facade; the older public `AlignedDiffResult` type is
+/// retained as a compatibility projection. `fallbacks` is a zero-copy
+/// read-only view whose backing storage is never mutated after this result is
+/// published.
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : DiffStatus
@@ -558,7 +559,7 @@ fn ast_document_from_positions(
   lhs_positions : ArrayView[MatchedPos],
   rhs_positions : ArrayView[MatchedPos],
   context : Int,
-  reduce_sparse : Bool,
+  reduce_sparse_replacements : Bool,
 ) -> @model.DiffDocument {
   let old_lines = document_lines(old_source)
   let new_lines = document_lines(new_source)
@@ -579,7 +580,7 @@ fn ast_document_from_positions(
       matched_lines,
       context + 1,
     )
-    let pairs = if reduce_sparse {
+    let pairs = if reduce_sparse_replacements {
       reduce_ast_sparse_replacements(matched_lines[start:end_], hunk)
     } else {
       matched_lines[start:end_].to_owned()
@@ -678,7 +679,7 @@ fn ast_unit_document_with_budget(
   new_unit : ImplUnit?,
   context : Int,
   graph_limit : UInt,
-  preserve_legacy_document : Bool,
+  reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
 ) -> @model.DiffDocument raise {
   let old_source = source_slice(old_unit)
@@ -711,12 +712,7 @@ fn ast_unit_document_with_budget(
     old_offset,
   )
   ast_document_from_positions(
-    old_source,
-    new_source,
-    lhs_positions,
-    rhs_positions,
-    context,
-    !preserve_legacy_document,
+    old_source, new_source, lhs_positions, rhs_positions, context, reduce_sparse_replacements,
   ).rebase(old_offset, new_offset)
 }
 
@@ -730,7 +726,12 @@ fn detailed_ast_edit_document(
   budget : @computation.Budget,
 ) -> DetailedUnitResult {
   let document = ast_unit_document_with_budget(
-    old_unit, new_unit, context, graph_limit, ignore_comments, budget,
+    old_unit,
+    new_unit,
+    context,
+    graph_limit,
+    !ignore_comments,
+    budget,
   ) catch {
     @computation.LimitExceeded(stage~, limit~) => {
       let reason : FallbackReason = ComputationLimitExceeded(
@@ -882,7 +883,7 @@ fn ast_root_document_with_budget(
   new_units : ArrayView[ImplUnit],
   context : Int,
   graph_limit : UInt,
-  preserve_legacy_document : Bool,
+  reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
 ) -> @model.DiffDocument raise {
   let lhs_roots = impl_roots(old_units)
@@ -900,7 +901,7 @@ fn ast_root_document_with_budget(
     @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
     @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
     context,
-    !preserve_legacy_document,
+    reduce_sparse_replacements,
   )
 }
 
@@ -933,7 +934,13 @@ fn detailed_ast_root_list_document(
   budget : @computation.Budget,
 ) -> DetailedDiffResult {
   let document = ast_root_document_with_budget(
-    old_source, new_source, old_units, new_units, context, graph_limit, ignore_comments,
+    old_source,
+    new_source,
+    old_units,
+    new_units,
+    context,
+    graph_limit,
+    !ignore_comments,
     budget,
   ) catch {
     @computation.LimitExceeded(stage~, limit~) =>
