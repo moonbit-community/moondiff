@@ -43,6 +43,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
       headRace: false,
       metadataCalls: 0,
       commentListCalls: 0,
+      authenticationFailureOps: [],
       issueComments: [{
         id: "10",
         body: "Existing overall comment",
@@ -207,6 +208,17 @@ async function installHost(page, target = pullTarget(), options = {}) {
         state.deviceFlow = null;
         saveAuth();
         return authStatus();
+      }
+      const authenticationFailureIndex = state.authenticationFailureOps.indexOf(op);
+      if (authenticationFailureIndex >= 0) {
+        state.authenticationFailureOps.splice(authenticationFailureIndex, 1);
+        state.authenticated = false;
+        state.deviceFlow = null;
+        saveAuth();
+        throw Object.assign(new Error("Your GitHub session expired. Sign in again."), {
+          status: 401,
+          code: "authentication_required",
+        });
       }
       if (op === "github.pull.get") {
         if (options.privateUntilAuth && !state.authenticated) {
@@ -483,6 +495,56 @@ test("login, overall comment, inline comment, reply, focus refresh, and view tog
 
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(page.locator("table.unified.review-diff")).toBeVisible();
+});
+
+test("expired credentials during comment refresh offer sign-in and hide authoring", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto("/panel.html");
+  await waitForSignedInComments(page);
+
+  await page.evaluate(() => {
+    window.__fake.authenticationFailureOps.push("github.comments.list");
+  });
+  await page.getByRole("button", { name: "Refresh" }).click();
+
+  await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
+  await expect(page.getByRole("button", { name: "Try sign-in" })).toBeVisible();
+  await expect(page.getByText("Signed in as tester")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
+  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Try sign-in" }).click();
+  await waitForSignedInComments(page);
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reply" }).first()).toBeVisible();
+  await expect(page.locator(".line-comment-button").first()).toBeAttached();
+});
+
+test("expired credentials during comment submission preserve the draft for retry", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto("/panel.html");
+  await waitForSignedInComments(page);
+
+  await page.getByRole("button", { name: "Add overall comment" }).click();
+  await page.locator(".comment-editor textarea").fill("Keep this draft");
+  await page.evaluate(() => {
+    window.__fake.authenticationFailureOps.push("github.issue.comment.create");
+  });
+  await page.getByRole("button", { name: "Post comment" }).click();
+
+  await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
+  await expect(page.getByRole("button", { name: "Try sign-in" })).toBeVisible();
+  await expect(page.locator(".comment-editor textarea")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
+  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Try sign-in" }).click();
+  await waitForSignedInComments(page);
+  await expect(page.locator(".comment-editor textarea")).toHaveValue("Keep this draft");
+  await page.getByRole("button", { name: "Post comment" }).click();
+  await expect(page.getByText("Keep this draft", { exact: true })).toBeVisible();
 });
 
 test("private PR prompts for GitHub App access and retries after login", async ({ page }) => {
