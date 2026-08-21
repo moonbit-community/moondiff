@@ -26,7 +26,7 @@ fn[T : FromJson] gateway_json_request(
       secondary,
       page,
       generation,
-      completed=(ok, status, status_text, response_body) => {
+      completed=(ok, status, code, status_text, response_body) => {
         let result : Result[T, Error] = if ok {
           try @json.from_json(@json.parse(response_body)) catch {
             error => Err(GitHubRequestError(error.to_string()))
@@ -39,9 +39,15 @@ fn[T : FromJson] gateway_json_request(
           } else {
             " \{status_text}"
           }
-          Err(
-            GitHubRequestError("GitHub request failed: HTTP \{status}\{suffix}"),
-          )
+          if code.trim().is_empty() {
+            Err(
+              GitHubRequestError(
+                "GitHub request failed: HTTP \{status}\{suffix}",
+              ),
+            )
+          } else {
+            Err(ExtensionRequestError(status~, code~, detail=status_text))
+          }
         }
         scheduler.add(msg(result))
       },
@@ -63,7 +69,7 @@ extern "js" fn send_gateway_json_request(
   secondary : String,
   page : Int,
   generation : Int,
-  completed~ : (Bool, Int, String, String) -> Unit,
+  completed~ : (Bool, Int, String, String, String) -> Unit,
   failed~ : (String) -> Unit,
 ) =
   #| (operation, owner, repo, primary, secondary, page, generation, completed, failed) => {
@@ -103,10 +109,11 @@ extern "js" fn send_gateway_json_request(
   #|   const host = globalThis.__MOONDIFF_EXTENSION_HOST__;
   #|   if (host?.request) {
   #|     host.request(operation, args, { generation })
-  #|       .then((value) => completed(true, 200, "", JSON.stringify(withoutNulls(value))))
+  #|       .then((value) => completed(true, 200, "", "", JSON.stringify(withoutNulls(value))))
   #|       .catch((error) => completed(
   #|         false,
   #|         Number.isInteger(error?.status) ? error.status : 0,
+  #|         typeof error?.code === "string" ? error.code : "extension_error",
   #|         error?.message || String(error),
   #|         "",
   #|       ));
@@ -124,13 +131,13 @@ extern "js" fn send_gateway_json_request(
   #|       return response.text().catch(() => "").then((body) => {
   #|         let detail = response.statusText || "";
   #|         try { detail = JSON.parse(body)?.message || detail; } catch {}
-  #|         completed(false, response.status, detail, "");
+  #|         completed(false, response.status, "", detail, "");
   #|       });
   #|     }
   #|     return response.text().then((body) => {
   #|       let normalized = body;
   #|       try { normalized = JSON.stringify(withoutNulls(JSON.parse(body))); } catch {}
-  #|       completed(true, response.status, response.statusText || "", normalized);
+  #|       completed(true, response.status, "", response.statusText || "", normalized);
   #|     });
   #|   }).catch((error) => failed(error?.message || String(error)));
   #| }
@@ -150,7 +157,7 @@ fn gateway_source_request(
       location.path,
       location.revision,
       generation,
-      completed=(ok, status, status_text, content_type, bytes) => {
+      completed=(ok, status, code, status_text, content_type, bytes) => {
         let result : Result[(String, Bytes), Error] = if ok {
           Ok((content_type, bytes))
         } else {
@@ -159,11 +166,15 @@ fn gateway_source_request(
           } else {
             " \{status_text}"
           }
-          Err(
-            GitHubRequestError(
-              "GitHub content request failed: HTTP \{status}\{suffix}",
-            ),
-          )
+          if code.trim().is_empty() {
+            Err(
+              GitHubRequestError(
+                "GitHub content request failed: HTTP \{status}\{suffix}",
+              ),
+            )
+          } else {
+            Err(ExtensionRequestError(status~, code~, detail=status_text))
+          }
         }
         scheduler.add(emit(SourceLoaded(generation, index, side, result)))
       },
@@ -192,7 +203,7 @@ extern "js" fn send_gateway_source_request(
   path : String,
   revision : String,
   generation : Int,
-  completed~ : (Bool, Int, String, String, Bytes) -> Unit,
+  completed~ : (Bool, Int, String, String, String, Bytes) -> Unit,
   failed~ : (String) -> Unit,
 ) =
   #| (owner, repo, path, revision, generation, completed, failed) => {
@@ -205,11 +216,12 @@ extern "js" fn send_gateway_source_request(
   #|         for (let index = 0; index < binary.length; index += 1) {
   #|           bytes[index] = binary.charCodeAt(index);
   #|         }
-  #|         completed(true, 200, "", value.contentType || "application/octet-stream", bytes);
+  #|         completed(true, 200, "", "", value.contentType || "application/octet-stream", bytes);
   #|       })
   #|       .catch((error) => completed(
   #|         false,
   #|         Number.isInteger(error?.status) ? error.status : 0,
+  #|         typeof error?.code === "string" ? error.code : "extension_error",
   #|         error?.message || String(error),
   #|         "",
   #|         new Uint8Array(),
@@ -220,13 +232,14 @@ extern "js" fn send_gateway_source_request(
   #|   const url = `https://raw.githubusercontent.com/${owner}/${repo}/${revision}/${encodedPath}`;
   #|   fetch(url, { method: "GET", cache: "no-cache" }).then((response) => {
   #|     if (!response.ok) {
-  #|       completed(false, response.status, response.statusText || "", "", new Uint8Array());
+  #|       completed(false, response.status, "", response.statusText || "", "", new Uint8Array());
   #|       return;
   #|     }
   #|     return response.arrayBuffer().then((buffer) => {
   #|       completed(
   #|         true,
   #|         response.status,
+  #|         "",
   #|         response.statusText || "",
   #|         response.headers.get("content-type") || "application/octet-stream",
   #|         new Uint8Array(buffer),

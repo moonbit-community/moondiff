@@ -194,9 +194,45 @@ priv enum Msg {
 }
 
 ///|
+priv suberror ExtensionRequestError {
+  ExtensionRequestError(status~ : Int, code~ : String, detail~ : String)
+}
+
+///|
+impl Show for ExtensionRequestError with fn output(self, logger) {
+  match self {
+    ExtensionRequestError(status~, code~, detail~) =>
+      logger.write_string(
+        "Moondiff extension request failed (status \{status}, \{code}): \{detail}",
+      )
+  }
+}
+
+///|
+fn extension_error_code(error : Error) -> String? {
+  match error {
+    ExtensionRequestError(status=_, code~, detail=_) => Some(code)
+    _ => None
+  }
+}
+
+///|
 fn error_message(error : Error, api : Bool) -> String {
   let detail = error.to_string()
   let lower = detail.to_lower()
+  if api {
+    match extension_error_code(error) {
+      Some("rate_limit") =>
+        return "GitHub API rate limit exceeded. Sign in or try again after the reset time."
+      Some("authentication_required") =>
+        return "Your GitHub session expired. Sign in again."
+      Some("not_found_or_not_installed") =>
+        return "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
+      Some("permission_denied") =>
+        return "GitHub denied this request. Install the app for this repository and check its permissions."
+      _ => ()
+    }
+  }
   if api && extension_host_enabled() && lower.contains("rate limit") {
     "GitHub API rate limit exceeded. Sign in or try again after the reset time."
   } else if api && detail.contains("HTTP 401") && extension_host_enabled() {
@@ -625,6 +661,17 @@ fn update_draft(
 
 ///|
 fn comment_failure_message(error : Error) -> String {
+  match extension_error_code(error) {
+    Some("authentication_required") =>
+      return "Your GitHub session expired. Sign in again, then retry."
+    Some("not_found_or_not_installed") =>
+      return "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
+    Some("permission_denied") =>
+      return "GitHub denied this action. Install the app for this repository and check its Pull requests permission."
+    Some("invalid_comment_anchor") =>
+      return "GitHub rejected this comment anchor. Refresh the diff and choose the line again."
+    _ => ()
+  }
   let detail = error_message(error, true)
   if detail.contains("HTTP 401") {
     "Your GitHub session expired. Sign in again, then retry."

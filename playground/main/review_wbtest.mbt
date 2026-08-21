@@ -33,6 +33,119 @@ test "PR commit URL and hash routes preserve pull context" {
 }
 
 ///|
+test "comment list arguments omit fields that do not apply to the target" {
+  json_inspect(comment_list_args(pull_reference("upstream", "project", "17")), content={
+    "owner": "upstream",
+    "repo": "project",
+    "kind": "pull",
+    "number": "17",
+  })
+  json_inspect(
+    comment_list_args(commit_reference("upstream", "project", "abcdef1")),
+    content={
+      "owner": "upstream",
+      "repo": "project",
+      "kind": "commit",
+      "sha": "abcdef1",
+    },
+  )
+  json_inspect(
+    comment_list_args(
+      pull_commit_reference("upstream", "project", "17", "abcdef1"),
+    ),
+    content={
+      "owner": "upstream",
+      "repo": "project",
+      "kind": "pull_commit",
+      "number": "17",
+      "sha": "abcdef1",
+    },
+  )
+}
+
+///|
+test "extension request errors retain diagnostics and format unknown codes neutrally" {
+  let error : Error = ExtensionRequestError(
+    status=400,
+    code="invalid_arguments",
+    detail="Missing RPC argument: sha",
+  )
+  guard error is ExtensionRequestError(status~, code~, detail~) else {
+    fail("expected a structured extension error")
+  }
+  assert_eq(status, 400)
+  assert_eq(code, "invalid_arguments")
+  assert_eq(detail, "Missing RPC argument: sha")
+  assert_eq(
+    error_message(error, true),
+    "Moondiff extension request failed (status 400, invalid_arguments): Missing RPC argument: sha",
+  )
+}
+
+///|
+test "extension request codes retain actionable GitHub guidance" {
+  assert_eq(
+    comment_failure_message(
+      ExtensionRequestError(
+        status=403,
+        code="rate_limit",
+        detail="API rate limit exceeded",
+      ),
+    ),
+    "GitHub API rate limit exceeded. Sign in or try again after the reset time.",
+  )
+  assert_eq(
+    comment_failure_message(
+      ExtensionRequestError(
+        status=401,
+        code="authentication_required",
+        detail="Bad credentials",
+      ),
+    ),
+    "Your GitHub session expired. Sign in again, then retry.",
+  )
+  assert_eq(
+    comment_failure_message(
+      ExtensionRequestError(
+        status=404,
+        code="not_found_or_not_installed",
+        detail="Not Found",
+      ),
+    ),
+    "GitHub could not access this repository. Sign in and install the GitHub App for private repositories.",
+  )
+  assert_eq(
+    comment_failure_message(
+      ExtensionRequestError(
+        status=403,
+        code="permission_denied",
+        detail="Resource not accessible by integration",
+      ),
+    ),
+    "GitHub denied this action. Install the app for this repository and check its Pull requests permission.",
+  )
+  assert_eq(
+    comment_failure_message(
+      ExtensionRequestError(
+        status=422,
+        code="invalid_comment_anchor",
+        detail="Validation Failed",
+      ),
+    ),
+    "GitHub rejected this comment anchor. Refresh the diff and choose the line again.",
+  )
+  assert_eq(
+    error_message(
+      GitHubRequestError(
+        "GitHub request failed: HTTP 403 API rate limit exceeded",
+      ),
+      true,
+    ),
+    "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later.",
+  )
+}
+
+///|
 test "fork pull revisions retain base and head repositories" {
   let reference = pull_reference("upstream", "project", "7")
   let pull = ApiPull::{
@@ -501,7 +614,13 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     model,
     IssueCommentCreated(
       5,
-      Err(GitHubRequestError("GitHub request failed: HTTP 422")),
+      Err(
+        ExtensionRequestError(
+          status=422,
+          code="invalid_comment_anchor",
+          detail="Validation Failed",
+        ),
+      ),
     ),
     emit,
   )
