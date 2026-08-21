@@ -134,7 +134,9 @@ fn section_max_line(range : @model.LineRange?) -> Int {
 }
 
 ///|
-fn legacy_empty_side_hunks(
+/// Keep established CLI hunk anchors for pure insertions and deletions by
+/// anchoring the missing side at line 1.
+fn adjust_cli_empty_side_hunk_anchors(
   hunks : ArrayView[@model.DiffHunk],
   old_missing : Bool,
   new_missing : Bool,
@@ -207,7 +209,7 @@ fn render_sectioned_document(
         "note: fallback to tokdiff (\{fallback_reason_text(fallbacks[index], parser_reason)})\n"
     }
     let rendered_hunks = if matching_fallbacks.is_empty() {
-      legacy_empty_side_hunks(
+      adjust_cli_empty_side_hunk_anchors(
         section_hunks,
         section.old is None,
         section.new is None,
@@ -249,7 +251,9 @@ fn render_sectioned_document(
 }
 
 ///|
-fn render_legacy_whole_ast_document(
+/// Render the CLI whole-document layout with source-derived line-number widths
+/// and adjusted anchors for an empty side.
+fn render_cli_whole_ast_document(
   old_label : String,
   old_source : String,
   new_label : String,
@@ -257,7 +261,7 @@ fn render_legacy_whole_ast_document(
   document : @model.DiffDocument,
   options : DiffOptions,
 ) -> String {
-  let hunks = legacy_empty_side_hunks(
+  let hunks = adjust_cli_empty_side_hunk_anchors(
     document.hunks,
     old_source.is_empty(),
     new_source.is_empty(),
@@ -330,7 +334,7 @@ pub fn diff_text(
       } else {
         match calculation.layout {
           WholeDocument =>
-            render_legacy_whole_ast_document(
+            render_cli_whole_ast_document(
               old_label,
               old_source,
               new_label,
