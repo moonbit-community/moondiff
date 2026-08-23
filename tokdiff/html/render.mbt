@@ -7,7 +7,7 @@ pub(all) struct HunkNote {
 
 ///|
 fn esc(text : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for char in text {
     match char {
       '&' => buf <+ "&amp;"
@@ -21,7 +21,7 @@ fn esc(text : String) -> String {
 
 ///|
 fn line_html(line : @model.DiffLine, changed_class : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for segment in line.segments {
     match segment.kind {
       Unchanged => buf <+ "\{esc(segment.text)}"
@@ -240,7 +240,7 @@ pub fn render_side_by_side(
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf <+ "<table class=\"split\">\n"
   for hunk_index, hunk in document.hunks {
     append_split_hunk(buf, hunk, hunk_index, line_numbers, hunk_notes)
@@ -258,7 +258,7 @@ pub fn render_side_by_side_hunks(
 ) -> Array[String] {
   let rendered : Array[String] = []
   for hunk_index, hunk in document.hunks {
-    let buf = StringBuilder::new()
+    let buf = StringBuilder()
     buf <+ "<table class=\"split\">\n"
     append_split_hunk(buf, hunk, hunk_index, line_numbers, hunk_notes)
     buf <+ "</table>\n"
@@ -468,7 +468,7 @@ pub fn render_unified(
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   if line_numbers {
     buf <+ "<table class=\"unified numbered\">\n"
   } else {
@@ -494,7 +494,7 @@ pub fn render_unified_hunks(
 ) -> Array[String] {
   let rendered : Array[String] = []
   for hunk_index, hunk in document.hunks {
-    let buf = StringBuilder::new()
+    let buf = StringBuilder()
     if line_numbers {
       buf <+ "<table class=\"unified numbered\">\n"
     } else {
@@ -650,7 +650,7 @@ pub fn unified_line_hunks_html(
 ///|
 /// Wrap rendered diff HTML in a complete standalone page with default styles.
 pub fn html_page(title~ : String, body : String) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf <+ "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">"
   buf <+ "<title>\{esc(title)}</title><style>\n"
   buf <+ "body { font-family: monospace; }\n"

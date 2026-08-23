@@ -14,8 +14,8 @@ fn cleanup_op_signature(ops : ArrayView[Op]) -> String {
 
 ///|
 fn reconstruct_ops(ops : ArrayView[Op]) -> (String, String) {
-  let old = StringBuilder::new()
-  let new = StringBuilder::new()
+  let old = StringBuilder()
+  let new = StringBuilder()
   for op in ops {
     match op {
       OEq(t) => {

@@ -190,7 +190,7 @@ fn pull_stats(pull : ApiPull) -> ApiStats {
 fn percent_encode_path(path : String) -> String {
   let bytes = @utf8.encode(path)
   let hex = "0123456789ABCDEF"
-  let encoded = StringBuilder::new(size_hint=bytes.length())
+  let encoded = StringBuilder(size_hint=bytes.length())
   for byte in bytes {
     let value = byte.to_int()
     if (value >= 'a' && value <= 'z') ||

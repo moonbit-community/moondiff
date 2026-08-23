@@ -181,7 +181,7 @@ fn render_sectioned_document(
   options : DiffOptions,
   sections : ArrayView[@alignment.DiffSection],
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let used_hunks = Array::make(document.hunks.length(), false)
   let used_fallbacks = Array::make(fallbacks.length(), false)
   let wrote = Ref(false)
@@ -203,7 +203,7 @@ fn render_sectioned_document(
     if section_hunks.is_empty() {
       continue
     }
-    let section_buf = StringBuilder::new()
+    let section_buf = StringBuilder()
     for index in matching_fallbacks {
       section_buf <+
         "note: fallback to tokdiff (\{fallback_reason_text(fallbacks[index], parser_reason)})\n"
@@ -284,7 +284,7 @@ pub fn diff_text(
   old_source : String,
   new_label : String,
   new_source : String,
-  options? : DiffOptions = DiffOptions::default(),
+  options? : DiffOptions = Default::default(),
 ) -> DiffResult {
   let has_changes = old_source != new_source
   let calculation = @alignment.calculate_diff_document(
@@ -317,7 +317,7 @@ pub fn diff_text(
           options.render_options(),
         )
       } else if options.ignore_comments {
-        let buf = StringBuilder::new()
+        let buf = StringBuilder()
         for fallback in fallbacks {
           buf <+
             "note: fallback to tokdiff (\{fallback_reason_text(fallback, parser_reason)})\n"

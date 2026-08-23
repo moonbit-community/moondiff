@@ -6,7 +6,7 @@
 pub fn diff(
   old_source : String,
   new_source : String,
-  options? : DiffOptions = DiffOptions::default(),
+  options? : DiffOptions = Default::default(),
 ) -> DiffResult {
   let result = @alignment.diff_document_detailed(
     old_source,

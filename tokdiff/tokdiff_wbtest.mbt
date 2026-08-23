@@ -45,8 +45,8 @@ test "pair_ops reconstruction property" {
       ("", "only new"),
     ] {
     let (oa, ob) = pair
-    let left = StringBuilder::new()
-    let right = StringBuilder::new()
+    let left = StringBuilder()
+    let right = StringBuilder()
     for op in pair_ops(tokenize_line(oa), tokenize_line(ob)) {
       match op {
         OEq(t) => {
@@ -125,7 +125,7 @@ test "fallback tokens still feed the existing alignment budgets" {
 
 ///|
 fn diff_segment_signature(segments : ArrayView[DiffSegment]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for segment in segments {
     match segment.kind {
       Unchanged => buf <+ "U[\{segment.text}]"

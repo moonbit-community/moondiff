@@ -10,7 +10,7 @@ test "basic" (t : @test.Test) {
       "  let mut sum = 0", "  for item in items {", "    sum += item.price * item.count + tax",
       "  }", "  sum // final", "}",
     ][:]
-  let body = StringBuilder::new()
+  let body = StringBuilder()
   body <+ "<h3>Split view</h3>\n"
   body <+ "\{@html.side_by_side_html(old~, new~)}"
   body <+ "<h3>Unified view</h3>\n"
@@ -40,7 +40,7 @@ test "left leaning insert" (t : @test.Test) {
       "      Some(", "        bind_value(bindings, name, string_binding(candidate_name, candidate)),",
       "      )", "    } else {", "      Some(false)", "   }",
     ][:]
-  let body = StringBuilder::new()
+  let body = StringBuilder()
   body <+ "<h3>Split view</h3>\n"
   body <+ "\{@html.side_by_side_html(old~, new~)}"
   body <+ "<h3>Unified view</h3>\n"
@@ -62,7 +62,7 @@ test "html fallback resource path" (t : @test.Test) {
       "      } else {", "        None", "      }", "      match resource {", "        Some((resource_path, content)) => {",
       "          let content_type = match @path.Path::extname(resource_path) {",
     ][:]
-  let body = StringBuilder::new()
+  let body = StringBuilder()
   body <+ "<h3>Split view</h3>\n"
   body <+ "\{@html.side_by_side_html(old~, new~)}"
   body <+ "<h3>Unified view</h3>\n"

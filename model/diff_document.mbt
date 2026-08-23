@@ -29,7 +29,7 @@ pub(all) struct DiffLine {
 ///|
 /// Reconstruct the exact source text of this line.
 pub fn DiffLine::text(self : DiffLine) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for segment in self.segments {
     buf <+ "\{segment.text}"
   }

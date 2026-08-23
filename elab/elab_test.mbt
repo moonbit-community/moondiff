@@ -23,7 +23,7 @@ fn positions_text(
   lines : Array[Array[Char]],
   positions : Array[@span.SingleLineSpan],
 ) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut first = true
   for position in positions {
     if first {
