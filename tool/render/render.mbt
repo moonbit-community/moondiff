@@ -76,7 +76,7 @@ fn collect_novel_ranges(mps : ArrayView[MatchedPos]) -> HighlightMap {
 
 ///|UUID(7b86a3ce-71eb-4062-b338-914509d4793a)
 fn repeat_char(ch : Char, width : Int) -> String {
-  let buf = StringBuilder::new(size_hint=width)
+  let buf = StringBuilder(size_hint=width)
   for _ in 0..<width {
     buf.write_char(ch)
   }
@@ -224,7 +224,7 @@ fn render_line_body(
     }
   }
 
-  let buf = StringBuilder::new(size_hint=line.length())
+  let buf = StringBuilder(size_hint=line.length())
   let mut start = 0
   while start < chars.length() {
     let highlighted = mask[start]
@@ -280,7 +280,7 @@ fn render_document_line_body(
   if !use_color {
     return line.text()
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for segment in line.segments {
     buf.write_string(
       style_text(
@@ -519,7 +519,7 @@ fn render_diff_document_impl(
     .map(line => @cmp.maximum(line, 1).to_string().length())
     .map(width => @cmp.maximum(width, document_new_width))
     .unwrap_or(document_new_width)
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   for hunk in document.hunks {
     buf.write_string(
@@ -810,7 +810,7 @@ pub fn render_ast_diff(
     options.context_lines,
   )
 
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   if hunks.is_empty() {
     buf.write_string("No changes.\n")
@@ -1002,7 +1002,7 @@ pub fn render_line_diff(
   )
   let hunks = diff.group(context=options.context_lines)
 
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   if hunks.is_empty() {
     buf.write_string("No changes.\n")

@@ -370,7 +370,7 @@ fn source_lines_slice(
   if start >= end_ {
     return ""
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i in start..<end_ {
     if i > start {
       buf.write_char('\n')

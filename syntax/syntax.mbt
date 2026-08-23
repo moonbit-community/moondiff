@@ -92,7 +92,7 @@ pub enum Syntax {
 
 ///|UUID(bec402de-e38b-45ca-9ae4-48b52e8ac3c7)
 let default_syntax_atom : Syntax = Syntax::Atom(
-  info=SyntaxInfo::default(),
+  info=Default::default(),
   content="",
   position=[],
   kind=Normal,
@@ -158,7 +158,7 @@ pub fn Syntax::list(
     }
   }
   Syntax::List(
-    info=SyntaxInfo::default(),
+    info=Default::default(),
     kind~,
     open_position~,
     open_content~,
@@ -196,7 +196,7 @@ pub fn Syntax::atom(
   position~ : Array[SingleLineSpan],
   kind~ : AtomKind,
 ) -> Self {
-  Syntax::Atom(info=SyntaxInfo::default(), position~, content~, kind~)
+  Syntax::Atom(info=Default::default(), position~, content~, kind~)
 }
 
 ///|UUID(d98843b3-75e9-4a9a-8a4c-9f21308b9dca)

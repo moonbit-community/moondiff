@@ -56,7 +56,7 @@ fn push_token_range(
   end : Int,
   kind : DiffSegmentKind,
 ) -> Unit {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for index in start..<end {
     buf <+ "\{tokens[index].text}"
   }

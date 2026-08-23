@@ -38,7 +38,7 @@ fn append_ignored_row(buf : StringBuilder, row : @model.DiffRow) -> Unit {
 
 ///|
 fn render_hunk(hunk : @model.DiffHunk) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   buf <+
     "\{@common.hunk_header(hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len)}\n"
   for block in hunk.blocks {

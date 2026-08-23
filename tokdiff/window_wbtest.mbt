@@ -28,7 +28,7 @@ fn pair_step_signature(steps : ArrayView[PairStep]) -> String {
 
 ///|
 fn reconstruct_window(stream : WindowStream) -> String {
-  let out = StringBuilder::new()
+  let out = StringBuilder()
   for atom in stream.atoms {
     out <+ "\{atom.gap_before}\{atom.token.text}"
   }

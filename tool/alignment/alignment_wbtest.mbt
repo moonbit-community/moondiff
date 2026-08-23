@@ -1364,7 +1364,7 @@ test "CST wrappers do not hide inserted sibling statements" {
 
 ///|
 fn changed_segment_text(document : @model.DiffDocument) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for hunk in document.hunks {
     for block in hunk.blocks {
       match block {
