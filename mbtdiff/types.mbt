@@ -103,8 +103,3 @@ pub fn DiffResult::status(self : DiffResult) -> DiffStatus {
 pub fn DiffResult::fallbacks(self : DiffResult) -> ArrayView[FallbackInfo] {
   self.fallbacks
 }
-
-///|
-pub fn DiffResult::has_fallback(self : DiffResult) -> Bool {
-  !self.fallbacks.is_empty()
-}

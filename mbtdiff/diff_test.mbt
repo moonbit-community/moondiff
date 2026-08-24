@@ -28,7 +28,7 @@ fn document_has_changed_segment_containing(
 test "public status contract" {
   let identical = @mbtdiff.diff("fn broken(", "fn broken(")
   assert_true(identical.status() is Identical)
-  assert_false(identical.has_fallback())
+  assert_true(identical.fallbacks().is_empty())
   assert_true(identical.document().hunks.is_empty())
 
   let formatting = @mbtdiff.diff("fn f() { 1 }", "fn f() {\n  1\n}")

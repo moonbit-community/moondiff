@@ -112,7 +112,7 @@ test "consumer traverses and matches every public renderer-free IR type" {
   }
 
   let parse = @mbtdiff.diff("fn broken( {", "fn okay() {}")
-  assert_true(parse.has_fallback())
+  assert_false(parse.fallbacks().is_empty())
   assert_false(fallback_name(parse.fallbacks()[0].reason).is_empty())
   guard parse.fallbacks()[0].reason is ParseError(sides~, ..) else {
     fail("expected a parse fallback")
