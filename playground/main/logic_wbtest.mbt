@@ -373,6 +373,7 @@ test "stale commit responses are discarded by generation" {
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
     ignore_comments: false,
+    ignore_tests: false,
     phase: Idle,
     route: None,
     share_url: None,
@@ -401,6 +402,7 @@ fn pull_test_model(
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
     ignore_comments: false,
+    ignore_tests: false,
     phase,
     route: Some(reference),
     share_url: None,
@@ -850,6 +852,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
     ignore_comments: false,
+    ignore_tests: false,
     phase: Showing(view),
     route: Some(reference),
     share_url: None,
@@ -894,6 +897,7 @@ fn analysis_test_model(
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
     ignore_comments: false,
+    ignore_tests: false,
     phase: Showing(view),
     route: Some(view.reference),
     share_url: None,
@@ -1261,10 +1265,45 @@ test "Lexical is the default and algorithm selection is not part of routes" {
   let model = initial_model()
   assert_true(model.diff_algorithm is LexicalAlgorithm)
   assert_false(model.ignore_comments)
+  assert_false(model.ignore_tests)
   let reference = commit_reference("owner", "repo", "abcdef1")
   assert_eq(playground_route(reference), "#/owner/repo/commit/abcdef1")
   assert_false(playground_route(reference).contains("algorithm"))
   assert_false(playground_route(reference).contains("ignore"))
+}
+
+///|
+test "MoonBit files cache all eight algorithm and filter combinations" {
+  let file = fixture_file("src/filters.mbt", "modified")
+  let mut cached = ready_test_file(
+    file,
+    [
+      "/// old docs", "fn production() { old_value() }", "test \"sample\" { old_test() }",
+    ],
+    [
+      "/// new docs", "fn production() { new_value() }", "test \"sample\" { new_test() }",
+    ],
+  )
+  for algorithm in [LexicalAlgorithm, AstAlgorithm] {
+    for ignore_comments in [false, true] {
+      for ignore_tests in [false, true] {
+        cached = ensure_file_document(
+          cached,
+          algorithm,
+          ignore_comments~,
+          ignore_tests~,
+        )
+      }
+    }
+  }
+  assert_true(cached.diff_cache.lexical is Some(_))
+  assert_true(cached.diff_cache.lexical_ignoring_comments is Some(_))
+  assert_true(cached.diff_cache.lexical_ignoring_tests is Some(_))
+  assert_true(cached.diff_cache.lexical_ignoring_comments_and_tests is Some(_))
+  assert_true(cached.diff_cache.ast is Some(_))
+  assert_true(cached.diff_cache.ast_ignoring_comments is Some(_))
+  assert_true(cached.diff_cache.ast_ignoring_tests is Some(_))
+  assert_true(cached.diff_cache.ast_ignoring_comments_and_tests is Some(_))
 }
 
 ///|
@@ -1377,6 +1416,50 @@ test "ignore comments survives commit navigation but stays out of routes" {
 }
 
 ///|
+test "ignore tests toggles independently and survives navigation without routes" {
+  let file = fixture_file("src/tests.mbt", "modified")
+  let ready = ready_test_file(file, ["test \"sample\" { old_value() }"], [
+    "test \"sample\" { new_value() }",
+  ])
+  let view = set_file_state(analysis_test_view([file]), 0, ready)
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (toggled, _) = update(
+    analysis_test_model(view, status=Analyzing),
+    ToggleIgnoreTests,
+    emit,
+  )
+  assert_true(toggled.ignore_tests)
+  assert_false(toggled.ignore_comments)
+  assert_true(toggled.analysis_status is AnalysisIdle)
+  guard toggled.phase is Showing(toggled_view) else {
+    fail("expected commit to remain visible")
+  }
+  assert_true(
+    toggled_view.files[0].diff_cache.lexical_ignoring_tests is Some(_),
+  )
+
+  let reference = commit_reference("owner", "repo", "abcdef1")
+  let fixture = decode_commit(
+    read_fixture("playground/main/fixtures/root_commit.json"),
+  )
+  let loading = {
+    ..toggled,
+    generation: 1,
+    route: Some(reference),
+    phase: LoadingCommit(
+      reference~,
+      repository=reference_repository(reference),
+      page=1,
+      first=None,
+      files=[],
+    ),
+  }
+  let (loaded, _) = update(loading, CommitPageLoaded(1, 1, Ok(fixture)), emit)
+  assert_true(loaded.ignore_tests)
+  assert_false(playground_route(reference).contains("ignore"))
+}
+
+///|
 test "comment-only filtered analysis is handled locally" {
   let file = fixture_file("src/comments.mbt", "modified")
   let view = set_file_state(
@@ -1418,6 +1501,57 @@ test "blank-line-only filtered analysis uses the shared skipped reason" {
       "No changes besides comments or blank lines were found",
     ),
   )
+}
+
+///|
+test "test-only filtered analysis is handled locally" {
+  let file = fixture_file("src/tests.mbt", "modified")
+  let view = set_file_state(
+    analysis_test_view([file]),
+    0,
+    ready_test_file(file, ["test \"sample\" { old_value() }"], [
+      "test \"sample\" { new_value() }",
+    ]),
+  )
+  let model = { ..analysis_test_model(view), ignore_tests: true }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (after, _) = update(model, AnalyzeChanges, emit)
+  guard after.analysis_status is AnalysisNoHunks([skipped]) else {
+    fail("expected local no-hunks result")
+  }
+  assert_eq(skipped.path, "src/tests.mbt")
+  assert_true(skipped.reason.contains("MoonBit test blocks"))
+  assert_true(skipped.reason.contains("turn off Ignore tests"))
+}
+
+///|
+test "late analysis response is discarded after toggling tests" {
+  let file = fixture_file("src/change.mbt", "modified")
+  let view = set_file_state(
+    analysis_test_view([file]),
+    0,
+    ensure_file_document(
+      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
+      LexicalAlgorithm,
+    ),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (switched, _) = update(
+    analysis_test_model(view, status=Analyzing),
+    ToggleIgnoreTests,
+    emit,
+  )
+  let response = AnalysisResponse::{
+    version: ANALYSIS_VERSION,
+    ok: true,
+    analysis: { summary: "late", groups: [] },
+  }
+  let (after, _) = update(
+    switched,
+    AnalysisLoaded(switched.generation, Ok(response)),
+    emit,
+  )
+  assert_true(after == switched)
 }
 
 ///|
@@ -1481,7 +1615,7 @@ test "late analysis response is discarded after an algorithm switch" {
 }
 
 ///|
-test "new source invalidates both MoonBit algorithm caches" {
+test "new source invalidates every MoonBit filter cache" {
   let file = fixture_file("src/change.mbt", "modified")
   let cached = ensure_file_document(
     ensure_file_document(
@@ -1508,6 +1642,18 @@ test "new source invalidates both MoonBit algorithm caches" {
   guard updated.phase is Showing(updated_view) else { fail("expected commit") }
   assert_true(updated_view.files[0].diff_cache.lexical is None)
   assert_true(updated_view.files[0].diff_cache.ast is Some(_))
+  assert_true(
+    updated_view.files[0].diff_cache.lexical_ignoring_comments is None,
+  )
+  assert_true(updated_view.files[0].diff_cache.lexical_ignoring_tests is None)
+  assert_true(
+    updated_view.files[0].diff_cache.lexical_ignoring_comments_and_tests is None,
+  )
+  assert_true(updated_view.files[0].diff_cache.ast_ignoring_comments is None)
+  assert_true(updated_view.files[0].diff_cache.ast_ignoring_tests is None)
+  assert_true(
+    updated_view.files[0].diff_cache.ast_ignoring_comments_and_tests is None,
+  )
 }
 
 ///|
@@ -1520,7 +1666,12 @@ test "non-MoonBit line document is shared across algorithm switches" {
   guard cached.diff_cache.line is Some(before) else {
     fail("expected line cache")
   }
-  let after = ensure_file_document(cached, AstAlgorithm)
+  let after = ensure_file_document(
+    cached,
+    AstAlgorithm,
+    ignore_comments=true,
+    ignore_tests=true,
+  )
   assert_true(after.diff_cache.line == Some(before))
   assert_true(after.diff_cache.lexical is None)
   assert_true(after.diff_cache.ast is None)

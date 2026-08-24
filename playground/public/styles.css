@@ -506,18 +506,27 @@ button.algorithm-option.active {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-button.ignore-comments-toggle {
+button.ignore-comments-toggle,
+button.ignore-tests-toggle {
   width: auto;
   padding: 0 0.5rem;
 }
 
-button.ignore-comments-toggle.active {
+button.ignore-comments-toggle.active,
+button.ignore-tests-toggle.active {
   color: var(--foreground);
   background: var(--surface-subtle);
 }
 
 .ignore-comments-icon {
   color: #8064c8;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.ignore-tests-icon {
+  color: #3d8f73;
   font-family: var(--mono);
   font-size: 0.7rem;
   font-weight: 700;
@@ -1727,11 +1736,13 @@ footer {
     display: none;
   }
 
-  .ignore-comments-label {
+  .ignore-comments-label,
+  .ignore-tests-label {
     display: none;
   }
 
-  button.ignore-comments-toggle {
+  button.ignore-comments-toggle,
+  button.ignore-tests-toggle {
     width: 2rem;
     padding: 0;
   }

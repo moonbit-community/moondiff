@@ -44,15 +44,22 @@ also ignores empty lines, lines containing only Unicode whitespace, blank-line
 count changes, and a missing or added final newline. Pure comment and blank-line
 changes produce no hunks. When nearby code also changes, the original comments
 and blank lines remain visible as neutral context without addition, deletion,
-or intraline highlighting. Other valid UTF-8 text files always use a plain line
-diff and are unaffected by the control.
+or intraline highlighting. The separate default-off **Ignore tests** control
+excludes top-level `test` and `async test` blocks after both MoonBit inputs parse
+successfully, including their leading documentation comments, UUID markers,
+and `///|` separators. Test-only changes produce no hunks; mixed changes report
+only production code, while an `import { ... } for "test"` declaration remains
+part of the diff. Ignore comments and Ignore tests compose independently. If
+parsing fails, the existing whole-file lexical fallback is retained and test
+filtering is not guaranteed. Other valid UTF-8 text files always use a plain
+line diff and are unaffected by either control.
 
-The selected algorithm and comment setting survive later change navigation in
-the open app but are not written into share URLs; a refresh restores Lexical
-mode with comment filtering off. The first 20 MoonBit diffs open automatically,
-while all other files load on demand. Calculated documents are cached
-independently for every algorithm/comment-setting combination, so layout
-switches and analysis rendering reuse the same stable hunks.
+The selected algorithm and both filter settings survive later change navigation
+in the open app but are not written into share URLs; a refresh restores Lexical
+mode with both filters off. The first 20 MoonBit diffs open automatically, while
+all other files load on demand. LineDiff keeps one shared cache. MoonBit files
+cache all eight Lexical/AST × comments/tests combinations independently, so
+layout switches and analysis rendering reuse the same stable hunks.
 
 Each downloaded side is limited to 1 MiB and 20,000 lines. Invalid UTF-8,
 NUL-containing, binary, and over-limit content keeps its file card and shows
@@ -64,10 +71,10 @@ apply.
 When the playground is served by its optional local Node backend, an
 **Analyze changes** action appears. It loads both sides of every changed file
 without expanding file cards, uses the current algorithm's cached `context=3`
-hunks (including the current comment setting), and asks OpenSeek to group them
+hunks (including both current filter settings), and asks OpenSeek to group them
 by cross-file function in descending review importance. AST files with no
-structural changes and MoonBit files containing only ignored comment or
-blank-line changes are listed as skipped; if the change has no analyzable
+structural changes and MoonBit files containing only ignored tests, comments,
+or blank-line changes are listed as skipped; if the change has no analyzable
 hunks, the browser reports that locally without calling the backend. After
 analysis, the ordered groups replace the file list:
 the most important group opens first, later groups stay collapsed until

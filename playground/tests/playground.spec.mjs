@@ -71,6 +71,77 @@ const plainCommentsNew = "// new plain-text note";
 const plainBlankLinesOld = "first plain line\nsecond plain line";
 const plainBlankLinesNew = "first plain line\n\nsecond plain line";
 
+const testsSha = "5555555555555555555555555555555555555555";
+const testsUrl = `https://github.com/example/tests/commit/${testsSha}`;
+const mixedTestsOld = [
+  'test "sample" { old_test() }',
+  "fn production() { old_value() }",
+].join("\n");
+const mixedTestsNew = [
+  'test "sample" { new_test() }',
+  "fn production() { new_value() }",
+].join("\n");
+const testsOnlyOld = [
+  "/// old test docs",
+  "///|UUID(old-test)",
+  'async test "sample" { old_test() }',
+].join("\n");
+const testsOnlyNew = [
+  "/// new test docs",
+  "///|UUID(new-test)",
+  'async test "renamed" { new_test() }',
+].join("\n");
+const combinedOnlyOld = [
+  "/// old production docs",
+  "fn stable() {}",
+  'test "sample" { old_test() }',
+].join("\n");
+const combinedOnlyNew = [
+  "/// new production docs",
+  "fn stable() {}",
+  'test "sample" { new_test() }',
+].join("\n");
+const plainTestsOld = 'test "plain" { old_value() }';
+const plainTestsNew = 'test "plain" { new_value() }';
+
+const testsCommit = {
+  sha: testsSha,
+  html_url: testsUrl,
+  commit: { message: "Exercise test filtering" },
+  parents: [{ sha: parentSha }],
+  stats: { additions: 5, deletions: 5, total: 10 },
+  files: [
+    {
+      filename: "src/mixed_tests.mbt",
+      status: "modified",
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+    },
+    {
+      filename: "src/tests_only.mbt",
+      status: "modified",
+      additions: 3,
+      deletions: 3,
+      changes: 6,
+    },
+    {
+      filename: "src/combined_only.mbt",
+      status: "modified",
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+    },
+    {
+      filename: "tests.txt",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+  ],
+};
+
 const commentsCommit = {
   sha: commentsSha,
   html_url: commentsUrl,
@@ -400,6 +471,52 @@ async function loadAlgorithmCommit(page, options) {
   await installAlgorithmRoutes(page, options);
   await page.goto("/");
   await page.getByLabel("Public GitHub commit or pull request URL").fill(algorithmUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page.locator("table.split").first()).toBeVisible();
+}
+
+async function installTestsRoutes(
+  page,
+  { testsOnly = false, health = false } = {},
+) {
+  if (health) await installAnalysisHealth(page);
+  const commit = testsOnly
+    ? { ...testsCommit, files: [testsCommit.files[1]] }
+    : testsCommit;
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    headers: { "access-control-allow-origin": "*" },
+    body: JSON.stringify(commit),
+  }));
+  await page.route("https://raw.githubusercontent.com/**", async route => {
+    const parts = new URL(route.request().url()).pathname.split("/");
+    const revision = parts[3];
+    const filename = decodeURIComponent(parts.slice(4).join("/"));
+    let body;
+    if (filename === "src/mixed_tests.mbt") {
+      body = revision === parentSha ? mixedTestsOld : mixedTestsNew;
+    } else if (filename === "src/tests_only.mbt") {
+      body = revision === parentSha ? testsOnlyOld : testsOnlyNew;
+    } else if (filename === "src/combined_only.mbt") {
+      body = revision === parentSha ? combinedOnlyOld : combinedOnlyNew;
+    } else {
+      body = revision === parentSha ? plainTestsOld : plainTestsNew;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+}
+
+async function loadTestsCommit(page, options) {
+  await installTestsRoutes(page, options);
+  await page.goto("/");
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(testsUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split").first()).toBeVisible();
 }
@@ -994,6 +1111,101 @@ test("Ignore comments skips blank-line-only MoonBit changes during analysis", as
   expect(analyzeCalls).toBe(0);
 });
 
+test("Ignore tests works across algorithms, layouts, combined filters, and narrow screens", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await loadTestsCommit(page);
+
+  const testsToggle = page.getByRole("button", { name: "Ignore tests" });
+  const commentsToggle = page.getByRole("button", { name: "Ignore comments" });
+  const mixedCard = page.locator(".file-card").filter({ hasText: "src/mixed_tests.mbt" });
+  const testsOnlyCard = page.locator(".file-card").filter({ hasText: "src/tests_only.mbt" });
+  const combinedCard = page.locator(".file-card").filter({ hasText: "src/combined_only.mbt" });
+  const plainCard = page.locator(".file-card").filter({ hasText: "tests.txt" });
+  const urlBeforeFilters = page.url();
+
+  await expect(testsToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(testsToggle).toHaveAttribute(
+    "title",
+    "Ignore top-level MoonBit test and async test blocks",
+  );
+  await plainCard.getByRole("button", { name: "Expand" }).click();
+  const plainHtml = await plainCard.locator(".diff-scroll").innerHTML();
+
+  await testsToggle.click();
+  await expect(testsToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(testsToggle).toHaveAttribute("title", "Show MoonBit test changes");
+  await expect(testsOnlyCard).toContainText(
+    "No changes besides MoonBit test blocks found. Turn off Ignore tests",
+  );
+  await expect(testsOnlyCard.locator("table")).toHaveCount(0);
+  await expect(mixedCard.locator("b.wd")).toContainText("old_value");
+  await expect(mixedCard.locator("b.wa")).toContainText("new_value");
+  await expect(mixedCard.locator("td.del")).not.toContainText("old_test");
+  await expect(mixedCard.locator("td.add")).not.toContainText("new_test");
+  await expect(combinedCard.locator("table.split")).toBeVisible();
+  await expect(plainCard.locator(".diff-scroll")).toHaveJSProperty("innerHTML", plainHtml);
+
+  await commentsToggle.click();
+  await expect(combinedCard).toContainText(
+    "No changes besides MoonBit test blocks, comments, or blank lines found",
+  );
+  await expect(combinedCard.locator("table")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "AST" }).click();
+  await expect(testsOnlyCard).toContainText(
+    "No structural changes besides MoonBit test blocks, comments, or blank lines found",
+  );
+  await expect(mixedCard.locator("b.wd")).toContainText("old_value");
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(mixedCard.locator("table.unified")).toBeVisible();
+  await expect(plainCard.locator("table.unified")).toBeVisible();
+  expect(page.url()).toBe(urlBeforeFilters);
+  expect(new URL(page.url()).search).toBe("");
+  expect(page.url()).not.toContain("ignore");
+
+  await page.setViewportSize({ width: 420, height: 900 });
+  const compact = await testsToggle.evaluate(button => ({
+    left: button.getBoundingClientRect().left,
+    right: button.getBoundingClientRect().right,
+    width: button.getBoundingClientRect().width,
+    labelDisplay: getComputedStyle(button.querySelector(".ignore-tests-label")).display,
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(compact.left).toBeGreaterThanOrEqual(0);
+  expect(compact.right).toBeLessThanOrEqual(420);
+  expect(compact.width).toBeLessThanOrEqual(36);
+  expect(compact.labelDisplay).toBe("none");
+  expect(compact.pageWidth).toBeLessThanOrEqual(compact.viewportWidth);
+});
+
+test("Ignore tests skips test-only MoonBit changes during analysis", async ({ page }) => {
+  let analyzeCalls = 0;
+  await page.route("**/api/analyze", async route => {
+    analyzeCalls += 1;
+    await route.fulfill({ status: 500, body: "unexpected" });
+  });
+  await loadTestsCommit(page, { testsOnly: true, health: true });
+  await page.getByRole("button", { name: "Ignore tests" }).click();
+  await expect(page.locator(".comment-empty")).toContainText(
+    "No changes besides MoonBit test blocks found",
+  );
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.getByRole("heading", { name: "Nothing to analyze" })).toBeVisible();
+  await expect(page.locator(".analysis-skipped")).toContainText("src/tests_only.mbt");
+  await expect(page.locator(".analysis-skipped")).toContainText(
+    "No changes besides MoonBit test blocks were found",
+  );
+  expect(analyzeCalls).toBe(0);
+
+  await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Analyze changes" }).click();
+  await expect(page.locator(".analysis-skipped")).toContainText(
+    "No structural changes besides MoonBit test blocks were found",
+  );
+  expect(analyzeCalls).toBe(0);
+});
+
 test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await loadAlgorithmCommit(page);
@@ -1069,12 +1281,14 @@ test("the selected algorithm survives later commit navigation without entering t
   await loadAlgorithmCommit(page);
   await page.getByRole("button", { name: "AST" }).click();
   await page.getByRole("button", { name: "Ignore comments" }).click();
+  await page.getByRole("button", { name: "Ignore tests" }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
   await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".structural-empty")).toBeVisible();
   await expect(page).toHaveURL(`/#/example/algorithms/commit/${nextSha}`);
   expect(new URL(page.url()).search).toBe("");
