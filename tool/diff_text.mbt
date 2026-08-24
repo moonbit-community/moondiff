@@ -295,6 +295,7 @@ pub fn diff_text(
     context=options.context_lines,
     graph_limit=options.graph_limit,
     ignore_comments=options.ignore_comments,
+    ignore_tests=options.ignore_tests,
   )
   let result = calculation.result
   let fallbacks = result.fallbacks
@@ -303,9 +304,17 @@ pub fn diff_text(
     Identical =>
       @render.render_file_headers(old_label, new_label, options.use_color) +
       "No changes.\n"
-    IgnoredOnly =>
+    IgnoredOnly => {
+      let message = if options.ignore_comments && options.ignore_tests {
+        "No changes besides MoonBit test blocks, comments, or blank lines.\n"
+      } else if options.ignore_tests {
+        "No changes besides MoonBit test blocks.\n"
+      } else {
+        "No changes besides comments or blank lines.\n"
+      }
       @render.render_file_headers(old_label, new_label, options.use_color) +
-      "No changes besides comments or blank lines.\n"
+      message
+    }
     NoStructuralChanges => ""
     Changed =>
       if fallbacks is [fallback] && fallback.scope is WholeFile {

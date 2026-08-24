@@ -71,6 +71,24 @@ priv struct ImplUnitInput {
 }
 
 ///|
+// The exact character location occupied by a top-level test unit. The range
+// starts at the first line-adjacent test-owned leading trivia node, so
+// documentation comments, UUID markers, and `///|` separators are excluded
+// together with the declaration while ordinary comments remain independent.
+priv struct IgnoredTestRange {
+  loc : @basic.Location
+}
+
+///|
+// Successful CST collection keeps test ranges separately from elaborated
+// implementation units. This ensures ignored tests never contribute syntax
+// roots, top-level alignment work, graph size, or computation budget.
+priv struct ImplCollection {
+  units : Array[ImplUnit]
+  ignored_tests : Array[IgnoredTestRange]
+}
+
+///|
 // The top-level edit script produced after reliable and fuzzy pairing.
 // Replacement means "diff these two roots"; delete/insert compare a real root
 // with an empty side.
@@ -333,6 +351,32 @@ fn root_child_is_visible(source : String, node : @cst.CstNode) -> Bool {
 }
 
 ///|
+// MoonBit documentation comments and structural UUID/separator markers all
+// use the own-line `///` family. Other comments remain visible unless the
+// caller independently enables comment filtering.
+fn test_owns_leading_trivia(source : String, node : @cst.CstNode) -> Bool {
+  is_ownline_comment(node) && cst_node_text(source, node).has_prefix("///")
+}
+
+///|
+// The parser keeps same-line trailing comments inside the test declaration's
+// outer CST node. They begin after the body location and remain independently
+// comparable even when the test syntax itself is excluded.
+fn test_trailing_comments(
+  item : @cst.CstNode,
+  test_end : @basic.Position,
+) -> Array[@cst.CstNode] {
+  let comments : Array[@cst.CstNode] = []
+  for entry in item.children {
+    let (_, child) = entry
+    if child.kind is Syntax_Comment && child.loc.start.cnum >= test_end.cnum {
+      comments.push(child)
+    }
+  }
+  comments
+}
+
+///|
 fn make_impl_unit(
   source : String,
   source_lines : ArrayView[String],
@@ -385,7 +429,11 @@ fn source_lines_slice(
 // Keep them with that declaration so documentation/UUID changes stay inside
 // the same independently rendered unit. Trailing comment-only content becomes
 // a final unit rather than disappearing from the structural diff.
-fn collect_impl_units(source : String, root : @cst.CstNode) -> Array[ImplUnit] {
+fn collect_impl_units_detailed(
+  source : String,
+  root : @cst.CstNode,
+  ignore_tests : Bool,
+) -> ImplCollection {
   let inputs = Array::new()
   let mut pending : Array[@cst.CstNode] = []
   for entry in root.children {
@@ -403,18 +451,52 @@ fn collect_impl_units(source : String, root : @cst.CstNode) -> Array[ImplUnit] {
     inputs.push(ImplUnitInput::{ nodes: pending, item: None })
   }
 
-  let node_groups = Array::new()
+  let retained_inputs : Array[ImplUnitInput] = []
+  let ignored_tests : Array[IgnoredTestRange] = []
   for input in inputs {
+    if ignore_tests && input.item is Some({ kind: Impl_Test, .. }) {
+      let item = input.item.unwrap()
+      let item_index = input.nodes.length() - 1
+      let mut ignored_start = item_index
+      let mut next_start_line = input.nodes[item_index].loc.start.lnum
+      while ignored_start > 0 &&
+            test_owns_leading_trivia(source, input.nodes[ignored_start - 1]) &&
+            input.nodes[ignored_start - 1].loc.end.lnum + 1 == next_start_line {
+        ignored_start -= 1
+        next_start_line = input.nodes[ignored_start].loc.start.lnum
+      }
+      if ignored_start > 0 {
+        retained_inputs.push(ImplUnitInput::{
+          nodes: input.nodes[:ignored_start].to_owned(),
+          item: None,
+        })
+      }
+      let first = input.nodes[ignored_start]
+      let test_end = first_child_node(item, "body")
+        .map(body => body.loc.end)
+        .unwrap_or(item.loc.end)
+      ignored_tests.push({ loc: { start: first.loc.start, end: test_end } })
+      let trailing = test_trailing_comments(item, test_end)
+      if !trailing.is_empty() {
+        retained_inputs.push({ nodes: trailing, item: None })
+      }
+    } else {
+      retained_inputs.push(input)
+    }
+  }
+
+  let node_groups = Array::new()
+  for input in retained_inputs {
     node_groups.push(input.nodes)
   }
   let roots = @elab.elab_cst_node_groups(source, node_groups)
   let source_lines = @source_text.split_lines(source)
   let units = Array::new()
-  for i in 0..<inputs.length() {
-    let input = inputs[i]
+  for i in 0..<retained_inputs.length() {
+    let input = retained_inputs[i]
     units.push(
       make_impl_unit(source, source_lines, input.nodes, input.item, roots[i]),
     )
   }
-  units
+  { units, ignored_tests }
 }

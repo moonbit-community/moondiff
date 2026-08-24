@@ -17,8 +17,9 @@ pub struct DiffOptions {
   context_lines : Int
   use_color : Bool
   ignore_comments : Bool
+  ignore_tests : Bool
 }
-pub fn DiffOptions::new(graph_limit? : UInt, context_lines? : Int, use_color? : Bool, ignore_comments? : Bool) -> Self
+pub fn DiffOptions::new(graph_limit? : UInt, context_lines? : Int, use_color? : Bool, ignore_comments? : Bool, ignore_tests? : Bool) -> Self
 pub impl Default for DiffOptions
 
 pub struct DiffResult {

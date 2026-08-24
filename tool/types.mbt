@@ -1,12 +1,13 @@
 ///|UUID(199e1683-8dce-4b5b-ade5-21d8199f249b)
 // Diff options kept by the public text-diff entry point. This is a small
 // subset of difftastic's display options: graph size, context radius, comment
-// filtering, and whether the renderer should emit ANSI colors.
+// and test filtering, and whether the renderer should emit ANSI colors.
 pub struct DiffOptions {
   graph_limit : UInt
   context_lines : Int
   use_color : Bool
   ignore_comments : Bool
+  ignore_tests : Bool
 }
 
 ///|UUID(4b4b0094-f004-4736-8152-8313861cbdf7)
@@ -17,9 +18,10 @@ pub fn DiffOptions::new(
   context_lines? : Int = 3,
   use_color? : Bool = false,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> Self {
   let context_lines = if context_lines < 0 { 0 } else { context_lines }
-  { graph_limit, context_lines, use_color, ignore_comments }
+  { graph_limit, context_lines, use_color, ignore_comments, ignore_tests }
 }
 
 ///|UUID(67af8150-11cf-4e6a-93e4-32813df70c26)
