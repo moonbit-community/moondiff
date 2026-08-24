@@ -6,11 +6,11 @@ import {
 }
 
 // Values
-pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> DiffCalculation
+pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool) -> DiffCalculation
 
-pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> AlignedDiffResult
+pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool) -> AlignedDiffResult
 
-pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> DetailedDiffResult
+pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool) -> DetailedDiffResult
 
 // Errors
 

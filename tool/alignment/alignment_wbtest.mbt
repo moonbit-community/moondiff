@@ -45,7 +45,7 @@ fn parse_units(source : String) -> Array[ImplUnit] {
   if !result.diagnostics_view().is_empty() {
     panic()
   }
-  collect_impl_units(source, result.root())
+  collect_impl_units_detailed(source, result.root(), false).units
 }
 
 ///|
@@ -140,6 +140,87 @@ test "implementation units cache their source slices" {
   @debug.assert_eq(units.length(), 2)
   @debug.assert_eq(units[0].source, "/// leading a\nfn a() {\n  first()\n}")
   @debug.assert_eq(units[1].source, "/// leading b\nfn b() { second() }")
+}
+
+///|
+test "ignored test collection excludes roots and records leading trivia" {
+  let source =
+    #|fn production() {}
+    #|
+    #|/// test docs
+    #|///|UUID(test-id)
+    #|async test "sample" {
+    #|  inspect(1)
+    #|}
+  let parsed = @cst.parse_structure(source)
+  assert_true(parsed.diagnostics_view().is_empty())
+  let collection = collect_impl_units_detailed(source, parsed.root(), true)
+  @debug.assert_eq(collection.units.length(), 1)
+  @debug.assert_eq(collection.units[0].semantic_key, Some("fn:::production"))
+  @debug.assert_eq(collection.ignored_tests.length(), 1)
+  let ignored = collection.ignored_tests[0].loc
+  @debug.assert_eq((ignored.start.lnum, ignored.start.column()), (3, 1))
+  @debug.assert_eq((ignored.end.lnum, ignored.end.column()), (7, 2))
+}
+
+///|
+test "ignored test collection preserves ordinary leading comments" {
+  let source =
+    #|fn production() {}
+    #|// retained line comment
+    #|// retained second comment
+    #|/// test docs
+    #|///|UUID(test-id)
+    #|test "sample" { inspect(1) }
+  let parsed = @cst.parse_structure(source)
+  assert_true(parsed.diagnostics_view().is_empty())
+  let collection = collect_impl_units_detailed(source, parsed.root(), true)
+  @debug.assert_eq(collection.units.length(), 2)
+  @debug.assert_eq(collection.units[1].semantic_key, None)
+  @debug.assert_eq(
+    collection.units[1].source,
+    "// retained line comment\n// retained second comment",
+  )
+  @debug.assert_eq(collection.ignored_tests.length(), 1)
+  let ignored = collection.ignored_tests[0].loc
+  @debug.assert_eq((ignored.start.lnum, ignored.start.column()), (4, 1))
+  @debug.assert_eq((ignored.end.lnum, ignored.end.column()), (6, 29))
+}
+
+///|
+test "ignored test docs stop at a blank line" {
+  let source =
+    #|/// retained production docs
+    #|
+    #|/// owned test docs
+    #|test "sample" { inspect(1) }
+  let parsed = @cst.parse_structure(source)
+  assert_true(parsed.diagnostics_view().is_empty())
+  let collection = collect_impl_units_detailed(source, parsed.root(), true)
+  @debug.assert_eq(collection.units.length(), 1)
+  @debug.assert_eq(collection.units[0].source, "/// retained production docs")
+  @debug.assert_eq(collection.ignored_tests.length(), 1)
+  @debug.assert_eq(collection.ignored_tests[0].loc.start.lnum, 3)
+}
+
+///|
+test "ordinary comments interrupt ignored test doc ownership" {
+  let source =
+    #|/// retained earlier docs
+    #|// ordinary ownership boundary
+    #|/// owned test docs
+    #|///|UUID(test-id)
+    #|test "sample" { inspect(1) }
+  let parsed = @cst.parse_structure(source)
+  assert_true(parsed.diagnostics_view().is_empty())
+  let collection = collect_impl_units_detailed(source, parsed.root(), true)
+  @debug.assert_eq(collection.units.length(), 1)
+  @debug.assert_eq(
+    collection.units[0].source,
+    "/// retained earlier docs\n// ordinary ownership boundary",
+  )
+  @debug.assert_eq(collection.ignored_tests.length(), 1)
+  @debug.assert_eq(collection.ignored_tests[0].loc.start.lnum, 3)
 }
 
 ///|
@@ -1395,6 +1476,95 @@ fn changed_segment_text(document : @model.DiffDocument) -> String {
 }
 
 ///|
+fn segment_text_with_kind(
+  document : @model.DiffDocument,
+  kind : @model.DiffSegmentKind,
+) -> String {
+  let buf = StringBuilder()
+  fn append_line(
+    buf : StringBuilder,
+    line : @model.DiffLine,
+    kind : @model.DiffSegmentKind,
+  ) -> Unit {
+    for segment in line.segments {
+      if segment.kind == kind {
+        buf.write_string(segment.text)
+      }
+    }
+  }
+
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      match block {
+        ContextBlock(_) => ()
+        ChangeBlock(rows) | IgnoredBlock(rows) =>
+          for row in rows {
+            match row {
+              Paired(old_line, new_line) => {
+                append_line(buf, old_line, kind)
+                append_line(buf, new_line, kind)
+              }
+              OldOnly(line) | NewOnly(line) => append_line(buf, line, kind)
+            }
+          }
+      }
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn diff_rows_side_index_count(
+  rows : ArrayView[@model.DiffRow],
+  index : Int,
+  old_side : Bool,
+) -> Int {
+  let mut count = 0
+  for row in rows {
+    match row {
+      Paired(old_line, new_line) => {
+        let line = if old_side { old_line } else { new_line }
+        if line.index == index {
+          count += 1
+        }
+      }
+      OldOnly(line) => if old_side && line.index == index { count += 1 }
+      NewOnly(line) => if !old_side && line.index == index { count += 1 }
+    }
+  }
+  count
+}
+
+///|
+fn document_side_index_count(
+  document : @model.DiffDocument,
+  index : Int,
+  old_side : Bool,
+) -> Int {
+  let mut count = 0
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      match block {
+        ContextBlock(lines) =>
+          for line in lines {
+            let line_index = if old_side {
+              line.old_index
+            } else {
+              line.new_index
+            }
+            if line_index == index {
+              count += 1
+            }
+          }
+        ChangeBlock(rows) | IgnoredBlock(rows) =>
+          count += diff_rows_side_index_count(rows, index, old_side)
+      }
+    }
+  }
+  count
+}
+
+///|
 fn ast_segment_summary(
   segments : ArrayView[@model.DiffSegment],
 ) -> Array[String] {
@@ -1597,6 +1767,435 @@ test "aligned documents ignore comments in both modes" {
   assert_false(
     diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
   )
+}
+
+///|
+test "aligned documents ignore named anonymous and async tests" {
+  let cases = [
+    ("test { inspect(1) }", "test { inspect(2) }"),
+    ("test \"named\" { inspect(1) }", "test \"renamed\" { inspect(2) }"),
+    ("async test \"named\" { run_old() }", "async test \"named\" { run_new() }"),
+    ("", "test \"inserted\" { inspect(1) }"),
+    ("test \"deleted\" { inspect(1) }", ""),
+    (
+      "test \"first\" { one() }\ntest \"second\" { two() }", "test \"second\" { changed() }\ntest \"first\" { one() }",
+    ),
+  ]
+  for sources in cases {
+    let (old_source, new_source) = sources
+    for mode in [Lexical, Ast] {
+      let result = diff_document(
+        old_source,
+        new_source,
+        mode,
+        ignore_tests=true,
+      )
+      assert_true(result.outcome is NoNonCommentChanges)
+      assert_true(result.document.hunks.is_empty())
+    }
+    assert_false(
+      diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
+    )
+  }
+}
+
+///|
+test "ignore tests owns leading docs UUIDs separators and surrounding blanks" {
+  let old_source =
+    #|fn stable() {}
+    #|
+    #|/// old docs
+    #|///|UUID(old-id)
+    #|test "old" { inspect(1) }
+  let new_source = "fn stable() {}"
+  for mode in [Lexical, Ast] {
+    let result = diff_document(old_source, new_source, mode, ignore_tests=true)
+    assert_true(result.outcome is NoNonCommentChanges)
+    assert_true(result.document.hunks.is_empty())
+  }
+}
+
+///|
+test "same-line test changes are neutral while suffix comments stay visible" {
+  let old_same = "test \"sample\" { old_test() } // stable ordinary note"
+  let new_same = "test \"sample\" { new_test() } // stable ordinary note"
+  let old_changed = "test \"sample\" { old_test() } // old ordinary note"
+  let new_changed = "test \"sample\" { new_test() } // new ordinary note"
+  let parsed = @cst.parse_structure(old_changed)
+  assert_true(parsed.diagnostics_view().is_empty())
+  let collection = collect_impl_units_detailed(old_changed, parsed.root(), true)
+  @debug.assert_eq(
+    (
+      collection.ignored_tests[0].loc.start.column(),
+      collection.ignored_tests[0].loc.end.column(),
+    ),
+    (1, 29),
+  )
+  let projection = make_source_projection(old_changed, collection.ignored_tests)
+  @debug.assert_eq(projection.lines, ["// old ordinary note"])
+  for mode in [Lexical, Ast] {
+    let ignored_only = diff_document(
+      old_same,
+      new_same,
+      mode,
+      ignore_tests=true,
+    )
+    assert_true(ignored_only.outcome is NoNonCommentChanges)
+    assert_true(ignored_only.document.hunks.is_empty())
+
+    let comments_visible = diff_document(
+      old_changed,
+      new_changed,
+      mode,
+      context=0,
+      ignore_tests=true,
+    )
+    assert_false(
+      comments_visible.document.hunks.is_empty(),
+      msg=if mode is Lexical { "Lexical" } else { "Ast" },
+    )
+    let changed = changed_segment_text(comments_visible.document)
+    let ignored = segment_text_with_kind(
+      comments_visible.document,
+      @model.DiffSegmentKind::Ignored,
+    )
+    let patch = @tokdiff_text.render_unified_hunks(comments_visible.document).join(
+      "",
+    )
+    assert_true(changed.contains("old"), msg=changed)
+    assert_true(changed.contains("new"), msg=changed)
+    assert_false(changed.contains("_test"), msg=changed)
+    assert_true(ignored.contains("old_test"), msg=ignored)
+    assert_true(ignored.contains("new_test"), msg=ignored)
+    assert_true(patch.contains(old_changed), msg=patch)
+    assert_true(patch.contains(new_changed), msg=patch)
+
+    let both = diff_document(
+      old_changed,
+      new_changed,
+      mode,
+      ignore_comments=true,
+      ignore_tests=true,
+    )
+    assert_true(both.outcome is NoNonCommentChanges)
+    assert_true(both.document.hunks.is_empty())
+  }
+}
+
+///|
+test "unchanged projected suffixes restore differing tests as ignored rows" {
+  let old_source =
+    #|test "sample" { old_test() } // stable ordinary note
+    #|fn production() { old_value() }
+  let new_source =
+    #|test "sample" { new_test() } // stable ordinary note
+    #|fn production() { new_value() }
+  for mode in [Lexical, Ast] {
+    let result = diff_document(
+      old_source,
+      new_source,
+      mode,
+      context=1,
+      ignore_tests=true,
+    )
+    let ignored_test_row = Ref(false)
+    for hunk in result.document.hunks {
+      for block in hunk.blocks {
+        if block is IgnoredBlock(rows) {
+          for row in rows {
+            if row is Paired({ index: 0, .. }, { index: 0, .. }) {
+              ignored_test_row.val = true
+            }
+          }
+        }
+      }
+    }
+    assert_true(ignored_test_row.val)
+    let changed = changed_segment_text(result.document)
+    assert_true(changed.contains("old_value"), msg=changed)
+    assert_true(changed.contains("new_value"), msg=changed)
+    assert_false(changed.contains("_test"), msg=changed)
+    assert_false(changed.contains("ordinary note"), msg=changed)
+  }
+}
+
+///|
+test "per-unit projections do not restore a same-line test prefix" {
+  let old_source =
+    #|test "sample" { old_test() } // old unit note
+    #|///|UUID(production-id)
+    #|fn production() { stable_value() }
+  let new_source =
+    #|test "sample" { new_test() } // new unit note
+    #|///|UUID(production-id)
+    #|fn production() { stable_value() }
+  for mode in [Lexical, Ast] {
+    let result = diff_document(
+      old_source,
+      new_source,
+      mode,
+      context=0,
+      ignore_tests=true,
+    )
+    assert_false(result.document.hunks.is_empty())
+    let changed = changed_segment_text(result.document)
+    let ignored = segment_text_with_kind(
+      result.document,
+      @model.DiffSegmentKind::Ignored,
+    )
+    assert_true(changed.contains("old"), msg=changed)
+    assert_true(changed.contains("new"), msg=changed)
+    assert_false(changed.contains("_test"), msg=changed)
+    assert_true(ignored.contains("old_test"), msg=ignored)
+    assert_true(ignored.contains("new_test"), msg=ignored)
+    @debug.assert_eq(document_side_index_count(result.document, 0, true), 1)
+    @debug.assert_eq(document_side_index_count(result.document, 0, false), 1)
+  }
+}
+
+///|
+test "Unicode CRLF projections preserve suffixes indexes and nearby code" {
+  let old_source = "test \"😀\" { old_test() } // 注释旧\r\nfn production() { old_value() }\r\n"
+  let new_source = "test \"😀\" { new_test() } // 注释新\r\nfn production() { new_value() }\r\n"
+  for mode in [Lexical, Ast] {
+    let result = diff_document(
+      old_source,
+      new_source,
+      mode,
+      context=0,
+      ignore_tests=true,
+    )
+    assert_false(result.document.hunks.is_empty())
+    let changed = changed_segment_text(result.document)
+    let ignored = segment_text_with_kind(
+      result.document,
+      @model.DiffSegmentKind::Ignored,
+    )
+    let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+    assert_true(changed.contains("旧"), msg=changed)
+    assert_true(changed.contains("新"), msg=changed)
+    assert_true(changed.contains("old_value"), msg=changed)
+    assert_true(changed.contains("new_value"), msg=changed)
+    assert_false(changed.contains("_test"), msg=changed)
+    assert_true(ignored.contains("😀"), msg=ignored)
+    assert_true(
+      patch.contains("test \"😀\" { old_test() } // 注释旧"),
+      msg=patch,
+    )
+    assert_true(
+      patch.contains("test \"😀\" { new_test() } // 注释新"),
+      msg=patch,
+    )
+    @debug.assert_eq(document_side_index_count(result.document, 0, true), 1)
+    @debug.assert_eq(document_side_index_count(result.document, 0, false), 1)
+    @debug.assert_eq(document_side_index_count(result.document, 1, true), 1)
+    @debug.assert_eq(document_side_index_count(result.document, 1, false), 1)
+  }
+}
+
+///|
+test "asymmetric ignored test gaps do not duplicate production lines" {
+  let short_source =
+    #|test "sample" { short_test() }
+    #|fn production() { old_prod() }
+  let long_source =
+    #|test "sample" {
+    #|  long_test()
+    #|  extra_test_step()
+    #|}
+    #|fn production() { new_prod() }
+  let cases = [
+    (short_source, long_source, 1, 4),
+    (long_source, short_source, 4, 1),
+  ]
+  for sources in cases {
+    let (old_source, new_source, old_production_line, new_production_line) = sources
+    for mode in [Lexical, Ast] {
+      let result = diff_document(
+        old_source,
+        new_source,
+        mode,
+        context=0,
+        ignore_tests=true,
+      )
+      let changed = changed_segment_text(result.document)
+      assert_true(changed.contains("prod"), msg=changed)
+      assert_false(changed.contains("test"), msg=changed)
+      @debug.assert_eq(
+        document_side_index_count(result.document, old_production_line, true),
+        1,
+      )
+      @debug.assert_eq(
+        document_side_index_count(result.document, new_production_line, false),
+        1,
+      )
+    }
+  }
+}
+
+///|
+test "ignore tests preserves ordinary comments independently" {
+  let old_comment = "// old ordinary note"
+  let new_comment = "// new ordinary note"
+  let old_source =
+    $|fn stable() {}
+    $|\{old_comment}
+    $|/// old test docs
+    $|///|UUID(old-test-id)
+    $|test "old" { old_test() }
+  let new_source =
+    $|fn stable() {}
+    $|\{new_comment}
+    $|/// new test docs
+    $|///|UUID(new-test-id)
+    $|test "new" { new_test() }
+  for mode in [Lexical, Ast] {
+    let tests_only = diff_document(
+      old_source,
+      new_source,
+      mode,
+      ignore_tests=true,
+    )
+    assert_false(tests_only.document.hunks.is_empty())
+    let changed = changed_segment_text(tests_only.document)
+    let patch = @tokdiff_text.render_unified_hunks(tests_only.document).join("")
+    assert_true(patch.contains(old_comment), msg=patch)
+    assert_true(patch.contains(new_comment), msg=patch)
+    assert_false(changed.contains("test docs"), msg=changed)
+    assert_false(changed.contains("_test"), msg=changed)
+
+    let both = diff_document(
+      old_source,
+      new_source,
+      mode,
+      ignore_comments=true,
+      ignore_tests=true,
+    )
+    assert_true(both.outcome is NoNonCommentChanges)
+    assert_true(both.document.hunks.is_empty())
+  }
+}
+
+///|
+test "ignore tests reports only mixed production changes and keeps test imports" {
+  let old_source =
+    #|import { "old/helper" } for "test"
+    #|test "sample" { test_old() }
+    #|fn production() { prod_old() }
+  let new_source =
+    #|import { "new/helper" } for "test"
+    #|test "sample" { test_new() }
+    #|fn production() { prod_new() }
+  for mode in [Lexical, Ast] {
+    let result = diff_document(
+      old_source,
+      new_source,
+      mode,
+      context=0,
+      ignore_tests=true,
+    )
+    assert_false(result.document.hunks.is_empty())
+    let changed = changed_segment_text(result.document)
+    let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+    assert_true(patch.contains("old/helper"), msg=patch)
+    assert_true(patch.contains("new/helper"), msg=patch)
+    assert_true(changed.contains("prod_"), msg=changed)
+    assert_false(changed.contains("test_old"), msg=changed)
+    assert_false(changed.contains("test_new"), msg=changed)
+  }
+}
+
+///|
+test "comment and test filters compose independently" {
+  let old_source =
+    #|/// old production docs
+    #|fn stable() {}
+    #|test "sample" { old_test() }
+  let new_source =
+    #|/// new production docs
+    #|fn stable() {}
+    #|test "sample" { new_test() }
+  for mode in [Lexical, Ast] {
+    let tests_only = diff_document(
+      old_source,
+      new_source,
+      mode,
+      ignore_tests=true,
+    )
+    assert_false(tests_only.document.hunks.is_empty())
+    let both = diff_document(
+      old_source,
+      new_source,
+      mode,
+      ignore_comments=true,
+      ignore_tests=true,
+    )
+    assert_true(both.outcome is NoNonCommentChanges)
+    assert_true(both.document.hunks.is_empty())
+  }
+}
+
+///|
+test "successful graph and computation fallbacks still exclude tests" {
+  let old_source =
+    #|test "sample" { test_old() } // old fallback note
+    #|fn production() { "alpha beta gamma" }
+  let new_source =
+    #|test "sample" { test_new() } // new fallback note
+    #|fn production() { "alpha zeta gamma" }
+  let graph = diff_document(
+    old_source,
+    new_source,
+    Ast,
+    context=0,
+    graph_limit=0,
+    ignore_tests=true,
+  )
+  assert_true(graph.outcome is PartialFallback(_))
+  let graph_changed = changed_segment_text(graph.document)
+  assert_true(
+    graph_changed.contains("beta") || graph_changed.contains("zeta"),
+    msg=graph_changed,
+  )
+  assert_true(graph_changed.contains("old"), msg=graph_changed)
+  assert_true(graph_changed.contains("new"), msg=graph_changed)
+  assert_false(graph_changed.contains("test_"), msg=graph_changed)
+
+  let computation = calculate_diff_document_with_limit(
+    old_source,
+    new_source,
+    "old",
+    "new",
+    0,
+    3_000_000,
+    false,
+    0,
+    ignore_tests=true,
+  )
+  assert_true(computation.result.fallbacks is [_, ..])
+  let computation_changed = changed_segment_text(computation.result.document)
+  assert_true(
+    computation_changed.contains("beta") || computation_changed.contains("zeta"),
+    msg=computation_changed,
+  )
+  assert_true(computation_changed.contains("old"), msg=computation_changed)
+  assert_true(computation_changed.contains("new"), msg=computation_changed)
+  assert_false(computation_changed.contains("test_"), msg=computation_changed)
+}
+
+///|
+test "parse failure preserves the existing unfiltered test fallback" {
+  let result = diff_document(
+    "test \"sample\" { old_value( }",
+    "test \"sample\" { new_value( }",
+    Ast,
+    context=0,
+    ignore_tests=true,
+  )
+  assert_true(result.outcome is Fallback(_))
+  let changed = changed_segment_text(result.document)
+  assert_true(changed.contains("old_value"), msg=changed)
+  assert_true(changed.contains("new_value"), msg=changed)
 }
 
 ///|

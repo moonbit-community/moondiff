@@ -4,6 +4,7 @@ pub(all) enum DiffStatus {
   Identical
   Changed
   NoStructuralChanges
+  /// The inputs differ only in content excluded by enabled filters.
   IgnoredOnly
 } derive(Debug, Eq)
 

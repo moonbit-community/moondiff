@@ -5,6 +5,7 @@ struct DiffOptions {
   context_lines : Int
   graph_limit : UInt
   ignore_comments : Bool
+  ignore_tests : Bool
 }
 
 ///|
@@ -13,6 +14,7 @@ pub fn DiffOptions::new(
   context_lines? : Int = 3,
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> DiffOptions {
   {
     context_lines: if context_lines < 0 {
@@ -22,6 +24,7 @@ pub fn DiffOptions::new(
     },
     graph_limit,
     ignore_comments,
+    ignore_tests,
   }
 }
 

@@ -12,7 +12,7 @@ pub fn diff(String, String, options? : DiffOptions) -> DiffResult
 
 // Types and methods
 type DiffOptions
-pub fn DiffOptions::new(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool) -> Self
+pub fn DiffOptions::new(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool) -> Self
 pub impl Default for DiffOptions
 
 type DiffResult

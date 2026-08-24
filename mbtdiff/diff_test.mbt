@@ -46,6 +46,50 @@ test "public status contract" {
   )
   assert_true(ignored.status() is IgnoredOnly)
   assert_true(ignored.document().hunks.is_empty())
+
+  let ignored_tests = @mbtdiff.diff(
+    "test \"sample\" { old_value() }",
+    "test \"sample\" { new_value() }",
+    options=@mbtdiff.DiffOptions::new(ignore_tests=true),
+  )
+  assert_true(ignored_tests.status() is IgnoredOnly)
+  assert_true(ignored_tests.document().hunks.is_empty())
+
+  let tests_default = @mbtdiff.diff(
+    "test \"sample\" { old_value() }", "test \"sample\" { new_value() }",
+  )
+  assert_true(tests_default.status() is Changed)
+  assert_false(tests_default.document().hunks.is_empty())
+}
+
+///|
+test "public test filtering composes and keeps production changes" {
+  let old_source =
+    #|/// old docs
+    #|fn production() { old_value() }
+    #|test "sample" { old_test() }
+  let new_source =
+    #|/// new docs
+    #|fn production() { new_value() }
+    #|test "sample" { new_test() }
+  let result = @mbtdiff.diff(
+    old_source,
+    new_source,
+    options=@mbtdiff.DiffOptions::new(ignore_comments=true, ignore_tests=true),
+  )
+  assert_true(result.status() is Changed)
+  assert_true(
+    document_has_changed_segment_containing(result.document(), "old_value"),
+  )
+  assert_true(
+    document_has_changed_segment_containing(result.document(), "new_value"),
+  )
+  assert_false(
+    document_has_changed_segment_containing(result.document(), "old_test"),
+  )
+  assert_false(
+    document_has_changed_segment_containing(result.document(), "new_test"),
+  )
 }
 
 ///|

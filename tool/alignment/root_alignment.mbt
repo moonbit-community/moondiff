@@ -239,54 +239,6 @@ fn impl_line_base(unit : ImplUnit?) -> Int {
   }
 }
 
-///|UUID(92c64499-ea3f-4acd-8121-453b75789ee2)
-// Return the source text cached while collecting implementation units. The
-// corresponding line base keeps hunk headers referring to original file lines.
-fn source_slice(unit : ImplUnit?) -> String {
-  if unit is Some(unit) {
-    unit.source
-  } else {
-    ""
-  }
-}
-
-///|UUID(4d521cbe-fba0-481f-a4c4-bb73a4787f81)
-fn rebase_span(
-  span : @span.SingleLineSpan,
-  delta : Int,
-) -> @span.SingleLineSpan {
-  @span.SingleLineSpan::{
-    line: span.line - delta,
-    start_col: span.start_col,
-    end_col: span.end_col,
-  }
-}
-
-///|UUID(34c71798-ef33-4462-bbc6-a6d7965ade32)
-// Per-unit diffs run on sliced source text. Rebase structural positions so the
-// renderer can operate on the slice while hunk labels keep the original line
-// numbers.
-fn rebase_matched_positions(
-  positions : ArrayView[MatchedPos],
-  own_delta : Int,
-  opposite_delta : Int,
-) -> Array[MatchedPos] {
-  let rebased = Array::new()
-  for position in positions {
-    let kind = match position.kind {
-      Novel => MatchKind::Novel
-      Unchanged(opposite_pos~) =>
-        MatchKind::Unchanged(
-          opposite_pos=opposite_pos.map(fn(span) {
-            rebase_span(span, opposite_delta)
-          }),
-        )
-    }
-    rebased.push(MatchedPos::{ kind, pos: rebase_span(position.pos, own_delta) })
-  }
-  rebased
-}
-
 ///|UUID(58ac384d-5e05-4e16-8ced-e465cedf4774)
 fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
   let roots = Array::new()
