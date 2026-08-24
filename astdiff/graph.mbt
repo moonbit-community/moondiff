@@ -515,14 +515,14 @@ fn set_neighbours(
       // gets a replacement edge; the edit distance becomes part of the edge
       // cost instead of a construction-time threshold.
       if lhs_kind == rhs_kind && lhs_content != rhs_content {
-        let similarity = match budget {
-          Some(budget) =>
-            normalized_levenshtein_with_budget(
-              lhs=lhs_content,
-              rhs=rhs_content,
-              budget,
-            )
-          None => normalized_levenshtein(lhs=lhs_content, rhs=rhs_content)
+        let similarity = if budget is Some(budget) {
+          normalized_levenshtein_with_budget(
+            lhs=lhs_content,
+            rhs=rhs_content,
+            budget,
+          )
+        } else {
+          normalized_levenshtein(lhs=lhs_content, rhs=rhs_content)
         }
         let levenshtein_pct = (similarity * 100.0).round().to_uint()
         let edge = if lhs_kind is Comment {

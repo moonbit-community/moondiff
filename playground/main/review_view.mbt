@@ -9,18 +9,18 @@ fn review_segment_nodes(
   if !prefix.is_empty() {
     nodes.push(@html.span(class="diff-prefix", prefix))
   }
-  match segments {
-    Some(segments) =>
-      for segment in segments {
-        nodes.push(
-          match segment.kind {
-            Unchanged => @html.span(segment.text)
-            Changed => @html.b(class=changed_class, segment.text)
-            Ignored => @html.span(class="ignored-context", segment.text)
-          },
-        )
-      }
-    None => nodes.push(@html.span(text.unwrap_or("")))
+  if segments is Some(segments) {
+    for segment in segments {
+      nodes.push(
+        match segment.kind {
+          Unchanged => @html.span(segment.text)
+          Changed => @html.b(class=changed_class, segment.text)
+          Ignored => @html.span(class="ignored-context", segment.text)
+        },
+      )
+    }
+  } else {
+    nodes.push(@html.span(text.unwrap_or("")))
   }
   nodes
 }

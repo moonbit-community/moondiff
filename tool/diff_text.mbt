@@ -58,9 +58,10 @@ fn fallback_reason_text(
 
 ///|
 fn section_label(label : String, range : @model.LineRange?) -> String {
-  match range {
-    None => label
-    Some(range) => "\{label}: line \{range.start + 1}"
+  if range is Some(range) {
+    "\{label}: line \{range.start + 1}"
+  } else {
+    label
   }
 }
 
@@ -70,16 +71,16 @@ fn range_overlaps_hunk(
   start : Int,
   len : Int,
 ) -> Bool {
-  match range {
-    None => false
-    Some(range) =>
-      if len == 0 {
-        range.start <= start && start <= range.start + range.len
-      } else if range.len == 0 {
-        start <= range.start && range.start <= start + len
-      } else {
-        start < range.start + range.len && range.start < start + len
-      }
+  if range is Some(range) {
+    if len == 0 {
+      range.start <= start && start <= range.start + range.len
+    } else if range.len == 0 {
+      start <= range.start && range.start <= start + len
+    } else {
+      start < range.start + range.len && range.start < start + len
+    }
+  } else {
+    false
   }
 }
 
@@ -127,9 +128,10 @@ fn hunk_matches_section(
 
 ///|
 fn section_max_line(range : @model.LineRange?) -> Int {
-  match range {
-    None => 1
-    Some(range) => @cmp.maximum(range.start + range.len, 1)
+  if range is Some(range) {
+    @cmp.maximum(range.start + range.len, 1)
+  } else {
+    1
   }
 }
 

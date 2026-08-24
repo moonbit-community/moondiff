@@ -140,20 +140,18 @@ fn review_can_comment(review : ReviewState) -> Bool {
 fn auth_status_from_api(status : ApiAuthStatus) -> AuthStatus {
   if status.authenticated {
     SignedIn(status.login)
+  } else if status.device_flow is Some(flow) {
+    DeviceAuthorizing({
+      flow_id: flow.flow_id,
+      user_code: flow.user_code,
+      verification_uri: flow.verification_uri,
+      expires_in: flow.expires_in,
+      poll_after: flow.poll_after,
+      install_url: status.install_url,
+      copy_status: DeviceCodeCopyReady,
+    })
   } else {
-    match status.device_flow {
-      Some(flow) =>
-        DeviceAuthorizing({
-          flow_id: flow.flow_id,
-          user_code: flow.user_code,
-          verification_uri: flow.verification_uri,
-          expires_in: flow.expires_in,
-          poll_after: flow.poll_after,
-          install_url: status.install_url,
-          copy_status: DeviceCodeCopyReady,
-        })
-      None => Anonymous(status.install_url)
-    }
+    Anonymous(status.install_url)
   }
 }
 
@@ -656,9 +654,10 @@ fn commit_discussions(
   comments : ArrayView[ApiCommitComment],
 ) -> Array[CommitDiscussion] {
   comments.map(comment => {
-    let file_index = match comment.path {
-      Some(path) => find_file_index(view, path)
-      None => None
+    let file_index = if comment.path is Some(path) {
+      find_file_index(view, path)
+    } else {
+      None
     }
     { comment, file_index, outdated: commit_comment_outdated(view, comment) }
   })

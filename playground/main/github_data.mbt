@@ -246,10 +246,10 @@ fn branch_repository(
   branch : ApiPullBranch,
   fallback : RepositoryRef,
 ) -> RepositoryRef {
-  match branch.repo {
-    Some(repository) =>
-      repository_from_full_name(repository.full_name).unwrap_or(fallback)
-    None => fallback
+  if branch.repo is Some(repository) {
+    repository_from_full_name(repository.full_name).unwrap_or(fallback)
+  } else {
+    fallback
   }
 }
 
