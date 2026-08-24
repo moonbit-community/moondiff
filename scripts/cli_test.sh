@@ -11,6 +11,11 @@ ast_diff_ignore_comments() {
   moonrun ./_build/wasm/release/build/moondiff.wasm --ignore-comments "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
 }
 
+ast_diff_ignore_tests() {
+  name=$1
+  moonrun ./_build/wasm/release/build/moondiff.wasm --ignore-tests "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
+}
+
 moon build --target wasm --release
 
 ast_diff "20251114"
@@ -24,3 +29,4 @@ ast_diff "20260814"
 ast_diff "20260820"
 ast_diff_ignore_comments "ignore_comments"
 ast_diff_ignore_comments "ignore_blank_lines"
+ast_diff_ignore_tests "ignore_tests"

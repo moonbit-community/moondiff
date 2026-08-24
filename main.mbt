@@ -8,6 +8,7 @@ priv struct CliOptions {
   graph_limit_text : String
   use_color : Bool
   ignore_comments : Bool
+  ignore_tests : Bool
 }
 
 ///|UUID(9d8d9872-ee94-460e-99e1-8590c4ea178f)
@@ -73,6 +74,11 @@ fn moondiff_command() -> @argparse.Command {
         about="Ignore MoonBit comment-only and blank-line-only differences",
         action=@argparse.FlagAction::SetTrue,
       ),
+      @argparse.FlagArg(
+        "ignore-tests",
+        about="Ignore top-level MoonBit test and async test blocks",
+        action=@argparse.FlagAction::SetTrue,
+      ),
     ],
     positionals=[
       @argparse.PositionArg("old-file", num_args=@argparse.ValueRange::single()),
@@ -98,6 +104,7 @@ fn parse_cli_args(argv : ArrayView[String]) -> CliOptions raise {
     graph_limit_text: single_value(matches, "graph-limit"),
     use_color: matches.flags.get("no-color").unwrap_or(true),
     ignore_comments: matches.flags.get("ignore-comments").unwrap_or(false),
+    ignore_tests: matches.flags.get("ignore-tests").unwrap_or(false),
   }
 }
 
@@ -129,6 +136,7 @@ fn render_cli_diff(
         context_lines=3,
         use_color=options.use_color,
         ignore_comments=options.ignore_comments,
+        ignore_tests=options.ignore_tests,
       ),
     ).rendered
   } else {
