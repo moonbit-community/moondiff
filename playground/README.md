@@ -29,7 +29,7 @@ The files endpoint is fetched in 100-file pages. GitHub caps that endpoint at
 [3,000 files](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files),
 so larger or incomplete responses fail explicitly instead of showing a partial
 PR. Every changed file receives a card in GitHub's order. Files
-whose old or new path ends in `.mbt` use the bundled `tokdiff` engine's
+whose old or new path ends in `.mbt` use the bundled `mbtdiff` engine's
 MoonBit-aware lexical diff by default. The global **Lexical / AST** control
 switches those files to structural diffing; pure formatting and top-level
 reordering become an explicit no-structural-changes state. Parser failures and

@@ -382,22 +382,81 @@ priv struct DiffNotice {
 }
 
 ///|
-fn diff_notice(outcome : @alignment.AlignedDiffOutcome) -> DiffNotice? {
-  match outcome {
-    @alignment.AlignedDiffOutcome::Fallback(reason) =>
-      Some({
-        class_name: "diff-notice fallback",
-        label: "Lexical fallback",
-        message: "AST diff was unavailable, so this entire file is shown using lexical diff. \{reason}",
-      })
-    @alignment.AlignedDiffOutcome::PartialFallback(reasons) =>
-      Some({
-        class_name: "diff-notice partial-fallback",
-        label: "Partial lexical fallback",
-        message: "AST diff was used for the rest of this file. Lexical diff was used only for: \{reasons.join("; ")}.",
-      })
-    _ => None
+fn fallback_stage_text(stage : @mbtdiff.ComputationStage) -> String {
+  match stage {
+    TopLevelAlignment => "top-level alignment"
+    SyntaxMatching => "syntax matching"
+    IntralineMatching => "intraline matching"
   }
+}
+
+///|
+fn fallback_location(scope : @mbtdiff.FallbackScope) -> String {
+  match scope {
+    WholeFile => ""
+    Region(old~, new~) => {
+      let parts : Array[String] = []
+      if old is Some(range) {
+        parts.push("old line \{range.start + 1}")
+      }
+      if new is Some(range) {
+        parts.push("new line \{range.start + 1}")
+      }
+      if parts.is_empty() {
+        "file"
+      } else {
+        parts.join(", ")
+      }
+    }
+  }
+}
+
+///|
+fn fallback_reason_text(fallback : @mbtdiff.FallbackInfo) -> String {
+  match fallback.reason {
+    ParseError(detail~, ..) => detail
+    GraphLimitExceeded(limit~) => {
+      let base = "graph limit exceeded (\{limit})"
+      let location = fallback_location(fallback.scope)
+      if location.is_empty() {
+        base
+      } else {
+        "\{base} at \{location}"
+      }
+    }
+    ComputationLimitExceeded(stage~, limit~) => {
+      let base = "computation limit exceeded (\{limit}) during \{fallback_stage_text(stage)}"
+      let location = fallback_location(fallback.scope)
+      if location.is_empty() {
+        base
+      } else {
+        "\{base} at \{location}"
+      }
+    }
+    TopLevelReordering =>
+      "top-level reordering has no changes inside aligned declarations"
+  }
+}
+
+///|
+fn diff_notice(fallbacks : ArrayView[@mbtdiff.FallbackInfo]) -> DiffNotice? {
+  if fallbacks.is_empty() {
+    return None
+  }
+  if fallbacks is [fallback] && fallback.scope is WholeFile {
+    let reason = fallback_reason_text(fallback)
+    return Some({
+      class_name: "diff-notice fallback",
+      label: "Lexical fallback",
+      message: "AST diff was unavailable, so this entire file is shown using lexical diff. \{reason}",
+    })
+  }
+  let reasons = fallbacks.map(fallback_reason_text)
+  Some({
+    class_name: "diff-notice partial-fallback",
+    label: "Partial lexical fallback",
+    message: "AST diff was used for the rest of this file. Lexical diff was used only for: \{reasons.join("; ")}.",
+  })
 }
 
 ///|
@@ -444,7 +503,7 @@ fn file_diff_view(
         is Some(result) else {
         return @html.p(class="file-message loading-inline", "Preparing diff…")
       }
-      if result.outcome is @alignment.AlignedDiffOutcome::NoNonCommentChanges {
+      if result.status is IgnoredOnly {
         let structural = if algorithm is AstAlgorithm {
           "structural "
         } else {
@@ -463,7 +522,8 @@ fn file_diff_view(
           ),
         ])
       }
-      if result.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges {
+      if algorithm is AstAlgorithm &&
+        result.status is (Identical | NoStructuralChanges) {
         return @html.div(class="file-message structural-empty", [
           @html.p(
             "No structural changes found. Switch to Lexical to view text changes.",
@@ -471,7 +531,7 @@ fn file_diff_view(
         ])
       }
       @html.fragment([
-        if diff_notice(result.outcome) is Some(notice) {
+        if diff_notice(result.fallbacks) is Some(notice) {
           @html.div(class=notice.class_name, [
             @html.strong(notice.label),
             @html.span(notice.message),

@@ -219,10 +219,10 @@ extern "js" fn send_analysis_request(
   #| }
 
 ///|
-fn aligned_mode(algorithm : DiffAlgorithm) -> @alignment.AlignedDiffMode {
+fn mbtdiff_mode(algorithm : DiffAlgorithm) -> @mbtdiff.DiffMode {
   match algorithm {
-    LexicalAlgorithm => @alignment.AlignedDiffMode::Lexical
-    AstAlgorithm => @alignment.AlignedDiffMode::Ast
+    LexicalAlgorithm => @mbtdiff.DiffMode::Lexical
+    AstAlgorithm => @mbtdiff.DiffMode::Ast
   }
 }
 
@@ -232,7 +232,7 @@ fn cached_file_document(
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
-) -> @alignment.AlignedDiffResult? {
+) -> CachedDiffResult? {
   match file.diff_mode {
     LineDiff => file.diff_cache.line
     MoonBitDiff =>
@@ -259,7 +259,7 @@ fn calculate_file_document(
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
-) -> @alignment.AlignedDiffResult? {
+) -> CachedDiffResult? {
   guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
     return None
   }
@@ -267,20 +267,27 @@ fn calculate_file_document(
     LineDiff =>
       Some({
         document: @tokdiff.line_diff(old~, new~, context=3),
-        outcome: @alignment.AlignedDiffOutcome::Rendered,
+        status: Changed,
+        fallbacks: [],
       })
-    MoonBitDiff =>
-      Some(
-        @alignment.diff_document(
-          old.join("\n"),
-          new.join("\n"),
-          aligned_mode(algorithm),
-          context=3,
+    MoonBitDiff => {
+      let result = @mbtdiff.diff(
+        old.join("\n"),
+        new.join("\n"),
+        options=@mbtdiff.DiffOptions::new(
+          context_lines=3,
           graph_limit=3_000_000,
           ignore_comments~,
           ignore_tests~,
+          mode=mbtdiff_mode(algorithm),
         ),
       )
+      Some({
+        document: result.document(),
+        status: result.status(),
+        fallbacks: result.fallbacks(),
+      })
+    }
   }
 }
 
@@ -592,8 +599,7 @@ fn build_analysis_request(
         "Could not prepare \{state.file.filename}: diff is unavailable",
       )
     }
-    if state.diff_mode is MoonBitDiff &&
-      diff.outcome is @alignment.AlignedDiffOutcome::NoNonCommentChanges {
+    if state.diff_mode is MoonBitDiff && diff.status is IgnoredOnly {
       let structural = if algorithm is AstAlgorithm {
         "structural "
       } else {
@@ -607,7 +613,7 @@ fn build_analysis_request(
     }
     if state.diff_mode is MoonBitDiff &&
       algorithm is AstAlgorithm &&
-      diff.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges {
+      diff.status is (Identical | NoStructuralChanges) {
       skipped.push({
         path: state.file.filename,
         reason: "No structural changes were found; switch to Lexical to analyze text changes.",
