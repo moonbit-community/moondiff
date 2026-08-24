@@ -146,7 +146,12 @@ test "select MoonBit diff only when either path ends with lowercase mbt" {
 
 ///|
 test "diff notices distinguish whole-file and partial lexical fallbacks" {
-  guard diff_notice(@alignment.AlignedDiffOutcome::Fallback("old: parse error"))
+  guard diff_notice([
+      {
+        reason: ParseError(sides=[Old], detail="old: parse error"),
+        scope: WholeFile,
+      },
+    ])
     is Some(complete) else {
     fail("expected a complete fallback notice")
   }
@@ -155,11 +160,15 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
   assert_true(complete.message.contains("this entire file"))
   assert_true(complete.message.contains("old: parse error"))
 
-  guard diff_notice(
-      @alignment.AlignedDiffOutcome::PartialFallback([
-        "graph limit exceeded (3000000) at old line 724, new line 768",
-      ]),
-    )
+  guard diff_notice([
+      {
+        reason: GraphLimitExceeded(limit=3_000_000),
+        scope: Region(
+          old=Some({ start: 723, len: 1 }),
+          new=Some({ start: 767, len: 1 }),
+        ),
+      },
+    ])
     is Some(partial) else {
     fail("expected a partial fallback notice")
   }
@@ -168,10 +177,7 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
   assert_true(partial.message.contains("AST diff was used for the rest"))
   assert_true(partial.message.contains("old line 724, new line 768"))
 
-  assert_true(diff_notice(@alignment.AlignedDiffOutcome::Rendered) is None)
-  assert_true(
-    diff_notice(@alignment.AlignedDiffOutcome::NoStructuralChanges) is None,
-  )
+  assert_true(diff_notice([]) is None)
 }
 
 ///|
@@ -1336,9 +1342,7 @@ test "algorithm switching fills the second cache and clears analysis state" {
     guard changed.diff_cache.ast is Some(ast) else {
       fail("expected AST cache")
     }
-    assert_true(
-      ast.outcome is @alignment.AlignedDiffOutcome::NoStructuralChanges,
-    )
+    assert_true(ast.status is NoStructuralChanges)
   }
 }
 

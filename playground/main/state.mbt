@@ -26,16 +26,23 @@ priv enum SideLoad {
 } derive(Eq)
 
 ///|
+priv struct CachedDiffResult {
+  document : @mbtdiff.DiffDocument
+  status : @mbtdiff.DiffStatus
+  fallbacks : ArrayView[@mbtdiff.FallbackInfo]
+} derive(Eq)
+
+///|
 priv struct DiffCache {
-  line : @alignment.AlignedDiffResult?
-  lexical : @alignment.AlignedDiffResult?
-  lexical_ignoring_comments : @alignment.AlignedDiffResult?
-  lexical_ignoring_tests : @alignment.AlignedDiffResult?
-  lexical_ignoring_comments_and_tests : @alignment.AlignedDiffResult?
-  ast : @alignment.AlignedDiffResult?
-  ast_ignoring_comments : @alignment.AlignedDiffResult?
-  ast_ignoring_tests : @alignment.AlignedDiffResult?
-  ast_ignoring_comments_and_tests : @alignment.AlignedDiffResult?
+  line : CachedDiffResult?
+  lexical : CachedDiffResult?
+  lexical_ignoring_comments : CachedDiffResult?
+  lexical_ignoring_tests : CachedDiffResult?
+  lexical_ignoring_comments_and_tests : CachedDiffResult?
+  ast : CachedDiffResult?
+  ast_ignoring_comments : CachedDiffResult?
+  ast_ignoring_tests : CachedDiffResult?
+  ast_ignoring_comments_and_tests : CachedDiffResult?
 } derive(Eq)
 
 ///|
