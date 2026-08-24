@@ -66,9 +66,10 @@ fn make_review_row(
     (false, Some(line)) => canonical_anchor(patch, Left, line)
     _ => None
   }
-  let new_anchor = match new_line {
-    Some(line) => canonical_anchor(patch, Right, line)
-    None => None
+  let new_anchor = if new_line is Some(line) {
+    canonical_anchor(patch, Right, line)
+  } else {
+    None
   }
   {
     file_index,

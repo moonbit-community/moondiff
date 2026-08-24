@@ -205,32 +205,29 @@ fn mark_syntax_subtree(
               mark_syntax_roots_impl(
                 lhs_children, rhs_children, change_map, graph_limit, budget,
               )
+            } else if budget is Some(budget) {
+              mark_syntax_with_budget(
+                Some(lhs),
+                Some(rhs),
+                change_map,
+                graph_limit,
+                budget,
+              )
             } else {
-              match budget {
-                Some(budget) =>
-                  mark_syntax_with_budget(
-                    Some(lhs),
-                    Some(rhs),
-                    change_map,
-                    graph_limit,
-                    budget,
-                  )
-                None =>
-                  mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
-              }
+              mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
             }
           }
           _ =>
-            match budget {
-              Some(budget) =>
-                mark_syntax_with_budget(
-                  Some(lhs),
-                  Some(rhs),
-                  change_map,
-                  graph_limit,
-                  budget,
-                )
-              None => mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
+            if budget is Some(budget) {
+              mark_syntax_with_budget(
+                Some(lhs),
+                Some(rhs),
+                change_map,
+                graph_limit,
+                budget,
+              )
+            } else {
+              mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
             }
         }
       }
