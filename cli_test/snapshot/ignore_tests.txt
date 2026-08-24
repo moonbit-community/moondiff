@@ -1,0 +1,15 @@
+[34m--- cli_test/source/ignore_tests.old.mbt[39m
+[34m+++ cli_test/source/ignore_tests.new.mbt[39m
+@@ -1,6 +1,6 @@
+[90m1[39m [90m.[39m /// old test docs
+[90m.[39m [90m1[39m /// new test docs
+[90m2[39m [90m.[39m ///|UUID(old-test)
+[90m.[39m [90m2[39m ///|UUID(new-test)
+[90m3[39m [90m.[39m async test "sample" {
+[90m.[39m [90m3[39m async test "renamed" {
+[90m4[39m [90m.[39m   old_value()
+[90m.[39m [90m4[39m   new_value()
+[31m5[39m [90m.[39m [90m} [39m[90m// [39m[31m[1mold[22m[39m[90m ordinary note[39m
+[90m.[39m [32m5[39m [90m} [39m[90m// [39m[32m[1mnew[22m[39m[90m ordinary note[39m
+[90m6[39m [90m6[39m 
+
