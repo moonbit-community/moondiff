@@ -231,15 +231,24 @@ fn cached_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> @alignment.AlignedDiffResult? {
   match file.diff_mode {
     LineDiff => file.diff_cache.line
     MoonBitDiff =>
-      match (algorithm, ignore_comments) {
-        (LexicalAlgorithm, false) => file.diff_cache.lexical
-        (LexicalAlgorithm, true) => file.diff_cache.lexical_ignoring_comments
-        (AstAlgorithm, false) => file.diff_cache.ast
-        (AstAlgorithm, true) => file.diff_cache.ast_ignoring_comments
+      match (algorithm, ignore_comments, ignore_tests) {
+        (LexicalAlgorithm, false, false) => file.diff_cache.lexical
+        (LexicalAlgorithm, true, false) =>
+          file.diff_cache.lexical_ignoring_comments
+        (LexicalAlgorithm, false, true) =>
+          file.diff_cache.lexical_ignoring_tests
+        (LexicalAlgorithm, true, true) =>
+          file.diff_cache.lexical_ignoring_comments_and_tests
+        (AstAlgorithm, false, false) => file.diff_cache.ast
+        (AstAlgorithm, true, false) => file.diff_cache.ast_ignoring_comments
+        (AstAlgorithm, false, true) => file.diff_cache.ast_ignoring_tests
+        (AstAlgorithm, true, true) =>
+          file.diff_cache.ast_ignoring_comments_and_tests
       }
   }
 }
@@ -249,6 +258,7 @@ fn calculate_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> @alignment.AlignedDiffResult? {
   guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
     return None
@@ -268,6 +278,7 @@ fn calculate_file_document(
           context=3,
           graph_limit=3_000_000,
           ignore_comments~,
+          ignore_tests~,
         ),
       )
   }
@@ -278,11 +289,18 @@ fn ensure_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> FileState {
-  if cached_file_document(file, algorithm, ignore_comments~) is Some(_) {
+  if cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
+    is Some(_) {
     return file
   }
-  guard calculate_file_document(file, algorithm, ignore_comments~)
+  guard calculate_file_document(
+      file,
+      algorithm,
+      ignore_comments~,
+      ignore_tests~,
+    )
     is Some(result) else {
     return file
   }
@@ -292,42 +310,110 @@ fn ensure_file_document(
         line: Some(result),
         lexical: file.diff_cache.lexical,
         lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+        lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+        lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
         ast: file.diff_cache.ast,
         ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+        ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+        ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
       }
     MoonBitDiff =>
-      match (algorithm, ignore_comments) {
-        (LexicalAlgorithm, false) =>
+      match (algorithm, ignore_comments, ignore_tests) {
+        (LexicalAlgorithm, false, false) =>
           {
             line: file.diff_cache.line,
             lexical: Some(result),
             lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
             ast: file.diff_cache.ast,
             ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
           }
-        (LexicalAlgorithm, true) =>
+        (LexicalAlgorithm, true, false) =>
           {
             line: file.diff_cache.line,
             lexical: file.diff_cache.lexical,
             lexical_ignoring_comments: Some(result),
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
             ast: file.diff_cache.ast,
             ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
           }
-        (AstAlgorithm, false) =>
+        (LexicalAlgorithm, false, true) =>
           {
             line: file.diff_cache.line,
             lexical: file.diff_cache.lexical,
             lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: Some(result),
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
+            ast: file.diff_cache.ast,
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
+          }
+        (LexicalAlgorithm, true, true) =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: Some(result),
+            ast: file.diff_cache.ast,
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
+          }
+        (AstAlgorithm, false, false) =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
             ast: Some(result),
             ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
           }
-        (AstAlgorithm, true) =>
+        (AstAlgorithm, true, false) =>
           {
             line: file.diff_cache.line,
             lexical: file.diff_cache.lexical,
             lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
             ast: file.diff_cache.ast,
             ast_ignoring_comments: Some(result),
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
+          }
+        (AstAlgorithm, false, true) =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
+            ast: file.diff_cache.ast,
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: Some(result),
+            ast_ignoring_comments_and_tests: file.diff_cache.ast_ignoring_comments_and_tests,
+          }
+        (AstAlgorithm, true, true) =>
+          {
+            line: file.diff_cache.line,
+            lexical: file.diff_cache.lexical,
+            lexical_ignoring_comments: file.diff_cache.lexical_ignoring_comments,
+            lexical_ignoring_tests: file.diff_cache.lexical_ignoring_tests,
+            lexical_ignoring_comments_and_tests: file.diff_cache.lexical_ignoring_comments_and_tests,
+            ast: file.diff_cache.ast,
+            ast_ignoring_comments: file.diff_cache.ast_ignoring_comments,
+            ast_ignoring_tests: file.diff_cache.ast_ignoring_tests,
+            ast_ignoring_comments_and_tests: Some(result),
           }
       }
   }
@@ -346,11 +432,17 @@ fn ensure_expanded_file_documents(
   view : ChangeView,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> ChangeView {
   let files = view.files.copy()
   for index, file in files {
     if file.expanded {
-      files[index] = ensure_file_document(file, algorithm, ignore_comments~)
+      files[index] = ensure_file_document(
+        file,
+        algorithm,
+        ignore_comments~,
+        ignore_tests~,
+      )
     }
   }
   {
@@ -372,10 +464,16 @@ fn ensure_all_file_documents(
   view : ChangeView,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> ChangeView {
   let files = view.files.copy()
   for index, file in files {
-    files[index] = ensure_file_document(file, algorithm, ignore_comments~)
+    files[index] = ensure_file_document(
+      file,
+      algorithm,
+      ignore_comments~,
+      ignore_tests~,
+    )
   }
   {
     reference: view.reference,
@@ -396,8 +494,10 @@ fn file_hunks(
   file : FileState,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> Array[String] {
-  guard cached_file_document(file, algorithm, ignore_comments~) is Some(result) else {
+  guard cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
+    is Some(result) else {
     return []
   }
   @tokdiff_text.render_unified_hunks(result.document)
@@ -439,10 +539,36 @@ fn sources_pending(view : ChangeView) -> Bool {
 }
 
 ///|
+fn ignored_change_subject(
+  ignore_comments : Bool,
+  ignore_tests : Bool,
+) -> String {
+  if ignore_comments && ignore_tests {
+    "MoonBit test blocks, comments, or blank lines"
+  } else if ignore_tests {
+    "MoonBit test blocks"
+  } else {
+    "comments or blank lines"
+  }
+}
+
+///|
+fn ignored_filter_action(ignore_comments : Bool, ignore_tests : Bool) -> String {
+  if ignore_comments && ignore_tests {
+    "turn off Ignore tests or Ignore comments to include the corresponding filtered changes"
+  } else if ignore_tests {
+    "turn off Ignore tests to include test changes"
+  } else {
+    "turn off Ignore comments to include comment and blank-line changes"
+  }
+}
+
+///|
 fn build_analysis_request(
   view : ChangeView,
   algorithm : DiffAlgorithm,
   ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
 ) -> Result[(AnalysisRequest, Array[SkippedFile]), String] {
   let hunks : Array[AnalysisHunkInput] = []
   let skipped : Array[SkippedFile] = []
@@ -455,20 +581,27 @@ fn build_analysis_request(
       skipped.push({ path: state.file.filename, reason })
       continue
     }
-    guard cached_file_document(state, algorithm, ignore_comments~) is Some(diff) else {
+    guard cached_file_document(
+        state,
+        algorithm,
+        ignore_comments~,
+        ignore_tests~,
+      )
+      is Some(diff) else {
       return Err(
         "Could not prepare \{state.file.filename}: diff is unavailable",
       )
     }
     if state.diff_mode is MoonBitDiff &&
       diff.outcome is @alignment.AlignedDiffOutcome::NoNonCommentChanges {
+      let structural = if algorithm is AstAlgorithm {
+        "structural "
+      } else {
+        ""
+      }
       skipped.push({
         path: state.file.filename,
-        reason: if algorithm is AstAlgorithm {
-          "No structural changes besides comments or blank lines were found; turn off Ignore comments to analyze comment and blank-line changes."
-        } else {
-          "No changes besides comments or blank lines were found; turn off Ignore comments to analyze comment and blank-line changes."
-        },
+        reason: "No \{structural}changes besides \{ignored_change_subject(ignore_comments, ignore_tests)} were found; \{ignored_filter_action(ignore_comments, ignore_tests)}.",
       })
       continue
     }
@@ -481,7 +614,13 @@ fn build_analysis_request(
       })
       continue
     }
-    for hunk_index, patch in file_hunks(state, algorithm, ignore_comments~) {
+    for
+      hunk_index, patch in file_hunks(
+        state,
+        algorithm,
+        ignore_comments~,
+        ignore_tests~,
+      ) {
       patch_bytes += @utf8.encode(patch).length()
       if hunks.length() + 1 > MAX_ANALYSIS_HUNKS {
         return Err(

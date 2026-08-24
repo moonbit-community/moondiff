@@ -274,6 +274,34 @@ fn ignore_comments_control(
 }
 
 ///|
+fn ignore_tests_control(
+  ignore_tests : Bool,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  @html.button(
+    type_="button",
+    class=if ignore_tests {
+      "toolbar-button ignore-tests-toggle active"
+    } else {
+      "toolbar-button ignore-tests-toggle"
+    },
+    title=if ignore_tests {
+      "Show MoonBit test changes"
+    } else {
+      "Ignore top-level MoonBit test and async test blocks"
+    },
+    attrs=@html.Attrs::build()
+      .aria_label("Ignore tests")
+      .aria_pressed(if ignore_tests { "true" } else { "false" }),
+    on_click=emit(ToggleIgnoreTests),
+    [
+      @html.span(class="ignore-tests-icon", "T"),
+      @html.span(class="ignore-tests-label", "Ignore tests"),
+    ],
+  )
+}
+
+///|
 fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
   match model.phase {
     Showing(commit) => {
@@ -325,6 +353,7 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
           },
           algorithm_control(model.diff_algorithm, emit),
           ignore_comments_control(model.ignore_comments, emit),
+          ignore_tests_control(model.ignore_tests, emit),
           @html.span(class="toolbar-divider", ""),
           @html.button(
             type_="button",
@@ -379,6 +408,7 @@ fn file_diff_view(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  ignore_tests : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
@@ -405,18 +435,31 @@ fn file_diff_view(
   }
   match (file.old_side, file.new_side) {
     (Ready(_), Ready(_)) => {
-      guard cached_file_document(file, algorithm, ignore_comments~)
+      guard cached_file_document(
+          file,
+          algorithm,
+          ignore_comments~,
+          ignore_tests~,
+        )
         is Some(result) else {
         return @html.p(class="file-message loading-inline", "Preparing diff…")
       }
       if result.outcome is @alignment.AlignedDiffOutcome::NoNonCommentChanges {
+        let structural = if algorithm is AstAlgorithm {
+          "structural "
+        } else {
+          ""
+        }
+        let action = if ignore_comments && ignore_tests {
+          "Turn off Ignore tests or Ignore comments to view the corresponding filtered changes."
+        } else if ignore_tests {
+          "Turn off Ignore tests to view test changes."
+        } else {
+          "Turn off Ignore comments to view comment and blank-line changes."
+        }
         return @html.div(class="file-message comment-empty", [
           @html.p(
-            if algorithm is AstAlgorithm {
-              "No structural changes besides comments or blank lines found. Turn off Ignore comments to view comment and blank-line changes."
-            } else {
-              "No changes besides comments or blank lines found. Turn off Ignore comments to view comment and blank-line changes."
-            },
+            "No \{structural}changes besides \{ignored_change_subject(ignore_comments, ignore_tests)} found. \{action}",
           ),
         ])
       }
@@ -453,6 +496,7 @@ fn file_card(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  ignore_tests : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
@@ -485,7 +529,8 @@ fn file_card(
       ]),
       if file.expanded {
         file_diff_view(
-          file, generation, index, mode, algorithm, ignore_comments, review, emit,
+          file, generation, index, mode, algorithm, ignore_comments, ignore_tests,
+          review, emit,
         )
       } else {
         @html.nothing
@@ -516,6 +561,7 @@ fn file_list_view(
         model.view_mode,
         model.diff_algorithm,
         model.ignore_comments,
+        model.ignore_tests,
         model.review,
         emit,
       ),
@@ -548,8 +594,10 @@ fn analysis_file_hunks_html(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  ignore_tests : Bool,
 ) -> Array[String] {
-  guard cached_file_document(file, algorithm, ignore_comments~) is Some(diff) else {
+  guard cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
+    is Some(diff) else {
     return []
   }
   let hunk_notes = notes_for_file(
@@ -592,6 +640,7 @@ fn rendered_analysis_hunks(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  ignore_tests : Bool,
 ) -> Map[String, RenderedAnalysisHunk] {
   let wanted : Map[String, Unit] = Map([])
   for group_index, group in result.groups {
@@ -607,7 +656,7 @@ fn rendered_analysis_hunks(
       continue
     }
     let hunks = analysis_file_hunks_html(
-      file, file_index, result, mode, algorithm, ignore_comments,
+      file, file_index, result, mode, algorithm, ignore_comments, ignore_tests,
     )
     for hunk_index, html in hunks {
       let id = "f\{file_index}-h\{hunk_index}"
@@ -720,6 +769,7 @@ fn analysis_overview(
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
+  ignore_tests : Bool,
   status : AnalysisStatus,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
@@ -765,7 +815,7 @@ fn analysis_overview(
       ])
     AnalysisDone(result, skipped, expanded) => {
       let rendered = rendered_analysis_hunks(
-        commit, result, expanded, mode, algorithm, ignore_comments,
+        commit, result, expanded, mode, algorithm, ignore_comments, ignore_tests,
       )
       let group_views : Array[@rabbita.Html] = []
       for group_index, group in result.groups {
@@ -862,6 +912,7 @@ fn change_view(
       model.view_mode,
       model.diff_algorithm,
       model.ignore_comments,
+      model.ignore_tests,
       model.analysis_status,
       emit,
     ),

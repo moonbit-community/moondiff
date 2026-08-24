@@ -51,6 +51,7 @@ fn device_auth_test_model(
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
     ignore_comments: false,
+    ignore_tests: false,
     phase,
     route,
     share_url: None,

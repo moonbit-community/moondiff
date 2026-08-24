@@ -30,8 +30,12 @@ priv struct DiffCache {
   line : @alignment.AlignedDiffResult?
   lexical : @alignment.AlignedDiffResult?
   lexical_ignoring_comments : @alignment.AlignedDiffResult?
+  lexical_ignoring_tests : @alignment.AlignedDiffResult?
+  lexical_ignoring_comments_and_tests : @alignment.AlignedDiffResult?
   ast : @alignment.AlignedDiffResult?
   ast_ignoring_comments : @alignment.AlignedDiffResult?
+  ast_ignoring_tests : @alignment.AlignedDiffResult?
+  ast_ignoring_comments_and_tests : @alignment.AlignedDiffResult?
 } derive(Eq)
 
 ///|
@@ -40,8 +44,12 @@ fn empty_diff_cache() -> DiffCache {
     line: None,
     lexical: None,
     lexical_ignoring_comments: None,
+    lexical_ignoring_tests: None,
+    lexical_ignoring_comments_and_tests: None,
     ast: None,
     ast_ignoring_comments: None,
+    ast_ignoring_tests: None,
+    ast_ignoring_comments_and_tests: None,
   }
 }
 
@@ -114,6 +122,7 @@ priv struct Model {
   view_mode : ViewMode
   diff_algorithm : DiffAlgorithm
   ignore_comments : Bool
+  ignore_tests : Bool
   phase : Phase
   route : CommitRef?
   share_url : String?
@@ -131,6 +140,7 @@ fn initial_model() -> Model {
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
     ignore_comments: false,
+    ignore_tests: false,
     phase: Idle,
     route: None,
     share_url: None,
@@ -149,6 +159,7 @@ priv enum Msg {
   ToggleView
   SelectDiffAlgorithm(DiffAlgorithm)
   ToggleIgnoreComments
+  ToggleIgnoreTests
   CopyShareLink
   ShareCopied
   ShareCopyFailed(String)
@@ -579,6 +590,7 @@ fn with_phase(model : Model, phase : Phase) -> Model {
     view_mode: model.view_mode,
     diff_algorithm: model.diff_algorithm,
     ignore_comments: model.ignore_comments,
+    ignore_tests: model.ignore_tests,
     phase,
     route: model.route,
     share_url: model.share_url,
@@ -597,6 +609,7 @@ fn with_backend_status(model : Model, backend_status : BackendStatus) -> Model {
     view_mode: model.view_mode,
     diff_algorithm: model.diff_algorithm,
     ignore_comments: model.ignore_comments,
+    ignore_tests: model.ignore_tests,
     phase: model.phase,
     route: model.route,
     share_url: model.share_url,
@@ -618,6 +631,7 @@ fn with_analysis_status(
     view_mode: model.view_mode,
     diff_algorithm: model.diff_algorithm,
     ignore_comments: model.ignore_comments,
+    ignore_tests: model.ignore_tests,
     phase: model.phase,
     route: model.route,
     share_url: model.share_url,
@@ -815,6 +829,7 @@ fn show_pull(
               view,
               model.diff_algorithm,
               ignore_comments=model.ignore_comments,
+              ignore_tests=model.ignore_tests,
             ),
           ),
         ),
@@ -958,6 +973,7 @@ fn begin_change_load(
       view_mode: model.view_mode,
       diff_algorithm: model.diff_algorithm,
       ignore_comments: model.ignore_comments,
+      ignore_tests: model.ignore_tests,
       phase,
       route: Some(reference),
       share_url: Some(playground_share_url(reference)),
@@ -1103,6 +1119,7 @@ fn continue_analysis(
     view,
     model.diff_algorithm,
     ignore_comments=model.ignore_comments,
+    ignore_tests=model.ignore_tests,
   )
   let ready_model = with_phase(model, Showing(ready_view))
   match
@@ -1110,6 +1127,7 @@ fn continue_analysis(
       ready_view,
       model.diff_algorithm,
       ignore_comments=model.ignore_comments,
+      ignore_tests=model.ignore_tests,
     ) {
     Err(message) =>
       (
@@ -1712,6 +1730,7 @@ fn update(
           view_mode: model.view_mode,
           diff_algorithm: model.diff_algorithm,
           ignore_comments: model.ignore_comments,
+          ignore_tests: model.ignore_tests,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -1734,6 +1753,7 @@ fn update(
           },
           diff_algorithm: model.diff_algorithm,
           ignore_comments: model.ignore_comments,
+          ignore_tests: model.ignore_tests,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -1755,6 +1775,7 @@ fn update(
               view,
               algorithm,
               ignore_comments=model.ignore_comments,
+              ignore_tests=model.ignore_tests,
             ),
           )
         other => other
@@ -1766,6 +1787,7 @@ fn update(
           view_mode: model.view_mode,
           diff_algorithm: algorithm,
           ignore_comments: model.ignore_comments,
+          ignore_tests: model.ignore_tests,
           phase,
           route: model.route,
           share_url: model.share_url,
@@ -1786,12 +1808,32 @@ fn update(
               view,
               model.diff_algorithm,
               ignore_comments~,
+              ignore_tests=model.ignore_tests,
             ),
           )
         other => other
       }
       (
         { ..model, ignore_comments, phase, analysis_status: AnalysisIdle },
+        @rabbita.none,
+      )
+    }
+    ToggleIgnoreTests => {
+      let ignore_tests = !model.ignore_tests
+      let phase = match model.phase {
+        Showing(view) =>
+          Showing(
+            ensure_expanded_file_documents(
+              view,
+              model.diff_algorithm,
+              ignore_comments=model.ignore_comments,
+              ignore_tests~,
+            ),
+          )
+        other => other
+      }
+      (
+        { ..model, ignore_tests, phase, analysis_status: AnalysisIdle },
         @rabbita.none,
       )
     }
@@ -1805,6 +1847,7 @@ fn update(
               view_mode: model.view_mode,
               diff_algorithm: model.diff_algorithm,
               ignore_comments: model.ignore_comments,
+              ignore_tests: model.ignore_tests,
               phase: LoadFailed(message),
               route: model.route,
               share_url: model.share_url,
@@ -1836,6 +1879,7 @@ fn update(
               view_mode: model.view_mode,
               diff_algorithm: model.diff_algorithm,
               ignore_comments: model.ignore_comments,
+              ignore_tests: model.ignore_tests,
               phase: LoadFailed(message),
               route: None,
               share_url: None,
@@ -1854,6 +1898,7 @@ fn update(
               view_mode: model.view_mode,
               diff_algorithm: model.diff_algorithm,
               ignore_comments: model.ignore_comments,
+              ignore_tests: model.ignore_tests,
               phase: Idle,
               route: None,
               share_url: None,
@@ -1890,6 +1935,7 @@ fn update(
           view_mode: model.view_mode,
           diff_algorithm: model.diff_algorithm,
           ignore_comments: model.ignore_comments,
+          ignore_tests: model.ignore_tests,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -1908,6 +1954,7 @@ fn update(
           view_mode: model.view_mode,
           diff_algorithm: model.diff_algorithm,
           ignore_comments: model.ignore_comments,
+          ignore_tests: model.ignore_tests,
           phase: model.phase,
           route: model.route,
           share_url: model.share_url,
@@ -1988,6 +2035,7 @@ fn update(
               view,
               model.diff_algorithm,
               ignore_comments=model.ignore_comments,
+              ignore_tests=model.ignore_tests,
             ) {
             Ok((_, skipped)) => skipped
             Err(_) => []
@@ -2223,6 +2271,7 @@ fn update(
                     view,
                     model.diff_algorithm,
                     ignore_comments=model.ignore_comments,
+                    ignore_tests=model.ignore_tests,
                   ),
                 ),
               ),
@@ -2301,6 +2350,7 @@ fn update(
                   changed,
                   model.diff_algorithm,
                   ignore_comments=model.ignore_comments,
+                  ignore_tests=model.ignore_tests,
                 ),
               ),
             ),
@@ -2386,6 +2436,7 @@ fn update(
           changed,
           model.diff_algorithm,
           ignore_comments=model.ignore_comments,
+          ignore_tests=model.ignore_tests,
         )
       } else {
         changed
