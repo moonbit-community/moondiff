@@ -63,6 +63,100 @@ test "public status contract" {
 }
 
 ///|
+test "default and explicit AST modes are compatible" {
+  let old_source = "fn f() { old_value() }"
+  let new_source = "fn f() { new_value() }"
+  let default_result = @mbtdiff.diff(old_source, new_source)
+  let explicit_result = @mbtdiff.diff(
+    old_source,
+    new_source,
+    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Ast),
+  )
+  assert_true(default_result.status() == explicit_result.status())
+  assert_true(default_result.document() == explicit_result.document())
+  assert_true(default_result.fallbacks() == explicit_result.fallbacks())
+}
+
+///|
+test "lexical mode renders text changes and ignores the graph limit" {
+  let old_source = "fn format() { 1 }"
+  let new_source = "fn format() {\n  1\n}"
+  let lexical = @mbtdiff.diff(
+    old_source,
+    new_source,
+    options=@mbtdiff.DiffOptions::new(
+      graph_limit=0,
+      mode=@mbtdiff.DiffMode::Lexical,
+    ),
+  )
+  assert_true(lexical.status() is Changed)
+  assert_false(lexical.document().hunks.is_empty())
+  assert_true(lexical.fallbacks().is_empty())
+
+  let normal_limit = @mbtdiff.diff(
+    old_source,
+    new_source,
+    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical),
+  )
+  assert_true(lexical.document() == normal_limit.document())
+}
+
+///|
+test "lexical mode exposes reordering and parse fallbacks" {
+  let reordered = @mbtdiff.diff(
+    "fn first() {}\nfn second() {}",
+    "fn second() {}\nfn first() {}",
+    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical),
+  )
+  assert_true(reordered.status() is Changed)
+  assert_false(reordered.document().hunks.is_empty())
+  assert_true(
+    reordered.fallbacks() is [{ reason: TopLevelReordering, scope: WholeFile }],
+  )
+
+  let parsed = @mbtdiff.diff(
+    "fn broken( {",
+    "fn okay() {}",
+    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical),
+  )
+  assert_true(
+    parsed.fallbacks()
+    is [{ reason: ParseError(sides=[Old], ..), scope: WholeFile }],
+  )
+}
+
+///|
+test "lexical mode preserves identical and filtering statuses" {
+  let options = @mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical)
+  let identical = @mbtdiff.diff("fn stable() {}", "fn stable() {}", options~)
+  assert_true(identical.status() is Identical)
+  assert_true(identical.document().hunks.is_empty())
+  assert_true(identical.fallbacks().is_empty())
+
+  let comments = @mbtdiff.diff(
+    "fn f() { 1 // old\n}",
+    "fn f() { 1 // new\n}",
+    options=@mbtdiff.DiffOptions::new(
+      ignore_comments=true,
+      mode=@mbtdiff.DiffMode::Lexical,
+    ),
+  )
+  assert_true(comments.status() is IgnoredOnly)
+  assert_true(comments.document().hunks.is_empty())
+
+  let tests = @mbtdiff.diff(
+    "test \"sample\" { old_value() }",
+    "test \"sample\" { new_value() }",
+    options=@mbtdiff.DiffOptions::new(
+      ignore_tests=true,
+      mode=@mbtdiff.DiffMode::Lexical,
+    ),
+  )
+  assert_true(tests.status() is IgnoredOnly)
+  assert_true(tests.document().hunks.is_empty())
+}
+
+///|
 test "public test filtering composes and keeps production changes" {
   let old_source =
     #|/// old docs

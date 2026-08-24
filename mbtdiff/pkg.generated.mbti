@@ -3,6 +3,7 @@ package "moonbit-community/moondiff/mbtdiff"
 
 import {
   "moonbit-community/moondiff/model",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -11,8 +12,13 @@ pub fn diff(String, String, options? : DiffOptions) -> DiffResult
 // Errors
 
 // Types and methods
+pub(all) enum DiffMode {
+  Ast
+  Lexical
+} derive(Eq, @debug.Debug)
+
 type DiffOptions
-pub fn DiffOptions::new(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool) -> Self
+pub fn DiffOptions::new(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : DiffMode) -> Self
 pub impl Default for DiffOptions
 
 type DiffResult

@@ -85,6 +85,7 @@ pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+  TopLevelReordering
 } derive(Eq, @debug.Debug)
 
 pub(all) enum FallbackScope {

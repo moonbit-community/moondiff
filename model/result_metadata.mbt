@@ -31,6 +31,9 @@ pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+  /// Lexical declaration alignment found no changes inside matched
+  /// declarations, so the entire file was diffed to expose reordering.
+  TopLevelReordering
 } derive(Debug, Eq)
 
 ///|

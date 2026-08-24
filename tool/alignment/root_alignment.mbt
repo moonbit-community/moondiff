@@ -285,19 +285,6 @@ fn top_level_plan_impl(
 }
 
 ///|
-fn top_level_plan(
-  old_units : ArrayView[ImplUnit],
-  new_units : ArrayView[ImplUnit],
-  ignore_uuid? : Bool = false,
-) -> TopLevelPlan {
-  let budget = @computation.Budget::new(@computation.default_limit())
-  top_level_plan_impl(old_units, new_units, Some(budget), ignore_uuid~) catch {
-    @computation.LimitExceeded(..) =>
-      RootList(old=old_units.to_owned(), new=new_units.to_owned())
-  }
-}
-
-///|
 fn top_level_plan_with_budget(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
