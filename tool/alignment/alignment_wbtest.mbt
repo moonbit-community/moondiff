@@ -483,7 +483,7 @@ test "unique content hashes align anonymous units but duplicate hashes do not" {
   })
   let duplicate_edits = align_impl_units_by_key(duplicate, duplicate)
   assert_false(impl_edits_have_replacement(duplicate_edits))
-  assert_true(top_level_plan(duplicate, duplicate) is RootList(..))
+  assert_true(top_level_plan_impl(duplicate, duplicate, None) is RootList(..))
 }
 
 ///|
@@ -1618,7 +1618,7 @@ test "AST segments bridge only internal whitespace between changes" {
 test "top-level plan applies one pairing strategy to reordered declarations" {
   let old_units = parse_units("fn first() {}\nfn second() {}")
   let new_units = parse_units("fn second() {}\nfn first() {}")
-  guard top_level_plan(old_units, new_units) is PerUnit(edits) else {
+  guard top_level_plan_impl(old_units, new_units, None) is PerUnit(edits) else {
     fail("expected reliable semantic pairs")
   }
   @debug.assert_eq(edits.map(edit_line_summary), [
@@ -1627,7 +1627,9 @@ test "top-level plan applies one pairing strategy to reordered declarations" {
 
   let unmatched_old = parse_units("/// trailing old")
   let unmatched_new = parse_units("/// trailing new")
-  assert_true(top_level_plan(unmatched_old, unmatched_new) is RootList(..))
+  assert_true(
+    top_level_plan_impl(unmatched_old, unmatched_new, None) is RootList(..),
+  )
 }
 
 ///|
@@ -1669,6 +1671,72 @@ test "lexical pure reorder falls back to a whole-file document" {
   }
   assert_true(reason.contains("reordering"))
   assert_false(result.document.hunks.is_empty())
+}
+
+///|
+test "detailed lexical calculation retains typed status layout and compatibility" {
+  let old_source =
+    #|fn keep() {}
+    #|fn target() { old_value() }
+  let new_source =
+    #|fn inserted() {}
+    #|fn keep() {}
+    #|fn target() { new_value() }
+  let calculation = calculate_diff_document(
+    old_source,
+    new_source,
+    context=0,
+    graph_limit=0,
+    mode=Lexical,
+  )
+  assert_true(calculation.result.status is Changed)
+  assert_true(calculation.result.fallbacks.is_empty())
+  assert_true(calculation.layout is TopLevelSections(_))
+  let compatibility = diff_document(
+    old_source,
+    new_source,
+    Lexical,
+    context=0,
+    graph_limit=0,
+  )
+  assert_true(compatibility.outcome is Rendered)
+  assert_true(compatibility.document == calculation.result.document)
+
+  let identical = diff_document_detailed(
+    "fn same() {}",
+    "fn same() {}",
+    mode=Lexical,
+  )
+  assert_true(identical.status is Identical)
+  assert_true(
+    diff_document("fn same() {}", "fn same() {}", Lexical).outcome is Rendered,
+  )
+}
+
+///|
+test "detailed lexical reorder has a typed whole-file fallback" {
+  let old_source = "fn first() {}\nfn second() {}"
+  let new_source = "fn second() {}\nfn first() {}"
+  let calculation = calculate_diff_document(
+    old_source,
+    new_source,
+    context=0,
+    mode=Lexical,
+  )
+  assert_true(calculation.result.status is Changed)
+  assert_true(
+    calculation.result.fallbacks
+    is [{ reason: TopLevelReordering, scope: WholeFile }],
+  )
+  assert_true(calculation.layout is WholeDocument)
+  let compatibility = diff_document(old_source, new_source, Lexical, context=0)
+  assert_true(compatibility.document == calculation.result.document)
+  assert_true(
+    compatibility.outcome
+    is Fallback(
+      "top-level reordering has no changes inside aligned declarations"
+    ),
+  )
 }
 
 ///|
@@ -2412,6 +2480,45 @@ test "file budget stops top-level DP before allocation" {
   }
   assert_false(result.document.hunks.is_empty())
   assert_true(calculation.layout is WholeDocument)
+}
+
+///|
+test "lexical mode shares the top-level budget but not the graph limit" {
+  let old_source = "fn stable() {}\nfn Worker::old_name() { body() }"
+  let new_source = "fn stable() {}\nfn Worker::new_name() { body() }"
+  let exhausted = calculate_diff_document_with_limit(
+    old_source,
+    new_source,
+    "old",
+    "new",
+    0,
+    0,
+    false,
+    0,
+    mode=Lexical,
+  )
+  assert_true(
+    exhausted.result.fallbacks
+    is [
+      {
+        reason: ComputationLimitExceeded(stage=TopLevelAlignment, limit=0),
+        scope: WholeFile,
+      },
+    ],
+  )
+  assert_true(exhausted.layout is WholeDocument)
+  assert_false(exhausted.result.document.hunks.is_empty())
+
+  let graph_ignored = calculate_diff_document(
+    "fn target() { old_value() }",
+    "fn target() { new_value() }",
+    context=0,
+    graph_limit=0,
+    mode=Lexical,
+  )
+  assert_true(graph_ignored.result.status is Changed)
+  assert_true(graph_ignored.result.fallbacks.is_empty())
+  assert_false(graph_ignored.result.document.hunks.is_empty())
 }
 
 ///|

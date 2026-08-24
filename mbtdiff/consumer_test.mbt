@@ -31,6 +31,7 @@ fn fallback_name(reason : @mbtdiff.FallbackReason) -> String {
     ParseError(sides~, detail~) => "\{sides.map(side_name).join(",")}:\{detail}"
     GraphLimitExceeded(limit~) => "graph:\{limit}"
     ComputationLimitExceeded(stage~, limit~) => "\{stage_name(stage)}:\{limit}"
+    TopLevelReordering => "top-level-reordering"
   }
 }
 
@@ -57,6 +58,7 @@ fn segment_name(kind : @mbtdiff.DiffSegmentKind) -> String {
 
 ///|
 test "consumer traverses and matches every public renderer-free IR type" {
+  let _ : @mbtdiff.DiffMode = @mbtdiff.DiffMode::Ast
   let result = @mbtdiff.diff("fn f() { 1 }", "fn f() { 2 }")
   let _ : @mbtdiff.DiffStatus = result.status()
   assert_eq(status_name(result.status()), "changed")

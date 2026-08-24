@@ -94,12 +94,6 @@ pub(all) struct DiffCalculation {
 }
 
 ///|
-priv struct UnitDocumentResult {
-  document : @model.DiffDocument
-  fallback_reason : String?
-}
-
-///|
 priv struct DetailedUnitResult {
   document : @model.DiffDocument
   fallback : FallbackInfo?
@@ -181,7 +175,7 @@ fn lexical_edit_document(
 }
 
 ///|
-fn lexical_plan_document(
+fn detailed_lexical_plan_document(
   plan : TopLevelPlan,
   old_source : String,
   new_source : String,
@@ -189,13 +183,13 @@ fn lexical_plan_document(
   new_projection : SourceProjection,
   context : Int,
   ignore_comments : Bool,
-) -> AlignedDiffResult {
+) -> DetailedDiffResult {
   match plan {
     RootList(..) => {
       let document = lexical_projected_document(
         old_projection, new_projection, context, ignore_comments,
       )
-      { document, outcome: Rendered }
+      { document, status: Changed, fallbacks: [] }
     }
     PerUnit(edits) => {
       let hunks : Array[@model.DiffHunk] = []
@@ -236,12 +230,11 @@ fn lexical_plan_document(
           document: lexical_projected_document(
             old_projection, new_projection, context, ignore_comments,
           ),
-          outcome: Fallback(
-            "top-level reordering has no changes inside aligned declarations",
-          ),
+          status: Changed,
+          fallbacks: [{ reason: TopLevelReordering, scope: WholeFile }],
         }
       } else {
-        { document: { hunks: hunks[:] }, outcome: Rendered }
+        { document: { hunks: hunks[:] }, status: Changed, fallbacks: [] }
       }
     }
   }
@@ -642,22 +635,6 @@ fn ast_document_from_positions(
 }
 
 ///|
-fn graph_fallback_reason(
-  graph_limit : UInt,
-  old_unit : ImplUnit?,
-  new_unit : ImplUnit?,
-) -> String {
-  let location = match (old_unit, new_unit) {
-    (Some(old), Some(new)) =>
-      "old line \{old.start_line}, new line \{new.start_line}"
-    (Some(old), None) => "old line \{old.start_line}"
-    (None, Some(new)) => "new line \{new.start_line}"
-    (None, None) => "file"
-  }
-  "graph limit exceeded (\{graph_limit}) at \{location}"
-}
-
-///|
 fn computation_stage(stage : @computation.Stage) -> ComputationStage {
   match stage {
     @computation.TopLevelAlignment => TopLevelAlignment
@@ -836,129 +813,6 @@ fn lexical_detailed_unit(
 }
 
 ///|
-fn ast_edit_document(
-  old_unit : ImplUnit?,
-  new_unit : ImplUnit?,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
-  context : Int,
-  graph_limit : UInt,
-  ignore_comments : Bool,
-) -> UnitDocumentResult {
-  let old_local = unit_source_projection(old_projection, old_unit)
-  let new_local = unit_source_projection(new_projection, new_unit)
-  let old_offset = impl_line_base(old_unit) - 1
-  let new_offset = impl_line_base(new_unit) - 1
-  let lhs_roots = Array::new()
-  let rhs_roots = Array::new()
-  if old_unit is Some(unit) {
-    lhs_roots.push(unit.root)
-  }
-  if new_unit is Some(unit) {
-    rhs_roots.push(unit.root)
-  }
-  @syntax.init_all_info(lhs_roots, rhs_roots)
-  let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, graph_limit) catch {
-    _ => {
-      let reason = graph_fallback_reason(graph_limit, old_unit, new_unit)
-      return {
-        document: lexical_projected_document(
-          old_local, new_local, context, ignore_comments,
-        ).rebase(old_offset, new_offset),
-        fallback_reason: Some(reason),
-      }
-    }
-  }
-  @diff.fix_all_sliders(lhs_roots, change_map)
-  @diff.fix_all_sliders(rhs_roots, change_map)
-  let lhs_positions = project_matched_positions(
-    @syntax.change_positions(lhs_roots, change_map),
-    old_local,
-    new_local,
-  )
-  let rhs_positions = project_matched_positions(
-    @syntax.change_positions(rhs_roots, change_map),
-    new_local,
-    old_local,
-  )
-  {
-    document: restore_projected_document(
-      ast_document_from_positions(
-        old_local.source(),
-        new_local.source(),
-        lhs_positions,
-        rhs_positions,
-        context,
-        false,
-      ),
-      old_local,
-      new_local,
-    ).rebase(old_offset, new_offset),
-    fallback_reason: None,
-  }
-}
-
-///|
-fn ast_root_list_document(
-  old_units : ArrayView[ImplUnit],
-  new_units : ArrayView[ImplUnit],
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
-  context : Int,
-  graph_limit : UInt,
-  ignore_comments : Bool,
-) -> AlignedDiffResult {
-  let lhs_roots = impl_roots(old_units)
-  let rhs_roots = impl_roots(new_units)
-  @syntax.init_all_info(lhs_roots, rhs_roots)
-  let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, graph_limit) catch {
-    _ => {
-      let reason = "graph limit exceeded (\{graph_limit})"
-      return {
-        document: lexical_projected_document(
-          old_projection, new_projection, context, ignore_comments,
-        ),
-        outcome: Fallback(reason),
-      }
-    }
-  }
-  @diff.fix_all_sliders(lhs_roots, change_map)
-  @diff.fix_all_sliders(rhs_roots, change_map)
-  let lhs_positions = project_matched_positions(
-    @syntax.change_positions(lhs_roots, change_map),
-    old_projection,
-    new_projection,
-  )
-  let rhs_positions = project_matched_positions(
-    @syntax.change_positions(rhs_roots, change_map),
-    new_projection,
-    old_projection,
-  )
-  let document = restore_projected_document(
-    ast_document_from_positions(
-      old_projection.source(),
-      new_projection.source(),
-      lhs_positions,
-      rhs_positions,
-      context,
-      false,
-    ),
-    old_projection,
-    new_projection,
-  )
-  {
-    document,
-    outcome: if document.hunks.is_empty() {
-      NoStructuralChanges
-    } else {
-      Rendered
-    },
-  }
-}
-
-///|
 fn ast_root_document_with_budget(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
@@ -1128,74 +982,6 @@ fn detailed_ast_plan_document(
 }
 
 ///|
-fn ast_plan_document(
-  plan : TopLevelPlan,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
-  context : Int,
-  graph_limit : UInt,
-  ignore_comments : Bool,
-) -> AlignedDiffResult {
-  match plan {
-    RootList(old~, new~) =>
-      ast_root_list_document(
-        old, new, old_projection, new_projection, context, graph_limit, ignore_comments,
-      )
-    PerUnit(edits) => {
-      let hunks : Array[@model.DiffHunk] = []
-      let fallback_reasons : Array[String] = []
-      for edit in edits {
-        let result = match edit {
-          Replace(old~, new~) =>
-            ast_edit_document(
-              Some(old),
-              Some(new),
-              old_projection,
-              new_projection,
-              context,
-              graph_limit,
-              ignore_comments,
-            )
-          Delete(old) =>
-            ast_edit_document(
-              Some(old),
-              None,
-              old_projection,
-              new_projection,
-              context,
-              graph_limit,
-              ignore_comments,
-            )
-          Insert(new) =>
-            ast_edit_document(
-              None,
-              Some(new),
-              old_projection,
-              new_projection,
-              context,
-              graph_limit,
-              ignore_comments,
-            )
-        }
-        append_document(hunks, result.document)
-        if result.fallback_reason is Some(reason) {
-          fallback_reasons.push(reason)
-        }
-      }
-      let document : @model.DiffDocument = { hunks: hunks[:] }
-      let outcome = if !fallback_reasons.is_empty() {
-        PartialFallback(fallback_reasons)
-      } else if document.hunks.is_empty() {
-        NoStructuralChanges
-      } else {
-        Rendered
-      }
-      { document, outcome }
-    }
-  }
-}
-
-///|
 fn parse_report_summary(
   side : String,
   reports : ArrayView[@basic.Report],
@@ -1241,104 +1027,6 @@ fn parse_error_sides(
 }
 
 ///|
-fn initial_diff_document_result(
-  old_source : String,
-  new_source : String,
-  mode : AlignedDiffMode,
-  context : Int,
-  ignore_comments : Bool,
-) -> AlignedDiffResult? {
-  if old_source == new_source {
-    return Some({
-      document: empty_document(),
-      outcome: if mode is Ast {
-        NoStructuralChanges
-      } else {
-        Rendered
-      },
-    })
-  }
-  if ignore_comments {
-    let filtered = lexical_source_document(
-      old_source, new_source, context, true,
-    )
-    if filtered.hunks.is_empty() {
-      return Some({ document: filtered, outcome: NoNonCommentChanges })
-    }
-  }
-  None
-}
-
-///|
-fn diff_document_from_parsed_roots(
-  old_source : String,
-  new_source : String,
-  old_root : @cst.CstNode,
-  new_root : @cst.CstNode,
-  mode : AlignedDiffMode,
-  context : Int,
-  graph_limit : UInt,
-  ignore_comments : Bool,
-  ignore_tests : Bool,
-) -> AlignedDiffResult {
-  let old_collection = collect_impl_units_detailed(
-    old_source, old_root, ignore_tests,
-  )
-  let new_collection = collect_impl_units_detailed(
-    new_source, new_root, ignore_tests,
-  )
-  let old_projection = make_source_projection(
-    old_source,
-    old_collection.ignored_tests,
-  )
-  let new_projection = make_source_projection(
-    new_source,
-    new_collection.ignored_tests,
-  )
-  if ignore_comments || ignore_tests {
-    let filtered = lexical_projected_document(
-      old_projection, new_projection, context, ignore_comments,
-    )
-    if filtered.hunks.is_empty() {
-      return { document: filtered, outcome: NoNonCommentChanges }
-    }
-  }
-  let plan = top_level_plan(
-    old_collection.units,
-    new_collection.units,
-    ignore_uuid=ignore_comments,
-  )
-  match mode {
-    Lexical =>
-      lexical_plan_document(
-        plan, old_source, new_source, old_projection, new_projection, context, ignore_comments,
-      )
-    Ast => {
-      let result = ast_plan_document(
-        plan, old_projection, new_projection, context, graph_limit, ignore_comments,
-      )
-      if !ignore_comments {
-        return result
-      }
-      let document = @tokdiff.ignore_comments(
-        result.document,
-        old=document_lines(old_source),
-        new=document_lines(new_source),
-      )
-      {
-        document,
-        outcome: if document.hunks.is_empty() &&
-          !(result.outcome is (Fallback(_) | PartialFallback(_))) {
-          NoStructuralChanges
-        } else {
-          result.outcome
-        },
-      }
-    }
-  }
-}
-
-///|
 fn calculate_diff_document_with_limit(
   old_source : String,
   new_source : String,
@@ -1349,6 +1037,7 @@ fn calculate_diff_document_with_limit(
   ignore_comments : Bool,
   computation_limit : UInt,
   ignore_tests? : Bool = false,
+  mode? : AlignedDiffMode = Ast,
 ) -> DiffCalculation {
   let context = @cmp.maximum(context, 0)
   if old_source == new_source {
@@ -1448,12 +1137,18 @@ fn calculate_diff_document_with_limit(
         parser_reason,
       }
   }
-  let layout = layout_from_top_level_plan(plan)
-  let result = detailed_ast_plan_document(
-    plan, old_projection, new_projection, context, graph_limit, ignore_comments,
-    budget,
-  )
-  let result = if ignore_comments {
+  let result = match mode {
+    Lexical =>
+      detailed_lexical_plan_document(
+        plan, old_source, new_source, old_projection, new_projection, context, ignore_comments,
+      )
+    Ast =>
+      detailed_ast_plan_document(
+        plan, old_projection, new_projection, context, graph_limit, ignore_comments,
+        budget,
+      )
+  }
+  let result = if mode is Ast && ignore_comments {
     let document = @tokdiff.ignore_comments(
       result.document,
       old=document_lines(old_source),
@@ -1471,12 +1166,19 @@ fn calculate_diff_document_with_limit(
   } else {
     result
   }
+  let layout = if result.fallbacks is [{ scope: WholeFile, .. }] {
+    WholeDocument
+  } else {
+    layout_from_top_level_plan(plan)
+  }
   { result, layout, parser_reason }
 }
 
 ///|
-/// Calculate the AST-first renderer-neutral diff, its presentation layout,
-/// and parser diagnostics from one parse and one top-level alignment plan.
+/// Calculate a renderer-neutral diff, its presentation layout, and parser
+/// diagnostics from one parse and one top-level alignment plan. AST mode is
+/// the default; lexical mode keeps token-level text changes while retaining
+/// declaration alignment and the shared top-level computation budget.
 pub fn calculate_diff_document(
   old_source : String,
   new_source : String,
@@ -1486,6 +1188,7 @@ pub fn calculate_diff_document(
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
+  mode? : AlignedDiffMode = Ast,
 ) -> DiffCalculation {
   calculate_diff_document_with_limit(
     old_source,
@@ -1497,12 +1200,14 @@ pub fn calculate_diff_document(
     ignore_comments,
     @computation.default_limit(),
     ignore_tests~,
+    mode~,
   )
 }
 
 ///|
-/// Calculate the AST-first renderer-neutral diff and typed fallback metadata.
-/// The computation limit is deliberately fixed as an implementation detail.
+/// Calculate a renderer-neutral diff and typed fallback metadata. AST mode is
+/// the default. The computation limit is deliberately fixed as an
+/// implementation detail.
 pub fn diff_document_detailed(
   old_source : String,
   new_source : String,
@@ -1510,6 +1215,7 @@ pub fn diff_document_detailed(
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
+  mode? : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
   calculate_diff_document(
     old_source,
@@ -1518,6 +1224,7 @@ pub fn diff_document_detailed(
     graph_limit~,
     ignore_comments~,
     ignore_tests~,
+    mode~,
   ).result
 }
 
@@ -1573,14 +1280,25 @@ fn fallback_reason_text(fallback : FallbackInfo) -> String {
         "\{base} at \{location}"
       }
     }
+    TopLevelReordering =>
+      "top-level reordering has no changes inside aligned declarations"
   }
 }
 
 ///|
-fn detailed_compat_result(result : DetailedDiffResult) -> AlignedDiffResult {
+fn detailed_compat_result(
+  result : DetailedDiffResult,
+  mode : AlignedDiffMode,
+) -> AlignedDiffResult {
   let outcome = if result.fallbacks.is_empty() {
     match result.status {
-      Identical | NoStructuralChanges => AlignedDiffOutcome::NoStructuralChanges
+      Identical =>
+        if mode is Lexical {
+          AlignedDiffOutcome::Rendered
+        } else {
+          AlignedDiffOutcome::NoStructuralChanges
+        }
+      NoStructuralChanges => AlignedDiffOutcome::NoStructuralChanges
       IgnoredOnly => AlignedDiffOutcome::NoNonCommentChanges
       Changed => AlignedDiffOutcome::Rendered
     }
@@ -1605,48 +1323,16 @@ pub fn diff_document(
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
 ) -> AlignedDiffResult {
-  if mode is Ast {
-    return detailed_compat_result(
-      diff_document_detailed(
-        old_source,
-        new_source,
-        context~,
-        graph_limit~,
-        ignore_comments~,
-        ignore_tests~,
-      ),
-    )
-  }
-  let context = @cmp.maximum(context, 0)
-  if initial_diff_document_result(
-      old_source, new_source, mode, context, ignore_comments,
-    )
-    is Some(result) {
-    return result
-  }
-  let old_parse = @cst.parse_structure(old_source, name="old")
-  let new_parse = @cst.parse_structure(new_source, name="new")
-  if parser_fallback_reason(
-      old_parse.diagnostics_view(),
-      new_parse.diagnostics_view(),
-    )
-    is Some(reason) {
-    return {
-      document: lexical_source_document(
-        old_source, new_source, context, ignore_comments,
-      ),
-      outcome: Fallback(reason),
-    }
-  }
-  diff_document_from_parsed_roots(
-    old_source,
-    new_source,
-    old_parse.root(),
-    new_parse.root(),
+  detailed_compat_result(
+    diff_document_detailed(
+      old_source,
+      new_source,
+      context~,
+      graph_limit~,
+      ignore_comments~,
+      ignore_tests~,
+      mode~,
+    ),
     mode,
-    context,
-    graph_limit,
-    ignore_comments,
-    ignore_tests,
   )
 }

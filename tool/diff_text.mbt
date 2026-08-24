@@ -53,6 +53,8 @@ fn fallback_reason_text(
         "\{base} at \{location}"
       }
     }
+    TopLevelReordering =>
+      "top-level reordering has no changes inside aligned declarations"
   }
 }
 
