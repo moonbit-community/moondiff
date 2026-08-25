@@ -1,7 +1,0 @@
-import {
-  "moonbitlang/parser/untyped_cst" @cst,
-  "moonbit-community/moondiff/syntax" @dsyntax,
-  "moonbit-community/moondiff/span",
-}
-
-warnings = "-28"

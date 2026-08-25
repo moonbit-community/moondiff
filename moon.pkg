@@ -6,8 +6,8 @@ import {
   "moonbitlang/async/fs",
   "moonbitlang/async/io",
   "moonbitlang/async/stdio",
-  "moonbit-community/moondiff/tool",
-  "moonbit-community/moondiff/tool/render",
+  "moonbit-community/moondiff/internal/tool",
+  "moonbit-community/moondiff/internal/tool/render",
 }
 
 supported_targets = "wasm+native"

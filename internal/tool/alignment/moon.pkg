@@ -1,0 +1,20 @@
+import {
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/hashmap",
+  "moonbitlang/lexer/basic",
+  "moonbitlang/parser/untyped_cst" @cst,
+  "moonbit-community/moondiff/internal/astdiff" @diff,
+  "moonbit-community/moondiff/internal/elab",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/internal/syntax",
+  "moonbit-community/moondiff/internal/span",
+  "moonbit-community/moondiff/internal/tokdiff",
+  "moonbit-community/moondiff/internal/tool/hunks",
+  "moonbit-community/moondiff/internal/source_text",
+  "moonbit-community/moondiff/internal/computation",
+}
+
+import {
+  "moonbitlang/core/debug",
+  "moonbit-community/moondiff/internal/tokdiff/text" @tokdiff_text,
+} for "wbtest"

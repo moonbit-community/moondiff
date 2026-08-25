@@ -1,0 +1,62 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/internal/astdiff"
+
+import {
+  "moonbit-community/moondiff/internal/computation",
+  "moonbit-community/moondiff/internal/syntax",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/ref",
+}
+
+// Values
+pub fn fix_all_sliders(ArrayView[@syntax.Syntax], @syntax.ChangeMap) -> Unit
+
+pub fn mark_syntax_roots_with_budget(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt, @computation.Budget) -> Unit raise
+
+pub fn shortest_path_with_budget(Vertex, Int, Int, @computation.Budget) -> Array[(Edge, Vertex)] raise
+
+pub fn tree_count(@syntax.Syntax?) -> UInt
+
+// Errors
+
+// Types and methods
+pub enum Edge {
+  UnchangedNode(depth_difference~ : UInt, probably_punctuation~ : Bool)
+  EnterUnchangedDelimiter(depth_difference~ : UInt)
+  ReplacedComment(levenshtein_pct~ : UInt)
+  ReplacedString(levenshtein_pct~ : UInt)
+  NovelAtomLHS
+  NovelAtomRHS
+  EnterNovelDelimiterLHS
+  EnterNovelDelimiterRHS
+} derive(@debug.Debug)
+
+type EnteredDelimiter derive(Eq)
+pub impl Show for EnteredDelimiter
+
+type Node[T] derive(Eq)
+
+pub struct Stack[T](Node[T]?) derive(Eq)
+pub fn[T] Stack::is_empty(Self[T]) -> Bool
+pub fn[T] Stack::new() -> Self[T]
+pub fn[T] Stack::peek(Self[T]) -> T?
+pub fn[T] Stack::pop(Self[T]) -> Self[T]?
+pub fn[T] Stack::push(Self[T], T) -> Self[T]
+pub fn[T] Stack::size(Self[T]) -> UInt
+
+pub struct Vertex {
+  neighbours : @ref.Ref[Array[(Edge, Vertex)]?]
+  predecessor : @ref.Ref[(UInt, Vertex)?]
+  lhs_syntax : @syntax.Syntax?
+  rhs_syntax : @syntax.Syntax?
+  parents : Stack[EnteredDelimiter]
+  lhs_parent_id : UInt?
+  rhs_parent_id : UInt?
+}
+pub fn Vertex::new(lhs~ : @syntax.Syntax?, rhs~ : @syntax.Syntax?) -> Self
+pub impl Eq for Vertex
+pub impl Hash for Vertex
+
+// Type aliases
+
+// Traits

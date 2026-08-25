@@ -1,0 +1,9 @@
+import {
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/internal/tokdiff",
+  "moonbit-community/moondiff/internal/render/common",
+}
+
+import {
+  "moonbitlang/core/test",
+} for "test"
