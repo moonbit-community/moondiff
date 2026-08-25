@@ -126,12 +126,12 @@ fn render_cli_diff(
   graph_limit : UInt,
 ) -> String {
   if should_use_structural_diff(options.old_path, options.new_path) {
-    @tool.diff_text(
+    @render.diff_text(
       options.old_path,
       old_source,
       options.new_path,
       new_source,
-      options=@tool.DiffOptions::new(
+      options=@render.DiffOptions::new(
         graph_limit~,
         context_lines=3,
         use_color=options.use_color,

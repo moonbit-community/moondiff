@@ -222,7 +222,7 @@ fn render_sectioned_document(
       section_hunks
     }
     section_buf.write_string(
-      @render.render_diff_document_with_max_lines(
+      render_diff_document_with_max_lines(
         section_label(old_label, section.old),
         section_label(new_label, section.new),
         { hunks: rendered_hunks[:] },
@@ -243,7 +243,7 @@ fn render_sectioned_document(
     append_rendered_section(
       buf,
       wrote,
-      @render.render_diff_document(
+      render_diff_document(
         old_label,
         new_label,
         { hunks: unassigned[:] },
@@ -270,13 +270,13 @@ fn render_cli_whole_ast_document(
     old_source.is_empty(),
     new_source.is_empty(),
   )
-  @render.render_diff_document_with_max_lines(
+  render_diff_document_with_max_lines(
     old_label,
     new_label,
     { hunks, },
     options.render_options(),
-    @render.split_lines(old_source).length(),
-    @render.split_lines(new_source).length(),
+    split_lines(old_source).length(),
+    split_lines(new_source).length(),
   )
 }
 
@@ -306,7 +306,7 @@ pub fn diff_text(
   let parser_reason = calculation.parser_reason
   let rendered = match result.status {
     Identical =>
-      @render.render_file_headers(old_label, new_label, options.use_color) +
+      render_file_headers(old_label, new_label, options.use_color) +
       "No changes.\n"
     IgnoredOnly => {
       let message = if options.ignore_comments && options.ignore_tests {
@@ -316,14 +316,13 @@ pub fn diff_text(
       } else {
         "No changes besides comments or blank lines.\n"
       }
-      @render.render_file_headers(old_label, new_label, options.use_color) +
-      message
+      render_file_headers(old_label, new_label, options.use_color) + message
     }
     NoStructuralChanges => ""
     Changed =>
       if fallbacks is [fallback] && fallback.scope is WholeFile {
         "note: fallback to tokdiff (\{fallback_reason_text(fallback, parser_reason)})\n" +
-        @render.render_diff_document(
+        render_diff_document(
           old_label,
           new_label,
           result.document,
@@ -336,7 +335,7 @@ pub fn diff_text(
             "note: fallback to tokdiff (\{fallback_reason_text(fallback, parser_reason)})\n"
         }
         buf.write_string(
-          @render.render_diff_document(
+          render_diff_document(
             old_label,
             new_label,
             result.document,

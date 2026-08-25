@@ -35,7 +35,7 @@
 ## Medium Priority
 
 - [ ] Ensure real textual changes never result in empty CLI output.
-  - Affected areas: `tool/alignment/root_alignment.mbt`, `tool/diff_text.mbt`, and `main.mbt`.
+  - Affected areas: `alignment/root_alignment.mbt`, `render/terminal/diff_text.mbt`, and `main.mbt`.
   - [ ] Define and implement an explicit output contract for `has_changes && rendered.is_empty()`.
   - [ ] For formatting-only changes, report that the text changed but no structural change was found; for top-level reordering, show a move summary or fall back to a regular line diff.
   - [ ] Add regression tests for reordered top-level declarations and ignored Unicode whitespace changes.

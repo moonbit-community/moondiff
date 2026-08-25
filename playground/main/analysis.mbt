@@ -507,7 +507,7 @@ fn file_hunks(
     is Some(result) else {
     return []
   }
-  @tokdiff_text.render_unified_hunks(result.document)
+  @unified.render_unified_hunks(result.document)
 }
 
 ///|
@@ -674,7 +674,7 @@ fn analysis_note(
   result : AnalysisResult,
   file_index : Int,
   hunk_index : Int,
-) -> @tokdiff_html.HunkNote? {
+) -> @render_html.HunkNote? {
   let id = "f\{file_index}-h\{hunk_index}"
   for group in result.groups {
     for hunk in group.hunks {
@@ -691,8 +691,8 @@ fn notes_for_file(
   result : AnalysisResult,
   file_index : Int,
   hunk_count : Int,
-) -> Array[@tokdiff_html.HunkNote?] {
-  let notes : Array[@tokdiff_html.HunkNote?] = []
+) -> Array[@render_html.HunkNote?] {
+  let notes : Array[@render_html.HunkNote?] = []
   for hunk_index in 0..<hunk_count {
     notes.push(analysis_note(result, file_index, hunk_index))
   }

@@ -30,11 +30,8 @@ pub impl Default for DiffOptions with fn default() {
 }
 
 ///|UUID(8e5d3fc9-598e-4dce-a881-fcff64c6b41c)
-fn DiffOptions::render_options(self : Self) -> @render.RenderOptions {
-  @render.RenderOptions::new(
-    context_lines=self.context_lines,
-    use_color=self.use_color,
-  )
+fn DiffOptions::render_options(self : Self) -> RenderOptions {
+  RenderOptions::new(context_lines=self.context_lines, use_color=self.use_color)
 }
 
 ///|UUID(3056bc33-5b65-4d21-bdfc-d602536de30d)

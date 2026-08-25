@@ -9,8 +9,8 @@ test "semantic convenience renderers equal direct IR renderers" {
   let cleaned = @tokdiff.diff(old~, new~, context=1, line_cleanup=true)
   let raw = @tokdiff.diff(old~, new~, context=0, line_cleanup=false)
   assert_eq(
-    @tokdiff_html.render_side_by_side(cleaned, line_numbers=true),
-    @tokdiff_html.side_by_side_html(
+    @render_html.render_side_by_side(cleaned, line_numbers=true),
+    @render_html.side_by_side_html(
       old~,
       new~,
       context=1,
@@ -19,8 +19,8 @@ test "semantic convenience renderers equal direct IR renderers" {
     ),
   )
   assert_eq(
-    @tokdiff_html.render_unified(raw, line_numbers=false),
-    @tokdiff_html.unified_html(
+    @render_html.render_unified(raw, line_numbers=false),
+    @render_html.unified_html(
       old~,
       new~,
       context=0,
@@ -29,18 +29,18 @@ test "semantic convenience renderers equal direct IR renderers" {
     ),
   )
   assert_eq(
-    @tokdiff_html.render_side_by_side_hunks(raw),
-    @tokdiff_html.side_by_side_hunks_html(old~, new~, context=0),
+    @render_html.render_side_by_side_hunks(raw),
+    @render_html.side_by_side_hunks_html(old~, new~, context=0),
   )
   assert_eq(
-    @tokdiff_html.render_unified_hunks(raw, line_numbers=true),
-    @tokdiff_html.unified_hunks_html(old~, new~, context=0, line_numbers=true),
+    @render_html.render_unified_hunks(raw, line_numbers=true),
+    @render_html.unified_hunks_html(old~, new~, context=0, line_numbers=true),
   )
   assert_eq(
-    @tokdiff_text.render_unified_hunks(
+    @unified.render_unified_hunks(
       @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
     ),
-    @tokdiff_text.unified_hunks(old~, new~, context=0, line_cleanup=true),
+    @unified.unified_hunks(old~, new~, context=0, line_cleanup=true),
   )
 }
 
@@ -55,8 +55,8 @@ test "plain convenience renderers equal direct IR renderers" {
     let (old, new) = pair
     let document = @tokdiff.line_diff(old~, new~, context=0)
     assert_eq(
-      @tokdiff_html.render_side_by_side(document, line_numbers=true),
-      @tokdiff_html.side_by_side_line_html(
+      @render_html.render_side_by_side(document, line_numbers=true),
+      @render_html.side_by_side_line_html(
         old~,
         new~,
         context=0,
@@ -64,12 +64,12 @@ test "plain convenience renderers equal direct IR renderers" {
       ),
     )
     assert_eq(
-      @tokdiff_html.render_unified(document),
-      @tokdiff_html.unified_line_html(old~, new~, context=0),
+      @render_html.render_unified(document),
+      @render_html.unified_line_html(old~, new~, context=0),
     )
     assert_eq(
-      @tokdiff_text.render_unified_hunks(document),
-      @tokdiff_text.unified_line_hunks(old~, new~, context=0),
+      @unified.render_unified_hunks(document),
+      @unified.unified_line_hunks(old~, new~, context=0),
     )
   }
 }

@@ -31,7 +31,7 @@ priv enum LineStyle {
 ///|UUID(32757abf-5f53-4a4d-bb1a-3df50a424d47)
 // Split on LF and CRLF. This intentionally returns a non-empty array and keeps
 // a trailing empty line, unlike APIs that treat `foo\n` as one line.
-pub fn split_lines(source : String) -> Array[String] {
+fn split_lines(source : String) -> Array[String] {
   @source_text.split_lines(source)
 }
 
@@ -118,7 +118,7 @@ fn style_file_header(text : String, use_color : Bool) -> String {
 }
 
 ///|UUID(06f17b4e-fb70-42ea-880f-a1af1661af4e)
-pub fn render_file_headers(
+fn render_file_headers(
   old_label : String,
   new_label : String,
   use_color : Bool,
@@ -534,7 +534,7 @@ fn render_diff_document_impl(
 
 ///|
 /// Render a calculated diff document with widths inferred from its rows.
-pub fn render_diff_document(
+fn render_diff_document(
   old_label : String,
   new_label : String,
   document : @model.DiffDocument,
@@ -547,7 +547,7 @@ pub fn render_diff_document(
 /// Render a document while reserving line-number widths for complete source
 /// sections. This preserves the historical terminal layout when a calculated
 /// hunk covers only part of a top-level declaration.
-pub fn render_diff_document_with_max_lines(
+fn render_diff_document_with_max_lines(
   old_label : String,
   new_label : String,
   document : @model.DiffDocument,

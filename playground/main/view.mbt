@@ -667,13 +667,13 @@ fn analysis_file_hunks_html(
   )
   match mode {
     Split =>
-      @tokdiff_html.render_side_by_side_hunks(
+      @render_html.render_side_by_side_hunks(
         diff.document,
         line_numbers=true,
         hunk_notes~,
       )
     Unified =>
-      @tokdiff_html.render_unified_hunks(
+      @render_html.render_unified_hunks(
         diff.document,
         line_numbers=true,
         hunk_notes~,
