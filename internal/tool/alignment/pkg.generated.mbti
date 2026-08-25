@@ -1,0 +1,58 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/internal/tool/alignment"
+
+import {
+  "moonbit-community/moondiff/model",
+}
+
+// Values
+pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DiffCalculation
+
+pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DetailedDiffResult
+
+// Errors
+
+// Types and methods
+pub(all) enum AlignedDiffMode {
+  Lexical
+  Ast
+} derive(Eq)
+
+pub(all) struct DetailedDiffResult {
+  document : @model.DiffDocument
+  status : @model.DiffStatus
+  fallbacks : ArrayView[@model.FallbackInfo]
+} derive(Eq)
+
+pub(all) struct DiffCalculation {
+  result : DetailedDiffResult
+  layout : DiffLayout
+  parser_reason : String?
+}
+
+pub(all) enum DiffLayout {
+  WholeDocument
+  TopLevelSections(Array[DiffSection])
+} derive(Eq)
+
+pub(all) struct DiffSection {
+  old : @model.LineRange?
+  new : @model.LineRange?
+} derive(Eq)
+
+// Type aliases
+pub using @model {type ComputationStage}
+
+pub using @model {type DiffSide}
+
+pub using @model {type DiffStatus}
+
+pub using @model {type FallbackInfo}
+
+pub using @model {type FallbackReason}
+
+pub using @model {type FallbackScope}
+
+pub using @model {type LineRange}
+
+// Traits

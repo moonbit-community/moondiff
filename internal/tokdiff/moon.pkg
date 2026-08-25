@@ -1,0 +1,16 @@
+import {
+  "moonbitlang/core/diff",
+  "moonbitlang/lexer",
+  "moonbitlang/lexer/tokens",
+  "moonbit-community/moondiff/model",
+}
+
+import {
+  "moonbitlang/core/debug",
+  "moonbit-community/moondiff/internal/tokdiff/html" @tokdiff_html,
+  "moonbit-community/moondiff/internal/tokdiff/text" @tokdiff_text,
+} for "test"
+
+import {
+  "moonbitlang/core/debug",
+} for "wbtest"

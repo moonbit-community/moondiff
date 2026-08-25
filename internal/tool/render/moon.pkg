@@ -1,0 +1,13 @@
+import {
+  "moonbit-community/chalk",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/diff",
+  "moonbitlang/core/hashmap",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/internal/source_text",
+  "moonbit-community/moondiff/internal/render/common",
+}
+
+import {
+  "moonbitlang/core/debug",
+} for "wbtest"

@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/internal/tokdiff/text"
+
+import {
+  "moonbit-community/moondiff/model",
+}
+
+// Values
+pub fn render_unified_hunks(@model.DiffDocument) -> Array[String]
+
+pub fn unified_hunks(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, ignore_comments? : Bool) -> Array[String]
+
+pub fn unified_line_hunks(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> Array[String]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

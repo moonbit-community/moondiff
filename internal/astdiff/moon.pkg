@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/hashmap",
+  "moonbitlang/core/priority_queue",
+  "moonbit-community/moondiff/internal/syntax",
+  "moonbit-community/moondiff/internal/span",
+  "moonbit-community/moondiff/internal/computation",
+}
+
+import {
+  "moonbitlang/parser/untyped_cst" @cst,
+} for "wbtest"

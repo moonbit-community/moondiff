@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/hashmap",
+  "moonbit-community/moondiff/internal/syntax",
+}
+
+import {
+  "moonbitlang/core/debug",
+  "moonbit-community/moondiff/internal/span",
+} for "wbtest"
