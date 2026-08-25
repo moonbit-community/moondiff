@@ -1,4 +1,4 @@
 import {
   "moonbit-community/moondiff/model",
-  "moonbit-community/moondiff/internal/render/common",
+  "moonbit-community/moondiff/internal/render",
 }

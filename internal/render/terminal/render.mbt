@@ -332,7 +332,7 @@ pub fn render_document(
   buf.write_string(render_file_headers(old_label, new_label, options.use_color))
   for hunk in document.hunks {
     buf.write_string(
-      @common.hunk_header(
+      @render.hunk_header(
         hunk.old_start,
         hunk.old_len,
         hunk.new_start,
