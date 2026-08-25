@@ -1,5 +1,5 @@
 ///|
-test "semantic convenience renderers equal direct IR renderers" {
+test "semantic HTML convenience renderers equal direct IR renderers" {
   let old = [
     "before semantic anchor", "call(alpha, old, omega)", "", "after semantic anchor",
   ]
@@ -36,16 +36,10 @@ test "semantic convenience renderers equal direct IR renderers" {
     @render_html.render_unified_hunks(raw, line_numbers=true),
     @render_html.unified_hunks_html(old~, new~, context=0, line_numbers=true),
   )
-  assert_eq(
-    @unified.render_unified_hunks(
-      @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
-    ),
-    @unified.unified_hunks(old~, new~, context=0, line_cleanup=true),
-  )
 }
 
 ///|
-test "plain convenience renderers equal direct IR renderers" {
+test "plain HTML convenience renderers equal direct IR renderers" {
   for
     pair in [
       (([] : Array[String]), ["x", ""]),
@@ -66,10 +60,6 @@ test "plain convenience renderers equal direct IR renderers" {
     assert_eq(
       @render_html.render_unified(document),
       @render_html.unified_line_html(old~, new~, context=0),
-    )
-    assert_eq(
-      @unified.render_unified_hunks(document),
-      @unified.unified_line_hunks(old~, new~, context=0),
     )
   }
 }

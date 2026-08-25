@@ -77,27 +77,3 @@ fn render_hunk(hunk : @model.DiffHunk) -> String {
 pub fn render_unified_hunks(document : @model.DiffDocument) -> Array[String] {
   document.hunks.map(render_hunk)
 }
-
-///|
-/// Return unified patch hunks for a MoonBit-aware diff.
-pub fn unified_hunks(
-  old~ : ArrayView[String],
-  new~ : ArrayView[String],
-  context? : Int = 3,
-  line_cleanup? : Bool = false,
-  ignore_comments? : Bool = false,
-) -> Array[String] {
-  render_unified_hunks(
-    @tokdiff.diff(old~, new~, context~, line_cleanup~, ignore_comments~),
-  )
-}
-
-///|
-/// Return unified patch hunks for a plain Patience line diff.
-pub fn unified_line_hunks(
-  old~ : ArrayView[String],
-  new~ : ArrayView[String],
-  context? : Int = 3,
-) -> Array[String] {
-  render_unified_hunks(@tokdiff.line_diff(old~, new~, context~))
-}
