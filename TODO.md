@@ -2,19 +2,35 @@
 
 ## High Priority
 
-- [ ] Support CR-only line endings without crashing or rendering blank changed lines.
-  - Affected areas: `elab/cst_elab.mbt`, `span/span.mbt`, and `tool/render/render.mbt`.
-  - [ ] Use the same universal-newline splitting logic for LF, CRLF, and CR in every layer.
-  - [ ] Add end-to-end structured-diff and line-diff tests for all three line-ending formats.
-  - [ ] Validate syntax positions against the rendered line array and fall back to a regular line diff when positions are out of bounds.
+- [ ] Finish universal-newline support at the remaining input boundaries.
+  - [x] Use the same LF, CRLF, and CR splitting rules in the core parser,
+    source-position, structural-diff, and rendering paths.
+  - [x] Add an end-to-end structured-diff test for all three line-ending
+    formats.
+  - [ ] Make Playground source validation and splitting recognize bare CR as a
+    line ending; it currently counts LF characters and only normalizes CRLF.
+  - [ ] Add Playground and line-diff regression tests for CR-only input,
+    including enforcement of the 20,000-line limit.
+  - [ ] Validate syntax positions against the rendered line array and fall back
+    to a regular line diff when positions are out of bounds.
 
-- [ ] Bound quadratic Levenshtein and LCS computations independently of `graph_limit`.
-  - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`, `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and `syntax/positions.mbt`.
-  - [ ] Add DP-cell budgets, such as a limit on `lhs_len × rhs_len`.
-  - [ ] Use banded or thresholded similarity algorithms, or algorithms that support early termination.
-  - [ ] Check the remaining computation budget before generating expensive graph neighbors.
-  - [ ] Fall back immediately to a regular line diff for the affected unit when a limit is exceeded.
-  - [ ] Add a regression/performance test for large strings that differ near the end.
+- [x] Bound quadratic Levenshtein and LCS computations independently of
+  `graph_limit`.
+  - [x] Charge DP matrix cells against an overflow-safe shared per-file
+    computation budget before allocation.
+  - [x] Report a typed computation-limit reason and fall back to a regular line
+    diff for the affected file or unit when the budget is exhausted.
+
+- [ ] Improve worst-case similarity work beyond the existing budget fallback.
+  - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`,
+    `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and
+    `syntax/positions.mbt`.
+  - [ ] Use banded or thresholded similarity algorithms, or algorithms that
+    support early termination.
+  - [ ] Check the remaining computation budget before generating expensive
+    graph neighbors.
+  - [ ] Add a regression/performance test for large strings that differ near
+    the end.
 
 ## Medium Priority
 
