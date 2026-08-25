@@ -1093,7 +1093,7 @@ fn calculate_diff_document_with_limit(
     }
   }
   let budget = @computation.Budget::new(computation_limit)
-  let plan = top_level_plan_with_budget(
+  let plan = top_level_plan_impl(
     old_collection.units,
     new_collection.units,
     budget,

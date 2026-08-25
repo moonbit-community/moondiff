@@ -40,12 +40,10 @@ fn same_root_content(lhs : Syntax, rhs : Syntax) -> Bool {
 fn root_matches_impl(
   lhs : ArrayView[Syntax],
   rhs : ArrayView[Syntax],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[(Int, Int)] raise @computation.LimitExceeded {
   let width = rhs.length() + 1
-  if budget is Some(budget) {
-    budget.charge_matrix(lhs.length() + 1, width, TopLevelAlignment)
-  }
+  budget.charge_matrix(lhs.length() + 1, width, TopLevelAlignment)
   let dp = Array::make((lhs.length() + 1) * width, 0)
   let index = fn(i : Int, j : Int) { i * width + j }
 
@@ -86,7 +84,7 @@ fn mark_root_segments(
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Unit raise {
   match (lhs_roots.length(), rhs_roots.length()) {
     (0, 0) => ()
@@ -167,7 +165,7 @@ fn mark_syntax_subtree(
   rhs_root : Syntax?,
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Unit raise {
   match (lhs_root, rhs_root) {
     (None, None) => ()
@@ -205,7 +203,7 @@ fn mark_syntax_subtree(
               mark_syntax_roots_impl(
                 lhs_children, rhs_children, change_map, graph_limit, budget,
               )
-            } else if budget is Some(budget) {
+            } else {
               mark_syntax_with_budget(
                 Some(lhs),
                 Some(rhs),
@@ -213,22 +211,16 @@ fn mark_syntax_subtree(
                 graph_limit,
                 budget,
               )
-            } else {
-              mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
             }
           }
           _ =>
-            if budget is Some(budget) {
-              mark_syntax_with_budget(
-                Some(lhs),
-                Some(rhs),
-                change_map,
-                graph_limit,
-                budget,
-              )
-            } else {
-              mark_syntax(Some(lhs), Some(rhs), change_map, graph_limit)
-            }
+            mark_syntax_with_budget(
+              Some(lhs),
+              Some(rhs),
+              change_map,
+              graph_limit,
+              budget,
+            )
         }
       }
   }
@@ -240,7 +232,7 @@ fn mark_syntax_roots_impl(
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Unit raise {
   let prefix_len = shared_prefix_len(lhs_roots, rhs_roots)
   for i in 0..<prefix_len {
@@ -274,16 +266,6 @@ fn mark_syntax_roots_impl(
 }
 
 ///|
-pub fn mark_syntax_roots(
-  lhs_roots : ArrayView[Syntax],
-  rhs_roots : ArrayView[Syntax],
-  change_map : ChangeMap,
-  graph_limit : UInt,
-) -> Unit raise {
-  mark_syntax_roots_impl(lhs_roots, rhs_roots, change_map, graph_limit, None)
-}
-
-///|
 pub fn mark_syntax_roots_with_budget(
   lhs_roots : ArrayView[Syntax],
   rhs_roots : ArrayView[Syntax],
@@ -291,11 +273,5 @@ pub fn mark_syntax_roots_with_budget(
   graph_limit : UInt,
   budget : @computation.Budget,
 ) -> Unit raise {
-  mark_syntax_roots_impl(
-    lhs_roots,
-    rhs_roots,
-    change_map,
-    graph_limit,
-    Some(budget),
-  )
+  mark_syntax_roots_impl(lhs_roots, rhs_roots, change_map, graph_limit, budget)
 }

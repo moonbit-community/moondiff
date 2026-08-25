@@ -6,13 +6,11 @@
 fn levenshtein_impl(
   lhs~ : Array[Char],
   rhs~ : Array[Char],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int raise @computation.LimitExceeded {
   let m = lhs.length()
   let n = rhs.length()
-  if budget is Some(budget) {
-    budget.charge_matrix(m + 1, n + 1, SyntaxMatching)
-  }
+  budget.charge_matrix(m + 1, n + 1, SyntaxMatching)
   let s = [[], []]
   // create Array of length n+1 with elements initialized to 0
   s[0] = Array::make(n + 1, 0)
@@ -43,27 +41,8 @@ fn levenshtein_impl(
   s[m & 1][n]
 }
 
-///|
-fn levenshtein(lhs~ : Array[Char], rhs~ : Array[Char]) -> Int {
-  levenshtein_impl(None, lhs~, rhs~) catch {
-    @computation.LimitExceeded(..) => panic()
-  }
-}
-
 ///|UUID(98dd7927-df59-420c-9c4d-a0a68ec9bfbf)
-fn normalized_levenshtein(lhs~ : String, rhs~ : String) -> Double {
-  let lhs = lhs.to_array()
-  let rhs = rhs.to_array()
-  if lhs.is_empty() && rhs.is_empty() {
-    return 1.0
-  }
-  1.0 -
-  levenshtein(lhs~, rhs~).to_double() /
-  @cmp.maximum(lhs.length(), rhs.length()).to_double()
-}
-
-///|
-fn normalized_levenshtein_with_budget(
+fn normalized_levenshtein(
   lhs~ : String,
   rhs~ : String,
   budget : @computation.Budget,
@@ -74,6 +53,6 @@ fn normalized_levenshtein_with_budget(
     return 1.0
   }
   1.0 -
-  levenshtein_impl(Some(budget), lhs~, rhs~).to_double() /
+  levenshtein_impl(budget, lhs~, rhs~).to_double() /
   @cmp.maximum(lhs.length(), rhs.length()).to_double()
 }
