@@ -2,16 +2,16 @@
 test "plain unified hunks preserve renderer boundaries and file-edge ranges" {
   let old = ["0", "old", "2", "3", "4", "5", "6", "gone", "8"]
   let new = ["0", "new", "2", "3", "4", "5", "6", "added", "8"]
-  assert_eq(@unified.unified_line_hunks(old~, new~, context=0), [
+  let document = @tokdiff.line_diff(old~, new~, context=0)
+  let patches = @unified.render_unified_hunks(document)
+  assert_eq(patches, [
     "@@ -2 +2 @@\n-old\n+new\n", "@@ -8 +8 @@\n-gone\n+added\n",
   ])
-  assert_eq(@unified.unified_line_hunks(old=[], new=["x", ""], context=0), [
-    "@@ -0,0 +1,2 @@\n+x\n+\n",
-  ])
-  assert_eq(@unified.unified_line_hunks(old=["x", ""], new=[], context=0), [
-    "@@ -1,2 +0,0 @@\n-x\n-\n",
-  ])
-  for patch in @unified.unified_line_hunks(old~, new~, context=0) {
+  let added = @tokdiff.line_diff(old=[], new=["x", ""], context=0)
+  assert_eq(@unified.render_unified_hunks(added), ["@@ -0,0 +1,2 @@\n+x\n+\n"])
+  let removed = @tokdiff.line_diff(old=["x", ""], new=[], context=0)
+  assert_eq(@unified.render_unified_hunks(removed), ["@@ -1,2 +0,0 @@\n-x\n-\n"])
+  for patch in patches {
     let header = patch.view(end_offset=patch.find("\n").unwrap())
     assert_true(
       @render_html.unified_line_html(old~, new~, context=0).contains(
@@ -25,8 +25,10 @@ test "plain unified hunks preserve renderer boundaries and file-edge ranges" {
 test "MoonBit hunks follow semantic line cleanup used by HTML" {
   let old = ["let a = old", "", "let b = old", "let c = old"]
   let new = ["let a = new", "let b = new", "let c = new", ""]
-  assert_eq(@unified.unified_hunks(old~, new~, context=0).length(), 2)
-  let cleaned = @unified.unified_hunks(old~, new~, context=0, line_cleanup=true)
+  let raw = @tokdiff.diff(old~, new~, context=0)
+  assert_eq(@unified.render_unified_hunks(raw).length(), 2)
+  let cleaned_document = @tokdiff.diff(old~, new~, context=0, line_cleanup=true)
+  let cleaned = @unified.render_unified_hunks(cleaned_document)
   assert_eq(cleaned.length(), 1)
   assert_true(cleaned[0].contains("-let b = old\n"))
   assert_true(cleaned[0].contains("+let b = new\n"))
@@ -125,8 +127,10 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
     Some({ title: "First <group>", body: "First explanation." }),
     Some({ title: "Second & group", body: "Second explanation." }),
   ]
-  let semantic_patches = @unified.unified_hunks(old~, new~, context=0)
-  let plain_patches = @unified.unified_line_hunks(old~, new~, context=0)
+  let semantic_document = @tokdiff.diff(old~, new~, context=0)
+  let semantic_patches = @unified.render_unified_hunks(semantic_document)
+  let plain_document = @tokdiff.line_diff(old~, new~, context=0)
+  let plain_patches = @unified.render_unified_hunks(plain_document)
   let semantic_renderers = [
     @render_html.side_by_side_hunks_html(
       old~,
