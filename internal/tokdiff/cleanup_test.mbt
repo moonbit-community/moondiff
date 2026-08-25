@@ -11,15 +11,21 @@ fn count_substring(text : String, needle : String) -> Int {
 
 ///|
 test "token cleanup highlights the natural repeated-token boundary" {
-  let split = @render_html.side_by_side_html(old=["x x"], new=["x"], context=0)
+  let split = @render_html.render_side_by_side(
+    @tokdiff.diff(old=["x x"], new=["x"], context=0),
+  )
   assert_true(
     split.contains(
       "<td class=\"del\">x <b class=\"wd\">x</b></td><td class=\"add\">x</td>",
     ),
   )
-  let comment = @render_html.unified_html(old=["// foo foo"], new=["// foo"])
+  let comment = @render_html.render_unified(
+    @tokdiff.diff(old=["// foo foo"], new=["// foo"]),
+  )
   assert_true(comment.contains("// foo <b class=\"wd\">foo</b>"))
-  let unicode = @render_html.side_by_side_html(old=["名 名"], new=["名"])
+  let unicode = @render_html.render_side_by_side(
+    @tokdiff.diff(old=["名 名"], new=["名"]),
+  )
   assert_true(unicode.contains("名 <b class=\"wd\">名</b>"))
 }
 
@@ -30,27 +36,22 @@ test "global traceback fixes left-leaning insertion in both renderers" {
     "    if candidate.normalized_expr_identifier_name() is Some(candidate_name) {",
   ]
   let expected = "    <b class=\"wa\">if</b> candidate.normalized_expr_identifier_name() <b class=\"wa\">is Some(candidate_name)</b> {"
-  let split = @render_html.side_by_side_html(
-    old~,
-    new~,
-    context=0,
-    line_cleanup=false,
-  )
-  let unified = @render_html.unified_html(
-    old~,
-    new~,
-    context=0,
-    line_cleanup=false,
-  )
+  let raw_document = @tokdiff.diff(old~, new~, context=0, line_cleanup=false)
+  let split = @render_html.render_side_by_side(raw_document)
+  let unified = @render_html.render_unified(raw_document)
   assert_true(split.contains(expected))
   assert_true(unified.contains(expected))
   assert_eq(
     split,
-    @render_html.side_by_side_html(old~, new~, context=0, line_cleanup=true),
+    @render_html.render_side_by_side(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
+    ),
   )
   assert_eq(
     unified,
-    @render_html.unified_html(old~, new~, context=0, line_cleanup=true),
+    @render_html.render_unified(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
+    ),
   )
 }
 
@@ -58,17 +59,17 @@ test "global traceback fixes left-leaning insertion in both renderers" {
 test "line cleanup is opt-in and removes a misleading blank anchor" {
   let old = ["let a = old", "", "let b = old", "let c = old"]
   let new = ["let a = new", "let b = new", "let c = new", ""]
-  let default_split = @render_html.side_by_side_html(old~, new~, context=0)
+  let default_document = @tokdiff.diff(old~, new~, context=0)
+  let default_split = @render_html.render_side_by_side(default_document)
   assert_eq(
     default_split,
-    @render_html.side_by_side_html(old~, new~, context=0, line_cleanup=false),
+    @render_html.render_side_by_side(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=false),
+    ),
   )
   assert_true(count_substring(default_split, "class=\"hunk-header\"") == 2)
-  let cleaned = @render_html.side_by_side_html(
-    old~,
-    new~,
-    context=0,
-    line_cleanup=true,
+  let cleaned = @render_html.render_side_by_side(
+    @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
   )
   assert_true(
     cleaned.contains(
@@ -82,23 +83,14 @@ test "line cleanup is opt-in and removes a misleading blank anchor" {
 test "re-aligned identical meaningful line is rendered as context" {
   let old = ["let a = old", "same line", "let b = old", "}", "let c = old", "}"]
   let new = ["let a = new", "}", "same line", "let b = new", "let c = new", "}"]
-  let split = @render_html.side_by_side_html(
-    old~,
-    new~,
-    context=1,
-    line_cleanup=true,
-  )
+  let document = @tokdiff.diff(old~, new~, context=1, line_cleanup=true)
+  let split = @render_html.render_side_by_side(document)
   assert_true(
     split.contains(
       "<td class=\"ctx\">same line</td><td class=\"ctx\">same line</td>",
     ),
   )
-  let unified = @render_html.unified_html(
-    old~,
-    new~,
-    context=1,
-    line_cleanup=true,
-  )
+  let unified = @render_html.render_unified(document)
   assert_true(unified.contains("<span class=\"ctx\"> same line</span>"))
 }
 
@@ -136,23 +128,14 @@ test "patience keeps an unchanged branch ahead of repeated tuple boilerplate" {
     .map(StringView::to_owned)
     .collect()
   let marker = "        Some({ review: Some({ baseline: ReviewMissing, .. }), .. }) =&gt;"
-  let split = @render_html.side_by_side_html(
-    old~,
-    new~,
-    context=1,
-    line_cleanup=true,
-  )
+  let document = @tokdiff.diff(old~, new~, context=1, line_cleanup=true)
+  let split = @render_html.render_side_by_side(document)
   assert_true(
     split.contains(
       "<td class=\"ctx\">\{marker}</td><td class=\"ctx\">\{marker}</td>",
     ),
   )
-  let unified = @render_html.unified_html(
-    old~,
-    new~,
-    context=1,
-    line_cleanup=true,
-  )
+  let unified = @render_html.render_unified(document)
   assert_true(unified.contains("<span class=\"ctx\"> \{marker}</span>"))
   assert_false(unified.contains("<span class=\"del\">-\{marker}</span>"))
   assert_false(unified.contains("<span class=\"add\">+\{marker}</span>"))
@@ -170,18 +153,9 @@ test "both renderers preserve exact core hunk headers for all contexts" {
       (99, ["@@ -1,10 +1,10 @@"]),
     ] {
     let (context, headers) = case
-    let split = @render_html.side_by_side_html(
-      old~,
-      new~,
-      context~,
-      line_cleanup=true,
-    )
-    let unified = @render_html.unified_html(
-      old~,
-      new~,
-      context~,
-      line_cleanup=true,
-    )
+    let document = @tokdiff.diff(old~, new~, context~, line_cleanup=true)
+    let split = @render_html.render_side_by_side(document)
+    let unified = @render_html.render_unified(document)
     assert_eq(count_substring(split, "class=\"hunk-header\""), headers.length())
     assert_eq(
       count_substring(unified, "class=\"hunk-header\""),
@@ -201,11 +175,8 @@ test "both renderers preserve exact core hunk headers for all contexts" {
 ///|
 test "pure insertion and deletion retain file-edge hunk ranges" {
   inspect(
-    @render_html.side_by_side_html(
-      old=[],
-      new=["x", "y"],
-      context=0,
-      line_cleanup=true,
+    @render_html.render_side_by_side(
+      @tokdiff.diff(old=[], new=["x", "y"], context=0, line_cleanup=true),
     ),
     content=(
       #|<table class="split">
@@ -217,11 +188,8 @@ test "pure insertion and deletion retain file-edge hunk ranges" {
     ),
   )
   inspect(
-    @render_html.unified_html(
-      old=["x", "y"],
-      new=[],
-      context=0,
-      line_cleanup=true,
+    @render_html.render_unified(
+      @tokdiff.diff(old=["x", "y"], new=[], context=0, line_cleanup=true),
     ),
     content=(
       #|<pre class="unified">
@@ -240,12 +208,20 @@ fn assert_line_cleanup_budget_fallback(
   new : Array[String],
 ) -> Unit raise {
   assert_eq(
-    @render_html.side_by_side_html(old~, new~, context=0, line_cleanup=true),
-    @render_html.side_by_side_html(old~, new~, context=0, line_cleanup=false),
+    @render_html.render_side_by_side(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
+    ),
+    @render_html.render_side_by_side(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=false),
+    ),
   )
   assert_eq(
-    @render_html.unified_html(old~, new~, context=0, line_cleanup=true),
-    @render_html.unified_html(old~, new~, context=0, line_cleanup=false),
+    @render_html.render_unified(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=true),
+    ),
+    @render_html.render_unified(
+      @tokdiff.diff(old~, new~, context=0, line_cleanup=false),
+    ),
   )
 }
 
@@ -290,22 +266,15 @@ test "line cleanup restores original grouping at all window budgets" {
 test "per-pair traceback budget keeps pairing but omits highlights" {
   let old_line = "x ".repeat(256) + "old"
   let new_line = "x ".repeat(256) + "new"
-  let split = @render_html.side_by_side_html(
-    old=[old_line],
-    new=[new_line],
-    context=0,
-  )
+  let document = @tokdiff.diff(old=[old_line], new=[new_line], context=0)
+  let split = @render_html.render_side_by_side(document)
   assert_false(split.contains("<b class="))
   assert_true(
     split.contains(
       "<td class=\"del\">\{old_line}</td><td class=\"add\">\{new_line}</td>",
     ),
   )
-  let unified = @render_html.unified_html(
-    old=[old_line],
-    new=[new_line],
-    context=0,
-  )
+  let unified = @render_html.render_unified(document)
   assert_false(unified.contains("<b class="))
   assert_true(
     unified.find("class=\"del\"").unwrap() <

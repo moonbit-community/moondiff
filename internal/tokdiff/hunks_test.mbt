@@ -14,7 +14,7 @@ test "plain unified hunks preserve renderer boundaries and file-edge ranges" {
   for patch in patches {
     let header = patch.view(end_offset=patch.find("\n").unwrap())
     assert_true(
-      @render_html.unified_line_html(old~, new~, context=0).contains(
+      @render_html.render_unified(document).contains(
         "<span class=\"hunk-header\">\{header}</span>",
       ),
     )
@@ -34,7 +34,7 @@ test "MoonBit hunks follow semantic line cleanup used by HTML" {
   assert_true(cleaned[0].contains("+let b = new\n"))
   let header = cleaned[0].view(end_offset=cleaned[0].find("\n").unwrap())
   assert_true(
-    @render_html.side_by_side_html(old~, new~, context=0, line_cleanup=true).contains(
+    @render_html.render_side_by_side(cleaned_document).contains(
       "<td class=\"hunk-header\" colspan=\"2\">\{header}</td>",
     ),
   )
@@ -48,29 +48,20 @@ test "hunk notes are escaped immediately after matching headers in all views" {
     Some({ title: "Group <&>", body: "Explain <old> & new." }),
     None,
   ]
-  let split = @render_html.side_by_side_html(
-    old~,
-    new~,
-    context=0,
+  let semantic_document = @tokdiff.diff(old~, new~, context=0)
+  let plain_document = @tokdiff.line_diff(old~, new~, context=0)
+  let split = @render_html.render_side_by_side(
+    semantic_document,
     line_numbers=true,
     hunk_notes=notes,
   )
-  let unified = @render_html.unified_html(
-    old~,
-    new~,
-    context=0,
+  let unified = @render_html.render_unified(semantic_document, hunk_notes=notes)
+  let plain_split = @render_html.render_side_by_side(
+    plain_document,
     hunk_notes=notes,
   )
-  let plain_split = @render_html.side_by_side_line_html(
-    old~,
-    new~,
-    context=0,
-    hunk_notes=notes,
-  )
-  let plain_unified = @render_html.unified_line_html(
-    old~,
-    new~,
-    context=0,
+  let plain_unified = @render_html.render_unified(
+    plain_document,
     line_numbers=true,
     hunk_notes=notes,
   )
@@ -101,21 +92,23 @@ test "hunk notes are escaped immediately after matching headers in all views" {
 test "omitting notes remains byte-identical to an explicit empty array" {
   let old = ["old"]
   let new = ["new"]
+  let semantic_document = @tokdiff.diff(old~, new~)
+  let plain_document = @tokdiff.line_diff(old~, new~)
   assert_eq(
-    @render_html.side_by_side_html(old~, new~),
-    @render_html.side_by_side_html(old~, new~, hunk_notes=[]),
+    @render_html.render_side_by_side(semantic_document),
+    @render_html.render_side_by_side(semantic_document, hunk_notes=[]),
   )
   assert_eq(
-    @render_html.unified_html(old~, new~),
-    @render_html.unified_html(old~, new~, hunk_notes=[]),
+    @render_html.render_unified(semantic_document),
+    @render_html.render_unified(semantic_document, hunk_notes=[]),
   )
   assert_eq(
-    @render_html.side_by_side_line_html(old~, new~),
-    @render_html.side_by_side_line_html(old~, new~, hunk_notes=[]),
+    @render_html.render_side_by_side(plain_document),
+    @render_html.render_side_by_side(plain_document, hunk_notes=[]),
   )
   assert_eq(
-    @render_html.unified_line_html(old~, new~),
-    @render_html.unified_line_html(old~, new~, hunk_notes=[]),
+    @render_html.render_unified(plain_document),
+    @render_html.render_unified(plain_document, hunk_notes=[]),
   )
 }
 
@@ -132,33 +125,25 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
   let plain_document = @tokdiff.line_diff(old~, new~, context=0)
   let plain_patches = @unified.render_unified_hunks(plain_document)
   let semantic_renderers = [
-    @render_html.side_by_side_hunks_html(
-      old~,
-      new~,
-      context=0,
+    @render_html.render_side_by_side_hunks(
+      semantic_document,
       line_numbers=true,
       hunk_notes=notes,
     ),
-    @render_html.unified_hunks_html(
-      old~,
-      new~,
-      context=0,
+    @render_html.render_unified_hunks(
+      semantic_document,
       line_numbers=true,
       hunk_notes=notes,
     ),
   ]
   let plain_renderers = [
-    @render_html.side_by_side_line_hunks_html(
-      old~,
-      new~,
-      context=0,
+    @render_html.render_side_by_side_hunks(
+      plain_document,
       line_numbers=true,
       hunk_notes=notes,
     ),
-    @render_html.unified_line_hunks_html(
-      old~,
-      new~,
-      context=0,
+    @render_html.render_unified_hunks(
+      plain_document,
       line_numbers=true,
       hunk_notes=notes,
     ),
@@ -185,8 +170,10 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
       assert_eq(rendered.split("class=\"hunk-header\"").length(), 2)
     }
   }
-  assert_eq(@render_html.side_by_side_hunks_html(old=[], new=[]), [])
-  assert_eq(@render_html.unified_hunks_html(old=[], new=[]), [])
-  assert_eq(@render_html.side_by_side_line_hunks_html(old=[], new=[]), [])
-  assert_eq(@render_html.unified_line_hunks_html(old=[], new=[]), [])
+  let empty_semantic = @tokdiff.diff(old=[], new=[])
+  let empty_plain = @tokdiff.line_diff(old=[], new=[])
+  assert_eq(@render_html.render_side_by_side_hunks(empty_semantic), [])
+  assert_eq(@render_html.render_unified_hunks(empty_semantic), [])
+  assert_eq(@render_html.render_side_by_side_hunks(empty_plain), [])
+  assert_eq(@render_html.render_unified_hunks(empty_plain), [])
 }

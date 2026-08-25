@@ -16,22 +16,6 @@ pub fn render_unified(@model.DiffDocument, line_numbers? : Bool, hunk_notes? : A
 
 pub fn render_unified_hunks(@model.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
 
-pub fn side_by_side_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?], ignore_comments? : Bool) -> String
-
-pub fn side_by_side_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?], ignore_comments? : Bool) -> Array[String]
-
-pub fn side_by_side_line_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
-
-pub fn side_by_side_line_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
-
-pub fn unified_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?], ignore_comments? : Bool) -> String
-
-pub fn unified_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?], ignore_comments? : Bool) -> Array[String]
-
-pub fn unified_line_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
-
-pub fn unified_line_hunks_html(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
-
 // Errors
 
 // Types and methods

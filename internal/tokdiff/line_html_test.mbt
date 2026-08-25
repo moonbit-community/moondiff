@@ -1,9 +1,12 @@
 ///|
 test "plain split pairs replacement lines by position and leaves extras empty" {
-  let fewer_new = @render_html.side_by_side_line_html(
+  let fewer_new_document = @tokdiff.line_diff(
     old=["old <one>", "old two"],
     new=["new & one"],
     context=0,
+  )
+  let fewer_new = @render_html.render_side_by_side(
+    fewer_new_document,
     line_numbers=true,
   )
   assert_true(
@@ -17,11 +20,12 @@ test "plain split pairs replacement lines by position and leaves extras empty" {
     ),
   )
 
-  let fewer_old = @render_html.side_by_side_line_html(
+  let fewer_old_document = @tokdiff.line_diff(
     old=["old"],
     new=["new one", "new two"],
     context=0,
   )
+  let fewer_old = @render_html.render_side_by_side(fewer_old_document)
   assert_true(
     fewer_old.contains(
       "<td class=\"empty\"></td><td class=\"add\">new two</td>",
@@ -37,12 +41,8 @@ test "plain split pairs replacement lines by position and leaves extras empty" {
 test "plain split preserves requested context and absolute line numbers" {
   let old = ["0", "old", "2", "3", "4", "5", "6", "gone", "8"]
   let new = ["0", "new", "2", "3", "4", "5", "6", "added", "8"]
-  let html = @render_html.side_by_side_line_html(
-    old~,
-    new~,
-    context=1,
-    line_numbers=true,
-  )
+  let document = @tokdiff.line_diff(old~, new~, context=1)
+  let html = @render_html.render_side_by_side(document, line_numbers=true)
   assert_true(html.contains("@@ -1,3 +1,3 @@"))
   assert_true(html.contains("@@ -7,3 +7,3 @@"))
   assert_true(
@@ -59,12 +59,12 @@ test "plain split preserves requested context and absolute line numbers" {
 
 ///|
 test "plain unified emits deletions before insertions without token markup" {
-  let html = @render_html.unified_line_html(
+  let document = @tokdiff.line_diff(
     old=["before", "old <one>", "old two", "after"],
     new=["before", "new & one", "new two", "new three", "after"],
     context=1,
-    line_numbers=true,
   )
+  let html = @render_html.render_unified(document, line_numbers=true)
   let first_delete = html.find("class=\"del\">-old &lt;one&gt;").unwrap()
   let second_delete = html.find("class=\"del\">-old two").unwrap()
   let first_insert = html.find("class=\"add\">+new &amp; one").unwrap()
@@ -85,7 +85,9 @@ test "plain unified emits deletions before insertions without token markup" {
 ///|
 test "plain unified keeps the historical unnumbered wrapper" {
   inspect(
-    @render_html.unified_line_html(old=["<old>"], new=["&new"], context=0),
+    @render_html.render_unified(
+      @tokdiff.line_diff(old=["<old>"], new=["&new"], context=0),
+    ),
     content=(
       #|<pre class="unified">
       #|<span class="hunk-header">@@ -1 +1 @@</span>

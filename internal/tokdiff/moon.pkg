@@ -7,6 +7,7 @@ import {
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/test",
   "moonbit-community/moondiff/internal/render/html" @render_html,
   "moonbit-community/moondiff/internal/render/unified",
 } for "test"
