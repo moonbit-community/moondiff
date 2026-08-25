@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/internal/cli_diff"
+
+// Values
+pub fn render(String, String, String, String, options? : Options) -> String
+
+// Errors
+
+// Types and methods
+pub struct Options {
+  context_lines : Int
+  graph_limit : UInt
+  use_color : Bool
+  ignore_comments : Bool
+  ignore_tests : Bool
+}
+pub fn Options::new(context_lines? : Int, graph_limit? : UInt, use_color? : Bool, ignore_comments? : Bool, ignore_tests? : Bool) -> Self
+pub impl Default for Options
+
+// Type aliases
+
+// Traits

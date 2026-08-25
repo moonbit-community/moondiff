@@ -75,6 +75,31 @@ test "default and explicit AST modes are compatible" {
   assert_true(default_result.status() == explicit_result.status())
   assert_true(default_result.document() == explicit_result.document())
   assert_true(default_result.fallbacks() == explicit_result.fallbacks())
+  assert_true(default_result.layout() == explicit_result.layout())
+}
+
+///|
+test "public result retains layout and source labels in parse diagnostics" {
+  let sectioned = @mbtdiff.diff(
+    "fn first() { old_value() }\nfn second() {}", "fn first() { new_value() }\nfn second() {}",
+  )
+  guard sectioned.layout() is TopLevelSections(sections) else {
+    fail("expected a sectioned structural layout")
+  }
+  let _ : ArrayView[@mbtdiff.DiffSection] = sections
+  assert_false(sections.is_empty())
+
+  let parsed = @mbtdiff.diff(
+    "fn broken( {",
+    "fn okay() {}",
+    old_name="before.mbt",
+    new_name="after.mbt",
+  )
+  guard parsed.fallbacks()
+    is [{ reason: ParseError(detail~, ..), scope: WholeFile }] else {
+    fail("expected a parse fallback")
+  }
+  assert_true(detail.contains("before.mbt"), msg=detail)
 }
 
 ///|

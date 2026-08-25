@@ -1,4 +1,4 @@
-///|UUID(fb09927f-8d77-415f-9b0e-b40809807775)
+///|
 fn computation_stage_text(stage : @model.ComputationStage) -> String {
   match stage {
     TopLevelAlignment => "top-level alignment"
@@ -29,12 +29,9 @@ fn fallback_location(scope : @model.FallbackScope) -> String {
 }
 
 ///|
-fn fallback_reason_text(
-  fallback : @model.FallbackInfo,
-  parser_reason : String?,
-) -> String {
+fn fallback_reason_text(fallback : @model.FallbackInfo) -> String {
   match fallback.reason {
-    ParseError(detail~, ..) => parser_reason.unwrap_or(detail)
+    ParseError(detail~, ..) => detail
     GraphLimitExceeded(limit~) => {
       let base = "graph limit exceeded (\{limit})"
       let location = fallback_location(fallback.scope)
@@ -56,6 +53,44 @@ fn fallback_reason_text(
     TopLevelReordering =>
       "top-level reordering has no changes inside aligned declarations"
   }
+}
+
+///|
+fn source_lines(source : String) -> Array[String] {
+  if source.is_empty() {
+    []
+  } else {
+    @source_text.split_lines(source)
+  }
+}
+
+///|
+fn terminal_options(
+  options : Options,
+  old_max_line : Int,
+  new_max_line : Int,
+) -> @terminal.RenderOptions {
+  @terminal.RenderOptions::new(
+    use_color=options.use_color,
+    old_max_line~,
+    new_max_line~,
+  )
+}
+
+///|
+fn render_empty_state(
+  old_label : String,
+  new_label : String,
+  message : String,
+  options : Options,
+) -> String {
+  @terminal.render_document(
+    old_label,
+    new_label,
+    { hunks: [] },
+    options=@terminal.RenderOptions::new(use_color=options.use_color),
+  ) +
+  message
 }
 
 ///|
@@ -104,7 +139,7 @@ fn ranges_overlap(left : @model.LineRange?, right : @model.LineRange?) -> Bool {
 ///|
 fn fallback_matches_section(
   fallback : @model.FallbackInfo,
-  section : @alignment.DiffSection,
+  section : @model.DiffSection,
 ) -> Bool {
   match fallback.scope {
     WholeFile => false
@@ -116,7 +151,7 @@ fn fallback_matches_section(
 ///|
 fn hunk_matches_section(
   hunk : @model.DiffHunk,
-  section : @alignment.DiffSection,
+  section : @model.DiffSection,
 ) -> Bool {
   if hunk.old_len == 0 && hunk.new_len > 0 {
     range_overlaps_hunk(section.new, hunk.new_start, hunk.new_len)
@@ -138,9 +173,9 @@ fn section_max_line(range : @model.LineRange?) -> Int {
 }
 
 ///|
-/// Keep established CLI hunk anchors for pure insertions and deletions by
-/// anchoring the missing side at line 1.
-fn adjust_cli_empty_side_hunk_anchors(
+/// Keep the established CLI hunk anchors for pure insertions and deletions by
+/// anchoring a missing side at line 1.
+fn adjust_empty_side_hunk_anchors(
   hunks : ArrayView[@model.DiffHunk],
   old_missing : Bool,
   new_missing : Bool,
@@ -181,9 +216,10 @@ fn render_sectioned_document(
   new_label : String,
   document : @model.DiffDocument,
   fallbacks : ArrayView[@model.FallbackInfo],
-  parser_reason : String?,
-  options : DiffOptions,
-  sections : ArrayView[@alignment.DiffSection],
+  options : Options,
+  sections : ArrayView[@model.DiffSection],
+  old_line_count : Int,
+  new_line_count : Int,
 ) -> String {
   let buf = StringBuilder()
   let used_hunks = Array::make(document.hunks.length(), false)
@@ -210,10 +246,10 @@ fn render_sectioned_document(
     let section_buf = StringBuilder()
     for index in matching_fallbacks {
       section_buf <+
-        "note: fallback to tokdiff (\{fallback_reason_text(fallbacks[index], parser_reason)})\n"
+        "note: fallback to tokdiff (\{fallback_reason_text(fallbacks[index])})\n"
     }
     let rendered_hunks = if matching_fallbacks.is_empty() {
-      adjust_cli_empty_side_hunk_anchors(
+      adjust_empty_side_hunk_anchors(
         section_hunks,
         section.old is None,
         section.new is None,
@@ -222,13 +258,15 @@ fn render_sectioned_document(
       section_hunks
     }
     section_buf.write_string(
-      render_diff_document_with_max_lines(
+      @terminal.render_document(
         section_label(old_label, section.old),
         section_label(new_label, section.new),
         { hunks: rendered_hunks[:] },
-        options.render_options(),
-        section_max_line(section.old),
-        section_max_line(section.new),
+        options=terminal_options(
+          options,
+          section_max_line(section.old),
+          section_max_line(section.new),
+        ),
       ),
     )
     append_rendered_section(buf, wrote, section_buf.to_string())
@@ -243,11 +281,11 @@ fn render_sectioned_document(
     append_rendered_section(
       buf,
       wrote,
-      render_diff_document(
+      @terminal.render_document(
         old_label,
         new_label,
         { hunks: unassigned[:] },
-        options.render_options(),
+        options=terminal_options(options, old_line_count, new_line_count),
       ),
     )
   }
@@ -255,122 +293,212 @@ fn render_sectioned_document(
 }
 
 ///|
-/// Render the CLI whole-document layout with source-derived line-number widths
-/// and adjusted anchors for an empty side.
-fn render_cli_whole_ast_document(
+fn render_whole_document(
   old_label : String,
-  old_source : String,
   new_label : String,
-  new_source : String,
   document : @model.DiffDocument,
-  options : DiffOptions,
+  options : Options,
+  old_line_count : Int,
+  new_line_count : Int,
 ) -> String {
-  let hunks = adjust_cli_empty_side_hunk_anchors(
+  let hunks = adjust_empty_side_hunk_anchors(
     document.hunks,
-    old_source.is_empty(),
-    new_source.is_empty(),
+    old_line_count == 0,
+    new_line_count == 0,
   )
-  render_diff_document_with_max_lines(
+  @terminal.render_document(
     old_label,
     new_label,
-    { hunks, },
-    options.render_options(),
-    split_lines(old_source).length(),
-    split_lines(new_source).length(),
+    { hunks: hunks[:] },
+    options=terminal_options(options, old_line_count, new_line_count),
   )
 }
 
-///|UUID(4dc6c7bd-e552-4ca2-b156-8b254afe1200)
-// Render one shared alignment calculation, falling back to tokdiff when
-// structural calculation cannot cover the whole input.
-pub fn diff_text(
+///|
+fn mark_plain_line_changed(line : @model.DiffLine) -> @model.DiffLine {
+  if line.segments.is_empty() {
+    line
+  } else {
+    { index: line.index, segments: [{ kind: Changed, text: line.text() }] }
+  }
+}
+
+///|
+fn mark_plain_row_changed(row : @model.DiffRow) -> @model.DiffRow {
+  match row {
+    Paired(old_line, new_line) =>
+      Paired(
+        mark_plain_line_changed(old_line),
+        mark_plain_line_changed(new_line),
+      )
+    OldOnly(line) => OldOnly(mark_plain_line_changed(line))
+    NewOnly(line) => NewOnly(mark_plain_line_changed(line))
+  }
+}
+
+///|
+/// Plain line calculation intentionally has no intraline classification. Mark
+/// each changed row as a full-line change for the terminal color convention
+/// while preserving the Patience hunk and row alignment verbatim.
+fn mark_plain_changes(document : @model.DiffDocument) -> @model.DiffDocument {
+  let hunks : Array[@model.DiffHunk] = []
+  for hunk in document.hunks {
+    let blocks : Array[@model.DiffBlock] = []
+    for block in hunk.blocks {
+      blocks.push(
+        match block {
+          ContextBlock(lines) => ContextBlock(lines)
+          ChangeBlock(rows) => ChangeBlock(rows.map(mark_plain_row_changed))
+          IgnoredBlock(rows) => IgnoredBlock(rows)
+        },
+      )
+    }
+    hunks.push({ ..hunk, blocks: blocks[:] })
+  }
+  { hunks: hunks[:] }
+}
+
+///|
+fn render_plain_text(
   old_label : String,
   old_source : String,
   new_label : String,
   new_source : String,
-  options? : DiffOptions = Default::default(),
-) -> DiffResult {
-  let has_changes = old_source != new_source
-  let calculation = @alignment.calculate_diff_document(
+  options : Options,
+) -> String {
+  let old = source_lines(old_source)
+  let new = source_lines(new_source)
+  let document = @tokdiff.line_diff(old~, new~, context=options.context_lines)
+  if document.hunks.is_empty() {
+    render_empty_state(old_label, new_label, "No changes.\n", options)
+  } else {
+    render_whole_document(
+      old_label,
+      new_label,
+      mark_plain_changes(document),
+      options,
+      old.length(),
+      new.length(),
+    )
+  }
+}
+
+///|
+fn ignored_only_message(options : Options) -> String {
+  if options.ignore_comments && options.ignore_tests {
+    "No changes besides MoonBit test blocks, comments, or blank lines.\n"
+  } else if options.ignore_tests {
+    "No changes besides MoonBit test blocks.\n"
+  } else {
+    "No changes besides comments or blank lines.\n"
+  }
+}
+
+///|
+fn render_moonbit(
+  old_label : String,
+  old_source : String,
+  new_label : String,
+  new_source : String,
+  options : Options,
+) -> String {
+  let old = source_lines(old_source)
+  let new = source_lines(new_source)
+  let result = @mbtdiff.diff(
     old_source,
     new_source,
     old_name=old_label,
     new_name=new_label,
-    context=options.context_lines,
-    graph_limit=options.graph_limit,
-    ignore_comments=options.ignore_comments,
-    ignore_tests=options.ignore_tests,
+    options=@mbtdiff.DiffOptions::new(
+      context_lines=options.context_lines,
+      graph_limit=options.graph_limit,
+      ignore_comments=options.ignore_comments,
+      ignore_tests=options.ignore_tests,
+    ),
   )
-  let result = calculation.result
-  let fallbacks = result.fallbacks
-  let parser_reason = calculation.parser_reason
-  let rendered = match result.status {
+  match result.status() {
     Identical =>
-      render_file_headers(old_label, new_label, options.use_color) +
-      "No changes.\n"
-    IgnoredOnly => {
-      let message = if options.ignore_comments && options.ignore_tests {
-        "No changes besides MoonBit test blocks, comments, or blank lines.\n"
-      } else if options.ignore_tests {
-        "No changes besides MoonBit test blocks.\n"
-      } else {
-        "No changes besides comments or blank lines.\n"
-      }
-      render_file_headers(old_label, new_label, options.use_color) + message
-    }
+      render_empty_state(old_label, new_label, "No changes.\n", options)
+    IgnoredOnly =>
+      render_empty_state(
+        old_label,
+        new_label,
+        ignored_only_message(options),
+        options,
+      )
     NoStructuralChanges => ""
-    Changed =>
+    Changed => {
+      let document = result.document()
+      let fallbacks = result.fallbacks()
       if fallbacks is [fallback] && fallback.scope is WholeFile {
-        "note: fallback to tokdiff (\{fallback_reason_text(fallback, parser_reason)})\n" +
-        render_diff_document(
+        "note: fallback to tokdiff (\{fallback_reason_text(fallback)})\n" +
+        render_whole_document(
           old_label,
           new_label,
-          result.document,
-          options.render_options(),
+          document,
+          options,
+          old.length(),
+          new.length(),
         )
       } else if options.ignore_comments {
         let buf = StringBuilder()
         for fallback in fallbacks {
           buf <+
-            "note: fallback to tokdiff (\{fallback_reason_text(fallback, parser_reason)})\n"
+            "note: fallback to tokdiff (\{fallback_reason_text(fallback)})\n"
         }
         buf.write_string(
-          render_diff_document(
+          render_whole_document(
             old_label,
             new_label,
-            result.document,
-            options.render_options(),
+            document,
+            options,
+            old.length(),
+            new.length(),
           ),
         )
         buf.to_string()
       } else {
-        match calculation.layout {
+        match result.layout() {
           WholeDocument =>
-            render_cli_whole_ast_document(
+            render_whole_document(
               old_label,
-              old_source,
               new_label,
-              new_source,
-              result.document,
+              document,
               options,
+              old.length(),
+              new.length(),
             )
           TopLevelSections(sections) =>
             render_sectioned_document(
               old_label,
               new_label,
-              result.document,
+              document,
               fallbacks,
-              parser_reason,
               options,
               sections,
+              old.length(),
+              new.length(),
             )
         }
       }
+    }
   }
-  let kind = if parser_reason is Some(reason) {
-    TextFallback(reason~)
+}
+
+///|
+/// Calculate and render one CLI diff. Both labels must end in `.mbt` to select
+/// MoonBit-aware calculation; all other pairs use the canonical plain Patience
+/// line diff. Rendering itself is delegated a completed `DiffDocument`.
+pub fn render(
+  old_label : String,
+  old_source : String,
+  new_label : String,
+  new_source : String,
+  options? : Options = Default::default(),
+) -> String {
+  if old_label.has_suffix(".mbt") && new_label.has_suffix(".mbt") {
+    render_moonbit(old_label, old_source, new_label, new_source, options)
   } else {
-    Ast
+    render_plain_text(old_label, old_source, new_label, new_source, options)
   }
-  { kind, rendered, has_changes }
 }

@@ -41,6 +41,11 @@ pub(all) struct DiffHunk {
   blocks : ArrayView[DiffBlock]
 } derive(Eq)
 
+pub(all) enum DiffLayout {
+  WholeDocument
+  TopLevelSections(ArrayView[DiffSection])
+} derive(Eq, @debug.Debug)
+
 pub(all) struct DiffLine {
   index : Int
   segments : ArrayView[DiffSegment]
@@ -52,6 +57,11 @@ pub(all) enum DiffRow {
   OldOnly(DiffLine)
   NewOnly(DiffLine)
 } derive(Eq)
+
+pub(all) struct DiffSection {
+  old : LineRange?
+  new : LineRange?
+} derive(Eq, @debug.Debug)
 
 pub(all) struct DiffSegment {
   kind : DiffSegmentKind

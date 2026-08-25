@@ -59,13 +59,6 @@ test "moondiff command help uses README command name" {
   )
 }
 
-///|UUID(f4c874ad-006a-41cb-ab86-0013549f7845)
-test "should_use_structural_diff requires both inputs to be mbt files" {
-  assert_true(should_use_structural_diff("old.mbt", "new.mbt"))
-  assert_false(should_use_structural_diff("old.txt", "new.mbt"))
-  assert_false(should_use_structural_diff("old.mbt", "new.txt"))
-}
-
 ///|UUID(fad12a14-0144-4f4f-8891-706c7971b622)
 test "render_cli_diff uses regular line diff for non-mbt paths" {
   let options = CliOptions::{

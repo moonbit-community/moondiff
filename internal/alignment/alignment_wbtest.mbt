@@ -2490,15 +2490,11 @@ test "shared calculation retains caller parser names" {
     fail("expected a whole-file parse fallback")
   }
   assert_true(detail.contains("before.mbt"), msg=detail)
-  guard calculation.parser_reason is Some(parser_reason) else {
-    fail("expected parser diagnostics")
-  }
-  assert_true(parser_reason.contains("before.mbt"), msg=parser_reason)
   assert_true(calculation.layout is WholeDocument)
 }
 
 ///|
-test "invalid ignored-only calculation retains private parser diagnostics" {
+test "invalid ignored-only calculation does not expose separate parser metadata" {
   let calculation = calculate_diff_document(
     "fn broken( {\n",
     "fn broken( {\n\u{3000}\n",
@@ -2509,11 +2505,6 @@ test "invalid ignored-only calculation retains private parser diagnostics" {
   assert_true(calculation.result.status is IgnoredOnly)
   assert_true(calculation.result.document.hunks.is_empty())
   assert_true(calculation.result.fallbacks.is_empty())
-  guard calculation.parser_reason is Some(parser_reason) else {
-    fail("expected parser diagnostics to remain available to the CLI")
-  }
-  assert_true(parser_reason.contains("before.mbt"), msg=parser_reason)
-  assert_true(parser_reason.contains("after.mbt"), msg=parser_reason)
   assert_true(calculation.layout is WholeDocument)
 }
 
