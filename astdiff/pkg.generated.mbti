@@ -11,13 +11,9 @@ import {
 // Values
 pub fn fix_all_sliders(ArrayView[@syntax.Syntax], @syntax.ChangeMap) -> Unit
 
-pub fn mark_syntax(@syntax.Syntax?, @syntax.Syntax?, @syntax.ChangeMap, UInt) -> Unit raise
-
-pub fn mark_syntax_roots(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt) -> Unit raise
-
 pub fn mark_syntax_roots_with_budget(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt, @computation.Budget) -> Unit raise
 
-pub fn shortest_path(Vertex, Int, Int) -> Array[(Edge, Vertex)] raise
+pub fn shortest_path_with_budget(Vertex, Int, Int, @computation.Budget) -> Array[(Edge, Vertex)] raise
 
 pub fn tree_count(@syntax.Syntax?) -> UInt
 

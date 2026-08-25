@@ -23,7 +23,7 @@ fn shortest_vertex_path(
   start : Vertex,
   size_hint : Int,
   graph_limit : Int,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[Vertex] raise {
   // We want to visit nodes with the shortest distance first, but
   // PriorityQueue is a max-heap. Ensure nodes are wrapped with
@@ -94,28 +94,13 @@ fn shortest_path_with_edges(route : Array[Vertex]) -> Array[(Edge, Vertex)] {
 ///
 /// The vec returned does not return the very last vertex. This is
 /// necessary because a route of N vertices only has N-1 edges.
-pub fn shortest_path(
-  start : Vertex,
-  size_hint : Int,
-  graph_limit : Int,
-) -> Array[(Edge, Vertex)] raise {
-  let vertex_path = shortest_vertex_path(start, size_hint, graph_limit, None)
-  shortest_path_with_edges(vertex_path)
-}
-
-///|
-fn shortest_path_with_budget(
+pub fn shortest_path_with_budget(
   start : Vertex,
   size_hint : Int,
   graph_limit : Int,
   budget : @computation.Budget,
 ) -> Array[(Edge, Vertex)] raise {
-  let vertex_path = shortest_vertex_path(
-    start,
-    size_hint,
-    graph_limit,
-    Some(budget),
-  )
+  let vertex_path = shortest_vertex_path(start, size_hint, graph_limit, budget)
   shortest_path_with_edges(vertex_path)
 }
 
@@ -166,35 +151,6 @@ pub fn tree_count(root : Syntax?) -> UInt {
 }
 
 ///|UUID(a24b0dfa-1df3-4fcb-b1c2-4355dd4083a5)
-pub fn mark_syntax(
-  lhs_syntax : Syntax?,
-  rhs_syntax : Syntax?,
-  change_map : ChangeMap,
-  graph_limit : UInt,
-) -> Unit raise {
-  let lhs_node_count = node_count(lhs_syntax)
-  let rhs_node_count = node_count(rhs_syntax)
-
-  // When there are a large number of changes, we end up building a
-  // graph whose size is roughly quadratic. Use this as a size hint,
-  // so we don't spend too much time re-hashing and expanding the
-  // predecessors hashmap.
-  //
-  // Cap this size hint to the graph limit, so we don't try to allocate
-  // an absurdly large (i.e. greater than physical memory) hashmap
-  // when there is a large number of nodes.
-  //
-  // The runtime limit is approximate: it is checked after neighbours are
-  // generated, and seen counts canonical graph keys rather than every
-  // Vertex variant.
-
-  let size_hint = @cmp.minimum(lhs_node_count * rhs_node_count, graph_limit).reinterpret_as_int()
-  let start = Vertex::new(lhs=lhs_syntax, rhs=rhs_syntax)
-  let route = shortest_path(start, size_hint, graph_limit.reinterpret_as_int())
-  populate_change_map(route, change_map)
-}
-
-///|
 fn mark_syntax_with_budget(
   lhs_syntax : Syntax?,
   rhs_syntax : Syntax?,

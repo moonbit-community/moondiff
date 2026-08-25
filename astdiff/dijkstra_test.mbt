@@ -6,13 +6,18 @@ fn pos(line : Int) -> Array[@span.SingleLineSpan] {
   [@span.SingleLineSpan::{ line, start_col: 0, end_col: 1 }]
 }
 
+///|
+fn test_budget() -> @computation.Budget {
+  @computation.Budget::new(@computation.default_limit())
+}
+
 ///|UUID(7ede833b-3459-4ab9-9357-2b43d49c7f0b)
 test "identical atoms" {
   let lhs = Syntax::atom(content="foo", position=pos(0), kind=Normal)
   let rhs = Syntax::atom(content="foo", position=pos(0), kind=Normal)
   @syntax.init_all_info([lhs], [rhs])
   let start = Vertex::new(lhs=Some(lhs), rhs=Some(rhs))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
     actions is [UnchangedNode(depth_difference=0, probably_punctuation=false)],
@@ -41,7 +46,7 @@ test "extra atom lhs" {
   ]
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
     actions is [EnterUnchangedDelimiter(depth_difference=0), NovelAtomLHS],
@@ -73,7 +78,7 @@ test "repeated atoms" {
   ]
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
     actions
@@ -121,7 +126,7 @@ test "atom after empty list" {
   ]
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
     actions
@@ -144,7 +149,7 @@ test "replace similar comment" {
   ]
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(actions is [ReplacedComment(levenshtein_pct=84)])
 }
@@ -157,7 +162,7 @@ test "replace very different comment" {
   let rhs = [Syntax::atom(content="foo bar", position=pos(1), kind=Comment)]
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(actions is [ReplacedComment(levenshtein_pct=11)])
 }
@@ -173,7 +178,7 @@ test "replace comment prefer most similar" {
   ]
   @syntax.init_all_info(lhs, rhs)
   let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
-  let route = shortest_path(start, 0, 3000000)
+  let route = shortest_path_with_budget(start, 0, 3000000, test_budget())
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(actions is [ReplacedComment(levenshtein_pct=95), NovelAtomLHS])
 }
@@ -184,7 +189,13 @@ test "mark syntax equal atoms" {
   let rhs = Syntax::atom(content="foo", position=pos(1), kind=Normal)
   @syntax.init_all_info([lhs], [rhs])
   let change_map = ChangeMap::new()
-  mark_syntax(Some(lhs), Some(rhs), change_map, 3000000)
+  mark_syntax_roots_with_budget(
+    [lhs],
+    [rhs],
+    change_map,
+    3000000,
+    test_budget(),
+  )
   assert_true(change_map.get(lhs) is Some(Unchanged(_)))
   assert_true(change_map.get(rhs) is Some(Unchanged(_)))
 }
@@ -195,7 +206,13 @@ test "mark syntax different atoms" {
   let rhs = Syntax::atom(content="bar", position=pos(1), kind=Normal)
   @syntax.init_all_info([lhs], [rhs])
   let change_map = ChangeMap::new()
-  mark_syntax(Some(lhs), Some(rhs), change_map, 3000000)
+  mark_syntax_roots_with_budget(
+    [lhs],
+    [rhs],
+    change_map,
+    3000000,
+    test_budget(),
+  )
   assert_true(change_map.get(lhs) is Some(Novel))
   assert_true(change_map.get(rhs) is Some(Novel))
 }
@@ -215,7 +232,7 @@ test "mark syntax roots handles multiple changed roots around an unchanged ancho
   @syntax.init_all_info(lhs, rhs)
   let change_map = ChangeMap::new()
 
-  mark_syntax_roots(lhs, rhs, change_map, 3000000)
+  mark_syntax_roots_with_budget(lhs, rhs, change_map, 3000000, test_budget())
 
   assert_true(change_map.get(lhs[1]) is Some(Unchanged(_)))
   assert_true(change_map.get(rhs[1]) is Some(Unchanged(_)))

@@ -303,7 +303,7 @@ fn impl_fuzzy_body_at(
   units : ArrayView[ImplUnit],
   index : Int,
   cache : Array[ImplFuzzyBody?],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> ImplFuzzyBody? raise @computation.LimitExceeded {
   if cache[index] is Some(body) {
     return Some(body)
@@ -311,13 +311,11 @@ fn impl_fuzzy_body_at(
   guard units[index].fuzzy is Some(info) && info.body_input is Some(input) else {
     return None
   }
-  if budget is Some(budget) {
-    let span = @cmp.maximum(
-      input.node.source_span.1 - input.node.source_span.0,
-      0,
-    )
-    budget.charge(span.reinterpret_as_uint(), TopLevelAlignment)
-  }
+  let span = @cmp.maximum(
+    input.node.source_span.1 - input.node.source_span.0,
+    0,
+  )
+  budget.charge(span.reinterpret_as_uint(), TopLevelAlignment)
   let body = make_impl_fuzzy_body(input)
   cache[index] = Some(body)
   Some(body)
@@ -527,14 +525,9 @@ fn impl_body_continuity(old : ImplFuzzyBody, candidate : ImplFuzzyBody) -> Int {
 fn impl_body_continuity_with_budget(
   old : ImplFuzzyBody,
   candidate : ImplFuzzyBody,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int raise @computation.LimitExceeded {
-  if budget is Some(budget) {
-    budget.charge(
-      old.trigrams.length().reinterpret_as_uint(),
-      TopLevelAlignment,
-    )
-  }
+  budget.charge(old.trigrams.length().reinterpret_as_uint(), TopLevelAlignment)
   impl_body_continuity(old, candidate)
 }
 
@@ -584,7 +577,7 @@ fn impl_helper_leads_other_old_declarations(
   old_body_cache : Array[ImplFuzzyBody?],
   old_competitors : @hashmap.HashMap[String, Array[Int]],
   current_score : Int,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Bool raise @computation.LimitExceeded {
   if !impl_fuzzy_declarations_compatible(old_info, helper_info) {
     return false
@@ -597,9 +590,7 @@ fn impl_helper_leads_other_old_declarations(
     if i == old_index {
       continue
     }
-    if budget is Some(budget) {
-      budget.charge(1U, TopLevelAlignment)
-    }
+    budget.charge(1U, TopLevelAlignment)
     if old_units[i].fuzzy is Some(other_info) &&
       impl_fuzzy_declarations_compatible(other_info, helper_info) &&
       impl_fuzzy_body_at(old_units, i, old_body_cache, budget)
@@ -628,7 +619,7 @@ fn impl_semantic_challenge_helper(
   new_uuid_used : @hashmap.HashMap[Int, Bool],
   new_semantic_used : @hashmap.HashMap[Int, Bool],
   new_challenge_used : @hashmap.HashMap[Int, Bool],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int? raise @computation.LimitExceeded {
   if !pair.unique_key {
     return None
@@ -770,11 +761,9 @@ fn impl_fuzzy_syntax_similarity(
 fn impl_fuzzy_levenshtein(
   lhs : ArrayView[Char],
   rhs : ArrayView[Char],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int raise @computation.LimitExceeded {
-  if budget is Some(budget) {
-    budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, TopLevelAlignment)
-  }
+  budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, TopLevelAlignment)
   let rows : Array[Array[Int]] = [
     Array::make(rhs.length() + 1, 0),
     Array::make(rhs.length() + 1, 0),
@@ -803,7 +792,7 @@ fn impl_fuzzy_levenshtein(
 fn impl_fuzzy_name_similarity(
   old_name : String,
   new_name : String,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int raise @computation.LimitExceeded {
   let old_chars = old_name.to_array()
   let new_chars = new_name.to_array()
@@ -821,7 +810,7 @@ fn impl_fuzzy_score(
   old_content : ImplFuzzyContent,
   new_info : ImplFuzzyInfo,
   new_content : ImplFuzzyContent,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int raise @computation.LimitExceeded {
   let syntax = impl_fuzzy_syntax_similarity(old_content, new_content)
   let name = impl_fuzzy_name_similarity(old_info.name, new_info.name, budget)
@@ -876,7 +865,7 @@ fn impl_fuzzy_candidate_score(
   old_contents : ArrayView[ImplFuzzyContent?],
   new_contents : ArrayView[ImplFuzzyContent?],
   use_uuid : Bool,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Int? raise @computation.LimitExceeded {
   if old_gaps[old_index] != new_gaps[new_index] ||
     (
@@ -911,7 +900,7 @@ fn align_fuzzy_impl_units(
   new_excluded_from_matching : @hashmap.HashMap[Int, Bool],
   reliable : @hashmap.HashMap[Int, Int],
   use_uuid : Bool,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[(Int, Int)] raise @computation.LimitExceeded {
   if reliable.is_empty() {
     return []

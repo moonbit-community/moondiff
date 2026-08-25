@@ -233,12 +233,10 @@ fn is_all_whitespace_text(text : String) -> Bool {
 fn word_diffs_impl(
   lhs_parts : ArrayView[WordPart],
   rhs_parts : ArrayView[WordPart],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[WordDiff] raise @computation.LimitExceeded {
   let width = rhs_parts.length() + 1
-  if budget is Some(budget) {
-    budget.charge_matrix(lhs_parts.length() + 1, width, IntralineMatching)
-  }
+  budget.charge_matrix(lhs_parts.length() + 1, width, IntralineMatching)
   let dp = Array::make((lhs_parts.length() + 1) * width, 0)
   let index = fn(i : Int, j : Int) { i * width + j }
 
@@ -309,7 +307,7 @@ fn has_common_words(diffs : ArrayView[WordDiff]) -> Bool {
 fn split_replaced_atom_positions(
   change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[MatchedPos] raise @computation.LimitExceeded {
   let (self_node, opposite_node) = match change {
     ChangeKind::ReplacedComment(lhs~, rhs~) => (lhs, rhs)
@@ -439,7 +437,7 @@ fn matched_positions_for(
   change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
   is_close_delim : Bool,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[MatchedPos] raise @computation.LimitExceeded {
   let positions = filter_empty_ends(positions)
   match change {
@@ -457,7 +455,7 @@ fn matched_positions_for(
 fn change_positions_impl(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
 ) -> Array[MatchedPos] raise @computation.LimitExceeded {
   let positions = Array::new()
   fn walk(node : Syntax) -> Unit raise @computation.LimitExceeded {
@@ -488,20 +486,10 @@ fn change_positions_impl(
 }
 
 ///|
-pub fn change_positions(
-  nodes : ArrayView[Syntax],
-  change_map : ChangeMap,
-) -> Array[MatchedPos] {
-  change_positions_impl(nodes, change_map, None) catch {
-    @computation.LimitExceeded(..) => panic()
-  }
-}
-
-///|
 pub fn change_positions_with_budget(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
   budget : @computation.Budget,
 ) -> Array[MatchedPos] raise @computation.LimitExceeded {
-  change_positions_impl(nodes, change_map, Some(budget))
+  change_positions_impl(nodes, change_map, budget)
 }

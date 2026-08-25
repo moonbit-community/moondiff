@@ -55,7 +55,7 @@ fn align_impl_units_by_uuid(
 fn align_impl_units_by_key_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
   use_uuid? : Bool = true,
 ) -> Array[ImplEdit] raise @computation.LimitExceeded {
   let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
@@ -262,7 +262,7 @@ fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
 fn top_level_plan_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  budget : @computation.Budget?,
+  budget : @computation.Budget,
   ignore_uuid? : Bool = false,
 ) -> TopLevelPlan raise @computation.LimitExceeded {
   if !ignore_uuid &&
@@ -282,14 +282,4 @@ fn top_level_plan_impl(
       RootList(old=old_units.to_owned(), new=new_units.to_owned())
     }
   }
-}
-
-///|
-fn top_level_plan_with_budget(
-  old_units : ArrayView[ImplUnit],
-  new_units : ArrayView[ImplUnit],
-  budget : @computation.Budget,
-  ignore_uuid? : Bool = false,
-) -> TopLevelPlan raise @computation.LimitExceeded {
-  top_level_plan_impl(old_units, new_units, Some(budget), ignore_uuid~)
 }

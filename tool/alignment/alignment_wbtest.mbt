@@ -49,12 +49,22 @@ fn parse_units(source : String) -> Array[ImplUnit] {
 }
 
 ///|
+fn alignment_test_budget() -> @computation.Budget {
+  @computation.Budget::new(@computation.default_limit())
+}
+
+///|
 fn align_impl_units_by_key(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   use_uuid? : Bool = true,
 ) -> Array[ImplEdit] {
-  align_impl_units_by_key_impl(old_units, new_units, None, use_uuid~) catch {
+  align_impl_units_by_key_impl(
+    old_units,
+    new_units,
+    alignment_test_budget(),
+    use_uuid~,
+  ) catch {
     @computation.LimitExceeded(..) => panic()
   }
 }
@@ -483,7 +493,10 @@ test "unique content hashes align anonymous units but duplicate hashes do not" {
   })
   let duplicate_edits = align_impl_units_by_key(duplicate, duplicate)
   assert_false(impl_edits_have_replacement(duplicate_edits))
-  assert_true(top_level_plan_impl(duplicate, duplicate, None) is RootList(..))
+  assert_true(
+    top_level_plan_impl(duplicate, duplicate, alignment_test_budget())
+    is RootList(..),
+  )
 }
 
 ///|
@@ -555,7 +568,7 @@ test "body fingerprints are charged and cached once per alignment" {
   assert_true(work > 0)
   let rejected_cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
   let insufficient = @computation.Budget::new(work - 1)
-  try impl_fuzzy_body_at(units, 0, rejected_cache, Some(insufficient)) catch {
+  try impl_fuzzy_body_at(units, 0, rejected_cache, insufficient) catch {
     @computation.LimitExceeded(stage~, limit~) => {
       assert_true(stage is TopLevelAlignment)
       assert_eq(limit, work - 1)
@@ -566,8 +579,8 @@ test "body fingerprints are charged and cached once per alignment" {
   }
   let cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
   let budget = @computation.Budget::new(work)
-  guard impl_fuzzy_body_at(units, 0, cache, Some(budget)) is Some(first) &&
-    impl_fuzzy_body_at(units, 0, cache, Some(budget)) is Some(second) else {
+  guard impl_fuzzy_body_at(units, 0, cache, budget) is Some(first) &&
+    impl_fuzzy_body_at(units, 0, cache, budget) is Some(second) else {
     fail("expected cached body fingerprints")
   }
   assert_eq(first.mass, second.mass)
@@ -589,7 +602,7 @@ test "semantic extraction filters missing helpers before body fingerprint work" 
   let edits = align_impl_units_by_key_impl(
     parse_units(old_source),
     parse_units(new_source),
-    Some(budget),
+    budget,
   )
   @debug.assert_eq(edits.map(edit_declaration_summary), [
     "Replace(target->target)",
@@ -1449,7 +1462,13 @@ test "CST wrappers do not hide inserted sibling statements" {
   let rhs_roots = [new_units[0].root]
   @syntax.init_all_info(lhs_roots, rhs_roots)
   let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots(lhs_roots, rhs_roots, change_map, 3_000_000) catch {
+  @diff.mark_syntax_roots_with_budget(
+    lhs_roots,
+    rhs_roots,
+    change_map,
+    3_000_000,
+    alignment_test_budget(),
+  ) catch {
     _ => panic()
   }
 
@@ -1640,7 +1659,8 @@ test "AST segments bridge only internal whitespace between changes" {
 test "top-level plan applies one pairing strategy to reordered declarations" {
   let old_units = parse_units("fn first() {}\nfn second() {}")
   let new_units = parse_units("fn second() {}\nfn first() {}")
-  guard top_level_plan_impl(old_units, new_units, None) is PerUnit(edits) else {
+  guard top_level_plan_impl(old_units, new_units, alignment_test_budget())
+    is PerUnit(edits) else {
     fail("expected reliable semantic pairs")
   }
   @debug.assert_eq(edits.map(edit_line_summary), [
@@ -1650,7 +1670,8 @@ test "top-level plan applies one pairing strategy to reordered declarations" {
   let unmatched_old = parse_units("/// trailing old")
   let unmatched_new = parse_units("/// trailing new")
   assert_true(
-    top_level_plan_impl(unmatched_old, unmatched_new, None) is RootList(..),
+    top_level_plan_impl(unmatched_old, unmatched_new, alignment_test_budget())
+    is RootList(..),
   )
 }
 

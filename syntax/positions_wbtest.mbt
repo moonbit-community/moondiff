@@ -35,7 +35,8 @@ test "change_positions narrows replaced string to changed word" {
 
   let change_map = ChangeMap::new()
   change_map.insert(rhs, ChangeKind::ReplacedString(lhs~, rhs~))
-  let positions = change_positions([rhs], change_map)
+  let budget = @computation.Budget::new(@computation.default_limit())
+  let positions = change_positions_with_budget([rhs], change_map, budget)
 
   assert_true(positions.length() > 0)
   assert_true(novel_width(positions) > 0)
