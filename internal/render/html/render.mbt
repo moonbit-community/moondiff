@@ -140,7 +140,7 @@ fn append_split_hunk(
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
 ) -> Unit {
-  let header = @common.hunk_header(
+  let header = @render.hunk_header(
     hunk.old_start,
     hunk.old_len,
     hunk.new_start,
@@ -401,7 +401,7 @@ fn append_unified_hunk(
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
 ) -> Unit {
-  let header = @common.hunk_header(
+  let header = @render.hunk_header(
     hunk.old_start,
     hunk.old_len,
     hunk.new_start,
