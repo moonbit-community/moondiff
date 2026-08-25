@@ -8,29 +8,6 @@ pub(all) enum AlignedDiffMode {
 } derive(Eq)
 
 ///|
-/// How an aligned document was produced.
-pub(all) enum AlignedDiffOutcome {
-  Rendered
-  /// The whole document was rendered lexically because structural diffing
-  /// could not be used.
-  Fallback(String)
-  /// Only the listed top-level edits were rendered lexically. All remaining
-  /// edits still use the structural diff.
-  PartialFallback(Array[String])
-  NoStructuralChanges
-  /// The inputs differ only in content excluded by the caller, such as
-  /// comments, blank lines, or top-level test blocks.
-  NoNonCommentChanges
-} derive(Eq)
-
-///|
-/// A renderer-neutral aligned diff and the outcome callers should present.
-pub(all) struct AlignedDiffResult {
-  document : @model.DiffDocument
-  outcome : AlignedDiffOutcome
-} derive(Eq)
-
-///|
 /// Compatibility alias for the public renderer-neutral model type.
 pub type DiffStatus = @model.DiffStatus
 
@@ -60,10 +37,8 @@ pub type FallbackInfo = @model.FallbackInfo
 
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
-/// through the `mbtdiff` facade; the older public `AlignedDiffResult` type is
-/// retained as a compatibility projection. `fallbacks` is a zero-copy
-/// read-only view whose backing storage is never mutated after this result is
-/// published.
+/// through the `mbtdiff` facade. `fallbacks` is a zero-copy read-only view whose
+/// backing storage is never mutated after this result is published.
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : DiffStatus
@@ -71,8 +46,8 @@ pub(all) struct DetailedDiffResult {
 } derive(Eq)
 
 ///|
-/// Renderer-neutral top-level section metadata used by compatibility
-/// consumers that retain per-declaration file labels.
+/// Renderer-neutral top-level section metadata used by consumers that retain
+/// per-declaration file labels.
 pub(all) struct DiffSection {
   old : LineRange?
   new : LineRange?
@@ -86,7 +61,7 @@ pub(all) enum DiffLayout {
 
 ///|
 /// One shared calculation consumed by both the renderer-free facade and the
-/// command-line compatibility renderer.
+/// command-line renderer.
 pub(all) struct DiffCalculation {
   result : DetailedDiffResult
   layout : DiffLayout
@@ -1226,113 +1201,4 @@ pub fn diff_document_detailed(
     ignore_tests~,
     mode~,
   ).result
-}
-
-///|
-fn computation_stage_text(stage : ComputationStage) -> String {
-  match stage {
-    TopLevelAlignment => "top-level alignment"
-    SyntaxMatching => "syntax matching"
-    IntralineMatching => "intraline matching"
-  }
-}
-
-///|
-fn scope_location(scope : FallbackScope) -> String {
-  match scope {
-    WholeFile => ""
-    Region(old~, new~) => {
-      let parts : Array[String] = []
-      if old is Some(range) {
-        parts.push("old line \{range.start + 1}")
-      }
-      if new is Some(range) {
-        parts.push("new line \{range.start + 1}")
-      }
-      if parts.is_empty() {
-        "file"
-      } else {
-        parts.join(", ")
-      }
-    }
-  }
-}
-
-///|
-fn fallback_reason_text(fallback : FallbackInfo) -> String {
-  match fallback.reason {
-    ParseError(detail~, ..) => detail
-    GraphLimitExceeded(limit~) => {
-      let base = "graph limit exceeded (\{limit})"
-      let location = scope_location(fallback.scope)
-      if location.is_empty() {
-        base
-      } else {
-        "\{base} at \{location}"
-      }
-    }
-    ComputationLimitExceeded(stage~, limit~) => {
-      let base = "computation limit exceeded (\{limit}) during \{computation_stage_text(stage)}"
-      let location = scope_location(fallback.scope)
-      if location.is_empty() {
-        base
-      } else {
-        "\{base} at \{location}"
-      }
-    }
-    TopLevelReordering =>
-      "top-level reordering has no changes inside aligned declarations"
-  }
-}
-
-///|
-fn detailed_compat_result(
-  result : DetailedDiffResult,
-  mode : AlignedDiffMode,
-) -> AlignedDiffResult {
-  let outcome = if result.fallbacks.is_empty() {
-    match result.status {
-      Identical =>
-        if mode is Lexical {
-          AlignedDiffOutcome::Rendered
-        } else {
-          AlignedDiffOutcome::NoStructuralChanges
-        }
-      NoStructuralChanges => AlignedDiffOutcome::NoStructuralChanges
-      IgnoredOnly => AlignedDiffOutcome::NoNonCommentChanges
-      Changed => AlignedDiffOutcome::Rendered
-    }
-  } else if result.fallbacks.length() == 1 &&
-    result.fallbacks[0].scope is WholeFile {
-    Fallback(fallback_reason_text(result.fallbacks[0]))
-  } else {
-    PartialFallback(result.fallbacks.map(fallback_reason_text))
-  }
-  { document: result.document, outcome }
-}
-
-///|
-/// Calculate a MoonBit-aware renderer-neutral diff using the same top-level
-/// alignment plan as the terminal AST renderer.
-pub fn diff_document(
-  old_source : String,
-  new_source : String,
-  mode : AlignedDiffMode,
-  context? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
-) -> AlignedDiffResult {
-  detailed_compat_result(
-    diff_document_detailed(
-      old_source,
-      new_source,
-      context~,
-      graph_limit~,
-      ignore_comments~,
-      ignore_tests~,
-      mode~,
-    ),
-    mode,
-  )
 }

@@ -1363,6 +1363,27 @@ test "UUID anchors keep priority and conflicting UUIDs forbid fuzzy pairing" {
 }
 
 ///|
+fn diff_document_for_test(
+  old_source : String,
+  new_source : String,
+  mode : AlignedDiffMode,
+  context? : Int = 3,
+  graph_limit? : UInt = 3_000_000,
+  ignore_comments? : Bool = false,
+  ignore_tests? : Bool = false,
+) -> DetailedDiffResult {
+  diff_document_detailed(
+    old_source,
+    new_source,
+    context~,
+    graph_limit~,
+    ignore_comments~,
+    ignore_tests~,
+    mode~,
+  )
+}
+
+///|
 test "renamed declarations render one paired hunk in lexical and AST modes" {
   let old_source =
     #|fn stable() {}
@@ -1375,8 +1396,9 @@ test "renamed declarations render one paired hunk in lexical and AST modes" {
     #|  launch(path)
     #|}
   for mode in [Lexical, Ast] {
-    let result = diff_document(old_source, new_source, mode, context=0)
-    assert_true(result.outcome is Rendered)
+    let result = diff_document_for_test(old_source, new_source, mode, context=0)
+    assert_true(result.status is Changed)
+    assert_true(result.fallbacks.is_empty())
     assert_eq(result.document.hunks.length(), 1)
     let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
     assert_true(patch.contains("spawn_unix"), msg=patch)
@@ -1645,14 +1667,26 @@ test "lexical aligned documents preserve original line numbers" {
     #|fn target() {
     #|  new_value()
     #|}
-  let result = diff_document(old_source, new_source, Lexical, context=0)
-  assert_true(result.outcome is Rendered)
+  let result = diff_document_for_test(
+    old_source,
+    new_source,
+    Lexical,
+    context=0,
+  )
+  assert_true(result.status is Changed)
+  assert_true(result.fallbacks.is_empty())
   assert_true(result.document.hunks.length() >= 2)
   let changed = result.document.hunks[0]
   @debug.assert_eq((changed.old_start, changed.new_start), (2, 3))
 
-  let ast_result = diff_document(old_source, new_source, Ast, context=0)
-  assert_true(ast_result.outcome is Rendered)
+  let ast_result = diff_document_for_test(
+    old_source,
+    new_source,
+    Ast,
+    context=0,
+  )
+  assert_true(ast_result.status is Changed)
+  assert_true(ast_result.fallbacks.is_empty())
   assert_true(ast_result.document.hunks.length() >= 2)
   let ast_changed = ast_result.document.hunks[0]
   @debug.assert_eq((ast_changed.old_start, ast_changed.new_start), (1, 2))
@@ -1660,21 +1694,21 @@ test "lexical aligned documents preserve original line numbers" {
 
 ///|
 test "lexical pure reorder falls back to a whole-file document" {
-  let result = diff_document(
+  let result = diff_document_for_test(
     "fn first() {}\nfn second() {}",
     "fn second() {}\nfn first() {}",
     Lexical,
     context=0,
   )
-  guard result.outcome is Fallback(reason) else {
+  guard result.fallbacks is [{ reason: TopLevelReordering, scope: WholeFile }] else {
     fail("expected reorder fallback")
   }
-  assert_true(reason.contains("reordering"))
+  assert_true(result.status is Changed)
   assert_false(result.document.hunks.is_empty())
 }
 
 ///|
-test "detailed lexical calculation retains typed status layout and compatibility" {
+test "typed lexical calculation retains status and section layout" {
   let old_source =
     #|fn keep() {}
     #|fn target() { old_value() }
@@ -1692,15 +1726,6 @@ test "detailed lexical calculation retains typed status layout and compatibility
   assert_true(calculation.result.status is Changed)
   assert_true(calculation.result.fallbacks.is_empty())
   assert_true(calculation.layout is TopLevelSections(_))
-  let compatibility = diff_document(
-    old_source,
-    new_source,
-    Lexical,
-    context=0,
-    graph_limit=0,
-  )
-  assert_true(compatibility.outcome is Rendered)
-  assert_true(compatibility.document == calculation.result.document)
 
   let identical = diff_document_detailed(
     "fn same() {}",
@@ -1708,13 +1733,11 @@ test "detailed lexical calculation retains typed status layout and compatibility
     mode=Lexical,
   )
   assert_true(identical.status is Identical)
-  assert_true(
-    diff_document("fn same() {}", "fn same() {}", Lexical).outcome is Rendered,
-  )
+  assert_true(identical.fallbacks.is_empty())
 }
 
 ///|
-test "detailed lexical reorder has a typed whole-file fallback" {
+test "typed lexical reorder retains whole-file fallback and layout" {
   let old_source = "fn first() {}\nfn second() {}"
   let new_source = "fn second() {}\nfn first() {}"
   let calculation = calculate_diff_document(
@@ -1729,25 +1752,18 @@ test "detailed lexical reorder has a typed whole-file fallback" {
     is [{ reason: TopLevelReordering, scope: WholeFile }],
   )
   assert_true(calculation.layout is WholeDocument)
-  let compatibility = diff_document(old_source, new_source, Lexical, context=0)
-  assert_true(compatibility.document == calculation.result.document)
-  assert_true(
-    compatibility.outcome
-    is Fallback(
-      "top-level reordering has no changes inside aligned declarations"
-    ),
-  )
 }
 
 ///|
 test "AST documents mark only novel source spans as changed" {
-  let result = diff_document(
+  let result = diff_document_for_test(
     "fn target() {\n  old_value()\n}",
     "fn target() {\n  new_value()\n}",
     Ast,
     context=0,
   )
-  assert_true(result.outcome is Rendered)
+  assert_true(result.status is Changed)
+  assert_true(result.fallbacks.is_empty())
   assert_false(result.document.hunks.is_empty())
   let changed = changed_segment_text(result.document)
   assert_true(changed.contains("old_value"), msg=changed)
@@ -1757,60 +1773,70 @@ test "AST documents mark only novel source spans as changed" {
 
 ///|
 test "AST formatting and top-level reorder are structural empty states" {
-  let formatting = diff_document(
+  let formatting = diff_document_for_test(
     "fn format() { 1 }",
     "fn format() {\n  1\n}",
     Ast,
   )
-  assert_true(formatting.outcome is NoStructuralChanges)
+  assert_true(formatting.status is NoStructuralChanges)
   assert_true(formatting.document.hunks.is_empty())
 
-  let reordered = diff_document(
+  let reordered = diff_document_for_test(
     "fn first() {}\nfn second() {}",
     "fn second() {}\nfn first() {}",
     Ast,
   )
-  assert_true(reordered.outcome is NoStructuralChanges)
+  assert_true(reordered.status is NoStructuralChanges)
   assert_true(reordered.document.hunks.is_empty())
 }
 
 ///|
 test "aligned documents distinguish complete and partial lexical fallbacks" {
-  let invalid = diff_document("fn broken( {", "fn broken() {}", Ast, context=0)
-  guard invalid.outcome is Fallback(parse_reason) else {
+  let invalid = diff_document_for_test(
+    "fn broken( {",
+    "fn broken() {}",
+    Ast,
+    context=0,
+  )
+  guard invalid.fallbacks
+    is [{ reason: ParseError(detail~, ..), scope: WholeFile }] else {
     fail("expected parser fallback")
   }
-  assert_true(parse_reason.contains("old:"), msg=parse_reason)
+  assert_true(detail.contains("old:"), msg=detail)
   assert_false(invalid.document.hunks.is_empty())
 
-  let limited = diff_document(
+  let limited = diff_document_for_test(
     "fn target() { old_value() }",
     "fn target() { new_value() }",
     Ast,
     context=0,
     graph_limit=0,
   )
-  guard limited.outcome is PartialFallback([limit_reason]) else {
+  guard limited.fallbacks
+    is [
+      {
+        reason: GraphLimitExceeded(limit=0),
+        scope: Region(
+          old=Some({ start: 0, len: 1 }),
+          new=Some({ start: 0, len: 1 })
+        ),
+      },
+    ] else {
     fail("expected partial graph fallback")
   }
-  assert_true(limit_reason.contains("graph limit exceeded"), msg=limit_reason)
-  assert_true(limit_reason.contains("old line 1, new line 1"), msg=limit_reason)
   assert_false(limited.document.hunks.is_empty())
 
-  let root_list_limited = diff_document(
+  let root_list_limited = diff_document_for_test(
     "/// trailing old",
     "/// trailing new",
     Ast,
     context=0,
     graph_limit=0,
   )
-  guard root_list_limited.outcome is Fallback(root_list_reason) else {
+  guard root_list_limited.fallbacks
+    is [{ reason: GraphLimitExceeded(limit=0), scope: WholeFile }] else {
     fail("expected whole-document graph fallback")
   }
-  assert_true(
-    root_list_reason.contains("graph limit exceeded"),
-    msg=root_list_reason,
-  )
   assert_false(root_list_limited.document.hunks.is_empty())
 }
 
@@ -1823,17 +1849,17 @@ test "aligned documents ignore comments in both modes" {
     #|/// new docs
     #|fn value() -> Int { 1  // new trailing }
   for mode in [Lexical, Ast] {
-    let result = diff_document(
+    let result = diff_document_for_test(
       old_source,
       new_source,
       mode,
       ignore_comments=true,
     )
-    assert_true(result.outcome is NoNonCommentChanges)
+    assert_true(result.status is IgnoredOnly)
     assert_true(result.document.hunks.is_empty())
   }
   assert_false(
-    diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
+    diff_document_for_test(old_source, new_source, Lexical).document.hunks.is_empty(),
   )
 }
 
@@ -1852,17 +1878,17 @@ test "aligned documents ignore named anonymous and async tests" {
   for sources in cases {
     let (old_source, new_source) = sources
     for mode in [Lexical, Ast] {
-      let result = diff_document(
+      let result = diff_document_for_test(
         old_source,
         new_source,
         mode,
         ignore_tests=true,
       )
-      assert_true(result.outcome is NoNonCommentChanges)
+      assert_true(result.status is IgnoredOnly)
       assert_true(result.document.hunks.is_empty())
     }
     assert_false(
-      diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
+      diff_document_for_test(old_source, new_source, Lexical).document.hunks.is_empty(),
     )
   }
 }
@@ -1877,8 +1903,13 @@ test "ignore tests owns leading docs UUIDs separators and surrounding blanks" {
     #|test "old" { inspect(1) }
   let new_source = "fn stable() {}"
   for mode in [Lexical, Ast] {
-    let result = diff_document(old_source, new_source, mode, ignore_tests=true)
-    assert_true(result.outcome is NoNonCommentChanges)
+    let result = diff_document_for_test(
+      old_source,
+      new_source,
+      mode,
+      ignore_tests=true,
+    )
+    assert_true(result.status is IgnoredOnly)
     assert_true(result.document.hunks.is_empty())
   }
 }
@@ -1902,16 +1933,16 @@ test "same-line test changes are neutral while suffix comments stay visible" {
   let projection = make_source_projection(old_changed, collection.ignored_tests)
   @debug.assert_eq(projection.lines, ["// old ordinary note"])
   for mode in [Lexical, Ast] {
-    let ignored_only = diff_document(
+    let ignored_only = diff_document_for_test(
       old_same,
       new_same,
       mode,
       ignore_tests=true,
     )
-    assert_true(ignored_only.outcome is NoNonCommentChanges)
+    assert_true(ignored_only.status is IgnoredOnly)
     assert_true(ignored_only.document.hunks.is_empty())
 
-    let comments_visible = diff_document(
+    let comments_visible = diff_document_for_test(
       old_changed,
       new_changed,
       mode,
@@ -1938,14 +1969,14 @@ test "same-line test changes are neutral while suffix comments stay visible" {
     assert_true(patch.contains(old_changed), msg=patch)
     assert_true(patch.contains(new_changed), msg=patch)
 
-    let both = diff_document(
+    let both = diff_document_for_test(
       old_changed,
       new_changed,
       mode,
       ignore_comments=true,
       ignore_tests=true,
     )
-    assert_true(both.outcome is NoNonCommentChanges)
+    assert_true(both.status is IgnoredOnly)
     assert_true(both.document.hunks.is_empty())
   }
 }
@@ -1959,7 +1990,7 @@ test "unchanged projected suffixes restore differing tests as ignored rows" {
     #|test "sample" { new_test() } // stable ordinary note
     #|fn production() { new_value() }
   for mode in [Lexical, Ast] {
-    let result = diff_document(
+    let result = diff_document_for_test(
       old_source,
       new_source,
       mode,
@@ -1998,7 +2029,7 @@ test "per-unit projections do not restore a same-line test prefix" {
     #|///|UUID(production-id)
     #|fn production() { stable_value() }
   for mode in [Lexical, Ast] {
-    let result = diff_document(
+    let result = diff_document_for_test(
       old_source,
       new_source,
       mode,
@@ -2026,7 +2057,7 @@ test "Unicode CRLF projections preserve suffixes indexes and nearby code" {
   let old_source = "test \"😀\" { old_test() } // 注释旧\r\nfn production() { old_value() }\r\n"
   let new_source = "test \"😀\" { new_test() } // 注释新\r\nfn production() { new_value() }\r\n"
   for mode in [Lexical, Ast] {
-    let result = diff_document(
+    let result = diff_document_for_test(
       old_source,
       new_source,
       mode,
@@ -2079,7 +2110,7 @@ test "asymmetric ignored test gaps do not duplicate production lines" {
   for sources in cases {
     let (old_source, new_source, old_production_line, new_production_line) = sources
     for mode in [Lexical, Ast] {
-      let result = diff_document(
+      let result = diff_document_for_test(
         old_source,
         new_source,
         mode,
@@ -2118,7 +2149,7 @@ test "ignore tests preserves ordinary comments independently" {
     $|///|UUID(new-test-id)
     $|test "new" { new_test() }
   for mode in [Lexical, Ast] {
-    let tests_only = diff_document(
+    let tests_only = diff_document_for_test(
       old_source,
       new_source,
       mode,
@@ -2132,14 +2163,14 @@ test "ignore tests preserves ordinary comments independently" {
     assert_false(changed.contains("test docs"), msg=changed)
     assert_false(changed.contains("_test"), msg=changed)
 
-    let both = diff_document(
+    let both = diff_document_for_test(
       old_source,
       new_source,
       mode,
       ignore_comments=true,
       ignore_tests=true,
     )
-    assert_true(both.outcome is NoNonCommentChanges)
+    assert_true(both.status is IgnoredOnly)
     assert_true(both.document.hunks.is_empty())
   }
 }
@@ -2155,7 +2186,7 @@ test "ignore tests reports only mixed production changes and keeps test imports"
     #|test "sample" { test_new() }
     #|fn production() { prod_new() }
   for mode in [Lexical, Ast] {
-    let result = diff_document(
+    let result = diff_document_for_test(
       old_source,
       new_source,
       mode,
@@ -2184,21 +2215,21 @@ test "comment and test filters compose independently" {
     #|fn stable() {}
     #|test "sample" { new_test() }
   for mode in [Lexical, Ast] {
-    let tests_only = diff_document(
+    let tests_only = diff_document_for_test(
       old_source,
       new_source,
       mode,
       ignore_tests=true,
     )
     assert_false(tests_only.document.hunks.is_empty())
-    let both = diff_document(
+    let both = diff_document_for_test(
       old_source,
       new_source,
       mode,
       ignore_comments=true,
       ignore_tests=true,
     )
-    assert_true(both.outcome is NoNonCommentChanges)
+    assert_true(both.status is IgnoredOnly)
     assert_true(both.document.hunks.is_empty())
   }
 }
@@ -2211,7 +2242,7 @@ test "successful graph and computation fallbacks still exclude tests" {
   let new_source =
     #|test "sample" { test_new() } // new fallback note
     #|fn production() { "alpha zeta gamma" }
-  let graph = diff_document(
+  let graph = diff_document_for_test(
     old_source,
     new_source,
     Ast,
@@ -2219,7 +2250,10 @@ test "successful graph and computation fallbacks still exclude tests" {
     graph_limit=0,
     ignore_tests=true,
   )
-  assert_true(graph.outcome is PartialFallback(_))
+  assert_true(
+    graph.fallbacks
+    is [{ reason: GraphLimitExceeded(limit=0), scope: Region(..) }],
+  )
   let graph_changed = changed_segment_text(graph.document)
   assert_true(
     graph_changed.contains("beta") || graph_changed.contains("zeta"),
@@ -2253,14 +2287,16 @@ test "successful graph and computation fallbacks still exclude tests" {
 
 ///|
 test "parse failure preserves the existing unfiltered test fallback" {
-  let result = diff_document(
+  let result = diff_document_for_test(
     "test \"sample\" { old_value( }",
     "test \"sample\" { new_value( }",
     Ast,
     context=0,
     ignore_tests=true,
   )
-  assert_true(result.outcome is Fallback(_))
+  assert_true(
+    result.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
+  )
   let changed = changed_segment_text(result.document)
   assert_true(changed.contains("old_value"), msg=changed)
   assert_true(changed.contains("new_value"), msg=changed)
@@ -2276,17 +2312,17 @@ test "aligned documents ignore blank lines and final newlines in both modes" {
     ] {
     let (old_source, new_source) = sources
     for mode in [Lexical, Ast] {
-      let result = diff_document(
+      let result = diff_document_for_test(
         old_source,
         new_source,
         mode,
         ignore_comments=true,
       )
-      assert_true(result.outcome is NoNonCommentChanges)
+      assert_true(result.status is IgnoredOnly)
       assert_true(result.document.hunks.is_empty())
     }
     assert_false(
-      diff_document(old_source, new_source, Lexical).document.hunks.is_empty(),
+      diff_document_for_test(old_source, new_source, Lexical).document.hunks.is_empty(),
     )
   }
 }
@@ -2295,17 +2331,19 @@ test "aligned documents ignore blank lines and final newlines in both modes" {
 test "parse-invalid blank-only changes are classified before lexical fallback" {
   let old_source = "fn broken( {\n"
   let new_source = "fn broken( {\n\u{2003}\n"
-  let unfiltered = diff_document(old_source, new_source, Ast)
-  assert_true(unfiltered.outcome is Fallback(_))
+  let unfiltered = diff_document_for_test(old_source, new_source, Ast)
+  assert_true(
+    unfiltered.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
+  )
   assert_false(unfiltered.document.hunks.is_empty())
 
-  let filtered = diff_document(
+  let filtered = diff_document_for_test(
     old_source,
     new_source,
     Ast,
     ignore_comments=true,
   )
-  assert_true(filtered.outcome is NoNonCommentChanges)
+  assert_true(filtered.status is IgnoredOnly)
   assert_true(filtered.document.hunks.is_empty())
 }
 
@@ -2320,13 +2358,13 @@ test "aligned documents ignore block separators in both modes" {
     #|///|
     #|fn second() {}
   for mode in [Lexical, Ast] {
-    let result = diff_document(
+    let result = diff_document_for_test(
       old_source,
       new_source,
       mode,
       ignore_comments=true,
     )
-    assert_true(result.outcome is NoNonCommentChanges)
+    assert_true(result.status is IgnoredOnly)
     assert_true(result.document.hunks.is_empty())
   }
 }
@@ -2343,21 +2381,15 @@ test "AST comment filtering retains neutral source around code changes" {
     #|fn value() -> Int {
     #|  new_value()  // new explanation
     #|}
-  let result = diff_document(
+  let result = diff_document_for_test(
     old_source,
     new_source,
     Ast,
     context=1,
     ignore_comments=true,
   )
-  let outcome_name = match result.outcome {
-    Rendered => "rendered"
-    Fallback(_) => "fallback"
-    PartialFallback(_) => "partial fallback"
-    NoStructuralChanges => "no structural changes"
-    NoNonCommentChanges => "no non-comment changes"
-  }
-  assert_eq(outcome_name, "rendered")
+  assert_true(result.status is Changed)
+  assert_true(result.fallbacks.is_empty())
   assert_false(result.document.hunks.is_empty())
   let changed = changed_segment_text(result.document)
   assert_true(changed.contains("old_value"), msg=changed)
@@ -2371,14 +2403,16 @@ test "AST comment filtering retains neutral source around code changes" {
 
 ///|
 test "parse failure fallback applies comment filtering" {
-  let result = diff_document(
+  let result = diff_document_for_test(
     "fn broken( { old_value // old comment",
     "fn broken( { new_value // new comment",
     Ast,
     context=0,
     ignore_comments=true,
   )
-  assert_true(result.outcome is Fallback(_))
+  assert_true(
+    result.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
+  )
   assert_false(result.document.hunks.is_empty())
   let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
   assert_true(patch.contains("old comment"), msg=patch)

@@ -8,8 +8,6 @@ import {
 // Values
 pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DiffCalculation
 
-pub fn diff_document(String, String, AlignedDiffMode, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool) -> AlignedDiffResult
-
 pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DetailedDiffResult
 
 // Errors
@@ -18,19 +16,6 @@ pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UIn
 pub(all) enum AlignedDiffMode {
   Lexical
   Ast
-} derive(Eq)
-
-pub(all) enum AlignedDiffOutcome {
-  Rendered
-  Fallback(String)
-  PartialFallback(Array[String])
-  NoStructuralChanges
-  NoNonCommentChanges
-} derive(Eq)
-
-pub(all) struct AlignedDiffResult {
-  document : @model.DiffDocument
-  outcome : AlignedDiffOutcome
 } derive(Eq)
 
 pub(all) struct DetailedDiffResult {
