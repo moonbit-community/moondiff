@@ -6,12 +6,15 @@ The static Rabbita playground accepts these public GitHub URLs:
 https://github.com/{owner}/{repo}/commit/{sha}
 https://github.com/{owner}/{repo}/pull/{number}
 https://github.com/{owner}/{repo}/pull/{number}/files
+https://github.com/{owner}/{repo}/pull/{number}/commits
 https://github.com/{owner}/{repo}/pull/{number}/changes/{sha}
 https://github.com/{owner}/{repo}/pull/{number}/commits/{sha}
 ```
 
 GitHub may rewrite PR commit-detail URLs between the `changes/{sha}` and
 `commits/{sha}` forms; the playground accepts both and treats them equivalently.
+The PR commits-list form (`pull/{number}/commits`) is treated like the base PR
+URL.
 Commit URLs and either PR commit-detail form compare one commit with its first
 parent (or an empty old side for a root commit). Pull request URLs load the PR's
 current head and aggregate the complete **Files changed** result. The
@@ -61,9 +64,13 @@ all other files load on demand. LineDiff keeps one shared cache. MoonBit files
 cache all eight Lexical/AST × comments/tests combinations independently, so
 layout switches and analysis rendering reuse the same stable hunks.
 
-Each downloaded side is limited to 1 MiB and 20,000 lines. Invalid UTF-8,
-NUL-containing, binary, and over-limit content keeps its file card and shows
-an explanatory message instead of a rendered diff. The browser fetches
+Each downloaded side is limited to 1 MiB and 20,000 LF-delimited lines. For
+this limit, the playground starts at one line and increments the count for each
+LF (`\n`) character. CRLF input therefore counts normally and is normalized
+to LF before rendering. Bare CR is not currently treated as a line separator,
+so CR-only input counts and renders as one line. Invalid UTF-8, NUL-containing,
+binary, and over-limit content keeps its file card and shows an explanatory
+message instead of a rendered diff. The browser fetches
 anonymous GitHub REST and raw-content endpoints and never accepts, stores, or
 sends a personal access token. Anonymous GitHub API rate limits therefore
 apply.
@@ -85,8 +92,8 @@ by `sha = head`, `parent_sha = merge base`, and `message = PR title` in the
 existing commit-shaped field.
 Changes over 50 files, 200 text hunks, or 256 KiB of UTF-8 patch data are
 rejected as a whole. Invalid UTF-8, NUL-containing, and binary files are listed
-as skipped; download failures and the existing 1 MiB/20,000-line source limits
-stop the analysis.
+as skipped; download failures and the existing per-side source limits stop the
+analysis.
 
 GitHub Pages remains a static deployment. If `/api/health` is unavailable,
 the analysis action is simply hidden and the normal diff viewer is unchanged.
