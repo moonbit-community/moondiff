@@ -11,10 +11,11 @@ test "basic" (t : @test.Test) {
       "  }", "  sum // final", "}",
     ][:]
   let body = StringBuilder()
+  let document = @tokdiff.diff(old~, new~)
   body <+ "<h3>Split view</h3>\n"
-  body <+ "\{@html.side_by_side_html(old~, new~)}"
+  body <+ "\{@render_html.render_side_by_side(document)}"
   body <+ "<h3>Unified view</h3>\n"
-  body <+ "\{@html.unified_html(old~, new~)}"
+  body <+ "\{@render_html.render_unified(document)}"
   // attributes, Unicode comments, HTML-special characters
   let sp_old = [
       "#deprecated(\"use `f` instead\")", "fn g(a : Int) -> Int { a < 3 && a > 0 } // 判断范围",
@@ -22,9 +23,10 @@ test "basic" (t : @test.Test) {
   let sp_new = [
       "#deprecated(\"use `h` instead\")", "fn g(a : Int) -> Bool { a <= 3 && a > 0 } // 判断闭区间",
     ][:]
+  let special_document = @tokdiff.diff(old=sp_old, new=sp_new)
   body <+ "<h3>Attributes, Unicode, HTML-specials</h3>\n"
-  body <+ "\{@html.side_by_side_html(old=sp_old, new=sp_new)}"
-  t.write(@html.html_page(title="tokdiff basic", body.to_string()))
+  body <+ "\{@render_html.render_side_by_side(special_document)}"
+  t.write(@render_html.html_page(title="tokdiff basic", body.to_string()))
   t.snapshot(filename="basic.html")
 }
 
@@ -41,11 +43,12 @@ test "left leaning insert" (t : @test.Test) {
       "      )", "    } else {", "      Some(false)", "   }",
     ][:]
   let body = StringBuilder()
+  let document = @tokdiff.diff(old~, new~)
   body <+ "<h3>Split view</h3>\n"
-  body <+ "\{@html.side_by_side_html(old~, new~)}"
+  body <+ "\{@render_html.render_side_by_side(document)}"
   body <+ "<h3>Unified view</h3>\n"
-  body <+ "\{@html.unified_html(old~, new~)}"
-  t.write(@html.html_page(title="left leaning insert", body.to_string()))
+  body <+ "\{@render_html.render_unified(document)}"
+  t.write(@render_html.html_page(title="left leaning insert", body.to_string()))
   t.snapshot(filename="left_leaning_insert.html")
 }
 
@@ -63,12 +66,16 @@ test "html fallback resource path" (t : @test.Test) {
       "          let content_type = match @path.Path::extname(resource_path) {",
     ][:]
   let body = StringBuilder()
+  let document = @tokdiff.diff(old~, new~)
   body <+ "<h3>Split view</h3>\n"
-  body <+ "\{@html.side_by_side_html(old~, new~)}"
+  body <+ "\{@render_html.render_side_by_side(document)}"
   body <+ "<h3>Unified view</h3>\n"
-  body <+ "\{@html.unified_html(old~, new~)}"
+  body <+ "\{@render_html.render_unified(document)}"
   t.write(
-    @html.html_page(title="html fallback resource path", body.to_string()),
+    @render_html.html_page(
+      title="html fallback resource path",
+      body.to_string(),
+    ),
   )
   t.snapshot(filename="html_fallback_resource_path.html")
 }
