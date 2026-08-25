@@ -3,13 +3,10 @@ package "moonbit-community/moondiff/tool/render"
 
 import {
   "moonbit-community/moondiff/model",
-  "moonbit-community/moondiff/syntax",
   "moonbitlang/core/hashmap",
 }
 
 // Values
-pub fn render_ast_diff(String, String, String, String, ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos], RenderOptions, old_line_base? : Int, new_line_base? : Int) -> String
-
 pub fn render_diff_document(String, String, @model.DiffDocument, RenderOptions) -> String
 
 pub fn render_diff_document_with_max_lines(String, String, @model.DiffDocument, RenderOptions, Int, Int) -> String
