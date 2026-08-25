@@ -4,13 +4,10 @@ import {
   "moonbitlang/core/diff",
   "moonbitlang/core/hashmap",
   "moonbit-community/moondiff/model",
-  "moonbit-community/moondiff/syntax",
-  "moonbit-community/moondiff/tool/hunks",
   "moonbit-community/moondiff/internal/source_text",
   "moonbit-community/moondiff/render/common",
 }
 
 import {
   "moonbitlang/core/debug",
-  "moonbit-community/moondiff/span",
 } for "wbtest"
