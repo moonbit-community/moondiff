@@ -9,12 +9,12 @@ import {
   "moonbit-community/moondiff/internal/syntax",
   "moonbit-community/moondiff/internal/span",
   "moonbit-community/moondiff/internal/tokdiff",
-  "moonbit-community/moondiff/internal/tool/hunks",
+  "moonbit-community/moondiff/internal/alignment/hunks",
   "moonbit-community/moondiff/internal/source_text",
   "moonbit-community/moondiff/internal/computation",
 }
 
 import {
   "moonbitlang/core/debug",
-  "moonbit-community/moondiff/internal/tokdiff/text" @tokdiff_text,
+  "moonbit-community/moondiff/internal/render/unified",
 } for "wbtest"

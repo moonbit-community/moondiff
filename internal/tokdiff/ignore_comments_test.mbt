@@ -83,7 +83,7 @@ test "ignored comments render as neutral context beside a code change" {
     ] else {
     fail("expected neutral comment context followed by a code change")
   }
-  let split = @tokdiff_html.render_side_by_side(document, line_numbers=true)
+  let split = @render_html.render_side_by_side(document, line_numbers=true)
   assert_true(
     split.contains(
       "class=\"ctx ignored\"><span class=\"ignored-context\">// old docs</span>",
@@ -96,7 +96,7 @@ test "ignored comments render as neutral context beside a code change" {
     split.contains("<span class=\"ignored-context\"> // old trailing</span>"),
   )
 
-  let patch = @tokdiff_text.render_unified_hunks(document).join("")
+  let patch = @unified.render_unified_hunks(document).join("")
   assert_true(patch.contains(" // old docs\n // new docs\n"))
   assert_true(patch.contains("-let value = old() // old trailing"))
   assert_true(patch.contains("+let value = new() // new trailing"))
@@ -211,12 +211,12 @@ test "blank lines beside code changes are neutral source-faithful context" {
   assert_true(new_spaces.segments.all(segment => segment.kind is Ignored))
   assert_true(old_tab.segments.all(segment => segment.kind is Ignored))
 
-  let split = @tokdiff_html.render_side_by_side(document, line_numbers=true)
+  let split = @render_html.render_side_by_side(document, line_numbers=true)
   assert_true(split.contains("class=\"ctx ignored\""), msg=split)
   assert_false(split.contains("class=\"del\"><span class=\"ignored-context\">"))
   assert_false(split.contains("class=\"add\"><span class=\"ignored-context\">"))
 
-  let unified = @tokdiff_html.render_unified(document, line_numbers=true)
+  let unified = @render_html.render_unified(document, line_numbers=true)
   assert_true(unified.contains("class=\"ctx ignored\""), msg=unified)
   assert_false(
     unified.contains("class=\"del\"><span class=\"ignored-context\">"),
@@ -225,7 +225,7 @@ test "blank lines beside code changes are neutral source-faithful context" {
     unified.contains("class=\"add\"><span class=\"ignored-context\">"),
   )
 
-  let patch = @tokdiff_text.render_unified_hunks(document).join("")
+  let patch = @unified.render_unified_hunks(document).join("")
   assert_true(patch.contains("-  old()\n+  new()\n \n   \n \t\n"), msg=patch)
 }
 

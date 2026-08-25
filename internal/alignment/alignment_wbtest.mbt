@@ -1413,7 +1413,7 @@ test "renamed declarations render one paired hunk in lexical and AST modes" {
     assert_true(result.status is Changed)
     assert_true(result.fallbacks.is_empty())
     assert_eq(result.document.hunks.length(), 1)
-    let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+    let patch = @unified.render_unified_hunks(result.document).join("")
     assert_true(patch.contains("spawn_unix"), msg=patch)
     assert_true(patch.contains("spawn_unix_ffi"), msg=patch)
   }
@@ -1979,7 +1979,7 @@ test "same-line test changes are neutral while suffix comments stay visible" {
       comments_visible.document,
       @model.DiffSegmentKind::Ignored,
     )
-    let patch = @tokdiff_text.render_unified_hunks(comments_visible.document).join(
+    let patch = @unified.render_unified_hunks(comments_visible.document).join(
       "",
     )
     assert_true(changed.contains("old"), msg=changed)
@@ -2091,7 +2091,7 @@ test "Unicode CRLF projections preserve suffixes indexes and nearby code" {
       result.document,
       @model.DiffSegmentKind::Ignored,
     )
-    let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+    let patch = @unified.render_unified_hunks(result.document).join("")
     assert_true(changed.contains("旧"), msg=changed)
     assert_true(changed.contains("新"), msg=changed)
     assert_true(changed.contains("old_value"), msg=changed)
@@ -2178,7 +2178,7 @@ test "ignore tests preserves ordinary comments independently" {
     )
     assert_false(tests_only.document.hunks.is_empty())
     let changed = changed_segment_text(tests_only.document)
-    let patch = @tokdiff_text.render_unified_hunks(tests_only.document).join("")
+    let patch = @unified.render_unified_hunks(tests_only.document).join("")
     assert_true(patch.contains(old_comment), msg=patch)
     assert_true(patch.contains(new_comment), msg=patch)
     assert_false(changed.contains("test docs"), msg=changed)
@@ -2216,7 +2216,7 @@ test "ignore tests reports only mixed production changes and keeps test imports"
     )
     assert_false(result.document.hunks.is_empty())
     let changed = changed_segment_text(result.document)
-    let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+    let patch = @unified.render_unified_hunks(result.document).join("")
     assert_true(patch.contains("old/helper"), msg=patch)
     assert_true(patch.contains("new/helper"), msg=patch)
     assert_true(changed.contains("prod_"), msg=changed)
@@ -2417,7 +2417,7 @@ test "AST comment filtering retains neutral source around code changes" {
   assert_true(changed.contains("new_value"), msg=changed)
   assert_false(changed.contains("explanation"), msg=changed)
   assert_false(changed.contains("old-id"), msg=changed)
-  let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+  let patch = @unified.render_unified_hunks(result.document).join("")
   assert_true(patch.contains("old explanation"), msg=patch)
   assert_true(patch.contains("new explanation"), msg=patch)
 }
@@ -2435,7 +2435,7 @@ test "parse failure fallback applies comment filtering" {
     result.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
   )
   assert_false(result.document.hunks.is_empty())
-  let patch = @tokdiff_text.render_unified_hunks(result.document).join("")
+  let patch = @unified.render_unified_hunks(result.document).join("")
   assert_true(patch.contains("old comment"), msg=patch)
   assert_true(patch.contains("new comment"), msg=patch)
   assert_false(changed_segment_text(result.document).contains("comment"))

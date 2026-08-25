@@ -4,6 +4,7 @@ import {
   "moonbitlang/core/diff",
   "moonbitlang/core/hashmap",
   "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/internal/alignment",
   "moonbit-community/moondiff/internal/source_text",
   "moonbit-community/moondiff/internal/render/common",
 }
