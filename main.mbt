@@ -21,11 +21,6 @@ fn parse_graph_limit(text : String) -> UInt raise {
 }
 
 ///|UUID(a34f9833-2141-48c6-8927-c7a3203564ee)
-fn should_use_structural_diff(old_path : String, new_path : String) -> Bool {
-  old_path.has_suffix(".mbt") && new_path.has_suffix(".mbt")
-}
-
-///|
 #cfg(target="wasm")
 fn proc_exit_ffi(rval : Int) -> Unit = "wasi_snapshot_preview1" "proc_exit"
 
@@ -125,31 +120,19 @@ fn render_cli_diff(
   new_source : String,
   graph_limit : UInt,
 ) -> String {
-  if should_use_structural_diff(options.old_path, options.new_path) {
-    @render.diff_text(
-      options.old_path,
-      old_source,
-      options.new_path,
-      new_source,
-      options=@render.DiffOptions::new(
-        graph_limit~,
-        context_lines=3,
-        use_color=options.use_color,
-        ignore_comments=options.ignore_comments,
-        ignore_tests=options.ignore_tests,
-      ),
-    ).rendered
-  } else {
-    @render.render_line_diff(
-      options.old_path,
-      old_source,
-      options.new_path,
-      new_source,
-      None,
-      None,
-      @render.RenderOptions::new(context_lines=3, use_color=options.use_color),
-    )
-  }
+  @cli_diff.render(
+    options.old_path,
+    old_source,
+    options.new_path,
+    new_source,
+    options=@cli_diff.Options::new(
+      graph_limit~,
+      context_lines=3,
+      use_color=options.use_color,
+      ignore_comments=options.ignore_comments,
+      ignore_tests=options.ignore_tests,
+    ),
+  )
 }
 
 ///|UUID(5da5cf7f-b7c4-474b-a87a-be6436f0b5f2)

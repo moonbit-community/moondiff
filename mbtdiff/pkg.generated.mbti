@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub fn diff(String, String, options? : DiffOptions) -> DiffResult
+pub fn diff(String, String, old_name? : String, new_name? : String, options? : DiffOptions) -> DiffResult
 
 // Errors
 
@@ -24,6 +24,7 @@ pub impl Default for DiffOptions
 type DiffResult
 pub fn DiffResult::document(Self) -> @model.DiffDocument
 pub fn DiffResult::fallbacks(Self) -> ArrayView[@model.FallbackInfo]
+pub fn DiffResult::layout(Self) -> @model.DiffLayout
 pub fn DiffResult::status(Self) -> @model.DiffStatus
 
 // Type aliases
@@ -37,9 +38,13 @@ pub using @model {type DiffDocument}
 
 pub using @model {type DiffHunk}
 
+pub using @model {type DiffLayout}
+
 pub using @model {type DiffLine}
 
 pub using @model {type DiffRow}
+
+pub using @model {type DiffSection}
 
 pub using @model {type DiffSegment}
 

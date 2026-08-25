@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/core/cmp",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/mbtdiff",
+  "moonbit-community/moondiff/internal/source_text",
+  "moonbit-community/moondiff/internal/tokdiff",
+  "moonbit-community/moondiff/internal/render/terminal",
+}

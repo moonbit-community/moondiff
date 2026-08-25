@@ -26,22 +26,15 @@ pub(all) struct DetailedDiffResult {
 
 pub(all) struct DiffCalculation {
   result : DetailedDiffResult
-  layout : DiffLayout
-  parser_reason : String?
+  layout : @model.DiffLayout
 }
-
-pub(all) enum DiffLayout {
-  WholeDocument
-  TopLevelSections(Array[DiffSection])
-} derive(Eq)
-
-pub(all) struct DiffSection {
-  old : @model.LineRange?
-  new : @model.LineRange?
-} derive(Eq)
 
 // Type aliases
 pub using @model {type ComputationStage}
+
+pub using @model {type DiffLayout}
+
+pub using @model {type DiffSection}
 
 pub using @model {type DiffSide}
 

@@ -36,6 +36,14 @@ pub type FallbackScope = @model.FallbackScope
 pub type FallbackInfo = @model.FallbackInfo
 
 ///|
+/// Compatibility alias for the public renderer-neutral model type.
+pub type DiffSection = @model.DiffSection
+
+///|
+/// Compatibility alias for the public renderer-neutral model type.
+pub type DiffLayout = @model.DiffLayout
+
+///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
 /// through the `mbtdiff` facade. `fallbacks` is a zero-copy read-only view whose
 /// backing storage is never mutated after this result is published.
@@ -46,26 +54,11 @@ pub(all) struct DetailedDiffResult {
 } derive(Eq)
 
 ///|
-/// Renderer-neutral top-level section metadata used by consumers that retain
-/// per-declaration file labels.
-pub(all) struct DiffSection {
-  old : LineRange?
-  new : LineRange?
-} derive(Eq)
-
-///|
-pub(all) enum DiffLayout {
-  WholeDocument
-  TopLevelSections(Array[DiffSection])
-} derive(Eq)
-
-///|
-/// One shared calculation consumed by both the renderer-free facade and the
-/// command-line renderer.
+/// One shared calculation consumed by the renderer-free facade and internal
+/// alignment tests.
 pub(all) struct DiffCalculation {
   result : DetailedDiffResult
   layout : DiffLayout
-  parser_reason : String?
 }
 
 ///|
@@ -661,7 +654,7 @@ fn layout_from_top_level_plan(plan : TopLevelPlan) -> DiffLayout {
           },
         )
       }
-      TopLevelSections(sections)
+      TopLevelSections(sections[:])
     }
   }
 }
@@ -971,7 +964,7 @@ fn parse_report_summary(
 }
 
 ///|
-fn parser_fallback_reason(
+fn parse_fallback_detail(
   old_reports : ArrayView[@basic.Report],
   new_reports : ArrayView[@basic.Report],
 ) -> String? {
@@ -1019,14 +1012,13 @@ fn calculate_diff_document_with_limit(
     return {
       result: { document: empty_document(), status: Identical, fallbacks: [] },
       layout: WholeDocument,
-      parser_reason: None,
     }
   }
   let old_parse = @cst.parse_structure(old_source, name=old_name)
   let new_parse = @cst.parse_structure(new_source, name=new_name)
   let old_reports = old_parse.diagnostics_view()
   let new_reports = new_parse.diagnostics_view()
-  let parser_reason = parser_fallback_reason(old_reports, new_reports)
+  let parse_detail = parse_fallback_detail(old_reports, new_reports)
   let comment_document = if ignore_comments {
     Some(lexical_source_document(old_source, new_source, context, true))
   } else {
@@ -1036,10 +1028,9 @@ fn calculate_diff_document_with_limit(
     return {
       result: { document, status: IgnoredOnly, fallbacks: [] },
       layout: WholeDocument,
-      parser_reason,
     }
   }
-  if parser_reason is Some(detail) {
+  if parse_detail is Some(detail) {
     return {
       result: {
         document: if comment_document is Some(document) {
@@ -1059,7 +1050,6 @@ fn calculate_diff_document_with_limit(
         ],
       },
       layout: WholeDocument,
-      parser_reason,
     }
   }
   let old_collection = collect_impl_units_detailed(
@@ -1088,7 +1078,6 @@ fn calculate_diff_document_with_limit(
       return {
         result: { document, status: IgnoredOnly, fallbacks: [] },
         layout: WholeDocument,
-        parser_reason,
       }
     }
   }
@@ -1109,7 +1098,6 @@ fn calculate_diff_document_with_limit(
           ComputationLimitExceeded(stage=computation_stage(stage), limit~),
         ),
         layout: WholeDocument,
-        parser_reason,
       }
   }
   let result = match mode {
@@ -1141,19 +1129,20 @@ fn calculate_diff_document_with_limit(
   } else {
     result
   }
-  let layout = if result.fallbacks is [{ scope: WholeFile, .. }] {
+  let layout : DiffLayout = if result.fallbacks is [{ scope: WholeFile, .. }] {
     WholeDocument
   } else {
     layout_from_top_level_plan(plan)
   }
-  { result, layout, parser_reason }
+  { result, layout }
 }
 
 ///|
-/// Calculate a renderer-neutral diff, its presentation layout, and parser
-/// diagnostics from one parse and one top-level alignment plan. AST mode is
-/// the default; lexical mode keeps token-level text changes while retaining
-/// declaration alignment and the shared top-level computation budget.
+/// Calculate a renderer-neutral diff and its presentation layout from one
+/// parse and one top-level alignment plan. AST mode is the default; lexical
+/// mode keeps token-level text changes while retaining declaration alignment
+/// and the shared top-level computation budget. Parse diagnostics are carried
+/// by `FallbackReason::ParseError.detail`.
 pub fn calculate_diff_document(
   old_source : String,
   new_source : String,

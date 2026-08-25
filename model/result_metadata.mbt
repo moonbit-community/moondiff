@@ -44,6 +44,23 @@ pub(all) struct LineRange {
 } derive(Debug, Eq)
 
 ///|
+/// One top-level source section retained by structural alignment. Either side
+/// may be absent for an inserted or deleted declaration.
+pub(all) struct DiffSection {
+  old : LineRange?
+  new : LineRange?
+} derive(Debug, Eq)
+
+///|
+/// Renderer-neutral presentation grouping calculated alongside a document.
+/// Section collections are exposed as read-only views whose backing storage is
+/// never mutated after publication.
+pub(all) enum DiffLayout {
+  WholeDocument
+  TopLevelSections(ArrayView[DiffSection])
+} derive(Debug, Eq)
+
+///|
 /// The source region affected by a calculation fallback.
 pub(all) enum FallbackScope {
   WholeFile

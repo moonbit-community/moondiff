@@ -1,59 +1,23 @@
-///|UUID(199e1683-8dce-4b5b-ade5-21d8199f249b)
-// Diff options kept by the public text-diff entry point. This is a small
-// subset of difftastic's display options: graph size, context radius, comment
-// and test filtering, and whether the renderer should emit ANSI colors.
-pub struct DiffOptions {
-  graph_limit : UInt
-  context_lines : Int
+///|
+/// Terminal-only display controls. Line-count hints reserve stable number
+/// column widths when the calculated document contains only part of a file or
+/// top-level section.
+pub struct RenderOptions {
   use_color : Bool
-  ignore_comments : Bool
-  ignore_tests : Bool
+  old_max_line : Int?
+  new_max_line : Int?
 }
 
-///|UUID(4b4b0094-f004-4736-8152-8313861cbdf7)
-// Treat a negative context radius as zero so every DiffOptions value is safe
-// to pass to the rendering layer.
-pub fn DiffOptions::new(
-  graph_limit? : UInt = 3_000_000,
-  context_lines? : Int = 3,
+///|
+pub fn RenderOptions::new(
   use_color? : Bool = false,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
-) -> Self {
-  let context_lines = if context_lines < 0 { 0 } else { context_lines }
-  { graph_limit, context_lines, use_color, ignore_comments, ignore_tests }
+  old_max_line? : Int,
+  new_max_line? : Int,
+) -> RenderOptions {
+  { use_color, old_max_line, new_max_line }
 }
 
-///|UUID(67af8150-11cf-4e6a-93e4-32813df70c26)
-pub impl Default for DiffOptions with fn default() {
-  DiffOptions::new()
-}
-
-///|UUID(8e5d3fc9-598e-4dce-a881-fcff64c6b41c)
-fn DiffOptions::render_options(self : Self) -> RenderOptions {
-  RenderOptions::new(context_lines=self.context_lines, use_color=self.use_color)
-}
-
-///|UUID(3056bc33-5b65-4d21-bdfc-d602536de30d)
-// Records the top-level mode selected by `diff_text`. `Ast` is retained for
-// API compatibility; it means the inputs were identical or both sides parsed
-// and CST-backed structural alignment/rendering was attempted. Graph-limit
-// fallbacks can still be rendered inside that output.
-pub enum DiffKind {
-  Ast
-  TextFallback(reason~ : String)
-}
-
-///|UUID(9fb5ba8b-d057-4c8d-b7f8-2bed3405b0a4)
-// The rendered output is returned with lightweight metadata for parser-level
-// fallback and change detection. Alignment fallbacks are reported in `rendered`.
-pub struct DiffResult {
-  kind : DiffKind
-  rendered : String
-  has_changes : Bool
-}
-
-///|UUID(459e9d80-820e-405f-9121-29bb74069f9c)
-pub fn DiffResult::is_fallback(self : Self) -> Bool {
-  self.kind is TextFallback(_)
+///|
+pub impl Default for RenderOptions with fn default() {
+  RenderOptions::new()
 }

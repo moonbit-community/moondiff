@@ -90,3 +90,15 @@ test "public fallback metadata remains constructible and matchable" {
   }
   let _ : ArrayView[@model.DiffSide] = sides
 }
+
+///|
+test "public layouts expose top-level sections as a read-only view" {
+  let layout : @model.DiffLayout = TopLevelSections([
+    { old: Some({ start: 2, len: 4 }), new: None },
+  ])
+  guard layout is TopLevelSections(sections) else {
+    fail("expected sectioned layout")
+  }
+  let _ : ArrayView[@model.DiffSection] = sections
+  assert_true(sections is [{ old: Some({ start: 2, len: 4 }), new: None }])
+}
