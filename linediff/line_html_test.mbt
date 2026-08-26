@@ -38,6 +38,54 @@ test "plain split pairs replacement lines by position and leaves extras empty" {
 }
 
 ///|
+test "equal-width replacements refine each positional line independently" {
+  let document = @linediff.line_diff(
+    old=["alpha beta gamma", "keep base"],
+    new=["alpha zeta gamma", "keep base tail"],
+    context=0,
+  )
+  let split = @render_html.render_side_by_side(document)
+  assert_true(
+    split.contains(
+      "<td class=\"del\">alpha <b class=\"wd\">beta</b> gamma</td><td class=\"add\">alpha <b class=\"wa\">zeta</b> gamma</td>",
+    ),
+    msg=split,
+  )
+  assert_true(
+    split.contains(
+      "<td class=\"del\">keep base</td><td class=\"add\">keep base<b class=\"wa\"> tail</b></td>",
+    ),
+    msg=split,
+  )
+  assert_false(split.contains("<b class=\"wd\">keep base"))
+
+  let patch = @unified.render_unified_hunks(
+    @linediff.line_diff(old=["alpha beta"], new=["alpha zeta"], context=0),
+  ).join("")
+  assert_eq(patch, "@@ -1 +1 @@\n-alpha beta\n+alpha zeta\n")
+}
+
+///|
+test "one over-limit line does not suppress refinement of its neighbors" {
+  let over_old = "x ".repeat(2_048) + "old"
+  let over_new = "x ".repeat(2_048) + "new"
+  let split = @render_html.render_side_by_side(
+    @linediff.line_diff(
+      old=[over_old, "alpha old omega"],
+      new=[over_new, "alpha new omega"],
+      context=0,
+    ),
+  )
+  assert_true(
+    split.contains(
+      "<td class=\"del\">\{over_old}</td><td class=\"add\">\{over_new}</td>",
+    ),
+  )
+  assert_true(split.contains("<b class=\"wd\">old</b>"), msg=split)
+  assert_true(split.contains("<b class=\"wa\">new</b>"), msg=split)
+}
+
+///|
 test "plain split preserves requested context and absolute line numbers" {
   let old = ["0", "old", "2", "3", "4", "5", "6", "gone", "8"]
   let new = ["0", "new", "2", "3", "4", "5", "6", "added", "8"]
@@ -52,7 +100,7 @@ test "plain split preserves requested context and absolute line numbers" {
   )
   assert_true(
     html.contains(
-      "<td class=\"line-number old-line-number\">8</td><td class=\"del\">gone</td><td class=\"line-number new-line-number\">8</td><td class=\"add\">added</td>",
+      "<td class=\"line-number old-line-number\">8</td><td class=\"del\"><b class=\"wd\">gone</b></td><td class=\"line-number new-line-number\">8</td><td class=\"add\"><b class=\"wa\">added</b></td>",
     ),
   )
 }
@@ -91,8 +139,8 @@ test "plain unified keeps the historical unnumbered wrapper" {
     content=(
       #|<pre class="unified">
       #|<span class="hunk-header">@@ -1 +1 @@</span>
-      #|<span class="del">-&lt;old&gt;</span>
-      #|<span class="add">+&amp;new</span>
+      #|<span class="del">-<b class="wd">&lt;old&gt;</b></span>
+      #|<span class="add">+<b class="wa">&amp;new</b></span>
       #|</pre>
       #|
     ),

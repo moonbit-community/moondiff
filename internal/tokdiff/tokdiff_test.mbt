@@ -162,14 +162,15 @@ test "semantic highlights exclude boundary whitespace in both HTML views" {
 }
 
 ///|
-test "budget fallbacks render plain rows" {
+test "alignment budget refusals refine equal-width rows by word" {
   // per-line token cap
   let big_old = "word ".repeat(600) + "same tail here"
   let big_new = "word ".repeat(600) + "same tail CHANGED"
   let html = @render_html.render_side_by_side(
     @tokdiff.diff(old=[big_old], new=[big_new]),
   )
-  assert_false(html.contains("<b class="))
+  assert_true(html.contains("<b class=\"wd\">here</b>"), msg=html)
+  assert_true(html.contains("<b class=\"wa\">CHANGED</b>"), msg=html)
   // total cell budget
   let old_lines : Array[String] = []
   let new_lines : Array[String] = []
@@ -181,7 +182,37 @@ test "budget fallbacks render plain rows" {
   let html2 = @render_html.render_side_by_side(
     @tokdiff.diff(old=old_lines, new=new_lines),
   )
-  assert_false(html2.contains("<b class="))
+  assert_false(html2.contains("<b class=\"wd\">"), msg=html2)
+  assert_true(html2.contains("<b class=\"wa\"> tail</b>"), msg=html2)
+
+  // An unequal replacement still keeps the original unpaired plain rows.
+  let unequal_old : Array[String] = []
+  let unequal_new : Array[String] = []
+  for i in 0..<50 {
+    unequal_old.push(
+      "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi OLD\{i}",
+    )
+  }
+  for i in 0..<49 {
+    unequal_new.push(
+      "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi NEW\{i} tail",
+    )
+  }
+  let unequal = @tokdiff.diff(old=unequal_old, new=unequal_new, context=0)
+  guard unequal.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
+    fail("expected one unequal budget fallback block")
+  }
+  assert_eq(rows.length(), 99)
+  assert_true(rows[0] is OldOnly(_))
+  assert_true(rows[50] is NewOnly(_))
+  for row in rows {
+    match row {
+      Paired(_, _) => fail("unequal fallback must not infer positional pairs")
+      OldOnly(line) | NewOnly(line) =>
+        assert_true(line.segments.all(segment => segment.kind is Unchanged))
+    }
+  }
+  assert_false(@render_html.render_side_by_side(unequal).contains("<b class="))
 }
 
 ///|
