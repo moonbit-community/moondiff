@@ -179,3 +179,65 @@ test "owned copies of result views cannot mutate later accessor results" {
   }
   assert_true(later_sides is [Old])
 }
+
+///|
+test "consumer renders DiffResult documents with the experimental public packages" {
+  let document = @mbtdiff.diff("fn f() { 1 }", "fn f() { 2 }").document()
+  let note : @render_html.HunkNote = {
+    title: "Changed <function>",
+    body: "Rendered & reviewed.",
+  }
+  let notes : Array[@render_html.HunkNote?] = [Some(note)]
+  let split = @render_html.render_side_by_side(
+    document,
+    line_numbers=true,
+    hunk_notes=notes,
+  )
+  let unified_html = @render_html.render_unified(
+    document,
+    line_numbers=true,
+    hunk_notes=notes,
+  )
+  assert_true(split.contains("Changed &lt;function&gt;"), msg=split)
+  assert_true(
+    unified_html.contains("Rendered &amp; reviewed."),
+    msg=unified_html,
+  )
+  assert_eq(
+    @render_html.render_side_by_side_hunks(
+      document,
+      line_numbers=true,
+      hunk_notes=notes,
+    ),
+    [split],
+  )
+  assert_eq(
+    @render_html.render_unified_hunks(
+      document,
+      line_numbers=true,
+      hunk_notes=notes,
+    ),
+    [unified_html],
+  )
+
+  let patch_hunks = @unified.render_unified_hunks(document)
+  assert_eq(patch_hunks.length(), 1)
+  assert_true(patch_hunks[0].contains("-fn f() { 1 }"), msg=patch_hunks[0])
+  assert_true(patch_hunks[0].contains("+fn f() { 2 }"), msg=patch_hunks[0])
+
+  let options = @terminal.RenderOptions::new(
+    use_color=false,
+    old_max_line=10,
+    new_max_line=10,
+  )
+  assert_true(options.old_max_line is Some(10))
+  assert_true(options.new_max_line is Some(10))
+  let terminal_text = @terminal.render_document(
+    "old.mbt",
+    "new.mbt",
+    document,
+    options~,
+  )
+  assert_true(terminal_text.contains("--- old.mbt\n+++ new.mbt\n"))
+  assert_false(terminal_text.contains("\u{1b}["))
+}
