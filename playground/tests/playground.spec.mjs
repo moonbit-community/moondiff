@@ -731,7 +731,8 @@ test("mixed commits use lazy line diffs and preserve binary file cards", async (
   await expect(readmeCard.locator("table.split")).toBeVisible();
   await expect(readmeCard.locator("td.del")).toContainText("Use the <old> workflow.");
   await expect(readmeCard.locator("td.add")).toContainText("Use the &new workflow.");
-  await expect(readmeCard.locator("b.wd, b.wa")).toHaveCount(0);
+  await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
+  await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 
   await binaryCard.getByRole("button", { name: "Expand" }).click();
   await expect(binaryCard).toContainText("Cannot render: the file is binary or is not valid UTF-8.");
@@ -741,7 +742,8 @@ test("mixed commits use lazy line diffs and preserve binary file cards", async (
   await expect(moonbitCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
   await expect(page.locator("table.unified")).toHaveCount(2);
-  await expect(readmeCard.locator("b.wd, b.wa")).toHaveCount(0);
+  await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
+  await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 });
 
 test("a shared playground URL restores the commit and can be copied", async ({ page }) => {
@@ -1234,13 +1236,16 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await readmeCard.getByRole("button", { name: "Expand" }).click();
   await expect(readmeCard.locator("table.split")).toBeVisible();
   const lineHtmlInAstMode = await readmeCard.locator(".diff-scroll").innerHTML();
-  await expect(readmeCard.locator("b.wd, b.wa")).toHaveCount(0);
+  await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
+  await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(structuralCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
   await expect(structuralCard.locator("b.wd")).toContainText("old_call");
   await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+  await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
+  await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 
   await page.setViewportSize({ width: 640, height: 900 });
   const astOverflow = await structuralCard.locator(".diff-scroll").evaluate(element => ({
