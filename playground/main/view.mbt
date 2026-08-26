@@ -412,9 +412,38 @@ fn fallback_location(scope : @mbtdiff.FallbackScope) -> String {
 }
 
 ///|
+fn fallback_sides_text(sides : ArrayView[@mbtdiff.DiffSide]) -> String {
+  let names = sides.map(side => {
+    match side {
+      Old => "old"
+      New => "new"
+    }
+  })
+  match names {
+    [] => ""
+    [side] => "the \{side} side"
+    _ => "the \{names.join(" and ")} sides"
+  }
+}
+
+///|
 fn fallback_reason_text(fallback : @mbtdiff.FallbackInfo) -> String {
   match fallback.reason {
     ParseError(detail~, ..) => detail
+    SyntaxPositionsOutOfBounds(sides~) => {
+      let side_text = fallback_sides_text(sides)
+      let base = if side_text.is_empty() {
+        "syntax positions out of bounds"
+      } else {
+        "syntax positions out of bounds on \{side_text}"
+      }
+      let location = fallback_location(fallback.scope)
+      if location.is_empty() {
+        base
+      } else {
+        "\{base} at \{location}"
+      }
+    }
     GraphLimitExceeded(limit~) => {
       let base = "graph limit exceeded (\{limit})"
       let location = fallback_location(fallback.scope)

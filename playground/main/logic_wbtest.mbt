@@ -161,6 +161,18 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
   assert_true(complete.message.contains("old: parse error"))
 
   guard diff_notice([
+      { reason: SyntaxPositionsOutOfBounds(sides=[Old, New]), scope: WholeFile },
+    ])
+    is Some(position_complete) else {
+    fail("expected a complete syntax-position fallback notice")
+  }
+  assert_true(
+    position_complete.message.contains(
+      "syntax positions out of bounds on the old and new sides",
+    ),
+  )
+
+  guard diff_notice([
       {
         reason: GraphLimitExceeded(limit=3_000_000),
         scope: Region(
@@ -176,6 +188,27 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
   assert_eq(partial.label, "Partial lexical fallback")
   assert_true(partial.message.contains("AST diff was used for the rest"))
   assert_true(partial.message.contains("old line 724, new line 768"))
+
+  guard diff_notice([
+      {
+        reason: SyntaxPositionsOutOfBounds(sides=[New]),
+        scope: Region(
+          old=Some({ start: 3, len: 2 }),
+          new=Some({ start: 5, len: 2 }),
+        ),
+      },
+    ])
+    is Some(position_partial) else {
+    fail("expected a partial syntax-position fallback notice")
+  }
+  assert_true(
+    position_partial.message.contains(
+      "syntax positions out of bounds on the new side at old line 4, new line 6",
+    ),
+  )
+  assert_true(
+    position_partial.message.contains("AST diff was used for the rest"),
+  )
 
   assert_true(diff_notice([]) is None)
 }
@@ -345,11 +378,13 @@ test "added deleted renamed merge and root commits choose the correct raw sides"
 }
 
 ///|
-test "source validation accepts Unicode and normalizes CRLF" {
-  guard check_source(@utf8.encode("a\r\n名😀\r\n")) is Renderable(lines) else {
-    fail("expected source to render")
+test "source validation accepts Unicode and universal newlines" {
+  for source in ["a\n名😀\n", "a\r\n名😀\r\n", "a\r名😀\r"] {
+    guard check_source(@utf8.encode(source)) is Renderable(lines) else {
+      fail("expected source to render")
+    }
+    assert_eq(lines, ["a", "名😀", ""])
   }
-  assert_eq(lines, ["a", "名😀", ""])
 }
 
 ///|
@@ -366,9 +401,18 @@ test "source validation rejects invalid UTF-8, NUL, byte and line limits" {
     check_source(Bytes::make(MAX_SOURCE_BYTES + 1, b'x')) is Rejected(_, false),
   )
   assert_true(
-    check_source(@utf8.encode("\n".repeat(MAX_SOURCE_LINES)))
+    check_source(@utf8.encode("\r".repeat(MAX_SOURCE_LINES)))
     is Rejected(_, false),
   )
+}
+
+///|
+test "source validation allows exactly 20,000 CR-only lines" {
+  guard check_source(@utf8.encode("\r".repeat(MAX_SOURCE_LINES - 1)))
+    is Renderable(lines) else {
+    fail("expected the line-limit boundary to render")
+  }
+  assert_eq(lines.length(), MAX_SOURCE_LINES)
 }
 
 ///|

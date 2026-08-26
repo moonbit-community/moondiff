@@ -35,11 +35,12 @@ PR. Every changed file receives a card in GitHub's order. Files
 whose old or new path ends in `.mbt` use the bundled `mbtdiff` engine's
 MoonBit-aware lexical diff by default. The global **Lexical / AST** control
 switches those files to structural diffing; pure formatting and top-level
-reordering become an explicit no-structural-changes state. Parser failures and
-whole-file graph-limit failures show a lexical fallback reason; when only one
-aligned top-level declaration exceeds the graph limit, the playground labels
-that declaration as a partial lexical fallback and keeps AST diffing the rest
-of the file. The default-off **Ignore comments** control applies to MoonBit
+reordering become an explicit no-structural-changes state. Parser failures,
+whole-file graph-limit failures, and invalid parser syntax positions show a
+lexical fallback reason. When a graph limit or invalid syntax position affects
+only one aligned top-level declaration, the playground labels that declaration
+as a partial lexical fallback and keeps AST diffing the rest of the file. The
+default-off **Ignore comments** control applies to MoonBit
 files in both Lexical and AST mode. It ignores ordinary and documentation
 comments, generated `///|UUID(...)` markers, and the separating whitespace
 before a comment while keeping strings such as `"//not a comment"` intact. It
@@ -72,13 +73,12 @@ all other files load on demand. LineDiff keeps one shared cache. MoonBit files
 cache all eight Lexical/AST × comments/tests combinations independently, so
 layout switches and analysis rendering reuse the same stable hunks.
 
-Each downloaded side is limited to 1 MiB and 20,000 LF-delimited lines. For
-this limit, the playground starts at one line and increments the count for each
-LF (`\n`) character. CRLF input therefore counts normally and is normalized
-to LF before rendering. Bare CR is not currently treated as a line separator,
-so CR-only input counts and renders as one line. Invalid UTF-8, NUL-containing,
-binary, and over-limit content keeps its file card and shows an explanatory
-message instead of a rendered diff. The browser fetches
+Each downloaded side is limited to 1 MiB and 20,000 universal-newline lines.
+LF (`\n`), CRLF (`\r\n`), and bare CR (`\r`) each terminate one line; empty
+input is one line, and a trailing terminator retains the final empty line.
+Exactly 20,000 lines are accepted and 20,001 are rejected. Invalid UTF-8,
+NUL-containing, binary, and over-limit content keeps its file card and shows
+an explanatory message instead of a rendered diff. The browser fetches
 anonymous GitHub REST and raw-content endpoints and never accepts, stores, or
 sends a personal access token. Anonymous GitHub API rate limits therefore
 apply.
