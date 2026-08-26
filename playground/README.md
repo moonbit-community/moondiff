@@ -54,8 +54,16 @@ and `///|` separators. Test-only changes produce no hunks; mixed changes report
 only production code, while an `import { ... } for "test"` declaration remains
 part of the diff. Ignore comments and Ignore tests compose independently. If
 parsing fails, the existing whole-file lexical fallback is retained and test
-filtering is not guaranteed. Other valid UTF-8 text files always use a plain
-line diff and are unaffected by either control.
+filtering is not guaranteed. Other valid UTF-8 text files always use a
+Patience line diff. Equal-width replacement blocks receive bounded,
+position-by-position whitespace-word highlights; unequal replacements and
+pure insertions or deletions retain their plain line structure. These files
+remain unaffected by either control. Word refinement is capped at 16,384
+UTF-16 code units per side of a line and shares fixed per-document allowances
+of 1,048,576 attempted code units and 65,536 diff tokens. Reaching a limit only
+removes word-level emphasis from later eligible rows; line text, line numbers,
+hunks, and unified patches remain unchanged. At the API level, `line_diff`
+treats a negative context radius as zero.
 
 The selected algorithm and both filter settings survive later change navigation
 in the open app but are not written into share URLs; a refresh restores Lexical
