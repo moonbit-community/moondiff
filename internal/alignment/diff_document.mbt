@@ -98,22 +98,22 @@ fn lexical_source_document(
 }
 
 ///|
-fn lexical_projected_document(
-  old : SourceProjection,
-  new : SourceProjection,
+fn lexical_view_document(
+  old : SourceView,
+  new : SourceView,
   context : Int,
   ignore_comments : Bool,
 ) -> @model.DiffDocument {
-  restore_projected_document(
+  @diff_ignore.restore_document(
     @tokdiff.diff(
-      old=old.lines,
-      new=new.lines,
+      old=old.lines(),
+      new=new.lines(),
       context~,
       line_cleanup=true,
       ignore_comments~,
     ),
-    old,
-    new,
+    old~,
+    new~,
   )
 }
 
@@ -129,14 +129,14 @@ fn append_document(
 fn lexical_edit_document(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   ignore_comments : Bool,
 ) -> @model.DiffDocument {
-  let old_local = unit_source_projection(old_projection, old_unit)
-  let new_local = unit_source_projection(new_projection, new_unit)
-  lexical_projected_document(old_local, new_local, context, ignore_comments).rebase(
+  let old_local = unit_source_view(old_view, old_unit)
+  let new_local = unit_source_view(new_view, new_unit)
+  lexical_view_document(old_local, new_local, context, ignore_comments).rebase(
     impl_line_base(old_unit) - 1,
     impl_line_base(new_unit) - 1,
   )
@@ -147,15 +147,15 @@ fn detailed_lexical_plan_document(
   plan : TopLevelPlan,
   old_source : String,
   new_source : String,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   ignore_comments : Bool,
 ) -> DetailedDiffResult {
   match plan {
     RootList(..) => {
-      let document = lexical_projected_document(
-        old_projection, new_projection, context, ignore_comments,
+      let document = lexical_view_document(
+        old_view, new_view, context, ignore_comments,
       )
       { document, status: Changed, fallbacks: [] }
     }
@@ -167,8 +167,8 @@ fn detailed_lexical_plan_document(
             lexical_edit_document(
               Some(old),
               Some(new),
-              old_projection,
-              new_projection,
+              old_view,
+              new_view,
               context,
               ignore_comments,
             )
@@ -176,8 +176,8 @@ fn detailed_lexical_plan_document(
             lexical_edit_document(
               Some(old),
               None,
-              old_projection,
-              new_projection,
+              old_view,
+              new_view,
               context,
               ignore_comments,
             )
@@ -185,8 +185,8 @@ fn detailed_lexical_plan_document(
             lexical_edit_document(
               None,
               Some(new),
-              old_projection,
-              new_projection,
+              old_view,
+              new_view,
               context,
               ignore_comments,
             )
@@ -195,8 +195,8 @@ fn detailed_lexical_plan_document(
       }
       if hunks.is_empty() && old_source != new_source {
         {
-          document: lexical_projected_document(
-            old_projection, new_projection, context, ignore_comments,
+          document: lexical_view_document(
+            old_view, new_view, context, ignore_comments,
           ),
           status: Changed,
           fallbacks: [{ reason: TopLevelReordering, scope: WholeFile }],
@@ -663,15 +663,15 @@ fn layout_from_top_level_plan(plan : TopLevelPlan) -> DiffLayout {
 fn ast_unit_document_with_budget(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
 ) -> @model.DiffDocument raise {
-  let old_local = unit_source_projection(old_projection, old_unit)
-  let new_local = unit_source_projection(new_projection, new_unit)
+  let old_local = unit_source_view(old_view, old_unit)
+  let new_local = unit_source_view(new_view, new_unit)
   let old_offset = impl_line_base(old_unit) - 1
   let new_offset = impl_line_base(new_unit) - 1
   let lhs_roots : Array[@syntax.Syntax] = []
@@ -689,17 +689,17 @@ fn ast_unit_document_with_budget(
   )
   @diff.fix_all_sliders(lhs_roots, change_map)
   @diff.fix_all_sliders(rhs_roots, change_map)
-  let lhs_positions = project_matched_positions(
+  let lhs_positions = map_matched_positions(
     @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
     old_local,
     new_local,
   )
-  let rhs_positions = project_matched_positions(
+  let rhs_positions = map_matched_positions(
     @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
     new_local,
     old_local,
   )
-  restore_projected_document(
+  @diff_ignore.restore_document(
     ast_document_from_positions(
       old_local.source(),
       new_local.source(),
@@ -708,8 +708,8 @@ fn ast_unit_document_with_budget(
       context,
       reduce_sparse_replacements,
     ),
-    old_local,
-    new_local,
+    old=old_local,
+    new=new_local,
   ).rebase(old_offset, new_offset)
 }
 
@@ -717,8 +717,8 @@ fn ast_unit_document_with_budget(
 fn detailed_ast_edit_document(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
@@ -727,8 +727,8 @@ fn detailed_ast_edit_document(
   let document = ast_unit_document_with_budget(
     old_unit,
     new_unit,
-    old_projection,
-    new_projection,
+    old_view,
+    new_view,
     context,
     graph_limit,
     !ignore_comments,
@@ -741,7 +741,7 @@ fn detailed_ast_edit_document(
       )
       return {
         document: lexical_edit_document(
-          old_unit, new_unit, old_projection, new_projection, context, ignore_comments,
+          old_unit, new_unit, old_view, new_view, context, ignore_comments,
         ),
         fallback: Some(unit_fallback(reason, old_unit, new_unit)),
         computation_exhausted: true,
@@ -751,7 +751,7 @@ fn detailed_ast_edit_document(
       let reason : FallbackReason = GraphLimitExceeded(limit=graph_limit)
       return {
         document: lexical_edit_document(
-          old_unit, new_unit, old_projection, new_projection, context, ignore_comments,
+          old_unit, new_unit, old_view, new_view, context, ignore_comments,
         ),
         fallback: Some(unit_fallback(reason, old_unit, new_unit)),
         computation_exhausted: false,
@@ -765,15 +765,15 @@ fn detailed_ast_edit_document(
 fn lexical_detailed_unit(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   ignore_comments : Bool,
   reason : FallbackReason,
 ) -> DetailedUnitResult {
   {
     document: lexical_edit_document(
-      old_unit, new_unit, old_projection, new_projection, context, ignore_comments,
+      old_unit, new_unit, old_view, new_view, context, ignore_comments,
     ),
     fallback: Some(unit_fallback(reason, old_unit, new_unit)),
     computation_exhausted: true,
@@ -784,8 +784,8 @@ fn lexical_detailed_unit(
 fn ast_root_document_with_budget(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
@@ -800,41 +800,41 @@ fn ast_root_document_with_budget(
   )
   @diff.fix_all_sliders(lhs_roots, change_map)
   @diff.fix_all_sliders(rhs_roots, change_map)
-  let lhs_positions = project_matched_positions(
+  let lhs_positions = map_matched_positions(
     @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
-    old_projection,
-    new_projection,
+    old_view,
+    new_view,
   )
-  let rhs_positions = project_matched_positions(
+  let rhs_positions = map_matched_positions(
     @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
-    new_projection,
-    old_projection,
+    new_view,
+    old_view,
   )
-  restore_projected_document(
+  @diff_ignore.restore_document(
     ast_document_from_positions(
-      old_projection.source(),
-      new_projection.source(),
+      old_view.source(),
+      new_view.source(),
       lhs_positions,
       rhs_positions,
       context,
       reduce_sparse_replacements,
     ),
-    old_projection,
-    new_projection,
+    old=old_view,
+    new=new_view,
   )
 }
 
 ///|
 fn whole_file_fallback(
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   ignore_comments : Bool,
   reason : FallbackReason,
 ) -> DetailedDiffResult {
   {
-    document: lexical_projected_document(
-      old_projection, new_projection, context, ignore_comments,
+    document: lexical_view_document(
+      old_view, new_view, context, ignore_comments,
     ),
     status: Changed,
     fallbacks: [{ reason, scope: WholeFile }],
@@ -845,8 +845,8 @@ fn whole_file_fallback(
 fn detailed_ast_root_list_document(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
@@ -855,8 +855,8 @@ fn detailed_ast_root_list_document(
   let document = ast_root_document_with_budget(
     old_units,
     new_units,
-    old_projection,
-    new_projection,
+    old_view,
+    new_view,
     context,
     graph_limit,
     !ignore_comments,
@@ -864,16 +864,16 @@ fn detailed_ast_root_list_document(
   ) catch {
     @computation.LimitExceeded(stage~, limit~) =>
       return whole_file_fallback(
-        old_projection,
-        new_projection,
+        old_view,
+        new_view,
         context,
         ignore_comments,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),
       )
     _ =>
       return whole_file_fallback(
-        old_projection,
-        new_projection,
+        old_view,
+        new_view,
         context,
         ignore_comments,
         GraphLimitExceeded(limit=graph_limit),
@@ -893,8 +893,8 @@ fn detailed_ast_root_list_document(
 ///|
 fn detailed_ast_plan_document(
   plan : TopLevelPlan,
-  old_projection : SourceProjection,
-  new_projection : SourceProjection,
+  old_view : SourceView,
+  new_view : SourceView,
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
@@ -903,8 +903,7 @@ fn detailed_ast_plan_document(
   match plan {
     RootList(old~, new~) =>
       detailed_ast_root_list_document(
-        old, new, old_projection, new_projection, context, graph_limit, ignore_comments,
-        budget,
+        old, new, old_view, new_view, context, graph_limit, ignore_comments, budget,
       )
     PerUnit(edits) => {
       let hunks : Array[@model.DiffHunk] = []
@@ -918,13 +917,12 @@ fn detailed_ast_plan_document(
         }
         let result = if exhausted_reason.val is Some(reason) {
           lexical_detailed_unit(
-            old_unit, new_unit, old_projection, new_projection, context, ignore_comments,
-            reason,
+            old_unit, new_unit, old_view, new_view, context, ignore_comments, reason,
           )
         } else {
           detailed_ast_edit_document(
-            old_unit, new_unit, old_projection, new_projection, context, graph_limit,
-            ignore_comments, budget,
+            old_unit, new_unit, old_view, new_view, context, graph_limit, ignore_comments,
+            budget,
           )
         }
         append_document(hunks, result.document)
@@ -1062,17 +1060,17 @@ fn calculate_diff_document_with_limit(
     new_parse.root(),
     ignore_tests,
   )
-  let old_projection = make_source_projection(
+  let old_view = @diff_ignore.SourceView::from_source(
     old_source,
-    old_collection.ignored_tests,
+    ignored_ranges=old_collection.ignored_tests,
   )
-  let new_projection = make_source_projection(
+  let new_view = @diff_ignore.SourceView::from_source(
     new_source,
-    new_collection.ignored_tests,
+    ignored_ranges=new_collection.ignored_tests,
   )
   if ignore_comments || ignore_tests {
-    let document = lexical_projected_document(
-      old_projection, new_projection, context, ignore_comments,
+    let document = lexical_view_document(
+      old_view, new_view, context, ignore_comments,
     )
     if document.hunks.is_empty() {
       return {
@@ -1091,8 +1089,8 @@ fn calculate_diff_document_with_limit(
     @computation.LimitExceeded(stage~, limit~) =>
       return {
         result: whole_file_fallback(
-          old_projection,
-          new_projection,
+          old_view,
+          new_view,
           context,
           ignore_comments,
           ComputationLimitExceeded(stage=computation_stage(stage), limit~),
@@ -1103,16 +1101,15 @@ fn calculate_diff_document_with_limit(
   let result = match mode {
     Lexical =>
       detailed_lexical_plan_document(
-        plan, old_source, new_source, old_projection, new_projection, context, ignore_comments,
+        plan, old_source, new_source, old_view, new_view, context, ignore_comments,
       )
     Ast =>
       detailed_ast_plan_document(
-        plan, old_projection, new_projection, context, graph_limit, ignore_comments,
-        budget,
+        plan, old_view, new_view, context, graph_limit, ignore_comments, budget,
       )
   }
   let result = if mode is Ast && ignore_comments {
-    let document = @tokdiff.ignore_comments(
+    let document = @diff_ignore.ignore_comments(
       result.document,
       old=document_lines(old_source),
       new=document_lines(new_source),

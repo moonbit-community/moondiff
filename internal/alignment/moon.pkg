@@ -8,6 +8,7 @@ import {
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/internal/syntax",
   "moonbit-community/moondiff/internal/span",
+  "moonbit-community/moondiff/internal/diff_ignore",
   "moonbit-community/moondiff/internal/tokdiff",
   "moonbit-community/moondiff/internal/alignment/hunks",
   "moonbit-community/moondiff/internal/source_text",

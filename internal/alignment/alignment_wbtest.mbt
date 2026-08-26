@@ -168,7 +168,7 @@ test "ignored test collection excludes roots and records leading trivia" {
   @debug.assert_eq(collection.units.length(), 1)
   @debug.assert_eq(collection.units[0].semantic_key, Some("fn:::production"))
   @debug.assert_eq(collection.ignored_tests.length(), 1)
-  let ignored = collection.ignored_tests[0].loc
+  let ignored = collection.ignored_tests[0]
   @debug.assert_eq((ignored.start.lnum, ignored.start.column()), (3, 1))
   @debug.assert_eq((ignored.end.lnum, ignored.end.column()), (7, 2))
 }
@@ -192,7 +192,7 @@ test "ignored test collection preserves ordinary leading comments" {
     "// retained line comment\n// retained second comment",
   )
   @debug.assert_eq(collection.ignored_tests.length(), 1)
-  let ignored = collection.ignored_tests[0].loc
+  let ignored = collection.ignored_tests[0]
   @debug.assert_eq((ignored.start.lnum, ignored.start.column()), (4, 1))
   @debug.assert_eq((ignored.end.lnum, ignored.end.column()), (6, 29))
 }
@@ -210,7 +210,7 @@ test "ignored test docs stop at a blank line" {
   @debug.assert_eq(collection.units.length(), 1)
   @debug.assert_eq(collection.units[0].source, "/// retained production docs")
   @debug.assert_eq(collection.ignored_tests.length(), 1)
-  @debug.assert_eq(collection.ignored_tests[0].loc.start.lnum, 3)
+  @debug.assert_eq(collection.ignored_tests[0].start.lnum, 3)
 }
 
 ///|
@@ -230,7 +230,7 @@ test "ordinary comments interrupt ignored test doc ownership" {
     "/// retained earlier docs\n// ordinary ownership boundary",
   )
   @debug.assert_eq(collection.ignored_tests.length(), 1)
-  @debug.assert_eq(collection.ignored_tests[0].loc.start.lnum, 3)
+  @debug.assert_eq(collection.ignored_tests[0].start.lnum, 3)
 }
 
 ///|
@@ -1946,13 +1946,16 @@ test "same-line test changes are neutral while suffix comments stay visible" {
   let collection = collect_impl_units_detailed(old_changed, parsed.root(), true)
   @debug.assert_eq(
     (
-      collection.ignored_tests[0].loc.start.column(),
-      collection.ignored_tests[0].loc.end.column(),
+      collection.ignored_tests[0].start.column(),
+      collection.ignored_tests[0].end.column(),
     ),
     (1, 29),
   )
-  let projection = make_source_projection(old_changed, collection.ignored_tests)
-  @debug.assert_eq(projection.lines, ["// old ordinary note"])
+  let view = @diff_ignore.SourceView::from_source(
+    old_changed,
+    ignored_ranges=collection.ignored_tests,
+  )
+  @debug.assert_eq(view.lines(), ["// old ordinary note"])
   for mode in [Lexical, Ast] {
     let ignored_only = diff_document_for_test(
       old_same,
@@ -2003,7 +2006,7 @@ test "same-line test changes are neutral while suffix comments stay visible" {
 }
 
 ///|
-test "unchanged projected suffixes restore differing tests as ignored rows" {
+test "unchanged filtered suffixes restore differing tests as ignored rows" {
   let old_source =
     #|test "sample" { old_test() } // stable ordinary note
     #|fn production() { old_value() }
@@ -2040,7 +2043,7 @@ test "unchanged projected suffixes restore differing tests as ignored rows" {
 }
 
 ///|
-test "per-unit projections do not restore a same-line test prefix" {
+test "per-unit views do not restore a same-line test prefix" {
   let old_source =
     #|test "sample" { old_test() } // old unit note
     #|///|UUID(production-id)
@@ -2074,7 +2077,7 @@ test "per-unit projections do not restore a same-line test prefix" {
 }
 
 ///|
-test "Unicode CRLF projections preserve suffixes indexes and nearby code" {
+test "Unicode CRLF views preserve suffixes indexes and nearby code" {
   let old_source = "test \"😀\" { old_test() } // 注释旧\r\nfn production() { old_value() }\r\n"
   let new_source = "test \"😀\" { new_test() } // 注释新\r\nfn production() { new_value() }\r\n"
   for mode in [Lexical, Ast] {
