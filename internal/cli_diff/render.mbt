@@ -324,22 +324,32 @@ fn mark_plain_line_changed(line : @model.DiffLine) -> @model.DiffLine {
 }
 
 ///|
+fn line_has_changed_segment(line : @model.DiffLine) -> Bool {
+  line.segments.any(segment => segment.kind is Changed)
+}
+
+///|
 fn mark_plain_row_changed(row : @model.DiffRow) -> @model.DiffRow {
   match row {
     Paired(old_line, new_line) =>
-      Paired(
-        mark_plain_line_changed(old_line),
-        mark_plain_line_changed(new_line),
-      )
+      if line_has_changed_segment(old_line) ||
+        line_has_changed_segment(new_line) {
+        Paired(old_line, new_line)
+      } else {
+        Paired(
+          mark_plain_line_changed(old_line),
+          mark_plain_line_changed(new_line),
+        )
+      }
     OldOnly(line) => OldOnly(mark_plain_line_changed(line))
     NewOnly(line) => NewOnly(mark_plain_line_changed(line))
   }
 }
 
 ///|
-/// Plain line calculation intentionally has no intraline classification. Mark
-/// each changed row as a full-line change for the terminal color convention
-/// while preserving the Patience hunk and row alignment verbatim.
+/// Preserve bounded word refinement on paired plain-text rows. Rows without
+/// refinement and unpaired insertions/deletions keep the terminal convention
+/// of presenting their complete text as changed.
 fn mark_plain_changes(document : @model.DiffDocument) -> @model.DiffDocument {
   let hunks : Array[@model.DiffHunk] = []
   for hunk in document.hunks {
