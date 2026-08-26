@@ -6,6 +6,8 @@ pub fn line_ranges(String) -> Array[(Int, Int)]
 
 pub fn split_lines(String) -> Array[String]
 
+pub fn split_lines_bounded(String, max_lines~ : Int) -> Array[String]?
+
 // Errors
 
 // Types and methods
