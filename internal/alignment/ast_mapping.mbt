@@ -16,30 +16,60 @@ fn unit_source_view(view : SourceView, unit : ImplUnit?) -> SourceView {
 }
 
 ///|
+fn record_out_of_bounds_side(sides : Array[DiffSide], side : DiffSide) -> Unit {
+  if !sides.contains(side) {
+    sides.push(side)
+  }
+}
+
+///|
+fn ordered_out_of_bounds_sides(sides : ArrayView[DiffSide]) -> Array[DiffSide] {
+  let ordered : Array[DiffSide] = []
+  if sides.contains(Old) {
+    ordered.push(Old)
+  }
+  if sides.contains(New) {
+    ordered.push(New)
+  }
+  ordered
+}
+
+///|
 // Structural positions keep original CST line numbers. Move both their own
-// and opposite spans into the dense filtered view before hunk building.
-// Any syntax span touching excluded source text is deliberately omitted.
+// and opposite spans into the dense filtered view before hunk building. Valid
+// spans touching excluded source text are deliberately omitted, while invalid
+// coordinates are retained as side-specific fallback metadata.
 fn map_matched_positions(
   positions : ArrayView[MatchedPos],
   own : SourceView,
   opposite : SourceView,
+  own_side : DiffSide,
+  opposite_side : DiffSide,
+  out_of_bounds_sides : Array[DiffSide],
 ) -> Array[MatchedPos] {
   let mapped : Array[MatchedPos] = []
   for position in positions {
-    guard own.map_span(position.pos) is Some(pos) else { continue }
-    let kind = match position.kind {
-      Novel => MatchKind::Novel
+    let own_mapping = own.map_span(position.pos)
+    let kind : MatchKind = match position.kind {
+      Novel => Novel
       Unchanged(opposite_pos~) => {
-        let mapped : Array[@span.SingleLineSpan] = []
+        let mapped_opposites : Array[@span.SingleLineSpan] = []
         for span in opposite_pos {
-          if opposite.map_span(span) is Some(mapped_span) {
-            mapped.push(mapped_span)
+          match opposite.map_span(span) {
+            Mapped(mapped_span) => mapped_opposites.push(mapped_span)
+            Filtered => ()
+            OutOfBounds =>
+              record_out_of_bounds_side(out_of_bounds_sides, opposite_side)
           }
         }
-        Unchanged(opposite_pos=mapped)
+        Unchanged(opposite_pos=mapped_opposites)
       }
     }
-    mapped.push({ kind, pos })
+    match own_mapping {
+      Mapped(pos) => mapped.push({ kind, pos })
+      Filtered => ()
+      OutOfBounds => record_out_of_bounds_side(out_of_bounds_sides, own_side)
+    }
   }
   mapped
 }

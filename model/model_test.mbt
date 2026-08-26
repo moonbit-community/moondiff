@@ -89,6 +89,14 @@ test "public fallback metadata remains constructible and matchable" {
     fail("expected parse-error metadata")
   }
   let _ : ArrayView[@model.DiffSide] = sides
+  let syntax_positions : @model.FallbackReason = SyntaxPositionsOutOfBounds(sides=[
+    Old,
+    New,
+  ])
+  guard syntax_positions is SyntaxPositionsOutOfBounds(sides~) else {
+    fail("expected syntax-position metadata")
+  }
+  assert_true(sides is [Old, New])
 }
 
 ///|

@@ -93,6 +93,7 @@ pub(all) struct FallbackInfo {
 
 pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
+  SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
   TopLevelReordering
