@@ -18,7 +18,7 @@ struct DiffOptions {
 
 ///|
 /// Construct safe options, clamping a negative context radius to zero.
-pub fn DiffOptions::new(
+pub fn DiffOptions::DiffOptions(
   context_lines? : Int = 3,
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
@@ -40,7 +40,7 @@ pub fn DiffOptions::new(
 
 ///|
 pub impl Default for DiffOptions with fn default() {
-  DiffOptions::new()
+  DiffOptions()
 }
 
 ///|
