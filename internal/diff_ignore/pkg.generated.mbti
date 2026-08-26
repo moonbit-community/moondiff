@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/internal/diff_ignore"
+
+import {
+  "moonbit-community/moondiff/internal/span",
+  "moonbit-community/moondiff/model",
+  "moonbitlang/lexer/basic",
+}
+
+// Values
+pub fn ignore_comments(@model.DiffDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.DiffDocument
+
+pub fn lexer_complexity_within_limit(String) -> Bool
+
+pub fn restore_document(@model.DiffDocument, old~ : SourceView, new~ : SourceView) -> @model.DiffDocument
+
+// Errors
+
+// Types and methods
+pub struct SourceLineView {
+  source : String
+  visible : String
+  ignored : Array[Bool]
+  has_ignored : Bool
+}
+
+pub struct SourceView {
+  source_lines : Array[String]
+  line_views : Array[SourceLineView]
+  lines : Array[String]
+  source_indices : Array[Int]
+  visible_indices : Array[Int]
+  source_line_offset : Int
+}
+pub fn SourceView::from_lines(ArrayView[String], ignore_comments? : Bool) -> Self
+pub fn SourceView::from_source(String, ignored_ranges? : ArrayView[@basic.Location], ignore_comments? : Bool) -> Self
+pub fn SourceView::lines(Self) -> ArrayView[String]
+pub fn SourceView::map_span(Self, @span.SingleLineSpan) -> @span.SingleLineSpan?
+pub fn SourceView::slice(Self, Int, Int) -> Self
+pub fn SourceView::source(Self) -> String
+
+// Type aliases
+
+// Traits

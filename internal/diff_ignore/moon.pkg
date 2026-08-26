@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/core/cmp",
+  "moonbitlang/lexer",
+  "moonbitlang/lexer/basic",
+  "moonbitlang/lexer/tokens",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/internal/source_text",
+  "moonbit-community/moondiff/internal/span",
+}
