@@ -23,6 +23,16 @@ pub struct SourceView {
 }
 
 ///|
+/// Result of translating one original syntax span into a filtered source
+/// view. `Filtered` is a valid span hidden by the active filters (or a valid
+/// zero-width span); `OutOfBounds` reports invalid source coordinates.
+pub(all) enum SpanMapping {
+  Mapped(@span.SingleLineSpan)
+  Filtered
+  OutOfBounds
+} derive(Debug)
+
+///|
 fn source_line_is_blank(line : String) -> Bool {
   for ch in line {
     if !ch.is_whitespace() {
@@ -368,11 +378,6 @@ pub fn SourceView::lines(self : SourceView) -> ArrayView[String] {
 }
 
 ///|
-pub fn SourceView::source(self : SourceView) -> String {
-  self.lines.join("\n")
-}
-
-///|
 pub fn SourceView::slice(
   self : SourceView,
   source_start : Int,
@@ -396,17 +401,23 @@ pub fn SourceView::slice(
 fn span_character_bounds(
   span : @span.SingleLineSpan,
   line_len : Int,
-) -> (Int, Int) {
-  let start = if span.start_col == 0 {
-    0
+) -> (Int, Int)? {
+  if span.start_col == 0 {
+    // Continuation spans use a zero-based start. Existing syntax producers
+    // emit either a zero-based exclusive end or the one-based end sentinel.
+    if span.end_col < 0 || span.end_col > line_len + 1 {
+      None
+    } else {
+      Some((0, @cmp.minimum(span.end_col, line_len)))
+    }
+  } else if span.start_col < 1 ||
+    span.start_col > line_len + 1 ||
+    span.end_col < span.start_col ||
+    span.end_col > line_len + 1 {
+    None
   } else {
-    @cmp.maximum(span.start_col - 1, 0)
+    Some((span.start_col - 1, span.end_col - 1))
   }
-  let end_ = if span.start_col == 0 { span.end_col } else { span.end_col - 1 }
-  (
-    @cmp.minimum(start, line_len),
-    @cmp.minimum(@cmp.maximum(end_, start), line_len),
-  )
 }
 
 ///|
@@ -424,28 +435,40 @@ fn visible_boundary(line : SourceLineView, boundary : Int) -> Int {
 pub fn SourceView::map_span(
   self : SourceView,
   span : @span.SingleLineSpan,
-) -> @span.SingleLineSpan? {
-  let source_index = span.line - 1 - self.source_line_offset
-  guard self.visible_indices.get(source_index) is Some(visible_index) &&
-    visible_index >= 0 &&
-    self.line_views.get(source_index) is Some(line) else {
-    return None
+) -> SpanMapping {
+  let first_line = self.source_line_offset + 1
+  let last_line = self.source_line_offset + self.line_views.length()
+  if span.line < first_line || span.line > last_line {
+    return OutOfBounds
   }
-  let (start, end_) = span_character_bounds(span, line.ignored.length())
+  let source_index = span.line - 1 - self.source_line_offset
+  guard self.line_views.get(source_index) is Some(line) else {
+    return OutOfBounds
+  }
+  guard span_character_bounds(span, line.ignored.length())
+    is Some((start, end_)) else {
+    return OutOfBounds
+  }
   if start >= end_ {
-    return None
+    return Filtered
+  }
+  guard self.visible_indices.get(source_index) is Some(visible_index) else {
+    return OutOfBounds
+  }
+  if visible_index < 0 {
+    return Filtered
   }
   for index in start..<end_ {
     if line.ignored[index] {
-      return None
+      return Filtered
     }
   }
   let visible_start = visible_boundary(line, start)
   let visible_end = visible_boundary(line, end_)
   if visible_start >= visible_end {
-    None
+    Filtered
   } else {
-    Some({
+    Mapped({
       line: visible_index + 1,
       start_col: visible_start + 1,
       end_col: visible_end + 1,

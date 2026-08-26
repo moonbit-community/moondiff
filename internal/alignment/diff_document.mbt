@@ -69,6 +69,12 @@ priv struct DetailedUnitResult {
 }
 
 ///|
+priv enum AstBuildResult {
+  AstDocument(@model.DiffDocument)
+  AstPositionsOutOfBounds(ArrayView[DiffSide])
+}
+
+///|
 type NovelRangeMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|
@@ -556,15 +562,19 @@ fn ast_hunk_side_range(
 
 ///|
 fn ast_document_from_positions(
-  old_source : String,
-  new_source : String,
+  old_lines : ArrayView[String],
+  new_lines : ArrayView[String],
   lhs_positions : ArrayView[MatchedPos],
   rhs_positions : ArrayView[MatchedPos],
   context : Int,
   reduce_sparse_replacements : Bool,
-) -> @model.DiffDocument {
-  let old_lines = document_lines(old_source)
-  let new_lines = document_lines(new_source)
+) -> AstBuildResult {
+  let out_of_bounds = ast_position_out_of_bounds_sides(
+    lhs_positions, rhs_positions, old_lines, new_lines,
+  )
+  if !out_of_bounds.is_empty() {
+    return AstPositionsOutOfBounds(out_of_bounds[:])
+  }
   let matched_lines = @hunks.all_matched_lines_filled(
     lhs_positions, rhs_positions, old_lines, new_lines,
   )
@@ -599,7 +609,80 @@ fn ast_document_from_positions(
       ),
     })
   }
-  { hunks: hunks[:] }
+  AstDocument({ hunks: hunks[:] })
+}
+
+///|
+fn span_columns_are_in_bounds(
+  span : @span.SingleLineSpan,
+  line_len : Int,
+) -> Bool {
+  if span.start_col == 0 {
+    span.end_col >= 0 && span.end_col <= line_len + 1
+  } else {
+    span.start_col >= 1 &&
+    span.start_col <= line_len + 1 &&
+    span.end_col >= span.start_col &&
+    span.end_col <= line_len + 1
+  }
+}
+
+///|
+fn span_is_in_bounds(
+  span : @span.SingleLineSpan,
+  lines : ArrayView[String],
+) -> Bool {
+  if span.line < 1 || span.line > lines.length() {
+    return false
+  }
+  guard lines.get(span.line - 1) is Some(line) else { return false }
+  span_columns_are_in_bounds(span, line.to_array().length())
+}
+
+///|
+fn matched_position_bounds(
+  positions : ArrayView[MatchedPos],
+  own_lines : ArrayView[String],
+  opposite_lines : ArrayView[String],
+) -> (Bool, Bool) {
+  let mut own_out_of_bounds = false
+  let mut opposite_out_of_bounds = false
+  for position in positions {
+    if !span_is_in_bounds(position.pos, own_lines) {
+      own_out_of_bounds = true
+    }
+    if position.kind is Unchanged(opposite_pos~) {
+      for span in opposite_pos {
+        if !span_is_in_bounds(span, opposite_lines) {
+          opposite_out_of_bounds = true
+        }
+      }
+    }
+  }
+  (own_out_of_bounds, opposite_out_of_bounds)
+}
+
+///|
+fn ast_position_out_of_bounds_sides(
+  lhs_positions : ArrayView[MatchedPos],
+  rhs_positions : ArrayView[MatchedPos],
+  old_lines : ArrayView[String],
+  new_lines : ArrayView[String],
+) -> Array[DiffSide] {
+  let (lhs_old, lhs_new) = matched_position_bounds(
+    lhs_positions, old_lines, new_lines,
+  )
+  let (rhs_new, rhs_old) = matched_position_bounds(
+    rhs_positions, new_lines, old_lines,
+  )
+  let sides : Array[DiffSide] = []
+  if lhs_old || rhs_old {
+    sides.push(Old)
+  }
+  if lhs_new || rhs_new {
+    sides.push(New)
+  }
+  sides
 }
 
 ///|
@@ -660,6 +743,57 @@ fn layout_from_top_level_plan(plan : TopLevelPlan) -> DiffLayout {
 }
 
 ///|
+// Unit and root-list AST paths share all syntax calculation, mapping, and
+// rendered-line validation. Their wrappers only restore filters and rebase.
+fn ast_document_for_roots_with_budget(
+  lhs_roots : ArrayView[@syntax.Syntax],
+  rhs_roots : ArrayView[@syntax.Syntax],
+  old_view : SourceView,
+  new_view : SourceView,
+  context : Int,
+  graph_limit : UInt,
+  reduce_sparse_replacements : Bool,
+  budget : @computation.Budget,
+) -> AstBuildResult raise {
+  @syntax.init_all_info(lhs_roots, rhs_roots)
+  let change_map = @syntax.ChangeMap::new()
+  @diff.mark_syntax_roots_with_budget(
+    lhs_roots, rhs_roots, change_map, graph_limit, budget,
+  )
+  @diff.fix_all_sliders(lhs_roots, change_map)
+  @diff.fix_all_sliders(rhs_roots, change_map)
+  let out_of_bounds_sides : Array[DiffSide] = []
+  let lhs_positions = map_matched_positions(
+    @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
+    old_view,
+    new_view,
+    Old,
+    New,
+    out_of_bounds_sides,
+  )
+  let rhs_positions = map_matched_positions(
+    @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
+    new_view,
+    old_view,
+    New,
+    Old,
+    out_of_bounds_sides,
+  )
+  if !out_of_bounds_sides.is_empty() {
+    let sides = ordered_out_of_bounds_sides(out_of_bounds_sides)
+    return AstPositionsOutOfBounds(sides[:])
+  }
+  ast_document_from_positions(
+    old_view.lines(),
+    new_view.lines(),
+    lhs_positions,
+    rhs_positions,
+    context,
+    reduce_sparse_replacements,
+  )
+}
+
+///|
 fn ast_unit_document_with_budget(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
@@ -669,7 +803,7 @@ fn ast_unit_document_with_budget(
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
-) -> @model.DiffDocument raise {
+) -> AstBuildResult raise {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
   let old_offset = impl_line_base(old_unit) - 1
@@ -682,35 +816,19 @@ fn ast_unit_document_with_budget(
   if new_unit is Some(unit) {
     rhs_roots.push(unit.root)
   }
-  @syntax.init_all_info(lhs_roots, rhs_roots)
-  let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots_with_budget(
-    lhs_roots, rhs_roots, change_map, graph_limit, budget,
-  )
-  @diff.fix_all_sliders(lhs_roots, change_map)
-  @diff.fix_all_sliders(rhs_roots, change_map)
-  let lhs_positions = map_matched_positions(
-    @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
-    old_local,
-    new_local,
-  )
-  let rhs_positions = map_matched_positions(
-    @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
-    new_local,
-    old_local,
-  )
-  @diff_ignore.restore_document(
-    ast_document_from_positions(
-      old_local.source(),
-      new_local.source(),
-      lhs_positions,
-      rhs_positions,
-      context,
-      reduce_sparse_replacements,
-    ),
-    old=old_local,
-    new=new_local,
-  ).rebase(old_offset, new_offset)
+  match
+    ast_document_for_roots_with_budget(
+      lhs_roots, rhs_roots, old_local, new_local, context, graph_limit, reduce_sparse_replacements,
+      budget,
+    ) {
+    AstDocument(document) =>
+      AstDocument(
+        @diff_ignore.restore_document(document, old=old_local, new=new_local).rebase(
+          old_offset, new_offset,
+        ),
+      )
+    AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
+  }
 }
 
 ///|
@@ -724,7 +842,7 @@ fn detailed_ast_edit_document(
   ignore_comments : Bool,
   budget : @computation.Budget,
 ) -> DetailedUnitResult {
-  let document = ast_unit_document_with_budget(
+  let build = ast_unit_document_with_budget(
     old_unit,
     new_unit,
     old_view,
@@ -758,7 +876,22 @@ fn detailed_ast_edit_document(
       }
     }
   }
-  { document, fallback: None, computation_exhausted: false }
+  match build {
+    AstDocument(document) =>
+      { document, fallback: None, computation_exhausted: false }
+    AstPositionsOutOfBounds(sides) => {
+      let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
+      {
+        document: lexical_edit_document(
+          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+        ),
+        fallback: Some(unit_fallback(reason, old_unit, new_unit)),
+        // Position corruption is local to this declaration. Unlike a shared
+        // budget exhaustion, it must not force later declarations to degrade.
+        computation_exhausted: false,
+      }
+    }
+  }
 }
 
 ///|
@@ -790,38 +923,20 @@ fn ast_root_document_with_budget(
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
-) -> @model.DiffDocument raise {
+) -> AstBuildResult raise {
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
-  @syntax.init_all_info(lhs_roots, rhs_roots)
-  let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots_with_budget(
-    lhs_roots, rhs_roots, change_map, graph_limit, budget,
-  )
-  @diff.fix_all_sliders(lhs_roots, change_map)
-  @diff.fix_all_sliders(rhs_roots, change_map)
-  let lhs_positions = map_matched_positions(
-    @syntax.change_positions_with_budget(lhs_roots, change_map, budget),
-    old_view,
-    new_view,
-  )
-  let rhs_positions = map_matched_positions(
-    @syntax.change_positions_with_budget(rhs_roots, change_map, budget),
-    new_view,
-    old_view,
-  )
-  @diff_ignore.restore_document(
-    ast_document_from_positions(
-      old_view.source(),
-      new_view.source(),
-      lhs_positions,
-      rhs_positions,
-      context,
-      reduce_sparse_replacements,
-    ),
-    old=old_view,
-    new=new_view,
-  )
+  match
+    ast_document_for_roots_with_budget(
+      lhs_roots, rhs_roots, old_view, new_view, context, graph_limit, reduce_sparse_replacements,
+      budget,
+    ) {
+    AstDocument(document) =>
+      AstDocument(
+        @diff_ignore.restore_document(document, old=old_view, new=new_view),
+      )
+    AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
+  }
 }
 
 ///|
@@ -852,7 +967,7 @@ fn detailed_ast_root_list_document(
   ignore_comments : Bool,
   budget : @computation.Budget,
 ) -> DetailedDiffResult {
-  let document = ast_root_document_with_budget(
+  let build = ast_root_document_with_budget(
     old_units,
     new_units,
     old_view,
@@ -879,14 +994,25 @@ fn detailed_ast_root_list_document(
         GraphLimitExceeded(limit=graph_limit),
       )
   }
-  {
-    document,
-    status: if document.hunks.is_empty() {
-      NoStructuralChanges
-    } else {
-      Changed
-    },
-    fallbacks: [],
+  match build {
+    AstPositionsOutOfBounds(sides) =>
+      whole_file_fallback(
+        old_view,
+        new_view,
+        context,
+        ignore_comments,
+        SyntaxPositionsOutOfBounds(sides~),
+      )
+    AstDocument(document) =>
+      {
+        document,
+        status: if document.hunks.is_empty() {
+          NoStructuralChanges
+        } else {
+          Changed
+        },
+        fallbacks: [],
+      }
   }
 }
 

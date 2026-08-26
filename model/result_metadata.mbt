@@ -25,10 +25,13 @@ pub(all) enum ComputationStage {
 
 ///|
 /// The typed reason that structural diffing degraded to a lexical result.
-/// Parse-error sides are exposed as a zero-copy read-only view with stable
+/// Side collections are exposed as zero-copy read-only views with stable
 /// backing storage.
 pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
+  /// A structural position did not belong to the rendered source lines for
+  /// one or both sides, so indexing it would have been unsafe.
+  SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
   /// Lexical declaration alignment found no changes inside matched
