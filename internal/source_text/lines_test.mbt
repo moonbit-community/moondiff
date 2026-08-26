@@ -25,3 +25,18 @@ test "universal line ranges exclude complete terminators" {
     (10, 10),
   ])
 }
+
+///|
+test "bounded universal splitting accepts its boundary and stops above it" {
+  assert_eq(@source_text.split_lines_bounded("", max_lines=1), Some([""]))
+  assert_eq(@source_text.split_lines_bounded("", max_lines=0), None)
+  assert_eq(
+    @source_text.split_lines_bounded("a\nb\r\nc\rd", max_lines=4),
+    Some(["a", "b", "c", "d"]),
+  )
+  assert_eq(@source_text.split_lines_bounded("a\nb\r\nc\rd", max_lines=3), None)
+  assert_eq(
+    @source_text.split_lines_bounded("a\r", max_lines=2),
+    Some(["a", ""]),
+  )
+}
