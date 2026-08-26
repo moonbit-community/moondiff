@@ -10,8 +10,6 @@ pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, 
 
 pub fn ignore_comments(@model.DiffDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.DiffDocument
 
-pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> @model.DiffDocument
-
 pub fn similarity(String, String) -> Int
 
 pub fn tokenize_line(String) -> Array[Tok]

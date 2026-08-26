@@ -232,7 +232,7 @@ test "blank lines beside code changes are neutral source-faithful context" {
 ///|
 test "plain line diff still reports blank-line changes" {
   assert_false(
-    @tokdiff.line_diff(old=["plain text"], new=["plain text", ""]).hunks.is_empty(),
+    @linediff.line_diff(old=["plain text"], new=["plain text", ""]).hunks.is_empty(),
   )
-  assert_false(@tokdiff.line_diff(old=[], new=["\u{2003}"]).hunks.is_empty())
+  assert_false(@linediff.line_diff(old=[], new=["\u{2003}"]).hunks.is_empty())
 }
