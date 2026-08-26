@@ -8,8 +8,8 @@ import {
 import {
   "moonbitlang/core/debug",
   "moonbitlang/core/test",
-  "moonbit-community/moondiff/internal/render/html" @render_html,
-  "moonbit-community/moondiff/internal/render/unified",
+  "moonbit-community/moondiff/render/html" @render_html,
+  "moonbit-community/moondiff/render/unified",
 } for "test"
 
 import {

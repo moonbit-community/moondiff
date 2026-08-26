@@ -1,6 +1,6 @@
 ///|
 test "RenderOptions retains only display controls" {
-  let options = RenderOptions::new(
+  let options = @terminal.RenderOptions::new(
     use_color=true,
     old_max_line=10,
     new_max_line=100,
@@ -8,27 +8,14 @@ test "RenderOptions retains only display controls" {
   assert_true(options.use_color)
   assert_true(options.old_max_line is Some(10))
   assert_true(options.new_max_line is Some(100))
-}
-
-///|UUID(0d1a0a7b-5a0d-4d9e-8fd3-e90428d09cc1)
-test "display_line_no colors missing placeholder dots gray for every line style" {
-  @debug.assert_eq(
-    display_line_no(None, 2, Deleted, true),
-    "\u{1b}[90m..\u{1b}[39m",
-  )
-  @debug.assert_eq(
-    display_line_no(None, 2, Added, true),
-    "\u{1b}[90m..\u{1b}[39m",
-  )
-  @debug.assert_eq(
-    display_line_no(None, 2, Context, true),
-    "\u{1b}[90m..\u{1b}[39m",
-  )
-  @debug.assert_eq(display_line_no(None, 2, Added, false), "..")
+  let defaults : @terminal.RenderOptions = Default::default()
+  assert_false(defaults.use_color)
+  assert_true(defaults.old_max_line is None)
+  assert_true(defaults.new_max_line is None)
 }
 
 ///|
-test "render_diff_document highlights changes and keeps ignored text neutral" {
+test "render_document highlights changes and keeps ignored text neutral" {
   let old_line : @model.DiffLine = {
     index: 1,
     segments: [
@@ -69,13 +56,13 @@ test "render_diff_document highlights changes and keeps ignored text neutral" {
     ],
   }
 
-  let plain = render_document(
+  let plain = @terminal.render_document(
     "old.mbt",
     "new.mbt",
     document,
-    options=RenderOptions::new(use_color=false),
+    options=@terminal.RenderOptions::new(use_color=false),
   )
-  @debug.assert_eq(
+  assert_eq(
     plain,
     (
       #|--- old.mbt
@@ -91,11 +78,11 @@ test "render_diff_document highlights changes and keeps ignored text neutral" {
   )
   assert_false(plain.contains("\u{1b}["))
 
-  let colored = render_document(
+  let colored = @terminal.render_document(
     "old.mbt",
     "new.mbt",
     document,
-    options=RenderOptions::new(use_color=true),
+    options=@terminal.RenderOptions::new(use_color=true),
   )
   assert_true(colored.contains("\u{1b}[31m\u{1b}[1m1\u{1b}[22m\u{1b}[39m"))
   assert_true(colored.contains("\u{1b}[32m\u{1b}[1m2\u{1b}[22m\u{1b}[39m"))
@@ -118,11 +105,11 @@ test "render_document honors 9 to 10 and 99 to 100 width hints" {
       },
     ],
   }
-  let rendered = render_document(
+  let rendered = @terminal.render_document(
     "old.txt",
     "new.txt",
     document,
-    options=RenderOptions::new(old_max_line=10, new_max_line=100),
+    options=@terminal.RenderOptions::new(old_max_line=10, new_max_line=100),
   )
   assert_true(rendered.contains("\n 9   9 same\n"), msg=rendered)
 }

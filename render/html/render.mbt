@@ -510,34 +510,3 @@ pub fn render_unified_hunks(
   }
   rendered
 }
-
-///|
-/// Wrap rendered diff HTML in a complete standalone page with default styles.
-pub fn html_page(title~ : String, body : String) -> String {
-  let buf = StringBuilder()
-  buf <+ "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">"
-  buf <+ "<title>\{esc(title)}</title><style>\n"
-  buf <+ "body { font-family: monospace; }\n"
-  buf <+ ".hunk-header { color: #00a; }\n"
-  buf <+ ".del { background: #ffecec; }\n"
-  buf <+ ".add { background: #eaffea; }\n"
-  buf <+ "td.empty { background: #fafafa; }\n"
-  buf <+ "b.wd { background: #f8b4b4; font-weight: normal; }\n"
-  buf <+ "b.wa { background: #97e0a0; font-weight: normal; }\n"
-  buf <+ ".ignored-context { background: white; font-weight: normal; }\n"
-  buf <+ "pre.unified span { display: block; }\n"
-  buf <+
-    "table.split, table.unified { border-collapse: collapse; width: 100%; }\n"
-  buf <+ "table.split td { width: 50%; vertical-align: top;\n"
-  buf <+ "  white-space: pre-wrap; border: 1px solid #eee; }\n"
-  buf <+
-    "table.unified td { vertical-align: top; white-space: pre-wrap; border: 1px solid #eee; }\n"
-  buf <+ "td.line-number { width: 1%; min-width: 3em; padding: 0 .5em;\n"
-  buf <+
-    "  color: #6e7781; background: #f6f8fa; text-align: right; user-select: none; }\n"
-  buf <+ "table.unified td:last-child { width: 100%; }\n"
-  buf <+ "</style></head><body>\n"
-  buf <+ "\{body}"
-  buf <+ "</body></html>\n"
-  buf.to_string()
-}
