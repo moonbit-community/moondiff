@@ -207,3 +207,67 @@ test "plain output honors ANSI toggle and mixed paths stay on line diff" {
     msg=colored,
   )
 }
+
+///|
+test "plain color preserves word refinement and a context-only old side" {
+  let inserted = @cli_diff.render(
+    "old.txt",
+    "alpha",
+    "new.txt",
+    "alpha beta",
+    options=@cli_diff.Options::new(context_lines=0, use_color=true),
+  )
+  assert_true(
+    inserted.contains(
+      "\u{1b}[90m1\u{1b}[39m \u{1b}[90m.\u{1b}[39m \u{1b}[90malpha\u{1b}[39m",
+    ),
+    msg=inserted,
+  )
+  assert_true(
+    inserted.contains(
+      "\u{1b}[90m.\u{1b}[39m \u{1b}[32m1\u{1b}[39m \u{1b}[90malpha\u{1b}[39m\u{1b}[32m\u{1b}[1m beta\u{1b}[22m\u{1b}[39m",
+    ),
+    msg=inserted,
+  )
+  assert_false(
+    inserted.contains("\u{1b}[31m\u{1b}[1malpha\u{1b}[22m\u{1b}[39m"),
+  )
+
+  let replaced = @cli_diff.render(
+    "old.txt",
+    "alpha beta gamma",
+    "new.txt",
+    "alpha zeta gamma",
+    options=@cli_diff.Options::new(context_lines=0, use_color=true),
+  )
+  assert_true(
+    replaced.contains(
+      "\u{1b}[90malpha \u{1b}[39m\u{1b}[31m\u{1b}[1mbeta\u{1b}[22m\u{1b}[39m\u{1b}[90m gamma\u{1b}[39m",
+    ),
+    msg=replaced,
+  )
+  assert_true(
+    replaced.contains(
+      "\u{1b}[90malpha \u{1b}[39m\u{1b}[32m\u{1b}[1mzeta\u{1b}[22m\u{1b}[39m\u{1b}[90m gamma\u{1b}[39m",
+    ),
+    msg=replaced,
+  )
+
+  inspect(
+    @cli_diff.render(
+      "old.txt",
+      "alpha",
+      "new.txt",
+      "alpha beta",
+      options=@cli_diff.Options::new(context_lines=0, use_color=false),
+    ),
+    content=(
+      #|--- old.txt
+      #|+++ new.txt
+      #|@@ -1 +1 @@
+      #|1 . alpha
+      #|. 1 alpha beta
+      #|
+    ),
+  )
+}
