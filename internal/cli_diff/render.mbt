@@ -368,7 +368,7 @@ fn render_plain_text(
 ) -> String {
   let old = source_lines(old_source)
   let new = source_lines(new_source)
-  let document = @tokdiff.line_diff(old~, new~, context=options.context_lines)
+  let document = @linediff.line_diff(old~, new~, context=options.context_lines)
   if document.hunks.is_empty() {
     render_empty_state(old_label, new_label, "No changes.\n", options)
   } else {

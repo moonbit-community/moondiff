@@ -1,7 +1,7 @@
 import {
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/mbtdiff",
-  "moonbit-community/moondiff/internal/tokdiff",
+  "moonbit-community/moondiff/linediff",
   "moonbit-community/moondiff/render/html" @render_html,
   "moonbit-community/moondiff/render/unified",
   "moonbit-community/rabbita",
