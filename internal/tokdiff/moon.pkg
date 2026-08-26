@@ -2,6 +2,7 @@ import {
   "moonbitlang/core/diff",
   "moonbitlang/lexer",
   "moonbitlang/lexer/tokens",
+  "moonbit-community/moondiff/internal/worddiff",
   "moonbit-community/moondiff/model",
 }
 
@@ -15,4 +16,5 @@ import {
 
 import {
   "moonbitlang/core/debug",
+  "moonbit-community/moondiff/render/unified",
 } for "wbtest"

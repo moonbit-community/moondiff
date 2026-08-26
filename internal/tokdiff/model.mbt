@@ -113,6 +113,22 @@ fn plain_segments(text : String) -> Array[DiffSegment] {
 }
 
 ///|
+fn fallback_pair_segments(
+  old_text : String,
+  new_text : String,
+  refine_words : Bool,
+  budget : @worddiff.RefinementBudget,
+) -> (Array[DiffSegment], Array[DiffSegment]) {
+  if refine_words {
+    match @worddiff.refine_line(old_text, new_text, budget~) {
+      Some(segments) => return segments
+      None => ()
+    }
+  }
+  (plain_segments(old_text), plain_segments(new_text))
+}
+
+///|
 fn full_line_segments(tokens : ArrayView[Tok]) -> Array[DiffSegment] {
   let segments : Array[DiffSegment] = []
   let run = tokens.to_owned()
@@ -198,8 +214,10 @@ fn semantic_change_rows(
   new_lines : ArrayView[ComparableLine],
   old_start : Int,
   new_start : Int,
+  budget : @worddiff.RefinementBudget,
 ) -> ArrayView[DiffRow] {
   let rows : Array[DiffRow] = []
+  let equal_width = old_lines.length() == new_lines.length()
   if alignment_tokens(old_lines, new_lines, line => line.text) is Some(tokens) {
     let changes = window_changes(tokens.olds, tokens.news)
     for pair in align(tokens.olds, tokens.news) {
@@ -220,9 +238,11 @@ fn semantic_change_rows(
               tokens.olds[old_index].length(),
               tokens.news[new_index].length(),
             ) {
-            (
-              plain_segments(old_lines[old_index].text),
-              plain_segments(new_lines[new_index].text),
+            fallback_pair_segments(
+              old_lines[old_index].text,
+              new_lines[new_index].text,
+              equal_width,
+              budget,
             )
           } else {
             pair_row_segments(
@@ -261,6 +281,21 @@ fn semantic_change_rows(
         (None, None) => ()
       }
     }
+  } else if equal_width {
+    for offset in 0..<old_lines.length() {
+      let (old_segments, new_segments) = fallback_pair_segments(
+        old_lines[offset].text,
+        new_lines[offset].text,
+        true,
+        budget,
+      )
+      rows.push(
+        Paired(
+          make_diff_line(old_start + offset, old_segments),
+          make_diff_line(new_start + offset, new_segments),
+        ),
+      )
+    }
   } else {
     for offset, line in old_lines {
       rows.push(OldOnly(make_plain_diff_line(old_start + offset, line.text)))
@@ -280,63 +315,73 @@ fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int, Int, Int, Int) {
 }
 
 ///|
-fn semantic_hunk(hunk : @diff.Hunk[ComparableLine]) -> DiffHunk {
+fn semantic_hunk(
+  hunk : @diff.Hunk[ComparableLine],
+  budget : @worddiff.RefinementBudget,
+) -> DiffHunk {
   let blocks : Array[DiffBlock] = []
   let edits = hunk.edits()
   let old_view = hunk.old_view()
   let new_view = hunk.new_view()
   let mut index = 0
   while index < edits.length() {
-    match edits[index] {
-      Delete(old_index~, old_len~, ..) if index + 1 < edits.length() &&
-        edits[index + 1] is Insert(..) => {
-        guard! edits[index + 1] is Insert(new_index~, new_len~, ..)
+    let replacement = if index + 1 < edits.length() {
+      @worddiff.replacement_ranges(edits[index], edits[index + 1])
+    } else {
+      None
+    }
+    match replacement {
+      Some(((old_start, old_end), (new_start, new_end))) => {
         blocks.push(
           ChangeBlock(
             semantic_change_rows(
-              old_view.view(start=old_index, end=old_index + old_len),
-              new_view.view(start=new_index, end=new_index + new_len),
-              old_index,
-              new_index,
+              old_view.view(start=old_start, end=old_end),
+              new_view.view(start=new_start, end=new_end),
+              old_start,
+              new_start,
+              budget,
             ),
           ),
         )
         index += 2
       }
-      Equal(old_index~, new_index~, len~) => {
-        let lines : Array[ContextLine] = []
-        for offset in 0..<len {
-          lines.push({
-            old_index: old_index + offset,
-            new_index: new_index + offset,
-            text: old_view[old_index + offset].text,
-          })
+      None =>
+        match edits[index] {
+          Equal(old_index~, new_index~, len~) => {
+            let lines : Array[ContextLine] = []
+            for offset in 0..<len {
+              lines.push({
+                old_index: old_index + offset,
+                new_index: new_index + offset,
+                text: old_view[old_index + offset].text,
+              })
+            }
+            blocks.push(ContextBlock(lines[:]))
+            index += 1
+          }
+          Delete(old_index~, old_len~, ..) => {
+            let rows : Array[DiffRow] = []
+            for offset in 0..<old_len {
+              let line = old_view[old_index + offset]
+              rows.push(
+                OldOnly(make_plain_diff_line(old_index + offset, line.text)),
+              )
+            }
+            blocks.push(ChangeBlock(rows[:]))
+            index += 1
+          }
+          Insert(new_index~, new_len~, ..) => {
+            let rows : Array[DiffRow] = []
+            for offset in 0..<new_len {
+              let line = new_view[new_index + offset]
+              rows.push(
+                NewOnly(make_plain_diff_line(new_index + offset, line.text)),
+              )
+            }
+            blocks.push(ChangeBlock(rows[:]))
+            index += 1
+          }
         }
-        blocks.push(ContextBlock(lines[:]))
-        index += 1
-      }
-      Delete(old_index~, old_len~, ..) => {
-        let rows : Array[DiffRow] = []
-        for offset in 0..<old_len {
-          let line = old_view[old_index + offset]
-          rows.push(
-            OldOnly(make_plain_diff_line(old_index + offset, line.text)),
-          )
-        }
-        blocks.push(ChangeBlock(rows[:]))
-        index += 1
-      }
-      Insert(new_index~, new_len~, ..) => {
-        let rows : Array[DiffRow] = []
-        for offset in 0..<new_len {
-          let line = new_view[new_index + offset]
-          rows.push(
-            NewOnly(make_plain_diff_line(new_index + offset, line.text)),
-          )
-        }
-        blocks.push(ChangeBlock(rows[:]))
-        index += 1
-      }
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
@@ -741,6 +786,7 @@ fn comment_hunk(
   new_projected : ArrayView[ProjectedSourceLine],
   old_lines : ArrayView[CommentProjection],
   new_lines : ArrayView[CommentProjection],
+  budget : @worddiff.RefinementBudget,
 ) -> DiffHunk {
   let blocks : Array[DiffBlock] = []
   let edits = hunk.edits()
@@ -768,15 +814,19 @@ fn comment_hunk(
   let mut new_cursor = new_start
   let mut index = 0
   while index < edits.length() {
-    match edits[index] {
-      Delete(old_index~, old_len~, ..) if index + 1 < edits.length() &&
-        edits[index + 1] is Insert(..) => {
-        guard! edits[index + 1] is Insert(new_index~, new_len~, ..)
+    let replacement = if index + 1 < edits.length() {
+      @worddiff.replacement_ranges(edits[index], edits[index + 1])
+    } else {
+      None
+    }
+    match replacement {
+      Some(((old_start, old_end), (new_start, new_end))) => {
         let rows = semantic_change_rows(
-          old_view.view(start=old_index, end=old_index + old_len),
-          new_view.view(start=new_index, end=new_index + new_len),
-          old_index,
-          new_index,
+          old_view.view(start=old_start, end=old_end),
+          new_view.view(start=new_start, end=new_end),
+          old_start,
+          new_start,
+          budget,
         )
         let (next_old_cursor, next_new_cursor) = append_mapped_change_rows(
           blocks, rows, old_projected, new_projected, old_lines, new_lines, old_cursor,
@@ -786,55 +836,58 @@ fn comment_hunk(
         new_cursor = next_new_cursor
         index += 2
       }
-      Equal(old_index~, new_index~, len~) => {
-        let (next_old_cursor, next_new_cursor) = append_mapped_equal_lines(
-          blocks, old_index, new_index, len, old_projected, new_projected, old_lines,
-          new_lines, old_cursor, new_cursor,
-        )
-        old_cursor = next_old_cursor
-        new_cursor = next_new_cursor
-        index += 1
-      }
-      Delete(old_index~, old_len~, ..) => {
-        let rows : Array[DiffRow] = []
-        for offset in 0..<old_len {
-          rows.push(
-            OldOnly(
-              make_plain_diff_line(
-                old_index + offset,
-                old_view[old_index + offset].text,
-              ),
-            ),
-          )
+      None =>
+        match edits[index] {
+          Equal(old_index~, new_index~, len~) => {
+            let (next_old_cursor, next_new_cursor) = append_mapped_equal_lines(
+              blocks, old_index, new_index, len, old_projected, new_projected, old_lines,
+              new_lines, old_cursor, new_cursor,
+            )
+            old_cursor = next_old_cursor
+            new_cursor = next_new_cursor
+            index += 1
+          }
+          Delete(old_index~, old_len~, ..) => {
+            let rows : Array[DiffRow] = []
+            for offset in 0..<old_len {
+              rows.push(
+                OldOnly(
+                  make_plain_diff_line(
+                    old_index + offset,
+                    old_view[old_index + offset].text,
+                  ),
+                ),
+              )
+            }
+            let (next_old_cursor, next_new_cursor) = append_mapped_change_rows(
+              blocks, rows, old_projected, new_projected, old_lines, new_lines, old_cursor,
+              new_cursor,
+            )
+            old_cursor = next_old_cursor
+            new_cursor = next_new_cursor
+            index += 1
+          }
+          Insert(new_index~, new_len~, ..) => {
+            let rows : Array[DiffRow] = []
+            for offset in 0..<new_len {
+              rows.push(
+                NewOnly(
+                  make_plain_diff_line(
+                    new_index + offset,
+                    new_view[new_index + offset].text,
+                  ),
+                ),
+              )
+            }
+            let (next_old_cursor, next_new_cursor) = append_mapped_change_rows(
+              blocks, rows, old_projected, new_projected, old_lines, new_lines, old_cursor,
+              new_cursor,
+            )
+            old_cursor = next_old_cursor
+            new_cursor = next_new_cursor
+            index += 1
+          }
         }
-        let (next_old_cursor, next_new_cursor) = append_mapped_change_rows(
-          blocks, rows, old_projected, new_projected, old_lines, new_lines, old_cursor,
-          new_cursor,
-        )
-        old_cursor = next_old_cursor
-        new_cursor = next_new_cursor
-        index += 1
-      }
-      Insert(new_index~, new_len~, ..) => {
-        let rows : Array[DiffRow] = []
-        for offset in 0..<new_len {
-          rows.push(
-            NewOnly(
-              make_plain_diff_line(
-                new_index + offset,
-                new_view[new_index + offset].text,
-              ),
-            ),
-          )
-        }
-        let (next_old_cursor, next_new_cursor) = append_mapped_change_rows(
-          blocks, rows, old_projected, new_projected, old_lines, new_lines, old_cursor,
-          new_cursor,
-        )
-        old_cursor = next_old_cursor
-        new_cursor = next_new_cursor
-        index += 1
-      }
     }
   }
   append_ignored_source_gap(
@@ -851,6 +904,7 @@ fn comment_aware_diff(
   new : ArrayView[String],
   context : Int,
   line_cleanup : Bool,
+  budget : @worddiff.RefinementBudget,
 ) -> DiffDocument {
   let old_lines = comment_projections(old)
   let new_lines = comment_projections(new)
@@ -861,7 +915,9 @@ fn comment_aware_diff(
   let hunks : Array[DiffHunk] = []
   for hunk in rendering_diff(old_code, new_code, line_cleanup).group(context~) {
     hunks.push(
-      comment_hunk(hunk, old_projected, new_projected, old_lines, new_lines),
+      comment_hunk(
+        hunk, old_projected, new_projected, old_lines, new_lines, budget,
+      ),
     )
   }
   { hunks: hunks[:] }
@@ -900,9 +956,32 @@ pub fn ignore_comments(
 }
 
 ///|
+fn diff_with_refinement_budget(
+  old : ArrayView[String],
+  new : ArrayView[String],
+  context : Int,
+  line_cleanup : Bool,
+  ignore_comments : Bool,
+  budget : @worddiff.RefinementBudget,
+) -> DiffDocument {
+  if ignore_comments {
+    return comment_aware_diff(old, new, context, line_cleanup, budget)
+  }
+  let hunks : Array[DiffHunk] = []
+  for hunk in rendering_diff(old, new, line_cleanup).group(context~) {
+    hunks.push(semantic_hunk(hunk, budget))
+  }
+  { hunks: hunks[:] }
+}
+
+///|
 /// Calculate a MoonBit-aware diff and all renderer-neutral intraline changes.
 /// When `ignore_comments` is enabled, comment-only and blank-line-only
 /// differences are excluded from comparison but retained beside code changes.
+/// Word-level refinement used by bounded fallback paths allows 16,384 UTF-16
+/// code units per side and shares document limits of 1,048,576 attempted code
+/// units and 65,536 diff tokens. Exhaustion preserves plain rows, line numbers,
+/// and hunk structure.
 pub fn diff(
   old~ : ArrayView[String],
   new~ : ArrayView[String],
@@ -910,12 +989,12 @@ pub fn diff(
   line_cleanup? : Bool = false,
   ignore_comments? : Bool = false,
 ) -> DiffDocument {
-  if ignore_comments {
-    return comment_aware_diff(old, new, context, line_cleanup)
-  }
-  let hunks : Array[DiffHunk] = []
-  for hunk in rendering_diff(old, new, line_cleanup).group(context~) {
-    hunks.push(semantic_hunk(hunk))
-  }
-  { hunks: hunks[:] }
+  diff_with_refinement_budget(
+    old,
+    new,
+    context,
+    line_cleanup,
+    ignore_comments,
+    @worddiff.RefinementBudget::new(),
+  )
 }

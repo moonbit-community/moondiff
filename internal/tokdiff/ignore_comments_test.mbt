@@ -67,6 +67,46 @@ test "long-line safety path keeps slashes inside strings as code" {
 }
 
 ///|
+test "ignore comments keeps bounded word fallback on the code projection" {
+  let prefix = "piece + ".repeat(600)
+  let old = prefix + "old // old explanation"
+  let new = prefix + "new // new explanation"
+  let document = @tokdiff.diff(
+    old=[old],
+    new=[new],
+    context=0,
+    ignore_comments=true,
+  )
+  guard document.hunks
+    is [{ blocks: [ChangeBlock([Paired(old_line, new_line)])], .. }] else {
+    fail("expected one projected fallback pair")
+  }
+  assert_eq(old_line.text(), old)
+  assert_eq(new_line.text(), new)
+  assert_true(
+    old_line.segments.any(segment => {
+      segment.kind is Changed && segment.text == "old"
+    }),
+  )
+  assert_true(
+    new_line.segments.any(segment => {
+      segment.kind is Changed && segment.text == "new"
+    }),
+  )
+  assert_true(old_line.segments.last().unwrap().kind is Ignored)
+  assert_true(new_line.segments.last().unwrap().kind is Ignored)
+  assert_false(
+    old_line.segments.any(segment => {
+      segment.kind is Changed && segment.text.contains("explanation")
+    }),
+  )
+  let split = @render_html.render_side_by_side(document)
+  assert_true(split.contains("<b class=\"wd\">old</b>"), msg=split)
+  assert_true(split.contains("<b class=\"wa\">new</b>"), msg=split)
+  assert_true(split.contains("class=\"ignored-context\"> // old explanation"))
+}
+
+///|
 test "ignored comments render as neutral context beside a code change" {
   let document = @tokdiff.diff(
     old=["// old docs", "let value = old() // old trailing"],

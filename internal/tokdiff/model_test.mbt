@@ -53,12 +53,32 @@ test "public IR distinguishes blank inserted lines from a missing old side" {
 }
 
 ///|
-test "plain line diff never marks intraline segments as changed" {
-  let document = @linediff.line_diff(old=["old"], new=["new"], context=0)
+test "plain line diff refines only equal-width replacements" {
+  let document = @linediff.line_diff(
+    old=["alpha old omega"],
+    new=["alpha new omega"],
+    context=0,
+  )
   guard document.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
     fail("expected one change block")
   }
-  for row in rows {
+  guard rows is [Paired(old_line, new_line)] else {
+    fail("expected one positional pair")
+  }
+  assert_true(old_line.segments.any(segment => segment.kind is Changed))
+  assert_true(new_line.segments.any(segment => segment.kind is Changed))
+  assert_eq(old_line.text(), "alpha old omega")
+  assert_eq(new_line.text(), "alpha new omega")
+
+  let unequal = @linediff.line_diff(
+    old=["old one", "old two"],
+    new=["new one"],
+    context=0,
+  )
+  guard unequal.hunks is [{ blocks: [ChangeBlock(unequal_rows)], .. }] else {
+    fail("expected one unequal change block")
+  }
+  for row in unequal_rows {
     match row {
       Paired(old_line, new_line) => {
         assert_true(old_line.segments.all(segment => segment.kind is Unchanged))

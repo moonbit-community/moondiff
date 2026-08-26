@@ -89,7 +89,7 @@ test "rejected multi-line window strongly highlights unpaired lines" {
 }
 
 ///|
-test "window traceback cell overflow takes the complete bounded fallback" {
+test "window traceback overflow uses per-row bounded word fallback" {
   let old_line = "x ".repeat(256) + "old"
   let new_line = "x ".repeat(256) + "new"
   let old = [old_line, old_line]
@@ -97,10 +97,11 @@ test "window traceback cell overflow takes the complete bounded fallback" {
   let document = @tokdiff.diff(old~, new~, context=0)
   let split = @render_html.render_side_by_side(document)
   let unified = @render_html.render_unified(document)
-  assert_false(split.contains("<b class="))
-  assert_false(unified.contains("<b class="))
-  assert_true(split.contains("<td class=\"del\">\{old_line}</td>"))
-  assert_true(split.contains("<td class=\"add\">\{new_line}</td>"))
+  assert_true(split.contains("<b class=\"wd\">old</b>"), msg=split)
+  assert_true(split.contains("<b class=\"wa\">new</b>"), msg=split)
+  assert_true(unified.contains("<b class=\"wd\">old</b>"), msg=unified)
+  assert_true(unified.contains("<b class=\"wa\">new</b>"), msg=unified)
+  assert_false(split.contains("<b class=\"wd\">\{old_line}</b>"))
 }
 
 ///|

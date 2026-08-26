@@ -263,19 +263,17 @@ test "line cleanup restores original grouping at all window budgets" {
 }
 
 ///|
-test "per-pair traceback budget keeps pairing but omits highlights" {
+test "per-pair traceback budget keeps pairing with bounded word highlights" {
   let old_line = "x ".repeat(256) + "old"
   let new_line = "x ".repeat(256) + "new"
   let document = @tokdiff.diff(old=[old_line], new=[new_line], context=0)
   let split = @render_html.render_side_by_side(document)
-  assert_false(split.contains("<b class="))
-  assert_true(
-    split.contains(
-      "<td class=\"del\">\{old_line}</td><td class=\"add\">\{new_line}</td>",
-    ),
-  )
+  assert_true(split.contains("<b class=\"wd\">old</b>"), msg=split)
+  assert_true(split.contains("<b class=\"wa\">new</b>"), msg=split)
+  assert_false(split.contains("<b class=\"wd\">\{old_line}</b>"))
   let unified = @render_html.render_unified(document)
-  assert_false(unified.contains("<b class="))
+  assert_true(unified.contains("<b class=\"wd\">old</b>"), msg=unified)
+  assert_true(unified.contains("<b class=\"wa\">new</b>"), msg=unified)
   assert_true(
     unified.find("class=\"del\"").unwrap() <
     unified.find("class=\"add\"").unwrap(),
