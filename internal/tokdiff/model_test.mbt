@@ -38,7 +38,7 @@ test "public IR retains hunk ranges, block boundaries, and source text" {
 
 ///|
 test "public IR distinguishes blank inserted lines from a missing old side" {
-  let document = @tokdiff.line_diff(old=[], new=["x", ""], context=0)
+  let document = @linediff.line_diff(old=[], new=["x", ""], context=0)
   guard document.hunks is [hunk] else { fail("expected one insertion hunk") }
   assert_eq(
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
@@ -54,7 +54,7 @@ test "public IR distinguishes blank inserted lines from a missing old side" {
 
 ///|
 test "plain line diff never marks intraline segments as changed" {
-  let document = @tokdiff.line_diff(old=["old"], new=["new"], context=0)
+  let document = @linediff.line_diff(old=["old"], new=["new"], context=0)
   guard document.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
     fail("expected one change block")
   }
@@ -117,7 +117,7 @@ test "DiffDocument rebase updates ranges context and changed indexes" {
   assert_eq((old_line.index, new_line.index), (11, 21))
   assert_eq((after.old_index, after.new_index), (12, 22))
 
-  let insertion = @tokdiff.line_diff(old=[], new=["new"], context=0).rebase(
+  let insertion = @linediff.line_diff(old=[], new=["new"], context=0).rebase(
     7, 12,
   )
   guard insertion.hunks is [insert_hunk] else {

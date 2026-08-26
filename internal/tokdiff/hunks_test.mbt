@@ -2,14 +2,14 @@
 test "plain unified hunks preserve renderer boundaries and file-edge ranges" {
   let old = ["0", "old", "2", "3", "4", "5", "6", "gone", "8"]
   let new = ["0", "new", "2", "3", "4", "5", "6", "added", "8"]
-  let document = @tokdiff.line_diff(old~, new~, context=0)
+  let document = @linediff.line_diff(old~, new~, context=0)
   let patches = @unified.render_unified_hunks(document)
   assert_eq(patches, [
     "@@ -2 +2 @@\n-old\n+new\n", "@@ -8 +8 @@\n-gone\n+added\n",
   ])
-  let added = @tokdiff.line_diff(old=[], new=["x", ""], context=0)
+  let added = @linediff.line_diff(old=[], new=["x", ""], context=0)
   assert_eq(@unified.render_unified_hunks(added), ["@@ -0,0 +1,2 @@\n+x\n+\n"])
-  let removed = @tokdiff.line_diff(old=["x", ""], new=[], context=0)
+  let removed = @linediff.line_diff(old=["x", ""], new=[], context=0)
   assert_eq(@unified.render_unified_hunks(removed), ["@@ -1,2 +0,0 @@\n-x\n-\n"])
   for patch in patches {
     let header = patch.view(end_offset=patch.find("\n").unwrap())
@@ -49,7 +49,7 @@ test "hunk notes are escaped immediately after matching headers in all views" {
     None,
   ]
   let semantic_document = @tokdiff.diff(old~, new~, context=0)
-  let plain_document = @tokdiff.line_diff(old~, new~, context=0)
+  let plain_document = @linediff.line_diff(old~, new~, context=0)
   let split = @render_html.render_side_by_side(
     semantic_document,
     line_numbers=true,
@@ -93,7 +93,7 @@ test "omitting notes remains byte-identical to an explicit empty array" {
   let old = ["old"]
   let new = ["new"]
   let semantic_document = @tokdiff.diff(old~, new~)
-  let plain_document = @tokdiff.line_diff(old~, new~)
+  let plain_document = @linediff.line_diff(old~, new~)
   assert_eq(
     @render_html.render_side_by_side(semantic_document),
     @render_html.render_side_by_side(semantic_document, hunk_notes=[]),
@@ -122,7 +122,7 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
   ]
   let semantic_document = @tokdiff.diff(old~, new~, context=0)
   let semantic_patches = @unified.render_unified_hunks(semantic_document)
-  let plain_document = @tokdiff.line_diff(old~, new~, context=0)
+  let plain_document = @linediff.line_diff(old~, new~, context=0)
   let plain_patches = @unified.render_unified_hunks(plain_document)
   let semantic_renderers = [
     @render_html.render_side_by_side_hunks(
@@ -171,7 +171,7 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
     }
   }
   let empty_semantic = @tokdiff.diff(old=[], new=[])
-  let empty_plain = @tokdiff.line_diff(old=[], new=[])
+  let empty_plain = @linediff.line_diff(old=[], new=[])
   assert_eq(@render_html.render_side_by_side_hunks(empty_semantic), [])
   assert_eq(@render_html.render_unified_hunks(empty_semantic), [])
   assert_eq(@render_html.render_side_by_side_hunks(empty_plain), [])

@@ -273,38 +273,6 @@ fn semantic_change_rows(
 }
 
 ///|
-fn plain_change_rows(
-  old_lines : ArrayView[String],
-  new_lines : ArrayView[String],
-  old_start : Int,
-  new_start : Int,
-) -> ArrayView[DiffRow] {
-  let rows : Array[DiffRow] = []
-  let row_count = if old_lines.length() > new_lines.length() {
-    old_lines.length()
-  } else {
-    new_lines.length()
-  }
-  for offset in 0..<row_count {
-    match (old_lines.get(offset), new_lines.get(offset)) {
-      (Some(old_line), Some(new_line)) =>
-        rows.push(
-          Paired(
-            make_plain_diff_line(old_start + offset, old_line),
-            make_plain_diff_line(new_start + offset, new_line),
-          ),
-        )
-      (Some(old_line), None) =>
-        rows.push(OldOnly(make_plain_diff_line(old_start + offset, old_line)))
-      (None, Some(new_line)) =>
-        rows.push(NewOnly(make_plain_diff_line(new_start + offset, new_line)))
-      (None, None) => ()
-    }
-  }
-  rows[:]
-}
-
-///|
 fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int, Int, Int, Int) {
   let (old_start, new_start, _, _) = edit_bounds(edits[0])
   let (_, _, old_end, new_end) = edit_bounds(edits[edits.length() - 1])
@@ -364,78 +332,6 @@ fn semantic_hunk(hunk : @diff.Hunk[ComparableLine]) -> DiffHunk {
           let line = new_view[new_index + offset]
           rows.push(
             NewOnly(make_plain_diff_line(new_index + offset, line.text)),
-          )
-        }
-        blocks.push(ChangeBlock(rows[:]))
-        index += 1
-      }
-    }
-  }
-  let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
-}
-
-///|
-fn plain_hunk(hunk : @diff.Hunk[String]) -> DiffHunk {
-  let blocks : Array[DiffBlock] = []
-  let edits = hunk.edits()
-  let old_view = hunk.old_view()
-  let new_view = hunk.new_view()
-  let mut index = 0
-  while index < edits.length() {
-    match edits[index] {
-      Delete(old_index~, old_len~, ..) if index + 1 < edits.length() &&
-        edits[index + 1] is Insert(..) => {
-        guard! edits[index + 1] is Insert(new_index~, new_len~, ..)
-        blocks.push(
-          ChangeBlock(
-            plain_change_rows(
-              old_view.view(start=old_index, end=old_index + old_len),
-              new_view.view(start=new_index, end=new_index + new_len),
-              old_index,
-              new_index,
-            ),
-          ),
-        )
-        index += 2
-      }
-      Equal(old_index~, new_index~, len~) => {
-        let lines : Array[ContextLine] = []
-        for offset in 0..<len {
-          lines.push({
-            old_index: old_index + offset,
-            new_index: new_index + offset,
-            text: old_view[old_index + offset],
-          })
-        }
-        blocks.push(ContextBlock(lines[:]))
-        index += 1
-      }
-      Delete(old_index~, old_len~, ..) => {
-        let rows : Array[DiffRow] = []
-        for offset in 0..<old_len {
-          rows.push(
-            OldOnly(
-              make_plain_diff_line(
-                old_index + offset,
-                old_view[old_index + offset],
-              ),
-            ),
-          )
-        }
-        blocks.push(ChangeBlock(rows[:]))
-        index += 1
-      }
-      Insert(new_index~, new_len~, ..) => {
-        let rows : Array[DiffRow] = []
-        for offset in 0..<new_len {
-          rows.push(
-            NewOnly(
-              make_plain_diff_line(
-                new_index + offset,
-                new_view[new_index + offset],
-              ),
-            ),
           )
         }
         blocks.push(ChangeBlock(rows[:]))
@@ -1020,27 +916,6 @@ pub fn diff(
   let hunks : Array[DiffHunk] = []
   for hunk in rendering_diff(old, new, line_cleanup).group(context~) {
     hunks.push(semantic_hunk(hunk))
-  }
-  { hunks: hunks[:] }
-}
-
-///|
-/// Calculate a plain Patience line diff without lexing, semantic cleanup, or
-/// intraline changes.
-pub fn line_diff(
-  old~ : ArrayView[String],
-  new~ : ArrayView[String],
-  context? : Int = 3,
-) -> DiffDocument {
-  let hunks : Array[DiffHunk] = []
-  for
-    hunk in @diff.Diff(
-      old~,
-      new~,
-      cutoff=CORE_LINE_DIFF_CUTOFF,
-      algorithm=Patience,
-    ).group(context~) {
-    hunks.push(plain_hunk(hunk))
   }
   { hunks: hunks[:] }
 }
