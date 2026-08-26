@@ -16,5 +16,5 @@ import {
 
 import {
   "moonbitlang/core/debug",
-  "moonbit-community/moondiff/internal/render/unified",
+  "moonbit-community/moondiff/render/unified",
 } for "wbtest"

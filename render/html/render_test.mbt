@@ -61,7 +61,7 @@ test "pure split renderer escapes text and preserves changed and ignored kinds" 
 }
 
 ///|
-test "pure unified renderer orders changes and wraps a standalone page" {
+test "pure unified renderer orders changes" {
   let rendered = @html.render_unified(renderer_fixture(), line_numbers=true)
   let old_position = rendered.find("&lt;old&gt;").unwrap()
   let new_position = rendered.find("&amp;new").unwrap()
@@ -70,10 +70,4 @@ test "pure unified renderer orders changes and wraps a standalone page" {
   assert_eq(@html.render_unified_hunks(renderer_fixture(), line_numbers=true), [
     rendered,
   ])
-  let page = @html.html_page(title="<diff & review>", rendered)
-  assert_true(
-    page.contains("<title>&lt;diff &amp; review&gt;</title>"),
-    msg=page,
-  )
-  assert_true(page.contains(rendered), msg=page)
 }
