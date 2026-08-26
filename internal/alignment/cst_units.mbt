@@ -71,21 +71,12 @@ priv struct ImplUnitInput {
 }
 
 ///|
-// The exact character location occupied by a top-level test unit. The range
-// starts at the first line-adjacent test-owned leading trivia node, so
-// documentation comments, UUID markers, and `///|` separators are excluded
-// together with the declaration while ordinary comments remain independent.
-priv struct IgnoredTestRange {
-  loc : @basic.Location
-}
-
-///|
 // Successful CST collection keeps test ranges separately from elaborated
 // implementation units. This ensures ignored tests never contribute syntax
 // roots, top-level alignment work, graph size, or computation budget.
 priv struct ImplCollection {
   units : Array[ImplUnit]
-  ignored_tests : Array[IgnoredTestRange]
+  ignored_tests : Array[@basic.Location]
 }
 
 ///|
@@ -452,7 +443,7 @@ fn collect_impl_units_detailed(
   }
 
   let retained_inputs : Array[ImplUnitInput] = []
-  let ignored_tests : Array[IgnoredTestRange] = []
+  let ignored_tests : Array[@basic.Location] = []
   for input in inputs {
     if ignore_tests && input.item is Some({ kind: Impl_Test, .. }) {
       let item = input.item.unwrap()
@@ -475,7 +466,7 @@ fn collect_impl_units_detailed(
       let test_end = first_child_node(item, "body")
         .map(body => body.loc.end)
         .unwrap_or(item.loc.end)
-      ignored_tests.push({ loc: { start: first.loc.start, end: test_end } })
+      ignored_tests.push({ start: first.loc.start, end: test_end })
       let trailing = test_trailing_comments(item, test_end)
       if !trailing.is_empty() {
         retained_inputs.push({ nodes: trailing, item: None })
