@@ -1,0 +1,8 @@
+import {
+  "moonbitlang/core/diff",
+  "moonbit-community/moondiff/model",
+}
+
+import {
+  "moonbit-community/moondiff/render/html" @render_html,
+} for "test"

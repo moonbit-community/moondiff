@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/linediff"
+
+import {
+  "moonbit-community/moondiff/model",
+}
+
+// Values
+pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> @model.DiffDocument
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
