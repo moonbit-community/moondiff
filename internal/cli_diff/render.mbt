@@ -409,7 +409,7 @@ fn render_moonbit(
     new_source,
     old_name=old_label,
     new_name=new_label,
-    options=@mbtdiff.DiffOptions::new(
+    options=@mbtdiff.DiffOptions(
       context_lines=options.context_lines,
       graph_limit=options.graph_limit,
       ignore_comments=options.ignore_comments,

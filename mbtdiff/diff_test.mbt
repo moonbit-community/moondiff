@@ -42,7 +42,7 @@ test "public status contract" {
   let ignored = @mbtdiff.diff(
     "fn f() { 1 // old\n}",
     "fn f() { 1 // new\n}",
-    options=@mbtdiff.DiffOptions::new(ignore_comments=true),
+    options=DiffOptions(ignore_comments=true),
   )
   assert_true(ignored.status() is IgnoredOnly)
   assert_true(ignored.document().hunks.is_empty())
@@ -50,7 +50,7 @@ test "public status contract" {
   let ignored_tests = @mbtdiff.diff(
     "test \"sample\" { old_value() }",
     "test \"sample\" { new_value() }",
-    options=@mbtdiff.DiffOptions::new(ignore_tests=true),
+    options=DiffOptions(ignore_tests=true),
   )
   assert_true(ignored_tests.status() is IgnoredOnly)
   assert_true(ignored_tests.document().hunks.is_empty())
@@ -70,7 +70,7 @@ test "default and explicit AST modes are compatible" {
   let explicit_result = @mbtdiff.diff(
     old_source,
     new_source,
-    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Ast),
+    options=DiffOptions(mode=@mbtdiff.DiffMode::Ast),
   )
   assert_true(default_result.status() == explicit_result.status())
   assert_true(default_result.document() == explicit_result.document())
@@ -109,10 +109,7 @@ test "lexical mode renders text changes and ignores the graph limit" {
   let lexical = @mbtdiff.diff(
     old_source,
     new_source,
-    options=@mbtdiff.DiffOptions::new(
-      graph_limit=0,
-      mode=@mbtdiff.DiffMode::Lexical,
-    ),
+    options=DiffOptions(graph_limit=0, mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(lexical.status() is Changed)
   assert_false(lexical.document().hunks.is_empty())
@@ -121,7 +118,7 @@ test "lexical mode renders text changes and ignores the graph limit" {
   let normal_limit = @mbtdiff.diff(
     old_source,
     new_source,
-    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical),
+    options=DiffOptions(mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(lexical.document() == normal_limit.document())
 }
@@ -131,7 +128,7 @@ test "lexical mode exposes reordering and parse fallbacks" {
   let reordered = @mbtdiff.diff(
     "fn first() {}\nfn second() {}",
     "fn second() {}\nfn first() {}",
-    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical),
+    options=DiffOptions(mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(reordered.status() is Changed)
   assert_false(reordered.document().hunks.is_empty())
@@ -142,7 +139,7 @@ test "lexical mode exposes reordering and parse fallbacks" {
   let parsed = @mbtdiff.diff(
     "fn broken( {",
     "fn okay() {}",
-    options=@mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical),
+    options=DiffOptions(mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(
     parsed.fallbacks()
@@ -152,7 +149,7 @@ test "lexical mode exposes reordering and parse fallbacks" {
 
 ///|
 test "lexical mode preserves identical and filtering statuses" {
-  let options = @mbtdiff.DiffOptions::new(mode=@mbtdiff.DiffMode::Lexical)
+  let options = @mbtdiff.DiffOptions(mode=@mbtdiff.DiffMode::Lexical)
   let identical = @mbtdiff.diff("fn stable() {}", "fn stable() {}", options~)
   assert_true(identical.status() is Identical)
   assert_true(identical.document().hunks.is_empty())
@@ -161,10 +158,7 @@ test "lexical mode preserves identical and filtering statuses" {
   let comments = @mbtdiff.diff(
     "fn f() { 1 // old\n}",
     "fn f() { 1 // new\n}",
-    options=@mbtdiff.DiffOptions::new(
-      ignore_comments=true,
-      mode=@mbtdiff.DiffMode::Lexical,
-    ),
+    options=DiffOptions(ignore_comments=true, mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(comments.status() is IgnoredOnly)
   assert_true(comments.document().hunks.is_empty())
@@ -172,10 +166,7 @@ test "lexical mode preserves identical and filtering statuses" {
   let tests = @mbtdiff.diff(
     "test \"sample\" { old_value() }",
     "test \"sample\" { new_value() }",
-    options=@mbtdiff.DiffOptions::new(
-      ignore_tests=true,
-      mode=@mbtdiff.DiffMode::Lexical,
-    ),
+    options=DiffOptions(ignore_tests=true, mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(tests.status() is IgnoredOnly)
   assert_true(tests.document().hunks.is_empty())
@@ -194,7 +185,7 @@ test "public test filtering composes and keeps production changes" {
   let result = @mbtdiff.diff(
     old_source,
     new_source,
-    options=@mbtdiff.DiffOptions::new(ignore_comments=true, ignore_tests=true),
+    options=DiffOptions(ignore_comments=true, ignore_tests=true),
   )
   assert_true(result.status() is Changed)
   assert_true(
@@ -217,7 +208,7 @@ test "AST diff always bridges internal whitespace in inserted and deleted units"
   let added = "fn inserted() { let total = 1 }"
   let with_insertion = "\{stable}\n\{added}"
   for ignore_comments in [false, true] {
-    let options = @mbtdiff.DiffOptions::new(ignore_comments~)
+    let options = @mbtdiff.DiffOptions(ignore_comments~)
     let inserted = @mbtdiff.diff(stable, with_insertion, options~)
     assert_true(inserted.status() is Changed)
     assert_true(
@@ -252,7 +243,7 @@ test "parse and graph fallbacks are typed" {
   let limited = @mbtdiff.diff(
     "fn f() { old_value() }",
     "fn f() { new_value() }",
-    options=@mbtdiff.DiffOptions::new(graph_limit=0),
+    options=DiffOptions(graph_limit=0),
   )
   guard limited.fallbacks()
     is [{ reason: GraphLimitExceeded(limit=0), scope: Region(old~, new~) }] else {
@@ -278,7 +269,7 @@ test "root and declaration graph fallbacks have typed scopes" {
   let root = @mbtdiff.diff(
     "/// trailing old",
     "/// trailing new",
-    options=@mbtdiff.DiffOptions::new(graph_limit=0),
+    options=DiffOptions(graph_limit=0),
   )
   assert_true(
     root.fallbacks()
@@ -288,7 +279,7 @@ test "root and declaration graph fallbacks have typed scopes" {
   let local_result = @mbtdiff.diff(
     "fn first() { old_one() }\nfn second() { old_two() }",
     "fn first() { new_one() }\nfn second() { new_two() }",
-    options=@mbtdiff.DiffOptions::new(context_lines=0, graph_limit=0),
+    options=DiffOptions(context_lines=0, graph_limit=0),
   )
   assert_true(
     local_result.fallbacks()
@@ -322,7 +313,7 @@ test "formatting reorder and ignored whitespace stay renderer-free" {
   let blank_only = @mbtdiff.diff(
     "fn stable() {}\n",
     "fn stable() {}\n\n \n",
-    options=@mbtdiff.DiffOptions::new(ignore_comments=true),
+    options=DiffOptions(ignore_comments=true),
   )
   assert_true(blank_only.status() is IgnoredOnly)
   assert_true(blank_only.document().hunks.is_empty())
@@ -330,12 +321,12 @@ test "formatting reorder and ignored whitespace stay renderer-free" {
   let clamped = @mbtdiff.diff(
     "fn f() { 1 }",
     "fn f() { 2 }",
-    options=@mbtdiff.DiffOptions::new(context_lines=-20),
+    options=DiffOptions(context_lines=-20),
   )
   let zero = @mbtdiff.diff(
     "fn f() { 1 }",
     "fn f() { 2 }",
-    options=@mbtdiff.DiffOptions::new(context_lines=0),
+    options=DiffOptions(context_lines=0),
   )
   assert_true(clamped.document() == zero.document())
 }
