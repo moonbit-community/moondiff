@@ -24,5 +24,5 @@ description = "Difftool that aware MoonBit language syntax"
 preferred_target = "wasm"
 
 options(
-  exclude: [ "extension", "playground", "cli_test" ],
+  exclude: [ "extension", "playground", "cli_test", "scripts" ],
 )
