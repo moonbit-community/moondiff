@@ -4,6 +4,7 @@ import {
   "moonbit-community/moondiff/linediff",
   "moonbit-community/moondiff/render/html" @render_html,
   "moonbit-community/moondiff/render/unified",
+  "moonbit-community/moondiff/internal/source_text",
   "moonbit-community/rabbita",
   "moonbit-community/rabbita/clipboard",
   "moonbit-community/rabbita/cmd",

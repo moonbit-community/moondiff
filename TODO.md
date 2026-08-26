@@ -2,16 +2,16 @@
 
 ## High Priority
 
-- [ ] Finish universal-newline support at the remaining input boundaries.
+- [x] Finish universal-newline support at the remaining input boundaries.
   - [x] Use the same LF, CRLF, and CR splitting rules in the core parser,
     source-position, structural-diff, and rendering paths.
   - [x] Add an end-to-end structured-diff test for all three line-ending
     formats.
-  - [ ] Make Playground source validation and splitting recognize bare CR as a
-    line ending; it currently counts LF characters and only normalizes CRLF.
-  - [ ] Add Playground and line-diff regression tests for CR-only input,
+  - [x] Make Playground source validation and splitting recognize bare CR as a
+    line ending.
+  - [x] Add Playground and line-diff regression tests for CR-only input,
     including enforcement of the 20,000-line limit.
-  - [ ] Validate syntax positions against the rendered line array and fall back
+  - [x] Validate syntax positions against the rendered line array and fall back
     to a regular line diff when positions are out of bounds.
 
 - [x] Bound quadratic Levenshtein and LCS computations independently of

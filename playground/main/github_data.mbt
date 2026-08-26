@@ -406,15 +406,8 @@ fn check_source(bytes : Bytes) -> CheckedSource {
   if text.contains("\u{0000}") {
     return Rejected("Cannot render: the file contains a NUL byte.", true)
   }
-  let mut line_count = 1
-  for c in text {
-    if c == '\n' {
-      line_count += 1
-      if line_count > MAX_SOURCE_LINES {
-        return Rejected("Cannot render: one side exceeds 20,000 lines.", false)
-      }
-    }
+  match @source_text.split_lines_bounded(text, max_lines=MAX_SOURCE_LINES) {
+    Some(lines) => Renderable(lines)
+    None => Rejected("Cannot render: one side exceeds 20,000 lines.", false)
   }
-  let normalized = text.replace_all(old="\r\n", new="\n")
-  Renderable(normalized.split("\n").map(StringView::to_owned).collect())
 }
