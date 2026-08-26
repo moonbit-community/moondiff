@@ -234,7 +234,7 @@ test "missing truncated and malformed patches are not commentable" {
 
 ///|
 test "review rows only expose anchors present in the canonical patch" {
-  let document = @tokdiff.line_diff(old=["context", "old", "tail"], new=[
+  let document = @linediff.line_diff(old=["context", "old", "tail"], new=[
     "context", "new", "tail",
   ])
   let patch = parse_canonical_patch(

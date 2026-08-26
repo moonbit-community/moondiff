@@ -266,7 +266,7 @@ fn calculate_file_document(
   match file.diff_mode {
     LineDiff =>
       Some({
-        document: @tokdiff.line_diff(old~, new~, context=3),
+        document: @linediff.line_diff(old~, new~, context=3),
         status: Changed,
         fallbacks: [],
       })
