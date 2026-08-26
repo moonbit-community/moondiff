@@ -3,6 +3,7 @@ import {
   "moonbitlang/lexer",
   "moonbitlang/lexer/tokens",
   "moonbit-community/moondiff/internal/worddiff",
+  "moonbit-community/moondiff/internal/diff_ignore",
   "moonbit-community/moondiff/model",
 }
 

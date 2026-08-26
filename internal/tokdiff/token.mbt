@@ -89,12 +89,6 @@ fn push_comment_tokens(toks : Array[Tok], body : String) -> Unit {
 }
 
 ///|
-/// The upstream lexer advances recursively once per lexical item. Keep a
-/// conservative, backend-independent ceiling below the JavaScript/Wasm stack
-/// limit and switch to the iterative tokenizer below before invoking it.
-const LEXER_COMPLEXITY_LIMIT : Int = 256
-
-///|
 fn fallback_char_class(c : Char) -> Int {
   if c.is_whitespace() {
     0
@@ -121,31 +115,10 @@ fn starts_marker(line : String, offset : Int) -> Bool {
 }
 
 ///|
-/// Estimate the number of recursive lexer advances without calling the
-/// lexer. Runs of identifier and whitespace characters count once;
-/// punctuation counts individually. The scan intentionally does not try to
-/// recognize comments or quoted literals: treating `//` inside a string as a
-/// comment would underestimate an interpolation-heavy line, while a
-/// conservative overestimate only selects the lossless fallback sooner.
+// Retain the package-local name for tokenizer white-box tests while sharing
+// the actual safety policy with source filtering.
 fn lexer_complexity_within_limit(line : String) -> Bool {
-  let mut offset = 0
-  let mut pieces = 0
-  while offset < line.length() {
-    guard line.get_char(offset) is Some(c) else { break }
-    let cls = fallback_char_class(c)
-    pieces += 1
-    if pieces > LEXER_COMPLEXITY_LIMIT {
-      return false
-    }
-    offset += c.utf16_len()
-    if cls != 2 {
-      while line.get_char(offset) is Some(next) &&
-            fallback_char_class(next) == cls {
-        offset += next.utf16_len()
-      }
-    }
-  }
-  true
+  @diff_ignore.lexer_complexity_within_limit(line)
 }
 
 ///|
@@ -313,93 +286,4 @@ pub fn tokenize_line(line : String) -> Array[Tok] {
     toks.push({ kind: Space, text: line.view(start_offset=prev_end).to_owned() })
   }
   toks
-}
-
-///|
-// A source-faithful projection used by comment-and-blank-insensitive diffs.
-// `code` excludes a whole whitespace-only line, or both a comment and the
-// separating whitespace immediately before it. `ignored_suffix` keeps the
-// excluded text exactly so renderers can reconstruct the original line.
-priv struct CommentProjection {
-  code : String
-  ignored_suffix : String
-  ignored_only : Bool
-}
-
-///|
-fn whitespace_only_line(line : String) -> Bool {
-  for char in line {
-    if !char.is_whitespace() {
-      return false
-    }
-  }
-  true
-}
-
-///|
-// The real lexer is intentionally skipped for extremely complex external
-// lines to protect JS/Wasm stacks. Mirror just enough quote handling here to
-// retain the comment contract in that safety path.
-fn fallback_source_comment_start(line : String) -> Int? {
-  let trimmed = line.trim_start()
-  if trimmed.has_prefix("#|") || trimmed.has_prefix("$|") {
-    return None
-  }
-  let mut quote : Char? = None
-  let mut escaped = false
-  let mut offset = 0
-  while offset < line.length() {
-    guard line.get_char(offset) is Some(char) else { break }
-    if quote is Some(delimiter) {
-      if escaped {
-        escaped = false
-      } else if char == '\\' {
-        escaped = true
-      } else if char == delimiter {
-        quote = None
-      }
-    } else if char is ('"' | '\'') {
-      quote = Some(char)
-    } else if char == '/' && line.get_char(offset + 1) == Some('/') {
-      return Some(offset)
-    }
-    offset += char.utf16_len()
-  }
-  None
-}
-
-///|
-// Locate a real MoonBit line comment from lexer-classified tokens. In
-// particular, `//` inside a string remains part of the `Str` token and is not
-// mistaken for a comment delimiter.
-fn source_comment_start(line : String) -> Int? {
-  if !lexer_complexity_within_limit(line) {
-    return fallback_source_comment_start(line)
-  }
-  let mut offset = 0
-  for token in tokenize_line(line) {
-    if token.kind is Marker ||
-      (token.kind is Filler && token.text.has_prefix("//")) {
-      return Some(offset)
-    }
-    offset += token.text.length()
-  }
-  None
-}
-
-///|
-fn project_comments(line : String) -> CommentProjection {
-  if whitespace_only_line(line) {
-    return { code: "", ignored_suffix: line, ignored_only: true }
-  }
-  guard source_comment_start(line) is Some(comment_start) else {
-    return { code: line, ignored_suffix: "", ignored_only: false }
-  }
-  let prefix = line.view(end_offset=comment_start).to_owned()
-  let code = prefix.trim_end().to_owned()
-  {
-    code,
-    ignored_suffix: line.view(start_offset=code.length()).to_owned(),
-    ignored_only: code.is_empty(),
-  }
 }
