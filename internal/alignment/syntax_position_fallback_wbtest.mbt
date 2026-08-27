@@ -240,8 +240,8 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
   let good_old = fallback_test_unit("old_good", 2, 2)
   let good_new = fallback_test_unit("new_good", 2, 2)
   let plan = PerUnit([
-    Replace(old=bad_old, new=bad_new),
-    Replace(old=good_old, new=good_new),
+    { edit: Replace(old=bad_old, new=bad_new), old_offset: 0, new_offset: 0 },
+    { edit: Replace(old=good_old, new=good_new), old_offset: 1, new_offset: 1 },
   ])
   let result = detailed_ast_plan_document(
     plan,
@@ -270,4 +270,39 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
   assert_true(patch.contains("old_good"), msg=patch)
   assert_true(patch.contains("new_good"), msg=patch)
   assert_true(layout_from_top_level_plan(plan) is TopLevelSections([_, _]))
+}
+
+///|
+test "one-sided syntax fallback honors its positioned missing-side cursor" {
+  let old_source = "old_keep\nold_tail"
+  let new_source = "new_keep\nnew_bad\nnew_tail"
+  let inserted = fallback_test_unit("new_bad", 2, 99)
+  let plan = PerUnit([{ edit: Insert(inserted), old_offset: 1, new_offset: 1 }])
+  let result = detailed_ast_plan_document(
+    plan,
+    @diff_ignore.SourceView::from_source(old_source),
+    @diff_ignore.SourceView::from_source(new_source),
+    0,
+    3_000_000,
+    false,
+    fallback_test_budget(),
+  )
+  guard result.fallbacks
+    is [
+      {
+        reason: SyntaxPositionsOutOfBounds(sides=[New]),
+        scope: Region(old=None, new=Some({ start: 1, len: 1 })),
+      },
+    ] else {
+    fail("expected a new-only regional position fallback")
+  }
+  guard result.document.hunks is [hunk] else {
+    fail("expected one lexical fallback hunk")
+  }
+  @debug.assert_eq(
+    (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
+    (1, 0, 1, 1),
+  )
+  let patch = @unified.render_unified_hunks(result.document).join("")
+  assert_true(patch.has_prefix("@@ -1,0 +2 @@\n"), msg=patch)
 }

@@ -54,6 +54,73 @@ fn alignment_test_budget() -> @computation.Budget {
 }
 
 ///|
+fn impl_edits_from_pairs_for_test(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  replacements : @hashmap.HashMap[Int, Int],
+) -> Array[ImplEdit] {
+  position_impl_edits(old_units, new_units, replacements, 0, 0).map(positioned => {
+    positioned.edit
+  })
+}
+
+///|
+fn align_impl_units_by_uuid(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+) -> Array[ImplEdit] {
+  impl_edits_from_pairs_for_test(
+    old_units,
+    new_units,
+    align_impl_unit_pairs_by_uuid(old_units, new_units),
+  )
+}
+
+///|
+fn align_impl_units_by_key_impl(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  budget : @computation.Budget,
+  use_uuid? : Bool = true,
+) -> Array[ImplEdit] raise @computation.LimitExceeded {
+  impl_edits_from_pairs_for_test(
+    old_units,
+    new_units,
+    align_impl_unit_pairs_by_key_impl(old_units, new_units, budget, use_uuid~),
+  )
+}
+
+///|
+fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
+  edits.any(edit => edit is Replace(..))
+}
+
+///|
+fn positioned_plan_for_test(
+  old_source : String,
+  new_source : String,
+) -> Array[PositionedImplEdit] {
+  let plan = top_level_plan_impl(
+    parse_units(old_source),
+    parse_units(new_source),
+    alignment_test_budget(),
+    old_file_line_count=document_lines(old_source).length(),
+    new_file_line_count=document_lines(new_source).length(),
+  ) catch {
+    LimitExceeded(..) => panic()
+  }
+  match plan {
+    PerUnit(edits) => edits
+    RootList(..) => panic()
+  }
+}
+
+///|
+fn positioned_edit_summary(positioned : PositionedImplEdit) -> String {
+  "\{edit_declaration_summary(positioned.edit)}@\{positioned.old_offset}->\{positioned.new_offset}"
+}
+
+///|
 fn align_impl_units_by_key(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
@@ -65,7 +132,7 @@ fn align_impl_units_by_key(
     alignment_test_budget(),
     use_uuid~,
   ) catch {
-    @computation.LimitExceeded(..) => panic()
+    LimitExceeded(..) => panic()
   }
 }
 
@@ -494,7 +561,13 @@ test "unique content hashes align anonymous units but duplicate hashes do not" {
   let duplicate_edits = align_impl_units_by_key(duplicate, duplicate)
   assert_false(impl_edits_have_replacement(duplicate_edits))
   assert_true(
-    top_level_plan_impl(duplicate, duplicate, alignment_test_budget())
+    top_level_plan_impl(
+      duplicate,
+      duplicate,
+      alignment_test_budget(),
+      old_file_line_count=2,
+      new_file_line_count=2,
+    )
     is RootList(..),
   )
 }
@@ -1659,19 +1732,146 @@ test "AST segments bridge only internal whitespace between changes" {
 test "top-level plan applies one pairing strategy to reordered declarations" {
   let old_units = parse_units("fn first() {}\nfn second() {}")
   let new_units = parse_units("fn second() {}\nfn first() {}")
-  guard top_level_plan_impl(old_units, new_units, alignment_test_budget())
+  guard top_level_plan_impl(
+      old_units,
+      new_units,
+      alignment_test_budget(),
+      old_file_line_count=2,
+      new_file_line_count=2,
+    )
     is PerUnit(edits) else {
     fail("expected reliable semantic pairs")
   }
-  @debug.assert_eq(edits.map(edit_line_summary), [
+  @debug.assert_eq(edits.map(edit => edit_line_summary(edit.edit)), [
     "Replace(1->2)", "Replace(2->1)",
   ])
 
   let unmatched_old = parse_units("/// trailing old")
   let unmatched_new = parse_units("/// trailing new")
   assert_true(
-    top_level_plan_impl(unmatched_old, unmatched_new, alignment_test_budget())
+    top_level_plan_impl(
+      unmatched_old,
+      unmatched_new,
+      alignment_test_budget(),
+      old_file_line_count=1,
+      new_file_line_count=1,
+    )
     is RootList(..),
+  )
+}
+
+///|
+test "positioned one-sided edits share raw boundaries after unequal units" {
+  let long_lead =
+    #|fn lead() {
+    #|  old_one()
+    #|  old_two()
+    #|}
+  let old_source = long_lead +
+    "\nfn deleted_one() {}\nfn deleted_two() {}\nfn tail() {}"
+  let new_source = "fn lead() {}\nfn tail() {}"
+  @debug.assert_eq(
+    positioned_plan_for_test(old_source, new_source).map(
+      positioned_edit_summary,
+    ),
+    [
+      "Replace(lead->lead)@0->0", "Delete(deleted_one)@4->1", "Delete(deleted_two)@5->1",
+      "Replace(tail->tail)@6->1",
+    ],
+  )
+  @debug.assert_eq(
+    positioned_plan_for_test(new_source, old_source).map(
+      positioned_edit_summary,
+    ),
+    [
+      "Replace(lead->lead)@0->0", "Replace(tail->tail)@1->6", "Insert(deleted_one)@1->4",
+      "Insert(deleted_two)@1->5",
+    ],
+  )
+}
+
+///|
+test "positioned deletion boundaries can jump during top-level reordering" {
+  let old_source =
+    #|fn a() {}
+    #|fn gone_before_b() {}
+    #|fn b() {}
+    #|fn gone_after_b() {}
+    #|fn c() {}
+  let new_source =
+    #|fn c() {}
+    #|fn a() {}
+    #|fn b() {}
+  @debug.assert_eq(
+    positioned_plan_for_test(old_source, new_source).map(
+      positioned_edit_summary,
+    ),
+    [
+      "Replace(a->a)@0->1", "Delete(gone_before_b)@1->2", "Replace(b->b)@2->2", "Delete(gone_after_b)@3->3",
+      "Replace(c->c)@4->0",
+    ],
+  )
+}
+
+///|
+test "UUID semantic and fuzzy pairs share positioned insert construction" {
+  let uuid_only_new =
+    #|///|UUID(inserted-id)
+    #|fn inserted() {}
+  @debug.assert_eq(
+    positioned_plan_for_test("", uuid_only_new).map(positioned_edit_summary),
+    ["Insert(inserted)@0->0"],
+  )
+
+  let uuid_old =
+    #|///|UUID(stable-id)
+    #|fn stable() {}
+    #|///|UUID(tail-id)
+    #|fn tail() {}
+  let uuid_new =
+    #|///|UUID(stable-id)
+    #|fn stable() {}
+    #|///|UUID(inserted-id)
+    #|fn inserted() {}
+    #|///|UUID(tail-id)
+    #|fn tail() {}
+  @debug.assert_eq(
+    positioned_plan_for_test(uuid_old, uuid_new).map(positioned_edit_summary),
+    [
+      "Replace(stable->stable)@0->0", "Replace(tail->tail)@2->4", "Insert(inserted)@2->2",
+    ],
+  )
+
+  let semantic_old = "fn stable() {}\nfn tail() {}"
+  let semantic_new = "fn stable() {}\nfn inserted() {}\nfn tail() {}"
+  @debug.assert_eq(
+    positioned_plan_for_test(semantic_old, semantic_new).map(
+      positioned_edit_summary,
+    ),
+    [
+      "Replace(stable->stable)@0->0", "Replace(tail->tail)@1->2", "Insert(inserted)@1->1",
+    ],
+  )
+
+  let fuzzy_old =
+    #|fn stable() {}
+    #|fn JobHandle::spawn_unix(path : String) {
+    #|  launch(path)
+    #|}
+    #|fn tail() {}
+  let fuzzy_new =
+    #|fn stable() {}
+    #|fn inserted() {}
+    #|fn JobHandle::spawn_unix_ffi(path : String) {
+    #|  launch(path)
+    #|}
+    #|fn tail() {}
+  @debug.assert_eq(
+    positioned_plan_for_test(fuzzy_old, fuzzy_new).map(positioned_edit_summary),
+    [
+      "Replace(stable->stable)@0->0", "Replace(spawn_unix->spawn_unix_ffi)@1->2",
+      "Replace(tail->tail)@4->5", "Insert(inserted)@1->1",
+    ],
   )
 }
 
@@ -1711,6 +1911,58 @@ test "lexical aligned documents preserve original line numbers" {
   assert_true(ast_result.document.hunks.length() >= 2)
   let ast_changed = ast_result.document.hunks[0]
   @debug.assert_eq((ast_changed.old_start, ast_changed.new_start), (1, 2))
+}
+
+///|
+test "one-sided filtered views retain original source cursors" {
+  let blank_old = "fn first() {}\n\n\nfn last() {}"
+  let blank_new = "fn first() {}\n\nfn middle() {}\n\nfn last() {}"
+  let test_old =
+    #|fn first() {}
+    #|test "hidden" { old_test() }
+    #|
+    #|fn last() {}
+  let test_new =
+    #|fn first() {}
+    #|test "hidden" { old_test() }
+    #|
+    #|fn middle() {}
+    #|fn last() {}
+  let cases = [
+    (blank_old, blank_new, true, false, (3, 0, 2, 1), 2),
+    (test_old, test_new, false, true, (3, 0, 3, 1), 3),
+  ]
+  for mode in [Lexical, Ast] {
+    for case in cases {
+      let (
+        old_source,
+        new_source,
+        ignore_comments,
+        ignore_tests,
+        expected_range,
+        inserted_index,
+      ) = case
+      let result = diff_document_for_test(
+        old_source,
+        new_source,
+        mode,
+        context=0,
+        ignore_comments~,
+        ignore_tests~,
+      )
+      assert_true(result.fallbacks.is_empty())
+      assert_eq(result.document.hunks.length(), 1)
+      let hunk = result.document.hunks[0]
+      assert_true(
+        (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len) ==
+        expected_range,
+      )
+      assert_eq(
+        document_side_index_count(result.document, inserted_index, false),
+        1,
+      )
+    }
+  }
 }
 
 ///|
