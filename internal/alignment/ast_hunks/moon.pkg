@@ -1,3 +1,4 @@
+// AST-specific line alignment and hunk construction.
 import {
   "moonbitlang/core/cmp",
   "moonbitlang/core/hashmap",

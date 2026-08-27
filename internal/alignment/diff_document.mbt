@@ -382,7 +382,7 @@ fn ast_diff_line(
 ///|
 fn ast_pair_is_context(
   pair : (Int?, Int?),
-  hunk : @hunks.AstHunk,
+  hunk : @ast_hunks.AstHunk,
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
 ) -> Bool {
@@ -420,7 +420,7 @@ fn ast_change_row(
 ///|
 fn ast_hunk_blocks(
   pairs : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  hunk : @ast_hunks.AstHunk,
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
@@ -457,7 +457,7 @@ fn ast_hunk_blocks(
 }
 
 ///|
-fn ast_line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
+fn ast_line_is_novel(line : Int?, novel_lines : @ast_hunks.LineSet) -> Bool {
   line is Some(line) && novel_lines.contains(line)
 }
 
@@ -465,13 +465,13 @@ fn ast_line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
 fn ast_pair_side_is_changed(
   line : Int?,
   opposite : Int?,
-  novel_lines : @hunks.LineSet,
+  novel_lines : @ast_hunks.LineSet,
 ) -> Bool {
   ast_line_is_novel(line, novel_lines) || (line is Some(_) && opposite is None)
 }
 
 ///|
-fn ast_pair_has_change(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
+fn ast_pair_has_change(pair : (Int?, Int?), hunk : @ast_hunks.AstHunk) -> Bool {
   ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) ||
   ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
 }
@@ -479,7 +479,7 @@ fn ast_pair_has_change(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
 ///|
 fn ast_should_render_as_block_replacement(
   segment : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  hunk : @ast_hunks.AstHunk,
 ) -> Bool {
   let lhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let rhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
@@ -511,7 +511,7 @@ fn ast_should_render_as_block_replacement(
 fn append_ast_segment_lines(
   output : Array[(Int?, Int?)],
   segment : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  hunk : @ast_hunks.AstHunk,
 ) -> Unit {
   if ast_should_render_as_block_replacement(segment, hunk) {
     for pair in segment {
@@ -532,7 +532,7 @@ fn append_ast_segment_lines(
 ///|
 fn reduce_ast_sparse_replacements(
   lines : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  hunk : @ast_hunks.AstHunk,
 ) -> Array[(Int?, Int?)] {
   let output : Array[(Int?, Int?)] = []
   let segment : Array[(Int?, Int?)] = []
@@ -590,11 +590,11 @@ fn ast_document_from_positions(
   if !out_of_bounds.is_empty() {
     return AstPositionsOutOfBounds(out_of_bounds[:])
   }
-  let matched_lines = @hunks.all_matched_lines_filled(
+  let matched_lines = @ast_hunks.all_matched_lines_filled(
     lhs_positions, rhs_positions, old_lines, new_lines,
   )
-  let ast_hunks = @hunks.merge_adjacent_hunks(
-    @hunks.matched_pos_to_hunks(lhs_positions, rhs_positions),
+  let ast_hunks = @ast_hunks.merge_adjacent_hunks(
+    @ast_hunks.matched_pos_to_hunks(lhs_positions, rhs_positions),
     matched_lines,
     context,
   )
@@ -602,7 +602,7 @@ fn ast_document_from_positions(
   let new_ranges = collect_novel_ranges(rhs_positions)
   let hunks : Array[@model.DiffHunk] = []
   for hunk in ast_hunks {
-    let (start, end_) = @hunks.contextual_index_range_for_hunk(
+    let (start, end_) = @ast_hunks.contextual_index_range_for_hunk(
       hunk,
       matched_lines,
       context + 1,
