@@ -1,5 +1,11 @@
 ///|
 /// Select whether MoonBit changes are compared structurally or lexically.
+///
+/// `Lexical` compares token-level text inside the selected semantic fragments.
+/// Once reliable top-level alignment produces independent declaration
+/// sections, whitespace-only lines outside every section (at file boundaries
+/// or between declarations) are intentionally outside the comparison. A
+/// whole-file lexical result still compares those lines.
 pub(all) enum DiffMode {
   Ast
   Lexical
@@ -44,6 +50,12 @@ pub impl Default for DiffOptions with fn default() {
 }
 
 ///|
+/// A renderer-ready hunk diff for one semantic fragment.
+pub type HunkDocument = @model.HunkDocument
+
+///|
+/// The high-level semantic document returned by `DiffResult::document`.
+/// Consumers must match `Whole` or `TopLevel` before rendering fragments.
 pub type DiffDocument = @model.DiffDocument
 
 ///|
@@ -83,46 +95,14 @@ pub type FallbackReason = @model.FallbackReason
 pub type LineRange = @model.LineRange
 
 ///|
-pub type FallbackScope = @model.FallbackScope
-
-///|
-pub type FallbackInfo = @model.FallbackInfo
+pub type DiffFragment = @model.DiffFragment
 
 ///|
 pub type DiffSection = @model.DiffSection
 
 ///|
-pub type DiffLayout = @model.DiffLayout
+pub type TopLevelDiff = @model.TopLevelDiff
 
 ///|
-/// A calculated document plus classification, layout, and typed degradation
-/// metadata. Its representation is private; use the accessor methods below.
-/// Document collections, section layouts, and fallback metadata are returned
-/// as zero-copy read-only views whose backing storage is never mutated after
-/// this result is published.
-struct DiffResult {
-  document : DiffDocument
-  status : DiffStatus
-  fallbacks : ArrayView[FallbackInfo]
-  layout : DiffLayout
-}
-
-///|
-pub fn DiffResult::document(self : DiffResult) -> DiffDocument {
-  self.document
-}
-
-///|
-pub fn DiffResult::status(self : DiffResult) -> DiffStatus {
-  self.status
-}
-
-///|
-pub fn DiffResult::fallbacks(self : DiffResult) -> ArrayView[FallbackInfo] {
-  self.fallbacks
-}
-
-///|
-pub fn DiffResult::layout(self : DiffResult) -> DiffLayout {
-  self.layout
-}
+/// An opaque calculation result exposing only `status` and `document`.
+pub type DiffResult = @model.DiffResult

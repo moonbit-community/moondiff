@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub fn diff(String, String, old_name? : String, new_name? : String, options? : DiffOptions) -> DiffResult
+pub fn diff(String, String, old_name? : String, new_name? : String, options? : DiffOptions) -> @model.DiffResult
 
 // Errors
 
@@ -21,12 +21,6 @@ type DiffOptions
 pub fn DiffOptions::DiffOptions(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : DiffMode) -> Self
 pub impl Default for DiffOptions
 
-type DiffResult
-pub fn DiffResult::document(Self) -> @model.DiffDocument
-pub fn DiffResult::fallbacks(Self) -> ArrayView[@model.FallbackInfo]
-pub fn DiffResult::layout(Self) -> @model.DiffLayout
-pub fn DiffResult::status(Self) -> @model.DiffStatus
-
 // Type aliases
 pub using @model {type ComputationStage}
 
@@ -36,11 +30,13 @@ pub using @model {type DiffBlock}
 
 pub using @model {type DiffDocument}
 
+pub using @model {type DiffFragment}
+
 pub using @model {type DiffHunk}
 
-pub using @model {type DiffLayout}
-
 pub using @model {type DiffLine}
+
+pub using @model {type DiffResult}
 
 pub using @model {type DiffRow}
 
@@ -54,12 +50,12 @@ pub using @model {type DiffSide}
 
 pub using @model {type DiffStatus}
 
-pub using @model {type FallbackInfo}
-
 pub using @model {type FallbackReason}
 
-pub using @model {type FallbackScope}
+pub using @model {type HunkDocument}
 
 pub using @model {type LineRange}
+
+pub using @model {type TopLevelDiff}
 
 // Traits

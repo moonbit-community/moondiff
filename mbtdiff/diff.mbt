@@ -1,9 +1,13 @@
 ///|
 /// Calculate a MoonBit source diff without rendering it. AST mode is the
-/// default. Parsing, graph, or internal computation limits degrade to lexical
-/// documents and are described by typed fallback metadata. In AST mode,
-/// text-only changes with no AST change return `NoStructuralChanges` and an
-/// empty document. Optional source names are forwarded to parser diagnostics.
+/// default. A fallback is attached directly to the whole or top-level fragment
+/// that degraded. In AST mode, text-only changes with no AST change return
+/// `NoStructuralChanges`; pure declaration reordering returns `Reordered` and
+/// preserves both source orders. In a sectioned Lexical result, only
+/// declaration-owned ranges are compared, so a change confined to
+/// whitespace-only lines outside those ranges returns `NoStructuralChanges`.
+/// A `Whole` lexical result compares every source line. Optional source names
+/// are forwarded to parser diagnostics.
 pub fn diff(
   old_source : String,
   new_source : String,
@@ -15,7 +19,7 @@ pub fn diff(
     Ast => @alignment.AlignedDiffMode::Ast
     Lexical => @alignment.AlignedDiffMode::Lexical
   }
-  let calculation = @alignment.calculate_diff_document(
+  let result = @alignment.calculate_diff_document(
     old_source,
     new_source,
     old_name~,
@@ -26,11 +30,5 @@ pub fn diff(
     ignore_tests=options.ignore_tests,
     mode~,
   )
-  let result = calculation.result
-  {
-    document: result.document,
-    status: result.status,
-    fallbacks: result.fallbacks,
-    layout: calculation.layout,
-  }
+  @model.DiffResult::make(result.document, result.status)
 }
