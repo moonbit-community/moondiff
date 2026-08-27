@@ -117,11 +117,11 @@ When at least one trustworthy correspondence exists, declarations are compared i
 - Unpaired old declarations are deletions.
 - Unpaired new declarations are insertions.
 
-This isolates edits inside moved declarations from the movement itself and preserves original source locations for reporting. The result keeps a stable section identity table plus independent old-side and new-side orderings. Each section's detailed hunk document uses local, zero-based coordinates; the section ranges are the only source of original-file coordinates. Lexical mode compares these section slices independently and does not synthesize sections for unassigned blank-only gaps. A change confined to such gaps therefore produces no hunks and `DiffStatus::NoStructuralChanges`.
+This isolates edits inside moved declarations from the movement itself and preserves original source locations for reporting. The result keeps a stable section identity table plus independent old-side and new-side orderings. Each section's `DiffFragment.rows` uses local, zero-based coordinates. When non-empty, that stream covers both section slices completely and monotonically: exact pairs are `Context`, mode-recognized edits are `Changed`, and faithfully retained formatting or filtered differences are `Neutral`. Hunk selection and context expansion are not part of semantic alignment; the enclosing section ranges are the only source of original-file coordinates. Lexical mode compares these section slices independently and does not synthesize sections for unassigned blank-only gaps. A change confined to such gaps therefore leaves every fragment row stream empty and produces `DiffStatus::NoStructuralChanges`.
 
 If no trustworthy correspondence exists, the matcher avoids arbitrary pairings and compares the complete declaration lists or files as one `Whole` fragment. Parse failures and top-level planning failures use the same representation.
 
-Pure reordering deserves special treatment. All reliably matched declarations remain in the result even when their local hunk documents are empty. Crossing old-side and new-side identity orders sets `reordered` and produces `DiffStatus::Reordered`; it does not trigger a whole-file textual fallback or turn the move into deletion plus insertion. Consumers can show a compact movement summary while choosing the side order appropriate to their view.
+Pure reordering deserves special treatment. All reliably matched declarations remain in the result even when their local row streams are empty. Crossing old-side and new-side identity orders sets `reordered` and produces `DiffStatus::Reordered`; it does not trigger a whole-file textual fallback or turn the move into deletion plus insertion. Consumers can show a compact movement summary while choosing the side order appropriate to their view.
 
 ## Resource Bounds
 
@@ -141,7 +141,7 @@ If that budget is exhausted before reliable planning completes, the result expan
 | Identical anonymous content appears once on each side | It can be paired by exact structural identity. |
 | Identical anonymous content is duplicated | It remains ambiguous at the structural-fingerprint stage. |
 | A large body is extracted into a nearby helper | The helper may preserve the old implementation's continuity; the wrapper appears inserted. |
-| Blank-only lines change before, between, or after reliably aligned declarations | A sectioned lexical diff produces no hunks and reports `NoStructuralChanges`; a `Whole` lexical comparison still observes them. |
+| Blank-only lines change before, between, or after reliably aligned declarations | A sectioned lexical diff leaves fragment rows empty and reports `NoStructuralChanges`; a `Whole` lexical comparison still observes them. |
 | Parsing or top-level alignment exceeds its limits | The diff falls back to one `Whole` fragment. |
 | One declaration exceeds a local diff limit | Only that section falls back to lexical diff; other sections remain independent. |
 

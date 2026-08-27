@@ -117,11 +117,11 @@
 - 未配对的旧声明视为删除。
 - 未配对的新声明视为插入。
 
-这样可以把声明内部变化与声明移动分离，同时在结果中保留原始源码位置。结果包含一张稳定的 section 身份表，以及旧侧、新侧各自独立的顺序。每个 section 内的 hunk document 使用从零开始的局部坐标，只有 section 的行范围保存原文件坐标。Lexical 模式会独立比较这些 section 切片，不会为未分配的纯空白 gap 合成 section。因此，如果变化仅限于这些 gap，就不会产生 hunk，并返回 `DiffStatus::NoStructuralChanges`。
+这样可以把声明内部变化与声明移动分离，同时在结果中保留原始源码位置。结果包含一张稳定的 section 身份表，以及旧侧、新侧各自独立的顺序。每个 section 的 `DiffFragment.rows` 使用从零开始的局部坐标；只要 rows 非空，它就会完整、单调地覆盖两侧 section：完全一致的配对是 `Context`，当前模式认可的变化是 `Changed`，需要忠实保留的格式或过滤差异是 `Neutral`。语义对齐本身不再选择 hunk，也不扩展 context；只有 section 行范围保存原文件坐标。Lexical 模式会独立比较这些 section 切片，不会为未分配的纯空白 gap 合成 section。因此，如果变化仅限于这些 gap，所有 fragment 的 rows 都为空，并返回 `DiffStatus::NoStructuralChanges`。
 
 如果一个可信对应关系也没有，匹配器不会强行绑定声明，而是把完整声明列表或整个文件作为一个 `Whole` fragment 比较。解析失败和顶层规划失败也使用这一表示。
 
-纯重排需要特殊处理。即使局部 hunk document 为空，所有可靠配对的声明仍会保留在结果中。旧、新两侧的身份顺序交叉时设置 `reordered` 并返回 `DiffStatus::Reordered`；它不会触发整文件文本 fallback，也不会把移动伪装成删除加插入。消费方可以显示简洁的重排摘要，并按自身场景选择一侧顺序展示。
+纯重排需要特殊处理。即使局部 rows 为空，所有可靠配对的声明仍会保留在结果中。旧、新两侧的身份顺序交叉时设置 `reordered` 并返回 `DiffStatus::Reordered`；它不会触发整文件文本 fallback，也不会把移动伪装成删除加插入。消费方可以显示简洁的重排摘要，并按自身场景选择一侧顺序展示。
 
 ## 资源边界
 
@@ -141,7 +141,7 @@
 | 相同匿名内容在两边各出现一次 | 可以通过精确结构身份配对。 |
 | 相同匿名内容重复出现 | 在结构指纹阶段仍视为歧义。 |
 | 大段函数体抽取到邻近 helper | helper 可以延续旧实现，wrapper 显示为插入。 |
-| 在可靠对齐的声明之前、之间或之后修改纯空白行 | sectioned lexical diff 不产生 hunk，并返回 `NoStructuralChanges`；`Whole` lexical 比较仍会观察这些变化。 |
+| 在可靠对齐的声明之前、之间或之后修改纯空白行 | sectioned lexical diff 的 fragment rows 为空，并返回 `NoStructuralChanges`；`Whole` lexical 比较仍会观察这些变化。 |
 | 解析失败或顶层匹配超过资源限制 | 降级为一个 `Whole` fragment。 |
 | 单个声明超过局部 diff 限制 | 只有该 section 降级为 lexical diff，其他 section 保持独立。 |
 
