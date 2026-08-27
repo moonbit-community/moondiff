@@ -21,6 +21,15 @@
   - [x] Report a typed computation-limit reason and fall back to a regular line
     diff for the affected file or unit when the budget is exhausted.
 
+- [ ] Preserve the file-level computation limit when diffing per unit.
+  - Affected areas: `internal/alignment/diff_document.mbt` and
+    `internal/computation/budget.mbt`.
+  - [ ] Keep the per-unit budget for local fallback while charging every unit
+    against a shared, monotonically decreasing file-level budget.
+  - [ ] Fall back when either the per-unit or file-level budget is exhausted.
+  - [ ] Add a regression test in which multiple units cumulatively exceed the
+    file-level computation limit.
+
 - [ ] Improve worst-case similarity work beyond the existing budget fallback.
   - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`,
     `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and
@@ -33,6 +42,14 @@
     the end.
 
 ## Medium Priority
+
+- [ ] Show fallback notices when an AST diff has no structural changes.
+  - Affected area: `playground/main/view.mbt`.
+  - [ ] Collect and display fallback metadata before returning early for
+    `Identical` or `NoStructuralChanges`, or use the shared fragment-rendering
+    path for these states.
+  - [ ] Add a view regression test for `NoStructuralChanges` with fallback
+    metadata.
 
 - [ ] Ensure real textual changes never result in empty CLI output.
   - Affected areas: `alignment/root_alignment.mbt`, `render/terminal/diff_text.mbt`, and `main.mbt`.
