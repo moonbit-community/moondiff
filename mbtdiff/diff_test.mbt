@@ -226,6 +226,136 @@ test "AST diff always bridges internal whitespace in inserted and deleted units"
 }
 
 ///|
+fn one_sided_line_indexes(
+  document : @mbtdiff.DiffDocument,
+) -> (Array[Int], Array[Int]) {
+  let old_indexes : Array[Int] = []
+  let new_indexes : Array[Int] = []
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      guard block is ChangeBlock(rows) else { continue }
+      for row in rows {
+        match row {
+          Paired(old_line, new_line) => {
+            old_indexes.push(old_line.index)
+            new_indexes.push(new_line.index)
+          }
+          OldOnly(line) => old_indexes.push(line.index)
+          NewOnly(line) => new_indexes.push(line.index)
+        }
+      }
+    }
+  }
+  (old_indexes, new_indexes)
+}
+
+///|
+test "top-level one-sided edits keep source cursors in lexical and AST modes" {
+  let first = "fn first() {}"
+  let middle = "fn middle() {}"
+  let last = "fn last() {}"
+  let without_middle = "\{first}\n\{last}"
+  let with_middle = "\{first}\n\{middle}\n\{last}"
+  let cases : Array[
+    (
+      String,
+      String,
+      String,
+      (Int, Int, Int, Int),
+      String,
+      Array[Int],
+      Array[Int],
+    ),
+  ] = [
+    (
+      "insert at start",
+      without_middle,
+      "\{middle}\n\{without_middle}",
+      (0, 0, 0, 1),
+      "@@ -0,0 +1 @@",
+      [],
+      [0],
+    ),
+    (
+      "delete at start",
+      "\{middle}\n\{without_middle}",
+      without_middle,
+      (0, 1, 0, 0),
+      "@@ -1 +0,0 @@",
+      [0],
+      [],
+    ),
+    (
+      "insert in middle",
+      without_middle,
+      with_middle,
+      (1, 0, 1, 1),
+      "@@ -1,0 +2 @@",
+      [],
+      [1],
+    ),
+    (
+      "delete in middle",
+      with_middle,
+      without_middle,
+      (1, 1, 1, 0),
+      "@@ -2 +1,0 @@",
+      [1],
+      [],
+    ),
+    (
+      "insert at end",
+      without_middle,
+      "\{without_middle}\n\{middle}",
+      (2, 0, 2, 1),
+      "@@ -2,0 +3 @@",
+      [],
+      [2],
+    ),
+    (
+      "delete at end",
+      "\{without_middle}\n\{middle}",
+      without_middle,
+      (2, 1, 2, 0),
+      "@@ -3 +2,0 @@",
+      [2],
+      [],
+    ),
+  ]
+  for mode in [@mbtdiff.DiffMode::Lexical, Ast] {
+    for case in cases {
+      let (
+        name,
+        old_source,
+        new_source,
+        expected_range,
+        expected_header,
+        expected_old_indexes,
+        expected_new_indexes,
+      ) = case
+      let result = @mbtdiff.diff(
+        old_source,
+        new_source,
+        options=DiffOptions(context_lines=0, mode~),
+      )
+      assert_true(result.fallbacks().is_empty(), msg=name)
+      assert_eq(result.document().hunks.length(), 1)
+      let hunk = result.document().hunks[0]
+      assert_true(
+        (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len) ==
+        expected_range,
+        msg=name,
+      )
+      let (old_indexes, new_indexes) = one_sided_line_indexes(result.document())
+      assert_true(old_indexes == expected_old_indexes, msg=name)
+      assert_true(new_indexes == expected_new_indexes, msg=name)
+      let patch = @unified.render_unified_hunks(result.document()).join("")
+      assert_true(patch.has_prefix("\{expected_header}\n"), msg=name)
+    }
+  }
+}
+
+///|
 test "parse and graph fallbacks are typed" {
   let parsed = @mbtdiff.diff("fn broken( {", "fn okay() {}")
   guard parsed.fallbacks()
