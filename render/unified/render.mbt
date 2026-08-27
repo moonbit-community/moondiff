@@ -73,7 +73,8 @@ fn render_hunk(hunk : @model.DiffHunk) -> String {
 }
 
 ///|
-/// Render every hunk in a calculated diff as unified patch text.
-pub fn render_unified_hunks(document : @model.DiffDocument) -> Array[String] {
+/// Render every hunk in one fragment `HunkDocument` as unified patch text.
+/// This function does not flatten a high-level semantic document.
+pub fn render_unified_hunks(document : @model.HunkDocument) -> Array[String] {
   document.hunks.map(render_hunk)
 }
