@@ -175,7 +175,7 @@ fn line_diff_with_budget(
   new : ArrayView[String],
   context : Int,
   budget : @worddiff.RefinementBudget,
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   let context = if context < 0 { 0 } else { context }
   let hunks : Array[@model.DiffHunk] = []
   for
@@ -197,6 +197,6 @@ pub fn line_diff(
   old~ : ArrayView[String],
   new~ : ArrayView[String],
   context? : Int = 3,
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   line_diff_with_budget(old, new, context, @worddiff.RefinementBudget::new())
 }

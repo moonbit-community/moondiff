@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> @model.DiffDocument
+pub fn line_diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int) -> @model.HunkDocument
 
 // Errors
 

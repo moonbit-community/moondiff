@@ -1,6 +1,6 @@
 ///|
 fn paired_rows(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
 ) -> Array[(@model.DiffLine, @model.DiffLine)] {
   let pairs = []
   for hunk in document.hunks {
