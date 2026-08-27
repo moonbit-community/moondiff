@@ -135,6 +135,8 @@ fn append_document(
 fn lexical_edit_document(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
+  old_offset : Int,
+  new_offset : Int,
   old_view : SourceView,
   new_view : SourceView,
   context : Int,
@@ -143,8 +145,7 @@ fn lexical_edit_document(
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
   lexical_view_document(old_local, new_local, context, ignore_comments).rebase(
-    impl_line_base(old_unit) - 1,
-    impl_line_base(new_unit) - 1,
+    old_offset, new_offset,
   )
 }
 
@@ -167,36 +168,22 @@ fn detailed_lexical_plan_document(
     }
     PerUnit(edits) => {
       let hunks : Array[@model.DiffHunk] = []
-      for edit in edits {
-        let document = match edit {
-          Replace(old~, new~) =>
-            lexical_edit_document(
-              Some(old),
-              Some(new),
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
-          Delete(old) =>
-            lexical_edit_document(
-              Some(old),
-              None,
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
-          Insert(new) =>
-            lexical_edit_document(
-              None,
-              Some(new),
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
+      for positioned in edits {
+        let (old_unit, new_unit) = match positioned.edit {
+          Replace(old~, new~) => (Some(old), Some(new))
+          Delete(old) => (Some(old), None)
+          Insert(new) => (None, Some(new))
         }
+        let document = lexical_edit_document(
+          old_unit,
+          new_unit,
+          positioned.old_offset,
+          positioned.new_offset,
+          old_view,
+          new_view,
+          context,
+          ignore_comments,
+        )
         append_document(hunks, document)
       }
       if hunks.is_empty() && old_source != new_source {
@@ -724,9 +711,9 @@ fn layout_from_top_level_plan(plan : TopLevelPlan) -> DiffLayout {
     RootList(..) => WholeDocument
     PerUnit(edits) => {
       let sections : Array[DiffSection] = []
-      for edit in edits {
+      for positioned in edits {
         sections.push(
-          match edit {
+          match positioned.edit {
             Replace(old~, new~) =>
               {
                 old: unit_line_range(Some(old)),
@@ -797,6 +784,8 @@ fn ast_document_for_roots_with_budget(
 fn ast_unit_document_with_budget(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
+  old_offset : Int,
+  new_offset : Int,
   old_view : SourceView,
   new_view : SourceView,
   context : Int,
@@ -806,8 +795,6 @@ fn ast_unit_document_with_budget(
 ) -> AstBuildResult raise {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
-  let old_offset = impl_line_base(old_unit) - 1
-  let new_offset = impl_line_base(new_unit) - 1
   let lhs_roots : Array[@syntax.Syntax] = []
   let rhs_roots : Array[@syntax.Syntax] = []
   if old_unit is Some(unit) {
@@ -835,6 +822,8 @@ fn ast_unit_document_with_budget(
 fn detailed_ast_edit_document(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
+  old_offset : Int,
+  new_offset : Int,
   old_view : SourceView,
   new_view : SourceView,
   context : Int,
@@ -845,6 +834,8 @@ fn detailed_ast_edit_document(
   let build = ast_unit_document_with_budget(
     old_unit,
     new_unit,
+    old_offset,
+    new_offset,
     old_view,
     new_view,
     context,
@@ -859,7 +850,8 @@ fn detailed_ast_edit_document(
       )
       return {
         document: lexical_edit_document(
-          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+          old_unit, new_unit, old_offset, new_offset, old_view, new_view, context,
+          ignore_comments,
         ),
         fallback: Some(unit_fallback(reason, old_unit, new_unit)),
         computation_exhausted: true,
@@ -869,7 +861,8 @@ fn detailed_ast_edit_document(
       let reason : FallbackReason = GraphLimitExceeded(limit=graph_limit)
       return {
         document: lexical_edit_document(
-          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+          old_unit, new_unit, old_offset, new_offset, old_view, new_view, context,
+          ignore_comments,
         ),
         fallback: Some(unit_fallback(reason, old_unit, new_unit)),
         computation_exhausted: false,
@@ -883,7 +876,8 @@ fn detailed_ast_edit_document(
       let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
       {
         document: lexical_edit_document(
-          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+          old_unit, new_unit, old_offset, new_offset, old_view, new_view, context,
+          ignore_comments,
         ),
         fallback: Some(unit_fallback(reason, old_unit, new_unit)),
         // Position corruption is local to this declaration. Unlike a shared
@@ -898,6 +892,8 @@ fn detailed_ast_edit_document(
 fn lexical_detailed_unit(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
+  old_offset : Int,
+  new_offset : Int,
   old_view : SourceView,
   new_view : SourceView,
   context : Int,
@@ -906,7 +902,7 @@ fn lexical_detailed_unit(
 ) -> DetailedUnitResult {
   {
     document: lexical_edit_document(
-      old_unit, new_unit, old_view, new_view, context, ignore_comments,
+      old_unit, new_unit, old_offset, new_offset, old_view, new_view, context, ignore_comments,
     ),
     fallback: Some(unit_fallback(reason, old_unit, new_unit)),
     computation_exhausted: true,
@@ -1035,19 +1031,35 @@ fn detailed_ast_plan_document(
       let hunks : Array[@model.DiffHunk] = []
       let fallbacks : Array[FallbackInfo] = []
       let exhausted_reason : Ref[FallbackReason?] = Ref(None)
-      for edit in edits {
-        let (old_unit, new_unit) = match edit {
+      for positioned in edits {
+        let (old_unit, new_unit) = match positioned.edit {
           Replace(old~, new~) => (Some(old), Some(new))
           Delete(old) => (Some(old), None)
           Insert(new) => (None, Some(new))
         }
         let result = if exhausted_reason.val is Some(reason) {
           lexical_detailed_unit(
-            old_unit, new_unit, old_view, new_view, context, ignore_comments, reason,
+            old_unit,
+            new_unit,
+            positioned.old_offset,
+            positioned.new_offset,
+            old_view,
+            new_view,
+            context,
+            ignore_comments,
+            reason,
           )
         } else {
           detailed_ast_edit_document(
-            old_unit, new_unit, old_view, new_view, context, graph_limit, ignore_comments,
+            old_unit,
+            new_unit,
+            positioned.old_offset,
+            positioned.new_offset,
+            old_view,
+            new_view,
+            context,
+            graph_limit,
+            ignore_comments,
             budget,
           )
         }
@@ -1210,6 +1222,8 @@ fn calculate_diff_document_with_limit(
     old_collection.units,
     new_collection.units,
     budget,
+    old_file_line_count=document_lines(old_source).length(),
+    new_file_line_count=document_lines(new_source).length(),
     ignore_uuid=ignore_comments,
   ) catch {
     @computation.LimitExceeded(stage~, limit~) =>

@@ -6,10 +6,10 @@ fn all_units_have_uuid(units : ArrayView[ImplUnit]) -> Bool {
 ///|UUID(75486f71-7af0-4c26-a905-97cdfbc7d623)
 // Align duplicated UUIDs by occurrence order. This keeps repeated generated
 // declarations deterministic without requiring UUIDs to be globally unique.
-fn align_impl_units_by_uuid(
+fn align_impl_unit_pairs_by_uuid(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-) -> Array[ImplEdit] {
+) -> @hashmap.HashMap[Int, Int] {
   let new_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([])
   for i in 0..<new_units.length() {
     if new_units[i].uuid is Some(uuid) {
@@ -20,44 +20,32 @@ fn align_impl_units_by_uuid(
   }
 
   let new_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
-  let used_new : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
-  let edits = Array::new()
+  let replacements : @hashmap.HashMap[Int, Int] = @hashmap.HashMap([])
 
-  for old_unit in old_units {
+  for old_index, old_unit in old_units {
     if old_unit.uuid is Some(uuid) {
       if new_positions.get(uuid) is Some(indices) {
         let offset = new_offsets.get(uuid).unwrap_or(0)
         if offset < indices.length() {
           let new_index = indices[offset]
           new_offsets[uuid] = offset + 1
-          used_new.set(new_index, true)
-          edits.push(Replace(old=old_unit, new=new_units[new_index]))
-        } else {
-          edits.push(Delete(old_unit))
+          replacements[old_index] = new_index
         }
-      } else {
-        edits.push(Delete(old_unit))
       }
     } else {
       panic()
     }
   }
-
-  for i in 0..<new_units.length() {
-    if !used_new.contains(i) {
-      edits.push(Insert(new_units[i]))
-    }
-  }
-  edits
+  replacements
 }
 
 ///|UUID(218731b6-e35d-469a-b7a9-a31dcc3b1c70)
-fn align_impl_units_by_key_impl(
+fn align_impl_unit_pairs_by_key_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   budget : @computation.Budget,
   use_uuid? : Bool = true,
-) -> Array[ImplEdit] raise @computation.LimitExceeded {
+) -> @hashmap.HashMap[Int, Int] raise @computation.LimitExceeded {
   let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let replacements : @hashmap.HashMap[Int, Int] = @hashmap.HashMap([])
@@ -212,31 +200,78 @@ fn align_impl_units_by_key_impl(
     let (old_index, new_index) = fuzzy_pair
     pair(old_index, new_index)
   }
+  replacements
+}
 
-  let edits = Array::new()
-  for i in 0..<old_units.length() {
-    if replacements.get(i) is Some(new_index) {
-      edits.push(Replace(old=old_units[i], new=new_units[new_index]))
-    } else {
-      edits.push(Delete(old_units[i]))
+///|
+fn impl_boundary_offset(
+  units : ArrayView[ImplUnit],
+  boundary : Int,
+  file_line_count : Int,
+) -> Int {
+  match units.get(boundary) {
+    Some(unit) => unit.start_line - 1
+    None => file_line_count
+  }
+}
+
+///|
+// Preserve the established edit order (old scan, then unpaired new units),
+// while calculating missing-side cursors from the nearest paired boundary.
+// A pair may move that boundary in either direction during a reorder.
+fn position_impl_edits(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  replacements : @hashmap.HashMap[Int, Int],
+  old_file_line_count : Int,
+  new_file_line_count : Int,
+) -> Array[PositionedImplEdit] {
+  let old_positions : @hashmap.HashMap[Int, Int] = HashMap([])
+  for old_index, new_index in replacements {
+    old_positions[new_index] = old_index
+  }
+
+  let edits : Array[PositionedImplEdit] = []
+  let mut new_boundary = 0
+  for old_index in 0..<old_units.length() {
+    let old = old_units[old_index]
+    match replacements.get(old_index) {
+      Some(new_index) => {
+        let new = new_units[new_index]
+        edits.push({
+          edit: Replace(old~, new~),
+          old_offset: old.start_line - 1,
+          new_offset: new.start_line - 1,
+        })
+        new_boundary = new_index + 1
+      }
+      None =>
+        edits.push({
+          edit: Delete(old),
+          old_offset: old.start_line - 1,
+          new_offset: impl_boundary_offset(
+            new_units, new_boundary, new_file_line_count,
+          ),
+        })
     }
   }
 
-  for i in 0..<new_units.length() {
-    if !new_used.contains(i) {
-      edits.push(Insert(new_units[i]))
+  let mut old_boundary = 0
+  for new_index in 0..<new_units.length() {
+    let new = new_units[new_index]
+    match old_positions.get(new_index) {
+      Some(old_index) => old_boundary = old_index + 1
+      None =>
+        edits.push({
+          edit: Insert(new),
+          old_offset: impl_boundary_offset(
+            old_units, old_boundary, old_file_line_count,
+          ),
+          new_offset: new.start_line - 1,
+        })
     }
   }
   edits
-}
-
-///|UUID(efd8452b-7521-4f76-9171-86843cf72de6)
-fn impl_line_base(unit : ImplUnit?) -> Int {
-  if unit is Some(unit) {
-    unit.start_line
-  } else {
-    1
-  }
 }
 
 ///|UUID(58ac384d-5e05-4e16-8ced-e465cedf4774)
@@ -248,38 +283,35 @@ fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
   roots
 }
 
-///|UUID(97bfcfe4-80de-498e-a147-90d250e6c93e)
-fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
-  edits.any(fn(edit) {
-    match edit {
-      Replace(..) => true
-      _ => false
-    }
-  })
-}
-
 ///|
 fn top_level_plan_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   budget : @computation.Budget,
+  old_file_line_count~ : Int,
+  new_file_line_count~ : Int,
   ignore_uuid? : Bool = false,
 ) -> TopLevelPlan raise @computation.LimitExceeded {
-  if !ignore_uuid &&
+  let uuid_alignment = !ignore_uuid &&
     all_units_have_uuid(old_units) &&
-    all_units_have_uuid(new_units) {
-    PerUnit(align_impl_units_by_uuid(old_units, new_units))
+    all_units_have_uuid(new_units)
+  let replacements = if uuid_alignment {
+    align_impl_unit_pairs_by_uuid(old_units, new_units)
   } else {
-    let edits = align_impl_units_by_key_impl(
+    align_impl_unit_pairs_by_key_impl(
       old_units,
       new_units,
       budget,
       use_uuid=!ignore_uuid,
     )
-    if impl_edits_have_replacement(edits) {
-      PerUnit(edits)
-    } else {
-      RootList(old=old_units.to_owned(), new=new_units.to_owned())
-    }
+  }
+  if !uuid_alignment && replacements.is_empty() {
+    RootList(old=old_units.to_owned(), new=new_units.to_owned())
+  } else {
+    PerUnit(
+      position_impl_edits(
+        old_units, new_units, replacements, old_file_line_count, new_file_line_count,
+      ),
+    )
   }
 }

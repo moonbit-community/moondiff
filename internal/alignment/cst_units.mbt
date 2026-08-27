@@ -90,12 +90,22 @@ priv enum ImplEdit {
 }
 
 ///|
+// A top-level edit plus the zero-based source cursor for each side. Present
+// units use their own source position; a missing side uses the boundary
+// implied by the surrounding top-level pairs.
+priv struct PositionedImplEdit {
+  edit : ImplEdit
+  old_offset : Int
+  new_offset : Int
+}
+
+///|
 // The single top-level alignment decision shared by terminal rendering and
 // renderer-neutral document calculation. Reliable UUID/key/hash matches are
 // compared unit-by-unit; otherwise both engines compare the root lists/files
 // as a whole.
 priv enum TopLevelPlan {
-  PerUnit(Array[ImplEdit])
+  PerUnit(Array[PositionedImplEdit])
   RootList(old~ : Array[ImplUnit], new~ : Array[ImplUnit])
 }
 
