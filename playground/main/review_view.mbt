@@ -359,14 +359,24 @@ fn unified_review_line(
 fn safe_review_diff(
   file : ApiFile,
   file_index : Int,
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   mode : ViewMode,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  old_base? : Int = 0,
+  new_base? : Int = 0,
 ) -> @rabbita.Html {
   let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Array[@rabbita.Html] = []
-  for item in project_review_items(file_index, file.filename, document, patch) {
+  for
+    item in project_review_items(
+      file_index,
+      file.filename,
+      document,
+      patch,
+      old_base~,
+      new_base~,
+    ) {
     match item {
       ReviewHunk(header) =>
         rows.push(

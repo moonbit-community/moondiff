@@ -35,8 +35,12 @@ fn review_hunk_range(start : Int, len : Int) -> String {
 }
 
 ///|
-fn review_hunk_header(hunk : @model.DiffHunk) -> String {
-  "@@ -\{review_hunk_range(hunk.old_start, hunk.old_len)} +\{review_hunk_range(hunk.new_start, hunk.new_len)} @@"
+fn review_hunk_header(
+  hunk : @model.DiffHunk,
+  old_base : Int,
+  new_base : Int,
+) -> String {
+  "@@ -\{review_hunk_range(hunk.old_start + old_base, hunk.old_len)} +\{review_hunk_range(hunk.new_start + new_base, hunk.new_len)} @@"
 }
 
 ///|
@@ -89,8 +93,10 @@ fn make_review_row(
 fn project_review_rows(
   file_index : Int,
   path : String,
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   patch : CanonicalPatch,
+  old_base? : Int = 0,
+  new_base? : Int = 0,
 ) -> Array[ReviewRow] {
   let rows : Array[ReviewRow] = []
   for hunk in document.hunks {
@@ -103,8 +109,8 @@ fn project_review_rows(
                 file_index,
                 path,
                 patch,
-                Some(line.old_index + 1),
-                Some(line.new_index + 1),
+                Some(old_base + line.old_index + 1),
+                Some(new_base + line.new_index + 1),
                 Some(line.text),
                 Some(line.text),
                 Some(plain_review_segments(line.text)),
@@ -128,8 +134,8 @@ fn project_review_rows(
                     file_index,
                     path,
                     patch,
-                    Some(old.index + 1),
-                    Some(new.index + 1),
+                    Some(old_base + old.index + 1),
+                    Some(new_base + new.index + 1),
                     Some(old.text()),
                     Some(new.text()),
                     Some(old.segments),
@@ -144,7 +150,7 @@ fn project_review_rows(
                     file_index,
                     path,
                     patch,
-                    Some(old.index + 1),
+                    Some(old_base + old.index + 1),
                     None,
                     Some(old.text()),
                     None,
@@ -161,7 +167,7 @@ fn project_review_rows(
                     path,
                     patch,
                     None,
-                    Some(new.index + 1),
+                    Some(new_base + new.index + 1),
                     None,
                     Some(new.text()),
                     None,
@@ -183,14 +189,24 @@ fn project_review_rows(
 fn project_review_items(
   file_index : Int,
   path : String,
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   patch : CanonicalPatch,
+  old_base? : Int = 0,
+  new_base? : Int = 0,
 ) -> Array[ReviewItem] {
   let items : Array[ReviewItem] = []
   for hunk in document.hunks {
-    items.push(ReviewHunk(review_hunk_header(hunk)))
-    let one = @model.DiffDocument::{ hunks: [hunk] }
-    for row in project_review_rows(file_index, path, one, patch) {
+    items.push(ReviewHunk(review_hunk_header(hunk, old_base, new_base)))
+    let one = @model.HunkDocument::{ hunks: [hunk] }
+    for
+      row in project_review_rows(
+        file_index,
+        path,
+        one,
+        patch,
+        old_base~,
+        new_base~,
+      ) {
       items.push(ReviewLine(row))
     }
   }
