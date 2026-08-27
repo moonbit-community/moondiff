@@ -210,7 +210,7 @@ test "full-line calculation trims whitespace and skips empty emphasis" {
 }
 
 ///|
-fn fallback_pairs(document : DiffDocument) -> Array[(DiffLine, DiffLine)] {
+fn fallback_pairs(document : HunkDocument) -> Array[(DiffLine, DiffLine)] {
   let pairs = []
   for hunk in document.hunks {
     for block in hunk.blocks {

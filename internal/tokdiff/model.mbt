@@ -28,7 +28,7 @@ pub type DiffHunk = @model.DiffHunk
 
 ///|
 /// Compatibility alias for the renderer-neutral model type.
-pub type DiffDocument = @model.DiffDocument
+pub type HunkDocument = @model.HunkDocument
 
 ///|
 fn push_diff_segment(
@@ -395,7 +395,7 @@ fn semantic_diff_with_refinement_budget(
   context : Int,
   line_cleanup : Bool,
   budget : @worddiff.RefinementBudget,
-) -> DiffDocument {
+) -> HunkDocument {
   let hunks : Array[DiffHunk] = []
   for hunk in rendering_diff(old, new, line_cleanup).group(context~) {
     hunks.push(semantic_hunk(hunk, budget))
@@ -410,7 +410,7 @@ fn comment_aware_diff(
   context : Int,
   line_cleanup : Bool,
   budget : @worddiff.RefinementBudget,
-) -> DiffDocument {
+) -> HunkDocument {
   let old_view = @diff_ignore.SourceView::from_lines(old, ignore_comments=true)
   let new_view = @diff_ignore.SourceView::from_lines(new, ignore_comments=true)
   @diff_ignore.restore_document(
@@ -434,7 +434,7 @@ fn diff_with_refinement_budget(
   line_cleanup : Bool,
   ignore_comments : Bool,
   budget : @worddiff.RefinementBudget,
-) -> DiffDocument {
+) -> HunkDocument {
   if ignore_comments {
     return comment_aware_diff(old, new, context, line_cleanup, budget)
   }
@@ -455,7 +455,7 @@ pub fn diff(
   context? : Int = 3,
   line_cleanup? : Bool = false,
   ignore_comments? : Bool = false,
-) -> DiffDocument {
+) -> HunkDocument {
   diff_with_refinement_budget(
     old,
     new,
