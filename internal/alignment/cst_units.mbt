@@ -51,14 +51,15 @@ priv struct ImplFuzzyInfo {
 ///|
 // One top-level CST item plus any source-faithful leading trivia needed to
 // render it independently. UUIDs, semantic keys, and unique root hashes let us
-// align moved items before running the structural diff.
+// align moved items before running the structural diff. The range begins at
+// the first parser-visible node and ends at the last; adjacent whitespace-only
+// lines are deliberately not absorbed into the unit.
 priv struct ImplUnit {
   root : @syntax.Syntax
   uuid : String?
   semantic_key : String?
   fuzzy : ImplFuzzyInfo?
-  start_line : Int
-  source : String
+  range : @model.LineRange
 }
 
 ///|
@@ -95,8 +96,18 @@ priv enum ImplEdit {
 // compared unit-by-unit; otherwise both engines compare the root lists/files
 // as a whole.
 priv enum TopLevelPlan {
-  PerUnit(Array[ImplEdit])
+  PerUnit(PerUnitPlan)
   RootList(old~ : Array[ImplUnit], new~ : Array[ImplUnit])
+}
+
+///|
+// Stable section identities plus each source's order. The order arrays index
+// `edits`; they are computed once when the plan is formed.
+priv struct PerUnitPlan {
+  edits : Array[ImplEdit]
+  old_order : Array[Int]
+  new_order : Array[Int]
+  reordered : Bool
 }
 
 ///|
@@ -377,49 +388,30 @@ fn make_impl_unit(
 ) -> ImplUnit {
   let first = nodes[0]
   let last = nodes[nodes.length() - 1]
+  let start = @cmp.minimum(
+    @cmp.maximum(first.loc.start.lnum - 1, 0),
+    source_lines.length(),
+  )
+  let end_ = @cmp.minimum(
+    @cmp.maximum(last.loc.end.lnum, start),
+    source_lines.length(),
+  )
+  let range : @model.LineRange = { start, len: end_ - start }
   ImplUnit::{
     root,
     uuid: nodes_uuid(source, nodes),
     semantic_key: item.bind(fn(item) { impl_semantic_key(source, item) }),
     fuzzy: item.bind(fn(item) { impl_fuzzy_info(source, item, root) }),
-    start_line: first.loc.start.lnum,
-    source: source_lines_slice(
-      source_lines,
-      first.loc.start.lnum,
-      last.loc.end.lnum,
-    ),
+    range,
   }
-}
-
-///|
-fn source_lines_slice(
-  lines : ArrayView[String],
-  start_line : Int,
-  end_line : Int,
-) -> String {
-  if lines.is_empty() {
-    return ""
-  }
-  let start = @cmp.maximum(start_line - 1, 0)
-  let end_ = @cmp.minimum(end_line, lines.length())
-  if start >= end_ {
-    return ""
-  }
-  let buf = StringBuilder()
-  for i in start..<end_ {
-    if i > start {
-      buf.write_char('\n')
-    }
-    buf.write_string(lines[i])
-  }
-  buf.to_string()
 }
 
 ///|
 // Root-level comments and separators precede the next declaration in the CST.
 // Keep them with that declaration so documentation/UUID changes stay inside
-// the same independently rendered unit. Trailing comment-only content becomes
-// a final unit rather than disappearing from the structural diff.
+// the same independently rendered unit. Trailing parser-visible comment-only
+// content becomes a final unit rather than disappearing from the structural
+// diff; trailing whitespace alone remains outside every unit.
 fn collect_impl_units_detailed(
   source : String,
   root : @cst.CstNode,

@@ -231,21 +231,53 @@ fn align_impl_units_by_key_impl(
 }
 
 ///|UUID(efd8452b-7521-4f76-9171-86843cf72de6)
-fn impl_line_base(unit : ImplUnit?) -> Int {
-  if unit is Some(unit) {
-    unit.start_line
-  } else {
-    1
-  }
-}
-
-///|UUID(58ac384d-5e05-4e16-8ced-e465cedf4774)
 fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
   let roots = Array::new()
   for unit in units {
     roots.push(unit.root)
   }
   roots
+}
+
+///|
+fn per_unit_plan(edits : Array[ImplEdit]) -> TopLevelPlan {
+  let old_order : Array[Int] = []
+  let new_order : Array[Int] = []
+  for index, edit in edits {
+    match edit {
+      Replace(..) => {
+        old_order.push(index)
+        new_order.push(index)
+      }
+      Delete(_) => old_order.push(index)
+      Insert(_) => new_order.push(index)
+    }
+  }
+  old_order.sort_by_key(index => {
+    match edits[index] {
+      Replace(old~, ..) | Delete(old) => old.range.start
+      Insert(_) => -1
+    }
+  })
+  new_order.sort_by_key(index => {
+    match edits[index] {
+      Replace(new~, ..) | Insert(new) => new.range.start
+      Delete(_) => -1
+    }
+  })
+  let old_matched : Array[Int] = []
+  for index in old_order {
+    if edits[index] is Replace(..) {
+      old_matched.push(index)
+    }
+  }
+  let new_matched : Array[Int] = []
+  for index in new_order {
+    if edits[index] is Replace(..) {
+      new_matched.push(index)
+    }
+  }
+  PerUnit({ edits, old_order, new_order, reordered: old_matched != new_matched })
 }
 
 ///|UUID(97bfcfe4-80de-498e-a147-90d250e6c93e)
@@ -268,7 +300,7 @@ fn top_level_plan_impl(
   if !ignore_uuid &&
     all_units_have_uuid(old_units) &&
     all_units_have_uuid(new_units) {
-    PerUnit(align_impl_units_by_uuid(old_units, new_units))
+    per_unit_plan(align_impl_units_by_uuid(old_units, new_units))
   } else {
     let edits = align_impl_units_by_key_impl(
       old_units,
@@ -277,7 +309,7 @@ fn top_level_plan_impl(
       use_uuid=!ignore_uuid,
     )
     if impl_edits_have_replacement(edits) {
-      PerUnit(edits)
+      per_unit_plan(edits)
     } else {
       RootList(old=old_units.to_owned(), new=new_units.to_owned())
     }
