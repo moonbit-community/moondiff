@@ -10,8 +10,9 @@ test "render renders CST-backed inline diff" {
     #|}
   let result = render("old.mbt", old_source, "new.mbt", new_source)
   let expected =
-    #|--- old.mbt: line 1
-    #|+++ new.mbt: line 1
+    #|[section #1 matched] old lines 1-3; new lines 1-3
+    #|--- old.mbt: lines 1-3
+    #|+++ new.mbt: lines 1-3
     #|@@ -1,3 +1,3 @@
     #|1 1 fn f() {
     #|2 .   foo(bar)
@@ -77,8 +78,8 @@ test "render colors file headers blue" {
     options=Options::new(use_color=true),
   )
   assert_true(
-    result.has_prefix(
-      "\u{1b}[34m--- old.mbt: line 1\u{1b}[39m\n\u{1b}[34m+++ new.mbt: line 1\u{1b}[39m\n",
+    result.contains(
+      "\u{1b}[34m--- old.mbt: lines 1-3\u{1b}[39m\n\u{1b}[34m+++ new.mbt: lines 1-3\u{1b}[39m\n",
     ),
   )
 }
@@ -182,8 +183,8 @@ test "render keeps wrapped call matched when adding a sibling call" {
     #|. 3   println(5 + 6)
   assert_true(result.contains("--- old.mbt"))
   assert_true(result.contains("+++ new.mbt"))
-  assert_true(result.contains("--- old.mbt: line 1"))
-  assert_true(result.contains("+++ new.mbt: line 1"))
+  assert_true(result.contains("--- old.mbt: lines 1-5"))
+  assert_true(result.contains("+++ new.mbt: lines 1-4"))
   assert_false(result.contains(interleaved_prefix))
   assert_true(result.contains(separated_suffix))
   assert_false(result.contains("-   3 |     \"Hello, world!\""))
@@ -340,17 +341,59 @@ test "render uses per-top-level diff without UUIDs" {
     #|  alpha(gamma(beta))
     #|}
   let result = render("old.mbt", old_source, "new.mbt", new_source)
-  assert_true(result.contains("--- old.mbt: line 1"))
-  assert_true(result.contains("+++ new.mbt: line 1"))
-  assert_true(result.contains("--- old.mbt: line 7"))
-  assert_true(result.contains("+++ new.mbt: line 7"))
-  assert_true(result.split("--- old.mbt: line").count() == 3)
-  assert_true(result.split("+++ new.mbt: line").count() == 3)
+  assert_true(
+    result.contains("[section #1 matched] old lines 1-3; new lines 1-3"),
+  )
+  assert_true(result.contains("--- old.mbt: lines 1-3"))
+  assert_true(result.contains("+++ new.mbt: lines 1-3"))
+  assert_true(
+    result.contains("[section #3 matched] old lines 7-9; new lines 7-9"),
+  )
+  assert_true(result.contains("--- old.mbt: lines 7-9"))
+  assert_true(result.contains("+++ new.mbt: lines 7-9"))
+  assert_true(result.split("--- old.mbt: lines").count() == 3)
+  assert_true(result.split("+++ new.mbt: lines").count() == 3)
   assert_true(result.contains("2 .   foo(bar)"))
   assert_true(result.contains(". 2   foo(baz(bar))"))
   assert_true(result.contains("8 .   alpha(beta)"))
   assert_true(result.contains(". 8   alpha(gamma(beta))"))
   assert_false(result.contains("5 5 fn mid() {}"))
+}
+
+///|
+test "render summarizes pure reorder without expanding empty fragments" {
+  let result = render(
+    "old.mbt", "fn first() {}\nfn second() {}", "new.mbt", "fn second() {}\nfn first() {}",
+  )
+  assert_eq(
+    result, "--- old.mbt\n+++ new.mbt\nTop-level declarations reordered; no fragment-local changes.\n",
+  )
+  assert_false(result.contains("[section #"))
+}
+
+///|
+test "render reports mixed reorder and changed fragment coordinates" {
+  let result = render(
+    "old.mbt", "fn first() { old_value() }\nfn second() {}", "new.mbt", "fn second() {}\nfn first() { new_value() }",
+  )
+  assert_true(result.has_prefix("note: top-level declarations reordered\n"))
+  assert_true(result.contains("[section #1 matched] old line 1; new line 2"))
+  assert_true(result.contains("old_value"))
+  assert_true(result.contains("new_value"))
+}
+
+///|
+test "render groups deleted declarations in old order" {
+  let result = render(
+    "old.mbt", "fn first() {}\nfn removed() {}\nfn keep() {}", "new.mbt", "fn keep() {}",
+  )
+  assert_true(result.has_prefix("Deleted declarations (old order):\n"))
+  assert_true(result.contains("[section #1 deleted] old line 1; new absent"))
+  assert_true(result.contains("[section #2 deleted] old line 2; new absent"))
+  assert_true(
+    result.find("[section #1 deleted]").unwrap() <
+    result.find("[section #2 deleted]").unwrap(),
+  )
 }
 
 ///|UUID(a950075e-cfce-4d10-a195-3db5d77760ed)
@@ -368,8 +411,8 @@ test "render matches no-UUID top-level roots after insertion" {
     #|}
   let result = render("old.mbt", old_source, "new.mbt", new_source)
 
-  assert_true(result.contains("--- old.mbt: line 2"))
-  assert_true(result.contains("+++ new.mbt: line 3"))
+  assert_true(result.contains("--- old.mbt: lines 2-4"))
+  assert_true(result.contains("+++ new.mbt: lines 3-5"))
   assert_true(result.contains("--- old.mbt\n+++ new.mbt: line 1"))
   assert_false(result.contains("--- old.mbt\n+++ new.mbt\n"))
   assert_true(result.contains(". 1 fn inserted() {}"))
@@ -400,8 +443,8 @@ test "render falls back to single-definition tokdiff for graph limit" {
   )
 
   assert_true(
-    result.has_prefix(
-      "note: fallback to tokdiff (graph limit exceeded (0) at old line 2, new line 3)\n--- old.mbt: line 2\n+++ new.mbt: line 3\n",
+    result.contains(
+      "[section #2 matched] old lines 2-4; new lines 3-5\nnote: fallback to tokdiff (graph limit exceeded (0))\n--- old.mbt: lines 2-4\n+++ new.mbt: lines 3-5\n",
     ),
   )
   assert_true(result.contains("--- old.mbt\n+++ new.mbt: line 1"))
@@ -640,8 +683,8 @@ test "render keeps UUID-aligned top-level changes on the CST path" {
     #|}
   let result = render("old.mbt", old_source, "new.mbt", new_source)
 
-  assert_true(result.contains("--- old.mbt: line 3"))
-  assert_true(result.contains("+++ new.mbt: line 5"))
+  assert_true(result.contains("--- old.mbt: lines 3-6"))
+  assert_true(result.contains("+++ new.mbt: lines 5-8"))
   assert_true(result.contains("fn inserted() {}"))
   assert_true(result.contains("foo(bar)"))
   assert_true(result.contains("foo(baz(bar))"))

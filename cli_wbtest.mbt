@@ -163,6 +163,10 @@ test "ignore tests preserves CLI layout for files without tests" {
   let sectioned = render_cli_diff(
     defaults, sectioned_old, sectioned_new, 3_000_000,
   )
-  assert_true(sectioned.contains("old.mbt: line 1"), msg=sectioned)
-  assert_true(sectioned.contains("new.mbt: line 1"), msg=sectioned)
+  assert_true(
+    sectioned.contains("[section #1 matched] old lines 1-2; new lines 1-2"),
+    msg=sectioned,
+  )
+  assert_true(sectioned.contains("--- old.mbt: lines 1-2"), msg=sectioned)
+  assert_true(sectioned.contains("+++ new.mbt: lines 1-2"), msg=sectioned)
 }
