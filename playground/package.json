@@ -6,7 +6,6 @@
     "build": "node scripts/build.mjs",
     "dev": "npm run build && node --watch server.mjs",
     "start": "node server.mjs",
-    "server-test": "node --test tests/server.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "build:extension": "node ../extension/scripts/build.mjs",
