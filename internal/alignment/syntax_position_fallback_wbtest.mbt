@@ -198,14 +198,13 @@ fn fallback_test_unit(
     uuid: None,
     semantic_key: None,
     fuzzy: None,
-    start_line,
-    source,
+    range: { start: start_line - 1, len: 1 },
   }
 }
 
 ///|
-fn fallback_test_budget() -> @computation.Budget {
-  @computation.Budget::new(@computation.default_limit())
+fn fallback_test_limit() -> UInt {
+  @computation.default_limit()
 }
 
 ///|
@@ -220,15 +219,15 @@ test "root syntax-position overflow uses a whole-file lexical fallback" {
     0,
     3_000_000,
     false,
-    fallback_test_budget(),
+    fallback_test_limit(),
   )
-  guard result.fallbacks
-    is [
-      { reason: SyntaxPositionsOutOfBounds(sides=[Old, New]), scope: WholeFile },
-    ] else {
+  guard result.document is Whole(fragment) else {
+    fail("expected a whole document")
+  }
+  guard fragment.fallbacks is [SyntaxPositionsOutOfBounds(sides=[Old, New])] else {
     fail("expected a two-sided whole-file position fallback")
   }
-  assert_false(result.document.hunks.is_empty())
+  assert_false(fragment.document.hunks.is_empty())
 }
 
 ///|
@@ -239,7 +238,7 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
   let bad_new = fallback_test_unit("new_bad", 1, 1)
   let good_old = fallback_test_unit("old_good", 2, 2)
   let good_new = fallback_test_unit("new_good", 2, 2)
-  let plan = PerUnit([
+  let plan = per_unit_plan([
     Replace(old=bad_old, new=bad_new),
     Replace(old=good_old, new=good_new),
   ])
@@ -250,24 +249,24 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
     0,
     3_000_000,
     false,
-    fallback_test_budget(),
+    fallback_test_limit(),
   )
-  guard result.fallbacks
-    is [
-      {
-        reason: SyntaxPositionsOutOfBounds(sides=[Old]),
-        scope: Region(
-          old=Some({ start: 0, len: 1 }),
-          new=Some({ start: 0, len: 1 })
-        ),
-      },
-    ] else {
+  guard result.document is TopLevel(top) else {
+    fail("expected a sectioned document")
+  }
+  guard top.sections is [Matched(diff=bad, ..), Matched(diff=good, ..)] else {
+    fail("expected two matched sections")
+  }
+  guard bad.fallbacks is [SyntaxPositionsOutOfBounds(sides=[Old])] else {
     fail("expected only the invalid declaration to fall back")
   }
-  let patch = @unified.render_unified_hunks(result.document).join("")
-  assert_true(patch.contains("old_bad"), msg=patch)
-  assert_true(patch.contains("new_bad"), msg=patch)
-  assert_true(patch.contains("old_good"), msg=patch)
-  assert_true(patch.contains("new_good"), msg=patch)
-  assert_true(layout_from_top_level_plan(plan) is TopLevelSections([_, _]))
+  assert_true(good.fallbacks.is_empty())
+  let bad_patch = @unified.render_unified_hunks(bad.document).join("")
+  let good_patch = @unified.render_unified_hunks(good.document).join("")
+  assert_true(bad_patch.contains("old_bad"), msg=bad_patch)
+  assert_true(bad_patch.contains("new_bad"), msg=bad_patch)
+  assert_true(good_patch.contains("old_good"), msg=good_patch)
+  assert_true(good_patch.contains("new_good"), msg=good_patch)
+  assert_true(top.old_order is [0, 1])
+  assert_true(top.new_order is [0, 1])
 }

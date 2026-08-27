@@ -20,9 +20,10 @@ fn edit_summary(edit : ImplEdit) -> String {
 ///|UUID(42a6fa59-8e84-4dad-aee4-0435e8c07d32)
 fn edit_line_summary(edit : ImplEdit) -> String {
   match edit {
-    Replace(old~, new~) => "Replace(\{old.start_line}->\{new.start_line})"
-    Delete(old) => "Delete(\{old.start_line})"
-    Insert(new) => "Insert(\{new.start_line})"
+    Replace(old~, new~) =>
+      "Replace(\{old.range.start + 1}->\{new.range.start + 1})"
+    Delete(old) => "Delete(\{old.range.start + 1})"
+    Insert(new) => "Insert(\{new.range.start + 1})"
   }
 }
 
@@ -46,6 +47,12 @@ fn parse_units(source : String) -> Array[ImplUnit] {
     panic()
   }
   collect_impl_units_detailed(source, result.root(), false).units
+}
+
+///|
+fn unit_source_for_test(source : String, unit : ImplUnit) -> String {
+  let lines = @source_text.split_lines(source)
+  lines[unit.range.start:unit.range.start + unit.range.len].join("\n")
 }
 
 ///|
@@ -148,8 +155,14 @@ test "implementation units cache their source slices" {
     #|fn b() { second() }
   let units = parse_units(source)
   @debug.assert_eq(units.length(), 2)
-  @debug.assert_eq(units[0].source, "/// leading a\nfn a() {\n  first()\n}")
-  @debug.assert_eq(units[1].source, "/// leading b\nfn b() { second() }")
+  @debug.assert_eq(
+    unit_source_for_test(source, units[0]),
+    "/// leading a\nfn a() {\n  first()\n}",
+  )
+  @debug.assert_eq(
+    unit_source_for_test(source, units[1]),
+    "/// leading b\nfn b() { second() }",
+  )
 }
 
 ///|
@@ -188,7 +201,7 @@ test "ignored test collection preserves ordinary leading comments" {
   @debug.assert_eq(collection.units.length(), 2)
   @debug.assert_eq(collection.units[1].semantic_key, None)
   @debug.assert_eq(
-    collection.units[1].source,
+    unit_source_for_test(source, collection.units[1]),
     "// retained line comment\n// retained second comment",
   )
   @debug.assert_eq(collection.ignored_tests.length(), 1)
@@ -208,7 +221,10 @@ test "ignored test docs stop at a blank line" {
   assert_true(parsed.diagnostics_view().is_empty())
   let collection = collect_impl_units_detailed(source, parsed.root(), true)
   @debug.assert_eq(collection.units.length(), 1)
-  @debug.assert_eq(collection.units[0].source, "/// retained production docs")
+  @debug.assert_eq(
+    unit_source_for_test(source, collection.units[0]),
+    "/// retained production docs",
+  )
   @debug.assert_eq(collection.ignored_tests.length(), 1)
   @debug.assert_eq(collection.ignored_tests[0].start.lnum, 3)
 }
@@ -226,7 +242,7 @@ test "ordinary comments interrupt ignored test doc ownership" {
   let collection = collect_impl_units_detailed(source, parsed.root(), true)
   @debug.assert_eq(collection.units.length(), 1)
   @debug.assert_eq(
-    collection.units[0].source,
+    unit_source_for_test(source, collection.units[0]),
     "/// retained earlier docs\n// ordinary ownership boundary",
   )
   @debug.assert_eq(collection.ignored_tests.length(), 1)
@@ -1054,17 +1070,14 @@ test "semantic extraction ambiguity work uses the file budget" {
   let calculation = calculate_diff_document_with_limit(
     old_source, new_source, "old", "new", 0, 3_000_000, false, 1,
   )
-  guard calculation.result.fallbacks
-    is [
-      {
-        reason: ComputationLimitExceeded(stage=TopLevelAlignment, limit=1),
-        scope: WholeFile,
-      },
-    ] else {
+  guard calculation.document is Whole(fragment) else {
+    fail("expected top-level budget exhaustion to produce Whole")
+  }
+  guard fragment.fallbacks
+    is [ComputationLimitExceeded(stage=TopLevelAlignment, limit=1)] else {
     fail("expected extraction ambiguity work to use the top-level budget")
   }
-  assert_true(calculation.layout is WholeDocument)
-  assert_false(calculation.result.document.hunks.is_empty())
+  assert_false(fragment.document.hunks.is_empty())
 }
 
 ///|
@@ -1397,6 +1410,45 @@ fn diff_document_for_test(
 }
 
 ///|
+fn section_fragment(section : @model.DiffSection) -> @model.DiffFragment {
+  match section {
+    Matched(diff~, ..) | Deleted(diff~, ..) | Inserted(diff~, ..) => diff
+  }
+}
+
+///|
+fn result_fragments(result : DetailedDiffResult) -> Array[@model.DiffFragment] {
+  match result.document {
+    Whole(fragment) => [fragment]
+    TopLevel(top) => top.sections.map(section_fragment)
+  }
+}
+
+///|
+fn result_is_empty(result : DetailedDiffResult) -> Bool {
+  result_fragments(result).all(fragment => fragment.document.hunks.is_empty())
+}
+
+///|
+fn result_fallbacks(result : DetailedDiffResult) -> Array[FallbackReason] {
+  let reasons : Array[FallbackReason] = []
+  for fragment in result_fragments(result) {
+    reasons.push_iter(fragment.fallbacks.iter())
+  }
+  reasons
+}
+
+///|
+fn first_changed_document(result : DetailedDiffResult) -> @model.HunkDocument {
+  for fragment in result_fragments(result) {
+    if !fragment.document.hunks.is_empty() {
+      return fragment.document
+    }
+  }
+  { hunks: [] }
+}
+
+///|
 test "renamed declarations render one paired hunk in lexical and AST modes" {
   let old_source =
     #|fn stable() {}
@@ -1411,9 +1463,10 @@ test "renamed declarations render one paired hunk in lexical and AST modes" {
   for mode in [Lexical, Ast] {
     let result = diff_document_for_test(old_source, new_source, mode, context=0)
     assert_true(result.status is Changed)
-    assert_true(result.fallbacks.is_empty())
-    assert_eq(result.document.hunks.length(), 1)
-    let patch = @unified.render_unified_hunks(result.document).join("")
+    assert_true(result_fallbacks(result).is_empty())
+    let document = first_changed_document(result)
+    assert_eq(document.hunks.length(), 1)
+    let patch = @unified.render_unified_hunks(document).join("")
     assert_true(patch.contains("spawn_unix"), msg=patch)
     assert_true(patch.contains("spawn_unix_ffi"), msg=patch)
   }
@@ -1485,7 +1538,7 @@ test "CST wrappers do not hide inserted sibling statements" {
 }
 
 ///|
-fn changed_segment_text(document : @model.DiffDocument) -> String {
+fn changed_segment_text(document : @model.HunkDocument) -> String {
   let buf = StringBuilder()
   for hunk in document.hunks {
     for block in hunk.blocks {
@@ -1514,95 +1567,6 @@ fn changed_segment_text(document : @model.DiffDocument) -> String {
     }
   }
   buf.to_string()
-}
-
-///|
-fn segment_text_with_kind(
-  document : @model.DiffDocument,
-  kind : @model.DiffSegmentKind,
-) -> String {
-  let buf = StringBuilder()
-  fn append_line(
-    buf : StringBuilder,
-    line : @model.DiffLine,
-    kind : @model.DiffSegmentKind,
-  ) -> Unit {
-    for segment in line.segments {
-      if segment.kind == kind {
-        buf.write_string(segment.text)
-      }
-    }
-  }
-
-  for hunk in document.hunks {
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(_) => ()
-        ChangeBlock(rows) | IgnoredBlock(rows) =>
-          for row in rows {
-            match row {
-              Paired(old_line, new_line) => {
-                append_line(buf, old_line, kind)
-                append_line(buf, new_line, kind)
-              }
-              OldOnly(line) | NewOnly(line) => append_line(buf, line, kind)
-            }
-          }
-      }
-    }
-  }
-  buf.to_string()
-}
-
-///|
-fn diff_rows_side_index_count(
-  rows : ArrayView[@model.DiffRow],
-  index : Int,
-  old_side : Bool,
-) -> Int {
-  let mut count = 0
-  for row in rows {
-    match row {
-      Paired(old_line, new_line) => {
-        let line = if old_side { old_line } else { new_line }
-        if line.index == index {
-          count += 1
-        }
-      }
-      OldOnly(line) => if old_side && line.index == index { count += 1 }
-      NewOnly(line) => if !old_side && line.index == index { count += 1 }
-    }
-  }
-  count
-}
-
-///|
-fn document_side_index_count(
-  document : @model.DiffDocument,
-  index : Int,
-  old_side : Bool,
-) -> Int {
-  let mut count = 0
-  for hunk in document.hunks {
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(lines) =>
-          for line in lines {
-            let line_index = if old_side {
-              line.old_index
-            } else {
-              line.new_index
-            }
-            if line_index == index {
-              count += 1
-            }
-          }
-        ChangeBlock(rows) | IgnoredBlock(rows) =>
-          count += diff_rows_side_index_count(rows, index, old_side)
-      }
-    }
-  }
-  count
 }
 
 ///|
@@ -1656,16 +1620,64 @@ test "AST segments bridge only internal whitespace between changes" {
 }
 
 ///|
-test "top-level plan applies one pairing strategy to reordered declarations" {
+fn top_level_for_test(result : DetailedDiffResult) -> @model.TopLevelDiff raise {
+  guard result.document is TopLevel(top) else {
+    fail("expected a top-level semantic document")
+  }
+  top
+}
+
+///|
+fn whole_fragment_for_test(
+  result : DetailedDiffResult,
+) -> @model.DiffFragment raise {
+  guard result.document is Whole(fragment) else {
+    fail("expected a whole semantic document")
+  }
+  fragment
+}
+
+///|
+fn semantic_changed_text(result : DetailedDiffResult) -> String {
+  let buf = StringBuilder()
+  for fragment in result_fragments(result) {
+    buf.write_string(changed_segment_text(fragment.document))
+  }
+  buf.to_string()
+}
+
+///|
+fn assert_fragment_bounds(
+  fragment : @model.DiffFragment,
+  old_len : Int?,
+  new_len : Int?,
+) -> Unit raise {
+  for hunk in fragment.document.hunks {
+    if old_len is Some(limit) {
+      assert_true(hunk.old_start >= 0)
+      assert_true(hunk.old_start + hunk.old_len <= limit)
+    }
+    if new_len is Some(limit) {
+      assert_true(hunk.new_start >= 0)
+      assert_true(hunk.new_start + hunk.new_len <= limit)
+    }
+  }
+}
+
+///|
+test "top-level plan preserves crossing declaration identities and both orders" {
   let old_units = parse_units("fn first() {}\nfn second() {}")
   let new_units = parse_units("fn second() {}\nfn first() {}")
   guard top_level_plan_impl(old_units, new_units, alignment_test_budget())
-    is PerUnit(edits) else {
+    is PerUnit(plan) else {
     fail("expected reliable semantic pairs")
   }
-  @debug.assert_eq(edits.map(edit_line_summary), [
+  @debug.assert_eq(plan.edits.map(edit_line_summary), [
     "Replace(1->2)", "Replace(2->1)",
   ])
+  assert_true(plan.old_order is [0, 1])
+  assert_true(plan.new_order is [1, 0])
+  assert_true(plan.reordered)
 
   let unmatched_old = parse_units("/// trailing old")
   let unmatched_new = parse_units("/// trailing new")
@@ -1676,7 +1688,26 @@ test "top-level plan applies one pairing strategy to reordered declarations" {
 }
 
 ///|
-test "lexical aligned documents preserve original line numbers" {
+test "implementation unit ranges are exact across universal newlines" {
+  for
+    source in [
+      "fn first() {}\nfn second() {}", "fn first() {}\r\nfn second() {}\r\n", "fn first() {}\rfn second() {}",
+    ] {
+    let units = parse_units(source)
+    assert_eq(units.length(), 2)
+    assert_true(units[0].range == @model.LineRange::{ start: 0, len: 1 })
+    assert_true(units[1].range == @model.LineRange::{ start: 1, len: 1 })
+  }
+
+  let documented = parse_units(
+    "/// docs\nfn first() {}\n\n/// next\nfn second() {}\n",
+  )
+  assert_true(documented[0].range == @model.LineRange::{ start: 0, len: 2 })
+  assert_true(documented[1].range == @model.LineRange::{ start: 3, len: 2 })
+}
+
+///|
+test "section fragments use local coordinates and exact source ranges" {
   let old_source =
     #|fn keep() {}
     #|fn target() {
@@ -1688,950 +1719,284 @@ test "lexical aligned documents preserve original line numbers" {
     #|fn target() {
     #|  new_value()
     #|}
-  let result = diff_document_for_test(
-    old_source,
-    new_source,
-    Lexical,
-    context=0,
-  )
-  assert_true(result.status is Changed)
-  assert_true(result.fallbacks.is_empty())
-  assert_true(result.document.hunks.length() >= 2)
-  let changed = result.document.hunks[0]
-  @debug.assert_eq((changed.old_start, changed.new_start), (2, 3))
-
-  let ast_result = diff_document_for_test(
-    old_source,
-    new_source,
-    Ast,
-    context=0,
-  )
-  assert_true(ast_result.status is Changed)
-  assert_true(ast_result.fallbacks.is_empty())
-  assert_true(ast_result.document.hunks.length() >= 2)
-  let ast_changed = ast_result.document.hunks[0]
-  @debug.assert_eq((ast_changed.old_start, ast_changed.new_start), (1, 2))
-}
-
-///|
-test "lexical pure reorder falls back to a whole-file document" {
-  let result = diff_document_for_test(
-    "fn first() {}\nfn second() {}",
-    "fn second() {}\nfn first() {}",
-    Lexical,
-    context=0,
-  )
-  guard result.fallbacks is [{ reason: TopLevelReordering, scope: WholeFile }] else {
-    fail("expected reorder fallback")
+  for mode in [Lexical, Ast] {
+    let result = diff_document_for_test(old_source, new_source, mode, context=0)
+    assert_true(result.status is Changed)
+    let top = top_level_for_test(result)
+    assert_false(top.reordered)
+    assert_true(top.old_order is [0, 1])
+    assert_true(top.new_order is [2, 0, 1])
+    assert_eq(top.sections.length(), 3)
+    guard top.sections
+      is [
+        Matched(old={ start: 0, len: 1 }, new={ start: 1, len: 1 }, diff=keep),
+        Matched(old={ start: 1, len: 3 }, new={ start: 2, len: 3 }, diff=target),
+        Inserted(new={ start: 0, len: 1 }, diff=inserted),
+      ] else {
+      fail("expected matched declarations plus one new-side section")
+    }
+    assert_true(keep.document.hunks.is_empty())
+    assert_fragment_bounds(target, Some(3), Some(3))
+    assert_fragment_bounds(inserted, None, Some(1))
+    assert_false(target.document.hunks.is_empty())
+    assert_false(inserted.document.hunks.is_empty())
+    assert_true(result_fallbacks(result).is_empty())
   }
-  assert_true(result.status is Changed)
-  assert_false(result.document.hunks.is_empty())
 }
 
 ///|
-test "typed lexical calculation retains status and section layout" {
-  let old_source =
-    #|fn keep() {}
-    #|fn target() { old_value() }
-  let new_source =
-    #|fn inserted() {}
-    #|fn keep() {}
-    #|fn target() { new_value() }
-  let calculation = calculate_diff_document(
-    old_source,
-    new_source,
-    context=0,
-    graph_limit=0,
-    mode=Lexical,
-  )
-  assert_true(calculation.result.status is Changed)
-  assert_true(calculation.result.fallbacks.is_empty())
-  assert_true(calculation.layout is TopLevelSections(_))
-
-  let identical = diff_document_detailed(
-    "fn same() {}",
-    "fn same() {}",
-    mode=Lexical,
-  )
-  assert_true(identical.status is Identical)
-  assert_true(identical.fallbacks.is_empty())
+test "pure top-level reorder is semantic instead of lexical fallback" {
+  for mode in [Lexical, Ast] {
+    let result = diff_document_for_test(
+      "fn first() {}\nfn second() {}",
+      "fn second() {}\nfn first() {}",
+      mode,
+      context=0,
+    )
+    assert_true(result.status is Reordered)
+    let top = top_level_for_test(result)
+    assert_true(top.reordered)
+    assert_true(top.old_order is [0, 1])
+    assert_true(top.new_order is [1, 0])
+    assert_eq(top.sections.length(), 2)
+    assert_true(result_is_empty(result))
+    assert_true(result_fallbacks(result).is_empty())
+  }
 }
 
 ///|
-test "typed lexical reorder retains whole-file fallback and layout" {
-  let old_source = "fn first() {}\nfn second() {}"
-  let new_source = "fn second() {}\nfn first() {}"
-  let calculation = calculate_diff_document(
-    old_source,
-    new_source,
-    context=0,
-    mode=Lexical,
-  )
-  assert_true(calculation.result.status is Changed)
-  assert_true(
-    calculation.result.fallbacks
-    is [{ reason: TopLevelReordering, scope: WholeFile }],
-  )
-  assert_true(calculation.layout is WholeDocument)
-}
-
-///|
-test "AST documents mark only novel source spans as changed" {
+test "reorder plus an internal change remains Changed" {
   let result = diff_document_for_test(
-    "fn target() {\n  old_value()\n}",
-    "fn target() {\n  new_value()\n}",
+    "fn first() { old_value() }\nfn second() {}",
+    "fn second() {}\nfn first() { new_value() }",
     Ast,
     context=0,
   )
   assert_true(result.status is Changed)
-  assert_true(result.fallbacks.is_empty())
-  assert_false(result.document.hunks.is_empty())
-  let changed = changed_segment_text(result.document)
+  let top = top_level_for_test(result)
+  assert_true(top.reordered)
+  assert_true(top.old_order is [0, 1])
+  assert_true(top.new_order is [1, 0])
+  let changed = semantic_changed_text(result)
   assert_true(changed.contains("old_value"), msg=changed)
   assert_true(changed.contains("new_value"), msg=changed)
-  assert_false(changed.contains("fn target"), msg=changed)
 }
 
 ///|
-test "AST formatting and top-level reorder are structural empty states" {
-  let formatting = diff_document_for_test(
+test "inserted and deleted declarations have no fabricated opposite range" {
+  let inserted = diff_document_for_test(
+    "fn keep() {}",
+    "fn added() {}\nfn keep() {}",
+    Ast,
+    context=0,
+  )
+  let inserted_top = top_level_for_test(inserted)
+  assert_true(inserted_top.old_order is [0])
+  assert_true(inserted_top.new_order is [1, 0])
+  guard inserted_top.sections
+    is [Matched(..), Inserted(new={ start: 0, len: 1 }, diff~)] else {
+    fail("expected a distinct inserted section")
+  }
+  assert_fragment_bounds(diff, None, Some(1))
+
+  let deleted = diff_document_for_test(
+    "fn removed() {}\nfn keep() {}",
+    "fn keep() {}",
+    Ast,
+    context=0,
+  )
+  let deleted_top = top_level_for_test(deleted)
+  assert_true(deleted_top.old_order is [0, 1])
+  assert_true(deleted_top.new_order is [1])
+  guard deleted_top.sections
+    is [Deleted(old={ start: 0, len: 1 }, diff~), Matched(..)] else {
+    fail("expected a distinct deleted section")
+  }
+  assert_fragment_bounds(diff, Some(1), None)
+}
+
+///|
+test "formatting-only AST changes retain an empty matched section" {
+  let result = diff_document_for_test(
     "fn format() { 1 }",
     "fn format() {\n  1\n}",
     Ast,
   )
-  assert_true(formatting.status is NoStructuralChanges)
-  assert_true(formatting.document.hunks.is_empty())
-
-  let reordered = diff_document_for_test(
-    "fn first() {}\nfn second() {}",
-    "fn second() {}\nfn first() {}",
-    Ast,
-  )
-  assert_true(reordered.status is NoStructuralChanges)
-  assert_true(reordered.document.hunks.is_empty())
+  assert_true(result.status is NoStructuralChanges)
+  let top = top_level_for_test(result)
+  guard top.sections is [Matched(diff~, ..)] else {
+    fail("expected one reliable matched section")
+  }
+  assert_true(diff.document.hunks.is_empty())
+  assert_false(top.reordered)
 }
 
 ///|
-test "aligned documents distinguish complete and partial lexical fallbacks" {
-  let invalid = diff_document_for_test(
+test "parse and root-list fallbacks attach only to Whole fragments" {
+  let parsed = calculate_diff_document(
     "fn broken( {",
-    "fn broken() {}",
-    Ast,
+    "fn okay() {}",
+    old_name="before.mbt",
+    new_name="after.mbt",
     context=0,
   )
-  guard invalid.fallbacks
-    is [{ reason: ParseError(detail~, ..), scope: WholeFile }] else {
-    fail("expected parser fallback")
+  assert_true(parsed.status is Changed)
+  let parsed_fragment = whole_fragment_for_test(parsed)
+  guard parsed_fragment.fallbacks is [ParseError(sides=[Old], detail~)] else {
+    fail("expected an old-side parse fallback")
   }
-  assert_true(detail.contains("old:"), msg=detail)
-  assert_false(invalid.document.hunks.is_empty())
+  assert_true(detail.contains("before.mbt"), msg=detail)
+  assert_false(parsed_fragment.document.hunks.is_empty())
 
-  let limited = diff_document_for_test(
-    "fn target() { old_value() }",
-    "fn target() { new_value() }",
-    Ast,
-    context=0,
-    graph_limit=0,
-  )
-  guard limited.fallbacks
-    is [
-      {
-        reason: GraphLimitExceeded(limit=0),
-        scope: Region(
-          old=Some({ start: 0, len: 1 }),
-          new=Some({ start: 0, len: 1 })
-        ),
-      },
-    ] else {
-    fail("expected partial graph fallback")
-  }
-  assert_false(limited.document.hunks.is_empty())
-
-  let root_list_limited = diff_document_for_test(
+  let root = diff_document_for_test(
     "/// trailing old",
     "/// trailing new",
     Ast,
     context=0,
     graph_limit=0,
   )
-  guard root_list_limited.fallbacks
-    is [{ reason: GraphLimitExceeded(limit=0), scope: WholeFile }] else {
-    fail("expected whole-document graph fallback")
-  }
-  assert_false(root_list_limited.document.hunks.is_empty())
+  let root_fragment = whole_fragment_for_test(root)
+  assert_true(root_fragment.fallbacks is [GraphLimitExceeded(limit=0)])
+  assert_false(root_fragment.document.hunks.is_empty())
 }
 
 ///|
-test "aligned documents ignore comments in both modes" {
-  let old_source =
-    #|/// old docs
-    #|fn value() -> Int { 1 // old trailing }
-  let new_source =
-    #|/// new docs
-    #|fn value() -> Int { 1  // new trailing }
-  for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      ignore_comments=true,
-    )
-    assert_true(result.status is IgnoredOnly)
-    assert_true(result.document.hunks.is_empty())
-  }
-  assert_false(
-    diff_document_for_test(old_source, new_source, Lexical).document.hunks.is_empty(),
+test "top-level budget exhaustion creates one Whole fallback" {
+  let result = calculate_diff_document_with_limit(
+    "fn stable() {}\nfn Worker::old_name() { body() }", "fn stable() {}\nfn Worker::new_name() { body() }",
+    "old", "new", 0, 3_000_000, false, 0,
   )
-}
-
-///|
-test "aligned documents ignore named anonymous and async tests" {
-  let cases = [
-    ("test { inspect(1) }", "test { inspect(2) }"),
-    ("test \"named\" { inspect(1) }", "test \"renamed\" { inspect(2) }"),
-    ("async test \"named\" { run_old() }", "async test \"named\" { run_new() }"),
-    ("", "test \"inserted\" { inspect(1) }"),
-    ("test \"deleted\" { inspect(1) }", ""),
-    (
-      "test \"first\" { one() }\ntest \"second\" { two() }", "test \"second\" { changed() }\ntest \"first\" { one() }",
-    ),
-  ]
-  for sources in cases {
-    let (old_source, new_source) = sources
-    for mode in [Lexical, Ast] {
-      let result = diff_document_for_test(
-        old_source,
-        new_source,
-        mode,
-        ignore_tests=true,
-      )
-      assert_true(result.status is IgnoredOnly)
-      assert_true(result.document.hunks.is_empty())
-    }
-    assert_false(
-      diff_document_for_test(old_source, new_source, Lexical).document.hunks.is_empty(),
-    )
-  }
-}
-
-///|
-test "ignore tests owns leading docs UUIDs separators and surrounding blanks" {
-  let old_source =
-    #|fn stable() {}
-    #|
-    #|/// old docs
-    #|///|UUID(old-id)
-    #|test "old" { inspect(1) }
-  let new_source = "fn stable() {}"
-  for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      ignore_tests=true,
-    )
-    assert_true(result.status is IgnoredOnly)
-    assert_true(result.document.hunks.is_empty())
-  }
-}
-
-///|
-test "same-line test changes are neutral while suffix comments stay visible" {
-  let old_same = "test \"sample\" { old_test() } // stable ordinary note"
-  let new_same = "test \"sample\" { new_test() } // stable ordinary note"
-  let old_changed = "test \"sample\" { old_test() } // old ordinary note"
-  let new_changed = "test \"sample\" { new_test() } // new ordinary note"
-  let parsed = @cst.parse_structure(old_changed)
-  assert_true(parsed.diagnostics_view().is_empty())
-  let collection = collect_impl_units_detailed(old_changed, parsed.root(), true)
-  @debug.assert_eq(
-    (
-      collection.ignored_tests[0].start.column(),
-      collection.ignored_tests[0].end.column(),
-    ),
-    (1, 29),
+  let fragment = whole_fragment_for_test(result)
+  assert_true(
+    fragment.fallbacks
+    is [ComputationLimitExceeded(stage=TopLevelAlignment, limit=0)],
   )
-  let view = @diff_ignore.SourceView::from_source(
-    old_changed,
-    ignored_ranges=collection.ignored_tests,
-  )
-  @debug.assert_eq(view.lines(), ["// old ordinary note"])
-  for mode in [Lexical, Ast] {
-    let ignored_only = diff_document_for_test(
-      old_same,
-      new_same,
-      mode,
-      ignore_tests=true,
-    )
-    assert_true(ignored_only.status is IgnoredOnly)
-    assert_true(ignored_only.document.hunks.is_empty())
-
-    let comments_visible = diff_document_for_test(
-      old_changed,
-      new_changed,
-      mode,
-      context=0,
-      ignore_tests=true,
-    )
-    assert_false(
-      comments_visible.document.hunks.is_empty(),
-      msg=if mode is Lexical { "Lexical" } else { "Ast" },
-    )
-    let changed = changed_segment_text(comments_visible.document)
-    let ignored = segment_text_with_kind(
-      comments_visible.document,
-      @model.DiffSegmentKind::Ignored,
-    )
-    let patch = @unified.render_unified_hunks(comments_visible.document).join(
-      "",
-    )
-    assert_true(changed.contains("old"), msg=changed)
-    assert_true(changed.contains("new"), msg=changed)
-    assert_false(changed.contains("_test"), msg=changed)
-    assert_true(ignored.contains("old_test"), msg=ignored)
-    assert_true(ignored.contains("new_test"), msg=ignored)
-    assert_true(patch.contains(old_changed), msg=patch)
-    assert_true(patch.contains(new_changed), msg=patch)
-
-    let both = diff_document_for_test(
-      old_changed,
-      new_changed,
-      mode,
-      ignore_comments=true,
-      ignore_tests=true,
-    )
-    assert_true(both.status is IgnoredOnly)
-    assert_true(both.document.hunks.is_empty())
-  }
+  assert_false(fragment.document.hunks.is_empty())
 }
 
 ///|
-test "unchanged filtered suffixes restore differing tests as ignored rows" {
+test "local fallbacks stay on their own top-level fragments" {
   let old_source =
-    #|test "sample" { old_test() } // stable ordinary note
-    #|fn production() { old_value() }
+    #|///|UUID(first)
+    #|fn first() { "alpha beta gamma" }
+    #|///|UUID(second)
+    #|fn second() { "one two three" }
   let new_source =
-    #|test "sample" { new_test() } // stable ordinary note
-    #|fn production() { new_value() }
-  for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      context=1,
-      ignore_tests=true,
-    )
-    let ignored_test_row = Ref(false)
-    for hunk in result.document.hunks {
-      for block in hunk.blocks {
-        if block is IgnoredBlock(rows) {
-          for row in rows {
-            if row is Paired({ index: 0, .. }, { index: 0, .. }) {
-              ignored_test_row.val = true
-            }
-          }
-        }
-      }
-    }
-    assert_true(ignored_test_row.val)
-    let changed = changed_segment_text(result.document)
-    assert_true(changed.contains("old_value"), msg=changed)
-    assert_true(changed.contains("new_value"), msg=changed)
-    assert_false(changed.contains("_test"), msg=changed)
-    assert_false(changed.contains("ordinary note"), msg=changed)
-  }
-}
-
-///|
-test "per-unit views do not restore a same-line test prefix" {
-  let old_source =
-    #|test "sample" { old_test() } // old unit note
-    #|///|UUID(production-id)
-    #|fn production() { stable_value() }
-  let new_source =
-    #|test "sample" { new_test() } // new unit note
-    #|///|UUID(production-id)
-    #|fn production() { stable_value() }
-  for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      context=0,
-      ignore_tests=true,
-    )
-    assert_false(result.document.hunks.is_empty())
-    let changed = changed_segment_text(result.document)
-    let ignored = segment_text_with_kind(
-      result.document,
-      @model.DiffSegmentKind::Ignored,
-    )
-    assert_true(changed.contains("old"), msg=changed)
-    assert_true(changed.contains("new"), msg=changed)
-    assert_false(changed.contains("_test"), msg=changed)
-    assert_true(ignored.contains("old_test"), msg=ignored)
-    assert_true(ignored.contains("new_test"), msg=ignored)
-    @debug.assert_eq(document_side_index_count(result.document, 0, true), 1)
-    @debug.assert_eq(document_side_index_count(result.document, 0, false), 1)
-  }
-}
-
-///|
-test "Unicode CRLF views preserve suffixes indexes and nearby code" {
-  let old_source = "test \"😀\" { old_test() } // 注释旧\r\nfn production() { old_value() }\r\n"
-  let new_source = "test \"😀\" { new_test() } // 注释新\r\nfn production() { new_value() }\r\n"
-  for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      context=0,
-      ignore_tests=true,
-    )
-    assert_false(result.document.hunks.is_empty())
-    let changed = changed_segment_text(result.document)
-    let ignored = segment_text_with_kind(
-      result.document,
-      @model.DiffSegmentKind::Ignored,
-    )
-    let patch = @unified.render_unified_hunks(result.document).join("")
-    assert_true(changed.contains("旧"), msg=changed)
-    assert_true(changed.contains("新"), msg=changed)
-    assert_true(changed.contains("old_value"), msg=changed)
-    assert_true(changed.contains("new_value"), msg=changed)
-    assert_false(changed.contains("_test"), msg=changed)
-    assert_true(ignored.contains("😀"), msg=ignored)
-    assert_true(
-      patch.contains("test \"😀\" { old_test() } // 注释旧"),
-      msg=patch,
-    )
-    assert_true(
-      patch.contains("test \"😀\" { new_test() } // 注释新"),
-      msg=patch,
-    )
-    @debug.assert_eq(document_side_index_count(result.document, 0, true), 1)
-    @debug.assert_eq(document_side_index_count(result.document, 0, false), 1)
-    @debug.assert_eq(document_side_index_count(result.document, 1, true), 1)
-    @debug.assert_eq(document_side_index_count(result.document, 1, false), 1)
-  }
-}
-
-///|
-test "asymmetric ignored test gaps do not duplicate production lines" {
-  let short_source =
-    #|test "sample" { short_test() }
-    #|fn production() { old_prod() }
-  let long_source =
-    #|test "sample" {
-    #|  long_test()
-    #|  extra_test_step()
-    #|}
-    #|fn production() { new_prod() }
-  let cases = [
-    (short_source, long_source, 1, 4),
-    (long_source, short_source, 4, 1),
-  ]
-  for sources in cases {
-    let (old_source, new_source, old_production_line, new_production_line) = sources
-    for mode in [Lexical, Ast] {
-      let result = diff_document_for_test(
-        old_source,
-        new_source,
-        mode,
-        context=0,
-        ignore_tests=true,
-      )
-      let changed = changed_segment_text(result.document)
-      assert_true(changed.contains("prod"), msg=changed)
-      assert_false(changed.contains("test"), msg=changed)
-      @debug.assert_eq(
-        document_side_index_count(result.document, old_production_line, true),
-        1,
-      )
-      @debug.assert_eq(
-        document_side_index_count(result.document, new_production_line, false),
-        1,
-      )
-    }
-  }
-}
-
-///|
-test "ignore tests preserves ordinary comments independently" {
-  let old_comment = "// old ordinary note"
-  let new_comment = "// new ordinary note"
-  let old_source =
-    $|fn stable() {}
-    $|\{old_comment}
-    $|/// old test docs
-    $|///|UUID(old-test-id)
-    $|test "old" { old_test() }
-  let new_source =
-    $|fn stable() {}
-    $|\{new_comment}
-    $|/// new test docs
-    $|///|UUID(new-test-id)
-    $|test "new" { new_test() }
-  for mode in [Lexical, Ast] {
-    let tests_only = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      ignore_tests=true,
-    )
-    assert_false(tests_only.document.hunks.is_empty())
-    let changed = changed_segment_text(tests_only.document)
-    let patch = @unified.render_unified_hunks(tests_only.document).join("")
-    assert_true(patch.contains(old_comment), msg=patch)
-    assert_true(patch.contains(new_comment), msg=patch)
-    assert_false(changed.contains("test docs"), msg=changed)
-    assert_false(changed.contains("_test"), msg=changed)
-
-    let both = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      ignore_comments=true,
-      ignore_tests=true,
-    )
-    assert_true(both.status is IgnoredOnly)
-    assert_true(both.document.hunks.is_empty())
-  }
-}
-
-///|
-test "ignore tests reports only mixed production changes and keeps test imports" {
-  let old_source =
-    #|import { "old/helper" } for "test"
-    #|test "sample" { test_old() }
-    #|fn production() { prod_old() }
-  let new_source =
-    #|import { "new/helper" } for "test"
-    #|test "sample" { test_new() }
-    #|fn production() { prod_new() }
-  for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      context=0,
-      ignore_tests=true,
-    )
-    assert_false(result.document.hunks.is_empty())
-    let changed = changed_segment_text(result.document)
-    let patch = @unified.render_unified_hunks(result.document).join("")
-    assert_true(patch.contains("old/helper"), msg=patch)
-    assert_true(patch.contains("new/helper"), msg=patch)
-    assert_true(changed.contains("prod_"), msg=changed)
-    assert_false(changed.contains("test_old"), msg=changed)
-    assert_false(changed.contains("test_new"), msg=changed)
-  }
-}
-
-///|
-test "comment and test filters compose independently" {
-  let old_source =
-    #|/// old production docs
-    #|fn stable() {}
-    #|test "sample" { old_test() }
-  let new_source =
-    #|/// new production docs
-    #|fn stable() {}
-    #|test "sample" { new_test() }
-  for mode in [Lexical, Ast] {
-    let tests_only = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      ignore_tests=true,
-    )
-    assert_false(tests_only.document.hunks.is_empty())
-    let both = diff_document_for_test(
-      old_source,
-      new_source,
-      mode,
-      ignore_comments=true,
-      ignore_tests=true,
-    )
-    assert_true(both.status is IgnoredOnly)
-    assert_true(both.document.hunks.is_empty())
-  }
-}
-
-///|
-test "successful graph and computation fallbacks still exclude tests" {
-  let old_source =
-    #|test "sample" { test_old() } // old fallback note
-    #|fn production() { "alpha beta gamma" }
-  let new_source =
-    #|test "sample" { test_new() } // new fallback note
-    #|fn production() { "alpha zeta gamma" }
+    #|///|UUID(first)
+    #|fn first() { "alpha zeta gamma" }
+    #|///|UUID(second)
+    #|fn second() { "one four three" }
   let graph = diff_document_for_test(
     old_source,
     new_source,
     Ast,
     context=0,
     graph_limit=0,
-    ignore_tests=true,
   )
-  assert_true(
-    graph.fallbacks
-    is [{ reason: GraphLimitExceeded(limit=0), scope: Region(..) }],
-  )
-  let graph_changed = changed_segment_text(graph.document)
-  assert_true(
-    graph_changed.contains("beta") || graph_changed.contains("zeta"),
-    msg=graph_changed,
-  )
-  assert_true(graph_changed.contains("old"), msg=graph_changed)
-  assert_true(graph_changed.contains("new"), msg=graph_changed)
-  assert_false(graph_changed.contains("test_"), msg=graph_changed)
+  let graph_top = top_level_for_test(graph)
+  assert_eq(graph_top.sections.length(), 2)
+  for section in graph_top.sections {
+    let fragment = section_fragment(section)
+    assert_true(fragment.fallbacks is [GraphLimitExceeded(limit=0)])
+    assert_false(fragment.document.hunks.is_empty())
+  }
 
-  let computation = calculate_diff_document_with_limit(
-    old_source,
-    new_source,
-    "old",
-    "new",
-    0,
-    3_000_000,
-    false,
-    0,
-    ignore_tests=true,
+  let limited = calculate_diff_document_with_limit(
+    old_source, new_source, "old", "new", 0, 3_000_000, false, 0,
   )
-  assert_true(computation.result.fallbacks is [_, ..])
-  let computation_changed = changed_segment_text(computation.result.document)
-  assert_true(
-    computation_changed.contains("beta") || computation_changed.contains("zeta"),
-    msg=computation_changed,
-  )
-  assert_true(computation_changed.contains("old"), msg=computation_changed)
-  assert_true(computation_changed.contains("new"), msg=computation_changed)
-  assert_false(computation_changed.contains("test_"), msg=computation_changed)
-}
-
-///|
-test "parse failure preserves the existing unfiltered test fallback" {
-  let result = diff_document_for_test(
-    "test \"sample\" { old_value( }",
-    "test \"sample\" { new_value( }",
-    Ast,
-    context=0,
-    ignore_tests=true,
-  )
-  assert_true(
-    result.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
-  )
-  let changed = changed_segment_text(result.document)
-  assert_true(changed.contains("old_value"), msg=changed)
-  assert_true(changed.contains("new_value"), msg=changed)
-}
-
-///|
-test "aligned documents ignore blank lines and final newlines in both modes" {
-  for
-    sources in [
-      ("fn stable() {}", "fn stable() {}\n"),
-      ("fn stable() {}\n\n\t\n\u{2003}", "fn stable() {}\n \n\u{3000}"),
-      ("", "\n"),
-    ] {
-    let (old_source, new_source) = sources
-    for mode in [Lexical, Ast] {
-      let result = diff_document_for_test(
-        old_source,
-        new_source,
-        mode,
-        ignore_comments=true,
-      )
-      assert_true(result.status is IgnoredOnly)
-      assert_true(result.document.hunks.is_empty())
-    }
-    assert_false(
-      diff_document_for_test(old_source, new_source, Lexical).document.hunks.is_empty(),
-    )
+  let limited_top = top_level_for_test(limited)
+  assert_eq(limited_top.sections.length(), 2)
+  for section in limited_top.sections {
+    let fragment = section_fragment(section)
+    assert_true(fragment.fallbacks is [ComputationLimitExceeded(limit=0, ..)])
   }
 }
 
 ///|
-test "parse-invalid blank-only changes are classified before lexical fallback" {
-  let old_source = "fn broken( {\n"
-  let new_source = "fn broken( {\n\u{2003}\n"
-  let unfiltered = diff_document_for_test(old_source, new_source, Ast)
-  assert_true(
-    unfiltered.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
-  )
-  assert_false(unfiltered.document.hunks.is_empty())
-
-  let filtered = diff_document_for_test(
-    old_source,
-    new_source,
-    Ast,
-    ignore_comments=true,
-  )
-  assert_true(filtered.status is IgnoredOnly)
-  assert_true(filtered.document.hunks.is_empty())
-}
-
-///|
-test "aligned documents ignore block separators in both modes" {
-  let old_source =
-    #|fn first() {}
-    #|fn second() {}
-  let new_source =
-    #|///|
-    #|fn first() {}
-    #|///|
-    #|fn second() {}
+test "comment and test filters preserve semantic statuses in both modes" {
+  let comment_old = "fn value() { 1 // old\n}"
+  let comment_new = "fn value() { 1 // new\n}"
+  let test_old = "test \"sample\" { old_test() }"
+  let test_new = "test \"sample\" { new_test() }"
   for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(
-      old_source,
-      new_source,
+    let comments = diff_document_for_test(
+      comment_old,
+      comment_new,
       mode,
       ignore_comments=true,
     )
-    assert_true(result.status is IgnoredOnly)
-    assert_true(result.document.hunks.is_empty())
+    assert_true(comments.status is IgnoredOnly)
+    assert_true(result_is_empty(comments))
+
+    let tests = diff_document_for_test(
+      test_old,
+      test_new,
+      mode,
+      ignore_tests=true,
+    )
+    assert_true(tests.status is IgnoredOnly)
+    assert_true(result_is_empty(tests))
   }
 }
 
 ///|
-test "AST comment filtering retains neutral source around code changes" {
-  let old_source =
-    #|///|UUID(old-id)
-    #|fn value() -> Int {
-    #|  old_value() // old explanation
-    #|}
-  let new_source =
-    #|///|UUID(new-id)
-    #|fn value() -> Int {
-    #|  new_value()  // new explanation
-    #|}
+test "filtered local fragments retain production changes only" {
   let result = diff_document_for_test(
-    old_source,
-    new_source,
+    "/// old docs\nfn production() { old_value() }\ntest \"t\" { old_test() }",
+    "/// new docs\nfn production() { new_value() }\ntest \"t\" { new_test() }",
     Ast,
-    context=1,
+    context=0,
     ignore_comments=true,
+    ignore_tests=true,
   )
   assert_true(result.status is Changed)
-  assert_true(result.fallbacks.is_empty())
-  assert_false(result.document.hunks.is_empty())
-  let changed = changed_segment_text(result.document)
+  let changed = semantic_changed_text(result)
   assert_true(changed.contains("old_value"), msg=changed)
   assert_true(changed.contains("new_value"), msg=changed)
-  assert_false(changed.contains("explanation"), msg=changed)
-  assert_false(changed.contains("old-id"), msg=changed)
-  let patch = @unified.render_unified_hunks(result.document).join("")
-  assert_true(patch.contains("old explanation"), msg=patch)
-  assert_true(patch.contains("new explanation"), msg=patch)
+  assert_false(changed.contains("old_test"), msg=changed)
+  assert_false(changed.contains("new_test"), msg=changed)
+  assert_true(result_fallbacks(result).is_empty())
 }
 
 ///|
-test "parse failure fallback applies comment filtering" {
-  let result = diff_document_for_test(
-    "fn broken( { old_value // old comment",
-    "fn broken( { new_value // new comment",
+test "identical, blank-only, and universal-newline results keep status priority" {
+  let identical = diff_document_for_test("fn same() {}", "fn same() {}", Ast)
+  assert_true(identical.status is Identical)
+  assert_true(identical.document is Whole(_))
+  assert_true(result_is_empty(identical))
+
+  let blank = diff_document_for_test(
+    "fn same() {}\n",
+    "fn same() {}\n\n \n",
     Ast,
-    context=0,
     ignore_comments=true,
   )
-  assert_true(
-    result.fallbacks is [{ reason: ParseError(..), scope: WholeFile }],
-  )
-  assert_false(result.document.hunks.is_empty())
-  let patch = @unified.render_unified_hunks(result.document).join("")
-  assert_true(patch.contains("old comment"), msg=patch)
-  assert_true(patch.contains("new comment"), msg=patch)
-  assert_false(changed_segment_text(result.document).contains("comment"))
+  assert_true(blank.status is IgnoredOnly)
+  assert_true(result_is_empty(blank))
+
+  for
+    sources in [
+      ("fn f() {\n  1\n}", "fn f() {\n  2\n}"),
+      ("fn f() {\r\n  1\r\n}", "fn f() {\r\n  2\r\n}"),
+      ("fn f() {\r  1\r}", "fn f() {\r  2\r}"),
+    ] {
+    let (old_source, new_source) = sources
+    let result = diff_document_for_test(old_source, new_source, Ast)
+    assert_true(result.status is Changed)
+    assert_false(result_is_empty(result))
+  }
 }
 
 ///|
-test "shared calculation keeps sections aligned with hunks and fallbacks" {
-  let calculation = calculate_diff_document(
-    "fn first() { old_one() }\nfn second() { old_two() }",
-    "fn first() { new_one() }\nfn second() { new_two() }",
+test "lexical RootList remains a primary Whole document" {
+  let result = diff_document_for_test(
+    "/// trailing old",
+    "/// trailing new",
+    Lexical,
     context=0,
-    graph_limit=0,
   )
-  guard calculation.layout is TopLevelSections(sections) else {
-    fail("expected one sectioned top-level layout")
-  }
-  let _ : ArrayView[@model.FallbackInfo] = calculation.result.fallbacks
-  assert_eq(sections.length(), 2)
-  assert_eq(calculation.result.document.hunks.length(), sections.length())
-  assert_eq(calculation.result.fallbacks.length(), sections.length())
-  for index, section in sections {
-    guard (section.old, section.new) is (Some(old_range), Some(new_range)) else {
-      fail("expected paired section ranges")
-    }
-    let hunk = calculation.result.document.hunks[index]
-    assert_true(hunk.old_start >= old_range.start)
-    assert_true(
-      hunk.old_start + hunk.old_len <= old_range.start + old_range.len,
-    )
-    assert_true(hunk.new_start >= new_range.start)
-    assert_true(
-      hunk.new_start + hunk.new_len <= new_range.start + new_range.len,
-    )
-    guard calculation.result.fallbacks[index].scope is Region(old~, new~) else {
-      fail("expected a regional fallback")
-    }
-    assert_true(old == section.old)
-    assert_true(new == section.new)
-  }
-}
-
-///|
-test "shared calculation retains caller parser names" {
-  let calculation = calculate_diff_document(
-    "fn broken( {",
-    "fn okay() {}",
-    old_name="before.mbt",
-    new_name="after.mbt",
-  )
-  guard calculation.result.fallbacks
-    is [{ reason: ParseError(detail~, ..), scope: WholeFile }] else {
-    fail("expected a whole-file parse fallback")
-  }
-  assert_true(detail.contains("before.mbt"), msg=detail)
-  assert_true(calculation.layout is WholeDocument)
-}
-
-///|
-test "invalid ignored-only calculation does not expose separate parser metadata" {
-  let calculation = calculate_diff_document(
-    "fn broken( {\n",
-    "fn broken( {\n\u{3000}\n",
-    old_name="before.mbt",
-    new_name="after.mbt",
-    ignore_comments=true,
-  )
-  assert_true(calculation.result.status is IgnoredOnly)
-  assert_true(calculation.result.document.hunks.is_empty())
-  assert_true(calculation.result.fallbacks.is_empty())
-  assert_true(calculation.layout is WholeDocument)
-}
-
-///|
-test "file budget stops top-level DP before allocation" {
-  let calculation = calculate_diff_document_with_limit(
-    "fn stable() {}\nfn Worker::old_name() { body() }", "fn stable() {}\nfn Worker::new_name() { body() }",
-    "old", "new", 0, 3_000_000, false, 0,
-  )
-  let result = calculation.result
-  guard result.fallbacks
-    is [
-      {
-        reason: ComputationLimitExceeded(stage=TopLevelAlignment, limit=0),
-        scope: WholeFile,
-      },
-    ] else {
-    fail("expected a whole-file top-level computation fallback")
-  }
-  assert_false(result.document.hunks.is_empty())
-  assert_true(calculation.layout is WholeDocument)
-}
-
-///|
-test "lexical mode shares the top-level budget but not the graph limit" {
-  let old_source = "fn stable() {}\nfn Worker::old_name() { body() }"
-  let new_source = "fn stable() {}\nfn Worker::new_name() { body() }"
-  let exhausted = calculate_diff_document_with_limit(
-    old_source,
-    new_source,
-    "old",
-    "new",
-    0,
-    0,
-    false,
-    0,
-    mode=Lexical,
-  )
-  assert_true(
-    exhausted.result.fallbacks
-    is [
-      {
-        reason: ComputationLimitExceeded(stage=TopLevelAlignment, limit=0),
-        scope: WholeFile,
-      },
-    ],
-  )
-  assert_true(exhausted.layout is WholeDocument)
-  assert_false(exhausted.result.document.hunks.is_empty())
-
-  let graph_ignored = calculate_diff_document(
-    "fn target() { old_value() }",
-    "fn target() { new_value() }",
-    context=0,
-    graph_limit=0,
-    mode=Lexical,
-  )
-  assert_true(graph_ignored.result.status is Changed)
-  assert_true(graph_ignored.result.fallbacks.is_empty())
-  assert_false(graph_ignored.result.document.hunks.is_empty())
-}
-
-///|
-test "syntax budget exhaustion lexically falls back through later units" {
-  let calculation = calculate_diff_document_with_limit(
-    "fn first() { \"alpha beta gamma\" }\nfn second() { 1 }", "fn first() { \"alpha zeta gamma\" }\nfn second() { 2 }",
-    "old", "new", 0, 3_000_000, false, 0,
-  )
-  let result = calculation.result
-  guard result.fallbacks
-    is [
-      {
-        reason: ComputationLimitExceeded(stage=SyntaxMatching, limit=0),
-        scope: Region(
-          old=Some({ start: 0, len: 1 }),
-          new=Some({ start: 0, len: 1 })
-        ),
-      },
-      {
-        reason: ComputationLimitExceeded(stage=SyntaxMatching, limit=0),
-        scope: Region(
-          old=Some({ start: 1, len: 1 }),
-          new=Some({ start: 1, len: 1 })
-        ),
-      },
-    ] else {
-    fail("expected ordered current-and-later syntax fallbacks")
-  }
-  assert_false(result.document.hunks.is_empty())
-  guard calculation.layout is TopLevelSections(sections) else {
-    fail("expected syntax exhaustion to retain the shared layout")
-  }
-  assert_eq(sections.length(), 2)
-}
-
-///|
-test "intraline budget exhaustion is a local typed fallback" {
-  let calculation = calculate_diff_document_with_limit(
-    "fn first() { \"alpha beta gamma\" }\nfn second() { 1 }", "fn first() { \"alpha zeta gamma\" }\nfn second() { 2 }",
-    "old", "new", 0, 3_000_000, false, 1_100,
-  )
-  let result = calculation.result
-  guard result.fallbacks
-    is [
-      {
-        reason: ComputationLimitExceeded(stage=IntralineMatching, limit=1_100),
-        scope: Region(
-          old=Some({ start: 0, len: 1 }),
-          new=Some({ start: 0, len: 1 })
-        ),
-      },
-      {
-        reason: ComputationLimitExceeded(stage=IntralineMatching, limit=1_100),
-        scope: Region(
-          old=Some({ start: 1, len: 1 }),
-          new=Some({ start: 1, len: 1 })
-        ),
-      },
-    ] else {
-    fail("expected ordered current-and-later intraline fallbacks")
-  }
-  assert_false(result.document.hunks.is_empty())
-  guard calculation.layout is TopLevelSections(sections) else {
-    fail("expected intraline exhaustion to retain the shared layout")
-  }
-  assert_eq(sections.length(), 2)
+  assert_true(result.status is Changed)
+  let fragment = whole_fragment_for_test(result)
+  assert_true(fragment.fallbacks.is_empty())
+  assert_false(fragment.document.hunks.is_empty())
 }
