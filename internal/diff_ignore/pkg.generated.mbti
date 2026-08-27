@@ -9,11 +9,11 @@ import {
 }
 
 // Values
-pub fn ignore_comments(@model.DiffDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.DiffDocument
+pub fn ignore_comments(@model.HunkDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.HunkDocument
 
 pub fn lexer_complexity_within_limit(String) -> Bool
 
-pub fn restore_document(@model.DiffDocument, old~ : SourceView, new~ : SourceView) -> @model.DiffDocument
+pub fn restore_document(@model.HunkDocument, old~ : SourceView, new~ : SourceView) -> @model.HunkDocument
 
 // Errors
 
