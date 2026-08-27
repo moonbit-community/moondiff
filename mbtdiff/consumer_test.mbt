@@ -47,41 +47,34 @@ fn segment_name(kind : @mbtdiff.DiffSegmentKind) -> String {
 }
 
 ///|
-fn traverse_hunk_document(document : @mbtdiff.HunkDocument) -> Int {
-  let _ : ArrayView[@mbtdiff.DiffHunk] = document.hunks
+fn traverse_pair(pair : @mbtdiff.DiffLinePair) -> Int {
+  let lines : Array[@mbtdiff.DiffLine] = match pair {
+    Paired(old_line, new_line) => [old_line, new_line]
+    OldOnly(line) | NewOnly(line) => [line]
+  }
   let mut segments = 0
-  for hunk in document.hunks {
-    let _ : @mbtdiff.DiffHunk = hunk
-    let _ : ArrayView[@mbtdiff.DiffBlock] = hunk.blocks
-    let _ = (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len)
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(lines) => {
-          let _ : ArrayView[@mbtdiff.ContextLine] = lines
-          for line in lines {
-            let _ = (line.old_index, line.new_index, line.text)
-          }
-        }
-        ChangeBlock(rows) | IgnoredBlock(rows) => {
-          let _ : ArrayView[@mbtdiff.DiffRow] = rows
-          for row in rows {
-            let lines = match row {
-              Paired(old_line, new_line) => [old_line, new_line]
-              OldOnly(line) | NewOnly(line) => [line]
-            }
-            for line in lines {
-              let _ : @mbtdiff.DiffLine = line
-              let _ = (line.index, line.text())
-              let _ : ArrayView[@mbtdiff.DiffSegment] = line.segments
-              for segment in line.segments {
-                let _ : @mbtdiff.DiffSegmentKind = segment.kind
-                ignore(segment_name(segment.kind))
-                segments += 1
-              }
-            }
-          }
-        }
+  for line in lines {
+    let _ = (line.index, line.text())
+    let _ : ArrayView[@mbtdiff.DiffSegment] = line.segments
+    for segment in line.segments {
+      let _ : @mbtdiff.DiffSegmentKind = segment.kind
+      ignore(segment_name(segment.kind))
+      segments += 1
+    }
+  }
+  segments
+}
+
+///|
+fn traverse_rows(rows : ArrayView[@mbtdiff.DiffRow]) -> Int {
+  let mut segments = 0
+  for row in rows {
+    match row {
+      Context(line) => {
+        let _ : @mbtdiff.ContextLine = line
+        let _ = (line.old_index, line.new_index, line.text)
       }
+      Changed(pair) | Neutral(pair) => segments += traverse_pair(pair)
     }
   }
   segments
@@ -95,7 +88,7 @@ fn fragment_of_section(section : @mbtdiff.DiffSection) -> @mbtdiff.DiffFragment 
 }
 
 ///|
-test "external consumer exhaustively matches the semantic result" {
+test "external consumer exhaustively matches the complete semantic result" {
   let result = @mbtdiff.diff(
     "fn first() { old_value() }\nfn removed() {}", "fn inserted() {}\nfn first() { new_value() }",
   )
@@ -117,6 +110,7 @@ test "external consumer exhaustively matches the semantic result" {
   let mut matched = 0
   let mut deleted = 0
   let mut inserted = 0
+  let mut row_count = 0
   for section in top.sections {
     match section {
       Matched(old~, new~, diff~) => {
@@ -134,9 +128,13 @@ test "external consumer exhaustively matches the semantic result" {
         inserted += 1
       }
     }
-    ignore(traverse_hunk_document(fragment_of_section(section).document))
+    let fragment = fragment_of_section(section)
+    let _ : ArrayView[@mbtdiff.DiffRow] = fragment.rows
+    row_count += fragment.rows.length()
+    ignore(traverse_rows(fragment.rows))
   }
   assert_eq((matched, deleted, inserted), (1, 1, 1))
+  assert_true(row_count >= 3)
 }
 
 ///|
@@ -151,12 +149,10 @@ test "fallbacks are read from the fragment that degraded" {
     old_name="before.mbt",
   )
   guard parsed.document()
-    is Whole(
-      { document: parsed_document, fallbacks: [ParseError(sides~, detail~)] }
-    ) else {
+    is Whole({ rows, fallbacks: [ParseError(sides~, detail~)] }) else {
     fail("expected one Whole parse fallback")
   }
-  assert_false(parsed_document.hunks.is_empty())
+  assert_false(rows.is_empty())
   let _ : ArrayView[@mbtdiff.DiffSide] = sides
   assert_true(sides is [Old])
   assert_true(detail.contains("before.mbt"), msg=detail)
@@ -179,16 +175,16 @@ test "copies of semantic views cannot mutate later accessor results" {
   guard later_top.sections is [Matched(diff~, ..)] else {
     fail("expected one matched fragment")
   }
-  let hunk_count = diff.document.hunks.length()
-  let hunk_copy = diff.document.hunks.to_owned()
-  hunk_copy.clear()
+  let row_count = diff.rows.length()
+  let row_copy = diff.rows.to_owned()
+  row_copy.clear()
   guard changed.document() is TopLevel(final_top) else {
     fail("expected a stable top-level document")
   }
   guard final_top.sections is [Matched(diff=final_diff, ..)] else {
     fail("expected one stable fragment")
   }
-  assert_eq(final_diff.document.hunks.length(), hunk_count)
+  assert_eq(final_diff.rows.length(), row_count)
 
   let parsed = @mbtdiff.diff("fn broken( {", "fn okay() {}")
   guard parsed.document() is Whole({ fallbacks: [ParseError(sides~, ..)], .. }) else {
@@ -204,47 +200,6 @@ test "copies of semantic views cannot mutate later accessor results" {
 }
 
 ///|
-test "renderers consume an explicit fragment HunkDocument" {
-  let result = @mbtdiff.diff("fn f() { 1 }", "fn f() { 2 }")
-  guard result.document() is TopLevel({ sections: [Matched(diff~, ..)], .. }) else {
-    fail("expected one matched fragment")
-  }
-  let note : @render_html.HunkNote = {
-    title: "Changed <function>",
-    body: "Rendered & reviewed.",
-  }
-  let notes : Array[@render_html.HunkNote?] = [Some(note)]
-  let split = @render_html.render_side_by_side(
-    diff.document,
-    line_numbers=true,
-    hunk_notes=notes,
-  )
-  let unified_html = @render_html.render_unified(
-    diff.document,
-    line_numbers=true,
-    hunk_notes=notes,
-  )
-  assert_true(split.contains("Changed &lt;function&gt;"), msg=split)
-  assert_true(
-    unified_html.contains("Rendered &amp; reviewed."),
-    msg=unified_html,
-  )
-
-  let patch_hunks = @unified.render_unified_hunks(diff.document)
-  assert_eq(patch_hunks.length(), 1)
-  assert_true(patch_hunks[0].contains("-fn f() { 1 }"), msg=patch_hunks[0])
-  assert_true(patch_hunks[0].contains("+fn f() { 2 }"), msg=patch_hunks[0])
-
-  let options = @terminal.RenderOptions::new(
-    use_color=false,
-    old_max_line=10,
-    new_max_line=10,
-  )
-  assert_true(options.old_max_line is Some(10))
-  assert_true(options.new_max_line is Some(10))
-}
-
-///|
 test "external consumer observes pure reorder without flattening" {
   let result = @mbtdiff.diff(
     "fn first() {}\nfn second() {}", "fn second() {}\nfn first() {}",
@@ -257,6 +212,6 @@ test "external consumer observes pure reorder without flattening" {
   assert_true(top.old_order is [0, 1])
   assert_true(top.new_order is [1, 0])
   for section in top.sections {
-    assert_true(fragment_of_section(section).document.hunks.is_empty())
+    assert_true(fragment_of_section(section).rows.is_empty())
   }
 }

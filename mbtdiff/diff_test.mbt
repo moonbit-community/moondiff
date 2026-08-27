@@ -19,7 +19,7 @@ fn public_fragments(
 
 ///|
 fn public_document_is_empty(document : @mbtdiff.DiffDocument) -> Bool {
-  public_fragments(document).all(fragment => fragment.document.hunks.is_empty())
+  public_fragments(document).all(fragment => fragment.rows.is_empty())
 }
 
 ///|
@@ -34,31 +34,83 @@ fn public_fallbacks(
 }
 
 ///|
+fn public_pair_lines(pair : @mbtdiff.DiffLinePair) -> Array[@mbtdiff.DiffLine] {
+  match pair {
+    Paired(old_line, new_line) => [old_line, new_line]
+    OldOnly(line) | NewOnly(line) => [line]
+  }
+}
+
+///|
 fn public_document_has_changed_segment_containing(
   document : @mbtdiff.DiffDocument,
   expected : String,
 ) -> Bool {
   for fragment in public_fragments(document) {
-    for hunk in fragment.document.hunks {
-      for block in hunk.blocks {
-        guard block is ChangeBlock(rows) else { continue }
-        for row in rows {
-          let lines = match row {
-            Paired(old_line, new_line) => [old_line, new_line]
-            OldOnly(line) | NewOnly(line) => [line]
-          }
-          for line in lines {
-            for segment in line.segments {
-              if segment.kind is Changed && segment.text.contains(expected) {
-                return true
-              }
-            }
+    for row in fragment.rows {
+      guard row is Changed(pair) else { continue }
+      for line in public_pair_lines(pair) {
+        for segment in line.segments {
+          if segment.kind is Changed && segment.text.contains(expected) {
+            return true
           }
         }
       }
     }
   }
   false
+}
+
+///|
+fn public_document_has_neutral(document : @mbtdiff.DiffDocument) -> Bool {
+  public_fragments(document).any(fragment => {
+    fragment.rows.any(row => row is Neutral(_))
+  })
+}
+
+///|
+fn assert_complete_public_fragment(
+  fragment : @mbtdiff.DiffFragment,
+  old_len : Int?,
+  new_len : Int?,
+) -> Unit raise {
+  let old_indices : Array[Int] = []
+  let new_indices : Array[Int] = []
+  for row in fragment.rows {
+    match row {
+      Context(line) => {
+        old_indices.push(line.old_index)
+        new_indices.push(line.new_index)
+      }
+      Changed(pair) | Neutral(pair) =>
+        match pair {
+          Paired(old_line, new_line) => {
+            old_indices.push(old_line.index)
+            new_indices.push(new_line.index)
+          }
+          OldOnly(line) => old_indices.push(line.index)
+          NewOnly(line) => new_indices.push(line.index)
+        }
+    }
+  }
+  match old_len {
+    Some(limit) => {
+      assert_eq(old_indices.length(), limit)
+      for expected, actual in old_indices {
+        assert_eq(actual, expected)
+      }
+    }
+    None => assert_true(old_indices.is_empty())
+  }
+  match new_len {
+    Some(limit) => {
+      assert_eq(new_indices.length(), limit)
+      for expected, actual in new_indices {
+        assert_eq(actual, expected)
+      }
+    }
+    None => assert_true(new_indices.is_empty())
+  }
 }
 
 ///|
@@ -99,7 +151,7 @@ test "default and explicit AST modes are identical" {
 }
 
 ///|
-test "top-level sections preserve both source orders and local ranges" {
+test "top-level sections preserve both source orders and complete local rows" {
   let result = @mbtdiff.diff(
     "fn first() { old_value() }\nfn removed() {}", "fn inserted() {}\nfn first() { new_value() }",
   )
@@ -116,16 +168,9 @@ test "top-level sections preserve both source orders and local ranges" {
     ] else {
     fail("expected matched, deleted, and inserted section variants")
   }
-  for hunk in matched.document.hunks {
-    assert_true(hunk.old_start >= 0 && hunk.old_start + hunk.old_len <= 1)
-    assert_true(hunk.new_start >= 0 && hunk.new_start + hunk.new_len <= 1)
-  }
-  for hunk in deleted.document.hunks {
-    assert_true(hunk.old_start >= 0 && hunk.old_start + hunk.old_len <= 1)
-  }
-  for hunk in inserted.document.hunks {
-    assert_true(hunk.new_start >= 0 && hunk.new_start + hunk.new_len <= 1)
-  }
+  assert_complete_public_fragment(matched, Some(1), Some(1))
+  assert_complete_public_fragment(deleted, Some(1), None)
+  assert_complete_public_fragment(inserted, None, Some(1))
 }
 
 ///|
@@ -160,11 +205,9 @@ test "pure and mixed reorders retain crossing identities" {
 
 ///|
 test "lexical mode keeps fragment-local text changes" {
-  let old_source = "fn format() { 1 }"
-  let new_source = "fn format() {\n  1\n}"
   let lexical = @mbtdiff.diff(
-    old_source,
-    new_source,
+    "fn format() { 1 }",
+    "fn format() {\n  1\n}",
     options=DiffOptions(graph_limit=0, mode=@mbtdiff.DiffMode::Lexical),
   )
   assert_true(lexical.status() is Changed)
@@ -184,7 +227,7 @@ test "lexical mode keeps fragment-local text changes" {
 }
 
 ///|
-test "comment and test filters classify IgnoredOnly" {
+test "filters classify ignored-only changes and restore neutral rows beside code" {
   for mode in [@mbtdiff.DiffMode::Ast, @mbtdiff.DiffMode::Lexical] {
     let comments = @mbtdiff.diff(
       "fn f() { 1 // old\n}",
@@ -202,38 +245,27 @@ test "comment and test filters classify IgnoredOnly" {
     assert_true(tests.status() is IgnoredOnly)
     assert_true(public_document_is_empty(tests.document()))
   }
-}
 
-///|
-test "filters compose while retaining production changes" {
-  let result = @mbtdiff.diff(
-    "/// old docs\nfn production() { old_value() }\ntest \"t\" { old_test() }",
-    "/// new docs\nfn production() { new_value() }\ntest \"t\" { new_test() }",
-    options=DiffOptions(ignore_comments=true, ignore_tests=true),
+  let mixed = @mbtdiff.diff(
+    "fn production() {\n  old_value()\n  // old note\n}",
+    "fn production() {\n  new_value()\n  // new note\n}",
+    options=DiffOptions(ignore_comments=true),
   )
-  assert_true(result.status() is Changed)
+  assert_true(mixed.status() is Changed)
+  assert_true(public_document_has_neutral(mixed.document()))
   assert_true(
     public_document_has_changed_segment_containing(
-      result.document(),
-      "old_value",
-    ),
-  )
-  assert_true(
-    public_document_has_changed_segment_containing(
-      result.document(),
+      mixed.document(),
       "new_value",
     ),
   )
   assert_false(
-    public_document_has_changed_segment_containing(
-      result.document(),
-      "old_test",
-    ),
+    public_document_has_changed_segment_containing(mixed.document(), "new note"),
   )
 }
 
 ///|
-test "parse fallbacks are Whole and preserve source labels and sides" {
+test "parse and graph fallbacks preserve ownership" {
   let parsed = @mbtdiff.diff(
     "fn old_broken( {",
     "fn new_broken( [",
@@ -241,34 +273,26 @@ test "parse fallbacks are Whole and preserve source labels and sides" {
     new_name="after.mbt",
   )
   guard parsed.document()
-    is Whole(
-      {
-        document: parsed_document,
-        fallbacks: [ParseError(sides=[Old, New], detail~)],
-      }
-    ) else {
+    is Whole({ rows, fallbacks: [ParseError(sides=[Old, New], detail~)] }) else {
     fail("expected a two-sided Whole parse fallback")
   }
-  assert_false(parsed_document.hunks.is_empty())
+  assert_false(rows.is_empty())
   assert_true(detail.contains("before.mbt"), msg=detail)
   assert_true(detail.contains("after.mbt"), msg=detail)
-}
 
-///|
-test "graph fallbacks remain local to their sections" {
-  let result = @mbtdiff.diff(
+  let graph = @mbtdiff.diff(
     "fn first() { old_one() }\nfn second() { old_two() }",
     "fn first() { new_one() }\nfn second() { new_two() }",
-    options=DiffOptions(context_lines=0, graph_limit=0),
+    options=DiffOptions(graph_limit=0),
   )
-  guard result.document() is TopLevel(top) else {
+  guard graph.document() is TopLevel(top) else {
     fail("expected reliable top-level sections")
   }
   assert_eq(top.sections.length(), 2)
   for section in top.sections {
     let fragment = public_section_fragment(section)
     assert_true(fragment.fallbacks is [GraphLimitExceeded(limit=0)])
-    assert_false(fragment.document.hunks.is_empty())
+    assert_false(fragment.rows.is_empty())
   }
 }
 
@@ -297,19 +321,4 @@ test "universal newlines and empty files preserve semantic status" {
   let inserted = @mbtdiff.diff("", "fn f() {}")
   assert_true(inserted.status() is Changed)
   assert_false(public_document_is_empty(inserted.document()))
-}
-
-///|
-test "negative context is clamped before fragment calculation" {
-  let clamped = @mbtdiff.diff(
-    "fn f() { 1 }",
-    "fn f() { 2 }",
-    options=DiffOptions(context_lines=-20),
-  )
-  let zero = @mbtdiff.diff(
-    "fn f() { 1 }",
-    "fn f() { 2 }",
-    options=DiffOptions(context_lines=0),
-  )
-  assert_true(clamped.document() == zero.document())
 }
