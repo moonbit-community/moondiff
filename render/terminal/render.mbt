@@ -184,7 +184,7 @@ fn append_document_context_line(
 ///|
 fn append_document_change_row(
   buf : StringBuilder,
-  row : @model.DiffRow,
+  row : @model.DiffLinePair,
   old_width : Int,
   new_width : Int,
   use_color : Bool,
@@ -212,7 +212,7 @@ fn append_document_change_row(
 ///|
 fn append_document_ignored_row(
   buf : StringBuilder,
-  row : @model.DiffRow,
+  row : @model.DiffLinePair,
   old_width : Int,
   new_width : Int,
   use_color : Bool,
@@ -282,23 +282,20 @@ fn document_line_widths(document : @model.HunkDocument) -> (Int, Int) {
   let old_max = Ref(1)
   let new_max = Ref(1)
   for hunk in document.hunks {
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(lines) =>
-          for line in lines {
-            update_document_max_line(old_max, line.old_index)
-            update_document_max_line(new_max, line.new_index)
-          }
-        ChangeBlock(rows) | IgnoredBlock(rows) =>
-          for row in rows {
-            match row {
-              Paired(old_line, new_line) => {
-                update_document_max_line(old_max, old_line.index)
-                update_document_max_line(new_max, new_line.index)
-              }
-              OldOnly(line) => update_document_max_line(old_max, line.index)
-              NewOnly(line) => update_document_max_line(new_max, line.index)
+    for row in hunk.rows {
+      match row {
+        Context(line) => {
+          update_document_max_line(old_max, line.old_index)
+          update_document_max_line(new_max, line.new_index)
+        }
+        Changed(pair) | Neutral(pair) =>
+          match pair {
+            Paired(old_line, new_line) => {
+              update_document_max_line(old_max, old_line.index)
+              update_document_max_line(new_max, new_line.index)
             }
+            OldOnly(line) => update_document_max_line(old_max, line.index)
+            NewOnly(line) => update_document_max_line(new_max, line.index)
           }
       }
     }
@@ -315,7 +312,7 @@ fn hinted_width(hint : Int?, document_width : Int) -> Int {
 }
 
 ///|
-/// Render one already calculated fragment `HunkDocument` with file headers,
+/// Render one already grouped presentation `HunkDocument` with file headers,
 /// two line-number columns, and optional ANSI highlighting. The renderer does
 /// not flatten a high-level semantic document, calculate hunks, apply context,
 /// normalize source text, or choose empty and fallback messages. An empty
@@ -341,40 +338,34 @@ pub fn render_document(
       ),
     )
     buf.write_char('\n')
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(lines) =>
-          for line in lines {
-            append_document_context_line(
-              buf,
-              Some(line.old_index),
-              Some(line.new_index),
-              line.text,
-              old_width,
-              new_width,
-              options.use_color,
-            )
-          }
-        ChangeBlock(rows) =>
-          for row in rows {
-            append_document_change_row(
-              buf,
-              row,
-              old_width,
-              new_width,
-              options.use_color,
-            )
-          }
-        IgnoredBlock(rows) =>
-          for row in rows {
-            append_document_ignored_row(
-              buf,
-              row,
-              old_width,
-              new_width,
-              options.use_color,
-            )
-          }
+    for row in hunk.rows {
+      match row {
+        Context(line) =>
+          append_document_context_line(
+            buf,
+            Some(line.old_index),
+            Some(line.new_index),
+            line.text,
+            old_width,
+            new_width,
+            options.use_color,
+          )
+        Changed(pair) =>
+          append_document_change_row(
+            buf,
+            pair,
+            old_width,
+            new_width,
+            options.use_color,
+          )
+        Neutral(pair) =>
+          append_document_ignored_row(
+            buf,
+            pair,
+            old_width,
+            new_width,
+            options.use_color,
+          )
       }
     }
   }

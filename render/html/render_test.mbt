@@ -29,10 +29,10 @@ fn renderer_fixture() -> @model.HunkDocument {
         old_len: 3,
         new_start: 0,
         new_len: 3,
-        blocks: [
-          ContextBlock([{ old_index: 0, new_index: 0, text: "a < b" }]),
-          ChangeBlock([Paired(old_line, new_line)]),
-          IgnoredBlock([Paired(old_ignored, new_ignored)]),
+        rows: [
+          Context({ old_index: 0, new_index: 0, text: "a < b" }),
+          Changed(Paired(old_line, new_line)),
+          Neutral(Paired(old_ignored, new_ignored)),
         ],
       },
     ],

@@ -92,7 +92,7 @@ fn split_row(
 ///|
 fn split_ignored_row(
   buf : StringBuilder,
-  row : @model.DiffRow,
+  row : @model.DiffLinePair,
   line_numbers : Bool,
 ) -> Unit {
   match row {
@@ -156,86 +156,79 @@ fn append_split_hunk(
   if hunk_note_at(hunk_notes, hunk_index) is Some(note) {
     table_hunk_note(buf, note, if line_numbers { 4 } else { 2 })
   }
-  for block in hunk.blocks {
-    match block {
-      ContextBlock(lines) =>
-        for line in lines {
-          split_row(
-            buf,
-            Some(line.old_index + 1),
-            "ctx",
-            esc(line.text),
-            Some(line.new_index + 1),
-            "ctx",
-            esc(line.text),
-            line_numbers,
-          )
+  for row in hunk.rows {
+    match row {
+      Context(line) =>
+        split_row(
+          buf,
+          Some(line.old_index + 1),
+          "ctx",
+          esc(line.text),
+          Some(line.new_index + 1),
+          "ctx",
+          esc(line.text),
+          line_numbers,
+        )
+      Changed(pair) =>
+        match pair {
+          Paired(old_line, new_line) =>
+            split_row(
+              buf,
+              Some(old_line.index + 1),
+              if line_is_ignored(old_line) {
+                "ctx ignored"
+              } else {
+                "del"
+              },
+              line_html(old_line, "wd"),
+              Some(new_line.index + 1),
+              if line_is_ignored(new_line) {
+                "ctx ignored"
+              } else {
+                "add"
+              },
+              line_html(new_line, "wa"),
+              line_numbers,
+            )
+          OldOnly(old_line) =>
+            split_row(
+              buf,
+              Some(old_line.index + 1),
+              if line_is_ignored(old_line) {
+                "ctx ignored"
+              } else {
+                "del"
+              },
+              line_html(old_line, "wd"),
+              None,
+              "empty",
+              "",
+              line_numbers,
+            )
+          NewOnly(new_line) =>
+            split_row(
+              buf,
+              None,
+              "empty",
+              "",
+              Some(new_line.index + 1),
+              if line_is_ignored(new_line) {
+                "ctx ignored"
+              } else {
+                "add"
+              },
+              line_html(new_line, "wa"),
+              line_numbers,
+            )
         }
-      ChangeBlock(rows) =>
-        for row in rows {
-          match row {
-            Paired(old_line, new_line) =>
-              split_row(
-                buf,
-                Some(old_line.index + 1),
-                if line_is_ignored(old_line) {
-                  "ctx ignored"
-                } else {
-                  "del"
-                },
-                line_html(old_line, "wd"),
-                Some(new_line.index + 1),
-                if line_is_ignored(new_line) {
-                  "ctx ignored"
-                } else {
-                  "add"
-                },
-                line_html(new_line, "wa"),
-                line_numbers,
-              )
-            OldOnly(old_line) =>
-              split_row(
-                buf,
-                Some(old_line.index + 1),
-                if line_is_ignored(old_line) {
-                  "ctx ignored"
-                } else {
-                  "del"
-                },
-                line_html(old_line, "wd"),
-                None,
-                "empty",
-                "",
-                line_numbers,
-              )
-            NewOnly(new_line) =>
-              split_row(
-                buf,
-                None,
-                "empty",
-                "",
-                Some(new_line.index + 1),
-                if line_is_ignored(new_line) {
-                  "ctx ignored"
-                } else {
-                  "add"
-                },
-                line_html(new_line, "wa"),
-                line_numbers,
-              )
-          }
-        }
-      IgnoredBlock(rows) =>
-        for row in rows {
-          split_ignored_row(buf, row, line_numbers)
-        }
+      Neutral(pair) => split_ignored_row(buf, pair, line_numbers)
     }
   }
 }
 
 ///|
-/// Render one fragment `HunkDocument` as a GitHub-style side-by-side HTML
-/// table. This function does not flatten a high-level semantic document.
+/// Render one traditional `HunkDocument` as a GitHub-style side-by-side HTML
+/// table. Semantic fragments must first be handled by their consumer.
 pub fn render_side_by_side(
   document : @model.HunkDocument,
   line_numbers? : Bool = false,
@@ -251,7 +244,7 @@ pub fn render_side_by_side(
 }
 
 ///|
-/// Render every hunk in one fragment `HunkDocument` as its own side-by-side
+/// Render every hunk in one traditional `HunkDocument` as its own side-by-side
 /// HTML table.
 pub fn render_side_by_side_hunks(
   document : @model.HunkDocument,
@@ -347,7 +340,7 @@ fn unified_ignored_line(
 ///|
 fn append_unified_ignored_row(
   buf : StringBuilder,
-  row : @model.DiffRow,
+  row : @model.DiffLinePair,
   line_numbers : Bool,
 ) -> Unit {
   match row {
@@ -422,50 +415,57 @@ fn append_unified_hunk(
       pre_hunk_note(buf, note)
     }
   }
-  for block in hunk.blocks {
-    match block {
-      ContextBlock(lines) =>
-        for line in lines {
-          if line_numbers {
-            unified_numbered_line(
-              buf,
-              "ctx",
-              " ",
-              Some(line.old_index + 1),
-              Some(line.new_index + 1),
-              esc(line.text),
-            )
-          } else {
-            unified_text_line(buf, "ctx", " ", esc(line.text))
-          }
+  let mut index = 0
+  while index < hunk.rows.length() {
+    match hunk.rows[index] {
+      Context(line) => {
+        if line_numbers {
+          unified_numbered_line(
+            buf,
+            "ctx",
+            " ",
+            Some(line.old_index + 1),
+            Some(line.new_index + 1),
+            esc(line.text),
+          )
+        } else {
+          unified_text_line(buf, "ctx", " ", esc(line.text))
         }
-      ChangeBlock(rows) => {
-        for row in rows {
-          match row {
+        index += 1
+      }
+      Neutral(pair) => {
+        append_unified_ignored_row(buf, pair, line_numbers)
+        index += 1
+      }
+      Changed(_) => {
+        let start = index
+        while index < hunk.rows.length() && hunk.rows[index] is Changed(_) {
+          index += 1
+        }
+        for row in hunk.rows[start:index] {
+          guard row is Changed(pair) else { panic() }
+          match pair {
             Paired(old_line, _) | OldOnly(old_line) =>
               unified_old_line(buf, old_line, line_numbers)
             NewOnly(_) => ()
           }
         }
-        for row in rows {
-          match row {
+        for row in hunk.rows[start:index] {
+          guard row is Changed(pair) else { panic() }
+          match pair {
             Paired(_, new_line) | NewOnly(new_line) =>
               unified_new_line(buf, new_line, line_numbers)
             OldOnly(_) => ()
           }
         }
       }
-      IgnoredBlock(rows) =>
-        for row in rows {
-          append_unified_ignored_row(buf, row, line_numbers)
-        }
     }
   }
 }
 
 ///|
-/// Render one fragment `HunkDocument` as unified HTML. This function does not
-/// flatten a high-level semantic document.
+/// Render one traditional `HunkDocument` as unified HTML. Semantic fragments
+/// must first be handled by their consumer.
 pub fn render_unified(
   document : @model.HunkDocument,
   line_numbers? : Bool = false,
@@ -489,7 +489,7 @@ pub fn render_unified(
 }
 
 ///|
-/// Render every hunk in one fragment `HunkDocument` as its own unified HTML
+/// Render every hunk in one traditional `HunkDocument` as its own unified HTML
 /// block.
 pub fn render_unified_hunks(
   document : @model.HunkDocument,

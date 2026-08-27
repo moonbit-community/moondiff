@@ -47,10 +47,10 @@ test "render_document highlights changes and keeps ignored text neutral" {
         old_len: 3,
         new_start: 0,
         new_len: 3,
-        blocks: [
-          ContextBlock([{ old_index: 0, new_index: 0, text: "fn value() {" }]),
-          ChangeBlock([Paired(old_line, new_line)]),
-          IgnoredBlock([Paired(old_comment, new_comment)]),
+        rows: [
+          Context({ old_index: 0, new_index: 0, text: "fn value() {" }),
+          Changed(Paired(old_line, new_line)),
+          Neutral(Paired(old_comment, new_comment)),
         ],
       },
     ],
@@ -101,7 +101,7 @@ test "render_document honors 9 to 10 and 99 to 100 width hints" {
         old_len: 1,
         new_start: 8,
         new_len: 1,
-        blocks: [ContextBlock([{ old_index: 8, new_index: 8, text: "same" }])],
+        rows: [Context({ old_index: 8, new_index: 8, text: "same" })],
       },
     ],
   }

@@ -23,8 +23,8 @@ fn append_change_line(
 }
 
 ///|
-fn append_ignored_row(buf : StringBuilder, row : @model.DiffRow) -> Unit {
-  match row {
+fn append_neutral_pair(buf : StringBuilder, pair : @model.DiffLinePair) -> Unit {
+  match pair {
     Paired(old_line, new_line) =>
       if old_line.text() == new_line.text() {
         append_diff_line(buf, " ", old_line)
@@ -37,44 +37,60 @@ fn append_ignored_row(buf : StringBuilder, row : @model.DiffRow) -> Unit {
 }
 
 ///|
+fn append_changed_old(buf : StringBuilder, pair : @model.DiffLinePair) -> Unit {
+  match pair {
+    Paired(old_line, _) | OldOnly(old_line) =>
+      append_change_line(buf, "-", old_line)
+    NewOnly(_) => ()
+  }
+}
+
+///|
+fn append_changed_new(buf : StringBuilder, pair : @model.DiffLinePair) -> Unit {
+  match pair {
+    Paired(_, new_line) | NewOnly(new_line) =>
+      append_change_line(buf, "+", new_line)
+    OldOnly(_) => ()
+  }
+}
+
+///|
 fn render_hunk(hunk : @model.DiffHunk) -> String {
   let buf = StringBuilder()
   buf <+
     "\{@render.hunk_header(hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len)}\n"
-  for block in hunk.blocks {
-    match block {
-      ContextBlock(lines) =>
-        for line in lines {
-          buf <+ " \{line.text}\n"
+  let mut index = 0
+  while index < hunk.rows.length() {
+    match hunk.rows[index] {
+      Context(line) => {
+        buf <+ " \{line.text}\n"
+        index += 1
+      }
+      Neutral(pair) => {
+        append_neutral_pair(buf, pair)
+        index += 1
+      }
+      Changed(_) => {
+        let start = index
+        while index < hunk.rows.length() && hunk.rows[index] is Changed(_) {
+          index += 1
         }
-      ChangeBlock(rows) => {
-        for row in rows {
-          match row {
-            Paired(old_line, _) | OldOnly(old_line) =>
-              append_change_line(buf, "-", old_line)
-            NewOnly(_) => ()
-          }
+        for row in hunk.rows[start:index] {
+          guard row is Changed(pair) else { panic() }
+          append_changed_old(buf, pair)
         }
-        for row in rows {
-          match row {
-            Paired(_, new_line) | NewOnly(new_line) =>
-              append_change_line(buf, "+", new_line)
-            OldOnly(_) => ()
-          }
+        for row in hunk.rows[start:index] {
+          guard row is Changed(pair) else { panic() }
+          append_changed_new(buf, pair)
         }
       }
-      IgnoredBlock(rows) =>
-        for row in rows {
-          append_ignored_row(buf, row)
-        }
     }
   }
   buf.to_string()
 }
 
 ///|
-/// Render every hunk in one fragment `HunkDocument` as unified patch text.
-/// This function does not flatten a high-level semantic document.
+/// Render every hunk in one traditional `HunkDocument` as unified patch text.
 pub fn render_unified_hunks(document : @model.HunkDocument) -> Array[String] {
   document.hunks.map(render_hunk)
 }
