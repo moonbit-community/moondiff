@@ -100,88 +100,149 @@ fn project_review_rows(
 ) -> Array[ReviewRow] {
   let rows : Array[ReviewRow] = []
   for hunk in document.hunks {
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(lines) =>
-          for line in lines {
-            rows.push(
-              make_review_row(
-                file_index,
-                path,
-                patch,
-                Some(old_base + line.old_index + 1),
-                Some(new_base + line.new_index + 1),
-                Some(line.text),
-                Some(line.text),
-                Some(plain_review_segments(line.text)),
-                Some(plain_review_segments(line.text)),
-                ContextRow,
-                true,
-              ),
-            )
-          }
-        ChangeBlock(changes) | IgnoredBlock(changes) => {
-          let kind = if block is IgnoredBlock(_) {
-            IgnoredRow
-          } else {
-            ChangeRow
-          }
-          for row in changes {
-            match row {
-              Paired(old, new) =>
-                rows.push(
-                  make_review_row(
-                    file_index,
-                    path,
-                    patch,
-                    Some(old_base + old.index + 1),
-                    Some(new_base + new.index + 1),
-                    Some(old.text()),
-                    Some(new.text()),
-                    Some(old.segments),
-                    Some(new.segments),
-                    kind,
-                    false,
-                  ),
-                )
-              OldOnly(old) =>
-                rows.push(
-                  make_review_row(
-                    file_index,
-                    path,
-                    patch,
-                    Some(old_base + old.index + 1),
-                    None,
-                    Some(old.text()),
-                    None,
-                    Some(old.segments),
-                    None,
-                    kind,
-                    false,
-                  ),
-                )
-              NewOnly(new) =>
-                rows.push(
-                  make_review_row(
-                    file_index,
-                    path,
-                    patch,
-                    None,
-                    Some(new_base + new.index + 1),
-                    None,
-                    Some(new.text()),
-                    None,
-                    Some(new.segments),
-                    kind,
-                    false,
-                  ),
-                )
-            }
-          }
-        }
-      }
+    append_projected_review_rows(
+      rows,
+      file_index,
+      path,
+      hunk.rows,
+      patch,
+      old_base,
+      new_base,
+    )
+  }
+  rows
+}
+
+///|
+fn append_projected_review_pair(
+  rows : Array[ReviewRow],
+  file_index : Int,
+  path : String,
+  patch : CanonicalPatch,
+  pair : @model.DiffLinePair,
+  kind : ReviewRowKind,
+  old_base : Int,
+  new_base : Int,
+) -> Unit {
+  match pair {
+    Paired(old, new) =>
+      rows.push(
+        make_review_row(
+          file_index,
+          path,
+          patch,
+          Some(old_base + old.index + 1),
+          Some(new_base + new.index + 1),
+          Some(old.text()),
+          Some(new.text()),
+          Some(old.segments),
+          Some(new.segments),
+          kind,
+          false,
+        ),
+      )
+    OldOnly(old) =>
+      rows.push(
+        make_review_row(
+          file_index,
+          path,
+          patch,
+          Some(old_base + old.index + 1),
+          None,
+          Some(old.text()),
+          None,
+          Some(old.segments),
+          None,
+          kind,
+          false,
+        ),
+      )
+    NewOnly(new) =>
+      rows.push(
+        make_review_row(
+          file_index,
+          path,
+          patch,
+          None,
+          Some(new_base + new.index + 1),
+          None,
+          Some(new.text()),
+          None,
+          Some(new.segments),
+          kind,
+          false,
+        ),
+      )
+  }
+}
+
+///|
+fn append_projected_review_rows(
+  output : Array[ReviewRow],
+  file_index : Int,
+  path : String,
+  rows : ArrayView[@model.DiffRow],
+  patch : CanonicalPatch,
+  old_base : Int,
+  new_base : Int,
+) -> Unit {
+  for row in rows {
+    match row {
+      Context(line) =>
+        output.push(
+          make_review_row(
+            file_index,
+            path,
+            patch,
+            Some(old_base + line.old_index + 1),
+            Some(new_base + line.new_index + 1),
+            Some(line.text),
+            Some(line.text),
+            Some(plain_review_segments(line.text)),
+            Some(plain_review_segments(line.text)),
+            ContextRow,
+            true,
+          ),
+        )
+      Changed(pair) =>
+        append_projected_review_pair(
+          output,
+          file_index,
+          path,
+          patch,
+          pair,
+          ChangeRow,
+          old_base,
+          new_base,
+        )
+      Neutral(pair) =>
+        append_projected_review_pair(
+          output,
+          file_index,
+          path,
+          patch,
+          pair,
+          IgnoredRow,
+          old_base,
+          new_base,
+        )
     }
   }
+}
+
+///|
+fn project_semantic_review_rows(
+  file_index : Int,
+  path : String,
+  semantic_rows : ArrayView[@model.DiffRow],
+  patch : CanonicalPatch,
+  old_base? : Int = 0,
+  new_base? : Int = 0,
+) -> Array[ReviewRow] {
+  let rows : Array[ReviewRow] = []
+  append_projected_review_rows(
+    rows, file_index, path, semantic_rows, patch, old_base, new_base,
+  )
   rows
 }
 

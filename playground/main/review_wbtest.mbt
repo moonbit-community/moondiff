@@ -309,6 +309,53 @@ test "section-local review rows map to absolute GitHub anchors" {
 }
 
 ///|
+test "semantic review rows keep the full fragment and absolute anchors" {
+  let old_source = [
+    "fn structural() {", "  before()", "  old_one()", "  old_two()", "  after_one()",
+    "  after_two()", "  after_three()", "  after_four()", "  after_five()", "}",
+  ].join("\n")
+  let new_source = old_source
+    .replace(old="old_one", new="new_one")
+    .replace(old="old_two", new="new_two")
+  let result = @mbtdiff.diff(old_source, new_source)
+  guard result.document() is TopLevel({ sections: [Matched(diff~, ..)], .. }) else {
+    fail("expected one complete semantic fragment")
+  }
+  let patch = parse_canonical_patch(
+    "src/main.mbt",
+    Some(
+      "@@ -11,10 +21,10 @@\n fn structural() {\n   before()\n-  old_one()\n-  old_two()\n+  new_one()\n+  new_two()\n   after_one()\n   after_two()\n   after_three()\n   after_four()\n   after_five()\n }",
+    ),
+  )
+  let rows = project_semantic_review_rows(
+    7,
+    "src/main.mbt",
+    diff.rows,
+    patch,
+    old_base=10,
+    new_base=20,
+  )
+  assert_true(rows.length() >= 10)
+  assert_true(rows[0].old_line == Some(11))
+  assert_true(rows[0].new_line == Some(21))
+  assert_true(rows[rows.length() - 1].old_line == Some(20))
+  assert_true(rows[rows.length() - 1].new_line == Some(30))
+  assert_true(rows.any(row => row.new_text == Some("  after_five()")))
+  assert_true(
+    rows.any(row => {
+      row.old_text == Some("  old_two()") &&
+      row.old_anchor.map(anchor => anchor.line == 14).unwrap_or(false)
+    }),
+  )
+  assert_true(
+    rows.any(row => {
+      row.new_text == Some("  new_two()") &&
+      row.new_anchor.map(anchor => anchor.line == 24).unwrap_or(false)
+    }),
+  )
+}
+
+///|
 fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
   let reference = CommitRef::{ owner: "upstream", repo: "project", target }
   let repository = RepositoryRef::{ owner: "upstream", repo: "project" }
