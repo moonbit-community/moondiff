@@ -190,14 +190,21 @@ fn render_section_fragment(
   new_line_count : Int,
 ) -> String {
   let fragment = section_fragment(section)
-  if fragment.document.hunks.is_empty() && fragment.fallbacks.is_empty() {
+  if fragment.rows.is_empty() && fragment.fallbacks.is_empty() {
     return ""
   }
   let old_range = section_old_range(section)
   let new_range = section_new_range(section)
   let old_base = old_range.map(range => range.start).unwrap_or(0)
   let new_base = new_range.map(range => range.start).unwrap_or(0)
-  let document = fragment.document.rebase(old_base, new_base)
+  let document = compact_semantic_rows(
+    fragment.rows,
+    if fragment.fallbacks.is_empty() {
+      options.context_lines + 1
+    } else {
+      options.context_lines
+    },
+  ).rebase(old_base, new_base)
   let buf = StringBuilder()
   buf.write_string(section_title(section_index, section))
   for fallback in fragment.fallbacks {
@@ -249,7 +256,7 @@ fn render_top_level_document(
   if deleted.any(section_index => {
       guard top.sections.get(section_index) is Some(section) else { false }
       let fragment = section_fragment(section)
-      !fragment.document.hunks.is_empty() || !fragment.fallbacks.is_empty()
+      !fragment.rows.is_empty() || !fragment.fallbacks.is_empty()
     }) {
     append_rendered_section(buf, wrote, "Deleted declarations (old order):\n")
     for section_index in deleted {
@@ -302,8 +309,8 @@ fn line_has_changed_segment(line : @model.DiffLine) -> Bool {
 }
 
 ///|
-fn mark_plain_row_changed(row : @model.DiffRow) -> @model.DiffRow {
-  match row {
+fn mark_plain_pair_changed(pair : @model.DiffLinePair) -> @model.DiffLinePair {
+  match pair {
     Paired(old_line, new_line) =>
       if line_has_changed_segment(old_line) ||
         line_has_changed_segment(new_line) {
@@ -326,17 +333,16 @@ fn mark_plain_row_changed(row : @model.DiffRow) -> @model.DiffRow {
 fn mark_plain_changes(document : @model.HunkDocument) -> @model.HunkDocument {
   let hunks : Array[@model.DiffHunk] = []
   for hunk in document.hunks {
-    let blocks : Array[@model.DiffBlock] = []
-    for block in hunk.blocks {
-      blocks.push(
-        match block {
-          ContextBlock(lines) => ContextBlock(lines)
-          ChangeBlock(rows) => ChangeBlock(rows.map(mark_plain_row_changed))
-          IgnoredBlock(rows) => IgnoredBlock(rows)
+    let rows : Array[@model.DiffRow] = []
+    for row in hunk.rows {
+      rows.push(
+        match row {
+          Context(_) | Neutral(_) => row
+          Changed(pair) => Changed(mark_plain_pair_changed(pair))
         },
       )
     }
-    hunks.push({ ..hunk, blocks: blocks[:] })
+    hunks.push({ ..hunk, rows: rows[:] })
   }
   { hunks: hunks[:] }
 }
@@ -393,7 +399,6 @@ fn render_moonbit(
     old_name=old_label,
     new_name=new_label,
     options=@mbtdiff.DiffOptions(
-      context_lines=options.context_lines,
       graph_limit=options.graph_limit,
       ignore_comments=options.ignore_comments,
       ignore_tests=options.ignore_tests,
@@ -457,7 +462,14 @@ fn render_moonbit(
             render_whole_document(
               old_label,
               new_label,
-              fragment.document,
+              compact_semantic_rows(
+                fragment.rows,
+                if fragment.fallbacks.is_empty() {
+                  options.context_lines + 1
+                } else {
+                  options.context_lines
+                },
+              ),
               options,
               old.length(),
               new.length(),
@@ -488,7 +500,8 @@ fn render_moonbit(
 /// Calculate and render one CLI diff. Both labels must end in `.mbt` to select
 /// MoonBit-aware calculation; all other pairs use the canonical plain Patience
 /// line diff. Semantic fragments are explicitly selected and independently
-/// rebased before the terminal renderer receives each `HunkDocument`.
+/// compacted and rebased before the terminal renderer receives each
+/// presentation-only `HunkDocument`.
 pub fn render(
   old_label : String,
   old_source : String,
