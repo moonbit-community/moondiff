@@ -1,8 +1,10 @@
 ///|
-/// One independently calculated semantic fragment. Its hunk indexes are
-/// local to the fragment; original-file coordinates live on its section.
+/// One independently calculated semantic fragment. A non-empty `rows` view is
+/// complete, monotonically covers the selected fragment on both sides, and
+/// uses fragment-local indexes. Empty rows mean the selected mode recognizes
+/// no change. Original-file coordinates live on the enclosing section.
 pub(all) struct DiffFragment {
-  document : HunkDocument
+  rows : ArrayView[DiffRow]
   fallbacks : ArrayView[FallbackReason]
 } derive(Eq)
 

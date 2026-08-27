@@ -22,19 +22,13 @@ pub(all) struct ContextLine {
   text : String
 } derive(Eq)
 
-pub(all) enum DiffBlock {
-  ContextBlock(ArrayView[ContextLine])
-  ChangeBlock(ArrayView[DiffRow])
-  IgnoredBlock(ArrayView[DiffRow])
-} derive(Eq)
-
 pub(all) enum DiffDocument {
   Whole(DiffFragment)
   TopLevel(TopLevelDiff)
 } derive(Eq)
 
 pub(all) struct DiffFragment {
-  document : HunkDocument
+  rows : ArrayView[DiffRow]
   fallbacks : ArrayView[FallbackReason]
 } derive(Eq)
 
@@ -43,7 +37,7 @@ pub(all) struct DiffHunk {
   old_len : Int
   new_start : Int
   new_len : Int
-  blocks : ArrayView[DiffBlock]
+  rows : ArrayView[DiffRow]
 } derive(Eq)
 
 pub(all) struct DiffLine {
@@ -52,15 +46,21 @@ pub(all) struct DiffLine {
 } derive(Eq)
 pub fn DiffLine::text(Self) -> String
 
+pub(all) enum DiffLinePair {
+  Paired(DiffLine, DiffLine)
+  OldOnly(DiffLine)
+  NewOnly(DiffLine)
+} derive(Eq)
+
 type DiffResult
 pub fn DiffResult::document(Self) -> DiffDocument
 pub fn DiffResult::make(DiffDocument, DiffStatus) -> Self
 pub fn DiffResult::status(Self) -> DiffStatus
 
 pub(all) enum DiffRow {
-  Paired(DiffLine, DiffLine)
-  OldOnly(DiffLine)
-  NewOnly(DiffLine)
+  Context(ContextLine)
+  Changed(DiffLinePair)
+  Neutral(DiffLinePair)
 } derive(Eq)
 
 pub(all) enum DiffSection {
