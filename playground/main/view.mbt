@@ -327,30 +327,6 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
             attrs=@html.Attrs::build().aria_label(source_label),
             @html.span(class="source-icon", "↗"),
           ),
-          if model.backend_status is BackendReady {
-            let (label, busy) = match model.analysis_status {
-              PreparingSources => ("Preparing source…", true)
-              Analyzing => ("Analyzing…", true)
-              AnalysisDone(_, _, _) | AnalysisNoHunks(_) =>
-                ("Analyze again", false)
-              AnalysisFailed(_) => ("Retry analysis", false)
-              AnalysisIdle => ("Analyze changes", false)
-            }
-            @html.button(
-              type_="button",
-              class="toolbar-button analyze-button",
-              title=label,
-              disabled=busy,
-              attrs=@html.Attrs::build().aria_label(label),
-              on_click=emit(AnalyzeChanges),
-              [
-                @html.span(class="analyze-icon", "✦"),
-                @html.span(class="analyze-label", label),
-              ],
-            )
-          } else {
-            @html.nothing
-          },
           algorithm_control(model.diff_algorithm, emit),
           ignore_comments_control(model.ignore_comments, emit),
           ignore_tests_control(model.ignore_tests, emit),
@@ -391,27 +367,6 @@ fn fallback_stage_text(stage : @mbtdiff.ComputationStage) -> String {
 }
 
 ///|
-fn fallback_location(scope : @mbtdiff.FallbackScope) -> String {
-  match scope {
-    WholeFile => ""
-    Region(old~, new~) => {
-      let parts : Array[String] = []
-      if old is Some(range) {
-        parts.push("old line \{range.start + 1}")
-      }
-      if new is Some(range) {
-        parts.push("new line \{range.start + 1}")
-      }
-      if parts.is_empty() {
-        "file"
-      } else {
-        parts.join(", ")
-      }
-    }
-  }
-}
-
-///|
 fn fallback_sides_text(sides : ArrayView[@mbtdiff.DiffSide]) -> String {
   let names = sides.map(side => {
     match side {
@@ -427,65 +382,251 @@ fn fallback_sides_text(sides : ArrayView[@mbtdiff.DiffSide]) -> String {
 }
 
 ///|
-fn fallback_reason_text(fallback : @mbtdiff.FallbackInfo) -> String {
-  match fallback.reason {
+fn fallback_reason_text(reason : @mbtdiff.FallbackReason) -> String {
+  match reason {
     ParseError(detail~, ..) => detail
     SyntaxPositionsOutOfBounds(sides~) => {
       let side_text = fallback_sides_text(sides)
-      let base = if side_text.is_empty() {
+      if side_text.is_empty() {
         "syntax positions out of bounds"
       } else {
         "syntax positions out of bounds on \{side_text}"
       }
-      let location = fallback_location(fallback.scope)
-      if location.is_empty() {
-        base
-      } else {
-        "\{base} at \{location}"
-      }
     }
-    GraphLimitExceeded(limit~) => {
-      let base = "graph limit exceeded (\{limit})"
-      let location = fallback_location(fallback.scope)
-      if location.is_empty() {
-        base
-      } else {
-        "\{base} at \{location}"
-      }
-    }
-    ComputationLimitExceeded(stage~, limit~) => {
-      let base = "computation limit exceeded (\{limit}) during \{fallback_stage_text(stage)}"
-      let location = fallback_location(fallback.scope)
-      if location.is_empty() {
-        base
-      } else {
-        "\{base} at \{location}"
-      }
-    }
-    TopLevelReordering =>
-      "top-level reordering has no changes inside aligned declarations"
+    GraphLimitExceeded(limit~) => "graph limit exceeded (\{limit})"
+    ComputationLimitExceeded(stage~, limit~) =>
+      "computation limit exceeded (\{limit}) during \{fallback_stage_text(stage)}"
   }
 }
 
 ///|
-fn diff_notice(fallbacks : ArrayView[@mbtdiff.FallbackInfo]) -> DiffNotice? {
+fn diff_notice(
+  fallbacks : ArrayView[@mbtdiff.FallbackReason],
+  whole : Bool,
+) -> DiffNotice? {
   if fallbacks.is_empty() {
     return None
   }
-  if fallbacks is [fallback] && fallback.scope is WholeFile {
-    let reason = fallback_reason_text(fallback)
-    return Some({
+  let reasons = fallbacks.map(fallback_reason_text)
+  if whole {
+    Some({
       class_name: "diff-notice fallback",
       label: "Lexical fallback",
-      message: "AST diff was unavailable, so this entire file is shown using lexical diff. \{reason}",
+      message: "AST diff was unavailable, so this entire file is shown using lexical diff. \{reasons.join("; ")}",
+    })
+  } else {
+    Some({
+      class_name: "diff-notice partial-fallback",
+      label: "Section lexical fallback",
+      message: "Only this semantic section uses lexical diff. \{reasons.join("; ")}.",
     })
   }
-  let reasons = fallbacks.map(fallback_reason_text)
-  Some({
-    class_name: "diff-notice partial-fallback",
-    label: "Partial lexical fallback",
-    message: "AST diff was used for the rest of this file. Lexical diff was used only for: \{reasons.join("; ")}.",
+}
+
+///|
+fn diff_notice_view(
+  fallbacks : ArrayView[@mbtdiff.FallbackReason],
+  whole : Bool,
+) -> @rabbita.Html {
+  if diff_notice(fallbacks, whole) is Some(notice) {
+    @html.div(class=notice.class_name, [
+      @html.strong(notice.label),
+      @html.span(notice.message),
+    ])
+  } else {
+    @html.nothing
+  }
+}
+
+///|
+fn semantic_range_text(range : @mbtdiff.LineRange) -> String {
+  if range.len <= 1 {
+    "line \{range.start + 1}"
+  } else {
+    "lines \{range.start + 1}-\{range.start + range.len}"
+  }
+}
+
+///|
+fn semantic_section_fragment(
+  section : @mbtdiff.DiffSection,
+) -> @mbtdiff.DiffFragment {
+  match section {
+    Matched(diff~, ..) | Deleted(diff~, ..) | Inserted(diff~, ..) => diff
+  }
+}
+
+///|
+fn semantic_section_old_range(
+  section : @mbtdiff.DiffSection,
+) -> @mbtdiff.LineRange? {
+  match section {
+    Matched(old~, ..) | Deleted(old~, ..) => Some(old)
+    Inserted(..) => None
+  }
+}
+
+///|
+fn semantic_section_new_range(
+  section : @mbtdiff.DiffSection,
+) -> @mbtdiff.LineRange? {
+  match section {
+    Matched(new~, ..) | Inserted(new~, ..) => Some(new)
+    Deleted(..) => None
+  }
+}
+
+///|
+fn semantic_section_title(
+  index : Int,
+  section : @mbtdiff.DiffSection,
+) -> String {
+  let kind = match section {
+    Matched(..) => "Matched"
+    Deleted(..) => "Deleted"
+    Inserted(..) => "Inserted"
+  }
+  let old = semantic_section_old_range(section)
+    .map(range => "old \{semantic_range_text(range)}")
+    .unwrap_or("old side absent")
+  let new = semantic_section_new_range(section)
+    .map(range => "new \{semantic_range_text(range)}")
+    .unwrap_or("new side absent")
+  "Section #\{index + 1} · \{kind} · \{old} · \{new}"
+}
+
+///|
+fn fragment_has_output(fragment : @mbtdiff.DiffFragment) -> Bool {
+  !fragment.document.hunks.is_empty() || !fragment.fallbacks.is_empty()
+}
+
+///|
+fn semantic_fragment_view(
+  file : ApiFile,
+  file_index : Int,
+  section_index : Int?,
+  fragment : @mbtdiff.DiffFragment,
+  old_range : @mbtdiff.LineRange?,
+  new_range : @mbtdiff.LineRange?,
+  mode : ViewMode,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+  whole : Bool,
+) -> @rabbita.Html {
+  let title = section_index.map(index => {
+    semantic_section_title(
+      index,
+      match (old_range, new_range) {
+        (Some(old), Some(new)) => Matched(old~, new~, diff=fragment)
+        (Some(old), None) => Deleted(old~, diff=fragment)
+        (None, Some(new)) => Inserted(new~, diff=fragment)
+        (None, None) => panic()
+      },
+    )
   })
+  let old_base = old_range.map(range => range.start).unwrap_or(0)
+  let new_base = new_range.map(range => range.start).unwrap_or(0)
+  @html.section(
+    class=if whole { "semantic-whole" } else { "semantic-section" },
+    [
+      if title is Some(title) {
+        @html.div(class="semantic-section-title", title)
+      } else {
+        @html.nothing
+      },
+      diff_notice_view(fragment.fallbacks, whole),
+      if fragment.document.hunks.is_empty() {
+        @html.nothing
+      } else {
+        safe_review_diff(
+          file,
+          file_index,
+          fragment.document,
+          mode,
+          review,
+          emit,
+          old_base~,
+          new_base~,
+        )
+      },
+    ],
+  )
+}
+
+///|
+fn top_level_diff_view(
+  file : ApiFile,
+  file_index : Int,
+  top : @mbtdiff.TopLevelDiff,
+  mode : ViewMode,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  let sections : Array[@rabbita.Html] = []
+  if top.reordered {
+    sections.push(
+      @html.div(
+        class="semantic-reorder",
+        "Top-level declarations are reordered; fragment diffs remain paired by declaration identity.",
+      ),
+    )
+  }
+  for section_index in top.new_order {
+    guard top.sections.get(section_index) is Some(section) else { continue }
+    if section is Deleted(..) {
+      continue
+    }
+    let fragment = semantic_section_fragment(section)
+    if fragment_has_output(fragment) {
+      sections.push(
+        semantic_fragment_view(
+          file,
+          file_index,
+          Some(section_index),
+          fragment,
+          semantic_section_old_range(section),
+          semantic_section_new_range(section),
+          mode,
+          review,
+          emit,
+          false,
+        ),
+      )
+    }
+  }
+
+  let deleted : Array[@rabbita.Html] = []
+  for section_index in top.old_order {
+    guard top.sections.get(section_index) is Some(section) else { continue }
+    if section is Deleted(..) {
+      let fragment = semantic_section_fragment(section)
+      if fragment_has_output(fragment) {
+        deleted.push(
+          semantic_fragment_view(
+            file,
+            file_index,
+            Some(section_index),
+            fragment,
+            semantic_section_old_range(section),
+            None,
+            mode,
+            review,
+            emit,
+            false,
+          ),
+        )
+      }
+    }
+  }
+  if !deleted.is_empty() {
+    sections.push(
+      @html.section(class="semantic-deleted-group", [
+        @html.h4("Deleted declarations (old order)"),
+        @html.fragment(deleted),
+      ]),
+    )
+  }
+  @html.div(class="semantic-document", sections)
 }
 
 ///|
@@ -532,44 +673,56 @@ fn file_diff_view(
         is Some(result) else {
         return @html.p(class="file-message loading-inline", "Preparing diff…")
       }
-      if result.status is IgnoredOnly {
-        let structural = if algorithm is AstAlgorithm {
-          "structural "
-        } else {
-          ""
+      match result {
+        Line(document) =>
+          safe_review_diff(file.file, index, document, mode, review, emit)
+        MoonBit(document~, status~) => {
+          if status is IgnoredOnly {
+            let structural = if algorithm is AstAlgorithm {
+              "structural "
+            } else {
+              ""
+            }
+            let action = if ignore_comments && ignore_tests {
+              "Turn off Ignore tests or Ignore comments to view the corresponding filtered changes."
+            } else if ignore_tests {
+              "Turn off Ignore tests to view test changes."
+            } else {
+              "Turn off Ignore comments to view comment and blank-line changes."
+            }
+            return @html.div(class="file-message comment-empty", [
+              @html.p(
+                "No \{structural}changes besides \{ignored_change_subject(ignore_comments, ignore_tests)} found. \{action}",
+              ),
+            ])
+          }
+          if algorithm is AstAlgorithm &&
+            status is (Identical | NoStructuralChanges) {
+            return @html.div(class="file-message structural-empty", [
+              @html.p(
+                "No structural changes found. Switch to Lexical to view text changes.",
+              ),
+            ])
+          }
+          match document {
+            Whole(fragment) =>
+              semantic_fragment_view(
+                file.file,
+                index,
+                None,
+                fragment,
+                None,
+                None,
+                mode,
+                review,
+                emit,
+                true,
+              )
+            TopLevel(top) =>
+              top_level_diff_view(file.file, index, top, mode, review, emit)
+          }
         }
-        let action = if ignore_comments && ignore_tests {
-          "Turn off Ignore tests or Ignore comments to view the corresponding filtered changes."
-        } else if ignore_tests {
-          "Turn off Ignore tests to view test changes."
-        } else {
-          "Turn off Ignore comments to view comment and blank-line changes."
-        }
-        return @html.div(class="file-message comment-empty", [
-          @html.p(
-            "No \{structural}changes besides \{ignored_change_subject(ignore_comments, ignore_tests)} found. \{action}",
-          ),
-        ])
       }
-      if algorithm is AstAlgorithm &&
-        result.status is (Identical | NoStructuralChanges) {
-        return @html.div(class="file-message structural-empty", [
-          @html.p(
-            "No structural changes found. Switch to Lexical to view text changes.",
-          ),
-        ])
-      }
-      @html.fragment([
-        if diff_notice(result.fallbacks) is Some(notice) {
-          @html.div(class=notice.class_name, [
-            @html.strong(notice.label),
-            @html.span(notice.message),
-          ])
-        } else {
-          @html.nothing
-        },
-        safe_review_diff(file.file, index, result.document, mode, review, emit),
-      ])
     }
     (Loading, _) | (_, Loading) =>
       @html.p(class="file-message loading-inline", "Loading file contents…")
@@ -661,282 +814,6 @@ fn file_list_view(
 }
 
 ///|
-priv struct RenderedAnalysisHunk {
-  file : FileState
-  html : String
-}
-
-///|
-fn analysis_hunk_count(hunks : ArrayView[AnalyzedHunk]) -> String {
-  if hunks.length() == 1 {
-    "1 hunk"
-  } else {
-    "\{hunks.length()} hunks"
-  }
-}
-
-///|
-fn analysis_file_hunks_html(
-  file : FileState,
-  file_index : Int,
-  result : AnalysisResult,
-  mode : ViewMode,
-  algorithm : DiffAlgorithm,
-  ignore_comments : Bool,
-  ignore_tests : Bool,
-) -> Array[String] {
-  guard cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
-    is Some(diff) else {
-    return []
-  }
-  let hunk_notes = notes_for_file(
-    result,
-    file_index,
-    diff.document.hunks.length(),
-  )
-  match mode {
-    Split =>
-      @render_html.render_side_by_side_hunks(
-        diff.document,
-        line_numbers=true,
-        hunk_notes~,
-      )
-    Unified =>
-      @render_html.render_unified_hunks(
-        diff.document,
-        line_numbers=true,
-        hunk_notes~,
-      )
-  }
-}
-
-///|
-fn analysis_wants_file(wanted : Map[String, Unit], file_index : Int) -> Bool {
-  let prefix = "f\{file_index}-h"
-  for id, _ in wanted {
-    if id.has_prefix(prefix) {
-      return true
-    }
-  }
-  false
-}
-
-///|
-fn rendered_analysis_hunks(
-  commit : ChangeView,
-  result : AnalysisResult,
-  expanded : ArrayView[Bool],
-  mode : ViewMode,
-  algorithm : DiffAlgorithm,
-  ignore_comments : Bool,
-  ignore_tests : Bool,
-) -> Map[String, RenderedAnalysisHunk] {
-  let wanted : Map[String, Unit] = Map([])
-  for group_index, group in result.groups {
-    if expanded.get(group_index) == Some(true) {
-      for hunk in group.hunks {
-        wanted[hunk.id] = ()
-      }
-    }
-  }
-  let rendered : Map[String, RenderedAnalysisHunk] = Map([])
-  for file_index, file in commit.files {
-    if !analysis_wants_file(wanted, file_index) {
-      continue
-    }
-    let hunks = analysis_file_hunks_html(
-      file, file_index, result, mode, algorithm, ignore_comments, ignore_tests,
-    )
-    for hunk_index, html in hunks {
-      let id = "f\{file_index}-h\{hunk_index}"
-      if wanted.contains(id) {
-        rendered[id] = { file, html }
-      }
-    }
-  }
-  rendered
-}
-
-///|
-#warnings("-alert_xss_vulnerable")
-fn analysis_hunk_view(
-  hunk : AnalyzedHunk,
-  rendered : Map[String, RenderedAnalysisHunk],
-) -> @rabbita.Html {
-  if rendered.get(hunk.id) is Some(item) {
-    @html.article(class="analysis-hunk", [
-      @html.div(class="analysis-hunk-heading", [
-        @html.div(class="analysis-hunk-file", [
-          @html.span(class=status_class(item.file.file.status), ""),
-          @html.code(class="file-path", file_label(item.file.file)),
-        ]),
-        @html.span(class="status-label", status_label(item.file.file.status)),
-      ]),
-      // tokdiff escapes source text, hunk headers, group titles, and hunk
-      // explanations before this raw HTML reaches the application.
-      @html.div(
-        class="diff-scroll",
-        attrs=@html.Attrs::build().inner_html(item.html),
-        ([] : Array[@rabbita.Html]),
-      ),
-    ])
-  } else {
-    @html.article(class="analysis-hunk analysis-hunk-error", [
-      @html.p(
-        "The analysis referenced \{hunk.id}, but that diff hunk could not be rendered.",
-      ),
-    ])
-  }
-}
-
-///|
-fn analysis_group_view(
-  group : AnalysisGroup,
-  group_index : Int,
-  expanded : Bool,
-  rendered : Map[String, RenderedAnalysisHunk],
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  let hunk_views : Array[@rabbita.Html] = []
-  if expanded {
-    for hunk in group.hunks {
-      hunk_views.push(analysis_hunk_view(hunk, rendered))
-    }
-  }
-  let action = if expanded { "Collapse" } else { "Expand" }
-  @html.article(
-    class=if expanded { "analysis-group expanded" } else { "analysis-group" },
-    [
-      @html.button(
-        type_="button",
-        class="analysis-group-toggle",
-        attrs=@html.Attrs::build()
-          .aria_expanded(if expanded { "true" } else { "false" })
-          .aria_label("\{action} \{group.title}"),
-        on_click=emit(ToggleAnalysisGroup(group_index)),
-        [
-          @html.span(class="analysis-group-disclosure", ""),
-          @html.span(class="analysis-group-title", group.title),
-          @html.span(
-            class="analysis-hunk-count",
-            analysis_hunk_count(group.hunks),
-          ),
-        ],
-      ),
-      @html.p(group.description),
-      if expanded {
-        @html.div(class="analysis-hunks", hunk_views)
-      } else {
-        @html.nothing
-      },
-    ],
-  )
-}
-
-///|
-fn analysis_skipped_view(skipped : ArrayView[SkippedFile]) -> @rabbita.Html {
-  if skipped.is_empty() {
-    return @html.nothing
-  }
-  let skipped_views : Array[@rabbita.Html] = []
-  for file in skipped {
-    skipped_views.push(
-      @html.li([@html.code(file.path), @html.span(" — \{file.reason}")]),
-    )
-  }
-  @html.div(class="analysis-skipped", [
-    @html.p(
-      "Skipped \{skipped.length()} \{if skipped.length() == 1 { "file" } else { "files" }}:",
-    ),
-    @html.ul(skipped_views),
-  ])
-}
-
-///|
-fn analysis_overview(
-  commit : ChangeView,
-  mode : ViewMode,
-  algorithm : DiffAlgorithm,
-  ignore_comments : Bool,
-  ignore_tests : Bool,
-  status : AnalysisStatus,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  match status {
-    AnalysisIdle => @html.nothing
-    PreparingSources =>
-      @html.section(class="analysis-card analysis-progress", [
-        @html.span(class="spinner", ""),
-        @html.div([
-          @html.h2("Preparing source files"),
-          @html.p(
-            "Loading both sides of every changed file before analysis. File cards stay as you left them.",
-          ),
-        ]),
-      ])
-    Analyzing =>
-      @html.section(class="analysis-card analysis-progress", [
-        @html.span(class="spinner", ""),
-        @html.div([
-          @html.h2("Analyzing changes"),
-          @html.p("OpenSeek is grouping the loaded diff hunks by function."),
-        ]),
-      ])
-    AnalysisFailed(message) =>
-      @html.section(class="analysis-card analysis-error", [
-        @html.div([@html.h2("Analysis failed"), @html.p(message)]),
-        @html.button(
-          type_="button",
-          class="secondary",
-          on_click=emit(AnalyzeChanges),
-          "Retry analysis",
-        ),
-      ])
-    AnalysisNoHunks(skipped) =>
-      @html.section(class="analysis-card analysis-complete", [
-        @html.p(class="section-label", "OpenSeek functional analysis"),
-        @html.h2("Nothing to analyze"),
-        @html.p(
-          class="analysis-empty",
-          "No diff hunks are available for the current algorithm, so no backend request was sent.",
-        ),
-        analysis_skipped_view(skipped),
-      ])
-    AnalysisDone(result, skipped, expanded) => {
-      let rendered = rendered_analysis_hunks(
-        commit, result, expanded, mode, algorithm, ignore_comments, ignore_tests,
-      )
-      let group_views : Array[@rabbita.Html] = []
-      for group_index, group in result.groups {
-        group_views.push(
-          analysis_group_view(
-            group,
-            group_index,
-            expanded.get(group_index).unwrap_or(false),
-            rendered,
-            emit,
-          ),
-        )
-      }
-      @html.section(class="analysis-card analysis-complete", [
-        @html.p(class="section-label", "OpenSeek functional analysis"),
-        @html.h2("Change groups"),
-        @html.p(class="analysis-summary", result.summary),
-        analysis_skipped_view(skipped),
-        if group_views.length() == 0 {
-          @html.p(
-            class="analysis-empty",
-            "No text diff hunks were available to group.",
-          )
-        } else {
-          @html.div(class="analysis-groups", group_views)
-        },
-      ])
-    }
-  }
-}
-
-///|
 fn change_view(
   commit : ChangeView,
   model : Model,
@@ -996,19 +873,7 @@ fn change_view(
       ]),
     ]),
     comments_overview(commit, model.review, emit),
-    analysis_overview(
-      commit,
-      model.view_mode,
-      model.diff_algorithm,
-      model.ignore_comments,
-      model.ignore_tests,
-      model.analysis_status,
-      emit,
-    ),
-    match model.analysis_status {
-      AnalysisDone(_, _, _) => @html.nothing
-      _ => file_list_view(commit, model, emit)
-    },
+    file_list_view(commit, model, emit),
   ])
 }
 
