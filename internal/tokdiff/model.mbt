@@ -120,9 +120,8 @@ fn fallback_pair_segments(
   budget : @worddiff.RefinementBudget,
 ) -> (Array[DiffSegment], Array[DiffSegment]) {
   if refine_words {
-    match @worddiff.refine_line(old_text, new_text, budget~) {
-      Some(segments) => return segments
-      None => ()
+    if @worddiff.refine_line(old_text, new_text, budget~) is Some(segments) {
+      return segments
     }
   }
   (plain_segments(old_text), plain_segments(new_text))
