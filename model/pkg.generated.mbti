@@ -28,10 +28,15 @@ pub(all) enum DiffBlock {
   IgnoredBlock(ArrayView[DiffRow])
 } derive(Eq)
 
-pub(all) struct DiffDocument {
-  hunks : ArrayView[DiffHunk]
+pub(all) enum DiffDocument {
+  Whole(DiffFragment)
+  TopLevel(TopLevelDiff)
 } derive(Eq)
-pub fn DiffDocument::rebase(Self, Int, Int) -> Self
+
+pub(all) struct DiffFragment {
+  document : HunkDocument
+  fallbacks : ArrayView[FallbackReason]
+} derive(Eq)
 
 pub(all) struct DiffHunk {
   old_start : Int
@@ -41,16 +46,16 @@ pub(all) struct DiffHunk {
   blocks : ArrayView[DiffBlock]
 } derive(Eq)
 
-pub(all) enum DiffLayout {
-  WholeDocument
-  TopLevelSections(ArrayView[DiffSection])
-} derive(Eq, @debug.Debug)
-
 pub(all) struct DiffLine {
   index : Int
   segments : ArrayView[DiffSegment]
 } derive(Eq)
 pub fn DiffLine::text(Self) -> String
+
+type DiffResult
+pub fn DiffResult::document(Self) -> DiffDocument
+pub fn DiffResult::make(DiffDocument, DiffStatus) -> Self
+pub fn DiffResult::status(Self) -> DiffStatus
 
 pub(all) enum DiffRow {
   Paired(DiffLine, DiffLine)
@@ -58,10 +63,11 @@ pub(all) enum DiffRow {
   NewOnly(DiffLine)
 } derive(Eq)
 
-pub(all) struct DiffSection {
-  old : LineRange?
-  new : LineRange?
-} derive(Eq, @debug.Debug)
+pub(all) enum DiffSection {
+  Matched(old~ : LineRange, new~ : LineRange, diff~ : DiffFragment)
+  Deleted(old~ : LineRange, diff~ : DiffFragment)
+  Inserted(new~ : LineRange, diff~ : DiffFragment)
+} derive(Eq)
 
 pub(all) struct DiffSegment {
   kind : DiffSegmentKind
@@ -82,13 +88,9 @@ pub(all) enum DiffSide {
 pub(all) enum DiffStatus {
   Identical
   Changed
+  Reordered
   NoStructuralChanges
   IgnoredOnly
-} derive(Eq, @debug.Debug)
-
-pub(all) struct FallbackInfo {
-  reason : FallbackReason
-  scope : FallbackScope
 } derive(Eq, @debug.Debug)
 
 pub(all) enum FallbackReason {
@@ -96,18 +98,24 @@ pub(all) enum FallbackReason {
   SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
-  TopLevelReordering
 } derive(Eq, @debug.Debug)
 
-pub(all) enum FallbackScope {
-  WholeFile
-  Region(old~ : LineRange?, new~ : LineRange?)
-} derive(Eq, @debug.Debug)
+pub(all) struct HunkDocument {
+  hunks : ArrayView[DiffHunk]
+} derive(Eq)
+pub fn HunkDocument::rebase(Self, Int, Int) -> Self
 
 pub(all) struct LineRange {
   start : Int
   len : Int
 } derive(Eq, @debug.Debug)
+
+pub(all) struct TopLevelDiff {
+  sections : ArrayView[DiffSection]
+  old_order : ArrayView[Int]
+  new_order : ArrayView[Int]
+  reordered : Bool
+} derive(Eq)
 
 // Type aliases
 

@@ -79,10 +79,11 @@ pub(all) struct DiffHunk {
 } derive(Eq)
 
 ///|
-/// A fully calculated, renderer-neutral diff document. Its recursively nested
-/// collections are zero-copy read-only views; their backing storage is never
-/// mutated after the document is published.
-pub(all) struct DiffDocument {
+/// A fully calculated, renderer-neutral diff for one semantic fragment. Hunk
+/// indexes are local to that fragment unless a consumer explicitly calls
+/// `rebase`. Its recursively nested collections are zero-copy read-only views;
+/// their backing storage is never mutated after publication.
+pub(all) struct HunkDocument {
   hunks : ArrayView[DiffHunk]
 } derive(Eq)
 
@@ -137,11 +138,11 @@ fn DiffBlock::rebase_indexes(
 /// Return a new document whose zero-based source indexes are shifted by the
 /// supplied offsets. Hunk ranges, context indexes, and changed-line indexes
 /// are rebased together.
-pub fn DiffDocument::rebase(
-  self : DiffDocument,
+pub fn HunkDocument::rebase(
+  self : HunkDocument,
   old_line_offset : Int,
   new_line_offset : Int,
-) -> DiffDocument {
+) -> HunkDocument {
   let hunks : Array[DiffHunk] = []
   for hunk in self.hunks {
     let old_start = hunk.old_start + old_line_offset
