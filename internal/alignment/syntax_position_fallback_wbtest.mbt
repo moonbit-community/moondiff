@@ -137,7 +137,7 @@ fn expect_ast_position_sides(
   rhs : ArrayView[MatchedPos],
   expected : ArrayView[DiffSide],
 ) -> Unit raise {
-  guard ast_document_from_positions(["old"], ["new"], lhs, rhs, 0, true)
+  guard ast_rows_from_positions(["old"], ["new"], lhs, rhs, true)
     is AstPositionsOutOfBounds(sides) else {
     fail("expected AST position validation to stop document construction")
   }
@@ -168,15 +168,14 @@ test "AST document validates primary and opposite positions before indexing" {
     [Old, New],
   )
 
-  guard ast_document_from_positions(
+  guard ast_rows_from_positions(
       ["old"],
       ["new"],
       [fallback_test_novel(1, 2, 2)],
       [],
-      0,
       true,
     )
-    is AstDocument(_) else {
+    is AstRows(_) else {
     fail("valid zero-width syntax positions must not trigger fallback")
   }
 }
@@ -216,7 +215,6 @@ test "root syntax-position overflow uses a whole-file lexical fallback" {
     [fallback_test_unit(new_source, 1, 98)],
     @diff_ignore.SourceView::from_source(old_source),
     @diff_ignore.SourceView::from_source(new_source),
-    0,
     3_000_000,
     false,
     fallback_test_limit(),
@@ -227,7 +225,26 @@ test "root syntax-position overflow uses a whole-file lexical fallback" {
   guard fragment.fallbacks is [SyntaxPositionsOutOfBounds(sides=[Old, New])] else {
     fail("expected a two-sided whole-file position fallback")
   }
-  assert_false(fragment.document.hunks.is_empty())
+  assert_false(fragment.rows.is_empty())
+}
+
+///|
+fn fallback_row_text(rows : ArrayView[@model.DiffRow]) -> String {
+  let buf = StringBuilder()
+  for row in rows {
+    match row {
+      Context(line) => buf.write_string(line.text)
+      Changed(pair) | Neutral(pair) =>
+        match pair {
+          Paired(old_line, new_line) => {
+            buf.write_string(old_line.text())
+            buf.write_string(new_line.text())
+          }
+          OldOnly(line) | NewOnly(line) => buf.write_string(line.text())
+        }
+    }
+  }
+  buf.to_string()
 }
 
 ///|
@@ -246,7 +263,6 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
     plan,
     @diff_ignore.SourceView::from_source(old_source),
     @diff_ignore.SourceView::from_source(new_source),
-    0,
     3_000_000,
     false,
     fallback_test_limit(),
@@ -261,12 +277,12 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
     fail("expected only the invalid declaration to fall back")
   }
   assert_true(good.fallbacks.is_empty())
-  let bad_patch = @unified.render_unified_hunks(bad.document).join("")
-  let good_patch = @unified.render_unified_hunks(good.document).join("")
-  assert_true(bad_patch.contains("old_bad"), msg=bad_patch)
-  assert_true(bad_patch.contains("new_bad"), msg=bad_patch)
-  assert_true(good_patch.contains("old_good"), msg=good_patch)
-  assert_true(good_patch.contains("new_good"), msg=good_patch)
+  let bad_text = fallback_row_text(bad.rows)
+  let good_text = fallback_row_text(good.rows)
+  assert_true(bad_text.contains("old_bad"), msg=bad_text)
+  assert_true(bad_text.contains("new_bad"), msg=bad_text)
+  assert_true(good_text.contains("old_good"), msg=good_text)
+  assert_true(good_text.contains("new_good"), msg=good_text)
   assert_true(top.old_order is [0, 1])
   assert_true(top.new_order is [0, 1])
 }

@@ -1068,7 +1068,7 @@ test "semantic extraction ambiguity work uses the file budget" {
   assert_eq(insertions, extraction_count)
 
   let calculation = calculate_diff_document_with_limit(
-    old_source, new_source, "old", "new", 0, 3_000_000, false, 1,
+    old_source, new_source, "old", "new", 3_000_000, false, 1,
   )
   guard calculation.document is Whole(fragment) else {
     fail("expected top-level budget exhaustion to produce Whole")
@@ -1077,7 +1077,7 @@ test "semantic extraction ambiguity work uses the file budget" {
     is [ComputationLimitExceeded(stage=TopLevelAlignment, limit=1)] else {
     fail("expected extraction ambiguity work to use the top-level budget")
   }
-  assert_false(fragment.document.hunks.is_empty())
+  assert_false(fragment.rows.is_empty())
 }
 
 ///|
@@ -1393,7 +1393,6 @@ fn diff_document_for_test(
   old_source : String,
   new_source : String,
   mode : AlignedDiffMode,
-  context? : Int = 3,
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
@@ -1401,7 +1400,6 @@ fn diff_document_for_test(
   diff_document_detailed(
     old_source,
     new_source,
-    context~,
     graph_limit~,
     ignore_comments~,
     ignore_tests~,
@@ -1426,7 +1424,7 @@ fn result_fragments(result : DetailedDiffResult) -> Array[@model.DiffFragment] {
 
 ///|
 fn result_is_empty(result : DetailedDiffResult) -> Bool {
-  result_fragments(result).all(fragment => fragment.document.hunks.is_empty())
+  result_fragments(result).all(fragment => fragment.rows.is_empty())
 }
 
 ///|
@@ -1439,17 +1437,17 @@ fn result_fallbacks(result : DetailedDiffResult) -> Array[FallbackReason] {
 }
 
 ///|
-fn first_changed_document(result : DetailedDiffResult) -> @model.HunkDocument {
+fn first_changed_rows(result : DetailedDiffResult) -> ArrayView[@model.DiffRow] {
   for fragment in result_fragments(result) {
-    if !fragment.document.hunks.is_empty() {
-      return fragment.document
+    if !fragment.rows.is_empty() {
+      return fragment.rows
     }
   }
-  { hunks: [] }
+  []
 }
 
 ///|
-test "renamed declarations render one paired hunk in lexical and AST modes" {
+test "renamed declarations return complete changed rows in lexical and AST modes" {
   let old_source =
     #|fn stable() {}
     #|fn JobHandle::spawn_unix(path : String) {
@@ -1461,14 +1459,14 @@ test "renamed declarations render one paired hunk in lexical and AST modes" {
     #|  launch(path)
     #|}
   for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(old_source, new_source, mode, context=0)
+    let result = diff_document_for_test(old_source, new_source, mode)
     assert_true(result.status is Changed)
     assert_true(result_fallbacks(result).is_empty())
-    let document = first_changed_document(result)
-    assert_eq(document.hunks.length(), 1)
-    let patch = @unified.render_unified_hunks(document).join("")
-    assert_true(patch.contains("spawn_unix"), msg=patch)
-    assert_true(patch.contains("spawn_unix_ffi"), msg=patch)
+    let rows = first_changed_rows(result)
+    assert_false(rows.is_empty())
+    let changed = changed_segment_text(rows)
+    assert_true(changed.contains("spawn_unix"), msg=changed)
+    assert_true(changed.contains("spawn_unix_ffi"), msg=changed)
   }
 }
 
@@ -1538,32 +1536,25 @@ test "CST wrappers do not hide inserted sibling statements" {
 }
 
 ///|
-fn changed_segment_text(document : @model.HunkDocument) -> String {
+fn changed_segment_text(rows : ArrayView[@model.DiffRow]) -> String {
   let buf = StringBuilder()
-  for hunk in document.hunks {
-    for block in hunk.blocks {
-      match block {
-        ContextBlock(_) | IgnoredBlock(_) => ()
-        ChangeBlock(rows) =>
-          for row in rows {
-            match row {
-              Paired(old_line, new_line) =>
-                for line in [old_line, new_line] {
-                  for segment in line.segments {
-                    if segment.kind is Changed {
-                      buf.write_string(segment.text)
-                    }
-                  }
-                }
-              OldOnly(line) | NewOnly(line) =>
-                for segment in line.segments {
-                  if segment.kind is Changed {
-                    buf.write_string(segment.text)
-                  }
-                }
+  for row in rows {
+    guard row is Changed(pair) else { continue }
+    match pair {
+      Paired(old_line, new_line) =>
+        for line in [old_line, new_line] {
+          for segment in line.segments {
+            if segment.kind is Changed {
+              buf.write_string(segment.text)
             }
           }
-      }
+        }
+      OldOnly(line) | NewOnly(line) =>
+        for segment in line.segments {
+          if segment.kind is Changed {
+            buf.write_string(segment.text)
+          }
+        }
     }
   }
   buf.to_string()
@@ -1641,7 +1632,7 @@ fn whole_fragment_for_test(
 fn semantic_changed_text(result : DetailedDiffResult) -> String {
   let buf = StringBuilder()
   for fragment in result_fragments(result) {
-    buf.write_string(changed_segment_text(fragment.document))
+    buf.write_string(changed_segment_text(fragment.rows))
   }
   buf.to_string()
 }
@@ -1652,15 +1643,42 @@ fn assert_fragment_bounds(
   old_len : Int?,
   new_len : Int?,
 ) -> Unit raise {
-  for hunk in fragment.document.hunks {
-    if old_len is Some(limit) {
-      assert_true(hunk.old_start >= 0)
-      assert_true(hunk.old_start + hunk.old_len <= limit)
+  let old_indices : Array[Int] = []
+  let new_indices : Array[Int] = []
+  for row in fragment.rows {
+    match row {
+      Context(line) => {
+        old_indices.push(line.old_index)
+        new_indices.push(line.new_index)
+      }
+      Changed(pair) | Neutral(pair) =>
+        match pair {
+          Paired(old_line, new_line) => {
+            old_indices.push(old_line.index)
+            new_indices.push(new_line.index)
+          }
+          OldOnly(line) => old_indices.push(line.index)
+          NewOnly(line) => new_indices.push(line.index)
+        }
     }
-    if new_len is Some(limit) {
-      assert_true(hunk.new_start >= 0)
-      assert_true(hunk.new_start + hunk.new_len <= limit)
+  }
+  match old_len {
+    Some(limit) => {
+      assert_eq(old_indices.length(), limit)
+      for index, actual in old_indices {
+        assert_eq(actual, index)
+      }
     }
+    None => assert_true(old_indices.is_empty())
+  }
+  match new_len {
+    Some(limit) => {
+      assert_eq(new_indices.length(), limit)
+      for index, actual in new_indices {
+        assert_eq(actual, index)
+      }
+    }
+    None => assert_true(new_indices.is_empty())
   }
 }
 
@@ -1720,7 +1738,7 @@ test "section fragments use local coordinates and exact source ranges" {
     #|  new_value()
     #|}
   for mode in [Lexical, Ast] {
-    let result = diff_document_for_test(old_source, new_source, mode, context=0)
+    let result = diff_document_for_test(old_source, new_source, mode)
     assert_true(result.status is Changed)
     let top = top_level_for_test(result)
     assert_false(top.reordered)
@@ -1735,23 +1753,88 @@ test "section fragments use local coordinates and exact source ranges" {
       ] else {
       fail("expected matched declarations plus one new-side section")
     }
-    assert_true(keep.document.hunks.is_empty())
+    assert_true(keep.rows.is_empty())
     assert_fragment_bounds(target, Some(3), Some(3))
     assert_fragment_bounds(inserted, None, Some(1))
-    assert_false(target.document.hunks.is_empty())
-    assert_false(inserted.document.hunks.is_empty())
+    assert_false(target.rows.is_empty())
+    assert_false(inserted.rows.is_empty())
     assert_true(result_fallbacks(result).is_empty())
   }
+}
+
+///|
+test "distant edits retain one complete aligned fragment" {
+  let old_source =
+    #|fn distant() {
+    #|  old_first()
+    #|  stable_one()
+    #|  stable_two()
+    #|  stable_three()
+    #|  stable_four()
+    #|  stable_five()
+    #|  stable_six()
+    #|  stable_seven()
+    #|  stable_eight()
+    #|  old_last()
+    #|}
+  let new_source =
+    #|fn distant() {
+    #|  new_first()
+    #|  stable_one()
+    #|  stable_two()
+    #|  stable_three()
+    #|  stable_four()
+    #|  stable_five()
+    #|  stable_six()
+    #|  stable_seven()
+    #|  stable_eight()
+    #|  new_last()
+    #|}
+  for mode in [Lexical, Ast] {
+    let result = diff_document_for_test(old_source, new_source, mode)
+    let top = top_level_for_test(result)
+    guard top.sections is [Matched(diff~, ..)] else {
+      fail("expected one matched declaration fragment")
+    }
+    assert_fragment_bounds(diff, Some(12), Some(12))
+    assert_true(
+      diff.rows.any(row => row is Context({ text: "  stable_four()", .. })),
+    )
+  }
+}
+
+///|
+test "AST complete rows retain formatting differences as Neutral" {
+  let old_source =
+    #|fn mixed() {
+    #|  old_call()
+    #|  stable(1)
+    #|}
+  let new_source =
+    #|fn mixed() {
+    #|    new_call()
+    #|  stable( 1 )
+    #|}
+  let result = diff_document_for_test(old_source, new_source, Ast)
+  let top = top_level_for_test(result)
+  guard top.sections is [Matched(diff~, ..)] else {
+    fail("expected one matched declaration fragment")
+  }
+  assert_fragment_bounds(diff, Some(4), Some(4))
+  assert_true(diff.rows.any(row => row is Changed(_)))
+  assert_true(
+    diff.rows.any(row => {
+      guard row is Neutral(Paired(old_line, new_line)) else { false }
+      old_line.text() == "  stable(1)" && new_line.text() == "  stable( 1 )"
+    }),
+  )
 }
 
 ///|
 test "pure top-level reorder is semantic instead of lexical fallback" {
   for mode in [Lexical, Ast] {
     let result = diff_document_for_test(
-      "fn first() {}\nfn second() {}",
-      "fn second() {}\nfn first() {}",
-      mode,
-      context=0,
+      "fn first() {}\nfn second() {}", "fn second() {}\nfn first() {}", mode,
     )
     assert_true(result.status is Reordered)
     let top = top_level_for_test(result)
@@ -1770,7 +1853,6 @@ test "reorder plus an internal change remains Changed" {
     "fn first() { old_value() }\nfn second() {}",
     "fn second() {}\nfn first() { new_value() }",
     Ast,
-    context=0,
   )
   assert_true(result.status is Changed)
   let top = top_level_for_test(result)
@@ -1788,7 +1870,7 @@ test "inserted and deleted declarations have no fabricated opposite range" {
     "fn keep() {}",
     "fn added() {}\nfn keep() {}",
     Ast,
-    context=0,
+    graph_limit=0,
   )
   let inserted_top = top_level_for_test(inserted)
   assert_true(inserted_top.old_order is [0])
@@ -1798,12 +1880,13 @@ test "inserted and deleted declarations have no fabricated opposite range" {
     fail("expected a distinct inserted section")
   }
   assert_fragment_bounds(diff, None, Some(1))
+  assert_true(diff.fallbacks.is_empty())
 
   let deleted = diff_document_for_test(
     "fn removed() {}\nfn keep() {}",
     "fn keep() {}",
     Ast,
-    context=0,
+    graph_limit=0,
   )
   let deleted_top = top_level_for_test(deleted)
   assert_true(deleted_top.old_order is [0, 1])
@@ -1813,6 +1896,7 @@ test "inserted and deleted declarations have no fabricated opposite range" {
     fail("expected a distinct deleted section")
   }
   assert_fragment_bounds(diff, Some(1), None)
+  assert_true(diff.fallbacks.is_empty())
 }
 
 ///|
@@ -1827,7 +1911,7 @@ test "formatting-only AST changes retain an empty matched section" {
   guard top.sections is [Matched(diff~, ..)] else {
     fail("expected one reliable matched section")
   }
-  assert_true(diff.document.hunks.is_empty())
+  assert_true(diff.rows.is_empty())
   assert_false(top.reordered)
 }
 
@@ -1838,7 +1922,6 @@ test "parse and root-list fallbacks attach only to Whole fragments" {
     "fn okay() {}",
     old_name="before.mbt",
     new_name="after.mbt",
-    context=0,
   )
   assert_true(parsed.status is Changed)
   let parsed_fragment = whole_fragment_for_test(parsed)
@@ -1846,32 +1929,31 @@ test "parse and root-list fallbacks attach only to Whole fragments" {
     fail("expected an old-side parse fallback")
   }
   assert_true(detail.contains("before.mbt"), msg=detail)
-  assert_false(parsed_fragment.document.hunks.is_empty())
+  assert_false(parsed_fragment.rows.is_empty())
 
   let root = diff_document_for_test(
     "/// trailing old",
     "/// trailing new",
     Ast,
-    context=0,
     graph_limit=0,
   )
   let root_fragment = whole_fragment_for_test(root)
   assert_true(root_fragment.fallbacks is [GraphLimitExceeded(limit=0)])
-  assert_false(root_fragment.document.hunks.is_empty())
+  assert_false(root_fragment.rows.is_empty())
 }
 
 ///|
 test "top-level budget exhaustion creates one Whole fallback" {
   let result = calculate_diff_document_with_limit(
     "fn stable() {}\nfn Worker::old_name() { body() }", "fn stable() {}\nfn Worker::new_name() { body() }",
-    "old", "new", 0, 3_000_000, false, 0,
+    "old", "new", 3_000_000, false, 0,
   )
   let fragment = whole_fragment_for_test(result)
   assert_true(
     fragment.fallbacks
     is [ComputationLimitExceeded(stage=TopLevelAlignment, limit=0)],
   )
-  assert_false(fragment.document.hunks.is_empty())
+  assert_false(fragment.rows.is_empty())
 }
 
 ///|
@@ -1886,23 +1968,17 @@ test "local fallbacks stay on their own top-level fragments" {
     #|fn first() { "alpha zeta gamma" }
     #|///|UUID(second)
     #|fn second() { "one four three" }
-  let graph = diff_document_for_test(
-    old_source,
-    new_source,
-    Ast,
-    context=0,
-    graph_limit=0,
-  )
+  let graph = diff_document_for_test(old_source, new_source, Ast, graph_limit=0)
   let graph_top = top_level_for_test(graph)
   assert_eq(graph_top.sections.length(), 2)
   for section in graph_top.sections {
     let fragment = section_fragment(section)
     assert_true(fragment.fallbacks is [GraphLimitExceeded(limit=0)])
-    assert_false(fragment.document.hunks.is_empty())
+    assert_false(fragment.rows.is_empty())
   }
 
   let limited = calculate_diff_document_with_limit(
-    old_source, new_source, "old", "new", 0, 3_000_000, false, 0,
+    old_source, new_source, "old", "new", 3_000_000, false, 0,
   )
   let limited_top = top_level_for_test(limited)
   assert_eq(limited_top.sections.length(), 2)
@@ -1945,7 +2021,6 @@ test "filtered local fragments retain production changes only" {
     "/// old docs\nfn production() { old_value() }\ntest \"t\" { old_test() }",
     "/// new docs\nfn production() { new_value() }\ntest \"t\" { new_test() }",
     Ast,
-    context=0,
     ignore_comments=true,
     ignore_tests=true,
   )
@@ -1993,10 +2068,9 @@ test "lexical RootList remains a primary Whole document" {
     "/// trailing old",
     "/// trailing new",
     Lexical,
-    context=0,
   )
   assert_true(result.status is Changed)
   let fragment = whole_fragment_for_test(result)
   assert_true(fragment.fallbacks.is_empty())
-  assert_false(fragment.document.hunks.is_empty())
+  assert_false(fragment.rows.is_empty())
 }
