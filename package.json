@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "build": "npm --prefix playground run build",
-    "server-test": "npm --prefix playground run server-test",
     "test:playground": "npm --prefix playground run test:e2e",
     "build:extension": "node extension/scripts/build.mjs",
     "test:extension": "node --test extension/tests/*.test.mjs && playground/node_modules/.bin/playwright test --config extension/playwright.config.mjs",
