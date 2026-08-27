@@ -39,13 +39,13 @@ pub(all) struct DetailedDiffResult {
 
 ///|
 priv struct DetailedUnitResult {
-  document : @model.HunkDocument
+  rows : ArrayView[@model.DiffRow]
   fallback : FallbackReason?
 }
 
 ///|
 priv enum AstBuildResult {
-  AstDocument(@model.HunkDocument)
+  AstRows(ArrayView[@model.DiffRow])
   AstPositionsOutOfBounds(ArrayView[DiffSide])
 }
 
@@ -53,8 +53,8 @@ priv enum AstBuildResult {
 type NovelRangeMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|
-fn empty_document() -> @model.HunkDocument {
-  { hunks: [] }
+fn empty_rows() -> ArrayView[@model.DiffRow] {
+  []
 }
 
 ///|
@@ -67,55 +67,53 @@ fn document_lines(source : String) -> Array[String] {
 }
 
 ///|
-fn lexical_source_document(
+fn lexical_source_rows(
   old_source : String,
   new_source : String,
-  context : Int,
   ignore_comments : Bool,
-) -> @model.HunkDocument {
+) -> ArrayView[@model.DiffRow] {
   let old = document_lines(old_source)
   let new = document_lines(new_source)
-  @tokdiff.diff(old~, new~, context~, line_cleanup=true, ignore_comments~)
+  @tokdiff.diff_rows(old~, new~, line_cleanup=true, ignore_comments~)
 }
 
 ///|
-fn lexical_view_document(
+fn lexical_view_rows(
   old : SourceView,
   new : SourceView,
-  context : Int,
   ignore_comments : Bool,
-) -> @model.HunkDocument {
-  @diff_ignore.restore_document(
-    @tokdiff.diff(
-      old=old.lines(),
-      new=new.lines(),
-      context~,
-      line_cleanup=true,
-      ignore_comments~,
-    ),
-    old~,
-    new~,
+) -> ArrayView[@model.DiffRow] {
+  let rows = @tokdiff.diff_rows(
+    old=old.lines(),
+    new=new.lines(),
+    line_cleanup=true,
+    ignore_comments~,
   )
+  if rows.is_empty() {
+    []
+  } else {
+    @diff_ignore.restore_rows(rows, old~, new~)
+  }
 }
 
 ///|
 fn diff_fragment(
-  document : @model.HunkDocument,
+  rows : ArrayView[@model.DiffRow],
   fallback : FallbackReason?,
 ) -> DiffFragment {
   let fallbacks : Array[FallbackReason] = []
   if fallback is Some(reason) {
     fallbacks.push(reason)
   }
-  { document, fallbacks: fallbacks[:] }
+  { rows, fallbacks: fallbacks[:] }
 }
 
 ///|
 fn whole_document(
-  document : @model.HunkDocument,
+  rows : ArrayView[@model.DiffRow],
   fallback? : FallbackReason,
 ) -> DiffDocument {
-  @model.DiffDocument::Whole(diff_fragment(document, fallback))
+  @model.DiffDocument::Whole(diff_fragment(rows, fallback))
 }
 
 ///|
@@ -138,7 +136,7 @@ fn top_level_result(
     sections.push(section_from_edit(edit, fragments[index]))
   }
   let status : DiffStatus = if fragments.any(fragment => {
-      !fragment.document.hunks.is_empty()
+      !fragment.rows.is_empty()
     }) {
     Changed
   } else if plan.reordered {
@@ -158,17 +156,16 @@ fn top_level_result(
 }
 
 ///|
-fn lexical_edit_document(
+fn lexical_edit_rows(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   ignore_comments : Bool,
-) -> @model.HunkDocument {
+) -> ArrayView[@model.DiffRow] {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
-  lexical_view_document(old_local, new_local, context, ignore_comments)
+  lexical_view_rows(old_local, new_local, ignore_comments)
 }
 
 ///|
@@ -180,49 +177,31 @@ fn detailed_lexical_plan_document(
   plan : TopLevelPlan,
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   ignore_comments : Bool,
 ) -> DetailedDiffResult {
   match plan {
     RootList(..) => {
-      let document = lexical_view_document(
-        old_view, new_view, context, ignore_comments,
-      )
-      { document: whole_document(document), status: Changed }
+      let rows = lexical_view_rows(old_view, new_view, ignore_comments)
+      { document: whole_document(rows), status: Changed }
     }
     PerUnit(unit_plan) => {
       let fragments : Array[DiffFragment] = []
       for edit in unit_plan.edits {
-        let document = match edit {
+        let rows = match edit {
           Replace(old~, new~) =>
-            lexical_edit_document(
+            lexical_edit_rows(
               Some(old),
               Some(new),
               old_view,
               new_view,
-              context,
               ignore_comments,
             )
           Delete(old) =>
-            lexical_edit_document(
-              Some(old),
-              None,
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
+            unit_source_view(old_view, Some(old)).changed_rows(true)
           Insert(new) =>
-            lexical_edit_document(
-              None,
-              Some(new),
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
+            unit_source_view(new_view, Some(new)).changed_rows(false)
         }
-        fragments.push(diff_fragment(document, None))
+        fragments.push(diff_fragment(rows, None))
       }
       top_level_result(unit_plan, fragments)
     }
@@ -380,29 +359,30 @@ fn ast_diff_line(
 }
 
 ///|
-fn ast_pair_is_context(
-  pair : (Int?, Int?),
-  hunk : @hunks.AstHunk,
-  old_lines : ArrayView[String],
-  new_lines : ArrayView[String],
+fn ast_line_is_novel(
+  line : Int?,
+  novel_lines : @line_alignment.LineSet,
 ) -> Bool {
-  match pair {
-    (Some(old_line), Some(new_line)) =>
-      !hunk.novel_lhs.contains(old_line) &&
-      !hunk.novel_rhs.contains(new_line) &&
-      old_lines[old_line] == new_lines[new_line]
-    _ => false
-  }
+  line is Some(line) && novel_lines.contains(line)
 }
 
 ///|
-fn ast_change_row(
+fn ast_pair_is_changed(
+  pair : (Int?, Int?),
+  novel_lhs : @line_alignment.LineSet,
+  novel_rhs : @line_alignment.LineSet,
+) -> Bool {
+  ast_line_is_novel(pair.0, novel_lhs) || ast_line_is_novel(pair.1, novel_rhs)
+}
+
+///|
+fn ast_line_pair(
   pair : (Int?, Int?),
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
-) -> @model.DiffRow {
+) -> @model.DiffLinePair {
   match pair {
     (Some(old_line), Some(new_line)) =>
       Paired(
@@ -418,75 +398,65 @@ fn ast_change_row(
 }
 
 ///|
-fn ast_hunk_blocks(
-  pairs : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+fn ast_row(
+  pair : (Int?, Int?),
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
   new_ranges : NovelRangeMap,
-) -> ArrayView[@model.DiffBlock] {
-  let blocks : Array[@model.DiffBlock] = []
-  let context_lines : Array[@model.ContextLine] = []
-  let change_rows : Array[@model.DiffRow] = []
-  for pair in pairs {
-    if ast_pair_is_context(pair, hunk, old_lines, new_lines) {
-      if !change_rows.is_empty() {
-        blocks.push(ChangeBlock(change_rows.copy()[:]))
-        change_rows.clear()
-      }
-      guard pair is (Some(old_index), Some(new_index)) else { panic() }
-      context_lines.push({ old_index, new_index, text: old_lines[old_index] })
-    } else {
-      if !context_lines.is_empty() {
-        blocks.push(ContextBlock(context_lines.copy()[:]))
-        context_lines.clear()
-      }
-      change_rows.push(
-        ast_change_row(pair, old_lines, new_lines, old_ranges, new_ranges),
-      )
+  novel_lhs : @line_alignment.LineSet,
+  novel_rhs : @line_alignment.LineSet,
+) -> @model.DiffRow {
+  if ast_pair_is_changed(pair, novel_lhs, novel_rhs) {
+    Changed(ast_line_pair(pair, old_lines, new_lines, old_ranges, new_ranges))
+  } else {
+    match pair {
+      (Some(old_line), Some(new_line)) if old_lines[old_line] ==
+        new_lines[new_line] =>
+        Context({
+          old_index: old_line,
+          new_index: new_line,
+          text: old_lines[old_line],
+        })
+      _ =>
+        Neutral(
+          ast_line_pair(pair, old_lines, new_lines, old_ranges, new_ranges),
+        )
     }
   }
-  if !context_lines.is_empty() {
-    blocks.push(ContextBlock(context_lines[:]))
-  }
-  if !change_rows.is_empty() {
-    blocks.push(ChangeBlock(change_rows[:]))
-  }
-  blocks[:]
-}
-
-///|
-fn ast_line_is_novel(line : Int?, novel_lines : @hunks.LineSet) -> Bool {
-  line is Some(line) && novel_lines.contains(line)
 }
 
 ///|
 fn ast_pair_side_is_changed(
   line : Int?,
   opposite : Int?,
-  novel_lines : @hunks.LineSet,
+  novel_lines : @line_alignment.LineSet,
 ) -> Bool {
   ast_line_is_novel(line, novel_lines) || (line is Some(_) && opposite is None)
 }
 
 ///|
-fn ast_pair_has_change(pair : (Int?, Int?), hunk : @hunks.AstHunk) -> Bool {
-  ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) ||
-  ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
+fn ast_pair_affects_sparse_replacement(
+  pair : (Int?, Int?),
+  novel_lhs : @line_alignment.LineSet,
+  novel_rhs : @line_alignment.LineSet,
+) -> Bool {
+  ast_pair_side_is_changed(pair.0, pair.1, novel_lhs) ||
+  ast_pair_side_is_changed(pair.1, pair.0, novel_rhs)
 }
 
 ///|
 fn ast_should_render_as_block_replacement(
   segment : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  novel_lhs : @line_alignment.LineSet,
+  novel_rhs : @line_alignment.LineSet,
 ) -> Bool {
   let lhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let rhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let mut all_present_sides_are_novel = true
   for pair in segment {
-    let lhs_novel = ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs)
-    let rhs_novel = ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
+    let lhs_novel = ast_pair_side_is_changed(pair.0, pair.1, novel_lhs)
+    let rhs_novel = ast_pair_side_is_changed(pair.1, pair.0, novel_rhs)
     if pair.0 is Some(line) {
       if lhs_novel {
         lhs_lines[line] = true
@@ -511,16 +481,17 @@ fn ast_should_render_as_block_replacement(
 fn append_ast_segment_lines(
   output : Array[(Int?, Int?)],
   segment : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  novel_lhs : @line_alignment.LineSet,
+  novel_rhs : @line_alignment.LineSet,
 ) -> Unit {
-  if ast_should_render_as_block_replacement(segment, hunk) {
+  if ast_should_render_as_block_replacement(segment, novel_lhs, novel_rhs) {
     for pair in segment {
-      if ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) {
+      if ast_pair_side_is_changed(pair.0, pair.1, novel_lhs) {
         output.push((pair.0, None))
       }
     }
     for pair in segment {
-      if ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs) {
+      if ast_pair_side_is_changed(pair.1, pair.0, novel_rhs) {
         output.push((None, pair.1))
       }
     }
@@ -532,56 +503,30 @@ fn append_ast_segment_lines(
 ///|
 fn reduce_ast_sparse_replacements(
   lines : ArrayView[(Int?, Int?)],
-  hunk : @hunks.AstHunk,
+  novel_lhs : @line_alignment.LineSet,
+  novel_rhs : @line_alignment.LineSet,
 ) -> Array[(Int?, Int?)] {
   let output : Array[(Int?, Int?)] = []
   let segment : Array[(Int?, Int?)] = []
   for pair in lines {
-    if ast_pair_has_change(pair, hunk) {
+    if ast_pair_affects_sparse_replacement(pair, novel_lhs, novel_rhs) {
       segment.push(pair)
     } else {
-      append_ast_segment_lines(output, segment, hunk)
+      append_ast_segment_lines(output, segment, novel_lhs, novel_rhs)
       segment.clear()
       output.push(pair)
     }
   }
-  append_ast_segment_lines(output, segment, hunk)
+  append_ast_segment_lines(output, segment, novel_lhs, novel_rhs)
   output
 }
 
 ///|
-fn ast_hunk_side_range(
-  pairs : ArrayView[(Int?, Int?)],
-  old_side : Bool,
-) -> (Int, Int) {
-  let first : Ref[Int?] = Ref(None)
-  let last : Ref[Int?] = Ref(None)
-  let fallback : Ref[Int?] = Ref(None)
-  for pair in pairs {
-    let selected = if old_side { pair.0 } else { pair.1 }
-    let opposite = if old_side { pair.1 } else { pair.0 }
-    if selected is Some(line) {
-      if first.val is None {
-        first.val = Some(line)
-      }
-      last.val = Some(line)
-    } else if fallback.val is None && opposite is Some(line) {
-      fallback.val = Some(line)
-    }
-  }
-  match (first.val, last.val) {
-    (Some(start), Some(end_)) => (start, end_ - start + 1)
-    _ => (fallback.val.unwrap_or(0), 0)
-  }
-}
-
-///|
-fn ast_document_from_positions(
+fn ast_rows_from_positions(
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
   lhs_positions : ArrayView[MatchedPos],
   rhs_positions : ArrayView[MatchedPos],
-  context : Int,
   reduce_sparse_replacements : Bool,
 ) -> AstBuildResult {
   let out_of_bounds = ast_position_out_of_bounds_sides(
@@ -590,41 +535,31 @@ fn ast_document_from_positions(
   if !out_of_bounds.is_empty() {
     return AstPositionsOutOfBounds(out_of_bounds[:])
   }
-  let matched_lines = @hunks.all_matched_lines_filled(
+  let (novel_lhs, novel_rhs) = @line_alignment.novel_line_sets(
+    lhs_positions, rhs_positions,
+  )
+  if novel_lhs.is_empty() && novel_rhs.is_empty() {
+    return AstRows([])
+  }
+  let aligned = @line_alignment.all_matched_lines_filled(
     lhs_positions, rhs_positions, old_lines, new_lines,
   )
-  let ast_hunks = @hunks.merge_adjacent_hunks(
-    @hunks.matched_pos_to_hunks(lhs_positions, rhs_positions),
-    matched_lines,
-    context,
-  )
+  let pairs = if reduce_sparse_replacements {
+    reduce_ast_sparse_replacements(aligned, novel_lhs, novel_rhs)
+  } else {
+    aligned
+  }
   let old_ranges = collect_novel_ranges(lhs_positions)
   let new_ranges = collect_novel_ranges(rhs_positions)
-  let hunks : Array[@model.DiffHunk] = []
-  for hunk in ast_hunks {
-    let (start, end_) = @hunks.contextual_index_range_for_hunk(
-      hunk,
-      matched_lines,
-      context + 1,
-    )
-    let pairs = if reduce_sparse_replacements {
-      reduce_ast_sparse_replacements(matched_lines[start:end_], hunk)
-    } else {
-      matched_lines[start:end_].to_owned()
-    }
-    let (old_start, old_len) = ast_hunk_side_range(pairs, true)
-    let (new_start, new_len) = ast_hunk_side_range(pairs, false)
-    hunks.push({
-      old_start,
-      old_len,
-      new_start,
-      new_len,
-      blocks: ast_hunk_blocks(
-        pairs, hunk, old_lines, new_lines, old_ranges, new_ranges,
+  let rows : Array[@model.DiffRow] = []
+  for pair in pairs {
+    rows.push(
+      ast_row(
+        pair, old_lines, new_lines, old_ranges, new_ranges, novel_lhs, novel_rhs,
       ),
-    })
+    )
   }
-  AstDocument({ hunks: hunks[:] })
+  AstRows(rows[:])
 }
 
 ///|
@@ -712,12 +647,11 @@ fn computation_stage(stage : @computation.Stage) -> ComputationStage {
 ///|
 // Unit and root-list AST paths share all syntax calculation, mapping, and
 // rendered-line validation. Their wrappers only restore filtered text.
-fn ast_document_for_roots_with_budget(
+fn ast_rows_for_roots_with_budget(
   lhs_roots : ArrayView[@syntax.Syntax],
   rhs_roots : ArrayView[@syntax.Syntax],
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
@@ -750,23 +684,21 @@ fn ast_document_for_roots_with_budget(
     let sides = ordered_out_of_bounds_sides(out_of_bounds_sides)
     return AstPositionsOutOfBounds(sides[:])
   }
-  ast_document_from_positions(
+  ast_rows_from_positions(
     old_view.lines(),
     new_view.lines(),
     lhs_positions,
     rhs_positions,
-    context,
     reduce_sparse_replacements,
   )
 }
 
 ///|
-fn ast_unit_document_with_budget(
+fn ast_unit_rows_with_budget(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
@@ -782,35 +714,51 @@ fn ast_unit_document_with_budget(
     rhs_roots.push(unit.root)
   }
   match
-    ast_document_for_roots_with_budget(
-      lhs_roots, rhs_roots, old_local, new_local, context, graph_limit, reduce_sparse_replacements,
+    ast_rows_for_roots_with_budget(
+      lhs_roots, rhs_roots, old_local, new_local, graph_limit, reduce_sparse_replacements,
       budget,
     ) {
-    AstDocument(document) =>
-      AstDocument(
-        @diff_ignore.restore_document(document, old=old_local, new=new_local),
+    AstRows(rows) =>
+      AstRows(
+        if rows.is_empty() {
+          []
+        } else {
+          @diff_ignore.restore_rows(rows, old=old_local, new=new_local)
+        },
       )
     AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
   }
 }
 
 ///|
-fn detailed_ast_edit_document(
+fn detailed_ast_edit_rows(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
   budget : @computation.Budget,
 ) -> DetailedUnitResult {
-  let build = ast_unit_document_with_budget(
+  match (old_unit, new_unit) {
+    (Some(old), None) =>
+      return {
+        rows: unit_source_view(old_view, Some(old)).changed_rows(true),
+        fallback: None,
+      }
+    (None, Some(new)) =>
+      return {
+        rows: unit_source_view(new_view, Some(new)).changed_rows(false),
+        fallback: None,
+      }
+    (None, None) => return { rows: [], fallback: None }
+    _ => ()
+  }
+  let build = ast_unit_rows_with_budget(
     old_unit,
     new_unit,
     old_view,
     new_view,
-    context,
     graph_limit,
     !ignore_comments,
     budget,
@@ -821,8 +769,8 @@ fn detailed_ast_edit_document(
         limit~,
       )
       return {
-        document: lexical_edit_document(
-          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+        rows: lexical_edit_rows(
+          old_unit, new_unit, old_view, new_view, ignore_comments,
         ),
         fallback: Some(reason),
       }
@@ -830,20 +778,20 @@ fn detailed_ast_edit_document(
     _ => {
       let reason : FallbackReason = GraphLimitExceeded(limit=graph_limit)
       return {
-        document: lexical_edit_document(
-          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+        rows: lexical_edit_rows(
+          old_unit, new_unit, old_view, new_view, ignore_comments,
         ),
         fallback: Some(reason),
       }
     }
   }
   match build {
-    AstDocument(document) => { document, fallback: None }
+    AstRows(rows) => { rows, fallback: None }
     AstPositionsOutOfBounds(sides) => {
       let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
       {
-        document: lexical_edit_document(
-          old_unit, new_unit, old_view, new_view, context, ignore_comments,
+        rows: lexical_edit_rows(
+          old_unit, new_unit, old_view, new_view, ignore_comments,
         ),
         fallback: Some(reason),
       }
@@ -852,12 +800,11 @@ fn detailed_ast_edit_document(
 }
 
 ///|
-fn ast_root_document_with_budget(
+fn ast_root_rows_with_budget(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.Budget,
@@ -865,13 +812,17 @@ fn ast_root_document_with_budget(
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
   match
-    ast_document_for_roots_with_budget(
-      lhs_roots, rhs_roots, old_view, new_view, context, graph_limit, reduce_sparse_replacements,
+    ast_rows_for_roots_with_budget(
+      lhs_roots, rhs_roots, old_view, new_view, graph_limit, reduce_sparse_replacements,
       budget,
     ) {
-    AstDocument(document) =>
-      AstDocument(
-        @diff_ignore.restore_document(document, old=old_view, new=new_view),
+    AstRows(rows) =>
+      AstRows(
+        if rows.is_empty() {
+          []
+        } else {
+          @diff_ignore.restore_rows(rows, old=old_view, new=new_view)
+        },
       )
     AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
   }
@@ -881,14 +832,11 @@ fn ast_root_document_with_budget(
 fn whole_file_fallback(
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   ignore_comments : Bool,
   reason : FallbackReason,
 ) -> DetailedDiffResult {
-  let document = lexical_view_document(
-    old_view, new_view, context, ignore_comments,
-  )
-  { document: whole_document(document, fallback=reason), status: Changed }
+  let rows = lexical_view_rows(old_view, new_view, ignore_comments)
+  { document: whole_document(rows, fallback=reason), status: Changed }
 }
 
 ///|
@@ -897,18 +845,16 @@ fn detailed_ast_root_list_document(
   new_units : ArrayView[ImplUnit],
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
   computation_limit : UInt,
 ) -> DetailedDiffResult {
   let budget = @computation.Budget::new(computation_limit)
-  let build = ast_root_document_with_budget(
+  let build = ast_root_rows_with_budget(
     old_units,
     new_units,
     old_view,
     new_view,
-    context,
     graph_limit,
     !ignore_comments,
     budget,
@@ -917,7 +863,6 @@ fn detailed_ast_root_list_document(
       return whole_file_fallback(
         old_view,
         new_view,
-        context,
         ignore_comments,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),
       )
@@ -925,7 +870,6 @@ fn detailed_ast_root_list_document(
       return whole_file_fallback(
         old_view,
         new_view,
-        context,
         ignore_comments,
         GraphLimitExceeded(limit=graph_limit),
       )
@@ -935,14 +879,13 @@ fn detailed_ast_root_list_document(
       whole_file_fallback(
         old_view,
         new_view,
-        context,
         ignore_comments,
         SyntaxPositionsOutOfBounds(sides~),
       )
-    AstDocument(document) =>
+    AstRows(rows) =>
       {
-        document: whole_document(document),
-        status: if document.hunks.is_empty() {
+        document: whole_document(rows),
+        status: if rows.is_empty() {
           NoStructuralChanges
         } else {
           Changed
@@ -956,7 +899,6 @@ fn detailed_ast_plan_document(
   plan : TopLevelPlan,
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
   computation_limit : UInt,
@@ -964,7 +906,7 @@ fn detailed_ast_plan_document(
   match plan {
     RootList(old~, new~) =>
       detailed_ast_root_list_document(
-        old, new, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
+        old, new, old_view, new_view, graph_limit, ignore_comments, computation_limit,
       )
     PerUnit(unit_plan) => {
       let fragments : Array[DiffFragment] = []
@@ -974,17 +916,16 @@ fn detailed_ast_plan_document(
           Delete(old) => (Some(old), None)
           Insert(new) => (None, Some(new))
         }
-        let result = detailed_ast_edit_document(
+        let result = detailed_ast_edit_rows(
           old_unit,
           new_unit,
           old_view,
           new_view,
-          context,
           graph_limit,
           ignore_comments,
           @computation.Budget::new(computation_limit),
         )
-        fragments.push(diff_fragment(result.document, result.fallback))
+        fragments.push(diff_fragment(result.rows, result.fallback))
       }
       top_level_result(unit_plan, fragments)
     }
@@ -1042,44 +983,39 @@ fn calculate_diff_document_with_limit(
   new_source : String,
   old_name : String,
   new_name : String,
-  context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
   computation_limit : UInt,
   ignore_tests? : Bool = false,
   mode? : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
-  let context = @cmp.maximum(context, 0)
   if old_source == new_source {
-    return { document: whole_document(empty_document()), status: Identical }
+    return { document: whole_document(empty_rows()), status: Identical }
   }
   let old_parse = @cst.parse_structure(old_source, name=old_name)
   let new_parse = @cst.parse_structure(new_source, name=new_name)
   let old_reports = old_parse.diagnostics_view()
   let new_reports = new_parse.diagnostics_view()
   let parse_detail = parse_fallback_detail(old_reports, new_reports)
-  let comment_document = if ignore_comments {
-    Some(lexical_source_document(old_source, new_source, context, true))
+  let comment_rows = if ignore_comments {
+    Some(lexical_source_rows(old_source, new_source, true))
   } else {
     None
   }
-  if comment_document is Some(document) && document.hunks.is_empty() {
-    return { document: whole_document(document), status: IgnoredOnly }
+  if comment_rows is Some(rows) && rows.is_empty() {
+    return { document: whole_document(rows), status: IgnoredOnly }
   }
   if parse_detail is Some(detail) {
-    let document = if comment_document is Some(document) {
-      document
+    let rows = if comment_rows is Some(rows) {
+      rows
     } else {
-      lexical_source_document(old_source, new_source, context, false)
+      lexical_source_rows(old_source, new_source, false)
     }
     let reason : FallbackReason = ParseError(
       sides=parse_error_sides(old_reports, new_reports),
       detail~,
     )
-    return {
-      document: whole_document(document, fallback=reason),
-      status: Changed,
-    }
+    return { document: whole_document(rows, fallback=reason), status: Changed }
   }
   let old_collection = collect_impl_units_detailed(
     old_source,
@@ -1102,11 +1038,9 @@ fn calculate_diff_document_with_limit(
     ignore_comments~,
   )
   if ignore_comments || ignore_tests {
-    let document = lexical_view_document(
-      old_view, new_view, context, ignore_comments,
-    )
-    if document.hunks.is_empty() {
-      return { document: whole_document(document), status: IgnoredOnly }
+    let rows = lexical_view_rows(old_view, new_view, ignore_comments)
+    if rows.is_empty() {
+      return { document: whole_document(rows), status: IgnoredOnly }
     }
   }
   let budget = @computation.Budget::new(computation_limit)
@@ -1120,19 +1054,16 @@ fn calculate_diff_document_with_limit(
       return whole_file_fallback(
         old_view,
         new_view,
-        context,
         ignore_comments,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),
       )
   }
   match mode {
     Lexical =>
-      detailed_lexical_plan_document(
-        plan, old_view, new_view, context, ignore_comments,
-      )
+      detailed_lexical_plan_document(plan, old_view, new_view, ignore_comments)
     Ast =>
       detailed_ast_plan_document(
-        plan, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
+        plan, old_view, new_view, graph_limit, ignore_comments, computation_limit,
       )
   }
 }
@@ -1148,7 +1079,6 @@ pub fn calculate_diff_document(
   new_source : String,
   old_name? : String = "old",
   new_name? : String = "new",
-  context? : Int = 3,
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
@@ -1159,7 +1089,6 @@ pub fn calculate_diff_document(
     new_source,
     old_name,
     new_name,
-    context,
     graph_limit,
     ignore_comments,
     @computation.default_limit(),
@@ -1175,7 +1104,6 @@ pub fn calculate_diff_document(
 pub fn diff_document_detailed(
   old_source : String,
   new_source : String,
-  context? : Int = 3,
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
@@ -1184,7 +1112,6 @@ pub fn diff_document_detailed(
   calculate_diff_document(
     old_source,
     new_source,
-    context~,
     graph_limit~,
     ignore_comments~,
     ignore_tests~,

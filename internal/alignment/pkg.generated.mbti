@@ -6,9 +6,9 @@ import {
 }
 
 // Values
-pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DetailedDiffResult
+pub fn calculate_diff_document(String, String, old_name? : String, new_name? : String, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DetailedDiffResult
 
-pub fn diff_document_detailed(String, String, context? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DetailedDiffResult
+pub fn diff_document_detailed(String, String, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : AlignedDiffMode) -> DetailedDiffResult
 
 // Errors
 

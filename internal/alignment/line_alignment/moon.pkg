@@ -1,0 +1,4 @@
+import {
+  "moonbitlang/core/hashmap",
+  "moonbit-community/moondiff/internal/syntax",
+}

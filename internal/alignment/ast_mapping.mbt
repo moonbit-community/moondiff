@@ -31,9 +31,10 @@ fn ordered_out_of_bounds_sides(sides : ArrayView[DiffSide]) -> Array[DiffSide] {
 
 ///|
 // Structural positions keep original CST line numbers. Move both their own
-// and opposite spans into the dense filtered view before hunk building. Valid
-// spans touching excluded source text are deliberately omitted, while invalid
-// coordinates are retained as side-specific fallback metadata.
+// and opposite spans into the dense filtered view before complete line
+// alignment. Valid spans touching excluded source text are deliberately
+// omitted, while invalid coordinates are retained as side-specific fallback
+// metadata.
 fn map_matched_positions(
   positions : ArrayView[MatchedPos],
   own : SourceView,

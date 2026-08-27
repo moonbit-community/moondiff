@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/internal/alignment/line_alignment"
+
+import {
+  "moonbit-community/moondiff/internal/syntax",
+  "moonbitlang/core/hashmap",
+}
+
+// Values
+pub fn all_matched_lines_filled(ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos], ArrayView[String], ArrayView[String]) -> Array[(Int?, Int?)]
+
+pub fn novel_line_sets(ArrayView[@syntax.MatchedPos], ArrayView[@syntax.MatchedPos]) -> (@hashmap.HashMap[Int, Bool], @hashmap.HashMap[Int, Bool])
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+pub type LineSet = @hashmap.HashMap[Int, Bool]
+
+// Traits
