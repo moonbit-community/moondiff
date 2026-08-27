@@ -1,22 +1,60 @@
-[34m--- cli_test/source/20251114.old.mbt: line 1[39m
-[34m+++ cli_test/source/20251114.new.mbt: line 1[39m
+note: top-level declarations reordered
+[section #1 matched] old lines 1-4; new lines 1-12
+[34m--- cli_test/source/20251114.old.mbt: lines 1-4[39m
+[34m+++ cli_test/source/20251114.new.mbt: lines 1-12[39m
 @@ -1,4 +1,12 @@
-[90m1[39m  [90m1[39m ///|UUID(0)
-[90m2[39m [90m..[39m [90mpub fn decode(bytes : @bytes.View) -> String raise Malformed {[39m
-[90m.[39m  [90m2[39m [90mpub fn decode([39m
-[90m.[39m  [32m3[39m [90m  bytes : @bytes.View[39m[32m[1m,[22m[39m
-[90m.[39m  [32m4[39m [90m  [39m[32m[1mignore_bom? : Bool = false,[22m[39m
-[90m.[39m  [90m5[39m [90m) -> String raise Malformed {[39m
-[90m.[39m  [32m6[39m [90m  [39m[32m[1mlet bytes = if ignore_bom && bytes is [.. "\xef\xbb\xbf", .. rest] {[22m[39m
-[90m.[39m  [32m7[39m [90m    [39m[32m[1mrest[22m[39m
-[90m.[39m  [32m8[39m [90m  [39m[32m[1m} else {[22m[39m
-[90m.[39m  [32m9[39m [90m    [39m[32m[1mbytes[22m[39m
-[90m.[39m [32m10[39m [90m  [39m[32m[1m}[22m[39m
-[90m3[39m [90m11[39m   let builder = StringBuilder::new(size_hint=bytes.length())
-[90m4[39m [90m12[39m }
+ [90m1[39m  [90m1[39m ///|UUID(0)
+ [90m2[39m [90m..[39m [90mpub fn decode(bytes : @bytes.View) -> String raise Malformed {[39m
+[90m..[39m  [90m2[39m [90mpub fn decode([39m
+[90m..[39m  [32m3[39m [90m  bytes : @bytes.View[39m[32m[1m,[22m[39m
+[90m..[39m  [32m4[39m [90m  [39m[32m[1mignore_bom? : Bool = false,[22m[39m
+[90m..[39m  [90m5[39m [90m) -> String raise Malformed {[39m
+[90m..[39m  [32m6[39m [90m  [39m[32m[1mlet bytes = if ignore_bom && bytes is [.. "\xef\xbb\xbf", .. rest] {[22m[39m
+[90m..[39m  [32m7[39m [90m    [39m[32m[1mrest[22m[39m
+[90m..[39m  [32m8[39m [90m  [39m[32m[1m} else {[22m[39m
+[90m..[39m  [32m9[39m [90m    [39m[32m[1mbytes[22m[39m
+[90m..[39m [32m10[39m [90m  [39m[32m[1m}[22m[39m
+ [90m3[39m [90m11[39m   let builder = StringBuilder::new(size_hint=bytes.length())
+ [90m4[39m [90m12[39m }
 
-[34m--- cli_test/source/20251114.old.mbt: line 6[39m
-[34m+++ cli_test/source/20251114.new.mbt: line 36[39m
+[section #4 matched] old lines 24-28; new lines 14-20
+[34m--- cli_test/source/20251114.old.mbt: lines 24-28[39m
+[34m+++ cli_test/source/20251114.new.mbt: lines 14-20[39m
+@@ -24,5 +14,7 @@
+[90m24[39m [90m14[39m ///|UUID(1)
+[90m25[39m [90m15[39m fn main {
+[90m26[39m [90m16[39m   println("Hello, world!")
+[90m..[39m [32m17[39m [90m  [39m[32m[1m// insert comment[22m[39m
+[90m..[39m [32m18[39m [90m  [39m[32m[1m// more than one line[22m[39m
+[90m27[39m [90m19[39m   println(5 + 6)
+[90m28[39m [90m20[39m }
+
+[section #5 matched] old lines 30-36; new lines 22-28
+[34m--- cli_test/source/20251114.old.mbt: lines 30-36[39m
+[34m+++ cli_test/source/20251114.new.mbt: lines 22-28[39m
+@@ -30,6 +22,6 @@
+[90m30[39m [90m22[39m ///|UUID(2)
+[90m31[39m [90m..[39m [90mpub fn[T, U] map(self : T?, f : (T) -> U) -> U? {[39m
+[90m..[39m [32m23[39m [90mpub fn[T, U] map(self : T?, f : (T) -> U [39m[32m[1mraise?[22m[39m[90m) -> U? [39m[32m[1mraise?[22m[39m[90m {[39m
+[90m32[39m [90m24[39m   match self {
+[90m33[39m [90m25[39m     Some(t) => Some(f(t))
+[90m34[39m [90m26[39m     None => None
+[90m35[39m [90m27[39m   }
+
+[section #6 matched] old lines 38-43; new lines 30-34
+[34m--- cli_test/source/20251114.old.mbt: lines 38-43[39m
+[34m+++ cli_test/source/20251114.new.mbt: lines 30-34[39m
+@@ -40,4 +32,3 @@
+[90m40[39m [90m..[39m [90m  println([39m
+[90m41[39m [90m..[39m [90m    "Hello, world!"[39m
+[90m42[39m [90m..[39m [90m  )[39m
+[90m..[39m [90m32[39m [90m  println("Hello, world!")[39m
+[90m..[39m [32m33[39m [90m  [39m[32m[1mprintln(5 + 6)[22m[39m
+[90m43[39m [90m34[39m }
+
+[section #2 matched] old lines 6-10; new lines 36-40
+[34m--- cli_test/source/20251114.old.mbt: lines 6-10[39m
+[34m+++ cli_test/source/20251114.new.mbt: lines 36-40[39m
 @@ -6,5 +36,5 @@
  [90m6[39m [90m36[39m ///|UUID(4)
  [90m7[39m [90m37[39m pub fn View::from_array(chars : Array[Char]) -> View {
@@ -26,8 +64,9 @@
 [90m..[39m [32m39[39m [90m  [39m[32m[1mView::make_view(s, 0, s[22m[39m[90m.[39m[32m[1mlength[22m[39m[90m()[39m[32m[1m)[22m[39m
 [90m10[39m [90m40[39m }
 
-[34m--- cli_test/source/20251114.old.mbt: line 12[39m
-[34m+++ cli_test/source/20251114.new.mbt: line 42[39m
+[section #3 matched] old lines 12-22; new lines 42-51
+[34m--- cli_test/source/20251114.old.mbt: lines 12-22[39m
+[34m+++ cli_test/source/20251114.new.mbt: lines 42-51[39m
 @@ -12,11 +42,10 @@
 [90m12[39m [90m42[39m ///|UUID(5)
 [90m13[39m [90m43[39m struct Set[K] {
@@ -47,36 +86,4 @@
 [31m21[39m [90m..[39m [90m  mut tail : [39m[31m[1mSEntry[K]?[22m[39m
 [90m..[39m [32m50[39m [90m  mut tail : [39m[32m[1mInt // tail of linked list[22m[39m
 [90m22[39m [90m51[39m }
-
-[34m--- cli_test/source/20251114.old.mbt: line 24[39m
-[34m+++ cli_test/source/20251114.new.mbt: line 14[39m
-@@ -24,5 +14,7 @@
-[90m24[39m [90m14[39m ///|UUID(1)
-[90m25[39m [90m15[39m fn main {
-[90m26[39m [90m16[39m   println("Hello, world!")
-[90m..[39m [32m17[39m [90m  [39m[32m[1m// insert comment[22m[39m
-[90m..[39m [32m18[39m [90m  [39m[32m[1m// more than one line[22m[39m
-[90m27[39m [90m19[39m   println(5 + 6)
-[90m28[39m [90m20[39m }
-
-[34m--- cli_test/source/20251114.old.mbt: line 30[39m
-[34m+++ cli_test/source/20251114.new.mbt: line 22[39m
-@@ -30,6 +22,6 @@
-[90m30[39m [90m22[39m ///|UUID(2)
-[90m31[39m [90m..[39m [90mpub fn[T, U] map(self : T?, f : (T) -> U) -> U? {[39m
-[90m..[39m [32m23[39m [90mpub fn[T, U] map(self : T?, f : (T) -> U [39m[32m[1mraise?[22m[39m[90m) -> U? [39m[32m[1mraise?[22m[39m[90m {[39m
-[90m32[39m [90m24[39m   match self {
-[90m33[39m [90m25[39m     Some(t) => Some(f(t))
-[90m34[39m [90m26[39m     None => None
-[90m35[39m [90m27[39m   }
-
-[34m--- cli_test/source/20251114.old.mbt: line 38[39m
-[34m+++ cli_test/source/20251114.new.mbt: line 30[39m
-@@ -40,4 +32,3 @@
-[90m40[39m [90m..[39m [90m  println([39m
-[90m41[39m [90m..[39m [90m    "Hello, world!"[39m
-[90m42[39m [90m..[39m [90m  )[39m
-[90m..[39m [90m32[39m [90m  println("Hello, world!")[39m
-[90m..[39m [32m33[39m [90m  [39m[32m[1mprintln(5 + 6)[22m[39m
-[90m43[39m [90m34[39m }
 

@@ -1,5 +1,6 @@
-[34m--- cli_test/source/20260601.old.mbt: line 1[39m
-[34m+++ cli_test/source/20260601.new.mbt: line 1[39m
+[section #1 matched] old lines 1-8; new lines 1-7
+[34m--- cli_test/source/20260601.old.mbt: lines 1-8[39m
+[34m+++ cli_test/source/20260601.new.mbt: lines 1-7[39m
 @@ -1,8 +1,7 @@
 [90m1[39m [90m1[39m test "debug inspect error path" {
 [31m2[39m [90m.[39m [90m  [39m[31m[1mlet result = try![22m[39m[90m @debug.debug_inspect(1)[39m
