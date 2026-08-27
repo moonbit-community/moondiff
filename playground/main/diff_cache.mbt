@@ -64,7 +64,6 @@ fn calculate_file_document(
         old.join("\n"),
         new.join("\n"),
         options=@mbtdiff.DiffOptions(
-          context_lines=3,
           graph_limit=3_000_000,
           ignore_comments~,
           ignore_tests~,

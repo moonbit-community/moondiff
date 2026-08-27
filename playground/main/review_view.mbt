@@ -356,6 +356,180 @@ fn unified_review_line(
 }
 
 ///|
+fn unified_changed_side(
+  row : ReviewRow,
+  old_side : Bool,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+) -> Array[@rabbita.Html] {
+  if old_side {
+    if row.old_line is Some(_) {
+      unified_source_line(
+        row.file_index,
+        row.old_line,
+        None,
+        row.old_anchor,
+        "del",
+        row.old_text,
+        row.old_segments,
+        "wd",
+        "-",
+        review,
+        emit,
+      )
+    } else {
+      []
+    }
+  } else if row.new_line is Some(_) {
+    unified_source_line(
+      row.file_index,
+      None,
+      row.new_line,
+      row.new_anchor,
+      "add",
+      row.new_text,
+      row.new_segments,
+      "wa",
+      "+",
+      review,
+      emit,
+    )
+  } else {
+    []
+  }
+}
+
+///|
+fn append_semantic_unified_rows(
+  output : Array[@rabbita.Html],
+  rows : ArrayView[ReviewRow],
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+) -> Unit {
+  let mut index = 0
+  while index < rows.length() {
+    if rows[index].kind is ChangeRow {
+      let start = index
+      while index < rows.length() && rows[index].kind is ChangeRow {
+        index += 1
+      }
+      for row in rows[start:index] {
+        output.push_iter(unified_changed_side(row, true, review, emit).iter())
+      }
+      for row in rows[start:index] {
+        output.push_iter(unified_changed_side(row, false, review, emit).iter())
+      }
+    } else {
+      output.push_iter(unified_review_line(rows[index], review, emit).iter())
+      index += 1
+    }
+  }
+}
+
+///|
+fn single_review_line(
+  row : ReviewRow,
+  old_side : Bool,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+) -> Array[@rabbita.Html] {
+  let number = if old_side { row.old_line } else { row.new_line }
+  let anchor = if old_side { row.old_anchor } else { row.new_anchor }
+  let text = if old_side { row.old_text } else { row.new_text }
+  let segments = if old_side { row.old_segments } else { row.new_segments }
+  let class_name = match row.kind {
+    ContextRow => "ctx"
+    IgnoredRow => "ctx ignored"
+    ChangeRow => if old_side { "del" } else { "add" }
+  }
+  let prefix = match row.kind {
+    ContextRow | IgnoredRow => " "
+    ChangeRow => if old_side { "-" } else { "+" }
+  }
+  let items : Array[@rabbita.Html] = [
+    @html.tr([
+      review_gutter(
+        row.file_index,
+        number,
+        anchor,
+        if old_side {
+          "old-line-number"
+        } else {
+          "new-line-number"
+        },
+        review,
+        emit,
+      ),
+      @html.td(
+        class=class_name,
+        review_segment_nodes(
+          text,
+          segments,
+          if old_side {
+            "wd"
+          } else {
+            "wa"
+          },
+          prefix,
+        ),
+      ),
+    ]),
+  ]
+  if inline_draft_for_anchor(review, anchor) is Some(_) {
+    items.push(inline_editor_row(review, anchor, 2, emit))
+  }
+  items
+}
+
+///|
+fn safe_semantic_review_diff(
+  file : ApiFile,
+  file_index : Int,
+  semantic_rows : ArrayView[@model.DiffRow],
+  mode : ViewMode,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+  old_base? : Int = 0,
+  new_base? : Int = 0,
+  single_side? : SourceSide,
+) -> @rabbita.Html {
+  let patch = parse_canonical_patch(file.filename, file.patch)
+  let projected = project_semantic_review_rows(
+    file_index,
+    file.filename,
+    semantic_rows,
+    patch,
+    old_base~,
+    new_base~,
+  )
+  let rows : Array[@rabbita.Html] = []
+  if single_side is Some(side) {
+    let old_side = side is Old
+    for row in projected {
+      rows.push_iter(single_review_line(row, old_side, review, emit).iter())
+    }
+  } else {
+    match mode {
+      Split =>
+        for row in projected {
+          rows.push_iter(split_review_line(row, review, emit).iter())
+        }
+      Unified => append_semantic_unified_rows(rows, projected, review, emit)
+    }
+  }
+  let table_class = if single_side is Some(_) {
+    "single numbered review-diff"
+  } else if mode is Split {
+    "split review-diff"
+  } else {
+    "unified numbered review-diff"
+  }
+  @html.div(class="diff-scroll", [
+    @html.table(class=table_class, @html.tbody(rows)),
+  ])
+}
+
+///|
 fn safe_review_diff(
   file : ApiFile,
   file_index : Int,

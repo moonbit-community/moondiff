@@ -27,7 +27,7 @@ priv enum SideLoad {
 
 ///|
 priv enum CachedDiffResult {
-  Line(@mbtdiff.HunkDocument)
+  Line(@model.HunkDocument)
   MoonBit(document~ : @mbtdiff.DiffDocument, status~ : @mbtdiff.DiffStatus)
 } derive(Eq)
 

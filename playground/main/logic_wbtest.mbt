@@ -970,7 +970,7 @@ test "line and MoonBit caches retain distinct semantic variants" {
   assert_true(top.new_order is [1, 0])
   assert_true(
     top.sections.all(section => {
-      semantic_section_fragment(section).document.hunks.is_empty()
+      semantic_section_fragment(section).rows.is_empty()
     }),
   )
 }
@@ -1032,7 +1032,7 @@ test "ignore comments has independent algorithm caches" {
   guard filtered is MoonBit(document=Whole(fragment), status=IgnoredOnly) else {
     fail("expected an ignored-only semantic cache")
   }
-  assert_true(fragment.document.hunks.is_empty())
+  assert_true(fragment.rows.is_empty())
 
   let view = set_file_state(diff_test_view([file]), 0, cached)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)

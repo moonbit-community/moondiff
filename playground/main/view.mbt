@@ -497,7 +497,7 @@ fn semantic_section_title(
 
 ///|
 fn fragment_has_output(fragment : @mbtdiff.DiffFragment) -> Bool {
-  !fragment.document.hunks.is_empty() || !fragment.fallbacks.is_empty()
+  !fragment.rows.is_empty() || !fragment.fallbacks.is_empty()
 }
 
 ///|
@@ -535,19 +535,46 @@ fn semantic_fragment_view(
         @html.nothing
       },
       diff_notice_view(fragment.fallbacks, whole),
-      if fragment.document.hunks.is_empty() {
+      if fragment.rows.is_empty() {
         @html.nothing
       } else {
-        safe_review_diff(
-          file,
-          file_index,
-          fragment.document,
-          mode,
-          review,
-          emit,
-          old_base~,
-          new_base~,
-        )
+        match (old_range, new_range) {
+          (Some(_), None) =>
+            safe_semantic_review_diff(
+              file,
+              file_index,
+              fragment.rows,
+              mode,
+              review,
+              emit,
+              old_base~,
+              new_base~,
+              single_side=Old,
+            )
+          (None, Some(_)) =>
+            safe_semantic_review_diff(
+              file,
+              file_index,
+              fragment.rows,
+              mode,
+              review,
+              emit,
+              old_base~,
+              new_base~,
+              single_side=New,
+            )
+          _ =>
+            safe_semantic_review_diff(
+              file,
+              file_index,
+              fragment.rows,
+              mode,
+              review,
+              emit,
+              old_base~,
+              new_base~,
+            )
+        }
       },
     ],
   )
