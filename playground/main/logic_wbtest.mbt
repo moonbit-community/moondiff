@@ -145,13 +145,8 @@ test "select MoonBit diff only when either path ends with lowercase mbt" {
 }
 
 ///|
-test "diff notices distinguish whole-file and partial lexical fallbacks" {
-  guard diff_notice([
-      {
-        reason: ParseError(sides=[Old], detail="old: parse error"),
-        scope: WholeFile,
-      },
-    ])
+test "diff notices distinguish Whole and section-local fallbacks" {
+  guard diff_notice([ParseError(sides=[Old], detail="old: parse error")], true)
     is Some(complete) else {
     fail("expected a complete fallback notice")
   }
@@ -160,9 +155,7 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
   assert_true(complete.message.contains("this entire file"))
   assert_true(complete.message.contains("old: parse error"))
 
-  guard diff_notice([
-      { reason: SyntaxPositionsOutOfBounds(sides=[Old, New]), scope: WholeFile },
-    ])
+  guard diff_notice([SyntaxPositionsOutOfBounds(sides=[Old, New])], true)
     is Some(position_complete) else {
     fail("expected a complete syntax-position fallback notice")
   }
@@ -172,45 +165,28 @@ test "diff notices distinguish whole-file and partial lexical fallbacks" {
     ),
   )
 
-  guard diff_notice([
-      {
-        reason: GraphLimitExceeded(limit=3_000_000),
-        scope: Region(
-          old=Some({ start: 723, len: 1 }),
-          new=Some({ start: 767, len: 1 }),
-        ),
-      },
-    ])
+  guard diff_notice([GraphLimitExceeded(limit=3_000_000)], false)
     is Some(partial) else {
-    fail("expected a partial fallback notice")
+    fail("expected a section-local fallback notice")
   }
   assert_eq(partial.class_name, "diff-notice partial-fallback")
-  assert_eq(partial.label, "Partial lexical fallback")
-  assert_true(partial.message.contains("AST diff was used for the rest"))
-  assert_true(partial.message.contains("old line 724, new line 768"))
+  assert_eq(partial.label, "Section lexical fallback")
+  assert_true(partial.message.contains("Only this semantic section"))
+  assert_true(partial.message.contains("graph limit exceeded"))
 
-  guard diff_notice([
-      {
-        reason: SyntaxPositionsOutOfBounds(sides=[New]),
-        scope: Region(
-          old=Some({ start: 3, len: 2 }),
-          new=Some({ start: 5, len: 2 }),
-        ),
-      },
-    ])
+  guard diff_notice([SyntaxPositionsOutOfBounds(sides=[New])], false)
     is Some(position_partial) else {
-    fail("expected a partial syntax-position fallback notice")
+    fail("expected a section-local syntax-position fallback notice")
   }
   assert_true(
     position_partial.message.contains(
-      "syntax positions out of bounds on the new side at old line 4, new line 6",
+      "syntax positions out of bounds on the new side",
     ),
   )
-  assert_true(
-    position_partial.message.contains("AST diff was used for the rest"),
-  )
+  assert_true(position_partial.message.contains("Only this semantic section"))
 
-  assert_true(diff_notice([]) is None)
+  assert_true(diff_notice([], true) is None)
+  assert_true(diff_notice([], false) is None)
 }
 
 ///|
@@ -428,8 +404,6 @@ test "stale commit responses are discarded by generation" {
     route: None,
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendMissing,
-    analysis_status: AnalysisIdle,
     review: initial_review_state(),
   }
   let fixture = decode_commit(
@@ -457,8 +431,6 @@ fn pull_test_model(
     route: Some(reference),
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendMissing,
-    analysis_status: AnalysisIdle,
     review: initial_review_state(),
   }
 }
@@ -793,50 +765,6 @@ test "incomplete pull pagination retries once then keeps the incomplete error" {
 }
 
 ///|
-test "pull request analysis keeps the v1 commit-shaped payload" {
-  let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let file = fixture_file("src/analysis.mbt", "modified")
-  let ready_file = ensure_file_document(
-    ready_test_file(file, ["fn value() -> Int { 1 }"], [
-      "fn value() -> Int { 2 }",
-    ]),
-    LexicalAlgorithm,
-  )
-  let view = ChangeView::{
-    reference,
-    sha: pull.head.sha,
-    parent_sha: Some("9999999999999999999999999999999999999999"),
-    old_revision: Some({
-      repository: reference_repository(reference),
-      sha: "9999999999999999999999999999999999999999",
-    }),
-    new_revision: {
-      repository: reference_repository(reference),
-      sha: pull.head.sha,
-    },
-    message: pull.title,
-    html_url: pull.html_url,
-    stats: pull_stats(pull),
-    total_files: 1,
-    files: [ready_file],
-  }
-  guard build_analysis_request(view, LexicalAlgorithm) is Ok((payload, _)) else {
-    fail("expected a PR analysis payload")
-  }
-  assert_eq(payload.version, 1)
-  assert_eq(payload.commit.owner, "moonbitlang")
-  assert_eq(payload.commit.repo, "core")
-  assert_eq(payload.commit.sha, pull.head.sha)
-  assert_eq(
-    payload.commit.parent_sha.stringify(),
-    "\"9999999999999999999999999999999999999999\"",
-  )
-  assert_eq(payload.commit.message, pull.title)
-  assert_eq(payload.commit.html_url, pull.html_url)
-}
-
-///|
 test "all files remain listed but only the first twenty MoonBit diffs auto-load" {
   let fixture = decode_commit(
     read_fixture("playground/main/fixtures/root_commit.json"),
@@ -907,8 +835,6 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     route: Some(reference),
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendMissing,
-    analysis_status: AnalysisIdle,
     review: initial_review_state(),
   }
   let (after, _) = update(
@@ -920,7 +846,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
 }
 
 ///|
-fn analysis_test_view(files : Array[ApiFile]) -> ChangeView raise {
+fn diff_test_view(files : Array[ApiFile]) -> ChangeView raise {
   let fixture = decode_commit(
     read_fixture("playground/main/fixtures/commit_page1.json"),
   )
@@ -937,10 +863,7 @@ fn analysis_test_view(files : Array[ApiFile]) -> ChangeView raise {
 }
 
 ///|
-fn analysis_test_model(
-  view : ChangeView,
-  status? : AnalysisStatus = AnalysisIdle,
-) -> Model {
+fn diff_test_model(view : ChangeView) -> Model {
   {
     input: "",
     generation: 9,
@@ -952,345 +875,8 @@ fn analysis_test_model(
     route: Some(view.reference),
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendReady,
-    analysis_status: status,
     review: initial_review_state(),
   }
-}
-
-///|
-test "analysis prepares every source without expanding lazy file cards" {
-  let view = analysis_test_view([
-    fixture_file("README.md", "modified"),
-    fixture_file("docs/guide.txt", "modified"),
-  ])
-  assert_true(view.files.all(file => !file.expanded))
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(analysis_test_model(view), AnalyzeChanges, emit)
-  assert_true(after.analysis_status is PreparingSources)
-  guard after.phase is Showing(prepared) else {
-    fail("expected prepared commit")
-  }
-  for file in prepared.files {
-    assert_false(file.expanded)
-    assert_true(file.old_side is Loading)
-    assert_true(file.new_side is Loading)
-  }
-}
-
-///|
-test "analysis rejects file and source limits before making a partial conclusion" {
-  let files : Array[ApiFile] = []
-  for index in 0..<51 {
-    files.push(fixture_file("file-\{index}.txt", "modified"))
-  }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (too_many, _) = update(
-    analysis_test_model(analysis_test_view(files)),
-    AnalyzeChanges,
-    emit,
-  )
-  guard too_many.analysis_status is AnalysisFailed(file_message) else {
-    fail("expected file limit failure")
-  }
-  assert_true(file_message.contains("more than 50 files"))
-
-  let limited_view = set_file_state(
-    analysis_test_view([fixture_file("large.txt", "modified")]),
-    0,
-    {
-      file: fixture_file("large.txt", "modified"),
-      diff_mode: LineDiff,
-      expanded: false,
-      old_side: CannotRender(
-        "Cannot render: one side is larger than 1 MiB.", false,
-      ),
-      new_side: Ready(["new"]),
-      diff_cache: empty_diff_cache(),
-    },
-  )
-  let (limited, _) = update(
-    analysis_test_model(limited_view),
-    AnalyzeChanges,
-    emit,
-  )
-  guard limited.analysis_status is AnalysisFailed(source_message) else {
-    fail("expected source limit failure")
-  }
-  assert_true(source_message.contains("larger than 1 MiB"))
-
-  let patch_file = fixture_file("patch.txt", "modified")
-  let patch_view = set_file_state(analysis_test_view([patch_file]), 0, {
-    file: patch_file,
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(["a".repeat(MAX_ANALYSIS_PATCH_BYTES)]),
-    new_side: Ready(["b".repeat(MAX_ANALYSIS_PATCH_BYTES)]),
-    diff_cache: empty_diff_cache(),
-  })
-  let patch_view = ensure_all_file_documents(patch_view, LexicalAlgorithm)
-  guard build_analysis_request(patch_view, LexicalAlgorithm)
-    is Err(patch_message) else {
-    fail("expected patch byte limit failure")
-  }
-  assert_true(patch_message.contains("256 KiB"))
-
-  let old : Array[String] = []
-  let new : Array[String] = []
-  for index in 0..<201 {
-    old.push("old-\{index}")
-    new.push("new-\{index}")
-    for context in 0..<7 {
-      let line = "context-\{index}-\{context}"
-      old.push(line)
-      new.push(line)
-    }
-  }
-  let hunk_file = fixture_file("hunks.txt", "modified")
-  let hunk_view = set_file_state(analysis_test_view([hunk_file]), 0, {
-    file: hunk_file,
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(old),
-    new_side: Ready(new),
-    diff_cache: empty_diff_cache(),
-  })
-  let hunk_view = ensure_all_file_documents(hunk_view, LexicalAlgorithm)
-  guard build_analysis_request(hunk_view, LexicalAlgorithm) is Err(hunk_message) else {
-    fail("expected hunk count limit failure")
-  }
-  assert_true(hunk_message.contains("more than 200 text hunks"))
-}
-
-///|
-test "non-text files are skipped while text hunk ids retain file indexes" {
-  let files = [
-    fixture_file("src/a.txt", "modified"),
-    fixture_file("assets/logo.bin", "modified"),
-    fixture_file("src/c.txt", "modified"),
-  ]
-  let mut view = analysis_test_view(files)
-  view = set_file_state(view, 0, {
-    file: files[0],
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(["old"]),
-    new_side: Ready(["new"]),
-    diff_cache: empty_diff_cache(),
-  })
-  view = set_file_state(view, 1, {
-    file: files[1],
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: CannotRender(
-      "Cannot render: the file is binary or is not valid UTF-8.", true,
-    ),
-    new_side: CannotRender(
-      "Cannot render: the file is binary or is not valid UTF-8.", true,
-    ),
-    diff_cache: empty_diff_cache(),
-  })
-  view = set_file_state(view, 2, {
-    file: files[2],
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(["before"]),
-    new_side: Ready(["after"]),
-    diff_cache: empty_diff_cache(),
-  })
-  view = ensure_all_file_documents(view, LexicalAlgorithm)
-  guard build_analysis_request(view, LexicalAlgorithm) is Ok((payload, skipped)) else {
-    fail("expected analysis request")
-  }
-  assert_eq(payload.hunks.map(hunk => hunk.id), ["f0-h0", "f2-h0"])
-  assert_eq(skipped.map(file => file.path), ["assets/logo.bin"])
-  let encoded = ToJson::to_json(payload).stringify()
-  assert_true(encoded.contains("\"previous_path\":null"))
-  assert_true(encoded.contains("\"skipped_files\":["))
-
-  let root = decode_commit(
-    read_fixture("playground/main/fixtures/root_commit.json"),
-  )
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (root_view, _) = finish_commit(
-    commit_reference("example", "root", root.sha),
-    { owner: "example", repo: "root" },
-    root,
-    [fixture_file("root.txt", "added")],
-    9,
-    emit,
-  )
-  let root_ready = set_file_state(root_view, 0, {
-    file: fixture_file("root.txt", "added"),
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready([]),
-    new_side: Ready(["root"]),
-    diff_cache: empty_diff_cache(),
-  })
-  let root_ready = ensure_all_file_documents(root_ready, LexicalAlgorithm)
-  guard build_analysis_request(root_ready, LexicalAlgorithm)
-    is Ok((root_payload, _)) else {
-    fail("expected root analysis request")
-  }
-  assert_true(
-    ToJson::to_json(root_payload).stringify().contains("\"parent_sha\":null"),
-  )
-
-  let renamed = fixture_file("new.txt", "renamed", previous_filename="old.txt")
-  let renamed_view = set_file_state(analysis_test_view([renamed]), 0, {
-    file: renamed,
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(["old"]),
-    new_side: Ready(["new"]),
-    diff_cache: empty_diff_cache(),
-  })
-  let renamed_view = ensure_all_file_documents(renamed_view, LexicalAlgorithm)
-  guard build_analysis_request(renamed_view, LexicalAlgorithm)
-    is Ok((renamed_payload, _)) else {
-    fail("expected renamed analysis request")
-  }
-  let renamed_json = ToJson::to_json(renamed_payload).stringify()
-  assert_true(renamed_json.contains("\"previous_path\":\"old.txt\""))
-  assert_true(renamed_json.contains("\"status\":\"renamed\""))
-}
-
-///|
-test "failed source preparation retries and advances only after all sides load" {
-  let file = fixture_file("README.md", "modified")
-  let view = set_file_state(analysis_test_view([file]), 0, {
-    file,
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: LoadFailed("temporary failure"),
-    new_side: Ready(["new"]),
-    diff_cache: empty_diff_cache(),
-  })
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (retrying, _) = update(analysis_test_model(view), AnalyzeChanges, emit)
-  assert_true(retrying.analysis_status is PreparingSources)
-  guard retrying.phase is Showing(preparing) else {
-    fail("expected preparing commit")
-  }
-  assert_true(preparing.files[0].old_side is Loading)
-  assert_false(preparing.files[0].expanded)
-  let (running, _) = update(
-    retrying,
-    SourceLoaded(9, 0, Old, Ok(("text/plain", @utf8.encode("old")))),
-    emit,
-  )
-  assert_true(running.analysis_status is Analyzing)
-}
-
-///|
-test "analysis HTTP responses preserve friendly backend errors" {
-  let backend_message = "OpenSeek left 1 hunk out of the analysis. Please retry."
-  let error_body =
-    #|{"version":1,"ok":false,"error":{"code":"invalid_coverage","message":"OpenSeek left 1 hunk out of the analysis. Please retry."}}
-  guard decode_analysis_http_response(false, 502, "Bad Gateway", error_body)
-    is Err(message) else {
-    fail("expected backend analysis error")
-  }
-  assert_eq(message, backend_message)
-
-  guard decode_analysis_http_response(false, 502, "Bad Gateway", "not-json")
-    is Err(fallback) else {
-    fail("expected fallback analysis error")
-  }
-  assert_eq(
-    fallback, "The analysis request failed (HTTP 502 Bad Gateway). Please retry.",
-  )
-
-  let success_body =
-    #|{"version":1,"ok":true,"analysis":{"summary":"Summary","groups":[]}}
-  guard decode_analysis_http_response(true, 200, "OK", success_body)
-    is Ok(response) else {
-    fail("expected decoded analysis response")
-  }
-  assert_eq(response.analysis.summary, "Summary")
-}
-
-///|
-test "stale analysis responses are discarded by commit generation" {
-  let file = fixture_file("README.md", "modified")
-  let view = set_file_state(analysis_test_view([file]), 0, {
-    file,
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(["old"]),
-    new_side: Ready(["new"]),
-    diff_cache: empty_diff_cache(),
-  })
-  let model = analysis_test_model(view, status=Analyzing)
-  let response = AnalysisResponse::{
-    version: ANALYSIS_VERSION,
-    ok: true,
-    analysis: {
-      summary: "Summary",
-      groups: [
-        {
-          title: "Group",
-          description: "Description",
-          hunks: [{ id: "f0-h0", explanation: "Explanation" }],
-        },
-      ],
-    },
-  }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(model, AnalysisLoaded(8, Ok(response)), emit)
-  assert_true(after == model)
-}
-
-///|
-test "analysis groups open the most important result first and toggle independently" {
-  let file = fixture_file("README.md", "modified")
-  let view = set_file_state(analysis_test_view([file]), 0, {
-    file,
-    diff_mode: LineDiff,
-    expanded: false,
-    old_side: Ready(["old"]),
-    new_side: Ready(["new"]),
-    diff_cache: empty_diff_cache(),
-  })
-  let model = analysis_test_model(view, status=Analyzing)
-  let response = AnalysisResponse::{
-    version: ANALYSIS_VERSION,
-    ok: true,
-    analysis: {
-      summary: "Summary",
-      groups: [
-        {
-          title: "Important",
-          description: "Review first.",
-          hunks: [{ id: "f0-h0", explanation: "Important explanation." }],
-        },
-        {
-          title: "Supporting",
-          description: "Review later.",
-          hunks: [{ id: "f0-h1", explanation: "Supporting explanation." }],
-        },
-      ],
-    },
-  }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (loaded, _) = update(model, AnalysisLoaded(9, Ok(response)), emit)
-  guard loaded.analysis_status is AnalysisDone(_, _, initially_expanded) else {
-    fail("expected completed analysis")
-  }
-  assert_eq(initially_expanded, [true, false])
-  let (opened, _) = update(loaded, ToggleAnalysisGroup(1), emit)
-  guard opened.analysis_status is AnalysisDone(_, _, both_expanded) else {
-    fail("expected completed analysis")
-  }
-  assert_eq(both_expanded, [true, true])
-  let (collapsed, _) = update(opened, ToggleAnalysisGroup(0), emit)
-  guard collapsed.analysis_status is AnalysisDone(_, _, changed) else {
-    fail("expected completed analysis")
-  }
-  assert_eq(changed, [false, true])
-  let (out_of_range, _) = update(collapsed, ToggleAnalysisGroup(10), emit)
-  assert_true(out_of_range == collapsed)
 }
 
 ///|
@@ -1357,7 +943,40 @@ test "MoonBit files cache all eight algorithm and filter combinations" {
 }
 
 ///|
-test "algorithm switching fills the second cache and clears analysis state" {
+test "line and MoonBit caches retain distinct semantic variants" {
+  let text_file = ensure_file_document(
+    ready_test_file(fixture_file("README.md", "modified"), ["old"], ["new"]),
+    LexicalAlgorithm,
+  )
+  guard text_file.diff_cache.line is Some(Line(line_document)) else {
+    fail("expected a line-diff cache")
+  }
+  assert_false(line_document.hunks.is_empty())
+
+  let moonbit_file = ensure_file_document(
+    ready_test_file(
+      fixture_file("src/reorder.mbt", "modified"),
+      ["fn first() {}", "fn second() {}"],
+      ["fn second() {}", "fn first() {}"],
+    ),
+    AstAlgorithm,
+  )
+  guard moonbit_file.diff_cache.ast
+    is Some(MoonBit(document=TopLevel(top), status=Reordered)) else {
+    fail("expected a semantic reorder cache")
+  }
+  assert_true(top.reordered)
+  assert_true(top.old_order is [0, 1])
+  assert_true(top.new_order is [1, 0])
+  assert_true(
+    top.sections.all(section => {
+      semantic_section_fragment(section).document.hunks.is_empty()
+    }),
+  )
+}
+
+///|
+test "algorithm switching fills the second cache" {
   let file = fixture_file("src/format.mbt", "modified")
   let lexical_file = ensure_file_document(
     ready_test_file(file, ["fn format() { 1 }"], ["fn format() {", "  1", "}"]),
@@ -1365,33 +984,26 @@ test "algorithm switching fills the second cache and clears analysis state" {
   )
   assert_true(lexical_file.diff_cache.lexical is Some(_))
   assert_true(lexical_file.diff_cache.ast is None)
-  let view = set_file_state(analysis_test_view([file]), 0, lexical_file)
-  let response = AnalysisResult::{ summary: "done", groups: [] }
-  let statuses : Array[AnalysisStatus] = [
-    Analyzing,
-    AnalysisFailed("failed"),
-    AnalysisDone(response, [], []),
-  ]
+  let view = set_file_state(diff_test_view([file]), 0, lexical_file)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  for status in statuses {
-    let current = analysis_test_model(view, status~)
-    let (switched, _) = update(current, SelectDiffAlgorithm(AstAlgorithm), emit)
-    assert_true(switched.diff_algorithm is AstAlgorithm)
-    assert_true(switched.analysis_status is AnalysisIdle)
-    guard switched.phase is Showing(changed_view) else {
-      fail("expected commit to remain visible")
-    }
-    let changed = changed_view.files[0]
-    assert_true(changed.diff_cache.lexical is Some(_))
-    guard changed.diff_cache.ast is Some(ast) else {
-      fail("expected AST cache")
-    }
-    assert_true(ast.status is NoStructuralChanges)
+  let (switched, _) = update(
+    diff_test_model(view),
+    SelectDiffAlgorithm(AstAlgorithm),
+    emit,
+  )
+  assert_true(switched.diff_algorithm is AstAlgorithm)
+  guard switched.phase is Showing(changed_view) else {
+    fail("expected commit to remain visible")
   }
+  let changed = changed_view.files[0]
+  assert_true(changed.diff_cache.lexical is Some(_))
+  guard changed.diff_cache.ast is Some(ast) else { fail("expected AST cache") }
+  guard ast is MoonBit(status~, ..) else { fail("expected MoonBit cache") }
+  assert_true(status is NoStructuralChanges)
 }
 
 ///|
-test "ignore comments has independent algorithm caches and clears analysis" {
+test "ignore comments has independent algorithm caches" {
   let file = fixture_file("src/comments.mbt", "modified")
   let ready = ready_test_file(
     file,
@@ -1417,18 +1029,16 @@ test "ignore comments has independent algorithm caches and clears analysis" {
   guard cached.diff_cache.lexical_ignoring_comments is Some(filtered) else {
     fail("expected filtered lexical cache")
   }
-  assert_true(filtered.document.hunks.is_empty())
+  guard filtered is MoonBit(document=Whole(fragment), status=IgnoredOnly) else {
+    fail("expected an ignored-only semantic cache")
+  }
+  assert_true(fragment.document.hunks.is_empty())
 
-  let view = set_file_state(analysis_test_view([file]), 0, cached)
+  let view = set_file_state(diff_test_view([file]), 0, cached)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (toggled, _) = update(
-    analysis_test_model(view, status=Analyzing),
-    ToggleIgnoreComments,
-    emit,
-  )
+  let (toggled, _) = update(diff_test_model(view), ToggleIgnoreComments, emit)
   assert_true(toggled.ignore_comments)
   assert_true(toggled.diff_algorithm is LexicalAlgorithm)
-  assert_true(toggled.analysis_status is AnalysisIdle)
   guard toggled.phase is Showing(toggled_view) else {
     fail("expected commit to remain visible")
   }
@@ -1469,16 +1079,11 @@ test "ignore tests toggles independently and survives navigation without routes"
   let ready = ready_test_file(file, ["test \"sample\" { old_value() }"], [
     "test \"sample\" { new_value() }",
   ])
-  let view = set_file_state(analysis_test_view([file]), 0, ready)
+  let view = set_file_state(diff_test_view([file]), 0, ready)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (toggled, _) = update(
-    analysis_test_model(view, status=Analyzing),
-    ToggleIgnoreTests,
-    emit,
-  )
+  let (toggled, _) = update(diff_test_model(view), ToggleIgnoreTests, emit)
   assert_true(toggled.ignore_tests)
   assert_false(toggled.ignore_comments)
-  assert_true(toggled.analysis_status is AnalysisIdle)
   guard toggled.phase is Showing(toggled_view) else {
     fail("expected commit to remain visible")
   }
@@ -1508,161 +1113,6 @@ test "ignore tests toggles independently and survives navigation without routes"
 }
 
 ///|
-test "comment-only filtered analysis is handled locally" {
-  let file = fixture_file("src/comments.mbt", "modified")
-  let view = set_file_state(
-    analysis_test_view([file]),
-    0,
-    ready_test_file(file, ["fn value() -> Int {", "  1 // old", "}"], [
-      "fn value() -> Int {", "  1 // new", "}",
-    ]),
-  )
-  let model = { ..analysis_test_model(view), ignore_comments: true }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(model, AnalyzeChanges, emit)
-  guard after.analysis_status is AnalysisNoHunks([skipped]) else {
-    fail("expected local no-hunks result")
-  }
-  assert_eq(skipped.path, "src/comments.mbt")
-  assert_true(skipped.reason.contains("turn off Ignore comments"))
-}
-
-///|
-test "blank-line-only filtered analysis uses the shared skipped reason" {
-  let file = fixture_file("src/blank-lines.mbt", "modified")
-  let view = set_file_state(
-    analysis_test_view([file]),
-    0,
-    ready_test_file(file, ["fn value() -> Int {", "  1", "}"], [
-      "", "fn value() -> Int {", "\u{2003}", "  1", "\t", "}", "",
-    ]),
-  )
-  let model = { ..analysis_test_model(view), ignore_comments: true }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(model, AnalyzeChanges, emit)
-  guard after.analysis_status is AnalysisNoHunks([skipped]) else {
-    fail("expected local no-hunks result")
-  }
-  assert_eq(skipped.path, "src/blank-lines.mbt")
-  assert_true(
-    skipped.reason.contains(
-      "No changes besides comments or blank lines were found",
-    ),
-  )
-}
-
-///|
-test "test-only filtered analysis is handled locally" {
-  let file = fixture_file("src/tests.mbt", "modified")
-  let view = set_file_state(
-    analysis_test_view([file]),
-    0,
-    ready_test_file(file, ["test \"sample\" { old_value() }"], [
-      "test \"sample\" { new_value() }",
-    ]),
-  )
-  let model = { ..analysis_test_model(view), ignore_tests: true }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(model, AnalyzeChanges, emit)
-  guard after.analysis_status is AnalysisNoHunks([skipped]) else {
-    fail("expected local no-hunks result")
-  }
-  assert_eq(skipped.path, "src/tests.mbt")
-  assert_true(skipped.reason.contains("MoonBit test blocks"))
-  assert_true(skipped.reason.contains("turn off Ignore tests"))
-}
-
-///|
-test "late analysis response is discarded after toggling tests" {
-  let file = fixture_file("src/change.mbt", "modified")
-  let view = set_file_state(
-    analysis_test_view([file]),
-    0,
-    ensure_file_document(
-      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
-      LexicalAlgorithm,
-    ),
-  )
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (switched, _) = update(
-    analysis_test_model(view, status=Analyzing),
-    ToggleIgnoreTests,
-    emit,
-  )
-  let response = AnalysisResponse::{
-    version: ANALYSIS_VERSION,
-    ok: true,
-    analysis: { summary: "late", groups: [] },
-  }
-  let (after, _) = update(
-    switched,
-    AnalysisLoaded(switched.generation, Ok(response)),
-    emit,
-  )
-  assert_true(after == switched)
-}
-
-///|
-test "late analysis response is discarded after toggling comments" {
-  let file = fixture_file("src/change.mbt", "modified")
-  let view = set_file_state(
-    analysis_test_view([file]),
-    0,
-    ensure_file_document(
-      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
-      LexicalAlgorithm,
-    ),
-  )
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (switched, _) = update(
-    analysis_test_model(view, status=Analyzing),
-    ToggleIgnoreComments,
-    emit,
-  )
-  let response = AnalysisResponse::{
-    version: ANALYSIS_VERSION,
-    ok: true,
-    analysis: { summary: "late", groups: [] },
-  }
-  let (after, _) = update(
-    switched,
-    AnalysisLoaded(switched.generation, Ok(response)),
-    emit,
-  )
-  assert_true(after == switched)
-}
-
-///|
-test "late analysis response is discarded after an algorithm switch" {
-  let file = fixture_file("src/change.mbt", "modified")
-  let view = set_file_state(
-    analysis_test_view([file]),
-    0,
-    ensure_file_document(
-      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
-      LexicalAlgorithm,
-    ),
-  )
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (switched, _) = update(
-    analysis_test_model(view, status=Analyzing),
-    SelectDiffAlgorithm(AstAlgorithm),
-    emit,
-  )
-  let response = AnalysisResponse::{
-    version: ANALYSIS_VERSION,
-    ok: true,
-    analysis: { summary: "late", groups: [] },
-  }
-  let (after, _) = update(
-    switched,
-    AnalysisLoaded(switched.generation, Ok(response)),
-    emit,
-  )
-  assert_true(after == switched)
-}
-
-///|
 test "new source invalidates every MoonBit filter cache" {
   let file = fixture_file("src/change.mbt", "modified")
   let cached = ensure_file_document(
@@ -1674,8 +1124,8 @@ test "new source invalidates every MoonBit filter cache" {
   )
   assert_true(cached.diff_cache.lexical is Some(_))
   assert_true(cached.diff_cache.ast is Some(_))
-  let view = set_file_state(analysis_test_view([file]), 0, cached)
-  let model = { ..analysis_test_model(view), diff_algorithm: AstAlgorithm }
+  let view = set_file_state(diff_test_view([file]), 0, cached)
+  let model = { ..diff_test_model(view), diff_algorithm: AstAlgorithm }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (updated, _) = update(
     model,
@@ -1723,21 +1173,4 @@ test "non-MoonBit line document is shared across algorithm switches" {
   assert_true(after.diff_cache.line == Some(before))
   assert_true(after.diff_cache.lexical is None)
   assert_true(after.diff_cache.ast is None)
-}
-
-///|
-test "AST structural empty files are skipped without starting backend analysis" {
-  let file = fixture_file("src/format.mbt", "modified")
-  let state = ready_test_file(file, ["fn format() { 1 }"], [
-    "fn format() {", "  1", "}",
-  ])
-  let view = set_file_state(analysis_test_view([file]), 0, state)
-  let model = { ..analysis_test_model(view), diff_algorithm: AstAlgorithm }
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(model, AnalyzeChanges, emit)
-  guard after.analysis_status is AnalysisNoHunks(skipped) else {
-    fail("expected local no-hunks result")
-  }
-  assert_eq(skipped.map(item => item.path), ["src/format.mbt"])
-  assert_true(skipped[0].reason.contains("No structural changes"))
 }

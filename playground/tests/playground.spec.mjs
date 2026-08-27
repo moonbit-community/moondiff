@@ -429,12 +429,11 @@ async function installMockRoutes(page) {
 
 async function installAlgorithmRoutes(
   page,
-  { formatOnly = false, health = false, parseFailure = false } = {},
+  { formatOnly = false, parseFailure = false } = {},
 ) {
   const commit = formatOnly
     ? { ...algorithmCommit, files: [algorithmCommit.files[0]] }
     : algorithmCommit;
-  if (health) await installAnalysisHealth(page);
   await page.route("https://**", route => route.abort("blockedbyclient"));
   await page.route("https://api.github.com/**", async route => {
     await route.fulfill({
@@ -477,9 +476,8 @@ async function loadAlgorithmCommit(page, options) {
 
 async function installTestsRoutes(
   page,
-  { testsOnly = false, health = false } = {},
+  { testsOnly = false } = {},
 ) {
-  if (health) await installAnalysisHealth(page);
   const commit = testsOnly
     ? { ...testsCommit, files: [testsCommit.files[1]] }
     : testsCommit;
@@ -523,9 +521,8 @@ async function loadTestsCommit(page, options) {
 
 async function installCommentsRoutes(
   page,
-  { blankOnly = false, health = false } = {},
+  { blankOnly = false } = {},
 ) {
-  if (health) await installAnalysisHealth(page);
   const commit = blankOnly
     ? { ...commentsCommit, files: [commentsCommit.files[2]] }
     : commentsCommit;
@@ -584,37 +581,6 @@ async function openMockedShareLink(page) {
   await expect(page.locator("table.split")).toBeVisible();
 }
 
-function analysisForRequest(request) {
-  const groups = request.hunks.map((hunk, index) => ({
-    title: index === 0 ? "Formatting behavior" : "Documentation flow",
-    description: index === 0
-      ? "Updates the formatting path across the commit."
-      : "Keeps the documented workflow aligned with the implementation.",
-    hunks: [{
-      id: hunk.id,
-      explanation: index === 0
-        ? "Updates <formatting> & output behavior."
-        : "Refreshes the user-facing workflow description.",
-    }],
-  }));
-  return {
-    version: 1,
-    ok: true,
-    analysis: {
-      summary: "The commit updates formatting behavior and its documentation.",
-      groups: groups.reverse(),
-    },
-  };
-}
-
-async function installAnalysisHealth(page) {
-  await page.route("**/api/health", route => route.fulfill({
-    status: 200,
-    contentType: "application/json",
-    body: JSON.stringify({ version: 1, ok: true, openseek_available: true }),
-  }));
-}
-
 test("landing follows the compact DiffsHub-style URL handoff", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -631,7 +597,6 @@ test("landing follows the compact DiffsHub-style URL handoff", async ({ page }) 
   expect(landingMetrics.width).toBeLessThanOrEqual(688);
   expect(landingMetrics.background).toBe("rgb(247, 247, 247)");
 });
-
 test("desktop keeps split columns balanced and switches views", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await loadMockedCommit(page);
@@ -1082,37 +1047,6 @@ test("Ignore comments works across algorithms and layouts without changing plain
   expect(compactToggle.pageWidth).toBeLessThanOrEqual(compactToggle.viewportWidth);
 });
 
-test("Ignore comments skips blank-line-only MoonBit changes during analysis", async ({ page }) => {
-  let analyzeCalls = 0;
-  await page.route("**/api/analyze", async route => {
-    analyzeCalls += 1;
-    await route.fulfill({ status: 500, body: "unexpected" });
-  });
-  await loadCommentsCommit(page, { blankOnly: true, health: true });
-  const blankCard = page.locator(".file-card").filter({ hasText: "src/blank_lines_only.mbt" });
-  await page.getByRole("button", { name: "Ignore comments" }).click();
-  await expect(blankCard).toContainText(
-    "No changes besides comments or blank lines found",
-  );
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.getByRole("heading", { name: "Nothing to analyze" })).toBeVisible();
-  await expect(page.locator(".analysis-skipped")).toContainText("src/blank_lines_only.mbt");
-  await expect(page.locator(".analysis-skipped")).toContainText(
-    "No changes besides comments or blank lines were found",
-  );
-  expect(analyzeCalls).toBe(0);
-
-  await page.getByRole("button", { name: "AST" }).click();
-  await expect(blankCard).toContainText(
-    "No structural changes besides comments or blank lines found",
-  );
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.locator(".analysis-skipped")).toContainText(
-    "No structural changes besides comments or blank lines were found",
-  );
-  expect(analyzeCalls).toBe(0);
-});
-
 test("Ignore tests works across algorithms, layouts, combined filters, and narrow screens", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await loadTestsCommit(page);
@@ -1181,33 +1115,6 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   expect(compact.pageWidth).toBeLessThanOrEqual(compact.viewportWidth);
 });
 
-test("Ignore tests skips test-only MoonBit changes during analysis", async ({ page }) => {
-  let analyzeCalls = 0;
-  await page.route("**/api/analyze", async route => {
-    analyzeCalls += 1;
-    await route.fulfill({ status: 500, body: "unexpected" });
-  });
-  await loadTestsCommit(page, { testsOnly: true, health: true });
-  await page.getByRole("button", { name: "Ignore tests" }).click();
-  await expect(page.locator(".comment-empty")).toContainText(
-    "No changes besides MoonBit test blocks found",
-  );
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.getByRole("heading", { name: "Nothing to analyze" })).toBeVisible();
-  await expect(page.locator(".analysis-skipped")).toContainText("src/tests_only.mbt");
-  await expect(page.locator(".analysis-skipped")).toContainText(
-    "No changes besides MoonBit test blocks were found",
-  );
-  expect(analyzeCalls).toBe(0);
-
-  await page.getByRole("button", { name: "AST" }).click();
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.locator(".analysis-skipped")).toContainText(
-    "No structural changes besides MoonBit test blocks were found",
-  );
-  expect(analyzeCalls).toBe(0);
-});
-
 test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await loadAlgorithmCommit(page);
@@ -1266,22 +1173,6 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   expect(new URL(page.url()).hash).toBe(`#/example/algorithms/commit/${algorithmSha}`);
 });
 
-test("AST structural empty analysis is handled locally without a backend request", async ({ page }) => {
-  let analyzeCalls = 0;
-  await page.route("**/api/analyze", async route => {
-    analyzeCalls += 1;
-    await route.fulfill({ status: 500, body: "unexpected" });
-  });
-  await loadAlgorithmCommit(page, { formatOnly: true, health: true });
-  await page.getByRole("button", { name: "AST" }).click();
-  await expect(page.locator(".structural-empty")).toBeVisible();
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.getByRole("heading", { name: "Nothing to analyze" })).toBeVisible();
-  await expect(page.locator(".analysis-skipped")).toContainText("src/formatting_only.mbt");
-  await expect(page.locator(".analysis-skipped")).toContainText("No structural changes");
-  expect(analyzeCalls).toBe(0);
-});
-
 test("the selected algorithm survives later commit navigation without entering the URL", async ({ page }) => {
   await loadAlgorithmCommit(page);
   await page.getByRole("button", { name: "AST" }).click();
@@ -1313,139 +1204,4 @@ test("parse failures show their lexical fallback reason above both layouts", asy
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(card.locator("table.unified")).toBeVisible();
   await expect(card.locator(".diff-notice")).toContainText("old:");
-});
-
-test("switching algorithms cancels the visible analysis and ignores its late response", async ({ page }) => {
-  await installAnalysisHealth(page);
-  let releaseAnalysis;
-  const analysisGate = new Promise(resolve => {
-    releaseAnalysis = resolve;
-  });
-  await page.route("**/api/analyze", async route => {
-    const request = route.request().postDataJSON();
-    await analysisGate;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(analysisForRequest(request)),
-    });
-  });
-  await loadMockedCommit(page);
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.getByRole("button", { name: "Analyzing…" })).toBeVisible();
-  await page.getByRole("button", { name: "AST" }).click();
-  await expect(page.locator(".analysis-card")).toHaveCount(0);
-  await expect(page.locator(".file-card")).toHaveCount(3);
-  const lateResponse = page.waitForResponse(response => response.url().endsWith("/api/analyze"));
-  releaseAnalysis();
-  await lateResponse;
-  await expect(page.getByRole("heading", { name: "Change groups" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Analyze changes" })).toBeVisible();
-});
-
-test("manual functional analysis prepares the whole commit and annotates stable hunks", async ({ page }) => {
-  await installAnalysisHealth(page);
-  let submitted;
-  await page.route("**/api/analyze", async route => {
-    submitted = route.request().postDataJSON();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(analysisForRequest(submitted)),
-    });
-  });
-  await loadMockedCommit(page);
-
-  await expect(page.getByRole("button", { name: "Analyze changes" })).toBeVisible();
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.getByRole("heading", { name: "Change groups" })).toBeVisible();
-
-  expect(submitted.version).toBe(1);
-  expect(submitted.commit).toMatchObject({
-    owner: "example",
-    repo: "project",
-    sha: commitSha,
-    parent_sha: parentSha,
-  });
-  expect(submitted.hunks.map(hunk => hunk.id)).toEqual(["f0-h0", "f1-h0"]);
-  expect(submitted.hunks.map(hunk => hunk.path)).toEqual([
-    "src/format_change.mbt",
-    "README.md",
-  ]);
-  expect(submitted.hunks.every(hunk => hunk.patch.startsWith("@@ "))).toBe(true);
-  expect(submitted.skipped_files.map(file => file.path)).toEqual(["assets/logo.bin"]);
-
-  await expect(page.locator(".analysis-summary")).toContainText("formatting behavior");
-  await expect(page.locator(".analysis-skipped")).toContainText("assets/logo.bin");
-  await expect(page.locator(".analysis-group-title")).toHaveText([
-    "Documentation flow",
-    "Formatting behavior",
-  ]);
-  const groups = page.locator(".analysis-group");
-  await expect(groups).toHaveCount(2);
-  await expect(groups.nth(0).getByRole("button", { name: "Collapse Documentation flow" })).toHaveAttribute("aria-expanded", "true");
-  await expect(groups.nth(1).getByRole("button", { name: "Expand Formatting behavior" })).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator(".file-list, .file-card")).toHaveCount(0);
-  await expect(page.locator(".analysis-hunk")).toHaveCount(1);
-  await expect(page.locator(".analysis-hunk .file-path")).toHaveText("README.md");
-  await expect(page.locator(".diff-scroll")).toHaveCount(1);
-  await expect(page.locator("td.hunk-note")).toHaveCount(1);
-  await expect(page.locator("td.hunk-note")).toContainText("Documentation flow");
-  await expect(page.locator("td.hunk-note")).toContainText("Refreshes the user-facing workflow description.");
-
-  await groups.nth(1).getByRole("button", { name: "Expand Formatting behavior" }).click();
-  await expect(page.locator(".analysis-hunk")).toHaveCount(2);
-  await expect(page.locator("td.hunk-note")).toHaveCount(2);
-  await expect(groups.nth(1).locator("td.hunk-note")).toContainText("Updates <formatting> & output behavior.");
-  await expect(groups.nth(1).locator("td.hunk-note script, td.hunk-note formatting")).toHaveCount(0);
-  await page.getByRole("button", { name: "Use unified view" }).click();
-  await expect(page.locator("table.unified td.hunk-note")).toHaveCount(2);
-  await groups.nth(0).getByRole("button", { name: "Collapse Documentation flow" }).click();
-  await expect(page.locator("table.unified td.hunk-note")).toHaveCount(1);
-  await expect(groups.nth(1).locator("table.unified td.hunk-note")).toContainText("Formatting behavior");
-});
-
-test("analysis errors can be retried without reloading or expanding files", async ({ page }) => {
-  await installAnalysisHealth(page);
-  let attempts = 0;
-  await page.route("**/api/analyze", async route => {
-    attempts += 1;
-    const request = route.request().postDataJSON();
-    if (attempts === 1) {
-      await route.fulfill({
-        status: 502,
-        contentType: "application/json",
-        body: JSON.stringify({
-          version: 1,
-          ok: false,
-          error: {
-            code: "invalid_answer",
-            message: "OpenSeek returned malformed JSON, so the analysis could not be displayed. Please retry.",
-          },
-        }),
-      });
-    } else {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(analysisForRequest(request)),
-      });
-    }
-  });
-  await loadMockedCommit(page);
-  await page.getByRole("button", { name: "Analyze changes" }).click();
-  await expect(page.getByRole("heading", { name: "Analysis failed" })).toBeVisible();
-  await expect(page.locator(".analysis-card")).toContainText(
-    "OpenSeek returned malformed JSON, so the analysis could not be displayed. Please retry.",
-  );
-  await page.locator(".analysis-card").getByRole("button", { name: "Retry analysis" }).click();
-  await expect(page.getByRole("heading", { name: "Change groups" })).toBeVisible();
-  expect(attempts).toBe(2);
-  await expect(page.locator(".analysis-group").first().getByRole("button", { name: "Collapse Documentation flow" })).toBeVisible();
-  await expect(page.locator(".file-card")).toHaveCount(0);
-});
-
-test("a static deployment hides analysis when no backend is detected", async ({ page }) => {
-  await loadMockedCommit(page);
-  await expect(page.getByRole("button", { name: /Analyze changes|Retry analysis|Analyze again/ })).toHaveCount(0);
 });

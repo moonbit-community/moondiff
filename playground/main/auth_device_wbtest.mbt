@@ -56,8 +56,6 @@ fn device_auth_test_model(
     route,
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendMissing,
-    analysis_status: AnalysisIdle,
     review: {
       auth,
       comments: CommentsFailed("private repository"),
