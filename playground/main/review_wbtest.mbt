@@ -267,6 +267,48 @@ test "review rows only expose anchors present in the canonical patch" {
 }
 
 ///|
+test "section-local review rows map to absolute GitHub anchors" {
+  let document = @linediff.line_diff(old=["old"], new=["new"], context=0)
+  let patch = parse_canonical_patch(
+    "src/main.mbt",
+    Some("@@ -11 +21 @@\n-old\n+new"),
+  )
+  let rows = project_review_rows(
+    2,
+    "src/main.mbt",
+    document,
+    patch,
+    old_base=10,
+    new_base=20,
+  )
+  guard rows is [row] else { fail("expected one local replacement row") }
+  assert_true(row.old_line == Some(11))
+  assert_true(row.new_line == Some(21))
+  guard row.old_anchor is Some(old_anchor) else {
+    fail("expected an absolute old-side anchor")
+  }
+  guard row.new_anchor is Some(new_anchor) else {
+    fail("expected an absolute new-side anchor")
+  }
+  assert_true(old_anchor.side is Left)
+  assert_eq(old_anchor.line, 11)
+  assert_true(new_anchor.side is Right)
+  assert_eq(new_anchor.line, 21)
+
+  guard project_review_items(
+      2,
+      "src/main.mbt",
+      document,
+      patch,
+      old_base=10,
+      new_base=20,
+    )
+    is [ReviewHunk("@@ -11 +21 @@"), ReviewLine(_)] else {
+    fail("expected the hunk heading to use absolute section coordinates")
+  }
+}
+
+///|
 fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
   let reference = CommitRef::{ owner: "upstream", repo: "project", target }
   let repository = RepositoryRef::{ owner: "upstream", repo: "project" }
@@ -305,7 +347,6 @@ fn review_test_model(auth : AuthStatus) -> Model {
     generation: 5,
     phase: Showing(view),
     route: Some(view.reference),
-    backend_status: BackendMissing,
     review: {
       auth,
       comments: CommentsReady({
@@ -558,8 +599,6 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     route: Some(view.reference),
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendMissing,
-    analysis_status: AnalysisIdle,
     review: {
       auth: SignedIn(Some("reviewer")),
       comments: CommentsLoading,
@@ -670,8 +709,6 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     route: Some(view.reference),
     share_url: None,
     copy_status: CopyReady,
-    backend_status: BackendMissing,
-    analysis_status: AnalysisIdle,
     review: {
       auth: SignedIn(Some("reviewer")),
       comments: CommentsReady({
