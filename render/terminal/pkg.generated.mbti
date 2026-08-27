@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn render_document(String, String, @model.DiffDocument, options? : RenderOptions) -> String
+pub fn render_document(String, String, @model.HunkDocument, options? : RenderOptions) -> String
 
 // Errors
 
