@@ -2,25 +2,6 @@
 
 ## High Priority
 
-- [x] Finish universal-newline support at the remaining input boundaries.
-  - [x] Use the same LF, CRLF, and CR splitting rules in the core parser,
-    source-position, structural-diff, and rendering paths.
-  - [x] Add an end-to-end structured-diff test for all three line-ending
-    formats.
-  - [x] Make Playground source validation and splitting recognize bare CR as a
-    line ending.
-  - [x] Add Playground and line-diff regression tests for CR-only input,
-    including enforcement of the 20,000-line limit.
-  - [x] Validate syntax positions against the rendered line array and fall back
-    to a regular line diff when positions are out of bounds.
-
-- [x] Bound quadratic Levenshtein and LCS computations independently of
-  `graph_limit`.
-  - [x] Charge DP matrix cells against an overflow-safe shared per-file
-    computation budget before allocation.
-  - [x] Report a typed computation-limit reason and fall back to a regular line
-    diff for the affected file or unit when the budget is exhausted.
-
 - [ ] Preserve the file-level computation limit when diffing per unit.
   - Affected areas: `internal/alignment/diff_document.mbt` and
     `internal/computation/budget.mbt`.
