@@ -1087,6 +1087,10 @@ button.copy-button.copied {
   min-width: 44rem;
 }
 
+.diff-scroll table.single {
+  min-width: 30rem;
+}
+
 .diff-scroll td {
   vertical-align: top;
   white-space: pre;
@@ -1106,9 +1110,20 @@ button.copy-button.copied {
 .diff-scroll table.unified td.ctx,
 .diff-scroll table.unified td.del,
 .diff-scroll table.unified td.add,
-.diff-scroll table.unified td.empty {
+.diff-scroll table.unified td.empty,
+.diff-scroll table.single td.ctx,
+.diff-scroll table.single td.del,
+.diff-scroll table.single td.add,
+.diff-scroll table.single td.empty {
   width: calc(100% - 6rem);
   padding: 0 0.72rem;
+}
+
+.diff-scroll table.single td.ctx,
+.diff-scroll table.single td.del,
+.diff-scroll table.single td.add,
+.diff-scroll table.single td.empty {
+  width: calc(100% - 3rem);
 }
 
 .diff-scroll td.line-number {
@@ -1210,6 +1225,18 @@ button.copy-button.copied {
 .diff-scroll table.unified tr:has(> td.add) > td.line-number {
   color: var(--green);
   background: var(--add);
+}
+
+.diff-scroll table.single tr:has(> td.del) > td.line-number {
+  color: var(--red);
+  background: var(--del);
+  box-shadow: inset 3px 0 var(--red-bright);
+}
+
+.diff-scroll table.single tr:has(> td.add) > td.line-number {
+  color: var(--green);
+  background: var(--add);
+  box-shadow: inset 3px 0 var(--green-bright);
 }
 
 .diff-scroll b.wd {
@@ -1495,6 +1522,10 @@ button.copy-button.copied {
 
   .diff-scroll table.unified {
     min-width: 34rem;
+  }
+
+  .diff-scroll table.single {
+    min-width: 26rem;
   }
 }
 
