@@ -406,8 +406,10 @@ fn check_source(bytes : Bytes) -> CheckedSource {
   if text.contains("\u{0000}") {
     return Rejected("Cannot render: the file contains a NUL byte.", true)
   }
-  match @source_text.split_lines_bounded(text, max_lines=MAX_SOURCE_LINES) {
-    Some(lines) => Renderable(lines)
-    None => Rejected("Cannot render: one side exceeds 20,000 lines.", false)
+  if @source_text.split_lines_bounded(text, max_lines=MAX_SOURCE_LINES)
+    is Some(lines) {
+    Renderable(lines)
+  } else {
+    Rejected("Cannot render: one side exceeds 20,000 lines.", false)
   }
 }

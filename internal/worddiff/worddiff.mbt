@@ -174,9 +174,10 @@ pub fn refine_line(
   new : String,
   budget? : RefinementBudget,
 ) -> (Array[@model.DiffSegment], Array[@model.DiffSegment])? {
-  let budget = match budget {
-    Some(budget) => budget
-    None => RefinementBudget::new()
+  let budget = if budget is Some(budget) {
+    budget
+  } else {
+    RefinementBudget::new()
   }
   let old_length = old.length()
   let new_length = new.length()
