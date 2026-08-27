@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn render_unified_hunks(@model.DiffDocument) -> Array[String]
+pub fn render_unified_hunks(@model.HunkDocument) -> Array[String]
 
 // Errors
 
