@@ -3,6 +3,12 @@
 pub(all) enum DiffStatus {
   Identical
   Changed
+  /// Matched top-level declarations occur in a different order, with no
+  /// fragment-local text or structural changes.
+  Reordered
+  /// The inputs differ, but the selected comparison found no in-scope fragment
+  /// change. This includes AST-only text changes and, for sectioned Lexical
+  /// results, whitespace-only changes outside declaration-owned ranges.
   NoStructuralChanges
   /// The inputs differ only in content excluded by enabled filters.
   IgnoredOnly
@@ -34,9 +40,6 @@ pub(all) enum FallbackReason {
   SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
   GraphLimitExceeded(limit~ : UInt)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
-  /// Lexical declaration alignment found no changes inside matched
-  /// declarations, so the entire file was diffed to expose reordering.
-  TopLevelReordering
 } derive(Debug, Eq)
 
 ///|
@@ -44,35 +47,4 @@ pub(all) enum FallbackReason {
 pub(all) struct LineRange {
   start : Int
   len : Int
-} derive(Debug, Eq)
-
-///|
-/// One top-level source section retained by structural alignment. Either side
-/// may be absent for an inserted or deleted declaration.
-pub(all) struct DiffSection {
-  old : LineRange?
-  new : LineRange?
-} derive(Debug, Eq)
-
-///|
-/// Renderer-neutral presentation grouping calculated alongside a document.
-/// Section collections are exposed as read-only views whose backing storage is
-/// never mutated after publication.
-pub(all) enum DiffLayout {
-  WholeDocument
-  TopLevelSections(ArrayView[DiffSection])
-} derive(Debug, Eq)
-
-///|
-/// The source region affected by a calculation fallback.
-pub(all) enum FallbackScope {
-  WholeFile
-  Region(old~ : LineRange?, new~ : LineRange?)
-} derive(Debug, Eq)
-
-///|
-/// Typed degradation metadata for one fallback.
-pub(all) struct FallbackInfo {
-  reason : FallbackReason
-  scope : FallbackScope
 } derive(Debug, Eq)

@@ -9,7 +9,7 @@ test "public document model owns pure document methods" {
   }
   let _ : ArrayView[@model.DiffSegment] = line.segments
   assert_eq(line.text(), "let value = new")
-  let document : @model.DiffDocument = {
+  let document : @model.HunkDocument = {
     hunks: [
       {
         old_start: 2,
@@ -73,19 +73,19 @@ test "all public block payloads are read-only views" {
 }
 
 ///|
-test "public fallback metadata remains constructible and matchable" {
-  let fallback : @model.FallbackInfo = {
-    reason: ParseError(sides=[Old], detail="old: parse error"),
-    scope: WholeFile,
+test "fragment fallback metadata remains local and matchable" {
+  let reason : @model.FallbackReason = ParseError(
+    sides=[Old],
+    detail="old: parse error",
+  )
+  let fragment : @model.DiffFragment = {
+    document: { hunks: [] },
+    fallbacks: [reason],
   }
   assert_true(
-    fallback
-    is {
-      reason: ParseError(sides=[Old], detail="old: parse error"),
-      scope: WholeFile,
-    },
+    fragment.fallbacks is [ParseError(sides=[Old], detail="old: parse error")],
   )
-  guard fallback.reason is ParseError(sides~, ..) else {
+  guard fragment.fallbacks[0] is ParseError(sides~, ..) else {
     fail("expected parse-error metadata")
   }
   let _ : ArrayView[@model.DiffSide] = sides
@@ -100,13 +100,43 @@ test "public fallback metadata remains constructible and matchable" {
 }
 
 ///|
-test "public layouts expose top-level sections as a read-only view" {
-  let layout : @model.DiffLayout = TopLevelSections([
-    { old: Some({ start: 2, len: 4 }), new: None },
-  ])
-  guard layout is TopLevelSections(sections) else {
-    fail("expected sectioned layout")
-  }
+test "semantic documents expose all section variants and both orders" {
+  let empty : @model.DiffFragment = { document: { hunks: [] }, fallbacks: [] }
+  let document : @model.DiffDocument = TopLevel({
+    sections: [
+      Matched(old={ start: 0, len: 2 }, new={ start: 4, len: 2 }, diff=empty),
+      Deleted(old={ start: 2, len: 2 }, diff=empty),
+      Inserted(new={ start: 0, len: 4 }, diff=empty),
+    ],
+    old_order: [0, 1],
+    new_order: [2, 0],
+    reordered: false,
+  })
+  guard document is TopLevel(top) else { fail("expected a top-level document") }
+  let sections = top.sections
   let _ : ArrayView[@model.DiffSection] = sections
-  assert_true(sections is [{ old: Some({ start: 2, len: 4 }), new: None }])
+  let _ : ArrayView[Int] = top.old_order
+  let _ : ArrayView[Int] = top.new_order
+  assert_true(
+    sections
+    is [
+      Matched(old={ start: 0, len: 2 }, new={ start: 4, len: 2 }, ..),
+      Deleted(old={ start: 2, len: 2 }, ..),
+      Inserted(new={ start: 0, len: 4 }, ..),
+    ],
+  )
+  assert_true(top.old_order is [0, 1])
+  assert_true(top.new_order is [2, 0])
+}
+
+///|
+test "Whole owns its primary fragment without a linear projection" {
+  let fragment : @model.DiffFragment = {
+    document: { hunks: [] },
+    fallbacks: [GraphLimitExceeded(limit=7)],
+  }
+  let document : @model.DiffDocument = Whole(fragment)
+  guard document is Whole(actual) else { fail("expected Whole") }
+  assert_true(actual.document.hunks.is_empty())
+  assert_true(actual.fallbacks is [GraphLimitExceeded(limit=7)])
 }
