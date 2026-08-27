@@ -141,10 +141,10 @@ fn append_comment_rows(
 /// alignment, while sharing the same lexer-backed filtering policy as lexical
 /// view. Hunks containing no remaining semantic changes are removed.
 pub fn ignore_comments(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   old~ : ArrayView[String],
   new~ : ArrayView[String],
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   let old_view = SourceView::from_lines(old, ignore_comments=true)
   let new_view = SourceView::from_lines(new, ignore_comments=true)
   let hunks : Array[@model.DiffHunk] = []

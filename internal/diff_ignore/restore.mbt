@@ -301,10 +301,10 @@ fn append_mapped_rows(
 /// view. Removed lines and fragments are emitted only inside visible,
 /// code-driven hunks and are always neutral, so they cannot create a hunk.
 pub fn restore_document(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   old~ : SourceView,
   new~ : SourceView,
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   let hunks : Array[@model.DiffHunk] = []
   for hunk in document.hunks {
     let old_start = view_hunk_start(old, hunk.old_start)
