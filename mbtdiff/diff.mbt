@@ -24,7 +24,6 @@ pub fn diff(
     new_source,
     old_name~,
     new_name~,
-    context=options.context_lines,
     graph_limit=options.graph_limit,
     ignore_comments=options.ignore_comments,
     ignore_tests=options.ignore_tests,

@@ -18,7 +18,7 @@ pub(all) enum DiffMode {
 } derive(Eq, @debug.Debug)
 
 type DiffOptions
-pub fn DiffOptions::DiffOptions(context_lines? : Int, graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : DiffMode) -> Self
+pub fn DiffOptions::DiffOptions(graph_limit? : UInt, ignore_comments? : Bool, ignore_tests? : Bool, mode? : DiffMode) -> Self
 pub impl Default for DiffOptions
 
 // Type aliases
@@ -26,15 +26,13 @@ pub using @model {type ComputationStage}
 
 pub using @model {type ContextLine}
 
-pub using @model {type DiffBlock}
-
 pub using @model {type DiffDocument}
 
 pub using @model {type DiffFragment}
 
-pub using @model {type DiffHunk}
-
 pub using @model {type DiffLine}
+
+pub using @model {type DiffLinePair}
 
 pub using @model {type DiffResult}
 
@@ -51,8 +49,6 @@ pub using @model {type DiffSide}
 pub using @model {type DiffStatus}
 
 pub using @model {type FallbackReason}
-
-pub using @model {type HunkDocument}
 
 pub using @model {type LineRange}
 

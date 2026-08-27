@@ -15,7 +15,6 @@ pub(all) enum DiffMode {
 /// Renderer-free diff options. Display labels, colors, and layouts belong to
 /// consumers and are intentionally absent from this calculation API.
 struct DiffOptions {
-  context_lines : Int
   graph_limit : UInt
   ignore_comments : Bool
   ignore_tests : Bool
@@ -23,25 +22,14 @@ struct DiffOptions {
 }
 
 ///|
-/// Construct safe options, clamping a negative context radius to zero.
+/// Construct renderer-free semantic diff options.
 pub fn DiffOptions::DiffOptions(
-  context_lines? : Int = 3,
   graph_limit? : UInt = 3_000_000,
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
   mode? : DiffMode = Ast,
 ) -> DiffOptions {
-  {
-    context_lines: if context_lines < 0 {
-      0
-    } else {
-      context_lines
-    },
-    graph_limit,
-    ignore_comments,
-    ignore_tests,
-    mode,
-  }
+  { graph_limit, ignore_comments, ignore_tests, mode }
 }
 
 ///|
@@ -50,22 +38,15 @@ pub impl Default for DiffOptions with fn default() {
 }
 
 ///|
-/// A renderer-ready hunk diff for one semantic fragment.
-pub type HunkDocument = @model.HunkDocument
-
-///|
 /// The high-level semantic document returned by `DiffResult::document`.
 /// Consumers must match `Whole` or `TopLevel` before rendering fragments.
 pub type DiffDocument = @model.DiffDocument
 
 ///|
-pub type DiffHunk = @model.DiffHunk
-
-///|
-pub type DiffBlock = @model.DiffBlock
-
-///|
 pub type DiffRow = @model.DiffRow
+
+///|
+pub type DiffLinePair = @model.DiffLinePair
 
 ///|
 pub type DiffLine = @model.DiffLine
