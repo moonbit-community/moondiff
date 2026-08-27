@@ -43,7 +43,7 @@ test "ignore comments keeps string slashes and real code changes" {
     ignore_comments=true,
   )
   guard code_change.hunks
-    is [{ blocks: [ChangeBlock([Paired(old_line, new_line)])], .. }] else {
+    is [{ rows: [Changed(Paired(old_line, new_line))], .. }] else {
     fail("expected one paired code change")
   }
   assert_true(old_line.segments.last().unwrap().kind is Ignored)
@@ -77,8 +77,7 @@ test "ignore comments keeps bounded word fallback on the code projection" {
     context=0,
     ignore_comments=true,
   )
-  guard document.hunks
-    is [{ blocks: [ChangeBlock([Paired(old_line, new_line)])], .. }] else {
+  guard document.hunks is [{ rows: [Changed(Paired(old_line, new_line))], .. }] else {
     fail("expected one projected fallback pair")
   }
   assert_eq(old_line.text(), old)
@@ -115,12 +114,7 @@ test "ignored comments render as neutral context beside a code change" {
     ignore_comments=true,
   )
   guard document.hunks
-    is [
-      {
-        blocks: [IgnoredBlock([Paired(_, _)]), ChangeBlock([Paired(_, _)])],
-        ..,
-      },
-    ] else {
+    is [{ rows: [Neutral(Paired(_, _)), Changed(Paired(_, _))], .. }] else {
     fail("expected neutral comment context followed by a code change")
   }
   let split = @render_html.render_side_by_side(document, line_numbers=true)
@@ -157,10 +151,10 @@ test "ignored comment lines do not split code hunks" {
         old_len: 3,
         new_start: 0,
         new_len: 3,
-        blocks: [
-          ChangeBlock([Paired(first_old, first_new)]),
-          IgnoredBlock([Paired(old_comment, new_comment)]),
-          ChangeBlock([Paired(second_old, second_new)]),
+        rows: [
+          Changed(Paired(first_old, first_new)),
+          Neutral(Paired(old_comment, new_comment)),
+          Changed(Paired(second_old, second_new)),
         ],
       },
     ] else {
@@ -237,9 +231,10 @@ test "blank lines beside code changes are neutral source-faithful context" {
         old_len: 3,
         new_start: 1,
         new_len: 2,
-        blocks: [
-          ChangeBlock([Paired(_, _)]),
-          IgnoredBlock([Paired(old_empty, new_spaces), OldOnly(old_tab)]),
+        rows: [
+          Changed(Paired(_, _)),
+          Neutral(Paired(old_empty, new_spaces)),
+          Neutral(OldOnly(old_tab)),
         ],
       },
     ] else {

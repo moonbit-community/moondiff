@@ -1,5 +1,5 @@
 ///|
-test "public IR retains hunk ranges, block boundaries, and source text" {
+test "public IR retains hunk ranges, row classifications, and source text" {
   let document = @tokdiff.diff(
     old=["context", "  let old = 1", "tail"],
     new=["context", "    let new = 1", "tail"],
@@ -10,12 +10,13 @@ test "public IR retains hunk ranges, block boundaries, and source text" {
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
     (0, 3, 0, 3),
   )
-  guard hunk.blocks
-    is [ContextBlock(before), ChangeBlock(rows), ContextBlock(after)] else {
-    fail("expected context/change/context blocks")
-  }
-  guard before is [before_line] && after is [after_line] else {
-    fail("expected one context line on each side of the change")
+  guard hunk.rows
+    is [
+      Context(before_line),
+      Changed(Paired(old_line, new_line)),
+      Context(after_line),
+    ] else {
+    fail("expected context/change/context rows")
   }
   assert_eq(
     (before_line.old_index, before_line.new_index, before_line.text),
@@ -25,9 +26,6 @@ test "public IR retains hunk ranges, block boundaries, and source text" {
     (after_line.old_index, after_line.new_index, after_line.text),
     (2, 2, "tail"),
   )
-  guard rows is [Paired(old_line, new_line)] else {
-    fail("expected one paired change row")
-  }
   assert_eq(old_line.index, 1)
   assert_eq(new_line.index, 1)
   assert_eq(old_line.text(), "  let old = 1")
@@ -44,7 +42,7 @@ test "public IR distinguishes blank inserted lines from a missing old side" {
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
     (0, 0, 0, 2),
   )
-  guard hunk.blocks is [ChangeBlock([NewOnly(first), NewOnly(blank)])] else {
+  guard hunk.rows is [Changed(NewOnly(first)), Changed(NewOnly(blank))] else {
     fail("expected two present new-side rows")
   }
   assert_eq((first.index, first.text()), (0, "x"))
@@ -59,10 +57,7 @@ test "plain line diff refines only equal-width replacements" {
     new=["alpha new omega"],
     context=0,
   )
-  guard document.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
-    fail("expected one change block")
-  }
-  guard rows is [Paired(old_line, new_line)] else {
+  guard document.hunks is [{ rows: [Changed(Paired(old_line, new_line))], .. }] else {
     fail("expected one positional pair")
   }
   assert_true(old_line.segments.any(segment => segment.kind is Changed))
@@ -75,11 +70,12 @@ test "plain line diff refines only equal-width replacements" {
     new=["new one"],
     context=0,
   )
-  guard unequal.hunks is [{ blocks: [ChangeBlock(unequal_rows)], .. }] else {
-    fail("expected one unequal change block")
+  guard unequal.hunks is [{ rows: unequal_rows, .. }] else {
+    fail("expected one unequal change hunk")
   }
   for row in unequal_rows {
-    match row {
+    guard row is Changed(pair) else { fail("expected changed row") }
+    match pair {
       Paired(old_line, new_line) => {
         assert_true(old_line.segments.all(segment => segment.kind is Unchanged))
         assert_true(new_line.segments.all(segment => segment.kind is Unchanged))
@@ -97,8 +93,7 @@ test "calculation IR retains raw text without renderer markup or escaping" {
     new=["x < new && y"],
     context=0,
   )
-  guard document.hunks
-    is [{ blocks: [ChangeBlock([Paired(old_line, new_line)])], .. }] else {
+  guard document.hunks is [{ rows: [Changed(Paired(old_line, new_line))], .. }] else {
     fail("expected one paired semantic row")
   }
   assert_eq(old_line.text(), "x < old && y")
@@ -125,12 +120,8 @@ test "HunkDocument rebase updates ranges context and changed indexes" {
     (hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len),
     (10, 3, 20, 3),
   )
-  guard hunk.blocks
-    is [
-      ContextBlock([before]),
-      ChangeBlock([Paired(old_line, new_line)]),
-      ContextBlock([after]),
-    ] else {
+  guard hunk.rows
+    is [Context(before), Changed(Paired(old_line, new_line)), Context(after)] else {
     fail("expected rebased context/change/context blocks")
   }
   assert_eq((before.old_index, before.new_index), (10, 20))
@@ -143,7 +134,7 @@ test "HunkDocument rebase updates ranges context and changed indexes" {
   guard insertion.hunks is [insert_hunk] else {
     fail("expected one insertion hunk")
   }
-  guard insert_hunk.blocks is [ChangeBlock([NewOnly(inserted)])] else {
+  guard insert_hunk.rows is [Changed(NewOnly(inserted))] else {
     fail("expected one inserted line")
   }
   assert_eq(inserted.index, 12)

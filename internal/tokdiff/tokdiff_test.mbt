@@ -199,14 +199,15 @@ test "alignment budget refusals refine equal-width rows by word" {
     )
   }
   let unequal = @tokdiff.diff(old=unequal_old, new=unequal_new, context=0)
-  guard unequal.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
-    fail("expected one unequal budget fallback block")
+  guard unequal.hunks is [{ rows, .. }] else {
+    fail("expected one unequal budget fallback hunk")
   }
   assert_eq(rows.length(), 99)
-  assert_true(rows[0] is OldOnly(_))
-  assert_true(rows[50] is NewOnly(_))
+  assert_true(rows[0] is Changed(OldOnly(_)))
+  assert_true(rows[50] is Changed(NewOnly(_)))
   for row in rows {
-    match row {
+    guard row is Changed(pair) else { fail("expected changed row") }
+    match pair {
       Paired(_, _) => fail("unequal fallback must not infer positional pairs")
       OldOnly(line) | NewOnly(line) =>
         assert_true(line.segments.all(segment => segment.kind is Unchanged))

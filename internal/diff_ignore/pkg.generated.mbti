@@ -9,11 +9,11 @@ import {
 }
 
 // Values
-pub fn ignore_comments(@model.HunkDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.HunkDocument
-
 pub fn lexer_complexity_within_limit(String) -> Bool
 
 pub fn restore_document(@model.HunkDocument, old~ : SourceView, new~ : SourceView) -> @model.HunkDocument
+
+pub fn restore_rows(ArrayView[@model.DiffRow], old~ : SourceView, new~ : SourceView) -> ArrayView[@model.DiffRow]
 
 // Errors
 
@@ -33,6 +33,7 @@ pub struct SourceView {
   visible_indices : Array[Int]
   source_line_offset : Int
 }
+pub fn SourceView::changed_rows(Self, Bool) -> ArrayView[@model.DiffRow]
 pub fn SourceView::from_lines(ArrayView[String], ignore_comments? : Bool) -> Self
 pub fn SourceView::from_source(String, ignored_ranges? : ArrayView[@basic.Location], ignore_comments? : Bool) -> Self
 pub fn SourceView::lines(Self) -> ArrayView[String]

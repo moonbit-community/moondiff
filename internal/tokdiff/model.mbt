@@ -16,11 +16,11 @@ pub type ContextLine = @model.ContextLine
 
 ///|
 /// Compatibility alias for the renderer-neutral model type.
-pub type DiffRow = @model.DiffRow
+pub type DiffLinePair = @model.DiffLinePair
 
 ///|
 /// Compatibility alias for the renderer-neutral model type.
-pub type DiffBlock = @model.DiffBlock
+pub type DiffRow = @model.DiffRow
 
 ///|
 /// Compatibility alias for the renderer-neutral model type.
@@ -214,8 +214,8 @@ fn semantic_change_rows(
   old_start : Int,
   new_start : Int,
   budget : @worddiff.RefinementBudget,
-) -> ArrayView[DiffRow] {
-  let rows : Array[DiffRow] = []
+) -> ArrayView[DiffLinePair] {
+  let rows : Array[DiffLinePair] = []
   let equal_width = old_lines.length() == new_lines.length()
   if alignment_tokens(old_lines, new_lines, line => line.text) is Some(tokens) {
     let changes = window_changes(tokens.olds, tokens.news)
@@ -314,14 +314,13 @@ fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int, Int, Int, Int) {
 }
 
 ///|
-fn semantic_hunk(
-  hunk : @diff.Hunk[ComparableLine],
+fn semantic_rows_from_edits(
+  edits : ArrayView[@diff.Edit],
+  old_view : ArrayView[ComparableLine],
+  new_view : ArrayView[ComparableLine],
   budget : @worddiff.RefinementBudget,
-) -> DiffHunk {
-  let blocks : Array[DiffBlock] = []
-  let edits = hunk.edits()
-  let old_view = hunk.old_view()
-  let new_view = hunk.new_view()
+) -> Array[DiffRow] {
+  let rows : Array[DiffRow] = []
   let mut index = 0
   while index < edits.length() {
     let replacement = if index + 1 < edits.length() {
@@ -331,60 +330,74 @@ fn semantic_hunk(
     }
     match replacement {
       Some(((old_start, old_end), (new_start, new_end))) => {
-        blocks.push(
-          ChangeBlock(
-            semantic_change_rows(
-              old_view.view(start=old_start, end=old_end),
-              new_view.view(start=new_start, end=new_end),
-              old_start,
-              new_start,
-              budget,
-            ),
-          ),
-        )
+        for
+          lines in semantic_change_rows(
+            old_view.view(start=old_start, end=old_end),
+            new_view.view(start=new_start, end=new_end),
+            old_start,
+            new_start,
+            budget,
+          ) {
+          rows.push(Changed(lines))
+        }
         index += 2
       }
       None =>
         match edits[index] {
           Equal(old_index~, new_index~, len~) => {
-            let lines : Array[ContextLine] = []
             for offset in 0..<len {
-              lines.push({
-                old_index: old_index + offset,
-                new_index: new_index + offset,
-                text: old_view[old_index + offset].text,
-              })
+              rows.push(
+                Context({
+                  old_index: old_index + offset,
+                  new_index: new_index + offset,
+                  text: old_view[old_index + offset].text,
+                }),
+              )
             }
-            blocks.push(ContextBlock(lines[:]))
             index += 1
           }
           Delete(old_index~, old_len~, ..) => {
-            let rows : Array[DiffRow] = []
             for offset in 0..<old_len {
               let line = old_view[old_index + offset]
               rows.push(
-                OldOnly(make_plain_diff_line(old_index + offset, line.text)),
+                Changed(
+                  OldOnly(make_plain_diff_line(old_index + offset, line.text)),
+                ),
               )
             }
-            blocks.push(ChangeBlock(rows[:]))
             index += 1
           }
           Insert(new_index~, new_len~, ..) => {
-            let rows : Array[DiffRow] = []
             for offset in 0..<new_len {
               let line = new_view[new_index + offset]
               rows.push(
-                NewOnly(make_plain_diff_line(new_index + offset, line.text)),
+                Changed(
+                  NewOnly(make_plain_diff_line(new_index + offset, line.text)),
+                ),
               )
             }
-            blocks.push(ChangeBlock(rows[:]))
             index += 1
           }
         }
     }
   }
+  rows
+}
+
+///|
+fn semantic_hunk(
+  hunk : @diff.Hunk[ComparableLine],
+  budget : @worddiff.RefinementBudget,
+) -> DiffHunk {
+  let edits = hunk.edits()
+  let rows = semantic_rows_from_edits(
+    edits,
+    hunk.old_view(),
+    hunk.new_view(),
+    budget,
+  )
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
+  { old_start, old_len, new_start, new_len, rows: rows[:] }
 }
 
 ///|
@@ -400,6 +413,27 @@ fn semantic_diff_with_refinement_budget(
     hunks.push(semantic_hunk(hunk, budget))
   }
   { hunks: hunks[:] }
+}
+
+///|
+fn semantic_complete_rows_with_refinement_budget(
+  old : ArrayView[String],
+  new : ArrayView[String],
+  line_cleanup : Bool,
+  budget : @worddiff.RefinementBudget,
+) -> ArrayView[DiffRow] {
+  let calculation = rendering_diff(old, new, line_cleanup)
+  let rows = semantic_rows_from_edits(
+    calculation.edits(),
+    calculation.old_view(),
+    calculation.new_view(),
+    budget,
+  )
+  if rows.any(row => row is Changed(_)) {
+    rows[:]
+  } else {
+    []
+  }
 }
 
 ///|
@@ -426,6 +460,28 @@ fn comment_aware_diff(
 }
 
 ///|
+fn comment_aware_complete_rows(
+  old : ArrayView[String],
+  new : ArrayView[String],
+  line_cleanup : Bool,
+  budget : @worddiff.RefinementBudget,
+) -> ArrayView[DiffRow] {
+  let old_view = @diff_ignore.SourceView::from_lines(old, ignore_comments=true)
+  let new_view = @diff_ignore.SourceView::from_lines(new, ignore_comments=true)
+  let rows = semantic_complete_rows_with_refinement_budget(
+    old_view.lines(),
+    new_view.lines(),
+    line_cleanup,
+    budget,
+  )
+  if rows.is_empty() {
+    []
+  } else {
+    @diff_ignore.restore_rows(rows, old=old_view, new=new_view)
+  }
+}
+
+///|
 fn diff_with_refinement_budget(
   old : ArrayView[String],
   new : ArrayView[String],
@@ -438,6 +494,23 @@ fn diff_with_refinement_budget(
     return comment_aware_diff(old, new, context, line_cleanup, budget)
   }
   semantic_diff_with_refinement_budget(old, new, context, line_cleanup, budget)
+}
+
+///|
+fn complete_rows_with_refinement_budget(
+  old : ArrayView[String],
+  new : ArrayView[String],
+  line_cleanup : Bool,
+  ignore_comments : Bool,
+  budget : @worddiff.RefinementBudget,
+) -> ArrayView[DiffRow] {
+  if ignore_comments {
+    comment_aware_complete_rows(old, new, line_cleanup, budget)
+  } else {
+    semantic_complete_rows_with_refinement_budget(
+      old, new, line_cleanup, budget,
+    )
+  }
 }
 
 ///|
@@ -459,6 +532,25 @@ pub fn diff(
     old,
     new,
     context,
+    line_cleanup,
+    ignore_comments,
+    @worddiff.RefinementBudget::new(),
+  )
+}
+
+///|
+/// Calculate the complete aligned row stream used by semantic fragments.
+/// Context grouping is deliberately absent: a non-empty result covers both
+/// inputs monotonically, while a result with no recognized change is empty.
+pub fn diff_rows(
+  old~ : ArrayView[String],
+  new~ : ArrayView[String],
+  line_cleanup? : Bool = false,
+  ignore_comments? : Bool = false,
+) -> ArrayView[DiffRow] {
+  complete_rows_with_refinement_budget(
+    old,
+    new,
     line_cleanup,
     ignore_comments,
     @worddiff.RefinementBudget::new(),
