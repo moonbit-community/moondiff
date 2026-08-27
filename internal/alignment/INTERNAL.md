@@ -8,7 +8,7 @@ The strategy is intentionally conservative. A wrong pairing can make an unrelate
 
 ## Mental Model
 
-The source file is viewed as an ordered sequence of declaration units. A unit contains one top-level declaration together with leading material that belongs to it, such as documentation and separators. Standalone material at the end of a file remains an independent unit so that it is not lost.
+The source file is viewed as an ordered sequence of declaration units. A unit contains one top-level declaration together with leading parser-visible material that belongs to it, such as documentation and separators. Standalone parser-visible material at the end of a file remains an independent unit so that it is not lost. Each unit records its exact zero-based, half-open line range from its first visible CST node through its last; later stages never reconstruct ranges from sliced text or neighboring units. Blank-only lines enclosed by those two nodes remain part of the unit, but file-leading, inter-unit, and file-trailing blank-only gaps are not assigned to any unit.
 
 Alignment has two responsibilities:
 
@@ -47,7 +47,7 @@ This makes the result stable and explainable. Adding an unrelated declaration sh
 
 Alignment is optional guidance for the detailed diff, not a prerequisite for producing output. If parsing fails, computation becomes too expensive, or no reliable declaration pair can be found, the system falls back to comparing a larger scope.
 
-The fallback may be less precise, but it must remain complete and must never hide a real textual change.
+Within the selected comparison scope, the result must remain complete. A `Whole` comparison includes every source line, while a sectioned plan compares only the declaration-unit ranges described above.
 
 ## Evidence Hierarchy
 
@@ -117,17 +117,17 @@ When at least one trustworthy correspondence exists, declarations are compared i
 - Unpaired old declarations are deletions.
 - Unpaired new declarations are insertions.
 
-This isolates edits inside moved declarations from the movement itself and preserves original source locations for reporting.
+This isolates edits inside moved declarations from the movement itself and preserves original source locations for reporting. The result keeps a stable section identity table plus independent old-side and new-side orderings. Each section's detailed hunk document uses local, zero-based coordinates; the section ranges are the only source of original-file coordinates. Lexical mode compares these section slices independently and does not synthesize sections for unassigned blank-only gaps. A change confined to such gaps therefore produces no hunks and `DiffStatus::NoStructuralChanges`.
 
-If no trustworthy correspondence exists, the matcher avoids arbitrary pairings and compares the complete declaration lists or files together. The broader comparison retains global context and gives the lower-level diff a chance to find useful structure on its own.
+If no trustworthy correspondence exists, the matcher avoids arbitrary pairings and compares the complete declaration lists or files as one `Whole` fragment. Parse failures and top-level planning failures use the same representation.
 
-Pure reordering deserves special treatment. A structural view may legitimately report no internal structural changes, because every declaration is unchanged. A textual view must still show that the file text changed, so it falls back to a whole-file presentation when independent declaration diffs would otherwise be empty.
+Pure reordering deserves special treatment. All reliably matched declarations remain in the result even when their local hunk documents are empty. Crossing old-side and new-side identity orders sets `reordered` and produces `DiffStatus::Reordered`; it does not trigger a whole-file textual fallback or turn the move into deletion plus insertion. Consumers can show a compact movement summary while choosing the side order appropriate to their view.
 
 ## Resource Bounds
 
-Some heuristic work can grow quickly with the number and size of unmatched declarations. Similarity calculations therefore participate in a shared computation budget.
+Some heuristic work can grow quickly with the number and size of unmatched declarations. Similarity calculations therefore participate in a top-level computation budget.
 
-If the budget is exhausted, alignment stops and the diff expands to a safer, larger scope instead of returning a partial or unstable pairing.
+If that budget is exhausted before reliable planning completes, the result expands to one `Whole` fragment instead of returning a partial or unstable pairing. Once a reliable top-level plan exists, each section receives a fresh local diff budget. Exhausting a local budget degrades only that section to lexical diff and records the fallback on that section's fragment; other sections remain structural.
 
 ## Expected Behavior in Common Scenarios
 
@@ -141,7 +141,9 @@ If the budget is exhausted, alignment stops and the diff expands to a safer, lar
 | Identical anonymous content appears once on each side | It can be paired by exact structural identity. |
 | Identical anonymous content is duplicated | It remains ambiguous at the structural-fingerprint stage. |
 | A large body is extracted into a nearby helper | The helper may preserve the old implementation's continuity; the wrapper appears inserted. |
-| Parsing or alignment exceeds its limits | The diff falls back to a whole-file or whole-list comparison. |
+| Blank-only lines change before, between, or after reliably aligned declarations | A sectioned lexical diff produces no hunks and reports `NoStructuralChanges`; a `Whole` lexical comparison still observes them. |
+| Parsing or top-level alignment exceeds its limits | The diff falls back to one `Whole` fragment. |
+| One declaration exceeds a local diff limit | Only that section falls back to lexical diff; other sections remain independent. |
 
 ## Deliberate Limitations
 
@@ -153,6 +155,7 @@ The strategy intentionally does not:
 - Guess correspondences among duplicated exact structures.
 - Reconsider strong matches after weaker evidence appears.
 - Model arbitrary many-to-many declaration splits and merges.
+- Create synthetic sections for whitespace-only gaps outside visible unit ranges.
 - Sacrifice complete output when precise alignment is unavailable.
 
 These limitations favor predictable false negatives over misleading false positives. The central invariant is simple: every accepted pair should have a clear identity story, and every uncertain case should remain visibly uncertain.
