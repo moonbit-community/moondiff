@@ -4,15 +4,9 @@ fn paired_rows(
 ) -> Array[(@model.DiffLine, @model.DiffLine)] {
   let pairs = []
   for hunk in document.hunks {
-    for block in hunk.blocks {
-      match block {
-        ChangeBlock(rows) =>
-          for row in rows {
-            if row is Paired(old_line, new_line) {
-              pairs.push((old_line, new_line))
-            }
-          }
-        ContextBlock(_) | IgnoredBlock(_) => ()
+    for row in hunk.rows {
+      if row is Changed(Paired(old_line, new_line)) {
+        pairs.push((old_line, new_line))
       }
     }
   }
