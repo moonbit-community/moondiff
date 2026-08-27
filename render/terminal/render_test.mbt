@@ -40,7 +40,7 @@ test "render_document highlights changes and keeps ignored text neutral" {
     index: 2,
     segments: [{ kind: Ignored, text: "// new docs" }],
   }
-  let document : @model.DiffDocument = {
+  let document : @model.HunkDocument = {
     hunks: [
       {
         old_start: 0,
@@ -94,7 +94,7 @@ test "render_document highlights changes and keeps ignored text neutral" {
 
 ///|
 test "render_document honors 9 to 10 and 99 to 100 width hints" {
-  let document : @model.DiffDocument = {
+  let document : @model.HunkDocument = {
     hunks: [
       {
         old_start: 8,

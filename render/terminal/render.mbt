@@ -278,7 +278,7 @@ fn update_document_max_line(max_line : Ref[Int], index : Int) -> Unit {
 }
 
 ///|
-fn document_line_widths(document : @model.DiffDocument) -> (Int, Int) {
+fn document_line_widths(document : @model.HunkDocument) -> (Int, Int) {
   let old_max = Ref(1)
   let new_max = Ref(1)
   for hunk in document.hunks {
@@ -315,14 +315,15 @@ fn hinted_width(hint : Int?, document_width : Int) -> Int {
 }
 
 ///|
-/// Render an already calculated diff document with file headers, two
-/// line-number columns, and optional ANSI highlighting. The renderer does not
-/// calculate hunks, apply context, normalize source text, or choose empty and
-/// fallback messages. An empty document therefore renders only its headers.
+/// Render one already calculated fragment `HunkDocument` with file headers,
+/// two line-number columns, and optional ANSI highlighting. The renderer does
+/// not flatten a high-level semantic document, calculate hunks, apply context,
+/// normalize source text, or choose empty and fallback messages. An empty
+/// document therefore renders only its headers.
 pub fn render_document(
   old_label : String,
   new_label : String,
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   options? : RenderOptions = Default::default(),
 ) -> String {
   let (document_old_width, document_new_width) = document_line_widths(document)
