@@ -113,7 +113,7 @@ test "calculation IR retains raw text without renderer markup or escaping" {
 }
 
 ///|
-test "DiffDocument rebase updates ranges context and changed indexes" {
+test "HunkDocument rebase updates ranges context and changed indexes" {
   let original = @tokdiff.diff(
     old=["before", "let old = 1", "after"],
     new=["before", "let new = 2", "after"],

@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, ignore_comments? : Bool) -> @model.DiffDocument
+pub fn diff(old~ : ArrayView[String], new~ : ArrayView[String], context? : Int, line_cleanup? : Bool, ignore_comments? : Bool) -> @model.HunkDocument
 
 pub fn similarity(String, String) -> Int
 
@@ -37,8 +37,6 @@ pub using @model {type ContextLine}
 
 pub using @model {type DiffBlock}
 
-pub using @model {type DiffDocument}
-
 pub using @model {type DiffHunk}
 
 pub using @model {type DiffLine}
@@ -48,5 +46,7 @@ pub using @model {type DiffRow}
 pub using @model {type DiffSegment}
 
 pub using @model {type DiffSegmentKind}
+
+pub using @model {type HunkDocument}
 
 // Traits
