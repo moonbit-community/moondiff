@@ -4,12 +4,7 @@ using @diff_ignore {type SourceView}
 ///|
 fn unit_source_view(view : SourceView, unit : ImplUnit?) -> SourceView {
   if unit is Some(unit) {
-    let source_len = if unit.source == "" {
-      0
-    } else {
-      @source_text.split_lines(unit.source).length()
-    }
-    view.slice(unit.start_line - 1, source_len)
+    view.slice(unit.range.start, unit.range.len)
   } else {
     @diff_ignore.SourceView::from_lines([])
   }

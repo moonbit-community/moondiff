@@ -1,76 +1,51 @@
 ///|
 /// The MoonBit-aware calculation engine used to build an aligned diff
-/// document. Lexical mode retains token-level text changes; AST mode reports
-/// only structural changes.
+/// document. Lexical mode retains token-level text changes inside the selected
+/// whole-file or declaration-local fragments; AST mode reports only structural
+/// changes.
 pub(all) enum AlignedDiffMode {
   Lexical
   Ast
 } derive(Eq)
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type DiffStatus = @model.DiffStatus
+type DiffStatus = @model.DiffStatus
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type DiffSide = @model.DiffSide
+type DiffSide = @model.DiffSide
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type ComputationStage = @model.ComputationStage
+type ComputationStage = @model.ComputationStage
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type FallbackReason = @model.FallbackReason
+type FallbackReason = @model.FallbackReason
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type LineRange = @model.LineRange
+type DiffFragment = @model.DiffFragment
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type FallbackScope = @model.FallbackScope
+type DiffSection = @model.DiffSection
 
 ///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type FallbackInfo = @model.FallbackInfo
-
-///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type DiffSection = @model.DiffSection
-
-///|
-/// Compatibility alias for the public renderer-neutral model type.
-pub type DiffLayout = @model.DiffLayout
+type DiffDocument = @model.DiffDocument
 
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
-/// through the `mbtdiff` facade. `fallbacks` is a zero-copy read-only view whose
-/// backing storage is never mutated after this result is published.
+/// through the `mbtdiff` facade.
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
-  status : DiffStatus
-  fallbacks : ArrayView[FallbackInfo]
+  status : @model.DiffStatus
 } derive(Eq)
 
 ///|
-/// One shared calculation consumed by the renderer-free facade and internal
-/// alignment tests.
-pub(all) struct DiffCalculation {
-  result : DetailedDiffResult
-  layout : DiffLayout
-}
-
-///|
 priv struct DetailedUnitResult {
-  document : @model.DiffDocument
-  fallback : FallbackInfo?
-  computation_exhausted : Bool
+  document : @model.HunkDocument
+  fallback : FallbackReason?
 }
 
 ///|
 priv enum AstBuildResult {
-  AstDocument(@model.DiffDocument)
+  AstDocument(@model.HunkDocument)
   AstPositionsOutOfBounds(ArrayView[DiffSide])
 }
 
@@ -78,7 +53,7 @@ priv enum AstBuildResult {
 type NovelRangeMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|
-fn empty_document() -> @model.DiffDocument {
+fn empty_document() -> @model.HunkDocument {
   { hunks: [] }
 }
 
@@ -97,7 +72,7 @@ fn lexical_source_document(
   new_source : String,
   context : Int,
   ignore_comments : Bool,
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   let old = document_lines(old_source)
   let new = document_lines(new_source)
   @tokdiff.diff(old~, new~, context~, line_cleanup=true, ignore_comments~)
@@ -109,7 +84,7 @@ fn lexical_view_document(
   new : SourceView,
   context : Int,
   ignore_comments : Bool,
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   @diff_ignore.restore_document(
     @tokdiff.diff(
       old=old.lines(),
@@ -124,11 +99,62 @@ fn lexical_view_document(
 }
 
 ///|
-fn append_document(
-  hunks : Array[@model.DiffHunk],
-  document : @model.DiffDocument,
-) -> Unit {
-  hunks.push_iter(document.hunks.iter())
+fn diff_fragment(
+  document : @model.HunkDocument,
+  fallback : FallbackReason?,
+) -> DiffFragment {
+  let fallbacks : Array[FallbackReason] = []
+  if fallback is Some(reason) {
+    fallbacks.push(reason)
+  }
+  { document, fallbacks: fallbacks[:] }
+}
+
+///|
+fn whole_document(
+  document : @model.HunkDocument,
+  fallback? : FallbackReason,
+) -> DiffDocument {
+  @model.DiffDocument::Whole(diff_fragment(document, fallback))
+}
+
+///|
+fn section_from_edit(edit : ImplEdit, diff : DiffFragment) -> DiffSection {
+  match edit {
+    Replace(old~, new~) =>
+      @model.DiffSection::Matched(old=old.range, new=new.range, diff~)
+    Delete(old) => @model.DiffSection::Deleted(old=old.range, diff~)
+    Insert(new) => @model.DiffSection::Inserted(new=new.range, diff~)
+  }
+}
+
+///|
+fn top_level_result(
+  plan : PerUnitPlan,
+  fragments : Array[DiffFragment],
+) -> DetailedDiffResult {
+  let sections : Array[DiffSection] = []
+  for index, edit in plan.edits {
+    sections.push(section_from_edit(edit, fragments[index]))
+  }
+  let status : DiffStatus = if fragments.any(fragment => {
+      !fragment.document.hunks.is_empty()
+    }) {
+    Changed
+  } else if plan.reordered {
+    Reordered
+  } else {
+    NoStructuralChanges
+  }
+  {
+    document: @model.DiffDocument::TopLevel({
+      sections: sections[:],
+      old_order: plan.old_order[:],
+      new_order: plan.new_order[:],
+      reordered: plan.reordered,
+    }),
+    status,
+  }
 }
 
 ///|
@@ -139,20 +165,19 @@ fn lexical_edit_document(
   new_view : SourceView,
   context : Int,
   ignore_comments : Bool,
-) -> @model.DiffDocument {
+) -> @model.HunkDocument {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
-  lexical_view_document(old_local, new_local, context, ignore_comments).rebase(
-    impl_line_base(old_unit) - 1,
-    impl_line_base(new_unit) - 1,
-  )
+  lexical_view_document(old_local, new_local, context, ignore_comments)
 }
 
 ///|
+// Per-unit lexical comparison is declaration-scoped by design. It compares
+// only each unit's exact source slice and does not synthesize fragments for
+// whitespace-only gaps before, between, or after units. RootList plans retain
+// whole-file lexical behavior and therefore include those gaps.
 fn detailed_lexical_plan_document(
   plan : TopLevelPlan,
-  old_source : String,
-  new_source : String,
   old_view : SourceView,
   new_view : SourceView,
   context : Int,
@@ -163,11 +188,11 @@ fn detailed_lexical_plan_document(
       let document = lexical_view_document(
         old_view, new_view, context, ignore_comments,
       )
-      { document, status: Changed, fallbacks: [] }
+      { document: whole_document(document), status: Changed }
     }
-    PerUnit(edits) => {
-      let hunks : Array[@model.DiffHunk] = []
-      for edit in edits {
+    PerUnit(unit_plan) => {
+      let fragments : Array[DiffFragment] = []
+      for edit in unit_plan.edits {
         let document = match edit {
           Replace(old~, new~) =>
             lexical_edit_document(
@@ -197,19 +222,9 @@ fn detailed_lexical_plan_document(
               ignore_comments,
             )
         }
-        append_document(hunks, document)
+        fragments.push(diff_fragment(document, None))
       }
-      if hunks.is_empty() && old_source != new_source {
-        {
-          document: lexical_view_document(
-            old_view, new_view, context, ignore_comments,
-          ),
-          status: Changed,
-          fallbacks: [{ reason: TopLevelReordering, scope: WholeFile }],
-        }
-      } else {
-        { document: { hunks: hunks[:] }, status: Changed, fallbacks: [] }
-      }
+      top_level_result(unit_plan, fragments)
     }
   }
 }
@@ -695,56 +710,8 @@ fn computation_stage(stage : @computation.Stage) -> ComputationStage {
 }
 
 ///|
-fn unit_line_range(unit : ImplUnit?) -> LineRange? {
-  if unit is Some(unit) {
-    Some({
-      start: unit.start_line - 1,
-      len: document_lines(unit.source).length(),
-    })
-  } else {
-    None
-  }
-}
-
-///|
-fn unit_fallback(
-  reason : FallbackReason,
-  old_unit : ImplUnit?,
-  new_unit : ImplUnit?,
-) -> FallbackInfo {
-  {
-    reason,
-    scope: Region(old=unit_line_range(old_unit), new=unit_line_range(new_unit)),
-  }
-}
-
-///|
-fn layout_from_top_level_plan(plan : TopLevelPlan) -> DiffLayout {
-  match plan {
-    RootList(..) => WholeDocument
-    PerUnit(edits) => {
-      let sections : Array[DiffSection] = []
-      for edit in edits {
-        sections.push(
-          match edit {
-            Replace(old~, new~) =>
-              {
-                old: unit_line_range(Some(old)),
-                new: unit_line_range(Some(new)),
-              }
-            Delete(old) => { old: unit_line_range(Some(old)), new: None }
-            Insert(new) => { old: None, new: unit_line_range(Some(new)) }
-          },
-        )
-      }
-      TopLevelSections(sections[:])
-    }
-  }
-}
-
-///|
 // Unit and root-list AST paths share all syntax calculation, mapping, and
-// rendered-line validation. Their wrappers only restore filters and rebase.
+// rendered-line validation. Their wrappers only restore filtered text.
 fn ast_document_for_roots_with_budget(
   lhs_roots : ArrayView[@syntax.Syntax],
   rhs_roots : ArrayView[@syntax.Syntax],
@@ -806,8 +773,6 @@ fn ast_unit_document_with_budget(
 ) -> AstBuildResult raise {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
-  let old_offset = impl_line_base(old_unit) - 1
-  let new_offset = impl_line_base(new_unit) - 1
   let lhs_roots : Array[@syntax.Syntax] = []
   let rhs_roots : Array[@syntax.Syntax] = []
   if old_unit is Some(unit) {
@@ -823,9 +788,7 @@ fn ast_unit_document_with_budget(
     ) {
     AstDocument(document) =>
       AstDocument(
-        @diff_ignore.restore_document(document, old=old_local, new=new_local).rebase(
-          old_offset, new_offset,
-        ),
+        @diff_ignore.restore_document(document, old=old_local, new=new_local),
       )
     AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
   }
@@ -861,8 +824,7 @@ fn detailed_ast_edit_document(
         document: lexical_edit_document(
           old_unit, new_unit, old_view, new_view, context, ignore_comments,
         ),
-        fallback: Some(unit_fallback(reason, old_unit, new_unit)),
-        computation_exhausted: true,
+        fallback: Some(reason),
       }
     }
     _ => {
@@ -871,45 +833,21 @@ fn detailed_ast_edit_document(
         document: lexical_edit_document(
           old_unit, new_unit, old_view, new_view, context, ignore_comments,
         ),
-        fallback: Some(unit_fallback(reason, old_unit, new_unit)),
-        computation_exhausted: false,
+        fallback: Some(reason),
       }
     }
   }
   match build {
-    AstDocument(document) =>
-      { document, fallback: None, computation_exhausted: false }
+    AstDocument(document) => { document, fallback: None }
     AstPositionsOutOfBounds(sides) => {
       let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
       {
         document: lexical_edit_document(
           old_unit, new_unit, old_view, new_view, context, ignore_comments,
         ),
-        fallback: Some(unit_fallback(reason, old_unit, new_unit)),
-        // Position corruption is local to this declaration. Unlike a shared
-        // budget exhaustion, it must not force later declarations to degrade.
-        computation_exhausted: false,
+        fallback: Some(reason),
       }
     }
-  }
-}
-
-///|
-fn lexical_detailed_unit(
-  old_unit : ImplUnit?,
-  new_unit : ImplUnit?,
-  old_view : SourceView,
-  new_view : SourceView,
-  context : Int,
-  ignore_comments : Bool,
-  reason : FallbackReason,
-) -> DetailedUnitResult {
-  {
-    document: lexical_edit_document(
-      old_unit, new_unit, old_view, new_view, context, ignore_comments,
-    ),
-    fallback: Some(unit_fallback(reason, old_unit, new_unit)),
-    computation_exhausted: true,
   }
 }
 
@@ -947,13 +885,10 @@ fn whole_file_fallback(
   ignore_comments : Bool,
   reason : FallbackReason,
 ) -> DetailedDiffResult {
-  {
-    document: lexical_view_document(
-      old_view, new_view, context, ignore_comments,
-    ),
-    status: Changed,
-    fallbacks: [{ reason, scope: WholeFile }],
-  }
+  let document = lexical_view_document(
+    old_view, new_view, context, ignore_comments,
+  )
+  { document: whole_document(document, fallback=reason), status: Changed }
 }
 
 ///|
@@ -965,8 +900,9 @@ fn detailed_ast_root_list_document(
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
-  budget : @computation.Budget,
+  computation_limit : UInt,
 ) -> DetailedDiffResult {
+  let budget = @computation.Budget::new(computation_limit)
   let build = ast_root_document_with_budget(
     old_units,
     new_units,
@@ -1005,13 +941,12 @@ fn detailed_ast_root_list_document(
       )
     AstDocument(document) =>
       {
-        document,
+        document: whole_document(document),
         status: if document.hunks.is_empty() {
           NoStructuralChanges
         } else {
           Changed
         },
-        fallbacks: [],
       }
   }
 }
@@ -1024,51 +959,34 @@ fn detailed_ast_plan_document(
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
-  budget : @computation.Budget,
+  computation_limit : UInt,
 ) -> DetailedDiffResult {
   match plan {
     RootList(old~, new~) =>
       detailed_ast_root_list_document(
-        old, new, old_view, new_view, context, graph_limit, ignore_comments, budget,
+        old, new, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
       )
-    PerUnit(edits) => {
-      let hunks : Array[@model.DiffHunk] = []
-      let fallbacks : Array[FallbackInfo] = []
-      let exhausted_reason : Ref[FallbackReason?] = Ref(None)
-      for edit in edits {
+    PerUnit(unit_plan) => {
+      let fragments : Array[DiffFragment] = []
+      for edit in unit_plan.edits {
         let (old_unit, new_unit) = match edit {
           Replace(old~, new~) => (Some(old), Some(new))
           Delete(old) => (Some(old), None)
           Insert(new) => (None, Some(new))
         }
-        let result = if exhausted_reason.val is Some(reason) {
-          lexical_detailed_unit(
-            old_unit, new_unit, old_view, new_view, context, ignore_comments, reason,
-          )
-        } else {
-          detailed_ast_edit_document(
-            old_unit, new_unit, old_view, new_view, context, graph_limit, ignore_comments,
-            budget,
-          )
-        }
-        append_document(hunks, result.document)
-        if result.fallback is Some(fallback) {
-          fallbacks.push(fallback)
-          if result.computation_exhausted && exhausted_reason.val is None {
-            exhausted_reason.val = Some(fallback.reason)
-          }
-        }
+        let result = detailed_ast_edit_document(
+          old_unit,
+          new_unit,
+          old_view,
+          new_view,
+          context,
+          graph_limit,
+          ignore_comments,
+          @computation.Budget::new(computation_limit),
+        )
+        fragments.push(diff_fragment(result.document, result.fallback))
       }
-      let document : @model.DiffDocument = { hunks: hunks[:] }
-      {
-        document,
-        status: if document.hunks.is_empty() {
-          NoStructuralChanges
-        } else {
-          Changed
-        },
-        fallbacks: fallbacks[:],
-      }
+      top_level_result(unit_plan, fragments)
     }
   }
 }
@@ -1130,13 +1048,10 @@ fn calculate_diff_document_with_limit(
   computation_limit : UInt,
   ignore_tests? : Bool = false,
   mode? : AlignedDiffMode = Ast,
-) -> DiffCalculation {
+) -> DetailedDiffResult {
   let context = @cmp.maximum(context, 0)
   if old_source == new_source {
-    return {
-      result: { document: empty_document(), status: Identical, fallbacks: [] },
-      layout: WholeDocument,
-    }
+    return { document: whole_document(empty_document()), status: Identical }
   }
   let old_parse = @cst.parse_structure(old_source, name=old_name)
   let new_parse = @cst.parse_structure(new_source, name=new_name)
@@ -1149,31 +1064,21 @@ fn calculate_diff_document_with_limit(
     None
   }
   if comment_document is Some(document) && document.hunks.is_empty() {
-    return {
-      result: { document, status: IgnoredOnly, fallbacks: [] },
-      layout: WholeDocument,
-    }
+    return { document: whole_document(document), status: IgnoredOnly }
   }
   if parse_detail is Some(detail) {
+    let document = if comment_document is Some(document) {
+      document
+    } else {
+      lexical_source_document(old_source, new_source, context, false)
+    }
+    let reason : FallbackReason = ParseError(
+      sides=parse_error_sides(old_reports, new_reports),
+      detail~,
+    )
     return {
-      result: {
-        document: if comment_document is Some(document) {
-          document
-        } else {
-          lexical_source_document(old_source, new_source, context, false)
-        },
-        status: Changed,
-        fallbacks: [
-          {
-            reason: ParseError(
-              sides=parse_error_sides(old_reports, new_reports),
-              detail~,
-            ),
-            scope: WholeFile,
-          },
-        ],
-      },
-      layout: WholeDocument,
+      document: whole_document(document, fallback=reason),
+      status: Changed,
     }
   }
   let old_collection = collect_impl_units_detailed(
@@ -1189,20 +1094,19 @@ fn calculate_diff_document_with_limit(
   let old_view = @diff_ignore.SourceView::from_source(
     old_source,
     ignored_ranges=old_collection.ignored_tests,
+    ignore_comments~,
   )
   let new_view = @diff_ignore.SourceView::from_source(
     new_source,
     ignored_ranges=new_collection.ignored_tests,
+    ignore_comments~,
   )
   if ignore_comments || ignore_tests {
     let document = lexical_view_document(
       old_view, new_view, context, ignore_comments,
     )
     if document.hunks.is_empty() {
-      return {
-        result: { document, status: IgnoredOnly, fallbacks: [] },
-        layout: WholeDocument,
-      }
+      return { document: whole_document(document), status: IgnoredOnly }
     }
   }
   let budget = @computation.Budget::new(computation_limit)
@@ -1213,59 +1117,32 @@ fn calculate_diff_document_with_limit(
     ignore_uuid=ignore_comments,
   ) catch {
     @computation.LimitExceeded(stage~, limit~) =>
-      return {
-        result: whole_file_fallback(
-          old_view,
-          new_view,
-          context,
-          ignore_comments,
-          ComputationLimitExceeded(stage=computation_stage(stage), limit~),
-        ),
-        layout: WholeDocument,
-      }
+      return whole_file_fallback(
+        old_view,
+        new_view,
+        context,
+        ignore_comments,
+        ComputationLimitExceeded(stage=computation_stage(stage), limit~),
+      )
   }
-  let result = match mode {
+  match mode {
     Lexical =>
       detailed_lexical_plan_document(
-        plan, old_source, new_source, old_view, new_view, context, ignore_comments,
+        plan, old_view, new_view, context, ignore_comments,
       )
     Ast =>
       detailed_ast_plan_document(
-        plan, old_view, new_view, context, graph_limit, ignore_comments, budget,
+        plan, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
       )
   }
-  let result = if mode is Ast && ignore_comments {
-    let document = @diff_ignore.ignore_comments(
-      result.document,
-      old=document_lines(old_source),
-      new=document_lines(new_source),
-    )
-    {
-      document,
-      status: if document.hunks.is_empty() && result.fallbacks.is_empty() {
-        NoStructuralChanges
-      } else {
-        result.status
-      },
-      fallbacks: result.fallbacks,
-    }
-  } else {
-    result
-  }
-  let layout : DiffLayout = if result.fallbacks is [{ scope: WholeFile, .. }] {
-    WholeDocument
-  } else {
-    layout_from_top_level_plan(plan)
-  }
-  { result, layout }
 }
 
 ///|
-/// Calculate a renderer-neutral diff and its presentation layout from one
-/// parse and one top-level alignment plan. AST mode is the default; lexical
-/// mode keeps token-level text changes while retaining declaration alignment
-/// and the shared top-level computation budget. Parse diagnostics are carried
-/// by `FallbackReason::ParseError.detail`.
+/// Calculate the sole renderer-neutral semantic document from one parse and
+/// one top-level alignment plan. Reliable declaration pairings remain
+/// section-local even when their two source orders cross. Section-local
+/// lexical comparison is limited to exact unit ranges; whitespace-only gaps
+/// outside those ranges are not represented as sections.
 pub fn calculate_diff_document(
   old_source : String,
   new_source : String,
@@ -1276,7 +1153,7 @@ pub fn calculate_diff_document(
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
   mode? : AlignedDiffMode = Ast,
-) -> DiffCalculation {
+) -> DetailedDiffResult {
   calculate_diff_document_with_limit(
     old_source,
     new_source,
@@ -1312,5 +1189,5 @@ pub fn diff_document_detailed(
     ignore_comments~,
     ignore_tests~,
     mode~,
-  ).result
+  )
 }
