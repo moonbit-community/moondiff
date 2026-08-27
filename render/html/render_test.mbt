@@ -1,5 +1,5 @@
 ///|
-fn renderer_fixture() -> @model.DiffDocument {
+fn renderer_fixture() -> @model.HunkDocument {
   let old_line : @model.DiffLine = {
     index: 1,
     segments: [
