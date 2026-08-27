@@ -42,8 +42,34 @@ const formattingNew = [
   '  "<same&value>"',
   "}",
 ].join("\n");
-const structuralOld = 'fn structural() { old_call("<script>&safe") }';
-const structuralNew = 'fn structural() { new_call("<script>&safe") }';
+const structuralOld = [
+  "fn removed() { old_only() }",
+  "",
+  "fn structural() {",
+  "  before()",
+  '  old_call("<script>&safe")',
+  "  old_second()",
+  "  after_one()",
+  "  after_two()",
+  "  after_three()",
+  "  after_four()",
+  "  after_five()",
+  "}",
+].join("\n");
+const structuralNew = [
+  "fn inserted() { new_only() }",
+  "",
+  "fn structural() {",
+  "  before()",
+  '  new_call("<script>&safe")',
+  "  new_second()",
+  "  after_one()",
+  "  after_two()",
+  "  after_three()",
+  "  after_four()",
+  "  after_five()",
+  "}",
+].join("\n");
 
 const commentsSha = "4444444444444444444444444444444444444444";
 const commentsUrl = `https://github.com/example/comments/commit/${commentsSha}`;
@@ -1134,14 +1160,19 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await expect(formattingCard.locator("table")).toHaveCount(0);
 
   await expect(structuralCard.locator("table.split")).toBeVisible();
-  await expect(structuralCard.locator("b.wd")).toContainText("old_call");
-  await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+  await expect(structuralCard.locator("b.wd").filter({ hasText: "old_call" })).toHaveText("old_call");
+  await expect(structuralCard.locator("b.wa").filter({ hasText: "new_call" })).toHaveText("new_call");
   await expect(structuralCard.locator("td.old-line-number").first()).not.toHaveText("");
   await expect(structuralCard).toContainText('"<script>&safe"');
+  await expect(structuralCard).toContainText("after_five()");
   await expect(structuralCard.locator("script")).toHaveCount(0);
+  await expect(structuralCard.locator(".hunk-header")).toHaveCount(0);
+  await expect(structuralCard.locator("table.single")).toHaveCount(2);
+  await expect(structuralCard.locator("table.single tr").first().locator("td")).toHaveCount(2);
 
   await readmeCard.getByRole("button", { name: "Expand" }).click();
   await expect(readmeCard.locator("table.split")).toBeVisible();
+  await expect(readmeCard.locator(".hunk-header")).not.toHaveCount(0);
   const lineHtmlInAstMode = await readmeCard.locator(".diff-scroll").innerHTML();
   await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
   await expect(readmeCard.locator("b.wa")).toHaveText("&new");
@@ -1149,15 +1180,26 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(structuralCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
-  await expect(structuralCard.locator("b.wd")).toContainText("old_call");
-  await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+  await expect(structuralCard.locator("b.wd").filter({ hasText: "old_call" })).toHaveText("old_call");
+  await expect(structuralCard.locator("b.wa").filter({ hasText: "new_call" })).toHaveText("new_call");
+  const structuralUnifiedText = await structuralCard.locator("table.unified tbody").innerText();
+  expect(structuralUnifiedText.indexOf("old_call")).toBeLessThan(
+    structuralUnifiedText.indexOf("old_second"),
+  );
+  expect(structuralUnifiedText.indexOf("old_second")).toBeLessThan(
+    structuralUnifiedText.indexOf("new_call"),
+  );
+  expect(structuralUnifiedText.indexOf("new_call")).toBeLessThan(
+    structuralUnifiedText.indexOf("new_second"),
+  );
+  await expect(structuralCard.locator("table.single")).toHaveCount(2);
   await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
   await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 
   await page.setViewportSize({ width: 640, height: 900 });
-  const astOverflow = await structuralCard.locator(".diff-scroll").evaluate(element => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
+  const astOverflow = await structuralCard.locator("table.unified").evaluate(table => ({
+    clientWidth: table.parentElement.clientWidth,
+    scrollWidth: table.parentElement.scrollWidth,
     pageWidth: document.documentElement.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
   }));
