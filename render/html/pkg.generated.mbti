@@ -6,13 +6,13 @@ import {
 }
 
 // Values
-pub fn render_side_by_side(@model.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+pub fn render_side_by_side(@model.HunkDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
 
-pub fn render_side_by_side_hunks(@model.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+pub fn render_side_by_side_hunks(@model.HunkDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
 
-pub fn render_unified(@model.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
+pub fn render_unified(@model.HunkDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> String
 
-pub fn render_unified_hunks(@model.DiffDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
+pub fn render_unified_hunks(@model.HunkDocument, line_numbers? : Bool, hunk_notes? : ArrayView[HunkNote?]) -> Array[String]
 
 // Errors
 

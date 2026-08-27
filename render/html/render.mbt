@@ -234,9 +234,10 @@ fn append_split_hunk(
 }
 
 ///|
-/// Render a calculated diff as a GitHub-style side-by-side HTML table.
+/// Render one fragment `HunkDocument` as a GitHub-style side-by-side HTML
+/// table. This function does not flatten a high-level semantic document.
 pub fn render_side_by_side(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> String {
@@ -250,9 +251,10 @@ pub fn render_side_by_side(
 }
 
 ///|
-/// Render every calculated hunk as its own side-by-side HTML table.
+/// Render every hunk in one fragment `HunkDocument` as its own side-by-side
+/// HTML table.
 pub fn render_side_by_side_hunks(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> Array[String] {
@@ -462,9 +464,10 @@ fn append_unified_hunk(
 }
 
 ///|
-/// Render a calculated diff as unified HTML.
+/// Render one fragment `HunkDocument` as unified HTML. This function does not
+/// flatten a high-level semantic document.
 pub fn render_unified(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> String {
@@ -486,9 +489,10 @@ pub fn render_unified(
 }
 
 ///|
-/// Render every calculated hunk as its own unified HTML block.
+/// Render every hunk in one fragment `HunkDocument` as its own unified HTML
+/// block.
 pub fn render_unified_hunks(
-  document : @model.DiffDocument,
+  document : @model.HunkDocument,
   line_numbers? : Bool = false,
   hunk_notes? : ArrayView[HunkNote?] = [],
 ) -> Array[String] {
