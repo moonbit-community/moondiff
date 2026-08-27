@@ -1,3 +1,5 @@
+// White-box tests for AST-specific line pairing and hunk grouping.
+
 ///|UUID(d7228f90-8748-409c-85dc-e7e69ec96c77)
 fn whole_line_span(line : Int, text : String) -> @span.SingleLineSpan {
   @span.SingleLineSpan::{ line, start_col: 1, end_col: text.length() + 1 }

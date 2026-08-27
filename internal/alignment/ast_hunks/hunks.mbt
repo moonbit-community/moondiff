@@ -1,5 +1,5 @@
 ///|UUID(9e00411e-058e-4cef-92e3-1a0637d1a928)
-// Calculate which modified lines should be displayed together.
+// Calculate which lines modified by the AST diff should be displayed together.
 using @syntax {type MatchedPos}
 
 ///|UUID(43ea7bcf-0a8b-449e-aac4-dc8c0b633959)
