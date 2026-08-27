@@ -6,6 +6,7 @@ priv suberror ExceededGraphLimit {
 }
 
 ///|UUID(58abb95f-c5cc-4ced-8d34-ca251ed41672)
+#valtype
 priv struct WeightedVertex {
   vertex : Vertex
   distance : @cmp.Reverse[UInt]
