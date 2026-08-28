@@ -104,9 +104,23 @@ test "semantic documents expose all section variants and both orders" {
   let empty : @model.DiffFragment = { document: { hunks: [] }, fallbacks: [] }
   let document : @model.DiffDocument = TopLevel({
     sections: [
-      Matched(old={ start: 0, len: 2 }, new={ start: 4, len: 2 }, diff=empty),
-      Deleted(old={ start: 2, len: 2 }, diff=empty),
-      Inserted(new={ start: 0, len: 4 }, diff=empty),
+      Matched(
+        old={ start: 0, len: 2 },
+        new={ start: 4, len: 2 },
+        old_context=Some("fn old() {"),
+        new_context=Some("fn new() {"),
+        diff=empty,
+      ),
+      Deleted(
+        old={ start: 2, len: 2 },
+        old_context=Some("fn removed() {"),
+        diff=empty,
+      ),
+      Inserted(
+        new={ start: 0, len: 4 },
+        new_context=Some("fn inserted() {"),
+        diff=empty,
+      ),
     ],
     old_order: [0, 1],
     new_order: [2, 0],
@@ -120,9 +134,19 @@ test "semantic documents expose all section variants and both orders" {
   assert_true(
     sections
     is [
-      Matched(old={ start: 0, len: 2 }, new={ start: 4, len: 2 }, ..),
-      Deleted(old={ start: 2, len: 2 }, ..),
-      Inserted(new={ start: 0, len: 4 }, ..),
+      Matched(
+        old={ start: 0, len: 2 },
+        new={ start: 4, len: 2 },
+        old_context=Some("fn old() {"),
+        new_context=Some("fn new() {"),
+        ..
+      ),
+      Deleted(old={ start: 2, len: 2 }, old_context=Some("fn removed() {"), ..),
+      Inserted(
+        new={ start: 0, len: 4 },
+        new_context=Some("fn inserted() {"),
+        ..
+      ),
     ],
   )
   assert_true(top.old_order is [0, 1])

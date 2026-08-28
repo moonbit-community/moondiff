@@ -110,9 +110,23 @@ test "top-level sections preserve both source orders and local ranges" {
   assert_true(top.new_order is [2, 0])
   guard top.sections
     is [
-      Matched(old={ start: 0, len: 1 }, new={ start: 1, len: 1 }, diff=matched),
-      Deleted(old={ start: 1, len: 1 }, diff=deleted),
-      Inserted(new={ start: 0, len: 1 }, diff=inserted),
+      Matched(
+        old={ start: 0, len: 1 },
+        new={ start: 1, len: 1 },
+        old_context=Some("fn first() { old_value() }"),
+        new_context=Some("fn first() { new_value() }"),
+        diff=matched
+      ),
+      Deleted(
+        old={ start: 1, len: 1 },
+        old_context=Some("fn removed() {}"),
+        diff=deleted
+      ),
+      Inserted(
+        new={ start: 0, len: 1 },
+        new_context=Some("fn inserted() {}"),
+        diff=inserted
+      ),
     ] else {
     fail("expected matched, deleted, and inserted section variants")
   }
@@ -226,7 +240,7 @@ test "sectioned lexical mode ignores context_lines and returns full declarations
       options=DiffOptions(context_lines~, mode=@mbtdiff.DiffMode::Lexical),
     )
     guard result.document()
-      is TopLevel({ sections: [Matched(old~, new~, diff~)], .. }) else {
+      is TopLevel({ sections: [Matched(old~, new~, diff~, ..)], .. }) else {
       fail("expected one sectioned lexical declaration")
     }
     guard diff.document.hunks is [hunk] else {

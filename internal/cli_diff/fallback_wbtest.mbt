@@ -15,7 +15,13 @@ test "fallback text and section titles keep location responsibilities separate" 
   assert_eq(
     section_title(
       3,
-      Matched(old={ start: 1, len: 2 }, new={ start: 3, len: 2 }, diff=fragment),
+      Matched(
+        old={ start: 1, len: 2 },
+        new={ start: 3, len: 2 },
+        old_context=None,
+        new_context=None,
+        diff=fragment,
+      ),
     ),
     "[section #4 matched] old lines 2-3; new lines 4-5\n",
   )
@@ -32,6 +38,8 @@ test "top-level renderer keeps fallback-only fragments visible" {
       Matched(
         old={ start: 10, len: 2 },
         new={ start: 20, len: 2 },
+        old_context=None,
+        new_context=None,
         diff=fragment,
       ),
     ],

@@ -1744,7 +1744,7 @@ test "sectioned lexical changes include their complete declaration ranges" {
     guard top.sections
       is [
         Matched(diff=leading, ..),
-        Matched(old=old_range, new=new_range, diff=target),
+        Matched(old=old_range, new=new_range, diff=target, ..),
         Matched(diff=trailing, ..),
       ] else {
       fail("expected one changed declaration between stable neighbors")
@@ -1804,7 +1804,7 @@ test "complete lexical sections restore filtered trivia and fill inserts and del
     ignore_tests=true,
   )
   guard top_level_for_test(filtered).sections
-    is [Matched(old=old_range, new=new_range, diff=fragment)] else {
+    is [Matched(old=old_range, new=new_range, diff=fragment, ..)] else {
     fail("expected only the changed production declaration")
   }
   guard fragment.document.hunks is [hunk] else {
@@ -1840,7 +1840,7 @@ test "complete lexical sections restore filtered trivia and fill inserts and del
     context=0,
   )
   guard top_level_for_test(inserted).sections
-    is [Matched(diff=keep, ..), Inserted(new=inserted_range, diff=added)] else {
+    is [Matched(diff=keep, ..), Inserted(new=inserted_range, diff=added, ..)] else {
     fail("expected one stable and one inserted declaration")
   }
   assert_true(keep.document.hunks.is_empty())
@@ -1857,7 +1857,7 @@ test "complete lexical sections restore filtered trivia and fill inserts and del
     context=0,
   )
   guard top_level_for_test(deleted).sections
-    is [Matched(diff=kept, ..), Deleted(old=deleted_range, diff=removed)] else {
+    is [Matched(diff=kept, ..), Deleted(old=deleted_range, diff=removed, ..)] else {
     fail("expected one stable and one deleted declaration")
   }
   assert_true(kept.document.hunks.is_empty())
@@ -2065,9 +2065,19 @@ test "section fragments use local coordinates and exact source ranges" {
     assert_eq(top.sections.length(), 3)
     guard top.sections
       is [
-        Matched(old={ start: 0, len: 1 }, new={ start: 1, len: 1 }, diff=keep),
-        Matched(old={ start: 1, len: 3 }, new={ start: 2, len: 3 }, diff=target),
-        Inserted(new={ start: 0, len: 1 }, diff=inserted),
+        Matched(
+          old={ start: 0, len: 1 },
+          new={ start: 1, len: 1 },
+          diff=keep,
+          ..
+        ),
+        Matched(
+          old={ start: 1, len: 3 },
+          new={ start: 2, len: 3 },
+          diff=target,
+          ..
+        ),
+        Inserted(new={ start: 0, len: 1 }, diff=inserted, ..),
       ] else {
       fail("expected matched declarations plus one new-side section")
     }
@@ -2130,7 +2140,7 @@ test "inserted and deleted declarations have no fabricated opposite range" {
   assert_true(inserted_top.old_order is [0])
   assert_true(inserted_top.new_order is [1, 0])
   guard inserted_top.sections
-    is [Matched(..), Inserted(new={ start: 0, len: 1 }, diff~)] else {
+    is [Matched(..), Inserted(new={ start: 0, len: 1 }, diff~, ..)] else {
     fail("expected a distinct inserted section")
   }
   assert_fragment_bounds(diff, None, Some(1))
@@ -2145,7 +2155,7 @@ test "inserted and deleted declarations have no fabricated opposite range" {
   assert_true(deleted_top.old_order is [0, 1])
   assert_true(deleted_top.new_order is [1])
   guard deleted_top.sections
-    is [Deleted(old={ start: 0, len: 1 }, diff~), Matched(..)] else {
+    is [Deleted(old={ start: 0, len: 1 }, diff~, ..), Matched(..)] else {
     fail("expected a distinct deleted section")
   }
   assert_fragment_bounds(diff, Some(1), None)
