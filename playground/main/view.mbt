@@ -512,6 +512,7 @@ fn semantic_fragment_view(
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
   whole : Bool,
+  show_hunk_headers? : Bool = true,
 ) -> @rabbita.Html {
   let title = section_index.map(index => {
     semantic_section_title(
@@ -547,6 +548,7 @@ fn semantic_fragment_view(
           emit,
           old_base~,
           new_base~,
+          show_hunk_headers~,
         )
       },
     ],
@@ -559,6 +561,7 @@ fn top_level_diff_view(
   file_index : Int,
   top : @mbtdiff.TopLevelDiff,
   mode : ViewMode,
+  show_hunk_headers : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
@@ -590,6 +593,7 @@ fn top_level_diff_view(
           review,
           emit,
           false,
+          show_hunk_headers~,
         ),
       )
     }
@@ -613,6 +617,7 @@ fn top_level_diff_view(
             review,
             emit,
             false,
+            show_hunk_headers~,
           ),
         )
       }
@@ -719,7 +724,15 @@ fn file_diff_view(
                 true,
               )
             TopLevel(top) =>
-              top_level_diff_view(file.file, index, top, mode, review, emit)
+              top_level_diff_view(
+                file.file,
+                index,
+                top,
+                mode,
+                algorithm is AstAlgorithm,
+                review,
+                emit,
+              )
           }
         }
       }
