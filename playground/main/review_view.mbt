@@ -366,6 +366,7 @@ fn safe_review_diff(
   old_base? : Int = 0,
   new_base? : Int = 0,
   show_hunk_headers? : Bool = true,
+  hunk_context? : String = "",
 ) -> @rabbita.Html {
   let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Array[@rabbita.Html] = []
@@ -378,6 +379,7 @@ fn safe_review_diff(
       old_base~,
       new_base~,
       show_hunk_headers~,
+      hunk_context~,
     ) {
     match item {
       ReviewHunk(header) =>

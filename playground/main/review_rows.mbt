@@ -39,8 +39,14 @@ fn review_hunk_header(
   hunk : @model.DiffHunk,
   old_base : Int,
   new_base : Int,
+  hunk_context : String,
 ) -> String {
-  "@@ -\{review_hunk_range(hunk.old_start + old_base, hunk.old_len)} +\{review_hunk_range(hunk.new_start + new_base, hunk.new_len)} @@"
+  let header = "@@ -\{review_hunk_range(hunk.old_start + old_base, hunk.old_len)} +\{review_hunk_range(hunk.new_start + new_base, hunk.new_len)} @@"
+  if hunk_context.is_empty() {
+    header
+  } else {
+    "\{header} \{hunk_context}"
+  }
 }
 
 ///|
@@ -194,11 +200,14 @@ fn project_review_items(
   old_base? : Int = 0,
   new_base? : Int = 0,
   show_hunk_headers? : Bool = true,
+  hunk_context? : String = "",
 ) -> Array[ReviewItem] {
   let items : Array[ReviewItem] = []
   for hunk in document.hunks {
     if show_hunk_headers {
-      items.push(ReviewHunk(review_hunk_header(hunk, old_base, new_base)))
+      items.push(
+        ReviewHunk(review_hunk_header(hunk, old_base, new_base, hunk_context)),
+      )
     }
     let one = @model.HunkDocument::{ hunks: [hunk] }
     for

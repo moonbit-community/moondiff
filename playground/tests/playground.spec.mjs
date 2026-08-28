@@ -1320,7 +1320,11 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
   ).toHaveCount(1);
 
   await page.getByRole("button", { name: "AST" }).click();
-  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  const astUnifiedHeaders = structuralCard.locator(".hunk-header");
+  expect(await astUnifiedHeaders.count()).toBeGreaterThan(0);
+  expect(
+    (await astUnifiedHeaders.allTextContents()).every(text => text.endsWith("fn structural() {")),
+  ).toBe(true);
   await expect(
     structuralCard.locator('.new-line-number button[aria-label="Comment on line 15"]'),
   ).toHaveCount(1);
@@ -1332,7 +1336,11 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
 
   await page.getByRole("button", { name: "Use split view" }).click();
   await expect(structuralCard.locator("table.split")).toBeVisible();
-  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  const astSplitHeaders = structuralCard.locator(".hunk-header");
+  expect(await astSplitHeaders.count()).toBeGreaterThan(0);
+  expect(
+    (await astSplitHeaders.allTextContents()).every(text => text.endsWith("fn structural() {")),
+  ).toBe(true);
   expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
 });
 
@@ -1403,7 +1411,11 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await expect(formattingCard.locator("table")).toHaveCount(0);
 
   await expect(structuralCard.locator("table.split")).toBeVisible();
-  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  const structuralSplitHeaders = structuralCard.locator(".hunk-header");
+  expect(await structuralSplitHeaders.count()).toBeGreaterThan(0);
+  expect(
+    (await structuralSplitHeaders.allTextContents()).every(text => text.endsWith("fn structural() {")),
+  ).toBe(true);
   await expect(structuralCard.locator("b.wd").filter({ hasText: "old_call" })).toHaveText("old_call");
   await expect(structuralCard.locator("b.wa").filter({ hasText: "new_call" })).toHaveText("new_call");
   await expect(structuralCard.locator("td.old-line-number").first()).not.toHaveText("");
@@ -1420,7 +1432,11 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(structuralCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
-  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  const structuralUnifiedHeaders = structuralCard.locator(".hunk-header");
+  expect(await structuralUnifiedHeaders.count()).toBeGreaterThan(0);
+  expect(
+    (await structuralUnifiedHeaders.allTextContents()).every(text => text.endsWith("fn structural() {")),
+  ).toBe(true);
   expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
   await expect(structuralCard.locator("b.wd").filter({ hasText: "old_call" })).toHaveText("old_call");
   await expect(structuralCard.locator("b.wa").filter({ hasText: "new_call" })).toHaveText("new_call");
