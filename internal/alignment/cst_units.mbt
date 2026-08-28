@@ -60,6 +60,7 @@ priv struct ImplUnit {
   semantic_key : String?
   fuzzy : ImplFuzzyInfo?
   range : @model.LineRange
+  context : String?
 }
 
 ///|
@@ -379,6 +380,35 @@ fn test_trailing_comments(
 }
 
 ///|
+// Use the first keyword directly owned by the declaration item to avoid
+// leading documentation, UUID/separator comments, and standalone attributes.
+// Only that keyword's source line is used; multiline declarations are not
+// joined. For example, `async\nfn f()` yields `async`, while
+// `declare\npub fn f()` yields `declare`. The source line is preserved as
+// written except for indentation and trailing whitespace.
+fn declaration_context(
+  source_lines : ArrayView[String],
+  item : @cst.CstNode,
+) -> String? {
+  first_child_node(item, "kw").bind(fn(keyword) {
+    let line_index = keyword.loc.start.lnum - 1
+    if line_index < 0 {
+      return None
+    }
+    source_lines
+    .get(line_index)
+    .bind(fn(line) {
+      let context = line.trim().to_owned()
+      if context.is_empty() {
+        None
+      } else {
+        Some(context)
+      }
+    })
+  })
+}
+
+///|
 fn make_impl_unit(
   source : String,
   source_lines : ArrayView[String],
@@ -403,6 +433,7 @@ fn make_impl_unit(
     semantic_key: item.bind(fn(item) { impl_semantic_key(source, item) }),
     fuzzy: item.bind(fn(item) { impl_fuzzy_info(source, item, root) }),
     range,
+    context: item.bind(fn(item) { declaration_context(source_lines, item) }),
   }
 }
 

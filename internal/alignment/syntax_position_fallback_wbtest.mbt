@@ -199,6 +199,7 @@ fn fallback_test_unit(
     semantic_key: None,
     fuzzy: None,
     range: { start: start_line - 1, len: 1 },
+    context: None,
   }
 }
 

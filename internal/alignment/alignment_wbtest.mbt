@@ -50,6 +50,27 @@ fn parse_units(source : String) -> Array[ImplUnit] {
 }
 
 ///|
+test "implementation units keep only their declaration keyword source line" {
+  let source =
+    #|/// Leading documentation.
+    #|///|UUID(context-id)
+    #|#deprecated
+    #|pub fn CloserIndex::add(
+    #|  self : CloserIndex,
+    #|  key : Closer,
+    #|) -> Unit {
+    #|  ignore(key)
+    #|}
+    #|let singleton = 1
+    #|/// trailing trivia without a declaration
+  let units = parse_units(source)
+  assert_eq(units.length(), 3)
+  assert_true(units[0].context == Some("pub fn CloserIndex::add("))
+  assert_true(units[1].context == Some("let singleton = 1"))
+  assert_true(units[2].context is None)
+}
+
+///|
 fn unit_source_for_test(source : String, unit : ImplUnit) -> String {
   let lines = @source_text.split_lines(source)
   lines[unit.range.start:unit.range.start + unit.range.len].join("\n")
