@@ -82,10 +82,17 @@ implicit whole-file patch. Split and unified layouts render that fragment, then
 map its local line numbers back through the section's exact source ranges.
 Review comments are consequently anchored by side and absolute source line,
 including when matched declarations cross between the old and new orders.
-The playground hides `@@ ... @@` hunk headings only for these complete
-top-level Lexical sections; section titles, absolute line numbers, and review
-comment anchors remain visible. AST sections, Whole documents, fallbacks, and
-ordinary text diffs keep their hunk headings.
+Section titles also end with the trimmed source line containing the top-level
+declaration keyword, excluding leading documentation, UUID markers, separators,
+and standalone attribute lines. When the old and new declaration lines match,
+the context appears once; otherwise it appears as `old: … → new: …`. Every
+visible `@@ ... @@` heading in that section repeats the same context in both
+split and unified layouts. The playground hides hunk headings only for complete
+top-level Lexical sections, so their context remains available in the section
+title while absolute line numbers and review comment anchors stay visible. AST
+sections and section-local fallbacks keep contextual hunk headings. Whole
+documents, including parse-failure fallbacks, and ordinary text diffs keep
+their hunk headings without a top-level declaration context.
 
 The selected algorithm and both filter settings survive later change navigation
 in the open app but are not written into share URLs; a refresh restores Lexical
