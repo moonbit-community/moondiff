@@ -206,6 +206,28 @@ test "copies of semantic views cannot mutate later accessor results" {
 }
 
 ///|
+test "external consumer reads stable ignored test range views" {
+  let result : @mbtdiff.DiffResult = @mbtdiff.diff(
+    "fn production() {}",
+    "fn production() {}\n/// test docs\ntest \"sample\" { inspect(1) }",
+    options=@mbtdiff.DiffOptions(ignore_tests=true),
+  )
+  let old_ranges : ArrayView[@mbtdiff.LineRange] = result.ignored_test_ranges(
+    Old,
+  )
+  let new_ranges : ArrayView[@mbtdiff.LineRange] = result.ignored_test_ranges(
+    New,
+  )
+  assert_true(old_ranges.is_empty())
+  assert_true(new_ranges is [{ start: 1, len: 2 }])
+
+  let copy = new_ranges.to_owned()
+  copy.clear()
+  let later : ArrayView[@mbtdiff.LineRange] = result.ignored_test_ranges(New)
+  assert_true(later is [{ start: 1, len: 2 }])
+}
+
+///|
 test "renderers consume an explicit fragment HunkDocument" {
   let result = @mbtdiff.diff("fn f() { 1 }", "fn f() { 2 }")
   guard result.document() is TopLevel({ sections: [Matched(diff~, ..)], .. }) else {
