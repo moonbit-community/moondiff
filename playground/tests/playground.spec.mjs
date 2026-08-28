@@ -42,8 +42,81 @@ const formattingNew = [
   '  "<same&value>"',
   "}",
 ].join("\n");
-const structuralOld = 'fn structural() { old_call("<script>&safe") }';
-const structuralNew = 'fn structural() { new_call("<script>&safe") }';
+const structuralOld = [
+  "fn unchanged_before() {}",
+  "",
+  "/// structural docs",
+  "fn structural() {",
+  "  stable_prefix_one()",
+  "  stable_prefix_two()",
+  "  stable_prefix_three()",
+  "  stable_prefix_four()",
+  '  old_call("<script>&safe")',
+  "  stable_middle_one()",
+  "  stable_middle_two()",
+  "  stable_middle_three()",
+  "  stable_middle_four()",
+  "  stable_middle_five()",
+  "  old_tail()",
+  "  stable_suffix_one()",
+  "  stable_suffix_two()",
+  "  stable_suffix_three()",
+  "  stable_suffix_four()",
+  "}",
+  "",
+  "fn unchanged_after() {}",
+].join("\n");
+const structuralNew = [
+  "fn unchanged_before() {}",
+  "",
+  "/// structural docs",
+  "fn structural() {",
+  "  stable_prefix_one()",
+  "  stable_prefix_two()",
+  "  stable_prefix_three()",
+  "  stable_prefix_four()",
+  '  new_call("<script>&safe")',
+  "  stable_middle_one()",
+  "  stable_middle_two()",
+  "  stable_middle_three()",
+  "  stable_middle_four()",
+  "  stable_middle_five()",
+  "  new_tail()",
+  "  stable_suffix_one()",
+  "  stable_suffix_two()",
+  "  stable_suffix_three()",
+  "  stable_suffix_four()",
+  "}",
+  "",
+  "fn unchanged_after() {}",
+].join("\n");
+const structuralPatch = [
+  "@@ -1,22 +1,22 @@",
+  " fn unchanged_before() {}",
+  " ",
+  " /// structural docs",
+  " fn structural() {",
+  "   stable_prefix_one()",
+  "   stable_prefix_two()",
+  "   stable_prefix_three()",
+  "   stable_prefix_four()",
+  '-  old_call("<script>&safe")',
+  '+  new_call("<script>&safe")',
+  "   stable_middle_one()",
+  "   stable_middle_two()",
+  "   stable_middle_three()",
+  "   stable_middle_four()",
+  "   stable_middle_five()",
+  "-  old_tail()",
+  "+  new_tail()",
+  "   stable_suffix_one()",
+  "   stable_suffix_two()",
+  "   stable_suffix_three()",
+  "   stable_suffix_four()",
+  " }",
+  " ",
+  " fn unchanged_after() {}",
+].join("\n");
 
 const commentsSha = "4444444444444444444444444444444444444444";
 const commentsUrl = `https://github.com/example/comments/commit/${commentsSha}`;
@@ -192,7 +265,7 @@ const algorithmCommit = {
   html_url: algorithmUrl,
   commit: { message: "Exercise both diff algorithms" },
   parents: [{ sha: parentSha }],
-  stats: { additions: 4, deletions: 2, total: 6 },
+  stats: { additions: 6, deletions: 4, total: 10 },
   files: [
     {
       filename: "src/formatting_only.mbt",
@@ -204,9 +277,10 @@ const algorithmCommit = {
     {
       filename: "src/structural.mbt",
       status: "modified",
-      additions: 1,
-      deletions: 1,
-      changes: 2,
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+      patch: structuralPatch,
     },
     {
       filename: "README.md",
@@ -1134,14 +1208,16 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await expect(formattingCard.locator("table")).toHaveCount(0);
 
   await expect(structuralCard.locator("table.split")).toBeVisible();
-  await expect(structuralCard.locator("b.wd")).toContainText("old_call");
-  await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  await expect(structuralCard.locator("b.wd").filter({ hasText: "old_call" })).toHaveText("old_call");
+  await expect(structuralCard.locator("b.wa").filter({ hasText: "new_call" })).toHaveText("new_call");
   await expect(structuralCard.locator("td.old-line-number").first()).not.toHaveText("");
   await expect(structuralCard).toContainText('"<script>&safe"');
   await expect(structuralCard.locator("script")).toHaveCount(0);
 
   await readmeCard.getByRole("button", { name: "Expand" }).click();
   await expect(readmeCard.locator("table.split")).toBeVisible();
+  expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
   const lineHtmlInAstMode = await readmeCard.locator(".diff-scroll").innerHTML();
   await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
   await expect(readmeCard.locator("b.wa")).toHaveText("&new");
@@ -1149,8 +1225,10 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(structuralCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
-  await expect(structuralCard.locator("b.wd")).toContainText("old_call");
-  await expect(structuralCard.locator("b.wa")).toContainText("new_call");
+  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  await expect(structuralCard.locator("b.wd").filter({ hasText: "old_call" })).toHaveText("old_call");
+  await expect(structuralCard.locator("b.wa").filter({ hasText: "new_call" })).toHaveText("new_call");
   await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
   await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 
