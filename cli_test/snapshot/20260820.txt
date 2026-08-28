@@ -1,4 +1,4 @@
-[section #2 inserted] old absent; new lines 1-28
+[section #2 inserted] old absent; new lines 1-28 · fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {
 [34m--- cli_test/source/20260820.old.mbt[39m
 [34m+++ cli_test/source/20260820.new.mbt: lines 1-28[39m
 @@ -0,0 +1,28 @@
@@ -31,7 +31,7 @@
 [90m..[39m [32m27[39m [90m  [39m[32m[1mself.remove_duplicates_with_seen(next, seen)[22m[39m
 [90m..[39m [32m28[39m [32m[1m}[22m[39m
 
-[section #1 matched] old lines 1-46; new lines 30-61
+[section #1 matched] old lines 1-46; new lines 30-61 · old: fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet { → new: fn ThreadSet::remove_duplicates_with_seen(
 [34m--- cli_test/source/20260820.old.mbt: lines 1-46[39m
 [34m+++ cli_test/source/20260820.new.mbt: lines 30-61[39m
 @@ -1,23 +30,9 @@

@@ -121,6 +121,48 @@ fn section_new_range(section : @model.DiffSection) -> @model.LineRange? {
 }
 
 ///|
+fn section_old_context(section : @model.DiffSection) -> String? {
+  match section {
+    Matched(old_context~, ..) | Deleted(old_context~, ..) => old_context
+    Inserted(..) => None
+  }
+}
+
+///|
+fn section_new_context(section : @model.DiffSection) -> String? {
+  match section {
+    Matched(new_context~, ..) | Inserted(new_context~, ..) => new_context
+    Deleted(..) => None
+  }
+}
+
+///|
+fn declaration_context_text(
+  old_context : String?,
+  new_context : String?,
+) -> String {
+  match (old_context, new_context) {
+    (None, None) => ""
+    (Some(old), Some(new)) =>
+      if old == new {
+        old
+      } else {
+        "old: \{old} → new: \{new}"
+      }
+    (Some(old), None) => old
+    (None, Some(new)) => new
+  }
+}
+
+///|
+fn section_context(section : @model.DiffSection) -> String {
+  declaration_context_text(
+    section_old_context(section),
+    section_new_context(section),
+  )
+}
+
+///|
 fn section_kind(section : @model.DiffSection) -> String {
   match section {
     Matched(..) => "matched"
@@ -133,11 +175,16 @@ fn section_kind(section : @model.DiffSection) -> String {
 fn section_title(index : Int, section : @model.DiffSection) -> String {
   let old = section_old_range(section)
   let new = section_new_range(section)
-  "[section #\{index + 1} \{section_kind(section)}] " +
-  optional_range_text("old", old) +
-  "; " +
-  optional_range_text("new", new) +
-  "\n"
+  let title = "[section #\{index + 1} \{section_kind(section)}] " +
+    optional_range_text("old", old) +
+    "; " +
+    optional_range_text("new", new)
+  let context = section_context(section)
+  if context.is_empty() {
+    "\{title}\n"
+  } else {
+    "\{title} · \{context}\n"
+  }
 }
 
 ///|

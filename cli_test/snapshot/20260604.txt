@@ -1,4 +1,4 @@
-[section #1 inserted] old absent; new lines 1-18
+[section #1 inserted] old absent; new lines 1-18 · test "diff_text colors file headers blue" {
 [34m--- cli_test/source/20260604.old.mbt[39m
 [34m+++ cli_test/source/20260604.new.mbt: lines 1-18[39m
 @@ -0,0 +1,18 @@

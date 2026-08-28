@@ -1,4 +1,4 @@
-[section #1 matched] old lines 1-18; new lines 1-19
+[section #1 matched] old lines 1-18; new lines 1-19 · pub fn AstManager::mk_distinct(
 [34m--- cli_test/source/z0_20260608.old.mbt: lines 1-18[39m
 [34m+++ cli_test/source/z0_20260608.new.mbt: lines 1-19[39m
 @@ -1,18 +1,19 @@

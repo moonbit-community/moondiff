@@ -10,7 +10,7 @@ test "render renders CST-backed inline diff" {
     #|}
   let result = render("old.mbt", old_source, "new.mbt", new_source)
   let expected =
-    #|[section #1 matched] old lines 1-3; new lines 1-3
+    #|[section #1 matched] old lines 1-3; new lines 1-3 · fn f() {
     #|--- old.mbt: lines 1-3
     #|+++ new.mbt: lines 1-3
     #|@@ -1,3 +1,3 @@
@@ -444,7 +444,7 @@ test "render falls back to single-definition tokdiff for graph limit" {
 
   assert_true(
     result.contains(
-      "[section #2 matched] old lines 2-4; new lines 3-5\nnote: fallback to tokdiff (graph limit exceeded (0))\n--- old.mbt: lines 2-4\n+++ new.mbt: lines 3-5\n",
+      "[section #2 matched] old lines 2-4; new lines 3-5 · fn target() {\nnote: fallback to tokdiff (graph limit exceeded (0))\n--- old.mbt: lines 2-4\n+++ new.mbt: lines 3-5\n",
     ),
   )
   assert_true(result.contains("--- old.mbt\n+++ new.mbt: line 1"))
