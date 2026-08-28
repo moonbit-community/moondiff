@@ -184,6 +184,62 @@ test "lexical mode keeps fragment-local text changes" {
 }
 
 ///|
+test "sectioned lexical mode ignores context_lines and returns full declarations" {
+  let old_source =
+    #|fn target() {
+    #|  stable_prefix_one()
+    #|  stable_prefix_two()
+    #|  stable_prefix_three()
+    #|  stable_prefix_four()
+    #|  old_head()
+    #|  stable_one()
+    #|  stable_two()
+    #|  stable_three()
+    #|  stable_four()
+    #|  old_tail()
+    #|  stable_suffix_one()
+    #|  stable_suffix_two()
+    #|  stable_suffix_three()
+    #|  stable_suffix_four()
+    #|}
+  let new_source =
+    #|fn target() {
+    #|  stable_prefix_one()
+    #|  stable_prefix_two()
+    #|  stable_prefix_three()
+    #|  stable_prefix_four()
+    #|  new_head()
+    #|  stable_one()
+    #|  stable_two()
+    #|  stable_three()
+    #|  stable_four()
+    #|  new_tail()
+    #|  stable_suffix_one()
+    #|  stable_suffix_two()
+    #|  stable_suffix_three()
+    #|  stable_suffix_four()
+    #|}
+  for context_lines in [0, 3] {
+    let result = @mbtdiff.diff(
+      old_source,
+      new_source,
+      options=DiffOptions(context_lines~, mode=@mbtdiff.DiffMode::Lexical),
+    )
+    guard result.document()
+      is TopLevel({ sections: [Matched(old~, new~, diff~)], .. }) else {
+      fail("expected one sectioned lexical declaration")
+    }
+    guard diff.document.hunks is [hunk] else {
+      fail("expected one complete lexical hunk")
+    }
+    assert_eq(hunk.old_start, 0)
+    assert_eq(hunk.old_len, old.len)
+    assert_eq(hunk.new_start, 0)
+    assert_eq(hunk.new_len, new.len)
+  }
+}
+
+///|
 test "comment and test filters classify IgnoredOnly" {
   for mode in [@mbtdiff.DiffMode::Ast, @mbtdiff.DiffMode::Lexical] {
     let comments = @mbtdiff.diff(
