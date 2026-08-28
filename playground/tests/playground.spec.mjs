@@ -118,6 +118,37 @@ const structuralPatch = [
   " fn unchanged_after() {}",
 ].join("\n");
 
+const collapsibleSectionsOld = [
+  "fn first_change() -> Int {",
+  "  old_first()",
+  "}",
+  "",
+  "fn second_change() -> Int {",
+  "  old_second()",
+  "}",
+].join("\n");
+const collapsibleSectionsNew = [
+  "fn first_change() -> Int {",
+  "  new_first()",
+  "}",
+  "",
+  "fn second_change() -> Int {",
+  "  new_second()",
+  "}",
+].join("\n");
+const collapsibleSectionsPatch = [
+  "@@ -1,7 +1,7 @@",
+  " fn first_change() -> Int {",
+  "-  old_first()",
+  "+  new_first()",
+  " }",
+  " ",
+  " fn second_change() -> Int {",
+  "-  old_second()",
+  "+  new_second()",
+  " }",
+].join("\n");
+
 const commentsSha = "4444444444444444444444444444444444444444";
 const commentsUrl = `https://github.com/example/comments/commit/${commentsSha}`;
 const mixedCommentsOld = [
@@ -265,7 +296,7 @@ const algorithmCommit = {
   html_url: algorithmUrl,
   commit: { message: "Exercise both diff algorithms" },
   parents: [{ sha: parentSha }],
-  stats: { additions: 6, deletions: 4, total: 10 },
+  stats: { additions: 8, deletions: 6, total: 14 },
   files: [
     {
       filename: "src/formatting_only.mbt",
@@ -281,6 +312,14 @@ const algorithmCommit = {
       deletions: 2,
       changes: 4,
       patch: structuralPatch,
+    },
+    {
+      filename: "src/collapsible_sections.mbt",
+      status: "modified",
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+      patch: collapsibleSectionsPatch,
     },
     {
       filename: "README.md",
@@ -510,7 +549,18 @@ async function installAlgorithmRoutes(
     : algorithmCommit;
   if (extensionHost) {
     await page.addInitScript(
-      ({ commit, parentSha, formattingOld, formattingNew, structuralOld, structuralNew, oldReadme, newReadme }) => {
+      ({
+        commit,
+        parentSha,
+        formattingOld,
+        formattingNew,
+        structuralOld,
+        structuralNew,
+        collapsibleSectionsOld,
+        collapsibleSectionsNew,
+        oldReadme,
+        newReadme,
+      }) => {
         globalThis.__MOONDIFF_EXTENSION_HOST__ = {
           async request(operation, args) {
             if (operation === "auth.status") {
@@ -526,6 +576,8 @@ async function installAlgorithmRoutes(
                 ? (old ? formattingOld : formattingNew)
                 : args.path === "src/structural.mbt"
                   ? (old ? structuralOld : structuralNew)
+                  : args.path === "src/collapsible_sections.mbt"
+                    ? (old ? collapsibleSectionsOld : collapsibleSectionsNew)
                   : (old ? oldReadme : newReadme);
               return {
                 base64: btoa(body),
@@ -547,6 +599,8 @@ async function installAlgorithmRoutes(
         formattingNew,
         structuralOld,
         structuralNew,
+        collapsibleSectionsOld,
+        collapsibleSectionsNew,
         oldReadme,
         newReadme,
       },
@@ -572,6 +626,8 @@ async function installAlgorithmRoutes(
         : (revision === parentSha ? formattingOld : formattingNew);
     } else if (filename === "src/structural.mbt") {
       body = revision === parentSha ? structuralOld : structuralNew;
+    } else if (filename === "src/collapsible_sections.mbt") {
+      body = revision === parentSha ? collapsibleSectionsOld : collapsibleSectionsNew;
     } else {
       body = revision === parentSha ? oldReadme : newReadme;
     }
@@ -1278,6 +1334,54 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
   await expect(structuralCard.locator("table.split")).toBeVisible();
   expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
   expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+});
+
+test("MoonBit toplevel sections fold independently with mouse and keyboard", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loadAlgorithmCommit(page, { extensionHost: true });
+
+  const card = page.locator(".file-card").filter({
+    hasText: "src/collapsible_sections.mbt",
+  });
+  const sections = card.locator("details.semantic-section");
+  const first = sections.nth(0);
+  const second = sections.nth(1);
+  const firstSummary = first.locator("summary");
+
+  await expect(sections).toHaveCount(2);
+  await expect(firstSummary).toContainText("Section #1 · Matched");
+  await expect(second.locator("summary")).toContainText("Section #2 · Matched");
+  expect(await sections.evaluateAll(items => items.every(item => item.open))).toBe(true);
+  await expect(first.locator("table.split")).toBeVisible();
+  await expect(second.locator("table.split")).toBeVisible();
+
+  await firstSummary.click();
+  await expect(first).not.toHaveAttribute("open", "");
+  await expect(first.locator("table.split")).toBeHidden();
+  await expect(second).toHaveAttribute("open", "");
+  await expect(second.locator("table.split")).toBeVisible();
+
+  await firstSummary.click();
+  await expect(first.locator("table.split")).toBeVisible();
+  await firstSummary.focus();
+  await firstSummary.press("Space");
+  await expect(first.locator("table.split")).toBeHidden();
+  await expect(second.locator("table.split")).toBeVisible();
+  await firstSummary.press("Enter");
+  await expect(first.locator("table.split")).toBeVisible();
+
+  const commentAnchor = first.locator(
+    '.new-line-number button[aria-label="Comment on line 2"]',
+  );
+  await expect(commentAnchor).toHaveCount(1);
+  await commentAnchor.locator("xpath=..").hover();
+  await expect(commentAnchor).toBeVisible();
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(first.locator("table.unified")).toBeVisible();
+  await expect(second.locator("table.unified")).toBeVisible();
+  await expect(first.locator("table.split")).toHaveCount(0);
+  await expect(commentAnchor).toHaveCount(1);
 });
 
 test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {
