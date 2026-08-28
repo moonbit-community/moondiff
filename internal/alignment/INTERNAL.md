@@ -47,7 +47,7 @@ This makes the result stable and explainable. Adding an unrelated declaration sh
 
 Alignment is optional guidance for the detailed diff, not a prerequisite for producing output. If parsing fails, computation becomes too expensive, or no reliable declaration pair can be found, the system falls back to comparing a larger scope.
 
-Within the selected comparison scope, the result must remain complete. A `Whole` comparison includes every source line, while a sectioned plan compares only the declaration-unit ranges described above.
+Within the selected comparison scope, the result must remain complete. A `Whole` comparison includes every source line, while a sectioned plan compares only the declaration-unit ranges described above. In sectioned Lexical mode, each range with a text change is expanded to the complete declaration unit; unchanged declaration sections remain empty.
 
 ## Evidence Hierarchy
 
@@ -117,7 +117,7 @@ When at least one trustworthy correspondence exists, declarations are compared i
 - Unpaired old declarations are deletions.
 - Unpaired new declarations are insertions.
 
-This isolates edits inside moved declarations from the movement itself and preserves original source locations for reporting. The result keeps a stable section identity table plus independent old-side and new-side orderings. Each section's detailed hunk document uses local, zero-based coordinates; the section ranges are the only source of original-file coordinates. Lexical mode compares these section slices independently and does not synthesize sections for unassigned blank-only gaps. A change confined to such gaps therefore produces no hunks and `DiffStatus::NoStructuralChanges`.
+This isolates edits inside moved declarations from the movement itself and preserves original source locations for reporting. The result keeps a stable section identity table plus independent old-side and new-side orderings. Each section's detailed hunk document uses local, zero-based coordinates; the section ranges are the only source of original-file coordinates. Lexical mode compares these section slices independently. A changed section produces one local hunk spanning the complete old and new declaration ranges regardless of the requested context radius, while an unchanged section keeps an empty document. Lexical mode does not synthesize sections for unassigned blank-only gaps. A change confined to such gaps therefore produces no hunks and `DiffStatus::NoStructuralChanges`.
 
 If no trustworthy correspondence exists, the matcher avoids arbitrary pairings and compares the complete declaration lists or files as one `Whole` fragment. Parse failures and top-level planning failures use the same representation.
 
@@ -127,7 +127,7 @@ Pure reordering deserves special treatment. All reliably matched declarations re
 
 Some heuristic work can grow quickly with the number and size of unmatched declarations. Similarity calculations therefore participate in a top-level computation budget.
 
-If that budget is exhausted before reliable planning completes, the result expands to one `Whole` fragment instead of returning a partial or unstable pairing. Once a reliable top-level plan exists, each section receives a fresh local diff budget. Exhausting a local budget degrades only that section to lexical diff and records the fallback on that section's fragment; other sections remain structural.
+If that budget is exhausted before reliable planning completes, the result expands to one `Whole` fragment instead of returning a partial or unstable pairing. Once a reliable top-level plan exists, each section receives a fresh local diff budget. Exhausting a local budget degrades only that section to lexical diff and records the fallback on that section's fragment; other sections remain structural. These Whole and AST-fallback lexical documents retain the caller's compact context radius rather than adopting the complete-section Lexical presentation.
 
 ## Expected Behavior in Common Scenarios
 
@@ -141,6 +141,7 @@ If that budget is exhausted before reliable planning completes, the result expan
 | Identical anonymous content appears once on each side | It can be paired by exact structural identity. |
 | Identical anonymous content is duplicated | It remains ambiguous at the structural-fingerprint stage. |
 | A large body is extracted into a nearby helper | The helper may preserve the old implementation's continuity; the wrapper appears inserted. |
+| Text changes occur far apart inside one reliably aligned declaration in Lexical mode | One local hunk contains the complete declaration, including stable lines between and around the changes. |
 | Blank-only lines change before, between, or after reliably aligned declarations | A sectioned lexical diff produces no hunks and reports `NoStructuralChanges`; a `Whole` lexical comparison still observes them. |
 | Parsing or top-level alignment exceeds its limits | The diff falls back to one `Whole` fragment. |
 | One declaration exceeds a local diff limit | Only that section falls back to lexical diff; other sections remain independent. |
