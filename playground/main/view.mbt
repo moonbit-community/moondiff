@@ -526,7 +526,16 @@ fn semantic_section_title(
   let new = semantic_section_new_range(section)
     .map(range => "new \{semantic_range_text(range)}")
     .unwrap_or("new side absent")
-  "Section #\{index + 1} · \{kind} · \{old} · \{new}"
+  let title = "Section #\{index + 1} · \{kind} · \{old} · \{new}"
+  let context = semantic_declaration_context_text(
+    semantic_section_old_context(section),
+    semantic_section_new_context(section),
+  )
+  if context.is_empty() {
+    title
+  } else {
+    "\{title} · \{context}"
+  }
 }
 
 ///|

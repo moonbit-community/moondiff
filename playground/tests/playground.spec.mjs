@@ -149,6 +149,27 @@ const collapsibleSectionsPatch = [
   " }",
 ].join("\n");
 
+const longFunctionName = `render${"semanticsectioncontext".repeat(12)}`;
+const longDeclarationOld = [
+  "///|",
+  `fn ${longFunctionName}() -> Int {`,
+  "  1",
+  "}",
+].join("\n");
+const longDeclarationNew = [
+  "///|",
+  `fn ${longFunctionName}() -> Int {`,
+  "  2",
+  "}",
+].join("\n");
+const longDeclarationFile = {
+  filename: "src/long_declaration.mbt",
+  status: "modified",
+  additions: 1,
+  deletions: 1,
+  changes: 2,
+};
+
 const commentsSha = "4444444444444444444444444444444444444444";
 const commentsUrl = `https://github.com/example/comments/commit/${commentsSha}`;
 const mixedCommentsOld = [
@@ -542,11 +563,22 @@ async function installMockRoutes(page) {
 
 async function installAlgorithmRoutes(
   page,
-  { formatOnly = false, parseFailure = false, extensionHost = false } = {},
+  {
+    formatOnly = false,
+    longDeclarationOnly = false,
+    parseFailure = false,
+    extensionHost = false,
+  } = {},
 ) {
   const commit = formatOnly
     ? { ...algorithmCommit, files: [algorithmCommit.files[0]] }
-    : algorithmCommit;
+    : longDeclarationOnly
+      ? {
+        ...algorithmCommit,
+        stats: { additions: 1, deletions: 1, total: 2 },
+        files: [longDeclarationFile],
+      }
+      : algorithmCommit;
   if (extensionHost) {
     await page.addInitScript(
       ({
@@ -628,6 +660,8 @@ async function installAlgorithmRoutes(
       body = revision === parentSha ? structuralOld : structuralNew;
     } else if (filename === "src/collapsible_sections.mbt") {
       body = revision === parentSha ? collapsibleSectionsOld : collapsibleSectionsNew;
+    } else if (filename === longDeclarationFile.filename) {
+      body = revision === parentSha ? longDeclarationOld : longDeclarationNew;
     } else {
       body = revision === parentSha ? oldReadme : newReadme;
     }
@@ -1116,6 +1150,38 @@ test("narrow viewport scrolls only the diff and keeps controls usable", async ({
   expect(unifiedOverflow.scrollWidth).toBeGreaterThan(unifiedOverflow.clientWidth);
 });
 
+test("long semantic section titles wrap without widening narrow pages", async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 900 });
+  await loadAlgorithmCommit(page, { longDeclarationOnly: true });
+
+  const card = page.locator(".file-card").filter({ hasText: longDeclarationFile.filename });
+  const title = card.locator(".semantic-section-title");
+  await expect(title).toHaveCount(1);
+  await expect(title).toContainText(longFunctionName);
+
+  const layout = await title.evaluate(element => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const lineTops = new Set(
+      [...range.getClientRects()]
+        .filter(rect => rect.width > 0 && rect.height > 0)
+        .map(rect => Math.round(rect.top)),
+    );
+    return {
+      lineCount: lineTops.size,
+      overflowWrap: getComputedStyle(element).overflowWrap,
+      titleClientWidth: element.clientWidth,
+      titleScrollWidth: element.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+    };
+  });
+  expect(layout.overflowWrap).toBe("anywhere");
+  expect(layout.lineCount).toBeGreaterThan(1);
+  expect(layout.titleScrollWidth).toBeLessThanOrEqual(layout.titleClientWidth);
+  expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+});
+
 test("Ignore comments works across algorithms and layouts without changing plain text", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await loadCommentsCommit(page);
@@ -1297,7 +1363,9 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
   const structuralCard = page.locator(".file-card").filter({ hasText: "src/structural.mbt" });
   const section = structuralCard.locator(".semantic-section");
   await expect(section).toHaveCount(1);
-  await expect(section.locator(".semantic-section-title")).toContainText("Section #2 · Matched");
+  await expect(section.locator(".semantic-section-title")).toContainText(
+    "Section #2 · Matched · old lines 3-20 · new lines 3-20 · fn structural() {",
+  );
   await expect(section.locator("table.split")).toBeVisible();
   await expect(section.locator(".hunk-header")).toHaveCount(0);
   await expect(section).toContainText("/// structural docs");
@@ -1357,8 +1425,8 @@ test("MoonBit toplevel sections fold independently with mouse and keyboard", asy
   const firstSummary = first.locator("summary");
 
   await expect(sections).toHaveCount(2);
-  await expect(firstSummary).toContainText("Section #1 · Matched");
-  await expect(second.locator("summary")).toContainText("Section #2 · Matched");
+  await expect(firstSummary).toContainText("Section #1 · Matched · old lines 1-3 · new lines 1-3 · fn first_change() -> Int {");
+  await expect(second.locator("summary")).toContainText("Section #2 · Matched · old lines 5-7 · new lines 5-7 · fn second_change() -> Int {");
   expect(await sections.evaluateAll(items => items.every(item => item.open))).toBe(true);
   await expect(first.locator("table.split")).toBeVisible();
   await expect(second.locator("table.split")).toBeVisible();

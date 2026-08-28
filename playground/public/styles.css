@@ -1030,6 +1030,10 @@ button.copy-button.copied {
   line-height: 1.45;
 }
 
+.semantic-section-title {
+  overflow-wrap: anywhere;
+}
+
 .semantic-section > .semantic-section-title {
   position: relative;
   padding-left: 2rem;
