@@ -2286,6 +2286,8 @@ test "comment and test filters preserve semantic statuses in both modes" {
     )
     assert_true(tests.status is IgnoredOnly)
     assert_true(result_is_empty(tests))
+    assert_true(tests.old_ignored_test_ranges is [{ start: 0, len: 1 }])
+    assert_true(tests.new_ignored_test_ranges is [{ start: 0, len: 1 }])
   }
 }
 
@@ -2306,6 +2308,8 @@ test "filtered local fragments retain production changes only" {
   assert_false(changed.contains("old_test"), msg=changed)
   assert_false(changed.contains("new_test"), msg=changed)
   assert_true(result_fallbacks(result).is_empty())
+  assert_true(result.old_ignored_test_ranges is [{ start: 2, len: 1 }])
+  assert_true(result.new_ignored_test_ranges is [{ start: 2, len: 1 }])
 }
 
 ///|
