@@ -26,6 +26,15 @@ the CLI retains its existing whole-file lexical fallback; `--ignore-tests` is
 not guaranteed to filter that fallback. Non-`.mbt` inputs always use the plain
 line diff and are unaffected by either MoonBit filter.
 
+For reliably aligned MoonBit declarations, each CLI section title ends with
+the trimmed source line containing that declaration's keyword, and every
+visible `@@ ... @@` hunk heading repeats the same context. Matching old/new
+lines are shown once; changed declaration lines are rendered as
+`old: … → new: …`. Leading documentation, UUID markers, separators, and
+standalone attribute lines are not used as the context. Whole-file results,
+including parse-failure fallbacks, and ordinary text diffs do not attach a
+top-level declaration context.
+
 ## install (unfinish)
 
 
