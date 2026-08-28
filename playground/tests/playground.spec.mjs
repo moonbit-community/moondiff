@@ -503,11 +503,55 @@ async function installMockRoutes(page) {
 
 async function installAlgorithmRoutes(
   page,
-  { formatOnly = false, parseFailure = false } = {},
+  { formatOnly = false, parseFailure = false, extensionHost = false } = {},
 ) {
   const commit = formatOnly
     ? { ...algorithmCommit, files: [algorithmCommit.files[0]] }
     : algorithmCommit;
+  if (extensionHost) {
+    await page.addInitScript(
+      ({ commit, parentSha, formattingOld, formattingNew, structuralOld, structuralNew, oldReadme, newReadme }) => {
+        globalThis.__MOONDIFF_EXTENSION_HOST__ = {
+          async request(operation, args) {
+            if (operation === "auth.status") {
+              return { authenticated: true, login: "reviewer" };
+            }
+            if (operation === "github.comments.list") {
+              return { issue_comments: [], review_comments: [], commit_comments: [] };
+            }
+            if (operation === "github.commit.get") return commit;
+            if (operation === "github.content.get") {
+              const old = args.ref === parentSha;
+              const body = args.path === "src/formatting_only.mbt"
+                ? (old ? formattingOld : formattingNew)
+                : args.path === "src/structural.mbt"
+                  ? (old ? structuralOld : structuralNew)
+                  : (old ? oldReadme : newReadme);
+              return {
+                base64: btoa(body),
+                size: body.length,
+                contentType: "text/plain",
+              };
+            }
+            throw Object.assign(new Error(`Unhandled test operation: ${operation}`), {
+              status: 400,
+              code: "unhandled_test_operation",
+            });
+          },
+        };
+      },
+      {
+        commit,
+        parentSha,
+        formattingOld,
+        formattingNew,
+        structuralOld,
+        structuralNew,
+        oldReadme,
+        newReadme,
+      },
+    );
+  }
   await page.route("https://**", route => route.abort("blockedbyclient"));
   await page.route("https://api.github.com/**", async route => {
     await route.fulfill({
@@ -1187,6 +1231,53 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   expect(compact.width).toBeLessThanOrEqual(36);
   expect(compact.labelDisplay).toBe("none");
   expect(compact.pageWidth).toBeLessThanOrEqual(compact.viewportWidth);
+});
+
+test("complete Lexical sections hide only hunk headings in both review layouts", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loadAlgorithmCommit(page, { extensionHost: true });
+  await expect(page.getByText("Signed in as reviewer")).toBeVisible();
+
+  const structuralCard = page.locator(".file-card").filter({ hasText: "src/structural.mbt" });
+  const section = structuralCard.locator(".semantic-section");
+  await expect(section).toHaveCount(1);
+  await expect(section.locator(".semantic-section-title")).toContainText("Section #2 · Matched");
+  await expect(section.locator("table.split")).toBeVisible();
+  await expect(section.locator(".hunk-header")).toHaveCount(0);
+  await expect(section).toContainText("/// structural docs");
+  await expect(section).toContainText("stable_prefix_one()");
+  await expect(section).toContainText("stable_suffix_four()");
+  await expect(section).toContainText("new_tail()");
+  await expect(section).not.toContainText("unchanged_before");
+  await expect(section).not.toContainText("unchanged_after");
+  await expect(
+    section.locator('.new-line-number button[aria-label="Comment on line 15"]'),
+  ).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Use unified view" }).click();
+  await expect(section.locator("table.unified")).toBeVisible();
+  await expect(section.locator(".hunk-header")).toHaveCount(0);
+  await expect(section).toContainText("/// structural docs");
+  await expect(section).toContainText("stable_suffix_four()");
+  await expect(
+    section.locator('.new-line-number button[aria-label="Comment on line 15"]'),
+  ).toHaveCount(1);
+
+  await page.getByRole("button", { name: "AST" }).click();
+  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  await expect(
+    structuralCard.locator('.new-line-number button[aria-label="Comment on line 15"]'),
+  ).toHaveCount(1);
+
+  const readmeCard = page.locator(".file-card").filter({ hasText: "README.md" });
+  await readmeCard.getByRole("button", { name: "Expand" }).click();
+  await expect(readmeCard.locator("table.unified")).toBeVisible();
+  expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "Use split view" }).click();
+  await expect(structuralCard.locator("table.split")).toBeVisible();
+  expect(await structuralCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
 });
 
 test("AST mode keeps structural spans, empty states, line diffs, and layouts usable", async ({ page }) => {
