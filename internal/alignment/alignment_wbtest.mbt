@@ -205,6 +205,10 @@ test "ignored test collection excludes roots and records leading trivia" {
   let ignored = collection.ignored_tests[0]
   @debug.assert_eq((ignored.start.lnum, ignored.start.column()), (3, 1))
   @debug.assert_eq((ignored.end.lnum, ignored.end.column()), (7, 2))
+  assert_true(
+    ignored_test_line_ranges(collection.ignored_tests)
+    is [{ start: 2, len: 5 }],
+  )
 }
 
 ///|
