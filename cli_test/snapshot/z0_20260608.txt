@@ -1,7 +1,7 @@
 [section #1 matched] old lines 1-18; new lines 1-19 · pub fn AstManager::mk_distinct(
 [34m--- cli_test/source/z0_20260608.old.mbt: lines 1-18[39m
 [34m+++ cli_test/source/z0_20260608.new.mbt: lines 1-19[39m
-@@ -1,18 +1,19 @@
+@@ -1,18 +1,19 @@ pub fn AstManager::mk_distinct(
  [90m1[39m  [90m1[39m pub fn AstManager::mk_distinct(
  [90m2[39m  [90m2[39m   self : AstManager,
  [90m3[39m  [90m3[39m   args : Array[@util.ExprId],

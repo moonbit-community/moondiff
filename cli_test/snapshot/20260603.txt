@@ -1,7 +1,7 @@
 [section #1 matched] old lines 1-6; new lines 1-18 · fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
 [34m--- cli_test/source/20260603.old.mbt: lines 1-6[39m
 [34m+++ cli_test/source/20260603.new.mbt: lines 1-18[39m
-@@ -1,6 +1,18 @@
+@@ -1,6 +1,18 @@ fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
  [90m1[39m  [90m1[39m fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
  [90m2[39m  [90m2[39m   match self {
  [31m3[39m [90m..[39m [90m    Atom(content~, ..) => [39m[31m[1matom_text_is_punctuation([22m[39m[90mcontent[39m[31m[1m)[22m[39m
@@ -27,7 +27,7 @@ Deleted declarations (old order):
 [section #2 deleted] old lines 8-20; new absent · fn atom_text_is_punctuation(content : String) -> Bool {
 [34m--- cli_test/source/20260603.old.mbt: lines 8-20[39m
 [34m+++ cli_test/source/20260603.new.mbt[39m
-@@ -8,13 +0,0 @@
+@@ -8,13 +0,0 @@ fn atom_text_is_punctuation(content : String) -> Bool {
  [31m8[39m [90m..[39m [31m[1mfn atom_text_is_punctuation(content : String) -> Bool {[22m[39m
  [31m9[39m [90m..[39m [90m  [39m[31m[1mif content.is_empty() {[22m[39m
 [31m10[39m [90m..[39m [90m    [39m[31m[1mreturn false[22m[39m

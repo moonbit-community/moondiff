@@ -13,7 +13,7 @@ test "render renders CST-backed inline diff" {
     #|[section #1 matched] old lines 1-3; new lines 1-3 · fn f() {
     #|--- old.mbt: lines 1-3
     #|+++ new.mbt: lines 1-3
-    #|@@ -1,3 +1,3 @@
+    #|@@ -1,3 +1,3 @@ fn f() {
     #|1 1 fn f() {
     #|2 .   foo(bar)
     #|. 2   foo(baz(bar))

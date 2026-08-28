@@ -1,7 +1,7 @@
 [section #2 inserted] old absent; new lines 1-28 · fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {
 [34m--- cli_test/source/20260820.old.mbt[39m
 [34m+++ cli_test/source/20260820.new.mbt: lines 1-28[39m
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,28 @@ fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet {
 [90m..[39m  [32m1[39m [32m[1m///|[22m[39m
 [90m..[39m  [32m2[39m [32m[1m/// Drops threads that cannot contribute anything an earlier thread does not[22m[39m
 [90m..[39m  [32m3[39m [32m[1m/// already cover: two threads with the same future differ only in priority,[22m[39m
@@ -34,7 +34,7 @@
 [section #1 matched] old lines 1-46; new lines 30-61 · old: fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet { → new: fn ThreadSet::remove_duplicates_with_seen(
 [34m--- cli_test/source/20260820.old.mbt: lines 1-46[39m
 [34m+++ cli_test/source/20260820.new.mbt: lines 30-61[39m
-@@ -1,23 +30,9 @@
+@@ -1,23 +30,9 @@ old: fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet { → new: fn ThreadSet::remove_duplicates_with_seen(
  [90m1[39m [90m30[39m ///|
  [31m2[39m [90m..[39m [31m[1m/// Drops threads that cannot contribute anything an earlier thread does not[22m[39m
  [31m3[39m [90m..[39m [31m[1m/// already cover: two threads with the same future differ only in priority,[22m[39m
@@ -63,7 +63,7 @@
 [90m21[39m [90m36[39m   for thread in self; result = ts_empty {
 [90m22[39m [90m37[39m     match thread {
 [90m23[39m [90m38[39m       End(_) => break result + ts_one(thread)
-@@ -35,9 +50,9 @@
+@@ -35,9 +50,9 @@ old: fn ThreadSet::remove_duplicates(self : ThreadSet, next : Expr) -> ThreadSet { → new: fn ThreadSet::remove_duplicates_with_seen(
 [90m35[39m [90m50[39m         } else {
 [90m36[39m [90m51[39m           continue result
 [90m37[39m [90m52[39m         }

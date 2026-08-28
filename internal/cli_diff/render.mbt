@@ -257,6 +257,7 @@ fn render_section_fragment(
         section_label(new_label, new_range),
         document,
         options=terminal_options(options, old_line_count, new_line_count),
+        hunk_context=section_context(section),
       ),
     )
   }
