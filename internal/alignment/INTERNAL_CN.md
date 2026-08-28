@@ -47,7 +47,7 @@
 
 顶层匹配只是细粒度 diff 的辅助信息，不是生成结果的前提。解析失败、计算成本过高或完全找不到可靠配对时，系统会扩大比较范围。
 
-在选定的比较范围内，结果必须保持完整。`Whole` 比较会包含所有源码行，而 sectioned 计划只比较上述声明单元范围。
+在选定的比较范围内，结果必须保持完整。`Whole` 比较会包含所有源码行，而 sectioned 计划只比较上述声明单元范围。在 sectioned Lexical 模式下，每个发生文本变化的范围都会展开为完整声明单元；未变化声明的 section 保持为空。
 
 ## 证据层级
 
@@ -117,7 +117,7 @@
 - 未配对的旧声明视为删除。
 - 未配对的新声明视为插入。
 
-这样可以把声明内部变化与声明移动分离，同时在结果中保留原始源码位置。结果包含一张稳定的 section 身份表，以及旧侧、新侧各自独立的顺序。每个 section 内的 hunk document 使用从零开始的局部坐标，只有 section 的行范围保存原文件坐标。Lexical 模式会独立比较这些 section 切片，不会为未分配的纯空白 gap 合成 section。因此，如果变化仅限于这些 gap，就不会产生 hunk，并返回 `DiffStatus::NoStructuralChanges`。
+这样可以把声明内部变化与声明移动分离，同时在结果中保留原始源码位置。结果包含一张稳定的 section 身份表，以及旧侧、新侧各自独立的顺序。每个 section 内的 hunk document 使用从零开始的局部坐标，只有 section 的行范围保存原文件坐标。Lexical 模式会独立比较这些 section 切片：只要 section 有变化，就生成一个覆盖旧、新两侧完整声明范围的局部 hunk，不受请求的上下文半径裁剪；未变化 section 的 document 仍为空。Lexical 模式不会为未分配的纯空白 gap 合成 section。因此，如果变化仅限于这些 gap，就不会产生 hunk，并返回 `DiffStatus::NoStructuralChanges`。
 
 如果一个可信对应关系也没有，匹配器不会强行绑定声明，而是把完整声明列表或整个文件作为一个 `Whole` fragment 比较。解析失败和顶层规划失败也使用这一表示。
 
@@ -127,7 +127,7 @@
 
 启发式工作量可能随未匹配声明的数量和大小快速增长，因此相似度计算必须受顶层计算预算约束。
 
-如果可靠规划完成前耗尽该预算，结果会扩大为一个 `Whole` fragment，而不是返回一组不完整或不稳定的配对。一旦形成可靠顶层计划，每个 section 都获得独立的新局部预算。某个局部预算耗尽时，只把该 section 降级为 lexical diff，并把 fallback 直接记录在它的 fragment 上；其他 section 仍保持结构 diff。
+如果可靠规划完成前耗尽该预算，结果会扩大为一个 `Whole` fragment，而不是返回一组不完整或不稳定的配对。一旦形成可靠顶层计划，每个 section 都获得独立的新局部预算。某个局部预算耗尽时，只把该 section 降级为 lexical diff，并把 fallback 直接记录在它的 fragment 上；其他 section 仍保持结构 diff。这些 Whole 和 AST fallback 的 lexical document 继续采用调用方请求的紧凑上下文半径，不套用 Lexical 完整 section 的展示规则。
 
 ## 常见场景下的预期行为
 
@@ -141,6 +141,7 @@
 | 相同匿名内容在两边各出现一次 | 可以通过精确结构身份配对。 |
 | 相同匿名内容重复出现 | 在结构指纹阶段仍视为歧义。 |
 | 大段函数体抽取到邻近 helper | helper 可以延续旧实现，wrapper 显示为插入。 |
+| Lexical 模式下，同一个可靠对齐声明中存在相距很远的文本变化 | 用一个局部 hunk 完整包含该声明，包括变化之间及首尾的稳定行。 |
 | 在可靠对齐的声明之前、之间或之后修改纯空白行 | sectioned lexical diff 不产生 hunk，并返回 `NoStructuralChanges`；`Whole` lexical 比较仍会观察这些变化。 |
 | 解析失败或顶层匹配超过资源限制 | 降级为一个 `Whole` fragment。 |
 | 单个声明超过局部 diff 限制 | 只有该 section 降级为 lexical diff，其他 section 保持独立。 |

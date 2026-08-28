@@ -3,9 +3,12 @@
 ///
 /// `Lexical` compares token-level text inside the selected semantic fragments.
 /// Once reliable top-level alignment produces independent declaration
-/// sections, whitespace-only lines outside every section (at file boundaries
-/// or between declarations) are intentionally outside the comparison. A
-/// whole-file lexical result still compares those lines.
+/// sections, every declaration with a text change is returned in full,
+/// independently of `DiffOptions.context_lines`; unchanged declarations are
+/// retained as empty sections. Whitespace-only lines outside every section (at
+/// file boundaries or between declarations) are intentionally outside the
+/// comparison. A whole-file lexical result still compares those lines using
+/// the requested context radius.
 pub(all) enum DiffMode {
   Ast
   Lexical
@@ -23,7 +26,9 @@ struct DiffOptions {
 }
 
 ///|
-/// Construct safe options, clamping a negative context radius to zero.
+/// Construct safe options, clamping a negative context radius to zero. The
+/// radius controls Whole documents, AST documents, and lexical AST fallbacks;
+/// reliable top-level Lexical sections always include complete declarations.
 pub fn DiffOptions::DiffOptions(
   context_lines? : Int = 3,
   graph_limit? : UInt = 3_000_000,

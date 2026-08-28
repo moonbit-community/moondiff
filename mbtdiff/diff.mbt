@@ -3,11 +3,13 @@
 /// default. A fallback is attached directly to the whole or top-level fragment
 /// that degraded. In AST mode, text-only changes with no AST change return
 /// `NoStructuralChanges`; pure declaration reordering returns `Reordered` and
-/// preserves both source orders. In a sectioned Lexical result, only
-/// declaration-owned ranges are compared, so a change confined to
-/// whitespace-only lines outside those ranges returns `NoStructuralChanges`.
-/// A `Whole` lexical result compares every source line. Optional source names
-/// are forwarded to parser diagnostics.
+/// preserves both source orders. In a sectioned Lexical result, each changed
+/// declaration-owned range is emitted in full and is not cropped by
+/// `DiffOptions.context_lines`; unchanged declaration sections remain empty.
+/// A change confined to whitespace-only lines outside those ranges returns
+/// `NoStructuralChanges`. A `Whole` lexical result compares every source line
+/// with the requested context radius. Optional source names are forwarded to
+/// parser diagnostics.
 pub fn diff(
   old_source : String,
   new_source : String,
