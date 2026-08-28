@@ -1367,10 +1367,12 @@ test("parse failures show their lexical fallback reason above both layouts", asy
   await expect(card.locator(".diff-notice")).toContainText("this entire file");
   await expect(card.locator(".diff-notice")).toContainText("old:");
   await expect(card.locator("table.split")).toBeVisible();
+  expect(await card.locator(".hunk-header").count()).toBeGreaterThan(0);
   await page.getByRole("button", { name: "AST" }).click();
   await expect(card.locator(".diff-notice")).toContainText("Lexical fallback");
   await expect(card.locator(".diff-notice")).toContainText("this entire file");
   await page.getByRole("button", { name: "Use unified view" }).click();
   await expect(card.locator("table.unified")).toBeVisible();
+  expect(await card.locator(".hunk-header").count()).toBeGreaterThan(0);
   await expect(card.locator(".diff-notice")).toContainText("old:");
 });
