@@ -82,6 +82,29 @@ priv struct ImplCollection {
 }
 
 ///|
+// Convert the parser's one-based, end-exclusive locations directly to the
+// physical source lines occupied by each ignored test. This deliberately does
+// not use SourceView's expanded whitespace mask, which also hides adjacent
+// blank separator lines for comparison purposes.
+fn ignored_test_line_ranges(
+  locations : ArrayView[@basic.Location],
+) -> Array[@model.LineRange] {
+  let ranges : Array[@model.LineRange] = []
+  for location in locations {
+    let first = @cmp.maximum(location.start.lnum - 1, 0)
+    let end_line = @cmp.maximum(location.end.lnum - 1, first)
+    let end_column = @cmp.maximum(location.end.column() - 1, 0)
+    let last = if end_column == 0 && end_line > first {
+      end_line - 1
+    } else {
+      end_line
+    }
+    ranges.push({ start: first, len: last - first + 1 })
+  }
+  ranges
+}
+
+///|
 // The top-level edit script produced after reliable and fuzzy pairing.
 // Replacement means "diff these two roots"; delete/insert compare a real root
 // with an empty side.
