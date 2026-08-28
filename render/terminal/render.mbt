@@ -319,12 +319,14 @@ fn hinted_width(hint : Int?, document_width : Int) -> Int {
 /// two line-number columns, and optional ANSI highlighting. The renderer does
 /// not flatten a high-level semantic document, calculate hunks, apply context,
 /// normalize source text, or choose empty and fallback messages. An empty
-/// document therefore renders only its headers.
+/// document therefore renders only its headers. `hunk_context`, when nonempty,
+/// is appended to every hunk heading in the fragment.
 pub fn render_document(
   old_label : String,
   new_label : String,
   document : @model.HunkDocument,
   options? : RenderOptions = Default::default(),
+  hunk_context? : String = "",
 ) -> String {
   let (document_old_width, document_new_width) = document_line_widths(document)
   let old_width = hinted_width(options.old_max_line, document_old_width)
@@ -340,6 +342,10 @@ pub fn render_document(
         hunk.new_len,
       ),
     )
+    if !hunk_context.is_empty() {
+      buf.write_char(' ')
+      buf.write_string(hunk_context)
+    }
     buf.write_char('\n')
     for block in hunk.blocks {
       match block {
