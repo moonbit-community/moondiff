@@ -1665,6 +1665,321 @@ fn assert_fragment_bounds(
 }
 
 ///|
+test "sectioned lexical changes include their complete declaration ranges" {
+  let old_source =
+    #|fn unchanged_before() {}
+    #|
+    #|/// target docs
+    #|fn target() {
+    #|  stable_prefix_one()
+    #|  stable_prefix_two()
+    #|  stable_prefix_three()
+    #|  stable_prefix_four()
+    #|  old_head()
+    #|  stable_one()
+    #|  stable_two()
+    #|
+    #|  stable_three()
+    #|  stable_four()
+    #|  old_tail()
+    #|  stable_suffix_one()
+    #|  stable_suffix_two()
+    #|  stable_suffix_three()
+    #|  stable_suffix_four()
+    #|}
+    #|
+    #|fn unchanged_after() {}
+  let new_source =
+    #|fn unchanged_before() {}
+    #|
+    #|/// target docs
+    #|fn target() {
+    #|  stable_prefix_one()
+    #|  stable_prefix_two()
+    #|  stable_prefix_three()
+    #|  stable_prefix_four()
+    #|  new_head()
+    #|  stable_one()
+    #|  stable_two()
+    #|
+    #|  stable_three()
+    #|  stable_four()
+    #|  new_tail()
+    #|  stable_suffix_one()
+    #|  stable_suffix_two()
+    #|  stable_suffix_three()
+    #|  stable_suffix_four()
+    #|}
+    #|
+    #|fn unchanged_after() {}
+  for context in [0, 3] {
+    let result = diff_document_for_test(
+      old_source,
+      new_source,
+      Lexical,
+      context~,
+    )
+    let top = top_level_for_test(result)
+    guard top.sections
+      is [
+        Matched(diff=leading, ..),
+        Matched(old=old_range, new=new_range, diff=target),
+        Matched(diff=trailing, ..),
+      ] else {
+      fail("expected one changed declaration between stable neighbors")
+    }
+    assert_true(leading.document.hunks.is_empty())
+    assert_true(trailing.document.hunks.is_empty())
+    guard target.document.hunks is [hunk] else {
+      fail("expected one complete declaration hunk")
+    }
+    assert_eq(hunk.old_start, 0)
+    assert_eq(hunk.old_len, old_range.len)
+    assert_eq(hunk.new_start, 0)
+    assert_eq(hunk.new_len, new_range.len)
+    let patch = @unified.render_unified_hunks(target.document).join("")
+    for
+      text in [
+        "/// target docs", "fn target() {", "stable_prefix_one()", "stable_one()",
+        "stable_four()", "old_tail()", "new_tail()", "stable_suffix_four()", "}",
+      ] {
+      assert_true(patch.contains(text), msg=patch)
+    }
+    assert_false(patch.contains("unchanged_before"), msg=patch)
+    assert_false(patch.contains("unchanged_after"), msg=patch)
+  }
+}
+
+///|
+test "complete lexical sections restore filtered trivia and fill inserts and deletes" {
+  let old_source =
+    #|test "sample" { old_test() }
+    #|
+    #|/// old production docs
+    #|///|UUID(old-production-marker)
+    #|fn production() {
+    #|  let value = old_value()
+    #|
+    #|  // old production note
+    #|  value
+    #|}
+  let new_source =
+    #|test "sample" { new_test() }
+    #|
+    #|/// new production docs
+    #|///|UUID(new-production-marker)
+    #|fn production() {
+    #|  let value = new_value()
+    #|
+    #|  // new production note
+    #|  value
+    #|}
+  let filtered = diff_document_for_test(
+    old_source,
+    new_source,
+    Lexical,
+    context=0,
+    ignore_comments=true,
+    ignore_tests=true,
+  )
+  guard top_level_for_test(filtered).sections
+    is [Matched(old=old_range, new=new_range, diff=fragment)] else {
+    fail("expected only the changed production declaration")
+  }
+  guard fragment.document.hunks is [hunk] else {
+    fail("expected one restored production hunk")
+  }
+  assert_eq(hunk.old_start, 0)
+  assert_eq(hunk.old_len, old_range.len)
+  assert_eq(hunk.new_start, 0)
+  assert_eq(hunk.new_len, new_range.len)
+  let patch = @unified.render_unified_hunks(fragment.document).join("")
+  for
+    text in [
+      "/// old production docs", "/// new production docs", "///|UUID(old-production-marker)",
+      "///|UUID(new-production-marker)", "// old production note", "// new production note",
+      "old_value()", "new_value()",
+    ] {
+    assert_true(patch.contains(text), msg=patch)
+  }
+  assert_true(patch.contains("\n \n"), msg=patch)
+  assert_false(patch.contains("old_test"), msg=patch)
+  assert_false(patch.contains("new_test"), msg=patch)
+  let changed = changed_segment_text(fragment.document)
+  assert_true(changed.contains("old_value"), msg=changed)
+  assert_true(changed.contains("new_value"), msg=changed)
+  assert_false(changed.contains("production docs"), msg=changed)
+  assert_false(changed.contains("production note"), msg=changed)
+  assert_false(changed.contains("UUID"), msg=changed)
+
+  let inserted = diff_document_for_test(
+    "fn keep() {}",
+    "fn keep() {}\n\n/// inserted docs\nfn inserted() {\n  first()\n  last()\n}",
+    Lexical,
+    context=0,
+  )
+  guard top_level_for_test(inserted).sections
+    is [Matched(diff=keep, ..), Inserted(new=inserted_range, diff=added)] else {
+    fail("expected one stable and one inserted declaration")
+  }
+  assert_true(keep.document.hunks.is_empty())
+  guard added.document.hunks is [added_hunk] else {
+    fail("expected one inserted declaration hunk")
+  }
+  assert_eq(added_hunk.new_start, 0)
+  assert_eq(added_hunk.new_len, inserted_range.len)
+
+  let deleted = diff_document_for_test(
+    "fn keep() {}\n\n/// deleted docs\nfn deleted() {\n  first()\n  last()\n}",
+    "fn keep() {}",
+    Lexical,
+    context=0,
+  )
+  guard top_level_for_test(deleted).sections
+    is [Matched(diff=kept, ..), Deleted(old=deleted_range, diff=removed)] else {
+    fail("expected one stable and one deleted declaration")
+  }
+  assert_true(kept.document.hunks.is_empty())
+  guard removed.document.hunks is [removed_hunk] else {
+    fail("expected one deleted declaration hunk")
+  }
+  assert_eq(removed_hunk.old_start, 0)
+  assert_eq(removed_hunk.old_len, deleted_range.len)
+}
+
+///|
+test "Whole and AST lexical fallbacks retain compact caller context" {
+  let old_source =
+    #|fn stable() {}
+    #|fn target() {
+    #|  stable_zero()
+    #|  stable_one()
+    #|  old_value()
+    #|  stable_three()
+    #|  stable_four()
+    #|}
+  let new_source =
+    #|fn stable() {}
+    #|fn target() {
+    #|  stable_zero()
+    #|  stable_one()
+    #|  new_value()
+    #|  stable_three()
+    #|  stable_four()
+    #|}
+  let structural = diff_document_for_test(
+    old_source,
+    new_source,
+    Ast,
+    context=0,
+  )
+  guard top_level_for_test(structural).sections
+    is [Matched(diff=stable, ..), Matched(old=structural_range, diff=ast, ..)] else {
+    fail("expected a changed AST declaration")
+  }
+  assert_true(stable.document.hunks.is_empty())
+  guard ast.document.hunks is [ast_hunk] else {
+    fail("expected one compact AST hunk")
+  }
+  assert_true(ast_hunk.old_start > 0)
+  assert_true(ast_hunk.old_len < structural_range.len)
+
+  let local_fallback = diff_document_for_test(
+    old_source,
+    new_source,
+    Ast,
+    context=0,
+    graph_limit=0,
+  )
+  guard top_level_for_test(local_fallback).sections
+    is [
+      Matched(diff=unchanged, ..),
+      Matched(old=fallback_range, diff=fallback, ..),
+    ] else {
+    fail("expected a section-local graph fallback")
+  }
+  assert_true(unchanged.document.hunks.is_empty())
+  assert_true(fallback.fallbacks is [GraphLimitExceeded(limit=0)])
+  guard fallback.document.hunks is [fallback_hunk] else {
+    fail("expected one compact lexical fallback hunk")
+  }
+  assert_true(fallback_hunk.old_start > 0)
+  assert_true(fallback_hunk.old_len < fallback_range.len)
+
+  let parse_old =
+    #|fn broken( {
+    #|  stable_zero()
+    #|  stable_one()
+    #|  old_value()
+    #|  stable_three()
+    #|}
+  let parse_new =
+    #|fn broken( {
+    #|  stable_zero()
+    #|  stable_one()
+    #|  new_value()
+    #|  stable_three()
+    #|}
+  let parsed = diff_document_for_test(parse_old, parse_new, Lexical, context=0)
+  guard parsed.document is Whole(parsed_fragment) else {
+    fail("expected a Whole parse fallback")
+  }
+  assert_true(parsed_fragment.fallbacks is [ParseError(..)])
+  guard parsed_fragment.document.hunks is [parsed_hunk] else {
+    fail("expected one compact parse fallback hunk")
+  }
+  assert_true(parsed_hunk.old_start > 0)
+  assert_true(parsed_hunk.old_len < 6)
+
+  let root = diff_document_for_test(
+    "fn old_root() {\n  stable_zero()\n  stable_one()\n  stable_two()\n}",
+    "fn new_root() {\n  stable_zero()\n  stable_one()\n  stable_two()\n}",
+    Lexical,
+    context=0,
+  )
+  guard root.document is Whole(root_fragment) else {
+    fail("expected a Whole RootList lexical document")
+  }
+  assert_true(root_fragment.fallbacks.is_empty())
+  guard root_fragment.document.hunks is [root_hunk] else {
+    fail("expected one compact RootList hunk")
+  }
+  assert_true(root_hunk.old_len < 5)
+
+  let limit_old =
+    #|fn stable() {}
+    #|fn Worker::old_name() {
+    #|  stable_zero()
+    #|  stable_one()
+    #|  stable_two()
+    #|  stable_three()
+    #|}
+  let limit_new =
+    #|fn stable() {}
+    #|fn Worker::new_name() {
+    #|  stable_zero()
+    #|  stable_one()
+    #|  stable_two()
+    #|  stable_three()
+    #|}
+  let limited = calculate_diff_document_with_limit(
+    limit_old, limit_new, "old", "new", 0, 3_000_000, false, 0,
+  )
+  guard limited.document is Whole(limited_fragment) else {
+    fail("expected a Whole computation-limit fallback")
+  }
+  assert_true(
+    limited_fragment.fallbacks
+    is [ComputationLimitExceeded(stage=TopLevelAlignment, limit=0)],
+  )
+  guard limited_fragment.document.hunks is [limited_hunk] else {
+    fail("expected one compact computation fallback hunk")
+  }
+  assert_true(limited_hunk.old_start > 0)
+  assert_true(limited_hunk.old_len < 7)
+}
+
+///|
 test "top-level plan preserves crossing declaration identities and both orders" {
   let old_units = parse_units("fn first() {}\nfn second() {}")
   let new_units = parse_units("fn second() {}\nfn first() {}")
