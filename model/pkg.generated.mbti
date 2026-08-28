@@ -54,7 +54,8 @@ pub fn DiffLine::text(Self) -> String
 
 type DiffResult
 pub fn DiffResult::document(Self) -> DiffDocument
-pub fn DiffResult::make(DiffDocument, DiffStatus) -> Self
+pub fn DiffResult::ignored_test_ranges(Self, DiffSide) -> ArrayView[LineRange]
+pub fn DiffResult::make(DiffDocument, DiffStatus, ArrayView[LineRange], ArrayView[LineRange]) -> Self
 pub fn DiffResult::status(Self) -> DiffStatus
 
 pub(all) enum DiffRow {
