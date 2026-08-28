@@ -1030,6 +1030,51 @@ button.copy-button.copied {
   line-height: 1.45;
 }
 
+.semantic-section > .semantic-section-title {
+  position: relative;
+  padding-left: 2rem;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.semantic-section > .semantic-section-title::-webkit-details-marker {
+  display: none;
+}
+
+.semantic-section > .semantic-section-title::marker {
+  content: "";
+}
+
+.semantic-section > .semantic-section-title::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.95rem;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-50%) rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.semantic-section[open] > .semantic-section-title::before {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.semantic-section > .semantic-section-title:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 4%, var(--surface-subtle));
+}
+
+.semantic-section > .semantic-section-title:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+  color: var(--foreground);
+}
+
 .semantic-reorder {
   color: #806615;
   background: color-mix(in srgb, #b99a36 8%, var(--surface));
