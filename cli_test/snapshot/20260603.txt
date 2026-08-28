@@ -1,4 +1,4 @@
-[section #1 matched] old lines 1-6; new lines 1-18
+[section #1 matched] old lines 1-6; new lines 1-18 · fn Syntax::looks_like_punctuation(self : Syntax) -> Bool {
 [34m--- cli_test/source/20260603.old.mbt: lines 1-6[39m
 [34m+++ cli_test/source/20260603.new.mbt: lines 1-18[39m
 @@ -1,6 +1,18 @@
@@ -24,7 +24,7 @@
 
 Deleted declarations (old order):
 
-[section #2 deleted] old lines 8-20; new absent
+[section #2 deleted] old lines 8-20; new absent · fn atom_text_is_punctuation(content : String) -> Bool {
 [34m--- cli_test/source/20260603.old.mbt: lines 8-20[39m
 [34m+++ cli_test/source/20260603.new.mbt[39m
 @@ -8,13 +0,0 @@

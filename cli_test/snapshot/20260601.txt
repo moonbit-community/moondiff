@@ -1,4 +1,4 @@
-[section #1 matched] old lines 1-8; new lines 1-7
+[section #1 matched] old lines 1-8; new lines 1-7 · test "debug inspect error path" {
 [34m--- cli_test/source/20260601.old.mbt: lines 1-8[39m
 [34m+++ cli_test/source/20260601.new.mbt: lines 1-7[39m
 @@ -1,8 +1,7 @@

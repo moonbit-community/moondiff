@@ -1,5 +1,5 @@
 note: top-level declarations reordered
-[section #1 matched] old lines 1-4; new lines 1-12
+[section #1 matched] old lines 1-4; new lines 1-12 · old: pub fn decode(bytes : @bytes.View) -> String raise Malformed { → new: pub fn decode(
 [34m--- cli_test/source/20251114.old.mbt: lines 1-4[39m
 [34m+++ cli_test/source/20251114.new.mbt: lines 1-12[39m
 @@ -1,4 +1,12 @@
@@ -17,7 +17,7 @@ note: top-level declarations reordered
  [90m3[39m [90m11[39m   let builder = StringBuilder::new(size_hint=bytes.length())
  [90m4[39m [90m12[39m }
 
-[section #4 matched] old lines 24-28; new lines 14-20
+[section #4 matched] old lines 24-28; new lines 14-20 · fn main {
 [34m--- cli_test/source/20251114.old.mbt: lines 24-28[39m
 [34m+++ cli_test/source/20251114.new.mbt: lines 14-20[39m
 @@ -24,5 +14,7 @@
@@ -29,7 +29,7 @@ note: top-level declarations reordered
 [90m27[39m [90m19[39m   println(5 + 6)
 [90m28[39m [90m20[39m }
 
-[section #5 matched] old lines 30-36; new lines 22-28
+[section #5 matched] old lines 30-36; new lines 22-28 · old: pub fn[T, U] map(self : T?, f : (T) -> U) -> U? { → new: pub fn[T, U] map(self : T?, f : (T) -> U raise?) -> U? raise? {
 [34m--- cli_test/source/20251114.old.mbt: lines 30-36[39m
 [34m+++ cli_test/source/20251114.new.mbt: lines 22-28[39m
 @@ -30,6 +22,6 @@
@@ -41,7 +41,7 @@ note: top-level declarations reordered
 [90m34[39m [90m26[39m     None => None
 [90m35[39m [90m27[39m   }
 
-[section #6 matched] old lines 38-43; new lines 30-34
+[section #6 matched] old lines 38-43; new lines 30-34 · fn main() {
 [34m--- cli_test/source/20251114.old.mbt: lines 38-43[39m
 [34m+++ cli_test/source/20251114.new.mbt: lines 30-34[39m
 @@ -40,4 +32,3 @@
@@ -52,7 +52,7 @@ note: top-level declarations reordered
 [90m..[39m [32m33[39m [90m  [39m[32m[1mprintln(5 + 6)[22m[39m
 [90m43[39m [90m34[39m }
 
-[section #2 matched] old lines 6-10; new lines 36-40
+[section #2 matched] old lines 6-10; new lines 36-40 · pub fn View::from_array(chars : Array[Char]) -> View {
 [34m--- cli_test/source/20251114.old.mbt: lines 6-10[39m
 [34m+++ cli_test/source/20251114.new.mbt: lines 36-40[39m
 @@ -6,5 +36,5 @@
@@ -64,7 +64,7 @@ note: top-level declarations reordered
 [90m..[39m [32m39[39m [90m  [39m[32m[1mView::make_view(s, 0, s[22m[39m[90m.[39m[32m[1mlength[22m[39m[90m()[39m[32m[1m)[22m[39m
 [90m10[39m [90m40[39m }
 
-[section #3 matched] old lines 12-22; new lines 42-51
+[section #3 matched] old lines 12-22; new lines 42-51 · struct Set[K] {
 [34m--- cli_test/source/20251114.old.mbt: lines 12-22[39m
 [34m+++ cli_test/source/20251114.new.mbt: lines 42-51[39m
 @@ -12,11 +42,10 @@
