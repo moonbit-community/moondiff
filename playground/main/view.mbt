@@ -477,6 +477,40 @@ fn semantic_section_new_range(
 }
 
 ///|
+fn semantic_section_old_context(section : @mbtdiff.DiffSection) -> String? {
+  match section {
+    Matched(old_context~, ..) | Deleted(old_context~, ..) => old_context
+    Inserted(..) => None
+  }
+}
+
+///|
+fn semantic_section_new_context(section : @mbtdiff.DiffSection) -> String? {
+  match section {
+    Matched(new_context~, ..) | Inserted(new_context~, ..) => new_context
+    Deleted(..) => None
+  }
+}
+
+///|
+fn semantic_declaration_context_text(
+  old_context : String?,
+  new_context : String?,
+) -> String {
+  match (old_context, new_context) {
+    (None, None) => ""
+    (Some(old), Some(new)) =>
+      if old == new {
+        old
+      } else {
+        "old: \{old} → new: \{new}"
+      }
+    (Some(old), None) => old
+    (None, Some(new)) => new
+  }
+}
+
+///|
 fn semantic_section_title(
   index : Int,
   section : @mbtdiff.DiffSection,
@@ -508,6 +542,8 @@ fn semantic_fragment_view(
   fragment : @mbtdiff.DiffFragment,
   old_range : @mbtdiff.LineRange?,
   new_range : @mbtdiff.LineRange?,
+  old_context : String?,
+  new_context : String?,
   mode : ViewMode,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
@@ -519,19 +555,14 @@ fn semantic_fragment_view(
       index,
       match (old_range, new_range) {
         (Some(old), Some(new)) =>
-          Matched(
-            old~,
-            new~,
-            old_context=None,
-            new_context=None,
-            diff=fragment,
-          )
-        (Some(old), None) => Deleted(old~, old_context=None, diff=fragment)
-        (None, Some(new)) => Inserted(new~, new_context=None, diff=fragment)
+          Matched(old~, new~, old_context~, new_context~, diff=fragment)
+        (Some(old), None) => Deleted(old~, old_context~, diff=fragment)
+        (None, Some(new)) => Inserted(new~, new_context~, diff=fragment)
         (None, None) => panic()
       },
     )
   })
+  let hunk_context = semantic_declaration_context_text(old_context, new_context)
   let old_base = old_range.map(range => range.start).unwrap_or(0)
   let new_base = new_range.map(range => range.start).unwrap_or(0)
   let content = [
@@ -554,6 +585,7 @@ fn semantic_fragment_view(
         old_base~,
         new_base~,
         show_hunk_headers~,
+        hunk_context~,
       )
     },
   ]
@@ -598,6 +630,8 @@ fn top_level_diff_view(
           fragment,
           semantic_section_old_range(section),
           semantic_section_new_range(section),
+          semantic_section_old_context(section),
+          semantic_section_new_context(section),
           mode,
           review,
           emit,
@@ -621,6 +655,8 @@ fn top_level_diff_view(
             Some(section_index),
             fragment,
             semantic_section_old_range(section),
+            None,
+            semantic_section_old_context(section),
             None,
             mode,
             review,
@@ -725,6 +761,8 @@ fn file_diff_view(
                 index,
                 None,
                 fragment,
+                None,
+                None,
                 None,
                 None,
                 mode,

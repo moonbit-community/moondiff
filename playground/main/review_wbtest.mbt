@@ -342,6 +342,19 @@ test "section-local review rows map to absolute GitHub anchors" {
       patch,
       old_base=10,
       new_base=20,
+      hunk_context="fn target() {",
+    )
+    is [ReviewHunk("@@ -11 +21 @@ fn target() {"), ReviewLine(_)] else {
+    fail("expected the declaration context on the hunk heading")
+  }
+
+  guard project_review_items(
+      2,
+      "src/main.mbt",
+      document,
+      patch,
+      old_base=10,
+      new_base=20,
       show_hunk_headers=false,
     )
     is [ReviewLine(hidden)] else {
@@ -351,6 +364,28 @@ test "section-local review rows map to absolute GitHub anchors" {
   assert_true(hidden.new_line == Some(21))
   assert_eq(hidden.old_anchor.unwrap().line, 11)
   assert_eq(hidden.new_anchor.unwrap().line, 21)
+
+  let two_hunks : @model.HunkDocument = {
+    hunks: [
+      { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [] },
+      { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [] },
+    ],
+  }
+  guard project_review_items(
+      2,
+      "src/main.mbt",
+      two_hunks,
+      patch,
+      old_base=10,
+      new_base=20,
+      hunk_context="fn target() {",
+    )
+    is [
+      ReviewHunk("@@ -11 +21 @@ fn target() {"),
+      ReviewHunk("@@ -18 +30 @@ fn target() {"),
+    ] else {
+    fail("expected every hunk heading to share the section context")
+  }
 }
 
 ///|
