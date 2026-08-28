@@ -113,3 +113,24 @@ test "render_document honors 9 to 10 and 99 to 100 width hints" {
   )
   assert_true(rendered.contains("\n 9   9 same\n"), msg=rendered)
 }
+
+///|
+test "render_document appends one context to every hunk header" {
+  let document : @model.HunkDocument = {
+    hunks: [
+      { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [] },
+      { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [] },
+    ],
+  }
+  let unchanged = @terminal.render_document("old.mbt", "new.mbt", document)
+  assert_eq(unchanged, "--- old.mbt\n+++ new.mbt\n@@ -1 +1 @@\n@@ -8 +10 @@\n")
+  let contextual = @terminal.render_document(
+    "old.mbt",
+    "new.mbt",
+    document,
+    hunk_context="fn target() {",
+  )
+  assert_eq(
+    contextual, "--- old.mbt\n+++ new.mbt\n@@ -1 +1 @@ fn target() {\n@@ -8 +10 @@ fn target() {\n",
+  )
+}
