@@ -31,11 +31,36 @@ type DiffDocument = @model.DiffDocument
 
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
-/// through the `mbtdiff` facade.
+/// through the `mbtdiff` facade. Ignored-test ranges are zero-based physical
+/// source ranges retained as stable read-only views for each input side.
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : @model.DiffStatus
+  old_ignored_test_ranges : ArrayView[@model.LineRange]
+  new_ignored_test_ranges : ArrayView[@model.LineRange]
 } derive(Eq)
+
+///|
+fn detailed_diff_result(
+  document : @model.DiffDocument,
+  status : @model.DiffStatus,
+) -> DetailedDiffResult {
+  {
+    document,
+    status,
+    old_ignored_test_ranges: [],
+    new_ignored_test_ranges: [],
+  }
+}
+
+///|
+fn DetailedDiffResult::with_ignored_test_ranges(
+  self : DetailedDiffResult,
+  old_ignored_test_ranges : ArrayView[@model.LineRange],
+  new_ignored_test_ranges : ArrayView[@model.LineRange],
+) -> DetailedDiffResult {
+  { ..self, old_ignored_test_ranges, new_ignored_test_ranges }
+}
 
 ///|
 priv struct DetailedUnitResult {
@@ -158,15 +183,15 @@ fn top_level_result(
   } else {
     NoStructuralChanges
   }
-  {
-    document: @model.DiffDocument::TopLevel({
+  detailed_diff_result(
+    @model.DiffDocument::TopLevel({
       sections: sections[:],
       old_order: plan.old_order[:],
       new_order: plan.new_order[:],
       reordered: plan.reordered,
     }),
     status,
-  }
+  )
 }
 
 ///|
@@ -213,7 +238,7 @@ fn detailed_lexical_plan_document(
       let document = lexical_view_document(
         old_view, new_view, context, ignore_comments,
       )
-      { document: whole_document(document), status: Changed }
+      detailed_diff_result(whole_document(document), Changed)
     }
     PerUnit(unit_plan) => {
       let fragments : Array[DiffFragment] = []
@@ -897,7 +922,7 @@ fn whole_file_fallback(
   let document = lexical_view_document(
     old_view, new_view, context, ignore_comments,
   )
-  { document: whole_document(document, fallback=reason), status: Changed }
+  detailed_diff_result(whole_document(document, fallback=reason), Changed)
 }
 
 ///|
@@ -949,14 +974,14 @@ fn detailed_ast_root_list_document(
         SyntaxPositionsOutOfBounds(sides~),
       )
     AstDocument(document) =>
-      {
-        document: whole_document(document),
-        status: if document.hunks.is_empty() {
+      detailed_diff_result(
+        whole_document(document),
+        if document.hunks.is_empty() {
           NoStructuralChanges
         } else {
           Changed
         },
-      }
+      )
   }
 }
 
@@ -1060,7 +1085,7 @@ fn calculate_diff_document_with_limit(
 ) -> DetailedDiffResult {
   let context = @cmp.maximum(context, 0)
   if old_source == new_source {
-    return { document: whole_document(empty_document()), status: Identical }
+    return detailed_diff_result(whole_document(empty_document()), Identical)
   }
   let old_parse = @cst.parse_structure(old_source, name=old_name)
   let new_parse = @cst.parse_structure(new_source, name=new_name)
@@ -1072,8 +1097,10 @@ fn calculate_diff_document_with_limit(
   } else {
     None
   }
-  if comment_document is Some(document) && document.hunks.is_empty() {
-    return { document: whole_document(document), status: IgnoredOnly }
+  if comment_document is Some(document) &&
+    document.hunks.is_empty() &&
+    (!ignore_tests || parse_detail is Some(_)) {
+    return detailed_diff_result(whole_document(document), IgnoredOnly)
   }
   if parse_detail is Some(detail) {
     let document = if comment_document is Some(document) {
@@ -1085,10 +1112,10 @@ fn calculate_diff_document_with_limit(
       sides=parse_error_sides(old_reports, new_reports),
       detail~,
     )
-    return {
-      document: whole_document(document, fallback=reason),
-      status: Changed,
-    }
+    return detailed_diff_result(
+      whole_document(document, fallback=reason),
+      Changed,
+    )
   }
   let old_collection = collect_impl_units_detailed(
     old_source,
@@ -1099,6 +1126,12 @@ fn calculate_diff_document_with_limit(
     new_source,
     new_parse.root(),
     ignore_tests,
+  )
+  let old_ignored_test_ranges = ignored_test_line_ranges(
+    old_collection.ignored_tests,
+  )
+  let new_ignored_test_ranges = ignored_test_line_ranges(
+    new_collection.ignored_tests,
   )
   let old_view = @diff_ignore.SourceView::from_source(
     old_source,
@@ -1115,7 +1148,13 @@ fn calculate_diff_document_with_limit(
       old_view, new_view, context, ignore_comments,
     )
     if document.hunks.is_empty() {
-      return { document: whole_document(document), status: IgnoredOnly }
+      return detailed_diff_result(
+        whole_document(document),
+        IgnoredOnly,
+      ).with_ignored_test_ranges(
+        old_ignored_test_ranges,
+        new_ignored_test_ranges,
+      )
     }
   }
   let budget = @computation.Budget::new(computation_limit)
@@ -1132,9 +1171,12 @@ fn calculate_diff_document_with_limit(
         context,
         ignore_comments,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),
+      ).with_ignored_test_ranges(
+        old_ignored_test_ranges,
+        new_ignored_test_ranges,
       )
   }
-  match mode {
+  let result = match mode {
     Lexical =>
       detailed_lexical_plan_document(
         plan, old_view, new_view, context, ignore_comments,
@@ -1144,6 +1186,10 @@ fn calculate_diff_document_with_limit(
         plan, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
       )
   }
+  result.with_ignored_test_ranges(
+    old_ignored_test_ranges,
+    new_ignored_test_ranges,
+  )
 }
 
 ///|
