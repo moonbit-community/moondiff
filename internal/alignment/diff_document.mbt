@@ -172,10 +172,23 @@ fn lexical_edit_document(
 }
 
 ///|
+fn complete_lexical_edit_context(
+  old_unit : ImplUnit?,
+  new_unit : ImplUnit?,
+) -> Int {
+  @cmp.maximum(
+    old_unit.map(unit => unit.range.len).unwrap_or(0),
+    new_unit.map(unit => unit.range.len).unwrap_or(0),
+  )
+}
+
+///|
 // Per-unit lexical comparison is declaration-scoped by design. It compares
 // only each unit's exact source slice and does not synthesize fragments for
 // whitespace-only gaps before, between, or after units. RootList plans retain
-// whole-file lexical behavior and therefore include those gaps.
+// whole-file lexical behavior and therefore include those gaps. Changed
+// declaration fragments use enough local context to cover both complete unit
+// ranges; Whole comparisons and structural fallbacks retain caller context.
 fn detailed_lexical_plan_document(
   plan : TopLevelPlan,
   old_view : SourceView,
@@ -193,35 +206,19 @@ fn detailed_lexical_plan_document(
     PerUnit(unit_plan) => {
       let fragments : Array[DiffFragment] = []
       for edit in unit_plan.edits {
-        let document = match edit {
-          Replace(old~, new~) =>
-            lexical_edit_document(
-              Some(old),
-              Some(new),
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
-          Delete(old) =>
-            lexical_edit_document(
-              Some(old),
-              None,
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
-          Insert(new) =>
-            lexical_edit_document(
-              None,
-              Some(new),
-              old_view,
-              new_view,
-              context,
-              ignore_comments,
-            )
+        let (old_unit, new_unit) = match edit {
+          Replace(old~, new~) => (Some(old), Some(new))
+          Delete(old) => (Some(old), None)
+          Insert(new) => (None, Some(new))
         }
+        let document = lexical_edit_document(
+          old_unit,
+          new_unit,
+          old_view,
+          new_view,
+          complete_lexical_edit_context(old_unit, new_unit),
+          ignore_comments,
+        )
         fragments.push(diff_fragment(document, None))
       }
       top_level_result(unit_plan, fragments)
@@ -1141,8 +1138,9 @@ fn calculate_diff_document_with_limit(
 /// Calculate the sole renderer-neutral semantic document from one parse and
 /// one top-level alignment plan. Reliable declaration pairings remain
 /// section-local even when their two source orders cross. Section-local
-/// lexical comparison is limited to exact unit ranges; whitespace-only gaps
-/// outside those ranges are not represented as sections.
+/// lexical comparison returns each changed exact unit range in full, while
+/// whitespace-only gaps outside those ranges are not represented as sections.
+/// Caller context still controls Whole, AST, and AST-fallback documents.
 pub fn calculate_diff_document(
   old_source : String,
   new_source : String,
