@@ -88,6 +88,7 @@ pub type ContextLine = @model.ContextLine
 pub type DiffStatus = @model.DiffStatus
 
 ///|
+/// Selects the old or new input for side-specific result accessors.
 pub type DiffSide = @model.DiffSide
 
 ///|
@@ -97,6 +98,7 @@ pub type ComputationStage = @model.ComputationStage
 pub type FallbackReason = @model.FallbackReason
 
 ///|
+/// A zero-based physical source-line range.
 pub type LineRange = @model.LineRange
 
 ///|
@@ -109,5 +111,6 @@ pub type DiffSection = @model.DiffSection
 pub type TopLevelDiff = @model.TopLevelDiff
 
 ///|
-/// An opaque calculation result exposing only `status` and `document`.
+/// An opaque calculation result exposing its status, semantic document, and
+/// side-specific physical ranges for tests excluded by `ignore_tests`.
 pub type DiffResult = @model.DiffResult
