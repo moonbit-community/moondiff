@@ -140,3 +140,81 @@ test "comparison whitespace masking does not enlarge public test ranges" {
   assert_ignored_test_ranges(test_gap, New, [(1, 1)])
   assert_ignored_test_ranges(blank_gap, New, [])
 }
+
+///|
+test "combined filters retain ranges through ignored and changed results" {
+  let comment_only = @mbtdiff.diff(
+    "// old note\nfn production() {}\ntest \"same\" {}",
+    "// new note\nfn production() {}\ntest \"same\" {}",
+    options=DiffOptions(ignore_comments=true, ignore_tests=true),
+  )
+  assert_true(comment_only.status() is IgnoredOnly)
+  assert_ignored_test_ranges(comment_only, Old, [(2, 1)])
+  assert_ignored_test_ranges(comment_only, New, [(2, 1)])
+
+  for mode in [@mbtdiff.DiffMode::Ast, Lexical] {
+    let changed = @mbtdiff.diff(
+      "fn production() { old_value() }\ntest \"t\" { old_test() }",
+      "fn production() { new_value() }\ntest \"t\" { new_test() }",
+      options=DiffOptions(
+        ignore_comments=true,
+        ignore_tests=true,
+        mode~,
+      ),
+    )
+    assert_true(changed.status() is Changed)
+    assert_ignored_test_ranges(changed, Old, [(1, 1)])
+    assert_ignored_test_ranges(changed, New, [(1, 1)])
+  }
+}
+
+///|
+test "parse and identical fast paths expose no ignored test ranges" {
+  let parsed_fallback = @mbtdiff.diff(
+    "test \"old\" { old_test() }\nfn broken(",
+    "test \"new\" { new_test() }\nfn okay() {}",
+    options=DiffOptions(ignore_tests=true),
+  )
+  assert_ignored_test_ranges(parsed_fallback, Old, [])
+  assert_ignored_test_ranges(parsed_fallback, New, [])
+
+  let identical_source = "test \"same\" { inspect(1) }"
+  let identical = @mbtdiff.diff(
+    identical_source,
+    identical_source,
+    options=DiffOptions(ignore_tests=true),
+  )
+  assert_true(identical.status() is Identical)
+  assert_ignored_test_ranges(identical, Old, [])
+  assert_ignored_test_ranges(identical, New, [])
+
+  let filtering_disabled = @mbtdiff.diff(
+    "test \"sample\" { old_value() }", "test \"sample\" { new_value() }",
+  )
+  assert_ignored_test_ranges(filtering_disabled, Old, [])
+  assert_ignored_test_ranges(filtering_disabled, New, [])
+
+  let formatting = @mbtdiff.diff(
+    "fn production() { 1 }\ntest \"same\" {}",
+    "fn production() {\n  1\n}\ntest \"same\" {}",
+    options=DiffOptions(ignore_tests=true),
+  )
+  assert_true(formatting.status() is NoStructuralChanges)
+  assert_ignored_test_ranges(formatting, Old, [(1, 1)])
+  assert_ignored_test_ranges(formatting, New, [(3, 1)])
+}
+
+///|
+test "structured fallbacks retain ignored test geometry" {
+  let result = @mbtdiff.diff(
+    "test \"sample\" { old_test() }\nfn production() { old_value() }",
+    "test \"sample\" { new_test() }\nfn production() { new_value() }",
+    options=DiffOptions(graph_limit=0, ignore_tests=true),
+  )
+  assert_ignored_test_ranges(result, Old, [(0, 1)])
+  assert_ignored_test_ranges(result, New, [(0, 1)])
+  guard result.document() is TopLevel({ sections: [Matched(diff~, ..)], .. }) else {
+    fail("expected one production section")
+  }
+  assert_true(diff.fallbacks is [GraphLimitExceeded(limit=0)])
+}
