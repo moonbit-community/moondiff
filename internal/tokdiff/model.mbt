@@ -42,9 +42,9 @@ fn push_diff_segment(
   let last = segments.length() - 1
   if last >= 0 && segments[last].kind == kind {
     let previous = segments[last]
-    segments[last] = { kind, text: previous.text + text }
+    segments[last] = { kind, text: previous.text + text, }
   } else {
-    segments.push({ kind, text })
+    segments.push({ kind, text, })
   }
 }
 
@@ -108,7 +108,7 @@ fn plain_segments(text : String) -> Array[DiffSegment] {
   if text == "" {
     []
   } else {
-    [{ kind: Unchanged, text }]
+    [{ kind: Unchanged, text, }]
   }
 }
 
@@ -196,7 +196,7 @@ fn projected_line_segments(
 
 ///|
 fn make_diff_line(index : Int, segments : Array[DiffSegment]) -> DiffLine {
-  { index, segments: segments[:] }
+  { index, segments: segments[:], }
 }
 
 ///|
@@ -384,7 +384,7 @@ fn semantic_hunk(
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
+  { old_start, old_len, new_start, new_len, blocks: blocks[:], }
 }
 
 ///|
@@ -399,7 +399,7 @@ fn semantic_diff_with_refinement_budget(
   for hunk in rendering_diff(old, new, line_cleanup).group(context~) {
     hunks.push(semantic_hunk(hunk, budget))
   }
-  { hunks: hunks[:] }
+  { hunks: hunks[:], }
 }
 
 ///|

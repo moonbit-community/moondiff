@@ -3,24 +3,24 @@ fn renderer_fixture() -> @model.HunkDocument {
   let old_line : @model.DiffLine = {
     index: 1,
     segments: [
-      { kind: Changed, text: "<old>" },
-      { kind: Ignored, text: " // old" },
+      { kind: Changed, text: "<old>", },
+      { kind: Ignored, text: " // old", },
     ],
   }
   let new_line : @model.DiffLine = {
     index: 1,
     segments: [
-      { kind: Changed, text: "&new" },
-      { kind: Ignored, text: " // new" },
+      { kind: Changed, text: "&new", },
+      { kind: Ignored, text: " // new", },
     ],
   }
   let old_ignored : @model.DiffLine = {
     index: 2,
-    segments: [{ kind: Ignored, text: "// old docs" }],
+    segments: [{ kind: Ignored, text: "// old docs", }],
   }
   let new_ignored : @model.DiffLine = {
     index: 2,
-    segments: [{ kind: Ignored, text: "// new docs" }],
+    segments: [{ kind: Ignored, text: "// new docs", }],
   }
   {
     hunks: [
@@ -30,7 +30,7 @@ fn renderer_fixture() -> @model.HunkDocument {
         new_start: 0,
         new_len: 3,
         blocks: [
-          ContextBlock([{ old_index: 0, new_index: 0, text: "a < b" }]),
+          ContextBlock([{ old_index: 0, new_index: 0, text: "a < b", }]),
           ChangeBlock([Paired(old_line, new_line)]),
           IgnoredBlock([Paired(old_ignored, new_ignored)]),
         ],

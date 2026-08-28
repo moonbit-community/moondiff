@@ -14,7 +14,7 @@ pub fn RenderOptions::new(
   old_max_line? : Int,
   new_max_line? : Int,
 ) -> RenderOptions {
-  { use_color, old_max_line, new_max_line }
+  { use_color, old_max_line, new_max_line, }
 }
 
 ///|

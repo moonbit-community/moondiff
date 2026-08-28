@@ -85,7 +85,7 @@ fn AstHunk::merge(self : Self, other : Self) -> Self {
   for line, _ in other.novel_rhs {
     novel_rhs.set(line, true)
   }
-  AstHunk::{ novel_lhs, novel_rhs, lines: deduped }
+  AstHunk::{ novel_lhs, novel_rhs, lines: deduped, }
 }
 
 ///|UUID(063b1c16-81dc-4dd7-a575-84b383f4f363)
@@ -952,7 +952,7 @@ fn lines_to_hunks(
     let (novel_lhs, novel_rhs) = find_novel_lines(
       current_hunk_lines, all_lhs_novel, all_rhs_novel,
     )
-    hunks.push(AstHunk::{ novel_lhs, novel_rhs, lines: current_hunk_lines })
+    hunks.push(AstHunk::{ novel_lhs, novel_rhs, lines: current_hunk_lines, })
   }
   hunks
 }

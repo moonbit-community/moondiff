@@ -6,7 +6,7 @@ fn make_diff_line(
   index : Int,
   segments : Array[@model.DiffSegment],
 ) -> @model.DiffLine {
-  { index, segments: segments[:] }
+  { index, segments: segments[:], }
 }
 
 ///|
@@ -14,7 +14,7 @@ fn make_plain_diff_line(index : Int, text : String) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = if text == "" {
     []
   } else {
-    [{ kind: Unchanged, text }]
+    [{ kind: Unchanged, text, }]
   }
   make_diff_line(index, segments)
 }
@@ -166,7 +166,7 @@ fn plain_hunk(
     }
   }
   let (old_start, old_len, new_start, new_len) = hunk_range(edits)
-  { old_start, old_len, new_start, new_len, blocks: blocks[:] }
+  { old_start, old_len, new_start, new_len, blocks: blocks[:], }
 }
 
 ///|
@@ -184,7 +184,7 @@ fn line_diff_with_budget(
     ) {
     hunks.push(plain_hunk(hunk, budget))
   }
-  { hunks: hunks[:] }
+  { hunks: hunks[:], }
 }
 
 ///|

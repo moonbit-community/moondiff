@@ -154,7 +154,7 @@ test "fallbacks are read from the fragment that degraded" {
   )
   guard parsed.document()
     is Whole(
-      { document: parsed_document, fallbacks: [ParseError(sides~, detail~)] }
+      { document: parsed_document, fallbacks: [ParseError(sides~, detail~)], }
     ) else {
     fail("expected one Whole parse fallback")
   }
@@ -219,12 +219,12 @@ test "external consumer reads stable ignored test range views" {
     New,
   )
   assert_true(old_ranges.is_empty())
-  assert_true(new_ranges is [{ start: 1, len: 2 }])
+  assert_true(new_ranges is [{ start: 1, len: 2, }])
 
   let copy = new_ranges.to_owned()
   copy.clear()
   let later : ArrayView[@mbtdiff.LineRange] = result.ignored_test_ranges(New)
-  assert_true(later is [{ start: 1, len: 2 }])
+  assert_true(later is [{ start: 1, len: 2, }])
 }
 
 ///|

@@ -137,11 +137,11 @@ test "global traceback keeps call parentheses and isolates the insertion" {
 
 ///|
 test "token boundary score follows the language-aware priority table" {
-  let word = Tok::{ kind: Word, text: "word" }
-  let string = Tok::{ kind: Str, text: "\"s\"" }
-  let punct = Tok::{ kind: Punct, text: ")" }
-  let space = Tok::{ kind: Space, text: " " }
-  let filler = Tok::{ kind: Filler, text: "//" }
+  let word = Tok::{ kind: Word, text: "word", }
+  let string = Tok::{ kind: Str, text: "\"s\"", }
+  let punct = Tok::{ kind: Punct, text: ")", }
+  let space = Tok::{ kind: Space, text: " ", }
+  let filler = Tok::{ kind: Filler, text: "//", }
   assert_eq(token_boundary_score(None, Some(word)), 4)
   assert_eq(token_boundary_score(Some(word), Some(space)), 3)
   assert_eq(token_boundary_score(Some(filler), Some(word)), 3)

@@ -153,24 +153,24 @@ test "fork pull revisions retain base and head repositories" {
     html_url: "https://github.com/upstream/project/pull/7",
     base: {
       sha: "1111111111111111111111111111111111111111",
-      repo: Some({ full_name: "upstream/project" }),
+      repo: Some({ full_name: "upstream/project", }),
     },
     head: {
       sha: "2222222222222222222222222222222222222222",
-      repo: Some({ full_name: "contributor/project-fork" }),
+      repo: Some({ full_name: "contributor/project-fork", }),
     },
     additions: 1,
     deletions: 1,
     changed_files: 1,
   }
   let compare = ApiCompare::{
-    merge_base_commit: { sha: "3333333333333333333333333333333333333333" },
+    merge_base_commit: { sha: "3333333333333333333333333333333333333333", },
   }
   let (old, new) = pull_revisions(reference, pull, compare)
   guard old is Some(old) else { fail("expected an old revision") }
-  assert_true(old.repository == { owner: "upstream", repo: "project" })
+  assert_true(old.repository == { owner: "upstream", repo: "project", })
   assert_eq(old.sha, "3333333333333333333333333333333333333333")
-  assert_true(new.repository == { owner: "contributor", repo: "project-fork" })
+  assert_true(new.repository == { owner: "contributor", repo: "project-fork", })
   assert_eq(new.sha, pull.head.sha)
   let pair = source_pair_for_revisions(Some(old), new, {
     filename: "src/main.mbt",
@@ -196,7 +196,7 @@ test "canonical patch maps sides, source lines, and multi-hunk positions" {
   assert_true(patch_is_commentable(patch))
   assert_eq(
     canonical_anchor(patch, Right, 1),
-    Some({ path: "src/main.mbt", line: 1, side: Right, position: Some(1) }),
+    Some({ path: "src/main.mbt", line: 1, side: Right, position: Some(1), }),
   )
   assert_eq(canonical_anchor(patch, Left, 2).unwrap().position, Some(2))
   assert_eq(canonical_anchor(patch, Right, 2).unwrap().position, Some(3))
@@ -367,8 +367,8 @@ test "section-local review rows map to absolute GitHub anchors" {
 
   let two_hunks : @model.HunkDocument = {
     hunks: [
-      { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [] },
-      { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [] },
+      { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [], },
+      { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [], },
     ],
   }
   guard project_review_items(
@@ -391,15 +391,15 @@ test "section-local review rows map to absolute GitHub anchors" {
 ///|
 test "semantic section titles format declaration contexts" {
   let fragment : @mbtdiff.DiffFragment = {
-    document: { hunks: [] },
+    document: { hunks: [], },
     fallbacks: [],
   }
   assert_eq(
     semantic_section_title(
       0,
       Matched(
-        old={ start: 0, len: 1 },
-        new={ start: 1, len: 1 },
+        old={ start: 0, len: 1, },
+        new={ start: 1, len: 1, },
         old_context=Some("fn target() {"),
         new_context=Some("fn target() {"),
         diff=fragment,
@@ -411,8 +411,8 @@ test "semantic section titles format declaration contexts" {
     semantic_section_title(
       1,
       Matched(
-        old={ start: 2, len: 1 },
-        new={ start: 3, len: 1 },
+        old={ start: 2, len: 1, },
+        new={ start: 3, len: 1, },
         old_context=Some("fn old_name() {}"),
         new_context=Some("fn new_name() {}"),
         diff=fragment,
@@ -424,7 +424,7 @@ test "semantic section titles format declaration contexts" {
     semantic_section_title(
       2,
       Deleted(
-        old={ start: 4, len: 1 },
+        old={ start: 4, len: 1, },
         old_context=Some("fn removed() {}"),
         diff=fragment,
       ),
@@ -435,7 +435,7 @@ test "semantic section titles format declaration contexts" {
     semantic_section_title(
       3,
       Inserted(
-        new={ start: 5, len: 1 },
+        new={ start: 5, len: 1, },
         new_context=Some("fn inserted() {}"),
         diff=fragment,
       ),
@@ -446,8 +446,8 @@ test "semantic section titles format declaration contexts" {
     semantic_section_title(
       4,
       Matched(
-        old={ start: 6, len: 1 },
-        new={ start: 6, len: 1 },
+        old={ start: 6, len: 1, },
+        new={ start: 6, len: 1, },
         old_context=None,
         new_context=None,
         diff=fragment,
@@ -459,17 +459,17 @@ test "semantic section titles format declaration contexts" {
 
 ///|
 fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
-  let reference = CommitRef::{ owner: "upstream", repo: "project", target }
-  let repository = RepositoryRef::{ owner: "upstream", repo: "project" }
+  let reference = CommitRef::{ owner: "upstream", repo: "project", target, }
+  let repository = RepositoryRef::{ owner: "upstream", repo: "project", }
   let head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (view, _) = finish_change(
     reference,
-    Some({ repository, sha: "1111111111111111111111111111111111111111" }),
-    { repository, sha: head },
+    Some({ repository, sha: "1111111111111111111111111111111111111111", }),
+    { repository, sha: head, },
     "Review fixture",
     canonical_github_url(reference),
-    { additions: 1, deletions: 1, total: 2 },
+    { additions: 1, deletions: 1, total: 2, },
     [
       {
         filename: "src/main.mbt",
@@ -662,7 +662,7 @@ fn review_comment_fixture(
     body: "comment \{id}",
     html_url: "https://github.com/upstream/project/pull/17#discussion_r\{id}",
     created_at: "2026-08-18T08:00:00Z",
-    user: Some({ login: "reviewer" }),
+    user: Some({ login: "reviewer", }),
     path: "src/main.mbt",
     line: Some(line),
     side: Some(side),
@@ -764,11 +764,11 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     html_url: "https://github.com/upstream/project/pull/17",
     base: {
       sha: "1111111111111111111111111111111111111111",
-      repo: Some({ full_name: "upstream/project" }),
+      repo: Some({ full_name: "upstream/project", }),
     },
     head: {
       sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      repo: Some({ full_name: "upstream/project" }),
+      repo: Some({ full_name: "upstream/project", }),
     },
     additions: 1,
     deletions: 1,
@@ -793,7 +793,7 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     next,
     CommentsLoaded(
       5,
-      Ok({ issue_comments: [], review_comments: [], commit_comments: [] }),
+      Ok({ issue_comments: [], review_comments: [], commit_comments: [], }),
     ),
     emit,
   )
@@ -873,7 +873,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     body: "new comment",
     html_url: "https://github.com/upstream/project/pull/17#issuecomment-42",
     created_at: "2026-08-18T08:00:00Z",
-    user: Some({ login: "reviewer" }),
+    user: Some({ login: "reviewer", }),
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (posted, _) = update(model, IssueCommentCreated(5, Ok(created)), emit)

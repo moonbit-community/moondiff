@@ -10,9 +10,9 @@ fn push_segment(
   let last = segments.length() - 1
   if last >= 0 && segments[last].kind == kind {
     let previous = segments[last]
-    segments[last] = { kind, text: previous.text + text }
+    segments[last] = { kind, text: previous.text + text, }
   } else {
-    segments.push({ kind, text })
+    segments.push({ kind, text, })
   }
 }
 
@@ -21,9 +21,9 @@ fn ignored_source_line(index : Int, text : String) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = if text == "" {
     []
   } else {
-    [{ kind: Ignored, text }]
+    [{ kind: Ignored, text, }]
   }
-  { index, segments: segments[:] }
+  { index, segments: segments[:], }
 }
 
 ///|
@@ -31,9 +31,9 @@ fn unchanged_visible_line(index : Int, text : String) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = if text == "" {
     []
   } else {
-    [{ kind: Unchanged, text }]
+    [{ kind: Unchanged, text, }]
   }
-  { index, segments: segments[:] }
+  { index, segments: segments[:], }
 }
 
 ///|
@@ -63,7 +63,7 @@ fn restore_visible_line(
     }
     push_segment(segments, kind, ch.to_string())
   }
-  { index: source_index, segments: segments[:] }
+  { index: source_index, segments: segments[:], }
 }
 
 ///|
@@ -343,5 +343,5 @@ pub fn restore_document(
       blocks: blocks[:],
     })
   }
-  { hunks: hunks[:] }
+  { hunks: hunks[:], }
 }

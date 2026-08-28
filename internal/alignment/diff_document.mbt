@@ -59,7 +59,7 @@ fn DetailedDiffResult::with_ignored_test_ranges(
   old_ignored_test_ranges : ArrayView[@model.LineRange],
   new_ignored_test_ranges : ArrayView[@model.LineRange],
 ) -> DetailedDiffResult {
-  { ..self, old_ignored_test_ranges, new_ignored_test_ranges }
+  { ..self, old_ignored_test_ranges, new_ignored_test_ranges, }
 }
 
 ///|
@@ -79,7 +79,7 @@ type NovelRangeMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
 
 ///|
 fn empty_document() -> @model.HunkDocument {
-  { hunks: [] }
+  { hunks: [], }
 }
 
 ///|
@@ -132,7 +132,7 @@ fn diff_fragment(
   if fallback is Some(reason) {
     fallbacks.push(reason)
   }
-  { document, fallbacks: fallbacks[:] }
+  { document, fallbacks: fallbacks[:], }
 }
 
 ///|
@@ -303,9 +303,9 @@ fn push_ast_segment(
   let last = segments.length() - 1
   if last >= 0 && segments[last].kind == kind {
     let previous = segments[last]
-    segments[last] = { kind, text: previous.text + text }
+    segments[last] = { kind, text: previous.text + text, }
   } else {
-    segments.push({ kind, text })
+    segments.push({ kind, text, })
   }
 }
 
@@ -410,7 +410,7 @@ fn ast_diff_line(
   ranges : NovelRangeMap,
 ) -> @model.DiffLine {
   let segments = ast_line_segments_impl(text, ranges.get(index))
-  { index, segments: segments[:] }
+  { index, segments: segments[:], }
 }
 
 ///|
@@ -470,7 +470,7 @@ fn ast_hunk_blocks(
         change_rows.clear()
       }
       guard pair is (Some(old_index), Some(new_index)) else { panic() }
-      context_lines.push({ old_index, new_index, text: old_lines[old_index] })
+      context_lines.push({ old_index, new_index, text: old_lines[old_index], })
     } else {
       if !context_lines.is_empty() {
         blocks.push(ContextBlock(context_lines.copy()[:]))
@@ -658,7 +658,7 @@ fn ast_document_from_positions(
       ),
     })
   }
-  AstDocument({ hunks: hunks[:] })
+  AstDocument({ hunks: hunks[:], })
 }
 
 ///|
@@ -872,7 +872,7 @@ fn detailed_ast_edit_document(
     }
   }
   match build {
-    AstDocument(document) => { document, fallback: None }
+    AstDocument(document) => { document, fallback: None, }
     AstPositionsOutOfBounds(sides) => {
       let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
       {
@@ -1148,12 +1148,8 @@ fn calculate_diff_document_with_limit(
       old_view, new_view, context, ignore_comments,
     )
     if document.hunks.is_empty() {
-      return detailed_diff_result(
-        whole_document(document),
-        IgnoredOnly,
-      ).with_ignored_test_ranges(
-        old_ignored_test_ranges,
-        new_ignored_test_ranges,
+      return detailed_diff_result(whole_document(document), IgnoredOnly).with_ignored_test_ranges(
+        old_ignored_test_ranges, new_ignored_test_ranges,
       )
     }
   }
@@ -1172,8 +1168,7 @@ fn calculate_diff_document_with_limit(
         ignore_comments,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),
       ).with_ignored_test_ranges(
-        old_ignored_test_ranges,
-        new_ignored_test_ranges,
+        old_ignored_test_ranges, new_ignored_test_ranges,
       )
   }
   let result = match mode {
@@ -1187,8 +1182,7 @@ fn calculate_diff_document_with_limit(
       )
   }
   result.with_ignored_test_ranges(
-    old_ignored_test_ranges,
-    new_ignored_test_ranges,
+    old_ignored_test_ranges, new_ignored_test_ranges,
   )
 }
 

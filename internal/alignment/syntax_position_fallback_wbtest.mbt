@@ -4,7 +4,7 @@ fn fallback_test_span(
   start_col : Int,
   end_col : Int,
 ) -> @span.SingleLineSpan {
-  { line, start_col, end_col }
+  { line, start_col, end_col, }
 }
 
 ///|
@@ -13,7 +13,7 @@ fn fallback_test_novel(
   start_col : Int,
   end_col : Int,
 ) -> MatchedPos {
-  { kind: Novel, pos: fallback_test_span(line, start_col, end_col) }
+  { kind: Novel, pos: fallback_test_span(line, start_col, end_col), }
 }
 
 ///|
@@ -21,7 +21,7 @@ fn fallback_test_unchanged(
   pos : @span.SingleLineSpan,
   opposite : @span.SingleLineSpan,
 ) -> MatchedPos {
-  { kind: Unchanged(opposite_pos=[opposite]), pos }
+  { kind: Unchanged(opposite_pos=[opposite]), pos, }
 }
 
 ///|
@@ -125,7 +125,7 @@ test "matched-position mapping drops filtered opposite spans" {
     out_of_bounds_sides,
   )
   assert_true(out_of_bounds_sides.is_empty())
-  guard mapped is [{ kind: Unchanged(opposite_pos=[]), pos }] else {
+  guard mapped is [{ kind: Unchanged(opposite_pos=[]), pos, }] else {
     fail("expected the primary position with no mapped opposite positions")
   }
   assert_eq((pos.line, pos.start_col, pos.end_col), (1, 1, 5))
@@ -198,7 +198,7 @@ fn fallback_test_unit(
     uuid: None,
     semantic_key: None,
     fuzzy: None,
-    range: { start: start_line - 1, len: 1 },
+    range: { start: start_line - 1, len: 1, },
     context: None,
   }
 }

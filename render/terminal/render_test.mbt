@@ -19,26 +19,26 @@ test "render_document highlights changes and keeps ignored text neutral" {
   let old_line : @model.DiffLine = {
     index: 1,
     segments: [
-      { kind: Unchanged, text: "let value = " },
-      { kind: Changed, text: "1" },
-      { kind: Ignored, text: " // old explanation" },
+      { kind: Unchanged, text: "let value = ", },
+      { kind: Changed, text: "1", },
+      { kind: Ignored, text: " // old explanation", },
     ],
   }
   let new_line : @model.DiffLine = {
     index: 1,
     segments: [
-      { kind: Unchanged, text: "let value = " },
-      { kind: Changed, text: "2" },
-      { kind: Ignored, text: " // new explanation" },
+      { kind: Unchanged, text: "let value = ", },
+      { kind: Changed, text: "2", },
+      { kind: Ignored, text: " // new explanation", },
     ],
   }
   let old_comment : @model.DiffLine = {
     index: 2,
-    segments: [{ kind: Ignored, text: "// old docs" }],
+    segments: [{ kind: Ignored, text: "// old docs", }],
   }
   let new_comment : @model.DiffLine = {
     index: 2,
-    segments: [{ kind: Ignored, text: "// new docs" }],
+    segments: [{ kind: Ignored, text: "// new docs", }],
   }
   let document : @model.HunkDocument = {
     hunks: [
@@ -48,7 +48,7 @@ test "render_document highlights changes and keeps ignored text neutral" {
         new_start: 0,
         new_len: 3,
         blocks: [
-          ContextBlock([{ old_index: 0, new_index: 0, text: "fn value() {" }]),
+          ContextBlock([{ old_index: 0, new_index: 0, text: "fn value() {", }]),
           ChangeBlock([Paired(old_line, new_line)]),
           IgnoredBlock([Paired(old_comment, new_comment)]),
         ],
@@ -101,7 +101,7 @@ test "render_document honors 9 to 10 and 99 to 100 width hints" {
         old_len: 1,
         new_start: 8,
         new_len: 1,
-        blocks: [ContextBlock([{ old_index: 8, new_index: 8, text: "same" }])],
+        blocks: [ContextBlock([{ old_index: 8, new_index: 8, text: "same", }])],
       },
     ],
   }
@@ -118,8 +118,8 @@ test "render_document honors 9 to 10 and 99 to 100 width hints" {
 test "render_document appends one context to every hunk header" {
   let document : @model.HunkDocument = {
     hunks: [
-      { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [] },
-      { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [] },
+      { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [], },
+      { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [], },
     ],
   }
   let unchanged = @terminal.render_document("old.mbt", "new.mbt", document)

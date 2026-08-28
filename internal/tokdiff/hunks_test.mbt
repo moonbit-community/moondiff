@@ -45,7 +45,7 @@ test "hunk notes are escaped immediately after matching headers in all views" {
   let old = ["0", "old", "2", "3", "4", "5", "6", "gone", "8"]
   let new = ["0", "new", "2", "3", "4", "5", "6", "added", "8"]
   let notes : Array[@render_html.HunkNote?] = [
-    Some({ title: "Group <&>", body: "Explain <old> & new." }),
+    Some({ title: "Group <&>", body: "Explain <old> & new.", }),
     None,
   ]
   let semantic_document = @tokdiff.diff(old~, new~, context=0)
@@ -117,8 +117,8 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
   let old = ["0", "old", "2", "3", "4", "5", "6", "gone", "8"]
   let new = ["0", "new", "2", "3", "4", "5", "6", "added", "8"]
   let notes : Array[@render_html.HunkNote?] = [
-    Some({ title: "First <group>", body: "First explanation." }),
-    Some({ title: "Second & group", body: "Second explanation." }),
+    Some({ title: "First <group>", body: "First explanation.", }),
+    Some({ title: "Second & group", body: "Second explanation.", }),
   ]
   let semantic_document = @tokdiff.diff(old~, new~, context=0)
   let semantic_patches = @unified.render_unified_hunks(semantic_document)

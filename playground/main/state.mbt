@@ -934,7 +934,7 @@ fn begin_change_load(
       share_url: Some(playground_share_url(reference)),
       copy_status: CopyReady,
       review: if extension_host_enabled() {
-        { auth: model.review.auth, comments: CommentsLoading, draft: None }
+        { auth: model.review.auth, comments: CommentsLoading, draft: None, }
       } else {
         model.review
       },
@@ -1185,7 +1185,7 @@ fn update(
           model,
           review_state_with_auth(
             model.review,
-            DeviceAuthorizing({ ..device, copy_status: DeviceCodeCopyDone }),
+            DeviceAuthorizing({ ..device, copy_status: DeviceCodeCopyDone, }),
           ),
         ),
         @rabbita.none,
@@ -1362,7 +1362,7 @@ fn update(
           model,
           review_state_with_draft(
             model.review,
-            Some({ kind: draft.kind, body, submitting: false, error: None }),
+            Some({ kind: draft.kind, body, submitting: false, error: None, }),
           ),
         ),
         @rabbita.none,
@@ -1408,7 +1408,7 @@ fn update(
         model,
         review_state_with_draft(
           model.review,
-          Some({ kind: draft.kind, body, submitting: true, error: None }),
+          Some({ kind: draft.kind, body, submitting: true, error: None, }),
         ),
       )
       let command = match (view.reference.target, draft.kind) {
@@ -1645,7 +1645,7 @@ fn update(
           )
         other => other
       }
-      ({ ..model, ignore_comments, phase }, @rabbita.none)
+      ({ ..model, ignore_comments, phase, }, @rabbita.none)
     }
     ToggleIgnoreTests => {
       let ignore_tests = !model.ignore_tests
@@ -1661,7 +1661,7 @@ fn update(
           )
         other => other
       }
-      ({ ..model, ignore_tests, phase }, @rabbita.none)
+      ({ ..model, ignore_tests, phase, }, @rabbita.none)
     }
     Submit =>
       match parse_change_url(model.input) {

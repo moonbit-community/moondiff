@@ -1,6 +1,6 @@
 ///|
 fn reconstructed_line(segments : Array[@model.DiffSegment]) -> @model.DiffLine {
-  { index: 0, segments: segments[:] }
+  { index: 0, segments: segments[:], }
 }
 
 ///|
@@ -22,14 +22,14 @@ test "word refinement highlights only changed runs and reconstructs exactly" {
     fail("expected bounded word refinement")
   }
   assert_segments(old_segments, [
-    { kind: Unchanged, text: "alpha " },
-    { kind: Changed, text: "beta" },
-    { kind: Unchanged, text: " gamma" },
+    { kind: Unchanged, text: "alpha ", },
+    { kind: Changed, text: "beta", },
+    { kind: Unchanged, text: " gamma", },
   ])
   assert_segments(new_segments, [
-    { kind: Unchanged, text: "alpha " },
-    { kind: Changed, text: "zeta" },
-    { kind: Unchanged, text: " gamma" },
+    { kind: Unchanged, text: "alpha ", },
+    { kind: Changed, text: "zeta", },
+    { kind: Unchanged, text: " gamma", },
   ])
   assert_eq(reconstructed_line(old_segments).text(), old)
   assert_eq(reconstructed_line(new_segments).text(), new)
@@ -41,10 +41,10 @@ test "word refinement handles one-sided words whitespace punctuation and empties
     is Some((old_added, new_added)) else {
     fail("expected one-sided refinement")
   }
-  assert_segments(old_added, [{ kind: Unchanged, text: "alpha" }])
+  assert_segments(old_added, [{ kind: Unchanged, text: "alpha", }])
   assert_segments(new_added, [
-    { kind: Unchanged, text: "alpha" },
-    { kind: Changed, text: " beta" },
+    { kind: Unchanged, text: "alpha", },
+    { kind: Changed, text: " beta", },
   ])
 
   let old_space = "a \t\u{a0}b"
@@ -54,14 +54,14 @@ test "word refinement handles one-sided words whitespace punctuation and empties
     fail("expected Unicode whitespace refinement")
   }
   assert_segments(old_whitespace, [
-    { kind: Unchanged, text: "a" },
-    { kind: Changed, text: " \t\u{a0}" },
-    { kind: Unchanged, text: "b" },
+    { kind: Unchanged, text: "a", },
+    { kind: Changed, text: " \t\u{a0}", },
+    { kind: Unchanged, text: "b", },
   ])
   assert_segments(new_whitespace, [
-    { kind: Unchanged, text: "a" },
-    { kind: Changed, text: " \t\u{3000}" },
-    { kind: Unchanged, text: "b" },
+    { kind: Unchanged, text: "a", },
+    { kind: Changed, text: " \t\u{3000}", },
+    { kind: Unchanged, text: "b", },
   ])
   assert_eq(reconstructed_line(old_whitespace).text(), old_space)
   assert_eq(reconstructed_line(new_whitespace).text(), new_space)
@@ -70,8 +70,8 @@ test "word refinement handles one-sided words whitespace punctuation and empties
     is Some((old_punctuation, new_punctuation)) else {
     fail("expected punctuation refinement")
   }
-  assert_segments(old_punctuation, [{ kind: Changed, text: "foo(bar)" }])
-  assert_segments(new_punctuation, [{ kind: Changed, text: "foo(baz)" }])
+  assert_segments(old_punctuation, [{ kind: Changed, text: "foo(bar)", }])
+  assert_segments(new_punctuation, [{ kind: Changed, text: "foo(baz)", }])
 
   guard @worddiff.refine_line("", "") is Some((old_empty, new_empty)) else {
     fail("expected empty refinement")
@@ -81,7 +81,7 @@ test "word refinement handles one-sided words whitespace punctuation and empties
     fail("expected insertion into an empty line")
   }
   assert_true(old_empty.is_empty())
-  assert_segments(new_word, [{ kind: Changed, text: "word" }])
+  assert_segments(new_word, [{ kind: Changed, text: "word", }])
 }
 
 ///|

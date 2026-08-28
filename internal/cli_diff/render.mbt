@@ -72,7 +72,7 @@ fn render_empty_state(
   @terminal.render_document(
     old_label,
     new_label,
-    { hunks: [] },
+    { hunks: [], },
     options=@terminal.RenderOptions::new(use_color=options.use_color),
   ) +
   message
@@ -330,7 +330,7 @@ fn render_whole_document(
   @terminal.render_document(
     old_label,
     new_label,
-    { hunks: hunks[:] },
+    { hunks: hunks[:], },
     options=terminal_options(options, old_line_count, new_line_count),
   )
 }
@@ -340,7 +340,7 @@ fn mark_plain_line_changed(line : @model.DiffLine) -> @model.DiffLine {
   if line.segments.is_empty() {
     line
   } else {
-    { index: line.index, segments: [{ kind: Changed, text: line.text() }] }
+    { index: line.index, segments: [{ kind: Changed, text: line.text(), }], }
   }
 }
 
@@ -384,9 +384,9 @@ fn mark_plain_changes(document : @model.HunkDocument) -> @model.HunkDocument {
         },
       )
     }
-    hunks.push({ ..hunk, blocks: blocks[:] })
+    hunks.push({ ..hunk, blocks: blocks[:], })
   }
-  { hunks: hunks[:] }
+  { hunks: hunks[:], }
 }
 
 ///|

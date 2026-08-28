@@ -59,10 +59,10 @@ fn parse_patch_range(token : String, prefix : Char) -> PatchRange? {
     .map(StringView::to_owned)
     .collect()
   match parts {
-    [start] => parse_patch_decimal(start).map(start => { start, count: 1 })
+    [start] => parse_patch_decimal(start).map(start => { start, count: 1, })
     [start, count] =>
       match (parse_patch_decimal(start), parse_patch_decimal(count)) {
-        (Some(start), Some(count)) => Some({ start, count })
+        (Some(start), Some(count)) => Some({ start, count, })
         _ => None
       }
     _ => None
@@ -80,7 +80,7 @@ fn parse_patch_header(line : String) -> PatchHeader? {
     return None
   }
   match (parse_patch_range(parts[1], '-'), parse_patch_range(parts[2], '+')) {
-    (Some(old), Some(new)) => Some({ old, new })
+    (Some(old), Some(new)) => Some({ old, new, })
     _ => None
   }
 }

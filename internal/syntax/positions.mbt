@@ -96,7 +96,11 @@ fn split_word_parts(content : String) -> Array[WordPart] {
       i += 1
       continue
     }
-    parts.push(WordPart::{ text: string_slice(chars, start, i), start, end_: i })
+    parts.push(WordPart::{
+      text: string_slice(chars, start, i),
+      start,
+      end_: i,
+    })
     start = i
     kind = word_part_kind(chars[i])
     i += 1
@@ -188,7 +192,7 @@ fn whole_novel_positions(
     if positions.length() == 1 && span.start_col == span.end_col {
       continue
     }
-    matched.push(MatchedPos::{ kind: Novel, pos: span })
+    matched.push(MatchedPos::{ kind: Novel, pos: span, })
   }
   matched
 }

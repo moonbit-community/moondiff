@@ -229,14 +229,14 @@ priv struct Revision {
 
 ///|
 fn reference_repository(reference : CommitRef) -> RepositoryRef {
-  { owner: reference.owner, repo: reference.repo }
+  { owner: reference.owner, repo: reference.repo, }
 }
 
 ///|
 fn repository_from_full_name(full_name : String) -> RepositoryRef? {
   match full_name.split("/").map(StringView::to_owned).collect() {
     [owner, repo] if valid_owner(owner) && valid_repo(repo) =>
-      Some({ owner, repo })
+      Some({ owner, repo, })
     _ => None
   }
 }
@@ -260,7 +260,7 @@ fn commit_revisions(
   parent_sha : String?,
 ) -> (Revision?, Revision) {
   let repository = reference_repository(reference)
-  (parent_sha.map(parent => { repository, sha: parent }), { repository, sha })
+  (parent_sha.map(parent => { repository, sha: parent, }), { repository, sha, })
 }
 
 ///|
@@ -269,7 +269,7 @@ fn repository_commit_revisions(
   sha : String,
   parent_sha : String?,
 ) -> (Revision?, Revision) {
-  (parent_sha.map(parent => { repository, sha: parent }), { repository, sha })
+  (parent_sha.map(parent => { repository, sha: parent, }), { repository, sha, })
 }
 
 ///|
@@ -284,7 +284,7 @@ fn pull_revisions(
       repository: branch_repository(pull.base, fallback),
       sha: pull_merge_base(compare),
     }),
-    { repository: branch_repository(pull.head, fallback), sha: pull.head.sha },
+    { repository: branch_repository(pull.head, fallback), sha: pull.head.sha, },
   )
 }
 
