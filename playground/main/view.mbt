@@ -527,32 +527,34 @@ fn semantic_fragment_view(
   })
   let old_base = old_range.map(range => range.start).unwrap_or(0)
   let new_base = new_range.map(range => range.start).unwrap_or(0)
-  @html.section(
-    class=if whole { "semantic-whole" } else { "semantic-section" },
-    [
-      if title is Some(title) {
-        @html.div(class="semantic-section-title", title)
-      } else {
-        @html.nothing
-      },
-      diff_notice_view(fragment.fallbacks, whole),
-      if fragment.document.hunks.is_empty() {
-        @html.nothing
-      } else {
-        safe_review_diff(
-          file,
-          file_index,
-          fragment.document,
-          mode,
-          review,
-          emit,
-          old_base~,
-          new_base~,
-          show_hunk_headers~,
-        )
-      },
-    ],
-  )
+  let content = [
+    if title is Some(title) {
+      @html.summary(class="semantic-section-title", title)
+    } else {
+      @html.nothing
+    },
+    diff_notice_view(fragment.fallbacks, whole),
+    if fragment.document.hunks.is_empty() {
+      @html.nothing
+    } else {
+      safe_review_diff(
+        file,
+        file_index,
+        fragment.document,
+        mode,
+        review,
+        emit,
+        old_base~,
+        new_base~,
+        show_hunk_headers~,
+      )
+    },
+  ]
+  if whole {
+    @html.section(class="semantic-whole", content)
+  } else {
+    @html.details(class="semantic-section", open=true, content)
+  }
 }
 
 ///|
