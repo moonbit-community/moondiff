@@ -208,6 +208,34 @@ test "canonical patch maps sides, source lines, and multi-hunk positions" {
 }
 
 ///|
+test "canonical patch maps complete declaration context to absolute anchors" {
+  let patch_text =
+    $|@@ -1,15 +1,15 @@
+    $| fn unchanged_before() {}
+    $| \{""}
+    $| /// structural docs
+    $| fn structural() {
+    $|-  old_call("<script>&safe")
+    $|+  new_call("<script>&safe")
+    $|   stable_one()
+    $|   stable_two()
+    $| \{""}
+    $|   stable_three()
+    $|   stable_four()
+    $|   stable_five()
+    $|-  old_tail()
+    $|+  new_tail()
+    $| }
+    $| \{""}
+    $| fn unchanged_after() {}
+  let patch = parse_canonical_patch("src/structural.mbt", Some(patch_text))
+  assert_true(patch_is_commentable(patch))
+  assert_eq(canonical_anchor(patch, Right, 3).unwrap().line, 3)
+  assert_eq(canonical_anchor(patch, Left, 12).unwrap().line, 12)
+  assert_eq(canonical_anchor(patch, Right, 12).unwrap().line, 12)
+}
+
+///|
 test "canonical patch handles default counts and truly empty lines" {
   let patch = parse_canonical_patch(
     "empty.txt",
@@ -306,6 +334,23 @@ test "section-local review rows map to absolute GitHub anchors" {
     is [ReviewHunk("@@ -11 +21 @@"), ReviewLine(_)] else {
     fail("expected the hunk heading to use absolute section coordinates")
   }
+
+  guard project_review_items(
+      2,
+      "src/main.mbt",
+      document,
+      patch,
+      old_base=10,
+      new_base=20,
+      show_hunk_headers=false,
+    )
+    is [ReviewLine(hidden)] else {
+    fail("expected hidden headings to retain the projected review row")
+  }
+  assert_true(hidden.old_line == Some(11))
+  assert_true(hidden.new_line == Some(21))
+  assert_eq(hidden.old_anchor.unwrap().line, 11)
+  assert_eq(hidden.new_anchor.unwrap().line, 21)
 }
 
 ///|
