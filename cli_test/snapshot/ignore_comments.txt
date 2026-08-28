@@ -1,7 +1,7 @@
 [section #1 matched] old lines 1-5; new lines 1-6 · fn value() -> Int {
 [34m--- cli_test/source/ignore_comments.old.mbt: lines 1-5[39m
 [34m+++ cli_test/source/ignore_comments.new.mbt: lines 1-6[39m
-@@ -1,5 +1,6 @@
+@@ -1,5 +1,6 @@ fn value() -> Int {
 [90m1[39m [90m.[39m ///|UUID(old-id)
 [90m.[39m [90m1[39m ///|
 [90m2[39m [90m.[39m /// Old documentation.

@@ -1,7 +1,7 @@
 [section #2 matched] old lines 6-21; new lines 6-17 · old: fn JobHandle::spawn_unix( → new: fn JobHandle::spawn_unix_ffi(
 [34m--- cli_test/source/20260814.old.mbt: lines 6-21[39m
 [34m+++ cli_test/source/20260814.new.mbt: lines 6-17[39m
-@@ -6,16 +6,12 @@
+@@ -6,16 +6,12 @@ old: fn JobHandle::spawn_unix( → new: fn JobHandle::spawn_unix_ffi(
  [90m6[39m  [90m6[39m ///|
  [90m7[39m  [90m7[39m #unsafe_skip_stub_check
  [31m8[39m [90m..[39m [31m[1m#borrow(path, cwd)[22m[39m

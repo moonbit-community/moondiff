@@ -113,3 +113,42 @@ test "top-level renderer keeps fallback-only fragments visible" {
   )
   assert_false(rendered.contains("--- old.mbt"))
 }
+
+///|
+test "section renderer appends declaration context to every hunk" {
+  let fragment : @model.DiffFragment = {
+    document: {
+      hunks: [
+        { old_start: 0, old_len: 1, new_start: 0, new_len: 1, blocks: [] },
+        { old_start: 7, old_len: 1, new_start: 9, new_len: 1, blocks: [] },
+      ],
+    },
+    fallbacks: [],
+  }
+  let section : @model.DiffSection = Matched(
+    old={ start: 10, len: 10 },
+    new={ start: 20, len: 10 },
+    old_context=Some("fn target() {"),
+    new_context=Some("fn target() {"),
+    diff=fragment,
+  )
+  assert_eq(
+    render_section_fragment(
+      "old.mbt",
+      "new.mbt",
+      0,
+      section,
+      Options::new(),
+      20,
+      30,
+    ),
+    (
+      #|[section #1 matched] old lines 11-20; new lines 21-30 · fn target() {
+      #|--- old.mbt: lines 11-20
+      #|+++ new.mbt: lines 21-30
+      #|@@ -11 +21 @@ fn target() {
+      #|@@ -18 +30 @@ fn target() {
+      #|
+    ),
+  )
+}

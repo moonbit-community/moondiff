@@ -1,7 +1,7 @@
 [section #1 inserted] old absent; new lines 1-18 · test "diff_text colors file headers blue" {
 [34m--- cli_test/source/20260604.old.mbt[39m
 [34m+++ cli_test/source/20260604.new.mbt: lines 1-18[39m
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,18 @@ test "diff_text colors file headers blue" {
 [90m.[39m  [32m1[39m [32m[1m///|UUID(31d25c5a-0e2a-49e8-9e32-8de8940bded3)[22m[39m
 [90m.[39m  [32m2[39m [32m[1mtest "diff_text colors file headers blue" {[22m[39m
 [90m.[39m  [32m3[39m [90m  [39m[32m[1mlet old_source =[22m[39m

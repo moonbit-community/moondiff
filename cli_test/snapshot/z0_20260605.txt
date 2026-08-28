@@ -1,7 +1,7 @@
 [section #8 inserted] old absent; new lines 1-13 · fn expect_parse_ok(input : String, expected : String) -> Unit raise {
 [34m--- cli_test/source/z0_20260605.old.mbt[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 1-13[39m
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,13 @@ fn expect_parse_ok(input : String, expected : String) -> Unit raise {
 [90m..[39m  [32m1[39m [32m[1m///|[22m[39m
 [90m..[39m  [32m2[39m [32m[1mfn expect_parse_ok(input : String, expected : String) -> Unit raise {[22m[39m
 [90m..[39m  [32m3[39m [90m  [39m[32m[1mmatch parse_program(input) {[22m[39m
@@ -19,7 +19,7 @@
 [section #9 inserted] old absent; new lines 15-22 · fn expect_parse_err(input : String, expected : String) -> Unit raise {
 [34m--- cli_test/source/z0_20260605.old.mbt[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 15-22[39m
-@@ -0,0 +15,8 @@
+@@ -0,0 +15,8 @@ fn expect_parse_err(input : String, expected : String) -> Unit raise {
 [90m..[39m [32m15[39m [32m[1m///|[22m[39m
 [90m..[39m [32m16[39m [32m[1mfn expect_parse_err(input : String, expected : String) -> Unit raise {[22m[39m
 [90m..[39m [32m17[39m [90m  [39m[32m[1mmatch parse_program(input) {[22m[39m
@@ -32,7 +32,7 @@
 [section #2 matched] old lines 11-14; new lines 24-27 · test "sexpr_skips_comments" {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 11-14[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 24-27[39m
-@@ -11,4 +24,4 @@
+@@ -11,4 +24,4 @@ test "sexpr_skips_comments" {
 [90m11[39m [90m24[39m ///|
 [90m12[39m [90m25[39m test "sexpr_skips_comments" {
 [31m13[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m("; comment\np", "Atom(\"p\")")[39m
@@ -42,7 +42,7 @@
 [section #3 matched] old lines 16-21; new lines 29-34 · test "sexpr_parses_nested_lists" {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 16-21[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 29-34[39m
-@@ -16,6 +29,6 @@
+@@ -16,6 +29,6 @@ test "sexpr_parses_nested_lists" {
 [90m16[39m [90m29[39m ///|
 [90m17[39m [90m30[39m test "sexpr_parses_nested_lists" {
 [31m18[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m([39m
@@ -54,7 +54,7 @@
 [section #4 matched] old lines 23-28; new lines 36-41 · test "sexpr_parses_quoted_strings" {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 23-28[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 36-41[39m
-@@ -23,6 +36,6 @@
+@@ -23,6 +36,6 @@ test "sexpr_parses_quoted_strings" {
 [90m23[39m [90m36[39m ///|
 [90m24[39m [90m37[39m test "sexpr_parses_quoted_strings" {
 [31m25[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m([39m
@@ -66,7 +66,7 @@
 [section #5 matched] old lines 30-33; new lines 43-46 · test "sexpr_reports_unclosed_list" {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 30-33[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 43-46[39m
-@@ -30,4 +43,4 @@
+@@ -30,4 +43,4 @@ test "sexpr_reports_unclosed_list" {
 [90m30[39m [90m43[39m ///|
 [90m31[39m [90m44[39m test "sexpr_reports_unclosed_list" {
 [31m32[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m("(assert p", "line 1, col 1: unclosed list")[39m
@@ -76,7 +76,7 @@
 [section #6 matched] old lines 35-38; new lines 48-51 · test "sexpr_reports_unclosed_string" {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 35-38[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 48-51[39m
-@@ -35,4 +48,4 @@
+@@ -35,4 +48,4 @@ test "sexpr_reports_unclosed_string" {
 [90m35[39m [90m48[39m ///|
 [90m36[39m [90m49[39m test "sexpr_reports_unclosed_string" {
 [31m37[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m("\"unterminated", "line 1, col 1: unclosed string")[39m
@@ -86,7 +86,7 @@
 [section #7 matched] old lines 40-43; new lines 53-56 · test "sexpr_reports_extra_right_paren" {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 40-43[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt: lines 53-56[39m
-@@ -40,4 +53,4 @@
+@@ -40,4 +53,4 @@ test "sexpr_reports_extra_right_paren" {
 [90m40[39m [90m53[39m ///|
 [90m41[39m [90m54[39m test "sexpr_reports_extra_right_paren" {
 [31m42[39m [90m..[39m [90m  [39m[31m[1minspect_parse[22m[39m[90m(")", "line 1, col 1: extra ')'")[39m
@@ -98,7 +98,7 @@ Deleted declarations (old order):
 [section #1 deleted] old lines 1-7; new absent · fn inspect_parse(input : String, expected : String) -> Unit raise {
 [34m--- cli_test/source/z0_20260605.old.mbt: lines 1-7[39m
 [34m+++ cli_test/source/z0_20260605.new.mbt[39m
-@@ -1,7 +0,0 @@
+@@ -1,7 +0,0 @@ fn inspect_parse(input : String, expected : String) -> Unit raise {
  [31m1[39m [90m..[39m [31m[1m///|[22m[39m
  [31m2[39m [90m..[39m [31m[1mfn inspect_parse(input : String, expected : String) -> Unit raise {[22m[39m
  [31m3[39m [90m..[39m [90m  [39m[31m[1mmatch parse_program(input) {[22m[39m
