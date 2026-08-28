@@ -35,11 +35,14 @@ PR. Every changed file receives a card in GitHub's order. Files
 whose old or new path ends in `.mbt` use the bundled `mbtdiff` engine's
 MoonBit-aware lexical diff by default. The global **Lexical / AST** control
 switches those files to structural diffing. After reliable top-level alignment,
-Lexical compares declaration-owned sections independently. Whitespace-only
-lines outside every section—before the first declaration, between declarations,
-or after the last declaration—are intentionally omitted; if they are the only
-difference, the result is **No structural changes**. Whole-file lexical results
-and fallbacks still compare those lines. Pure formatting inside a declaration
+Lexical compares declaration-owned sections independently and displays every
+changed declaration in full, including its documentation, internal blank lines,
+and stable lines far from the edits. Unchanged declarations remain omitted.
+Whitespace-only lines outside every section—before the first declaration,
+between declarations, or after the last declaration—are intentionally omitted;
+if they are the only difference, the result is **No structural changes**.
+Whole-file lexical results and AST lexical fallbacks still use compact context.
+Pure formatting inside a declaration
 becomes an explicit no-structural-changes state in AST mode, while pure top-level
 reordering shows a compact reordering summary. Reliable top-level matches retain
 both source orders: the main view follows the new order, and deleted declarations
@@ -79,6 +82,10 @@ implicit whole-file patch. Split and unified layouts render that fragment, then
 map its local line numbers back through the section's exact source ranges.
 Review comments are consequently anchored by side and absolute source line,
 including when matched declarations cross between the old and new orders.
+The playground hides `@@ ... @@` hunk headings only for these complete
+top-level Lexical sections; section titles, absolute line numbers, and review
+comment anchors remain visible. AST sections, Whole documents, fallbacks, and
+ordinary text diffs keep their hunk headings.
 
 The selected algorithm and both filter settings survive later change navigation
 in the open app but are not written into share URLs; a refresh restores Lexical
