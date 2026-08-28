@@ -389,6 +389,75 @@ test "section-local review rows map to absolute GitHub anchors" {
 }
 
 ///|
+test "semantic section titles format declaration contexts" {
+  let fragment : @mbtdiff.DiffFragment = {
+    document: { hunks: [] },
+    fallbacks: [],
+  }
+  assert_eq(
+    semantic_section_title(
+      0,
+      Matched(
+        old={ start: 0, len: 1 },
+        new={ start: 1, len: 1 },
+        old_context=Some("fn target() {"),
+        new_context=Some("fn target() {"),
+        diff=fragment,
+      ),
+    ),
+    "Section #1 · Matched · old line 1 · new line 2 · fn target() {",
+  )
+  assert_eq(
+    semantic_section_title(
+      1,
+      Matched(
+        old={ start: 2, len: 1 },
+        new={ start: 3, len: 1 },
+        old_context=Some("fn old_name() {}"),
+        new_context=Some("fn new_name() {}"),
+        diff=fragment,
+      ),
+    ),
+    "Section #2 · Matched · old line 3 · new line 4 · old: fn old_name() {} → new: fn new_name() {}",
+  )
+  assert_eq(
+    semantic_section_title(
+      2,
+      Deleted(
+        old={ start: 4, len: 1 },
+        old_context=Some("fn removed() {}"),
+        diff=fragment,
+      ),
+    ),
+    "Section #3 · Deleted · old line 5 · new side absent · fn removed() {}",
+  )
+  assert_eq(
+    semantic_section_title(
+      3,
+      Inserted(
+        new={ start: 5, len: 1 },
+        new_context=Some("fn inserted() {}"),
+        diff=fragment,
+      ),
+    ),
+    "Section #4 · Inserted · old side absent · new line 6 · fn inserted() {}",
+  )
+  assert_eq(
+    semantic_section_title(
+      4,
+      Matched(
+        old={ start: 6, len: 1 },
+        new={ start: 6, len: 1 },
+        old_context=None,
+        new_context=None,
+        diff=fragment,
+      ),
+    ),
+    "Section #5 · Matched · old line 7 · new line 7",
+  )
+}
+
+///|
 fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
   let reference = CommitRef::{ owner: "upstream", repo: "project", target }
   let repository = RepositoryRef::{ owner: "upstream", repo: "project" }
