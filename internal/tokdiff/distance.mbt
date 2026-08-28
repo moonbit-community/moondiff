@@ -192,7 +192,7 @@ fn[T] alignment_tokens(
       }
     }
   }
-  Some({ olds, news })
+  Some({ olds, news, })
 }
 
 ///|
@@ -356,7 +356,7 @@ fn window_stream(lines : ArrayView[Array[Tok]]) -> WindowStream {
       if token.kind is Space {
         gap += token.text
       } else {
-        atoms.push({ token, line: line_index, token_index, gap_before: gap })
+        atoms.push({ token, line: line_index, token_index, gap_before: gap, })
         gap = ""
       }
     }
@@ -364,16 +364,16 @@ fn window_stream(lines : ArrayView[Array[Tok]]) -> WindowStream {
       gap += "\n"
     }
   }
-  { atoms, trailing_gap: gap }
+  { atoms, trailing_gap: gap, }
 }
 
 ///|
 fn per_line_pair_stream(tokens : ArrayView[Tok]) -> WindowStream {
   let atoms : Array[WindowAtom] = []
   for token_index, token in tokens {
-    atoms.push({ token, line: 0, token_index, gap_before: "" })
+    atoms.push({ token, line: 0, token_index, gap_before: "", })
   }
-  { atoms, trailing_gap: "" }
+  { atoms, trailing_gap: "", }
 }
 
 ///|
@@ -642,7 +642,7 @@ fn pair_finish_score(
     PerLine => 0
     Window => gap_layout_score(a_trailing_gap, b_trailing_gap)
   }
-  { ..score, gap: score.gap + trailing_layout, boundary }
+  { ..score, gap: score.gap + trailing_layout, boundary, }
 }
 
 ///|
@@ -935,7 +935,7 @@ fn pair_trace(a : WindowStream, b : WindowStream, mode : PairMode) -> PairTrace 
     state = previous_state
   }
   out.rev_in_place()
-  { steps: out, score: best }
+  { steps: out, score: best, }
 }
 
 ///|
@@ -1076,5 +1076,5 @@ fn window_changes(
       }
     }
   }
-  Some({ old_changed, new_changed })
+  Some({ old_changed, new_changed, })
 }

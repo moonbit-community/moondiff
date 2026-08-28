@@ -61,7 +61,7 @@ fn map_matched_positions(
       }
     }
     match own_mapping {
-      Mapped(pos) => mapped.push({ kind, pos })
+      Mapped(pos) => mapped.push({ kind, pos, })
       Filtered => ()
       OutOfBounds => record_out_of_bounds_side(out_of_bounds_sides, own_side)
     }

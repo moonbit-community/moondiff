@@ -125,9 +125,9 @@ priv struct ReviewState {
 ///|
 fn initial_review_state() -> ReviewState {
   if extension_host_enabled() {
-    { auth: AuthChecking, comments: CommentsLoading, draft: None }
+    { auth: AuthChecking, comments: CommentsLoading, draft: None, }
   } else {
-    { auth: WebReadOnly, comments: CommentsDisabled, draft: None }
+    { auth: WebReadOnly, comments: CommentsDisabled, draft: None, }
   }
 }
 
@@ -164,7 +164,7 @@ fn auth_status_from_api_preserving(
   match (next, previous) {
     (DeviceAuthorizing(device), DeviceAuthorizing(old)) if device.flow_id ==
       old.flow_id =>
-      DeviceAuthorizing({ ..device, copy_status: old.copy_status })
+      DeviceAuthorizing({ ..device, copy_status: old.copy_status, })
     _ => next
   }
 }
@@ -174,7 +174,7 @@ fn review_state_with_auth(
   review : ReviewState,
   auth : AuthStatus,
 ) -> ReviewState {
-  { auth, comments: review.comments, draft: review.draft }
+  { auth, comments: review.comments, draft: review.draft, }
 }
 
 ///|
@@ -182,7 +182,7 @@ fn review_state_with_comments(
   review : ReviewState,
   comments : CommentsStatus,
 ) -> ReviewState {
-  { auth: review.auth, comments, draft: review.draft }
+  { auth: review.auth, comments, draft: review.draft, }
 }
 
 ///|
@@ -190,7 +190,7 @@ fn review_state_with_draft(
   review : ReviewState,
   draft : CommentDraft?,
 ) -> ReviewState {
-  { auth: review.auth, comments: review.comments, draft }
+  { auth: review.auth, comments: review.comments, draft, }
 }
 
 ///|
@@ -403,7 +403,7 @@ fn comment_list_args(reference : CommitRef) -> CommentListArgs {
     Commit(sha) => ("commit", None, Some(sha))
     PullCommit(number, sha) => ("pull_commit", Some(number), Some(sha))
   }
-  { owner: reference.owner, repo: reference.repo, kind, number, sha }
+  { owner: reference.owner, repo: reference.repo, kind, number, sha, }
 }
 
 ///|
@@ -659,6 +659,6 @@ fn commit_discussions(
     } else {
       None
     }
-    { comment, file_index, outdated: commit_comment_outdated(view, comment) }
+    { comment, file_index, outdated: commit_comment_outdated(view, comment), }
   })
 }

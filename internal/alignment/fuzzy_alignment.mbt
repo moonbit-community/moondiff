@@ -84,7 +84,7 @@ fn fuzzy_decl_from_node(
     if name.is_empty() {
       None
     } else {
-      Some({ name, owner, node: name_node })
+      Some({ name, owner, node: name_node, })
     }
   })
 }
@@ -292,7 +292,7 @@ fn make_impl_fuzzy_body(input : ImplFuzzyBodyInput) -> ImplFuzzyBody {
     }
     trigrams[trigram] = trigrams.get(trigram).unwrap_or(0) + 1
   }
-  { trigrams, mass }
+  { trigrams, mass, }
 }
 
 ///|
@@ -408,9 +408,9 @@ fn impl_tail_delegate(
     }
     expression.bind(fn(expression) {
       if direct_function_delegate(source, expression) is Some(target) {
-        Some(ImplTailDelegate::{ target, through_self: false })
+        Some(ImplTailDelegate::{ target, through_self: false, })
       } else if direct_self_delegate(source, expression) is Some(target) {
-        Some(ImplTailDelegate::{ target, through_self: true })
+        Some(ImplTailDelegate::{ target, through_self: true, })
       } else {
         None
       }
@@ -489,7 +489,7 @@ fn impl_fuzzy_info(
         owner: decl.owner,
         root: fuzzy_root,
         body_input: body_node.map(fn(body) {
-          { source, node: body, declaration_name: decl.name }
+          { source, node: body, declaration_name: decl.name, }
         }),
         tail_delegate: body_node.bind(fn(body) {
           impl_tail_delegate(source, body)
@@ -737,7 +737,7 @@ fn collect_impl_fuzzy_content(
 fn make_impl_fuzzy_content(root : @syntax.Syntax) -> ImplFuzzyContent {
   let counts : @hashmap.HashMap[UInt, Int] = HashMap([])
   let size = collect_impl_fuzzy_content(root, counts)
-  { counts, size }
+  { counts, size, }
 }
 
 ///|
@@ -843,7 +843,7 @@ fn impl_fuzzy_gaps(
     }
     i -= 1
   }
-  Array::makei(length, fn(i) { { previous: previous[i], next: next[i] } })
+  Array::makei(length, fn(i) { { previous: previous[i], next: next[i], } })
 }
 
 ///|

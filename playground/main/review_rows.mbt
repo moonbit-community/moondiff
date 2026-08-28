@@ -54,7 +54,7 @@ fn plain_review_segments(text : String) -> ArrayView[@model.DiffSegment] {
   if text.is_empty() {
     []
   } else {
-    [{ kind: Unchanged, text }]
+    [{ kind: Unchanged, text, }]
   }
 }
 
@@ -209,7 +209,7 @@ fn project_review_items(
         ReviewHunk(review_hunk_header(hunk, old_base, new_base, hunk_context)),
       )
     }
-    let one = @model.HunkDocument::{ hunks: [hunk] }
+    let one = @model.HunkDocument::{ hunks: [hunk], }
     for
       row in project_review_rows(
         file_index,

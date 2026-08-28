@@ -207,7 +207,7 @@ test "ignored test collection excludes roots and records leading trivia" {
   @debug.assert_eq((ignored.end.lnum, ignored.end.column()), (7, 2))
   assert_true(
     ignored_test_line_ranges(collection.ignored_tests)
-    is [{ start: 2, len: 5 }],
+    is [{ start: 2, len: 5, }],
   )
 }
 
@@ -520,8 +520,8 @@ test "align_impl_units_by_key distinguishes methods on the same type" {
 test "unique content hashes align anonymous units but duplicate hashes do not" {
   let old_named = parse_units("fn first() {}\nfn second() {}")
   let new_named = parse_units("fn second() {}\nfn first() {}")
-  let old = old_named.map(unit => { ..unit, uuid: None, semantic_key: None })
-  let new = new_named.map(unit => { ..unit, uuid: None, semantic_key: None })
+  let old = old_named.map(unit => { ..unit, uuid: None, semantic_key: None, })
+  let new = new_named.map(unit => { ..unit, uuid: None, semantic_key: None, })
   @debug.assert_eq(align_impl_units_by_key(old, new).map(edit_line_summary), [
     "Replace(1->2)", "Replace(2->1)",
   ])
@@ -1470,7 +1470,7 @@ fn first_changed_document(result : DetailedDiffResult) -> @model.HunkDocument {
       return fragment.document
     }
   }
-  { hunks: [] }
+  { hunks: [], }
 }
 
 ///|
@@ -2035,15 +2035,15 @@ test "implementation unit ranges are exact across universal newlines" {
     ] {
     let units = parse_units(source)
     assert_eq(units.length(), 2)
-    assert_true(units[0].range == @model.LineRange::{ start: 0, len: 1 })
-    assert_true(units[1].range == @model.LineRange::{ start: 1, len: 1 })
+    assert_true(units[0].range == @model.LineRange::{ start: 0, len: 1, })
+    assert_true(units[1].range == @model.LineRange::{ start: 1, len: 1, })
   }
 
   let documented = parse_units(
     "/// docs\nfn first() {}\n\n/// next\nfn second() {}\n",
   )
-  assert_true(documented[0].range == @model.LineRange::{ start: 0, len: 2 })
-  assert_true(documented[1].range == @model.LineRange::{ start: 3, len: 2 })
+  assert_true(documented[0].range == @model.LineRange::{ start: 0, len: 2, })
+  assert_true(documented[1].range == @model.LineRange::{ start: 3, len: 2, })
 }
 
 ///|
@@ -2070,18 +2070,18 @@ test "section fragments use local coordinates and exact source ranges" {
     guard top.sections
       is [
         Matched(
-          old={ start: 0, len: 1 },
-          new={ start: 1, len: 1 },
+          old={ start: 0, len: 1, },
+          new={ start: 1, len: 1, },
           diff=keep,
           ..
         ),
         Matched(
-          old={ start: 1, len: 3 },
-          new={ start: 2, len: 3 },
+          old={ start: 1, len: 3, },
+          new={ start: 2, len: 3, },
           diff=target,
           ..
         ),
-        Inserted(new={ start: 0, len: 1 }, diff=inserted, ..),
+        Inserted(new={ start: 0, len: 1, }, diff=inserted, ..),
       ] else {
       fail("expected matched declarations plus one new-side section")
     }
@@ -2144,7 +2144,7 @@ test "inserted and deleted declarations have no fabricated opposite range" {
   assert_true(inserted_top.old_order is [0])
   assert_true(inserted_top.new_order is [1, 0])
   guard inserted_top.sections
-    is [Matched(..), Inserted(new={ start: 0, len: 1 }, diff~, ..)] else {
+    is [Matched(..), Inserted(new={ start: 0, len: 1, }, diff~, ..)] else {
     fail("expected a distinct inserted section")
   }
   assert_fragment_bounds(diff, None, Some(1))
@@ -2159,7 +2159,7 @@ test "inserted and deleted declarations have no fabricated opposite range" {
   assert_true(deleted_top.old_order is [0, 1])
   assert_true(deleted_top.new_order is [1])
   guard deleted_top.sections
-    is [Deleted(old={ start: 0, len: 1 }, diff~, ..), Matched(..)] else {
+    is [Deleted(old={ start: 0, len: 1, }, diff~, ..), Matched(..)] else {
     fail("expected a distinct deleted section")
   }
   assert_fragment_bounds(diff, Some(1), None)
@@ -2286,8 +2286,8 @@ test "comment and test filters preserve semantic statuses in both modes" {
     )
     assert_true(tests.status is IgnoredOnly)
     assert_true(result_is_empty(tests))
-    assert_true(tests.old_ignored_test_ranges is [{ start: 0, len: 1 }])
-    assert_true(tests.new_ignored_test_ranges is [{ start: 0, len: 1 }])
+    assert_true(tests.old_ignored_test_ranges is [{ start: 0, len: 1, }])
+    assert_true(tests.new_ignored_test_ranges is [{ start: 0, len: 1, }])
   }
 }
 
@@ -2308,8 +2308,8 @@ test "filtered local fragments retain production changes only" {
   assert_false(changed.contains("old_test"), msg=changed)
   assert_false(changed.contains("new_test"), msg=changed)
   assert_true(result_fallbacks(result).is_empty())
-  assert_true(result.old_ignored_test_ranges is [{ start: 2, len: 1 }])
-  assert_true(result.new_ignored_test_ranges is [{ start: 2, len: 1 }])
+  assert_true(result.old_ignored_test_ranges is [{ start: 2, len: 1, }])
+  assert_true(result.new_ignored_test_ranges is [{ start: 2, len: 1, }])
 }
 
 ///|

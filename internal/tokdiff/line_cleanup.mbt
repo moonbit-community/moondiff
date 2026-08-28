@@ -20,7 +20,7 @@ priv struct ComparableLine {
 fn original_diff_lines(lines : ArrayView[String]) -> Array[ComparableLine] {
   let out : Array[ComparableLine] = []
   for text in lines {
-    out.push({ text, key: (0, 0) })
+    out.push({ text, key: (0, 0), })
   }
   out
 }
@@ -123,11 +123,11 @@ fn cleaned_diff_lines(
 ) -> (Array[ComparableLine], Array[ComparableLine]) {
   let old_lines : Array[ComparableLine] = []
   for i, text in old {
-    old_lines.push({ text, key: (0, i) })
+    old_lines.push({ text, key: (0, i), })
   }
   let new_lines : Array[ComparableLine] = []
   for i, text in new {
-    new_lines.push({ text, key: (1, i) })
+    new_lines.push({ text, key: (1, i), })
   }
   let raw = @diff.Diff(
     old~,
@@ -143,8 +143,14 @@ fn cleaned_diff_lines(
       Equal(old_index~, new_index~, len~) =>
         for offset in 0..<len {
           let key = (2, next_anchor)
-          old_lines[old_index + offset] = { text: old[old_index + offset], key }
-          new_lines[new_index + offset] = { text: new[new_index + offset], key }
+          old_lines[old_index + offset] = {
+            text: old[old_index + offset],
+            key,
+          }
+          new_lines[new_index + offset] = {
+            text: new[new_index + offset],
+            key,
+          }
           next_anchor += 1
         }
       _ => ()
@@ -175,10 +181,10 @@ fn cleaned_diff_lines(
       )
       is Some(tokens) {
       for old_index in old_start..<old_end {
-        old_lines[old_index] = { text: old[old_index], key: (0, old_index) }
+        old_lines[old_index] = { text: old[old_index], key: (0, old_index), }
       }
       for new_index in new_start..<new_end {
-        new_lines[new_index] = { text: new[new_index], key: (1, new_index) }
+        new_lines[new_index] = { text: new[new_index], key: (1, new_index), }
       }
       for pair in align(tokens.olds, tokens.news) {
         match pair {
@@ -187,8 +193,8 @@ fn cleaned_diff_lines(
             let new_index = new_start + new_offset
             if old[old_index] == new[new_index] {
               let key = (2, next_anchor)
-              old_lines[old_index] = { text: old[old_index], key }
-              new_lines[new_index] = { text: new[new_index], key }
+              old_lines[old_index] = { text: old[old_index], key, }
+              new_lines[new_index] = { text: new[new_index], key, }
               next_anchor += 1
             }
           }

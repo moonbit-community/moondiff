@@ -156,11 +156,7 @@ test "combined filters retain ranges through ignored and changed results" {
     let changed = @mbtdiff.diff(
       "fn production() { old_value() }\ntest \"t\" { old_test() }",
       "fn production() { new_value() }\ntest \"t\" { new_test() }",
-      options=DiffOptions(
-        ignore_comments=true,
-        ignore_tests=true,
-        mode~,
-      ),
+      options=DiffOptions(ignore_comments=true, ignore_tests=true, mode~),
     )
     assert_true(changed.status() is Changed)
     assert_ignored_test_ranges(changed, Old, [(1, 1)])

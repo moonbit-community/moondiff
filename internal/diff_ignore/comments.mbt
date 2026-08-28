@@ -10,7 +10,7 @@ fn ignored_comment_line(index : Int, line : SourceLineView) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = []
   push_segment(segments, Unchanged, line.visible)
   push_segment(segments, Ignored, comment_ignored_suffix(line))
-  { index, segments: segments[:] }
+  { index, segments: segments[:], }
 }
 
 ///|
@@ -49,7 +49,7 @@ fn neutralize_comment_suffix(
     )
   }
   push_segment(segments, Ignored, comment_ignored_suffix(view))
-  { index: line.index, segments: segments[:] }
+  { index: line.index, segments: segments[:], }
 }
 
 ///|
@@ -167,8 +167,8 @@ pub fn ignore_comments(
       }
     }
     if has_change {
-      hunks.push({ ..hunk, blocks: blocks[:] })
+      hunks.push({ ..hunk, blocks: blocks[:], })
     }
   }
-  { hunks: hunks[:] }
+  { hunks: hunks[:], }
 }

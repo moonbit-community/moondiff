@@ -118,7 +118,7 @@ test "ignored comments render as neutral context beside a code change" {
     is [
       {
         blocks: [IgnoredBlock([Paired(_, _)]), ChangeBlock([Paired(_, _)])],
-        ..,
+        ..
       },
     ] else {
     fail("expected neutral comment context followed by a code change")

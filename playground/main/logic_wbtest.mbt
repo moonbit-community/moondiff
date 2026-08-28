@@ -242,16 +242,16 @@ test "decode pull request metadata and choose merge base and head" {
   assert_false(
     same_pull_snapshot(pull, {
       ..pull,
-      head: { sha: "dddddddddddddddddddddddddddddddddddddddd", repo: None },
+      head: { sha: "dddddddddddddddddddddddddddddddddddddddd", repo: None, },
     }),
   )
   assert_false(
     same_pull_snapshot(pull, {
       ..pull,
-      base: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", repo: None },
+      base: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", repo: None, },
     }),
   )
-  assert_false(same_pull_snapshot(pull, { ..pull, changed_files: 3 }))
+  assert_false(same_pull_snapshot(pull, { ..pull, changed_files: 3, }))
   let stats = pull_stats(pull)
   assert_eq(stats.additions, 7)
   assert_eq(stats.deletions, 3)
@@ -300,7 +300,7 @@ test "pull request files must be complete and within GitHub's limit" {
   let files = decode_pull_files(
     read_fixture("playground/main/fixtures/pull_files.json"),
   )
-  guard validate_pull_files({ ..pull, changed_files: 3_001 }, files)
+  guard validate_pull_files({ ..pull, changed_files: 3_001, }, files)
     is Err(over_limit) else {
     fail("expected the 3,000-file limit to be rejected")
   }
@@ -474,7 +474,7 @@ test "pull metadata starts a pinned snapshot and enforces the file limit" {
 
   let (over_limit, _) = update(
     loading,
-    PullMetadataLoaded(8, 0, Ok({ ..pull, changed_files: 3_001 })),
+    PullMetadataLoaded(8, 0, Ok({ ..pull, changed_files: 3_001, })),
     emit,
   )
   guard over_limit.phase is LoadFailed(limit_message) else {
@@ -542,7 +542,7 @@ test "pull compare and files can arrive out of order but wait for validation" {
     emit,
   )
   assert_true(validating.phase is ValidatingPullSnapshot(attempt=0, ..))
-  let verified = { ..pull, title: "Verified pull title", additions: 11 }
+  let verified = { ..pull, title: "Verified pull title", additions: 11, }
   let (shown, _) = update(
     validating,
     PullValidationLoaded(7, 0, Ok(verified)),
@@ -586,7 +586,7 @@ test "a changed pull head retries once and discards the old attempt" {
   let latest = {
     ..pull,
     title: "Latest pull title",
-    head: { sha: "dddddddddddddddddddddddddddddddddddddddd", repo: None },
+    head: { sha: "dddddddddddddddddddddddddddddddddddddddd", repo: None, },
     additions: 13,
   }
   assert_eq(latest.changed_files, pull.changed_files)
@@ -639,7 +639,7 @@ test "a changed pull head retries once and discards the old attempt" {
   assert_true(stale_validation == retrying)
 
   let latest_compare : ApiCompare = {
-    merge_base_commit: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
+    merge_base_commit: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", },
   }
   let (with_compare, _) = update(
     retrying,
@@ -695,7 +695,7 @@ test "a pull request that changes during both attempts fails explicitly" {
   )
   let changed_again = {
     ..pull,
-    base: { sha: "ffffffffffffffffffffffffffffffffffffffff", repo: None },
+    base: { sha: "ffffffffffffffffffffffffffffffffffffffff", repo: None, },
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (failed, _) = update(
@@ -853,7 +853,7 @@ fn diff_test_view(files : Array[ApiFile]) -> ChangeView raise {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (view, _) = finish_commit(
     commit_reference("example", "project", fixture.sha),
-    { owner: "example", repo: "project" },
+    { owner: "example", repo: "project", },
     fixture,
     files,
     9,
@@ -1125,7 +1125,7 @@ test "new source invalidates every MoonBit filter cache" {
   assert_true(cached.diff_cache.lexical is Some(_))
   assert_true(cached.diff_cache.ast is Some(_))
   let view = set_file_state(diff_test_view([file]), 0, cached)
-  let model = { ..diff_test_model(view), diff_algorithm: AstAlgorithm }
+  let model = { ..diff_test_model(view), diff_algorithm: AstAlgorithm, }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (updated, _) = update(
     model,

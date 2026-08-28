@@ -4,7 +4,7 @@ fn test_span(
   start_col : Int,
   end_col : Int,
 ) -> @span.SingleLineSpan {
-  @span.SingleLineSpan::{ line, start_col, end_col }
+  @span.SingleLineSpan::{ line, start_col, end_col, }
 }
 
 ///|UUID(e501c2b7-6c26-4f4b-81da-20dafcb87266)

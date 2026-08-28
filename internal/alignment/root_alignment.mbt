@@ -277,7 +277,12 @@ fn per_unit_plan(edits : Array[ImplEdit]) -> TopLevelPlan {
       new_matched.push(index)
     }
   }
-  PerUnit({ edits, old_order, new_order, reordered: old_matched != new_matched })
+  PerUnit({
+    edits,
+    old_order,
+    new_order,
+    reordered: old_matched != new_matched,
+  })
 }
 
 ///|UUID(97bfcfe4-80de-498e-a147-90d250e6c93e)

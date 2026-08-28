@@ -99,7 +99,7 @@ fn ignored_test_line_ranges(
     } else {
       end_line
     }
-    ranges.push({ start: first, len: last - first + 1 })
+    ranges.push({ start: first, len: last - first + 1, })
   }
   ranges
 }
@@ -449,7 +449,7 @@ fn make_impl_unit(
     @cmp.maximum(last.loc.end.lnum, start),
     source_lines.length(),
   )
-  let range : @model.LineRange = { start, len: end_ - start }
+  let range : @model.LineRange = { start, len: end_ - start, }
   ImplUnit::{
     root,
     uuid: nodes_uuid(source, nodes),
@@ -479,13 +479,13 @@ fn collect_impl_units_detailed(
       let nodes = pending
       pending = []
       nodes.push(child)
-      inputs.push(ImplUnitInput::{ nodes, item: Some(child) })
+      inputs.push(ImplUnitInput::{ nodes, item: Some(child), })
     } else if root_child_is_visible(source, child) {
       pending.push(child)
     }
   }
   if !pending.is_empty() {
-    inputs.push(ImplUnitInput::{ nodes: pending, item: None })
+    inputs.push(ImplUnitInput::{ nodes: pending, item: None, })
   }
 
   let retained_inputs : Array[ImplUnitInput] = []
@@ -512,10 +512,10 @@ fn collect_impl_units_detailed(
       let test_end = first_child_node(item, "body")
         .map(body => body.loc.end)
         .unwrap_or(item.loc.end)
-      ignored_tests.push({ start: first.loc.start, end: test_end })
+      ignored_tests.push({ start: first.loc.start, end: test_end, })
       let trailing = test_trailing_comments(item, test_end)
       if !trailing.is_empty() {
-        retained_inputs.push({ nodes: trailing, item: None })
+        retained_inputs.push({ nodes: trailing, item: None, })
       }
     } else {
       retained_inputs.push(input)
@@ -535,5 +535,5 @@ fn collect_impl_units_detailed(
       make_impl_unit(source, source_lines, input.nodes, input.item, roots[i]),
     )
   }
-  { units, ignored_tests }
+  { units, ignored_tests, }
 }

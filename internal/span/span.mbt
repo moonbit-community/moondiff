@@ -44,7 +44,7 @@ pub fn LineWidths::from_str(str : StringView) -> Self {
       [] => {
         // end of contents
         lines.push((current_line_start, current_line_start + current_column))
-        break LineWidths::{ contents, lines }
+        break LineWidths::{ contents, lines, }
       }
       ['\r', '\n', .. rest] => {
         lines.push((current_line_start, current_line_start + current_column))
@@ -131,7 +131,7 @@ pub fn LineWidths::loc_to_spans(
   for line in start_line..<end_line {
     let start_col = if line == start_line { loc.start.column() } else { 0 }
     let end_col = self.get_line_width(line) + 1
-    spans.push(SingleLineSpan::{ line, start_col, end_col })
+    spans.push(SingleLineSpan::{ line, start_col, end_col, })
   } nobreak {
     spans.push(SingleLineSpan::{
       line: end_line,

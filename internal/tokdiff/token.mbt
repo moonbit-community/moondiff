@@ -68,19 +68,19 @@ fn push_comment_tokens(toks : Array[Tok], body : String) -> Unit {
   while rest is [_, ..] {
     rest = lexmatch rest with longest {
       (re"^//+" as t, after=next) => {
-        toks.push({ kind: Filler, text: t.to_owned() })
+        toks.push({ kind: Filler, text: t.to_owned(), })
         next
       }
       (re"^[ \t]+" as t, after=next) => {
-        toks.push({ kind: Filler, text: t.to_owned() })
+        toks.push({ kind: Filler, text: t.to_owned(), })
         next
       }
       (re"^[A-Za-z0-9_]+" as t, after=next) => {
-        toks.push({ kind: Comment, text: t.to_owned() })
+        toks.push({ kind: Comment, text: t.to_owned(), })
         next
       }
       (re"^." as t, after=next) => {
-        toks.push({ kind: Comment, text: t.to_string() })
+        toks.push({ kind: Comment, text: t.to_string(), })
         next
       }
       _ => abort("unreachable")
@@ -173,7 +173,7 @@ fn fallback_tokenize_line(line : String) -> Array[Tok] {
   while offset < line.length() {
     if starts_line_comment(line, offset) {
       if starts_marker(line, offset) {
-        toks.push({ kind: Marker, text: "///|" })
+        toks.push({ kind: Marker, text: "///|", })
         push_fallback_comment_tokens(toks, line, offset + 4)
       } else {
         push_fallback_comment_tokens(toks, line, offset)
@@ -273,17 +273,20 @@ pub fn tokenize_line(line : String) -> Array[Tok] {
     match tok {
       COMMENT(_) =>
         if text is ['/', '/', '/', '|', ..] {
-          toks.push({ kind: Marker, text: "///|" })
+          toks.push({ kind: Marker, text: "///|", })
           push_comment_tokens(toks, text.view(start_offset=4).to_owned())
         } else {
           push_comment_tokens(toks, text)
         }
-      _ => toks.push({ kind: classify(tok, text), text })
+      _ => toks.push({ kind: classify(tok, text), text, })
     }
     prev_end = ep.cnum
   }
   if prev_end < line.length() {
-    toks.push({ kind: Space, text: line.view(start_offset=prev_end).to_owned() })
+    toks.push({
+      kind: Space,
+      text: line.view(start_offset=prev_end).to_owned(),
+    })
   }
   toks
 }

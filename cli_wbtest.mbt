@@ -111,7 +111,7 @@ test "render_cli_diff reports ignored MoonBit tests with dynamic descriptions" {
     render_cli_diff(tests_only, old_source, new_source, 0),
     "--- old.mbt\n+++ new.mbt\nNo changes besides MoonBit test blocks.\n",
   )
-  let combined = { ..tests_only, ignore_comments: true }
+  let combined = { ..tests_only, ignore_comments: true, }
   assert_eq(
     render_cli_diff(combined, old_source, new_source, 0),
     "--- old.mbt\n+++ new.mbt\nNo changes besides MoonBit test blocks, comments, or blank lines.\n",
@@ -153,7 +153,7 @@ test "ignore tests preserves CLI layout for files without tests" {
       defaults, old_source, new_source, graph_limit,
     )
     let actual = render_cli_diff(
-      { ..defaults, ignore_tests: true },
+      { ..defaults, ignore_tests: true, },
       old_source,
       new_source,
       graph_limit,

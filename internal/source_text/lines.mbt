@@ -10,7 +10,7 @@ priv struct LineRangeScanner {
 
 ///|
 fn LineRangeScanner::new(source : String) -> Self {
-  { chars: source.to_array(), line_start: 0, index: 0, finished: false }
+  { chars: source.to_array(), line_start: 0, index: 0, finished: false, }
 }
 
 ///|

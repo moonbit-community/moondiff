@@ -349,7 +349,7 @@ priv struct ListKindInterner {
 
 ///|
 fn ListKindInterner::new() -> Self {
-  { kinds: [] }
+  { kinds: [], }
 }
 
 ///|

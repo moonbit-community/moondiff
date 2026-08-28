@@ -3,8 +3,8 @@ test "public document model owns pure document methods" {
   let line : @model.DiffLine = {
     index: 2,
     segments: [
-      { kind: Unchanged, text: "let value = " },
-      { kind: Changed, text: "new" },
+      { kind: Unchanged, text: "let value = ", },
+      { kind: Changed, text: "new", },
     ],
   }
   let _ : ArrayView[@model.DiffSegment] = line.segments
@@ -36,7 +36,7 @@ test "public document model owns pure document methods" {
         old_start: 12,
         new_start: 23,
         blocks: [ChangeBlock([NewOnly(rebased_line)])],
-        ..,
+        ..
       },
     ] else {
     fail("expected all document indexes to be rebased")
@@ -48,7 +48,7 @@ test "public document model owns pure document methods" {
 ///|
 test "all public block payloads are read-only views" {
   let context : @model.DiffBlock = ContextBlock([
-    { old_index: 0, new_index: 0, text: "same" },
+    { old_index: 0, new_index: 0, text: "same", },
   ])
   let changed : @model.DiffBlock = ChangeBlock([])
   let ignored : @model.DiffBlock = IgnoredBlock([])
@@ -79,7 +79,7 @@ test "fragment fallback metadata remains local and matchable" {
     detail="old: parse error",
   )
   let fragment : @model.DiffFragment = {
-    document: { hunks: [] },
+    document: { hunks: [], },
     fallbacks: [reason],
   }
   assert_true(
@@ -101,23 +101,23 @@ test "fragment fallback metadata remains local and matchable" {
 
 ///|
 test "semantic documents expose all section variants and both orders" {
-  let empty : @model.DiffFragment = { document: { hunks: [] }, fallbacks: [] }
+  let empty : @model.DiffFragment = { document: { hunks: [], }, fallbacks: [], }
   let document : @model.DiffDocument = TopLevel({
     sections: [
       Matched(
-        old={ start: 0, len: 2 },
-        new={ start: 4, len: 2 },
+        old={ start: 0, len: 2, },
+        new={ start: 4, len: 2, },
         old_context=Some("fn old() {"),
         new_context=Some("fn new() {"),
         diff=empty,
       ),
       Deleted(
-        old={ start: 2, len: 2 },
+        old={ start: 2, len: 2, },
         old_context=Some("fn removed() {"),
         diff=empty,
       ),
       Inserted(
-        new={ start: 0, len: 4 },
+        new={ start: 0, len: 4, },
         new_context=Some("fn inserted() {"),
         diff=empty,
       ),
@@ -135,15 +135,15 @@ test "semantic documents expose all section variants and both orders" {
     sections
     is [
       Matched(
-        old={ start: 0, len: 2 },
-        new={ start: 4, len: 2 },
+        old={ start: 0, len: 2, },
+        new={ start: 4, len: 2, },
         old_context=Some("fn old() {"),
         new_context=Some("fn new() {"),
         ..
       ),
-      Deleted(old={ start: 2, len: 2 }, old_context=Some("fn removed() {"), ..),
+      Deleted(old={ start: 2, len: 2, }, old_context=Some("fn removed() {"), ..),
       Inserted(
-        new={ start: 0, len: 4 },
+        new={ start: 0, len: 4, },
         new_context=Some("fn inserted() {"),
         ..
       ),
@@ -156,7 +156,7 @@ test "semantic documents expose all section variants and both orders" {
 ///|
 test "Whole owns its primary fragment without a linear projection" {
   let fragment : @model.DiffFragment = {
-    document: { hunks: [] },
+    document: { hunks: [], },
     fallbacks: [GraphLimitExceeded(limit=7)],
   }
   let document : @model.DiffDocument = Whole(fragment)

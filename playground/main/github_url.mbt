@@ -14,12 +14,12 @@ priv struct CommitRef {
 
 ///|
 fn commit_reference(owner : String, repo : String, sha : String) -> CommitRef {
-  { owner, repo, target: Commit(sha) }
+  { owner, repo, target: Commit(sha), }
 }
 
 ///|
 fn pull_reference(owner : String, repo : String, number : String) -> CommitRef {
-  { owner, repo, target: PullRequest(number) }
+  { owner, repo, target: PullRequest(number), }
 }
 
 ///|
@@ -29,7 +29,7 @@ fn pull_commit_reference(
   number : String,
   sha : String,
 ) -> CommitRef {
-  { owner, repo, target: PullCommit(number, sha) }
+  { owner, repo, target: PullCommit(number, sha), }
 }
 
 ///|

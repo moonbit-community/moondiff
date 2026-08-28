@@ -25,7 +25,11 @@ fn CstElabCtx::new(source : String) -> Self {
     }
   }
   line_ranges.push((line_start, source.length()))
-  CstElabCtx::{ source, line_widths: LineWidths::from_str(source), line_ranges }
+  CstElabCtx::{
+    source,
+    line_widths: LineWidths::from_str(source),
+    line_ranges,
+  }
 }
 
 ///|
@@ -212,7 +216,7 @@ fn CstElabCtx::gap_position(
   let start_col = self.source[line_start:start].to_owned().to_array().length() +
     1
   let end_col = self.source[line_start:end_].to_owned().to_array().length() + 1
-  SingleLineSpan::{ line, start_col, end_col }
+  SingleLineSpan::{ line, start_col, end_col, }
 }
 
 ///|

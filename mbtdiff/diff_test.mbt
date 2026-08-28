@@ -111,19 +111,19 @@ test "top-level sections preserve both source orders and local ranges" {
   guard top.sections
     is [
       Matched(
-        old={ start: 0, len: 1 },
-        new={ start: 1, len: 1 },
+        old={ start: 0, len: 1, },
+        new={ start: 1, len: 1, },
         old_context=Some("fn first() { old_value() }"),
         new_context=Some("fn first() { new_value() }"),
         diff=matched
       ),
       Deleted(
-        old={ start: 1, len: 1 },
+        old={ start: 1, len: 1, },
         old_context=Some("fn removed() {}"),
         diff=deleted
       ),
       Inserted(
-        new={ start: 0, len: 1 },
+        new={ start: 0, len: 1, },
         new_context=Some("fn inserted() {}"),
         diff=inserted
       ),

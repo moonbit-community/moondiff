@@ -17,7 +17,7 @@ pub fn[T] Stack::new() -> Stack[T] {
 
 ///|UUID(b7c6ae40-0b9a-4021-aee5-673ecab1ee4b)
 pub fn[T] Stack::push(self : Stack[T], val : T) -> Stack[T] {
-  Stack(Some(Node::{ val, next: self.0 }))
+  Stack(Some(Node::{ val, next: self.0, }))
 }
 
 ///|UUID(6f8f8232-5a83-4152-a372-ebd14e8a504c)

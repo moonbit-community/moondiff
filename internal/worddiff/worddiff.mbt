@@ -141,9 +141,9 @@ fn push_segment(
   let last = segments.length() - 1
   if last >= 0 && segments[last].kind == kind {
     let previous = segments[last]
-    segments[last] = { kind, text: previous.text + text }
+    segments[last] = { kind, text: previous.text + text, }
   } else {
-    segments.push({ kind, text })
+    segments.push({ kind, text, })
   }
 }
 

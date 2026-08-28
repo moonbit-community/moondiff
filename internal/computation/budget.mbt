@@ -25,7 +25,7 @@ pub struct Budget {
 
 ///|
 pub fn Budget::new(limit : UInt) -> Budget {
-  { limit, remaining: Ref(limit) }
+  { limit, remaining: Ref(limit), }
 }
 
 ///|

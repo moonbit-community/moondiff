@@ -2,7 +2,7 @@
 
 ///|UUID(d7228f90-8748-409c-85dc-e7e69ec96c77)
 fn whole_line_span(line : Int, text : String) -> @span.SingleLineSpan {
-  @span.SingleLineSpan::{ line, start_col: 1, end_col: text.length() + 1 }
+  @span.SingleLineSpan::{ line, start_col: 1, end_col: text.length() + 1, }
 }
 
 ///|UUID(18960ac7-e004-469c-be30-f51141e1a28f)
@@ -24,7 +24,7 @@ fn unchanged_line(
 fn novel_span(line : Int, start_col : Int, end_col : Int) -> @syntax.MatchedPos {
   @syntax.MatchedPos::{
     kind: @syntax.MatchKind::Novel,
-    pos: @span.SingleLineSpan::{ line, start_col, end_col },
+    pos: @span.SingleLineSpan::{ line, start_col, end_col, },
   }
 }
 

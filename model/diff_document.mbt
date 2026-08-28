@@ -89,7 +89,7 @@ pub(all) struct HunkDocument {
 
 ///|
 fn DiffLine::rebase_index(self : DiffLine, offset : Int) -> DiffLine {
-  { index: self.index + offset, segments: self.segments }
+  { index: self.index + offset, segments: self.segments, }
 }
 
 ///|
@@ -159,5 +159,5 @@ pub fn HunkDocument::rebase(
       blocks: blocks[:],
     })
   }
-  { hunks: hunks[:] }
+  { hunks: hunks[:], }
 }

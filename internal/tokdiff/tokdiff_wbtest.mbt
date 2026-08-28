@@ -26,8 +26,8 @@ test "unrelated block orders delete before insert" {
 
 ///|
 test "comma carries less alignment evidence than structural punctuation" {
-  let comma = Tok::{ kind: Punct, text: "," }
-  let close = Tok::{ kind: Punct, text: ")" }
+  let comma = Tok::{ kind: Punct, text: ",", }
+  let close = Tok::{ kind: Punct, text: ")", }
   assert_eq(Punct.weight(), 6)
   assert_eq(alignment_weight(comma), 1)
   assert_eq(alignment_weight(close), 6)
@@ -138,9 +138,9 @@ fn diff_segment_signature(segments : ArrayView[DiffSegment]) -> String {
 
 ///|
 test "pair calculation trims whitespace at every changed-run boundary" {
-  let space = Tok::{ kind: Space, text: " " }
-  let old = Tok::{ kind: Word, text: "old" }
-  let new = Tok::{ kind: Word, text: "new" }
+  let space = Tok::{ kind: Space, text: " ", }
+  let old = Tok::{ kind: Word, text: "old", }
+  let new = Tok::{ kind: Word, text: "new", }
   let (both_left, both_right) = pair_row_segments([
     OSub(space, space),
     OSub(old, new),
@@ -158,32 +158,32 @@ test "pair calculation trims whitespace at every changed-run boundary" {
 ///|
 test "pair calculation uses token text and trims each side independently" {
   let (left, right) = pair_row_segments([
-    OSub({ kind: Filler, text: "\t" }, { kind: Word, text: "new" }),
-    OSub({ kind: Word, text: "old" }, { kind: Filler, text: " " }),
+    OSub({ kind: Filler, text: "\t", }, { kind: Word, text: "new", }),
+    OSub({ kind: Word, text: "old", }, { kind: Filler, text: " ", }),
   ])
   assert_eq(diff_segment_signature(left), "U[\t]C[old]")
   assert_eq(diff_segment_signature(right), "C[new]U[ ]")
 
   let (_, internal) = pair_row_segments([
-    OIns({ kind: Word, text: "a" }),
-    OIns({ kind: Space, text: " " }),
-    OIns({ kind: Punct, text: ":" }),
-    OIns({ kind: Filler, text: " " }),
-    OIns({ kind: Word, text: "Int" }),
+    OIns({ kind: Word, text: "a", }),
+    OIns({ kind: Space, text: " ", }),
+    OIns({ kind: Punct, text: ":", }),
+    OIns({ kind: Filler, text: " ", }),
+    OIns({ kind: Word, text: "Int", }),
   ])
   assert_eq(diff_segment_signature(internal), "C[a : Int]")
 
   let (plain, _) = pair_row_segments([
-    ODel({ kind: Space, text: " " }),
-    ODel({ kind: Filler, text: "\t" }),
+    ODel({ kind: Space, text: " ", }),
+    ODel({ kind: Filler, text: "\t", }),
   ])
   assert_eq(diff_segment_signature(plain), "U[ \t]")
 
   let (_, comment) = pair_row_segments([
-    OIns({ kind: Filler, text: "//" }),
-    OIns({ kind: Filler, text: " " }),
-    OIns({ kind: Comment, text: "word" }),
-    OIns({ kind: Filler, text: " " }),
+    OIns({ kind: Filler, text: "//", }),
+    OIns({ kind: Filler, text: " ", }),
+    OIns({ kind: Comment, text: "word", }),
+    OIns({ kind: Filler, text: " ", }),
   ])
   assert_eq(diff_segment_signature(comment), "C[// word]U[ ]")
 }
