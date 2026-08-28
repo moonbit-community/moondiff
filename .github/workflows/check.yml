@@ -35,6 +35,16 @@ jobs:
           moon check --target all
           moon check playground/main --target js --deny-warn
       
+      - name: format diff
+        run: |
+          moon fmt
+          git diff --exit-code
+
+      - name: info check
+        run: |
+          moon info
+          git diff --exit-code
+      
       - name: run test
         run: |
           moon test --target all
