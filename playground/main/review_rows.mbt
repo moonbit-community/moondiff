@@ -193,10 +193,13 @@ fn project_review_items(
   patch : CanonicalPatch,
   old_base? : Int = 0,
   new_base? : Int = 0,
+  show_hunk_headers? : Bool = true,
 ) -> Array[ReviewItem] {
   let items : Array[ReviewItem] = []
   for hunk in document.hunks {
-    items.push(ReviewHunk(review_hunk_header(hunk, old_base, new_base)))
+    if show_hunk_headers {
+      items.push(ReviewHunk(review_hunk_header(hunk, old_base, new_base)))
+    }
     let one = @model.HunkDocument::{ hunks: [hunk] }
     for
       row in project_review_rows(
