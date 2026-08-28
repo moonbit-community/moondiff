@@ -122,9 +122,21 @@ fn whole_document(
 fn section_from_edit(edit : ImplEdit, diff : DiffFragment) -> DiffSection {
   match edit {
     Replace(old~, new~) =>
-      @model.DiffSection::Matched(old=old.range, new=new.range, diff~)
-    Delete(old) => @model.DiffSection::Deleted(old=old.range, diff~)
-    Insert(new) => @model.DiffSection::Inserted(new=new.range, diff~)
+      @model.DiffSection::Matched(
+        old=old.range,
+        new=new.range,
+        old_context=old.context,
+        new_context=new.context,
+        diff~,
+      )
+    Delete(old) =>
+      @model.DiffSection::Deleted(old=old.range, old_context=old.context, diff~)
+    Insert(new) =>
+      @model.DiffSection::Inserted(
+        new=new.range,
+        new_context=new.context,
+        diff~,
+      )
   }
 }
 

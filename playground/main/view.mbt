@@ -518,9 +518,16 @@ fn semantic_fragment_view(
     semantic_section_title(
       index,
       match (old_range, new_range) {
-        (Some(old), Some(new)) => Matched(old~, new~, diff=fragment)
-        (Some(old), None) => Deleted(old~, diff=fragment)
-        (None, Some(new)) => Inserted(new~, diff=fragment)
+        (Some(old), Some(new)) =>
+          Matched(
+            old~,
+            new~,
+            old_context=None,
+            new_context=None,
+            diff=fragment,
+          )
+        (Some(old), None) => Deleted(old~, old_context=None, diff=fragment)
+        (None, Some(new)) => Inserted(new~, new_context=None, diff=fragment)
         (None, None) => panic()
       },
     )

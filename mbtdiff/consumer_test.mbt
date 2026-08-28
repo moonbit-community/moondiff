@@ -119,18 +119,20 @@ test "external consumer exhaustively matches the semantic result" {
   let mut inserted = 0
   for section in top.sections {
     match section {
-      Matched(old~, new~, diff~) => {
+      Matched(old~, new~, old_context~, new_context~, diff~) => {
         let _ : @mbtdiff.LineRange = old
         let _ : @mbtdiff.LineRange = new
+        let _ : String? = old_context
+        let _ : String? = new_context
         let _ : @mbtdiff.DiffFragment = diff
         matched += 1
       }
-      Deleted(old~, diff~) => {
-        let _ = (old.start, old.len, diff.fallbacks)
+      Deleted(old~, old_context~, diff~) => {
+        let _ = (old.start, old.len, old_context, diff.fallbacks)
         deleted += 1
       }
-      Inserted(new~, diff~) => {
-        let _ = (new.start, new.len, diff.fallbacks)
+      Inserted(new~, new_context~, diff~) => {
+        let _ = (new.start, new.len, new_context, diff.fallbacks)
         inserted += 1
       }
     }

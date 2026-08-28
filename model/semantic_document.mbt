@@ -8,11 +8,18 @@ pub(all) struct DiffFragment {
 
 ///|
 /// One stable top-level pairing identity. Missing sides are represented by
-/// distinct variants rather than fabricated empty ranges or cursors.
+/// distinct variants rather than fabricated empty ranges or cursors. Each
+/// available context is the trimmed declaration-keyword source line.
 pub(all) enum DiffSection {
-  Matched(old~ : LineRange, new~ : LineRange, diff~ : DiffFragment)
-  Deleted(old~ : LineRange, diff~ : DiffFragment)
-  Inserted(new~ : LineRange, diff~ : DiffFragment)
+  Matched(
+    old~ : LineRange,
+    new~ : LineRange,
+    old_context~ : String?,
+    new_context~ : String?,
+    diff~ : DiffFragment
+  )
+  Deleted(old~ : LineRange, old_context~ : String?, diff~ : DiffFragment)
+  Inserted(new~ : LineRange, new_context~ : String?, diff~ : DiffFragment)
 } derive(Eq)
 
 ///|
