@@ -98,6 +98,60 @@ fn align_impl_units_by_key(
 }
 
 ///|
+test "fresh pipeline scopes have independent budget state" {
+  let pipeline = DiffPipelineContext::new(
+    @diff_ignore.SourceView::from_source("old"),
+    @diff_ignore.SourceView::from_source("new"),
+    0,
+    3_000_000,
+    1,
+    false,
+  )
+  let fresh = pipeline.fresh_scope()
+  pipeline.budget.charge(1U, TopLevelAlignment)
+  fresh.budget.charge(1U, TopLevelAlignment)
+  for budget in [pipeline.budget, fresh.budget] {
+    try budget.charge(1U, TopLevelAlignment) catch {
+      @computation.ScopeLimitExceeded(stage~, limit~) => {
+        assert_true(stage is TopLevelAlignment)
+        assert_eq(limit, 1U)
+      }
+    } noraise {
+      _ => fail("expected each independent budget to be exhausted")
+    }
+  }
+}
+
+///|
+test "alignment state protects pairs and keeps excluded new units as inserts" {
+  let old_units = parse_units(
+    (
+      #|///|UUID(old-a)
+      #|fn old_first() {}
+      #|///|UUID(old-b)
+      #|fn old_second() {}
+    ),
+  )
+  let new_units = parse_units(
+    (
+      #|///|UUID(new-a)
+      #|fn new_first() {}
+      #|///|UUID(new-b)
+      #|fn new_second() {}
+    ),
+  )
+  let state = AlignmentState::new(old_units, new_units, true)
+  state.pair(0, 0)
+  state.pair(0, 1)
+  state.pair(1, 0)
+  state.exclude_new(1)
+  state.pair(1, 1)
+  @debug.assert_eq(state.finish().map(edit_summary), [
+    "Replace(old-a->new-a)", "Delete(old-b)", "Insert(new-b)",
+  ])
+}
+
+///|
 fn long_free_declaration(name : String, finish? : String = "finish") -> String {
   let source =
     $|fn \{name}(input : Input) -> Output {
