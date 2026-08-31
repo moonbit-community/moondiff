@@ -892,8 +892,22 @@ fn ready_test_file(
     expanded,
     old_side: Ready(old),
     new_side: Ready(new),
-    diff_cache: empty_diff_cache(),
+    diff_cache: DiffCache::empty(),
   }
+}
+
+///|
+fn all_moonbit_cache_keys() -> Array[CacheKey] {
+  [
+    MoonBit(LexicalAlgorithm, false, false),
+    MoonBit(LexicalAlgorithm, true, false),
+    MoonBit(LexicalAlgorithm, false, true),
+    MoonBit(LexicalAlgorithm, true, true),
+    MoonBit(AstAlgorithm, false, false),
+    MoonBit(AstAlgorithm, true, false),
+    MoonBit(AstAlgorithm, false, true),
+    MoonBit(AstAlgorithm, true, true),
+  ]
 }
 
 ///|
@@ -923,23 +937,22 @@ test "MoonBit files cache all eight algorithm and filter combinations" {
   for algorithm in [LexicalAlgorithm, AstAlgorithm] {
     for ignore_comments in [false, true] {
       for ignore_tests in [false, true] {
+        let key = CacheKey::MoonBit(algorithm, ignore_comments, ignore_tests)
+        assert_true(cached.diff_cache.get(key) is None)
         cached = ensure_file_document(
           cached,
           algorithm,
           ignore_comments~,
           ignore_tests~,
         )
+        assert_true(cached.diff_cache.get(key) is Some(_))
       }
     }
   }
-  assert_true(cached.diff_cache.lexical is Some(_))
-  assert_true(cached.diff_cache.lexical_ignoring_comments is Some(_))
-  assert_true(cached.diff_cache.lexical_ignoring_tests is Some(_))
-  assert_true(cached.diff_cache.lexical_ignoring_comments_and_tests is Some(_))
-  assert_true(cached.diff_cache.ast is Some(_))
-  assert_true(cached.diff_cache.ast_ignoring_comments is Some(_))
-  assert_true(cached.diff_cache.ast_ignoring_tests is Some(_))
-  assert_true(cached.diff_cache.ast_ignoring_comments_and_tests is Some(_))
+  for key in all_moonbit_cache_keys() {
+    assert_true(cached.diff_cache.get(key) is Some(_))
+  }
+  assert_true(cached.diff_cache.get(Line) is None)
 }
 
 ///|
@@ -948,7 +961,7 @@ test "line and MoonBit caches retain distinct semantic variants" {
     ready_test_file(fixture_file("README.md", "modified"), ["old"], ["new"]),
     LexicalAlgorithm,
   )
-  guard text_file.diff_cache.line is Some(Line(line_document)) else {
+  guard text_file.diff_cache.get(Line) is Some(Line(line_document)) else {
     fail("expected a line-diff cache")
   }
   assert_false(line_document.hunks.is_empty())
@@ -961,7 +974,7 @@ test "line and MoonBit caches retain distinct semantic variants" {
     ),
     AstAlgorithm,
   )
-  guard moonbit_file.diff_cache.ast
+  guard moonbit_file.diff_cache.get(MoonBit(AstAlgorithm, false, false))
     is Some(MoonBit(document=TopLevel(top), status=Reordered)) else {
     fail("expected a semantic reorder cache")
   }
@@ -976,14 +989,18 @@ test "line and MoonBit caches retain distinct semantic variants" {
 }
 
 ///|
-test "algorithm switching fills the second cache" {
+test "algorithm switching fills the second cache and reuses the first" {
   let file = fixture_file("src/format.mbt", "modified")
+  let lexical_key = CacheKey::MoonBit(LexicalAlgorithm, false, false)
+  let ast_key = CacheKey::MoonBit(AstAlgorithm, false, false)
   let lexical_file = ensure_file_document(
     ready_test_file(file, ["fn format() { 1 }"], ["fn format() {", "  1", "}"]),
     LexicalAlgorithm,
   )
-  assert_true(lexical_file.diff_cache.lexical is Some(_))
-  assert_true(lexical_file.diff_cache.ast is None)
+  guard lexical_file.diff_cache.get(lexical_key) is Some(lexical) else {
+    fail("expected lexical cache")
+  }
+  assert_true(lexical_file.diff_cache.get(ast_key) is None)
   let view = set_file_state(diff_test_view([file]), 0, lexical_file)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (switched, _) = update(
@@ -996,10 +1013,24 @@ test "algorithm switching fills the second cache" {
     fail("expected commit to remain visible")
   }
   let changed = changed_view.files[0]
-  assert_true(changed.diff_cache.lexical is Some(_))
-  guard changed.diff_cache.ast is Some(ast) else { fail("expected AST cache") }
+  assert_true(changed.diff_cache.get(lexical_key) == Some(lexical))
+  guard changed.diff_cache.get(ast_key) is Some(ast) else {
+    fail("expected AST cache")
+  }
   guard ast is MoonBit(status~, ..) else { fail("expected MoonBit cache") }
   assert_true(status is NoStructuralChanges)
+  let (switched_back, _) = update(
+    switched,
+    SelectDiffAlgorithm(LexicalAlgorithm),
+    emit,
+  )
+  guard switched_back.phase is Showing(restored_view) else {
+    fail("expected commit to remain visible")
+  }
+  assert_true(restored_view.files[0].diff_cache == changed.diff_cache)
+  assert_true(
+    restored_view.files[0].diff_cache.get(lexical_key) == Some(lexical),
+  )
 }
 
 ///|
@@ -1022,11 +1053,18 @@ test "ignore comments has independent algorithm caches" {
     AstAlgorithm,
     ignore_comments=true,
   )
-  assert_true(cached.diff_cache.lexical is Some(_))
-  assert_true(cached.diff_cache.lexical_ignoring_comments is Some(_))
-  assert_true(cached.diff_cache.ast is Some(_))
-  assert_true(cached.diff_cache.ast_ignoring_comments is Some(_))
-  guard cached.diff_cache.lexical_ignoring_comments is Some(filtered) else {
+  assert_true(
+    cached.diff_cache.get(MoonBit(LexicalAlgorithm, false, false)) is Some(_),
+  )
+  let filtered_key = CacheKey::MoonBit(LexicalAlgorithm, true, false)
+  assert_true(cached.diff_cache.get(filtered_key) is Some(_))
+  assert_true(
+    cached.diff_cache.get(MoonBit(AstAlgorithm, false, false)) is Some(_),
+  )
+  assert_true(
+    cached.diff_cache.get(MoonBit(AstAlgorithm, true, false)) is Some(_),
+  )
+  guard cached.diff_cache.get(filtered_key) is Some(filtered) else {
     fail("expected filtered lexical cache")
   }
   guard filtered is MoonBit(document=Whole(fragment), status=IgnoredOnly) else {
@@ -1042,9 +1080,7 @@ test "ignore comments has independent algorithm caches" {
   guard toggled.phase is Showing(toggled_view) else {
     fail("expected commit to remain visible")
   }
-  assert_true(
-    toggled_view.files[0].diff_cache.lexical_ignoring_comments is Some(_),
-  )
+  assert_true(toggled_view.files[0].diff_cache.get(filtered_key) is Some(_))
 }
 
 ///|
@@ -1088,7 +1124,8 @@ test "ignore tests toggles independently and survives navigation without routes"
     fail("expected commit to remain visible")
   }
   assert_true(
-    toggled_view.files[0].diff_cache.lexical_ignoring_tests is Some(_),
+    toggled_view.files[0].diff_cache.get(MoonBit(LexicalAlgorithm, false, true))
+    is Some(_),
   )
 
   let reference = commit_reference("owner", "repo", "abcdef1")
@@ -1115,17 +1152,31 @@ test "ignore tests toggles independently and survives navigation without routes"
 ///|
 test "new source invalidates every MoonBit filter cache" {
   let file = fixture_file("src/change.mbt", "modified")
-  let cached = ensure_file_document(
-    ensure_file_document(
-      ready_test_file(file, ["fn f() { old() }"], ["fn f() { new() }"]),
-      LexicalAlgorithm,
-    ),
-    AstAlgorithm,
-  )
-  assert_true(cached.diff_cache.lexical is Some(_))
-  assert_true(cached.diff_cache.ast is Some(_))
+  let mut cached = ready_test_file(file, ["fn f() { old() }"], [
+    "fn f() { new() }",
+  ])
+  for algorithm in [LexicalAlgorithm, AstAlgorithm] {
+    for ignore_comments in [false, true] {
+      for ignore_tests in [false, true] {
+        cached = ensure_file_document(
+          cached,
+          algorithm,
+          ignore_comments~,
+          ignore_tests~,
+        )
+      }
+    }
+  }
+  for key in all_moonbit_cache_keys() {
+    assert_true(cached.diff_cache.get(key) is Some(_))
+  }
   let view = set_file_state(diff_test_view([file]), 0, cached)
-  let model = { ..diff_test_model(view), diff_algorithm: AstAlgorithm, }
+  let model = {
+    ..diff_test_model(view),
+    diff_algorithm: AstAlgorithm,
+    ignore_comments: true,
+    ignore_tests: true,
+  }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (updated, _) = update(
     model,
@@ -1138,30 +1189,26 @@ test "new source invalidates every MoonBit filter cache" {
     emit,
   )
   guard updated.phase is Showing(updated_view) else { fail("expected commit") }
-  assert_true(updated_view.files[0].diff_cache.lexical is None)
-  assert_true(updated_view.files[0].diff_cache.ast is Some(_))
-  assert_true(
-    updated_view.files[0].diff_cache.lexical_ignoring_comments is None,
-  )
-  assert_true(updated_view.files[0].diff_cache.lexical_ignoring_tests is None)
-  assert_true(
-    updated_view.files[0].diff_cache.lexical_ignoring_comments_and_tests is None,
-  )
-  assert_true(updated_view.files[0].diff_cache.ast_ignoring_comments is None)
-  assert_true(updated_view.files[0].diff_cache.ast_ignoring_tests is None)
-  assert_true(
-    updated_view.files[0].diff_cache.ast_ignoring_comments_and_tests is None,
-  )
+  let current_key = CacheKey::MoonBit(AstAlgorithm, true, true)
+  for key in all_moonbit_cache_keys() {
+    if key == current_key {
+      assert_true(updated_view.files[0].diff_cache.get(key) is Some(_))
+    } else {
+      assert_true(updated_view.files[0].diff_cache.get(key) is None)
+    }
+  }
+  assert_true(updated_view.files[0].diff_cache.get(Line) is None)
 }
 
 ///|
 test "non-MoonBit line document is shared across algorithm switches" {
   let file = fixture_file("README.md", "modified")
+  let line_key = CacheKey::Line
   let cached = ensure_file_document(
     ready_test_file(file, ["old"], ["new"]),
     LexicalAlgorithm,
   )
-  guard cached.diff_cache.line is Some(before) else {
+  guard cached.diff_cache.get(line_key) is Some(before) else {
     fail("expected line cache")
   }
   let after = ensure_file_document(
@@ -1170,7 +1217,9 @@ test "non-MoonBit line document is shared across algorithm switches" {
     ignore_comments=true,
     ignore_tests=true,
   )
-  assert_true(after.diff_cache.line == Some(before))
-  assert_true(after.diff_cache.lexical is None)
-  assert_true(after.diff_cache.ast is None)
+  assert_true(after.diff_cache == cached.diff_cache)
+  assert_true(after.diff_cache.get(line_key) == Some(before))
+  for key in all_moonbit_cache_keys() {
+    assert_true(after.diff_cache.get(key) is None)
+  }
 }

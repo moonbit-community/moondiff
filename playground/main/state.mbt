@@ -8,7 +8,7 @@ priv enum ViewMode {
 priv enum DiffAlgorithm {
   LexicalAlgorithm
   AstAlgorithm
-} derive(Eq)
+} derive(Eq, Hash)
 
 ///|
 priv enum SourceSide {
@@ -32,31 +32,33 @@ priv enum CachedDiffResult {
 } derive(Eq)
 
 ///|
+priv enum CacheKey {
+  Line
+  MoonBit(DiffAlgorithm, Bool, Bool)
+} derive(Eq, Hash)
+
+///|
 priv struct DiffCache {
-  line : CachedDiffResult?
-  lexical : CachedDiffResult?
-  lexical_ignoring_comments : CachedDiffResult?
-  lexical_ignoring_tests : CachedDiffResult?
-  lexical_ignoring_comments_and_tests : CachedDiffResult?
-  ast : CachedDiffResult?
-  ast_ignoring_comments : CachedDiffResult?
-  ast_ignoring_tests : CachedDiffResult?
-  ast_ignoring_comments_and_tests : CachedDiffResult?
+  entries : @immut_hashmap.HashMap[CacheKey, CachedDiffResult]
 } derive(Eq)
 
 ///|
-fn empty_diff_cache() -> DiffCache {
-  {
-    line: None,
-    lexical: None,
-    lexical_ignoring_comments: None,
-    lexical_ignoring_tests: None,
-    lexical_ignoring_comments_and_tests: None,
-    ast: None,
-    ast_ignoring_comments: None,
-    ast_ignoring_tests: None,
-    ast_ignoring_comments_and_tests: None,
-  }
+fn DiffCache::empty() -> DiffCache {
+  { entries: @immut_hashmap.new(), }
+}
+
+///|
+fn DiffCache::get(self : DiffCache, key : CacheKey) -> CachedDiffResult? {
+  self.entries.get(key)
+}
+
+///|
+fn DiffCache::put(
+  self : DiffCache,
+  key : CacheKey,
+  value : CachedDiffResult,
+) -> DiffCache {
+  { entries: self.entries.add(key, value), }
 }
 
 ///|
@@ -471,7 +473,7 @@ fn finish_change(
       expanded,
       old_side: initial_side(pair.old_url, expanded),
       new_side: initial_side(pair.new_url, expanded),
-      diff_cache: empty_diff_cache(),
+      diff_cache: DiffCache::empty(),
     })
     if expanded {
       for
@@ -2113,7 +2115,7 @@ fn update(
         expanded: true,
         old_side,
         new_side,
-        diff_cache: empty_diff_cache(),
+        diff_cache: DiffCache::empty(),
       }
       (
         with_phase(model, Showing(set_file_state(view, index, changed))),
@@ -2136,7 +2138,7 @@ fn update(
             expanded: file.expanded,
             old_side: loaded,
             new_side: file.new_side,
-            diff_cache: empty_diff_cache(),
+            diff_cache: DiffCache::empty(),
           }
         New =>
           {
@@ -2145,7 +2147,7 @@ fn update(
             expanded: file.expanded,
             old_side: file.old_side,
             new_side: loaded,
-            diff_cache: empty_diff_cache(),
+            diff_cache: DiffCache::empty(),
           }
       }
       let changed = if changed.expanded {
