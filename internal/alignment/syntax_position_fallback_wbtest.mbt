@@ -209,18 +209,28 @@ fn fallback_test_limit() -> UInt {
 }
 
 ///|
+fn fallback_test_pipeline(
+  old_source : String,
+  new_source : String,
+) -> DiffPipelineContext {
+  DiffPipelineContext::new(
+    @diff_ignore.SourceView::from_source(old_source),
+    @diff_ignore.SourceView::from_source(new_source),
+    0,
+    3_000_000,
+    fallback_test_limit(),
+    false,
+  )
+}
+
+///|
 test "root syntax-position overflow uses a whole-file lexical fallback" {
   let old_source = "old_root"
   let new_source = "new_root"
   let result = detailed_ast_root_list_document(
     [fallback_test_unit(old_source, 1, 99)],
     [fallback_test_unit(new_source, 1, 98)],
-    @diff_ignore.SourceView::from_source(old_source),
-    @diff_ignore.SourceView::from_source(new_source),
-    0,
-    3_000_000,
-    false,
-    fallback_test_limit(),
+    fallback_test_pipeline(old_source, new_source),
   )
   guard result.document is Whole(fragment) else {
     fail("expected a whole document")
@@ -245,12 +255,7 @@ test "unit syntax-position overflow falls back locally and AST-diffs later units
   ])
   let result = detailed_ast_plan_document(
     plan,
-    @diff_ignore.SourceView::from_source(old_source),
-    @diff_ignore.SourceView::from_source(new_source),
-    0,
-    3_000_000,
-    false,
-    fallback_test_limit(),
+    fallback_test_pipeline(old_source, new_source),
   )
   guard result.document is TopLevel(top) else {
     fail("expected a sectioned document")
