@@ -923,6 +923,52 @@ test "Lexical is the default and algorithm selection is not part of routes" {
 }
 
 ///|
+test "DiffCache put preserves old caches and overwrites only the matching key" {
+  let line_key = CacheKey::Line
+  let moonbit_key = CacheKey::MoonBit(LexicalAlgorithm, false, false)
+  guard calculate_file_document(
+      ready_test_file(fixture_file("README.md", "modified"), ["old"], ["first"]),
+      line_key,
+    )
+    is Some(first) else {
+    fail("expected first line result")
+  }
+  guard calculate_file_document(
+      ready_test_file(fixture_file("CHANGELOG.md", "modified"), ["old"], [
+        "replacement",
+      ]),
+      line_key,
+    )
+    is Some(replacement) else {
+    fail("expected replacement line result")
+  }
+  guard calculate_file_document(
+      ready_test_file(
+        fixture_file("src/cache.mbt", "modified"),
+        ["fn value() { old() }"],
+        ["fn value() { new() }"],
+      ),
+      moonbit_key,
+    )
+    is Some(moonbit) else {
+    fail("expected MoonBit result")
+  }
+  let original = DiffCache::empty()
+  let with_line = original.put(line_key, first)
+  let with_both = with_line.put(moonbit_key, moonbit)
+  let overwritten = with_both.put(line_key, replacement)
+  assert_true(original.get(line_key) is None)
+  assert_true(original.get(moonbit_key) is None)
+  assert_true(with_line.get(line_key) == Some(first))
+  assert_true(with_line.get(moonbit_key) is None)
+  assert_true(with_both.get(line_key) == Some(first))
+  assert_true(with_both.get(moonbit_key) == Some(moonbit))
+  assert_true(overwritten.get(line_key) == Some(replacement))
+  assert_true(overwritten.get(moonbit_key) == Some(moonbit))
+  assert_true(with_both.get(line_key) == Some(first))
+}
+
+///|
 test "MoonBit files cache all eight algorithm and filter combinations" {
   let file = fixture_file("src/filters.mbt", "modified")
   let mut cached = ready_test_file(
