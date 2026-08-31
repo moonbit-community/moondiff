@@ -44,6 +44,42 @@ priv struct ImplFuzzyGap {
 } derive(Eq)
 
 ///|
+priv struct ImplFuzzyBestCandidate {
+  score : Int
+  index : Int
+  tied : Bool
+}
+
+///|
+fn ImplFuzzyBestCandidate::empty() -> Self {
+  { score: -1, index: -1, tied: false, }
+}
+
+///|
+fn ImplFuzzyBestCandidate::consider(
+  self : Self,
+  index : Int,
+  score : Int,
+) -> Self {
+  if score > self.score {
+    { score, index, tied: false, }
+  } else if score == self.score {
+    { score: self.score, index: self.index, tied: true, }
+  } else {
+    self
+  }
+}
+
+///|
+fn ImplFuzzyBestCandidate::unique_index(self : Self) -> Int? {
+  if self.score >= impl_fuzzy_threshold && !self.tied {
+    Some(self.index)
+  } else {
+    None
+  }
+}
+
+///|
 // Semantic-key pairs retain their occurrence-order default. Only a key that
 // occurs once on both sides is eligible for the extraction challenge.
 priv struct ImplSemanticPair {
@@ -956,15 +992,18 @@ fn align_fuzzy_impl_units(
     }
   }
 
-  let old_best = Array::make(old_units.length(), -1)
-  let new_best = Array::make(new_units.length(), -1)
+  let old_best = Array::make(
+    old_units.length(),
+    ImplFuzzyBestCandidate::empty(),
+  )
+  let new_best = Array::make(
+    new_units.length(),
+    ImplFuzzyBestCandidate::empty(),
+  )
   for old_index in 0..<old_units.length() {
     if old_used.contains(old_index) {
       continue
     }
-    let mut best_score = -1
-    let mut best_index = -1
-    let mut tied = false
     for new_index in 0..<new_units.length() {
       if !new_used.contains(new_index) &&
         !new_excluded_from_matching.contains(new_index) &&
@@ -973,53 +1012,16 @@ fn align_fuzzy_impl_units(
           new_contents, use_uuid, budget,
         )
         is Some(score) {
-        if score > best_score {
-          best_score = score
-          best_index = new_index
-          tied = false
-        } else if score == best_score {
-          tied = true
-        }
+        old_best[old_index] = old_best[old_index].consider(new_index, score)
+        new_best[new_index] = new_best[new_index].consider(old_index, score)
       }
-    }
-    if best_score >= impl_fuzzy_threshold && !tied {
-      old_best[old_index] = best_index
-    }
-  }
-
-  for new_index in 0..<new_units.length() {
-    if new_used.contains(new_index) ||
-      new_excluded_from_matching.contains(new_index) {
-      continue
-    }
-    let mut best_score = -1
-    let mut best_index = -1
-    let mut tied = false
-    for old_index in 0..<old_units.length() {
-      if !old_used.contains(old_index) &&
-        impl_fuzzy_candidate_score(
-          old_index, new_index, old_units, new_units, old_gaps, new_gaps, old_contents,
-          new_contents, use_uuid, budget,
-        )
-        is Some(score) {
-        if score > best_score {
-          best_score = score
-          best_index = old_index
-          tied = false
-        } else if score == best_score {
-          tied = true
-        }
-      }
-    }
-    if best_score >= impl_fuzzy_threshold && !tied {
-      new_best[new_index] = best_index
     }
   }
 
   let pairs = Array::new()
   for old_index in 0..<old_units.length() {
-    let new_index = old_best[old_index]
-    if new_index >= 0 && new_best[new_index] == old_index {
+    if old_best[old_index].unique_index() is Some(new_index) &&
+      new_best[new_index].unique_index() == Some(old_index) {
       pairs.push((old_index, new_index))
     }
   }
