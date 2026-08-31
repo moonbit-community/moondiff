@@ -1,10 +1,3 @@
-///|UUID(0b68f529-4c5b-42fe-8a34-07ecd4f883ef)
-/// Implements Dijkstra's algorithm for shortest path, to find an
-/// optimal and readable diff between two ASTs.
-priv suberror ExceededGraphLimit {
-  ExceededGraphLimit
-}
-
 ///|UUID(58abb95f-c5cc-4ced-8d34-ca251ed41672)
 #valtype
 priv struct WeightedVertex {
@@ -24,7 +17,7 @@ fn shortest_vertex_path(
   size_hint : Int,
   graph_limit : Int,
   budget : @computation.ScopeBudget,
-) -> Array[Vertex] raise {
+) -> GraphLimitResult[Array[Vertex]] raise @computation.ScopeLimitExceeded {
   // We want to visit nodes with the shortest distance first, but
   // PriorityQueue is a max-heap. Ensure nodes are wrapped with
   // @cmp.Reverse to flip comparisons.
@@ -38,6 +31,9 @@ fn shortest_vertex_path(
           break current
         }
         set_neighbours(current, seen, budget)
+        if seen.length() > graph_limit {
+          return GraphLimitExceeded
+        }
         for neighbor in current.neighbours.val.unwrap() {
           let (edge, next) = neighbor
           let distance_to_next = distance + edge.cost()
@@ -53,9 +49,6 @@ fn shortest_vertex_path(
             })
           }
         }
-        if seen.length() > graph_limit {
-          raise ExceededGraphLimit
-        }
         continue heap.pop()
       }
       None => panic() // Ran out of graph nodes before reaching end
@@ -68,7 +61,7 @@ fn shortest_vertex_path(
     current = node.predecessor.val
   }
   vertex_route.rev_in_place()
-  return vertex_route
+  WithinLimit(vertex_route)
 }
 
 ///|UUID(2a51db63-c593-4a88-a1d8-efbcb82369c8)
@@ -99,9 +92,12 @@ pub fn shortest_path_with_budget(
   size_hint : Int,
   graph_limit : Int,
   budget : @computation.ScopeBudget,
-) -> Array[(Edge, Vertex)] raise {
-  let vertex_path = shortest_vertex_path(start, size_hint, graph_limit, budget)
-  shortest_path_with_edges(vertex_path)
+) -> GraphLimitResult[Array[(Edge, Vertex)]] raise @computation.ScopeLimitExceeded {
+  match shortest_vertex_path(start, size_hint, graph_limit, budget) {
+    WithinLimit(vertex_path) =>
+      WithinLimit(shortest_path_with_edges(vertex_path))
+    GraphLimitExceeded => GraphLimitExceeded
+  }
 }
 
 ///|UUID(7491a578-084f-4361-b488-58b7f2f8cb56)
@@ -157,18 +153,24 @@ fn mark_syntax_with_budget(
   change_map : ChangeMap,
   graph_limit : UInt,
   budget : @computation.ScopeBudget,
-) -> Unit raise {
+) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   let lhs_node_count = node_count(lhs_syntax)
   let rhs_node_count = node_count(rhs_syntax)
   let size_hint = @cmp.minimum(lhs_node_count * rhs_node_count, graph_limit).reinterpret_as_int()
   let start = Vertex::new(lhs=lhs_syntax, rhs=rhs_syntax)
-  let route = shortest_path_with_budget(
-    start,
-    size_hint,
-    graph_limit.reinterpret_as_int(),
-    budget,
-  )
-  populate_change_map(route, change_map)
+  match
+    shortest_path_with_budget(
+      start,
+      size_hint,
+      graph_limit.reinterpret_as_int(),
+      budget,
+    ) {
+    WithinLimit(route) => {
+      populate_change_map(route, change_map)
+      WithinLimit(())
+    }
+    GraphLimitExceeded => GraphLimitExceeded
+  }
 }
 
 ///|UUID(b0f991cc-c1d3-4f68-998a-594ad3288a07)
