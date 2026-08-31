@@ -1536,14 +1536,16 @@ test "CST wrappers do not hide inserted sibling statements" {
   let rhs_roots = [new_units[0].root]
   @syntax.init_all_info(lhs_roots, rhs_roots)
   let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots_with_budget(
-    lhs_roots,
-    rhs_roots,
-    change_map,
-    3_000_000,
-    alignment_test_budget(),
-  ) catch {
-    _ => panic()
+  match
+    @diff.mark_syntax_roots_with_budget(
+      lhs_roots,
+      rhs_roots,
+      change_map,
+      3_000_000,
+      alignment_test_budget(),
+    ) {
+    WithinLimit(_) => ()
+    GraphLimitExceeded => panic()
   }
 
   let rhs_inserted_atom = find_atom(rhs_roots[0], "5").unwrap()

@@ -85,17 +85,21 @@ fn mark_root_segments(
   change_map : ChangeMap,
   graph_limit : UInt,
   budget : @computation.ScopeBudget,
-) -> Unit raise {
+) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   match (lhs_roots.length(), rhs_roots.length()) {
-    (0, 0) => ()
-    (_, 0) =>
+    (0, 0) => WithinLimit(())
+    (_, 0) => {
       for lhs in lhs_roots {
         change_map.insert_deep_novel(lhs)
       }
-    (0, _) =>
+      WithinLimit(())
+    }
+    (0, _) => {
       for rhs in rhs_roots {
         change_map.insert_deep_novel(rhs)
       }
+      WithinLimit(())
+    }
     (1, 1) =>
       mark_syntax_subtree(
         Some(lhs_roots[0]),
@@ -109,13 +113,17 @@ fn mark_root_segments(
       if matches.is_empty() {
         let paired = @cmp.minimum(lhs_roots.length(), rhs_roots.length())
         for i in 0..<paired {
-          mark_syntax_subtree(
-            Some(lhs_roots[i]),
-            Some(rhs_roots[i]),
-            change_map,
-            graph_limit,
-            budget,
-          )
+          match
+            mark_syntax_subtree(
+              Some(lhs_roots[i]),
+              Some(rhs_roots[i]),
+              change_map,
+              graph_limit,
+              budget,
+            ) {
+            GraphLimitExceeded => return GraphLimitExceeded
+            WithinLimit(_) => ()
+          }
         }
         for i in paired..<lhs_roots.length() {
           change_map.insert_deep_novel(lhs_roots[i])
@@ -123,20 +131,24 @@ fn mark_root_segments(
         for i in paired..<rhs_roots.length() {
           change_map.insert_deep_novel(rhs_roots[i])
         }
-        return
+        return WithinLimit(())
       }
 
       let mut lhs_start = 0
       let mut rhs_start = 0
       for match_ in matches {
         let (lhs_i, rhs_i) = match_
-        mark_root_segments(
-          lhs_roots[lhs_start:lhs_i],
-          rhs_roots[rhs_start:rhs_i],
-          change_map,
-          graph_limit,
-          budget,
-        )
+        match
+          mark_root_segments(
+            lhs_roots[lhs_start:lhs_i],
+            rhs_roots[rhs_start:rhs_i],
+            change_map,
+            graph_limit,
+            budget,
+          ) {
+          GraphLimitExceeded => return GraphLimitExceeded
+          WithinLimit(_) => ()
+        }
         change_map.insert_deep_unchanged(
           node=lhs_roots[lhs_i],
           opposite_node=rhs_roots[rhs_i],
@@ -166,15 +178,22 @@ fn mark_syntax_subtree(
   change_map : ChangeMap,
   graph_limit : UInt,
   budget : @computation.ScopeBudget,
-) -> Unit raise {
+) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   match (lhs_root, rhs_root) {
-    (None, None) => ()
-    (Some(lhs), None) => change_map.insert_deep_novel(lhs)
-    (None, Some(rhs)) => change_map.insert_deep_novel(rhs)
+    (None, None) => WithinLimit(())
+    (Some(lhs), None) => {
+      change_map.insert_deep_novel(lhs)
+      WithinLimit(())
+    }
+    (None, Some(rhs)) => {
+      change_map.insert_deep_novel(rhs)
+      WithinLimit(())
+    }
     (Some(lhs), Some(rhs)) =>
       if can_mark_deep_unchanged(lhs, rhs) {
         change_map.insert_deep_unchanged(node=lhs, opposite_node=rhs)
         change_map.insert_deep_unchanged(node=rhs, opposite_node=lhs)
+        WithinLimit(())
       } else {
         match (lhs, rhs) {
           (
@@ -233,7 +252,7 @@ fn mark_syntax_roots_impl(
   change_map : ChangeMap,
   graph_limit : UInt,
   budget : @computation.ScopeBudget,
-) -> Unit raise {
+) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   let prefix_len = shared_prefix_len(lhs_roots, rhs_roots)
   for i in 0..<prefix_len {
     change_map.insert_deep_unchanged(
@@ -272,6 +291,6 @@ pub fn mark_syntax_roots_with_budget(
   change_map : ChangeMap,
   graph_limit : UInt,
   budget : @computation.ScopeBudget,
-) -> Unit raise {
+) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   mark_syntax_roots_impl(lhs_roots, rhs_roots, change_map, graph_limit, budget)
 }

@@ -47,6 +47,7 @@ priv struct DetailedUnitResult {
 priv enum AstBuildResult {
   AstDocument(@model.HunkDocument)
   AstPositionsOutOfBounds(ArrayView[DiffSide])
+  AstGraphLimitExceeded
 }
 
 ///|
@@ -730,12 +731,16 @@ fn ast_document_for_roots_with_budget(
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.ScopeBudget,
-) -> AstBuildResult raise {
+) -> AstBuildResult raise @computation.ScopeLimitExceeded {
   @syntax.init_all_info(lhs_roots, rhs_roots)
   let change_map = @syntax.ChangeMap::new()
-  @diff.mark_syntax_roots_with_budget(
-    lhs_roots, rhs_roots, change_map, graph_limit, budget,
-  )
+  match
+    @diff.mark_syntax_roots_with_budget(
+      lhs_roots, rhs_roots, change_map, graph_limit, budget,
+    ) {
+    WithinLimit(_) => ()
+    GraphLimitExceeded => return AstGraphLimitExceeded
+  }
   @diff.fix_all_sliders(lhs_roots, change_map)
   @diff.fix_all_sliders(rhs_roots, change_map)
   let out_of_bounds_sides : Array[DiffSide] = []
@@ -779,7 +784,7 @@ fn ast_unit_document_with_budget(
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.ScopeBudget,
-) -> AstBuildResult raise {
+) -> AstBuildResult raise @computation.ScopeLimitExceeded {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
   let lhs_roots : Array[@syntax.Syntax] = []
@@ -800,6 +805,7 @@ fn ast_unit_document_with_budget(
         @diff_ignore.restore_document(document, old=old_local, new=new_local),
       )
     AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
+    AstGraphLimitExceeded => AstGraphLimitExceeded
   }
 }
 
@@ -836,20 +842,20 @@ fn detailed_ast_edit_document(
         fallback: Some(reason),
       }
     }
-    _ => {
-      let reason : FallbackReason = GraphLimitExceeded(limit=graph_limit)
-      return {
+  }
+  match build {
+    AstDocument(document) => { document, fallback: None, }
+    AstPositionsOutOfBounds(sides) => {
+      let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
+      {
         document: lexical_edit_document(
           old_unit, new_unit, old_view, new_view, context, ignore_comments,
         ),
         fallback: Some(reason),
       }
     }
-  }
-  match build {
-    AstDocument(document) => { document, fallback: None, }
-    AstPositionsOutOfBounds(sides) => {
-      let reason : FallbackReason = SyntaxPositionsOutOfBounds(sides~)
+    AstGraphLimitExceeded => {
+      let reason : FallbackReason = GraphLimitExceeded(limit=graph_limit)
       {
         document: lexical_edit_document(
           old_unit, new_unit, old_view, new_view, context, ignore_comments,
@@ -870,7 +876,7 @@ fn ast_root_document_with_budget(
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
   budget : @computation.ScopeBudget,
-) -> AstBuildResult raise {
+) -> AstBuildResult raise @computation.ScopeLimitExceeded {
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
   match
@@ -883,6 +889,7 @@ fn ast_root_document_with_budget(
         @diff_ignore.restore_document(document, old=old_view, new=new_view),
       )
     AstPositionsOutOfBounds(sides) => AstPositionsOutOfBounds(sides)
+    AstGraphLimitExceeded => AstGraphLimitExceeded
   }
 }
 
@@ -930,14 +937,6 @@ fn detailed_ast_root_list_document(
         ignore_comments,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),
       )
-    _ =>
-      return whole_file_fallback(
-        old_view,
-        new_view,
-        context,
-        ignore_comments,
-        GraphLimitExceeded(limit=graph_limit),
-      )
   }
   match build {
     AstPositionsOutOfBounds(sides) =>
@@ -957,6 +956,14 @@ fn detailed_ast_root_list_document(
           Changed
         },
       }
+    AstGraphLimitExceeded =>
+      whole_file_fallback(
+        old_view,
+        new_view,
+        context,
+        ignore_comments,
+        GraphLimitExceeded(limit=graph_limit),
+      )
   }
 }
 
