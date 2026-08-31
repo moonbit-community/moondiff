@@ -1263,6 +1263,45 @@ test "fuzzy alignment pairs a renamed method beside a stable anchor" {
 }
 
 ///|
+test "fuzzy alignment scores each candidate pair once" {
+  let old_units = parse_units(
+    (
+      #|fn stable() {}
+      #|fn JobHandle::spawn_unix(path : String) {
+      #|  launch(path)
+      #|}
+    ),
+  )
+  let new_units = parse_units(
+    (
+      #|fn stable() {}
+      #|fn JobHandle::spawn_unix_ffi(path : String) {
+      #|  launch(path)
+      #|}
+    ),
+  )
+  guard old_units[1].fuzzy is Some(old_info) &&
+    new_units[1].fuzzy is Some(new_info) else {
+    fail("expected fuzzy declaration metadata")
+  }
+  let old_name_size = old_info.name.to_array().length() + 1
+  let new_name_size = new_info.name.to_array().length() + 1
+  let score_work = (old_name_size * new_name_size).reinterpret_as_uint()
+  let state = AlignmentState::new(old_units, new_units, true)
+  state.pair(0, 0)
+  let budget = @computation.ScopeBudget::new(score_work)
+  @debug.assert_eq(align_fuzzy_impl_units(state, budget), [(1, 1)])
+  try budget.charge(1U, TopLevelAlignment) catch {
+    ScopeLimitExceeded(stage~, limit~) => {
+      assert_true(stage is TopLevelAlignment)
+      assert_eq(limit, score_work)
+    }
+  } noraise {
+    _ => fail("expected one candidate score to exhaust the exact budget")
+  }
+}
+
+///|
 test "fuzzy alignment uniquely pairs several changes under one receiver" {
   let old_source =
     #|fn stable() {}
