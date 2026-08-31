@@ -21,8 +21,6 @@ pub(all) enum AlignedDiffMode {
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : @model.DiffStatus
-  old_ignored_test_ranges : ArrayView[@model.LineRange]
-  new_ignored_test_ranges : ArrayView[@model.LineRange]
 } derive(Eq)
 
 // Type aliases

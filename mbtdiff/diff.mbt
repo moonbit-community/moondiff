@@ -32,10 +32,5 @@ pub fn diff(
     ignore_tests=options.ignore_tests,
     mode~,
   )
-  @model.DiffResult::make(
-    result.document,
-    result.status,
-    result.old_ignored_test_ranges,
-    result.new_ignored_test_ranges,
-  )
+  @model.DiffResult::make(result.document, result.status)
 }
