@@ -3,103 +3,126 @@ fn all_units_have_uuid(units : ArrayView[ImplUnit]) -> Bool {
   units.all(fn(unit) { unit.uuid is Some(_) })
 }
 
-///|UUID(75486f71-7af0-4c26-a905-97cdfbc7d623)
-// Align duplicated UUIDs by occurrence order. This keeps repeated generated
-// declarations deterministic without requiring UUIDs to be globally unique.
-fn align_impl_units_by_uuid(
+///|
+// Mutable occupancy for the fixed-order top-level alignment phases. Pairing is
+// centralized so a later phase cannot overwrite an earlier replacement.
+// Excluded new units remain unused and therefore still become final inserts.
+priv struct AlignmentState {
+  old_units : ArrayView[ImplUnit]
+  new_units : ArrayView[ImplUnit]
+  use_uuid : Bool
+  old_used : @hashmap.HashMap[Int, Bool]
+  new_used : @hashmap.HashMap[Int, Bool]
+  replacements : @hashmap.HashMap[Int, Int]
+  excluded_new : @hashmap.HashMap[Int, Bool]
+}
+
+///|
+fn AlignmentState::new(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-) -> Array[ImplEdit] {
-  let new_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([])
-  for i in 0..<new_units.length() {
-    if new_units[i].uuid is Some(uuid) {
-      new_positions.get_or_init(uuid, fn() { [] }).push(i)
+  use_uuid : Bool,
+) -> Self {
+  {
+    old_units,
+    new_units,
+    use_uuid,
+    old_used: @hashmap.HashMap([]),
+    new_used: @hashmap.HashMap([]),
+    replacements: @hashmap.HashMap([]),
+    excluded_new: @hashmap.HashMap([]),
+  }
+}
+
+///|
+fn AlignmentState::pair(self : Self, old_index : Int, new_index : Int) -> Unit {
+  if !self.old_used.contains(old_index) &&
+    !self.new_used.contains(new_index) &&
+    !self.excluded_new.contains(new_index) {
+    self.old_used[old_index] = true
+    self.new_used[new_index] = true
+    self.replacements[old_index] = new_index
+  }
+}
+
+///|
+fn AlignmentState::exclude_new(self : Self, new_index : Int) -> Unit {
+  self.excluded_new[new_index] = true
+}
+
+///|
+fn AlignmentState::finish(self : Self) -> Array[ImplEdit] {
+  let edits : Array[ImplEdit] = []
+  for i in 0..<self.old_units.length() {
+    if self.replacements.get(i) is Some(new_index) {
+      edits.push(Replace(old=self.old_units[i], new=self.new_units[new_index]))
     } else {
-      panic()
+      edits.push(Delete(self.old_units[i]))
     }
   }
-
-  let new_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
-  let used_new : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
-  let edits = Array::new()
-
-  for old_unit in old_units {
-    if old_unit.uuid is Some(uuid) {
-      if new_positions.get(uuid) is Some(indices) {
-        let offset = new_offsets.get(uuid).unwrap_or(0)
-        if offset < indices.length() {
-          let new_index = indices[offset]
-          new_offsets[uuid] = offset + 1
-          used_new.set(new_index, true)
-          edits.push(Replace(old=old_unit, new=new_units[new_index]))
-        } else {
-          edits.push(Delete(old_unit))
-        }
-      } else {
-        edits.push(Delete(old_unit))
-      }
-    } else {
-      panic()
-    }
-  }
-
-  for i in 0..<new_units.length() {
-    if !used_new.contains(i) {
-      edits.push(Insert(new_units[i]))
+  for i in 0..<self.new_units.length() {
+    if !self.new_used.contains(i) {
+      edits.push(Insert(self.new_units[i]))
     }
   }
   edits
 }
 
-///|UUID(218731b6-e35d-469a-b7a9-a31dcc3b1c70)
-fn align_impl_units_by_key_impl(
+///|
+priv struct SemanticCandidateSet {
+  pairs : Array[ImplSemanticPair]
+  new_used : @hashmap.HashMap[Int, Bool]
+}
+
+///|
+// Align duplicated UUIDs by occurrence order. This keeps repeated generated
+// declarations deterministic without requiring UUIDs to be globally unique.
+fn align_uuid_phase(state : AlignmentState) -> Unit {
+  if !state.use_uuid {
+    return
+  }
+  let new_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([])
+  for i in 0..<state.new_units.length() {
+    if state.new_units[i].uuid is Some(uuid) {
+      new_positions.get_or_init(uuid, fn() { [] }).push(i)
+    }
+  }
+  let new_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  for i in 0..<state.old_units.length() {
+    if state.old_units[i].uuid is Some(uuid) &&
+      new_positions.get(uuid) is Some(indices) {
+      let offset = new_offsets.get(uuid).unwrap_or(0)
+      if offset < indices.length() {
+        new_offsets[uuid] = offset + 1
+        state.pair(i, indices[offset])
+      }
+    }
+  }
+}
+
+///|UUID(75486f71-7af0-4c26-a905-97cdfbc7d623)
+fn align_impl_units_by_uuid(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  budget : @computation.ScopeBudget,
-  use_uuid? : Bool = true,
-) -> Array[ImplEdit] raise @computation.ScopeLimitExceeded {
-  let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
-  let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
-  let replacements : @hashmap.HashMap[Int, Int] = @hashmap.HashMap([])
-
-  fn pair(old_index : Int, new_index : Int) -> Unit {
-    if !old_used.contains(old_index) && !new_used.contains(new_index) {
-      old_used.set(old_index, true)
-      new_used.set(new_index, true)
-      replacements.set(old_index, new_index)
-    }
+) -> Array[ImplEdit] {
+  if !all_units_have_uuid(old_units) || !all_units_have_uuid(new_units) {
+    panic()
   }
+  let state = AlignmentState::new(old_units, new_units, true)
+  align_uuid_phase(state)
+  state.finish()
+}
 
-  if use_uuid {
-    let new_uuid_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
-    )
-    for i in 0..<new_units.length() {
-      if new_units[i].uuid is Some(uuid) {
-        new_uuid_positions.get_or_init(uuid, fn() { [] }).push(i)
-      }
-    }
-    let uuid_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
-    for i in 0..<old_units.length() {
-      if old_units[i].uuid is Some(uuid) {
-        if new_uuid_positions.get(uuid) is Some(indices) {
-          let offset = uuid_offsets.get(uuid).unwrap_or(0)
-          if offset < indices.length() {
-            uuid_offsets[uuid] = offset + 1
-            pair(i, indices[offset])
-          }
-        }
-      }
-    }
-  }
-
-  let old_key_counts : @hashmap.HashMap[String, Int] = HashMap([])
-  let new_key_counts : @hashmap.HashMap[String, Int] = HashMap([])
-  for unit in old_units {
+///|
+fn semantic_candidate_phase(state : AlignmentState) -> SemanticCandidateSet {
+  let old_key_counts : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  let new_key_counts : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
+  for unit in state.old_units {
     if unit.semantic_key is Some(key) {
       old_key_counts[key] = old_key_counts.get(key).unwrap_or(0) + 1
     }
   }
-  for unit in new_units {
+  for unit in state.new_units {
     if unit.semantic_key is Some(key) {
       new_key_counts[key] = new_key_counts.get(key).unwrap_or(0) + 1
     }
@@ -110,69 +133,85 @@ fn align_impl_units_by_key_impl(
   // original occurrence-order pairing and are never contestable.
   let new_key_positions : @hashmap.HashMap[String, Array[Int]] = @hashmap.HashMap([],
   )
-  for i in 0..<new_units.length() {
-    if !new_used.contains(i) {
-      if new_units[i].semantic_key is Some(key) {
-        new_key_positions.get_or_init(key, fn() { [] }).push(i)
-      }
+  for i in 0..<state.new_units.length() {
+    if !state.new_used.contains(i) &&
+      state.new_units[i].semantic_key is Some(key) {
+      new_key_positions.get_or_init(key, fn() { [] }).push(i)
     }
   }
   let key_offsets : @hashmap.HashMap[String, Int] = @hashmap.HashMap([])
-  let semantic_pairs : Array[ImplSemanticPair] = []
-  let new_semantic_used : @hashmap.HashMap[Int, Bool] = HashMap([])
-  for i in 0..<old_units.length() {
-    if !old_used.contains(i) {
-      if old_units[i].semantic_key is Some(key) {
-        if new_key_positions.get(key) is Some(indices) {
-          let offset = key_offsets.get(key).unwrap_or(0)
-          if offset < indices.length() {
-            key_offsets[key] = offset + 1
-            let new_index = indices[offset]
-            semantic_pairs.push({
-              old_index: i,
-              new_index,
-              unique_key: old_key_counts.get(key) == Some(1) &&
-              new_key_counts.get(key) == Some(1),
-            })
-            new_semantic_used[new_index] = true
-          }
-        }
+  let pairs : Array[ImplSemanticPair] = []
+  let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
+  for i in 0..<state.old_units.length() {
+    if !state.old_used.contains(i) &&
+      state.old_units[i].semantic_key is Some(key) &&
+      new_key_positions.get(key) is Some(indices) {
+      let offset = key_offsets.get(key).unwrap_or(0)
+      if offset < indices.length() {
+        key_offsets[key] = offset + 1
+        let new_index = indices[offset]
+        pairs.push({
+          old_index: i,
+          new_index,
+          unique_key: old_key_counts.get(key) == Some(1) &&
+          new_key_counts.get(key) == Some(1),
+        })
+        new_used[new_index] = true
       }
     }
   }
+  { pairs, new_used, }
+}
 
-  let new_challenge_used : @hashmap.HashMap[Int, Bool] = HashMap([])
-  let new_excluded_from_matching : @hashmap.HashMap[Int, Bool] = HashMap([])
+///|
+fn helper_extraction_phase(
+  state : AlignmentState,
+  candidates : SemanticCandidateSet,
+  budget : @computation.ScopeBudget,
+) -> Unit raise @computation.ScopeLimitExceeded {
+  let new_challenge_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let old_body_cache : Array[ImplFuzzyBody?] = Array::make(
-    old_units.length(),
+    state.old_units.length(),
     None,
   )
   let new_body_cache : Array[ImplFuzzyBody?] = Array::make(
-    new_units.length(),
+    state.new_units.length(),
     None,
   )
-  let old_competitors = impl_old_body_competitors_by_owner(old_units)
-  for semantic_pair in semantic_pairs {
+  let old_competitors = impl_old_body_competitors_by_owner(state.old_units)
+  for semantic_pair in candidates.pairs {
     if impl_semantic_challenge_helper(
-        semantic_pair, old_units, new_units, old_body_cache, new_body_cache, old_competitors,
-        use_uuid, new_used, new_semantic_used, new_challenge_used, budget,
+        semantic_pair,
+        state.old_units,
+        state.new_units,
+        old_body_cache,
+        new_body_cache,
+        old_competitors,
+        state.use_uuid,
+        state.new_used,
+        candidates.new_used,
+        new_challenge_used,
+        budget,
       )
       is Some(helper_index) {
       new_challenge_used[helper_index] = true
-      new_excluded_from_matching[semantic_pair.new_index] = true
-      pair(semantic_pair.old_index, helper_index)
+      state.exclude_new(semantic_pair.new_index)
+      state.pair(semantic_pair.old_index, helper_index)
     } else {
-      pair(semantic_pair.old_index, semantic_pair.new_index)
+      state.pair(semantic_pair.old_index, semantic_pair.new_index)
     }
   }
+}
 
-  let old_roots = impl_roots(old_units)
-  let new_roots = impl_roots(new_units)
+///|
+fn exact_content_phase(state : AlignmentState) -> Unit {
+  let old_roots = impl_roots(state.old_units)
+  let new_roots = impl_roots(state.new_units)
   @syntax.init_all_info(old_roots, new_roots)
   let old_content_counts : @hashmap.HashMap[UInt, Int] = @hashmap.HashMap([])
-  for i in 0..<old_units.length() {
-    if !old_used.contains(i) {
-      let content_id = old_units[i].root.content_id()
+  for i in 0..<state.old_units.length() {
+    if !state.old_used.contains(i) {
+      let content_id = state.old_units[i].root.content_id()
       old_content_counts[content_id] = old_content_counts
         .get(content_id)
         .unwrap_or(0) +
@@ -181,53 +220,55 @@ fn align_impl_units_by_key_impl(
   }
   let new_content_positions : @hashmap.HashMap[UInt, Array[Int]] = @hashmap.HashMap([],
   )
-  for i in 0..<new_units.length() {
-    if !new_used.contains(i) && !new_excluded_from_matching.contains(i) {
-      let content_id = new_units[i].root.content_id()
+  for i in 0..<state.new_units.length() {
+    if !state.new_used.contains(i) && !state.excluded_new.contains(i) {
+      let content_id = state.new_units[i].root.content_id()
       new_content_positions.get_or_init(content_id, fn() { [] }).push(i)
     }
   }
-  for i in 0..<old_units.length() {
-    if !old_used.contains(i) {
-      let content_id = old_units[i].root.content_id()
-      if old_content_counts.get(content_id).unwrap_or(0) == 1 {
-        if new_content_positions.get(content_id) is Some(indices) &&
-          indices.length() == 1 {
-          pair(i, indices[0])
-        }
+  for i in 0..<state.old_units.length() {
+    if !state.old_used.contains(i) {
+      let content_id = state.old_units[i].root.content_id()
+      if old_content_counts.get(content_id).unwrap_or(0) == 1 &&
+        new_content_positions.get(content_id) is Some(indices) &&
+        indices.length() == 1 {
+        state.pair(i, indices[0])
       }
     }
   }
+}
 
+///|
+fn fuzzy_phase(
+  state : AlignmentState,
+  budget : @computation.ScopeBudget,
+) -> Unit raise @computation.ScopeLimitExceeded {
   // UUID, final semantic-key/challenge, and exact-content pairs are fixed
   // anchors. Displaced wrappers cannot re-enter through exact or fuzzy
   // matching. This deliberately prioritizes implementation-body continuity
   // and does not guarantee continuity for documentation attached to the
   // displaced wrapper; the final pass renders the whole wrapper as an insert.
-  let fuzzy_pairs = align_fuzzy_impl_units(
-    old_units, new_units, old_used, new_used, new_excluded_from_matching, replacements,
-    use_uuid, budget,
-  )
+  let fuzzy_pairs = align_fuzzy_impl_units(state, budget)
   for fuzzy_pair in fuzzy_pairs {
     let (old_index, new_index) = fuzzy_pair
-    pair(old_index, new_index)
+    state.pair(old_index, new_index)
   }
+}
 
-  let edits = Array::new()
-  for i in 0..<old_units.length() {
-    if replacements.get(i) is Some(new_index) {
-      edits.push(Replace(old=old_units[i], new=new_units[new_index]))
-    } else {
-      edits.push(Delete(old_units[i]))
-    }
-  }
-
-  for i in 0..<new_units.length() {
-    if !new_used.contains(i) {
-      edits.push(Insert(new_units[i]))
-    }
-  }
-  edits
+///|UUID(218731b6-e35d-469a-b7a9-a31dcc3b1c70)
+fn align_impl_units_by_key_impl(
+  old_units : ArrayView[ImplUnit],
+  new_units : ArrayView[ImplUnit],
+  budget : @computation.ScopeBudget,
+  use_uuid? : Bool = true,
+) -> Array[ImplEdit] raise @computation.ScopeLimitExceeded {
+  let state = AlignmentState::new(old_units, new_units, use_uuid)
+  align_uuid_phase(state)
+  let candidates = semantic_candidate_phase(state)
+  helper_extraction_phase(state, candidates, budget)
+  exact_content_phase(state)
+  fuzzy_phase(state, budget)
+  state.finish()
 }
 
 ///|UUID(efd8452b-7521-4f76-9171-86843cf72de6)

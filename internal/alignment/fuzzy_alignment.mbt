@@ -893,15 +893,16 @@ fn impl_fuzzy_candidate_score(
 
 ///|
 fn align_fuzzy_impl_units(
-  old_units : ArrayView[ImplUnit],
-  new_units : ArrayView[ImplUnit],
-  old_used : @hashmap.HashMap[Int, Bool],
-  new_used : @hashmap.HashMap[Int, Bool],
-  new_excluded_from_matching : @hashmap.HashMap[Int, Bool],
-  reliable : @hashmap.HashMap[Int, Int],
-  use_uuid : Bool,
+  state : AlignmentState,
   budget : @computation.ScopeBudget,
 ) -> Array[(Int, Int)] raise @computation.ScopeLimitExceeded {
+  let old_units = state.old_units
+  let new_units = state.new_units
+  let old_used = state.old_used
+  let new_used = state.new_used
+  let new_excluded_from_matching = state.excluded_new
+  let reliable = state.replacements
+  let use_uuid = state.use_uuid
   if reliable.is_empty() {
     return []
   }
