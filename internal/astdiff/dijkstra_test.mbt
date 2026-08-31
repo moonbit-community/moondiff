@@ -269,3 +269,23 @@ test "mark syntax roots handles multiple changed roots around an unchanged ancho
   assert_true(change_map.get(lhs[2]) is Some(Novel))
   assert_true(change_map.get(rhs[2]) is Some(Novel))
 }
+
+///|
+test "mark syntax reports graph limit explicitly" {
+  let lhs = Syntax::atom(content="foo", position=pos(1), kind=Normal)
+  let rhs = Syntax::atom(content="bar", position=pos(1), kind=Normal)
+  @syntax.init_all_info([lhs], [rhs])
+  let change_map = ChangeMap::new()
+
+  let result = mark_syntax_roots_with_budget(
+    [lhs],
+    [rhs],
+    change_map,
+    0,
+    test_budget(),
+  )
+
+  assert_true(result is GraphLimitExceeded)
+  assert_true(change_map.get(lhs) is None)
+  assert_true(change_map.get(rhs) is None)
+}
