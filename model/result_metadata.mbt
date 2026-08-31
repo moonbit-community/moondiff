@@ -15,7 +15,7 @@ pub(all) enum DiffStatus {
 } derive(Debug, Eq)
 
 ///|
-/// An input side used by result metadata and side-specific accessors.
+/// The input side associated with a calculation fallback.
 pub(all) enum DiffSide {
   Old
   New
@@ -43,8 +43,7 @@ pub(all) enum FallbackReason {
 } derive(Debug, Eq)
 
 ///|
-/// A zero-based physical source-line range. `start` is the first line index and
-/// `len` is the number of lines in the range.
+/// A zero-based source range.
 pub(all) struct LineRange {
   start : Int
   len : Int
