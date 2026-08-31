@@ -2,15 +2,6 @@
 
 ## High Priority
 
-- [ ] Preserve the file-level computation limit when diffing per unit.
-  - Affected areas: `internal/alignment/diff_document.mbt` and
-    `internal/computation/budget.mbt`.
-  - [ ] Keep the per-unit budget for local fallback while charging every unit
-    against a shared, monotonically decreasing file-level budget.
-  - [ ] Fall back when either the per-unit or file-level budget is exhausted.
-  - [ ] Add a regression test in which multiple units cumulatively exceed the
-    file-level computation limit.
-
 - [ ] Improve worst-case similarity work beyond the existing budget fallback.
   - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`,
     `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and

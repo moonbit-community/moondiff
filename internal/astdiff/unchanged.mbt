@@ -40,8 +40,8 @@ fn same_root_content(lhs : Syntax, rhs : Syntax) -> Bool {
 fn root_matches_impl(
   lhs : ArrayView[Syntax],
   rhs : ArrayView[Syntax],
-  budget : @computation.Budget,
-) -> Array[(Int, Int)] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[(Int, Int)] raise @computation.ScopeLimitExceeded {
   let width = rhs.length() + 1
   budget.charge_matrix(lhs.length() + 1, width, TopLevelAlignment)
   let dp = Array::make((lhs.length() + 1) * width, 0)
@@ -84,7 +84,7 @@ fn mark_root_segments(
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Unit raise {
   match (lhs_roots.length(), rhs_roots.length()) {
     (0, 0) => ()
@@ -165,7 +165,7 @@ fn mark_syntax_subtree(
   rhs_root : Syntax?,
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Unit raise {
   match (lhs_root, rhs_root) {
     (None, None) => ()
@@ -232,7 +232,7 @@ fn mark_syntax_roots_impl(
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Unit raise {
   let prefix_len = shared_prefix_len(lhs_roots, rhs_roots)
   for i in 0..<prefix_len {
@@ -271,7 +271,7 @@ pub fn mark_syntax_roots_with_budget(
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Unit raise {
   mark_syntax_roots_impl(lhs_roots, rhs_roots, change_map, graph_limit, budget)
 }

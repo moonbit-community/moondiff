@@ -7,8 +7,8 @@ fn pos(line : Int) -> Array[@span.SingleLineSpan] {
 }
 
 ///|
-fn test_budget() -> @computation.Budget {
-  @computation.Budget::new(@computation.default_limit())
+fn test_budget() -> @computation.ScopeBudget {
+  @computation.ScopeBudget::new(@computation.default_scope_limit())
 }
 
 ///|UUID(7ede833b-3459-4ab9-9357-2b43d49c7f0b)

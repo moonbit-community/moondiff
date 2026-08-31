@@ -23,7 +23,7 @@ fn shortest_vertex_path(
   start : Vertex,
   size_hint : Int,
   graph_limit : Int,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Array[Vertex] raise {
   // We want to visit nodes with the shortest distance first, but
   // PriorityQueue is a max-heap. Ensure nodes are wrapped with
@@ -98,7 +98,7 @@ pub fn shortest_path_with_budget(
   start : Vertex,
   size_hint : Int,
   graph_limit : Int,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Array[(Edge, Vertex)] raise {
   let vertex_path = shortest_vertex_path(start, size_hint, graph_limit, budget)
   shortest_path_with_edges(vertex_path)
@@ -156,7 +156,7 @@ fn mark_syntax_with_budget(
   rhs_syntax : Syntax?,
   change_map : ChangeMap,
   graph_limit : UInt,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> Unit raise {
   let lhs_node_count = node_count(lhs_syntax)
   let rhs_node_count = node_count(rhs_syntax)

@@ -6,8 +6,8 @@
 fn levenshtein_impl(
   lhs~ : Array[Char],
   rhs~ : Array[Char],
-  budget : @computation.Budget,
-) -> Int raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int raise @computation.ScopeLimitExceeded {
   let m = lhs.length()
   let n = rhs.length()
   budget.charge_matrix(m + 1, n + 1, SyntaxMatching)
@@ -45,8 +45,8 @@ fn levenshtein_impl(
 fn normalized_levenshtein(
   lhs~ : String,
   rhs~ : String,
-  budget : @computation.Budget,
-) -> Double raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Double raise @computation.ScopeLimitExceeded {
   let lhs = lhs.to_array()
   let rhs = rhs.to_array()
   if lhs.is_empty() && rhs.is_empty() {

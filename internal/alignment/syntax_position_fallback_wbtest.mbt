@@ -205,7 +205,7 @@ fn fallback_test_unit(
 
 ///|
 fn fallback_test_limit() -> UInt {
-  @computation.default_limit()
+  @computation.default_scope_limit()
 }
 
 ///|

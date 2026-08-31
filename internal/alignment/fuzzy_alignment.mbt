@@ -303,8 +303,8 @@ fn impl_fuzzy_body_at(
   units : ArrayView[ImplUnit],
   index : Int,
   cache : Array[ImplFuzzyBody?],
-  budget : @computation.Budget,
-) -> ImplFuzzyBody? raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> ImplFuzzyBody? raise @computation.ScopeLimitExceeded {
   if cache[index] is Some(body) {
     return Some(body)
   }
@@ -525,8 +525,8 @@ fn impl_body_continuity(old : ImplFuzzyBody, candidate : ImplFuzzyBody) -> Int {
 fn impl_body_continuity_with_budget(
   old : ImplFuzzyBody,
   candidate : ImplFuzzyBody,
-  budget : @computation.Budget,
-) -> Int raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int raise @computation.ScopeLimitExceeded {
   budget.charge(old.trigrams.length().reinterpret_as_uint(), TopLevelAlignment)
   impl_body_continuity(old, candidate)
 }
@@ -577,8 +577,8 @@ fn impl_helper_leads_other_old_declarations(
   old_body_cache : Array[ImplFuzzyBody?],
   old_competitors : @hashmap.HashMap[String, Array[Int]],
   current_score : Int,
-  budget : @computation.Budget,
-) -> Bool raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Bool raise @computation.ScopeLimitExceeded {
   if !impl_fuzzy_declarations_compatible(old_info, helper_info) {
     return false
   }
@@ -619,8 +619,8 @@ fn impl_semantic_challenge_helper(
   new_uuid_used : @hashmap.HashMap[Int, Bool],
   new_semantic_used : @hashmap.HashMap[Int, Bool],
   new_challenge_used : @hashmap.HashMap[Int, Bool],
-  budget : @computation.Budget,
-) -> Int? raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int? raise @computation.ScopeLimitExceeded {
   if !pair.unique_key {
     return None
   }
@@ -761,8 +761,8 @@ fn impl_fuzzy_syntax_similarity(
 fn impl_fuzzy_levenshtein(
   lhs : ArrayView[Char],
   rhs : ArrayView[Char],
-  budget : @computation.Budget,
-) -> Int raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int raise @computation.ScopeLimitExceeded {
   budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, TopLevelAlignment)
   let rows : Array[Array[Int]] = [
     Array::make(rhs.length() + 1, 0),
@@ -792,8 +792,8 @@ fn impl_fuzzy_levenshtein(
 fn impl_fuzzy_name_similarity(
   old_name : String,
   new_name : String,
-  budget : @computation.Budget,
-) -> Int raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int raise @computation.ScopeLimitExceeded {
   let old_chars = old_name.to_array()
   let new_chars = new_name.to_array()
   let max_length = @cmp.maximum(old_chars.length(), new_chars.length())
@@ -810,8 +810,8 @@ fn impl_fuzzy_score(
   old_content : ImplFuzzyContent,
   new_info : ImplFuzzyInfo,
   new_content : ImplFuzzyContent,
-  budget : @computation.Budget,
-) -> Int raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int raise @computation.ScopeLimitExceeded {
   let syntax = impl_fuzzy_syntax_similarity(old_content, new_content)
   let name = impl_fuzzy_name_similarity(old_info.name, new_info.name, budget)
   // Keep the score integral and deterministic: (3 * syntax + name) / 4.
@@ -865,8 +865,8 @@ fn impl_fuzzy_candidate_score(
   old_contents : ArrayView[ImplFuzzyContent?],
   new_contents : ArrayView[ImplFuzzyContent?],
   use_uuid : Bool,
-  budget : @computation.Budget,
-) -> Int? raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Int? raise @computation.ScopeLimitExceeded {
   if old_gaps[old_index] != new_gaps[new_index] ||
     (
       use_uuid &&
@@ -900,8 +900,8 @@ fn align_fuzzy_impl_units(
   new_excluded_from_matching : @hashmap.HashMap[Int, Bool],
   reliable : @hashmap.HashMap[Int, Int],
   use_uuid : Bool,
-  budget : @computation.Budget,
-) -> Array[(Int, Int)] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[(Int, Int)] raise @computation.ScopeLimitExceeded {
   if reliable.is_empty() {
     return []
   }

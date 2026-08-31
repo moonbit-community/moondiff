@@ -408,8 +408,8 @@ fn pop_all_parents(
 fn set_neighbours(
   v : Vertex,
   seen : HashMap[Vertex, Array[Vertex]],
-  budget : @computation.Budget,
-) -> Unit raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Unit raise @computation.ScopeLimitExceeded {
   if v.neighbours.val is Some(_) {
     return
   }
