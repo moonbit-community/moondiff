@@ -45,7 +45,7 @@ pub fn line_index(span : @span.SingleLineSpan) -> Int {
 
 ///|UUID(f34e40a4-d17d-485d-8d05-14d6baa98dcb)
 fn is_whitespace_char(ch : Char) -> Bool {
-  ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+  ch.is_whitespace()
 }
 
 ///|UUID(c16c3f8a-c050-406d-8cc0-fac7505a9859)

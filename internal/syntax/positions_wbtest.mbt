@@ -27,6 +27,47 @@ fn novel_width(positions : ArrayView[MatchedPos]) -> Int {
   width.val
 }
 
+///|
+test "split_word_parts groups consecutive Unicode whitespace" {
+  let unicode_whitespace = "\u{00A0}\u{2003}\u{3000}"
+  guard split_word_parts("alpha\{unicode_whitespace}beta")
+    is [prefix, whitespace, suffix] else {
+    fail("expected one Unicode whitespace word part")
+  }
+  assert_eq(prefix.text, "alpha")
+  assert_eq(whitespace.text, unicode_whitespace)
+  assert_eq((whitespace.start, whitespace.end_), (5, 8))
+  assert_eq(suffix.text, "beta")
+}
+
+///|
+test "is_all_whitespace_text recognizes Unicode White_Space" {
+  assert_true(is_all_whitespace_text("\u{00A0}\u{2003}\u{3000}"))
+}
+
+///|
+test "replaced string treats Unicode whitespace like ASCII whitespace" {
+  for unicode_space in ["\u{00A0}", "\u{2003}", "\u{3000}"] {
+    let ascii_atom = test_string_atom("alpha beta gamma")
+    let unicode_atom = test_string_atom("alpha\{unicode_space}beta gamma")
+    init_all_info([ascii_atom], [unicode_atom])
+
+    let change_map = ChangeMap::new()
+    change_map.insert(
+      unicode_atom,
+      ReplacedString(lhs=unicode_atom, rhs=ascii_atom),
+    )
+    let budget = @computation.Budget::new(@computation.default_limit())
+    let positions = change_positions_with_budget(
+      [unicode_atom],
+      change_map,
+      budget,
+    )
+
+    assert_eq(novel_width(positions), 0)
+  }
+}
+
 ///|UUID(9d90653e-b585-4962-93b3-46e6e0ad7796)
 test "change_positions narrows replaced string to changed word" {
   let lhs = test_string_atom("alpha beta gamma")
