@@ -729,7 +729,7 @@ fn ast_document_for_roots_with_budget(
   context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> AstBuildResult raise {
   @syntax.init_all_info(lhs_roots, rhs_roots)
   let change_map = @syntax.ChangeMap::new()
@@ -778,7 +778,7 @@ fn ast_unit_document_with_budget(
   context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> AstBuildResult raise {
   let old_local = unit_source_view(old_view, old_unit)
   let new_local = unit_source_view(new_view, new_unit)
@@ -812,7 +812,7 @@ fn detailed_ast_edit_document(
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> DetailedUnitResult {
   let build = ast_unit_document_with_budget(
     old_unit,
@@ -824,7 +824,7 @@ fn detailed_ast_edit_document(
     !ignore_comments,
     budget,
   ) catch {
-    @computation.LimitExceeded(stage~, limit~) => {
+    @computation.ScopeLimitExceeded(stage~, limit~) => {
       let reason : FallbackReason = ComputationLimitExceeded(
         stage=computation_stage(stage),
         limit~,
@@ -869,7 +869,7 @@ fn ast_root_document_with_budget(
   context : Int,
   graph_limit : UInt,
   reduce_sparse_replacements : Bool,
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
 ) -> AstBuildResult raise {
   let lhs_roots = impl_roots(old_units)
   let rhs_roots = impl_roots(new_units)
@@ -909,9 +909,9 @@ fn detailed_ast_root_list_document(
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
-  computation_limit : UInt,
+  scope_limit : UInt,
 ) -> DetailedDiffResult {
-  let budget = @computation.Budget::new(computation_limit)
+  let budget = @computation.ScopeBudget::new(scope_limit)
   let build = ast_root_document_with_budget(
     old_units,
     new_units,
@@ -922,7 +922,7 @@ fn detailed_ast_root_list_document(
     !ignore_comments,
     budget,
   ) catch {
-    @computation.LimitExceeded(stage~, limit~) =>
+    @computation.ScopeLimitExceeded(stage~, limit~) =>
       return whole_file_fallback(
         old_view,
         new_view,
@@ -968,12 +968,12 @@ fn detailed_ast_plan_document(
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
-  computation_limit : UInt,
+  scope_limit : UInt,
 ) -> DetailedDiffResult {
   match plan {
     RootList(old~, new~) =>
       detailed_ast_root_list_document(
-        old, new, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
+        old, new, old_view, new_view, context, graph_limit, ignore_comments, scope_limit,
       )
     PerUnit(unit_plan) => {
       let fragments : Array[DiffFragment] = []
@@ -991,7 +991,7 @@ fn detailed_ast_plan_document(
           context,
           graph_limit,
           ignore_comments,
-          @computation.Budget::new(computation_limit),
+          @computation.ScopeBudget::new(scope_limit),
         )
         fragments.push(diff_fragment(result.document, result.fallback))
       }
@@ -1046,7 +1046,7 @@ fn parse_error_sides(
 }
 
 ///|
-fn calculate_diff_document_with_limit(
+fn calculate_diff_document_with_scope_limit(
   old_source : String,
   new_source : String,
   old_name : String,
@@ -1054,7 +1054,7 @@ fn calculate_diff_document_with_limit(
   context : Int,
   graph_limit : UInt,
   ignore_comments : Bool,
-  computation_limit : UInt,
+  scope_limit : UInt,
   ignore_tests? : Bool = false,
   mode? : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
@@ -1118,14 +1118,14 @@ fn calculate_diff_document_with_limit(
       return { document: whole_document(document), status: IgnoredOnly, }
     }
   }
-  let budget = @computation.Budget::new(computation_limit)
+  let budget = @computation.ScopeBudget::new(scope_limit)
   let plan = top_level_plan_impl(
     old_collection.units,
     new_collection.units,
     budget,
     ignore_uuid=ignore_comments,
   ) catch {
-    @computation.LimitExceeded(stage~, limit~) =>
+    @computation.ScopeLimitExceeded(stage~, limit~) =>
       return whole_file_fallback(
         old_view,
         new_view,
@@ -1141,7 +1141,7 @@ fn calculate_diff_document_with_limit(
       )
     Ast =>
       detailed_ast_plan_document(
-        plan, old_view, new_view, context, graph_limit, ignore_comments, computation_limit,
+        plan, old_view, new_view, context, graph_limit, ignore_comments, scope_limit,
       )
   }
 }
@@ -1164,7 +1164,7 @@ pub fn calculate_diff_document(
   ignore_tests? : Bool = false,
   mode? : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
-  calculate_diff_document_with_limit(
+  calculate_diff_document_with_scope_limit(
     old_source,
     new_source,
     old_name,
@@ -1172,7 +1172,7 @@ pub fn calculate_diff_document(
     context,
     graph_limit,
     ignore_comments,
-    @computation.default_limit(),
+    @computation.default_scope_limit(),
     ignore_tests~,
     mode~,
   )
@@ -1180,8 +1180,8 @@ pub fn calculate_diff_document(
 
 ///|
 /// Calculate a renderer-neutral diff and typed fallback metadata. AST mode is
-/// the default. The computation limit is deliberately fixed as an
-/// implementation detail.
+/// the default. The independently applied per-scope computation limit is
+/// deliberately fixed as an implementation detail.
 pub fn diff_document_detailed(
   old_source : String,
   new_source : String,

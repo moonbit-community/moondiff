@@ -7,21 +7,21 @@ import {
 }
 
 // Values
-pub fn default_limit() -> UInt
+pub fn default_scope_limit() -> UInt
 
 // Errors
-pub(all) suberror LimitExceeded {
-  LimitExceeded(stage~ : Stage, limit~ : UInt)
+pub(all) suberror ScopeLimitExceeded {
+  ScopeLimitExceeded(stage~ : Stage, limit~ : UInt)
 } derive(Eq, @debug.Debug)
 
 // Types and methods
-pub struct Budget {
+pub struct ScopeBudget {
   limit : UInt
   remaining : @ref.Ref[UInt]
 }
-pub fn Budget::charge(Self, UInt, Stage) -> Unit raise LimitExceeded
-pub fn Budget::charge_matrix(Self, Int, Int, Stage) -> Unit raise LimitExceeded
-pub fn Budget::new(UInt) -> Self
+pub fn ScopeBudget::charge(Self, UInt, Stage) -> Unit raise ScopeLimitExceeded
+pub fn ScopeBudget::charge_matrix(Self, Int, Int, Stage) -> Unit raise ScopeLimitExceeded
+pub fn ScopeBudget::new(UInt) -> Self
 
 pub(all) enum Stage {
   TopLevelAlignment

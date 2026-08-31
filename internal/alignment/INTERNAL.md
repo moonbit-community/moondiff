@@ -125,9 +125,11 @@ Pure reordering deserves special treatment. All reliably matched declarations re
 
 ## Resource Bounds
 
-Some heuristic work can grow quickly with the number and size of unmatched declarations. Similarity calculations therefore participate in a top-level computation budget.
+Some heuristic work can grow quickly with the number and size of unmatched declarations. Similarity calculations therefore participate in independently budgeted calculation scopes, all using the same configured per-scope ceiling.
 
-If that budget is exhausted before reliable planning completes, the result expands to one `Whole` fragment instead of returning a partial or unstable pairing. Once a reliable top-level plan exists, each section receives a fresh local diff budget. Exhausting a local budget degrades only that section to lexical diff and records the fallback on that section's fragment; other sections remain structural. These Whole and AST-fallback lexical documents retain the caller's compact context radius rather than adopting the complete-section Lexical presentation.
+Top-level planning runs in its own scope. If that scope is exhausted before reliable planning completes, the result expands to one `Whole` fragment instead of returning a partial or unstable pairing. Once a reliable plan exists, a `RootList` comparison receives a fresh scope for the complete declaration list, while a `PerUnit` plan gives every section its own fresh scope. These scopes do not charge one aggregate file-level budget.
+
+Exhausting a section scope degrades only that section to lexical diff and records the fallback on that section's fragment; other sections remain structural. These Whole and AST-fallback lexical documents retain the caller's compact context radius rather than adopting the complete-section Lexical presentation.
 
 ## Expected Behavior in Common Scenarios
 

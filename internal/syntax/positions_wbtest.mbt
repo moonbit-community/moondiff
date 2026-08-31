@@ -57,7 +57,9 @@ test "replaced string treats Unicode whitespace like ASCII whitespace" {
       unicode_atom,
       ReplacedString(lhs=unicode_atom, rhs=ascii_atom),
     )
-    let budget = @computation.Budget::new(@computation.default_limit())
+    let budget = @computation.ScopeBudget::new(
+      @computation.default_scope_limit(),
+    )
     let positions = change_positions_with_budget(
       [unicode_atom],
       change_map,
@@ -76,7 +78,7 @@ test "change_positions narrows replaced string to changed word" {
 
   let change_map = ChangeMap::new()
   change_map.insert(rhs, ChangeKind::ReplacedString(lhs~, rhs~))
-  let budget = @computation.Budget::new(@computation.default_limit())
+  let budget = @computation.ScopeBudget::new(@computation.default_scope_limit())
   let positions = change_positions_with_budget([rhs], change_map, budget)
 
   assert_true(positions.length() > 0)

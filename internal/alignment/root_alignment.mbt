@@ -55,9 +55,9 @@ fn align_impl_units_by_uuid(
 fn align_impl_units_by_key_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
   use_uuid? : Bool = true,
-) -> Array[ImplEdit] raise @computation.LimitExceeded {
+) -> Array[ImplEdit] raise @computation.ScopeLimitExceeded {
   let old_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let new_used : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
   let replacements : @hashmap.HashMap[Int, Int] = @hashmap.HashMap([])
@@ -299,9 +299,9 @@ fn impl_edits_have_replacement(edits : ArrayView[ImplEdit]) -> Bool {
 fn top_level_plan_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  budget : @computation.Budget,
+  budget : @computation.ScopeBudget,
   ignore_uuid? : Bool = false,
-) -> TopLevelPlan raise @computation.LimitExceeded {
+) -> TopLevelPlan raise @computation.ScopeLimitExceeded {
   if !ignore_uuid &&
     all_units_have_uuid(old_units) &&
     all_units_have_uuid(new_units) {

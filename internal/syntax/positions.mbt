@@ -237,8 +237,8 @@ fn is_all_whitespace_text(text : String) -> Bool {
 fn word_diffs_impl(
   lhs_parts : ArrayView[WordPart],
   rhs_parts : ArrayView[WordPart],
-  budget : @computation.Budget,
-) -> Array[WordDiff] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[WordDiff] raise @computation.ScopeLimitExceeded {
   let width = rhs_parts.length() + 1
   budget.charge_matrix(lhs_parts.length() + 1, width, IntralineMatching)
   let dp = Array::make((lhs_parts.length() + 1) * width, 0)
@@ -311,8 +311,8 @@ fn has_common_words(diffs : ArrayView[WordDiff]) -> Bool {
 fn split_replaced_atom_positions(
   change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
-  budget : @computation.Budget,
-) -> Array[MatchedPos] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
   let (self_node, opposite_node) = match change {
     ChangeKind::ReplacedComment(lhs~, rhs~) => (lhs, rhs)
     ChangeKind::ReplacedString(lhs~, rhs~) => (lhs, rhs)
@@ -441,8 +441,8 @@ fn matched_positions_for(
   change : ChangeKind,
   positions : ArrayView[@span.SingleLineSpan],
   is_close_delim : Bool,
-  budget : @computation.Budget,
-) -> Array[MatchedPos] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
   let positions = filter_empty_ends(positions)
   match change {
     ChangeKind::Novel => whole_novel_positions(positions)
@@ -459,10 +459,10 @@ fn matched_positions_for(
 fn change_positions_impl(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-  budget : @computation.Budget,
-) -> Array[MatchedPos] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
   let positions = Array::new()
-  fn walk(node : Syntax) -> Unit raise @computation.LimitExceeded {
+  fn walk(node : Syntax) -> Unit raise @computation.ScopeLimitExceeded {
     let change = change_map.get(node).unwrap_or_else(() => panic())
     match node {
       Syntax::Atom(position~, ..) =>
@@ -493,7 +493,7 @@ fn change_positions_impl(
 pub fn change_positions_with_budget(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-  budget : @computation.Budget,
-) -> Array[MatchedPos] raise @computation.LimitExceeded {
+  budget : @computation.ScopeBudget,
+) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
   change_positions_impl(nodes, change_map, budget)
 }

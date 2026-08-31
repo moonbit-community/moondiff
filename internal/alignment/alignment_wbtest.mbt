@@ -77,8 +77,8 @@ fn unit_source_for_test(source : String, unit : ImplUnit) -> String {
 }
 
 ///|
-fn alignment_test_budget() -> @computation.Budget {
-  @computation.Budget::new(@computation.default_limit())
+fn alignment_test_budget() -> @computation.ScopeBudget {
+  @computation.ScopeBudget::new(@computation.default_scope_limit())
 }
 
 ///|
@@ -93,7 +93,7 @@ fn align_impl_units_by_key(
     alignment_test_budget(),
     use_uuid~,
   ) catch {
-    @computation.LimitExceeded(..) => panic()
+    @computation.ScopeLimitExceeded(..) => panic()
   }
 }
 
@@ -604,9 +604,9 @@ test "body fingerprints are charged and cached once per alignment" {
   ).reinterpret_as_uint()
   assert_true(work > 0)
   let rejected_cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
-  let insufficient = @computation.Budget::new(work - 1)
+  let insufficient = @computation.ScopeBudget::new(work - 1)
   try impl_fuzzy_body_at(units, 0, rejected_cache, insufficient) catch {
-    @computation.LimitExceeded(stage~, limit~) => {
+    @computation.ScopeLimitExceeded(stage~, limit~) => {
       assert_true(stage is TopLevelAlignment)
       assert_eq(limit, work - 1)
       assert_true(rejected_cache[0] is None)
@@ -615,14 +615,14 @@ test "body fingerprints are charged and cached once per alignment" {
     _ => fail("expected construction to be rejected before caching")
   }
   let cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
-  let budget = @computation.Budget::new(work)
+  let budget = @computation.ScopeBudget::new(work)
   guard impl_fuzzy_body_at(units, 0, cache, budget) is Some(first) &&
     impl_fuzzy_body_at(units, 0, cache, budget) is Some(second) else {
     fail("expected cached body fingerprints")
   }
   assert_eq(first.mass, second.mass)
   try budget.charge(1U, TopLevelAlignment) catch {
-    @computation.LimitExceeded(stage~, limit~) => {
+    @computation.ScopeLimitExceeded(stage~, limit~) => {
       assert_true(stage is TopLevelAlignment)
       assert_eq(limit, work)
     }
@@ -635,7 +635,7 @@ test "body fingerprints are charged and cached once per alignment" {
 test "semantic extraction filters missing helpers before body fingerprint work" {
   let old_source = long_free_declaration("target")
   let new_source = long_free_declaration("target", finish="finish_changed")
-  let budget = @computation.Budget::new(0)
+  let budget = @computation.ScopeBudget::new(0)
   let edits = align_impl_units_by_key_impl(
     parse_units(old_source),
     parse_units(new_source),
@@ -1060,7 +1060,7 @@ test "semantic extraction requires an unoccupied helper with one clear old owner
 }
 
 ///|
-test "semantic extraction ambiguity work uses the file budget" {
+test "semantic extraction ambiguity work uses the planning scope budget" {
   let extraction_count = 24
   let (old_source, new_source) = many_independent_extraction_sources(
     extraction_count,
@@ -1088,7 +1088,7 @@ test "semantic extraction ambiguity work uses the file budget" {
   assert_eq(replacements, extraction_count)
   assert_eq(insertions, extraction_count)
 
-  let calculation = calculate_diff_document_with_limit(
+  let calculation = calculate_diff_document_with_scope_limit(
     old_source, new_source, "old", "new", 0, 3_000_000, false, 1,
   )
   guard calculation.document is Whole(fragment) else {
@@ -1983,7 +1983,7 @@ test "Whole and AST lexical fallbacks retain compact caller context" {
     #|  stable_two()
     #|  stable_three()
     #|}
-  let limited = calculate_diff_document_with_limit(
+  let limited = calculate_diff_document_with_scope_limit(
     limit_old, limit_new, "old", "new", 0, 3_000_000, false, 0,
   )
   guard limited.document is Whole(limited_fragment) else {
@@ -2208,7 +2208,7 @@ test "parse and root-list fallbacks attach only to Whole fragments" {
 
 ///|
 test "top-level budget exhaustion creates one Whole fallback" {
-  let result = calculate_diff_document_with_limit(
+  let result = calculate_diff_document_with_scope_limit(
     "fn stable() {}\nfn Worker::old_name() { body() }", "fn stable() {}\nfn Worker::new_name() { body() }",
     "old", "new", 0, 3_000_000, false, 0,
   )
@@ -2247,7 +2247,7 @@ test "local fallbacks stay on their own top-level fragments" {
     assert_false(fragment.document.hunks.is_empty())
   }
 
-  let limited = calculate_diff_document_with_limit(
+  let limited = calculate_diff_document_with_scope_limit(
     old_source, new_source, "old", "new", 0, 3_000_000, false, 0,
   )
   let limited_top = top_level_for_test(limited)

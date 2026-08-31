@@ -22,7 +22,7 @@ pub(all) enum DiffSide {
 } derive(Debug, Eq)
 
 ///|
-/// A bounded stage of the structural diff calculation.
+/// A bounded stage within one independently budgeted structural calculation.
 pub(all) enum ComputationStage {
   TopLevelAlignment
   SyntaxMatching
@@ -39,6 +39,7 @@ pub(all) enum FallbackReason {
   /// one or both sides, so indexing it would have been unsafe.
   SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
   GraphLimitExceeded(limit~ : UInt)
+  /// The current calculation scope exhausted its configured work ceiling.
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
 } derive(Debug, Eq)
 

@@ -10,7 +10,7 @@ import {
 }
 
 // Values
-pub fn change_positions_with_budget(ArrayView[Syntax], ChangeMap, @computation.Budget) -> Array[MatchedPos] raise @computation.LimitExceeded
+pub fn change_positions_with_budget(ArrayView[Syntax], ChangeMap, @computation.ScopeBudget) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded
 
 pub fn init_all_info(ArrayView[Syntax], ArrayView[Syntax]) -> Unit
 
