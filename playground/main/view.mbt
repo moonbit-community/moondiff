@@ -51,7 +51,7 @@ fn brand_view() -> @rabbita.Html {
 
 ///|
 fn commit_form(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
-  @html.form(on_submit=emit(Submit), class="commit-form", [
+  @html.form(on_submit=emit(Ui(Submit)), class="commit-form", [
     @html.label(
       for_="commit-url",
       class="sr-only",
@@ -64,7 +64,7 @@ fn commit_form(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
         value=model.input,
         placeholder="https://github.com/owner/repo/pull/123",
         required=true,
-        on_input=value => emit(InputChanged(value)),
+        on_input=value => emit(Ui(InputChanged(value))),
       ),
       @html.button(type_="submit", class="submit-button", [
         @html.span(class="submit-label", "View diff"),
@@ -186,7 +186,7 @@ fn share_control(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
           _ => label
         },
         attrs=@html.Attrs::build().aria_label(label),
-        on_click=emit(CopyShareLink),
+        on_click=emit(Ui(CopyShareLink)),
         [
           @html.span(class="copy-icon", ""),
           @html.span(class="copy-label", label),
@@ -221,7 +221,7 @@ fn algorithm_control(
             "false"
           },
         ),
-        on_click=emit(SelectDiffAlgorithm(LexicalAlgorithm)),
+        on_click=emit(Ui(SelectDiffAlgorithm(LexicalAlgorithm))),
         "Lexical",
       ),
       @html.button(
@@ -238,7 +238,7 @@ fn algorithm_control(
             "false"
           },
         ),
-        on_click=emit(SelectDiffAlgorithm(AstAlgorithm)),
+        on_click=emit(Ui(SelectDiffAlgorithm(AstAlgorithm))),
         "AST",
       ),
     ],
@@ -265,7 +265,7 @@ fn ignore_comments_control(
     attrs=@html.Attrs::build()
       .aria_label("Ignore comments")
       .aria_pressed(if ignore_comments { "true" } else { "false" }),
-    on_click=emit(ToggleIgnoreComments),
+    on_click=emit(Ui(ToggleIgnoreComments)),
     [
       @html.span(class="ignore-comments-icon", "//"),
       @html.span(class="ignore-comments-label", "Ignore comments"),
@@ -293,7 +293,7 @@ fn ignore_tests_control(
     attrs=@html.Attrs::build()
       .aria_label("Ignore tests")
       .aria_pressed(if ignore_tests { "true" } else { "false" }),
-    on_click=emit(ToggleIgnoreTests),
+    on_click=emit(Ui(ToggleIgnoreTests)),
     [
       @html.span(class="ignore-tests-icon", "T"),
       @html.span(class="ignore-tests-label", "Ignore tests"),
@@ -339,7 +339,7 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
             },
             title=view_label,
             attrs=@html.Attrs::build().aria_label(view_label),
-            on_click=emit(ToggleView),
+            on_click=emit(Ui(ToggleView)),
             @html.span(class="view-icon", ""),
           ),
           share_control(model, emit),
@@ -713,7 +713,7 @@ fn file_diff_view(
         @html.button(
           type_="button",
           class="secondary",
-          on_click=emit(RetryFile(generation, index)),
+          on_click=emit(Load(RetryFile(generation, index))),
           "Retry file",
         )
       } else {
@@ -823,7 +823,7 @@ fn file_card(
           attrs=@html.Attrs::build()
             .aria_expanded(if file.expanded { "true" } else { "false" })
             .aria_label("\{toggle_label} \{file_label(file.file)}"),
-          on_click=emit(ToggleFile(generation, index)),
+          on_click=emit(Load(ToggleFile(generation, index))),
           [
             @html.span(class="disclosure-icon", ""),
             @html.span(class=status_class(file.file.status), ""),
@@ -994,7 +994,7 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
         @html.button(
           type_="button",
           class="secondary",
-          on_click=emit(Submit),
+          on_click=emit(Ui(Submit)),
           "Try again",
         ),
       ])

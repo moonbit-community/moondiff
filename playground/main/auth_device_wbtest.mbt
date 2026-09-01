@@ -74,7 +74,7 @@ test "device authorization moves from code through pending to signed in" {
     Showing(view),
     Some(view.reference),
   )
-  let (started, _) = update(
+  let (started, _) = update_auth(
     anonymous,
     DeviceAuthorizationStarted(Ok(device_api_status(flow_id))),
     emit,
@@ -86,7 +86,7 @@ test "device authorization moves from code through pending to signed in" {
   assert_eq(device.user_code, "ABCD-EFGH")
   assert_true(device.copy_status is DeviceCodeCopyReady)
 
-  let (pending, _) = update(
+  let (pending, _) = update_auth(
     started,
     DeviceAuthorizationPolled(
       flow_id,
@@ -100,7 +100,7 @@ test "device authorization moves from code through pending to signed in" {
   assert_eq(waiting.expires_in, 895)
   assert_eq(waiting.poll_after, 7)
 
-  let (signed_in, _) = update(
+  let (signed_in, _) = update_auth(
     pending,
     DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("octocat"))),
     emit,
@@ -118,21 +118,21 @@ test "device code copy feedback and cancellation stay scoped to the current flow
     Idle,
     None,
   )
-  let (copying, _) = update(model, CopyDeviceCode, emit)
+  let (copying, _) = update_auth(model, CopyDeviceCode, emit)
   assert_true(copying == model)
-  let (copied, _) = update(model, DeviceCodeCopied(flow_id), emit)
+  let (copied, _) = update_auth(model, DeviceCodeCopied(flow_id), emit)
   guard copied.review.auth is DeviceAuthorizing(done) else {
     fail("expected a device authorization")
   }
   assert_true(done.copy_status is DeviceCodeCopyDone)
 
-  let (stale_copy, _) = update(
+  let (stale_copy, _) = update_auth(
     copied,
     DeviceCodeCopyFailed("old-flow", "no"),
     emit,
   )
   assert_true(stale_copy == copied)
-  let (failed_copy, _) = update(
+  let (failed_copy, _) = update_auth(
     copied,
     DeviceCodeCopyFailed(flow_id, "clipboard denied"),
     emit,
@@ -146,13 +146,13 @@ test "device code copy feedback and cancellation stay scoped to the current flow
     failed_copy,
     review_state_with_auth(failed_copy.review, DeviceCancelling(failed)),
   )
-  let (late_poll, _) = update(
+  let (late_poll, _) = update_auth(
     cancelling,
     DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("too-late"))),
     emit,
   )
   assert_true(late_poll == cancelling)
-  let (cancelled, _) = update(
+  let (cancelled, _) = update_auth(
     cancelling,
     DeviceAuthorizationCancelled(flow_id, Ok(anonymous_api_status())),
     emit,
@@ -169,7 +169,7 @@ test "expired and stale device responses cannot authenticate another flow" {
     Idle,
     None,
   )
-  let (stale_poll, _) = update(
+  let (stale_poll, _) = update_auth(
     model,
     DeviceAuthorizationPolled(
       "flow-old",
@@ -178,14 +178,14 @@ test "expired and stale device responses cannot authenticate another flow" {
     emit,
   )
   assert_true(stale_poll == model)
-  let (stale_cancel, _) = update(
+  let (stale_cancel, _) = update_auth(
     model,
     DeviceAuthorizationCancelled("flow-old", Ok(anonymous_api_status())),
     emit,
   )
   assert_true(stale_cancel == model)
 
-  let (expired, _) = update(
+  let (expired, _) = update_auth(
     model,
     DeviceAuthorizationPolled(
       current,
@@ -208,7 +208,7 @@ test "device sign-in retries a private repository load" {
     LoadFailed("private repository"),
     Some(reference),
   )
-  let (retried, _) = update(
+  let (retried, _) = update_auth(
     model,
     DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("reviewer"))),
     emit,

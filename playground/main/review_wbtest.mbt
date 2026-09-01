@@ -557,19 +557,19 @@ test "only signed-in reviews can open comment drafts" {
         OpenInlineDraft(0, anchor),
         OpenReplyDraft(Int64::from_int(20)),
       ] {
-      let (blocked, _) = update(model, msg, emit)
+      let (blocked, _) = update_review(model, msg, emit)
       assert_true(blocked == model)
     }
   }
 
   let signed_in = review_test_model(SignedIn(Some("reviewer")))
   assert_true(review_can_comment(signed_in.review))
-  let (overall, _) = update(signed_in, OpenOverallDraft, emit)
+  let (overall, _) = update_review(signed_in, OpenOverallDraft, emit)
   guard overall.review.draft is Some(overall_draft) else {
     fail("expected an overall draft")
   }
   assert_true(overall_draft.kind is OverallDraft)
-  let (inline, _) = update(signed_in, OpenInlineDraft(0, anchor), emit)
+  let (inline, _) = update_review(signed_in, OpenInlineDraft(0, anchor), emit)
   guard inline.review.draft is Some(inline_draft) else {
     fail("expected an inline draft")
   }
@@ -577,7 +577,7 @@ test "only signed-in reviews can open comment drafts" {
     inline_draft.kind is InlineDraft(0, selected) && selected == anchor,
   )
   let comment_id = Int64::from_int(20)
-  let (reply, _) = update(signed_in, OpenReplyDraft(comment_id), emit)
+  let (reply, _) = update_review(signed_in, OpenReplyDraft(comment_id), emit)
   guard reply.review.draft is Some(reply_draft) else {
     fail("expected a reply draft")
   }
@@ -602,7 +602,7 @@ test "submitting a retained draft still requires sign-in" {
     ),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (blocked, _) = update(with_draft, SubmitDraft, emit)
+  let (blocked, _) = update_review(with_draft, SubmitDraft, emit)
   guard blocked.review.draft is Some(draft) else {
     fail("expected the blocked draft to be retained")
   }
@@ -624,7 +624,7 @@ test "comment loading authentication failure signs out and preserves the draft" 
     review_state_with_draft(model.review, Some(draft)),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (failed, _) = update(
+  let (failed, _) = update_review(
     with_draft,
     CommentsLoaded(5, Err(authentication_required_error())),
     emit,
@@ -640,7 +640,7 @@ test "comment loading authentication failure signs out and preserves the draft" 
   assert_true(comments_message.contains("expired"))
   assert_true(failed.review.draft == Some(draft))
 
-  let (stale, _) = update(
+  let (stale, _) = update_review(
     with_draft,
     CommentsLoaded(4, Err(authentication_required_error())),
     emit,
@@ -775,7 +775,7 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     changed_files: 1,
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (next, _) = update(
+  let (next, _) = update_review(
     model,
     CommentHeadChecked(5, anchor, Ok(changed)),
     emit,
@@ -789,7 +789,7 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
   assert_false(draft.submitting)
   assert_true(draft.error.unwrap().contains("head changed"))
 
-  let (stale, _) = update(
+  let (stale, _) = update_review(
     next,
     CommentsLoaded(
       5,
@@ -820,7 +820,7 @@ test "PR comment head authentication failure signs out and preserves the draft" 
     review_state_with_draft(base.review, Some(original)),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (failed, _) = update(
+  let (failed, _) = update_review(
     model,
     CommentHeadChecked(5, anchor, Err(authentication_required_error())),
     emit,
@@ -876,14 +876,18 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     user: Some({ login: "reviewer", }),
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (posted, _) = update(model, IssueCommentCreated(5, Ok(created)), emit)
+  let (posted, _) = update_review(
+    model,
+    IssueCommentCreated(5, Ok(created)),
+    emit,
+  )
   assert_true(posted.review.draft is None)
   guard posted.review.comments is CommentsReady(bundle) else {
     fail("expected optimistic comments to stay visible")
   }
   assert_eq(bundle.issue_comments.map(comment => comment.id), [created.id])
 
-  let (failed, _) = update(
+  let (failed, _) = update_review(
     model,
     IssueCommentCreated(
       5,
@@ -927,7 +931,7 @@ test "comment creation authentication failures sign out and retain the draft" {
       CommitCommentCreated(5, Err(authentication_required_error())),
       ReviewReplyCreated(5, Err(authentication_required_error())),
     ] {
-    let (failed, _) = update(model, msg, emit)
+    let (failed, _) = update_review(model, msg, emit)
     guard failed.review.auth is AuthFailed(message) else {
       fail("expected comment creation to invalidate authentication")
     }

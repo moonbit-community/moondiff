@@ -61,7 +61,7 @@ fn review_gutter(
         class="line-comment-button",
         title="Comment on line \{anchor.line}",
         attrs=@html.Attrs::build().aria_label("Comment on line \{anchor.line}"),
-        on_click=emit(OpenInlineDraft(file_index, anchor)),
+        on_click=emit(Review(OpenInlineDraft(file_index, anchor))),
         "+",
       )
     } else {
@@ -84,7 +84,7 @@ fn comment_editor(
       placeholder="Leave a comment",
       autofocus=true,
       disabled=draft.submitting,
-      on_input=value => emit(DraftBodyChanged(value)),
+      on_input=value => emit(Review(DraftBodyChanged(value))),
       "",
     ),
     if draft.error is Some(message) {
@@ -97,14 +97,14 @@ fn comment_editor(
         type_="button",
         class="secondary",
         disabled=draft.submitting,
-        on_click=emit(CancelDraft),
+        on_click=emit(Review(CancelDraft)),
         "Cancel",
       ),
       @html.button(
         type_="button",
         class="comment-submit",
         disabled=draft.submitting || draft.body.trim().is_empty(),
-        on_click=emit(SubmitDraft),
+        on_click=emit(Review(SubmitDraft)),
         if draft.submitting {
           "Posting…"
         } else {
@@ -468,7 +468,7 @@ fn review_thread_view(
       @html.button(
         type_="button",
         class="comment-reply-button",
-        on_click=emit(OpenReplyDraft(thread.root.id)),
+        on_click=emit(Review(OpenReplyDraft(thread.root.id))),
         "Reply",
       ),
     )
@@ -587,7 +587,7 @@ fn auth_controls(
         @html.button(
           type_="button",
           class="secondary",
-          on_click=emit(Logout),
+          on_click=emit(Auth(Logout)),
           "Sign out",
         ),
       ])
@@ -596,7 +596,7 @@ fn auth_controls(
         @html.button(
           type_="button",
           class="comment-submit",
-          on_click=emit(StartDeviceAuthorization),
+          on_click=emit(Auth(StartDeviceAuthorization)),
           "Sign in with GitHub",
         ),
         if install_url is Some(url) {
@@ -633,7 +633,7 @@ fn auth_controls(
                 "Clipboard access failed: \{message}"
               _ => "Copy the GitHub device code"
             },
-            on_click=emit(CopyDeviceCode),
+            on_click=emit(Auth(CopyDeviceCode)),
             copy_label,
           ),
         ]),
@@ -657,7 +657,7 @@ fn auth_controls(
           @html.button(
             type_="button",
             class="secondary",
-            on_click=emit(CancelDeviceAuthorization(device.flow_id)),
+            on_click=emit(Auth(CancelDeviceAuthorization(device.flow_id))),
             "Cancel",
           ),
         ]),
@@ -683,7 +683,7 @@ fn auth_controls(
         @html.button(
           type_="button",
           class="secondary",
-          on_click=emit(StartDeviceAuthorization),
+          on_click=emit(Auth(StartDeviceAuthorization)),
           "Try sign-in",
         ),
       ])
@@ -724,7 +724,7 @@ fn comments_overview(
           type_="button",
           class="secondary refresh-comments",
           disabled=review.comments is CommentsLoading,
-          on_click=emit(RefreshComments),
+          on_click=emit(Review(RefreshComments)),
           "Refresh",
         ),
       ]),
@@ -745,7 +745,7 @@ fn comments_overview(
             @html.button(
               type_="button",
               class="secondary add-overall-comment",
-              on_click=emit(OpenOverallDraft),
+              on_click=emit(Review(OpenOverallDraft)),
               "Add overall comment",
             )
           }

@@ -342,14 +342,14 @@ extern "js" fn send_extension_rpc(
 ///|
 fn auth_status_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
   extension_rpc_json("auth.status", "{}", 0, result => {
-    emit(AuthStatusLoaded(result))
+    emit(Auth(AuthStatusLoaded(result)))
   })
 }
 
 ///|
 fn auth_device_start_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
   extension_rpc_json("auth.device.start", "{}", 0, result => {
-    emit(DeviceAuthorizationStarted(result))
+    emit(Auth(DeviceAuthorizationStarted(result)))
   })
 }
 
@@ -359,7 +359,7 @@ fn auth_device_poll_request(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   extension_rpc_request("auth.device.poll", DeviceFlowArgs::{ flow_id, }, 0, result => {
-    emit(DeviceAuthorizationPolled(flow_id, result))
+    emit(Auth(DeviceAuthorizationPolled(flow_id, result)))
   })
 }
 
@@ -369,7 +369,7 @@ fn auth_device_cancel_request(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   extension_rpc_request("auth.device.cancel", DeviceFlowArgs::{ flow_id, }, 0, result => {
-    emit(DeviceAuthorizationCancelled(flow_id, result))
+    emit(Auth(DeviceAuthorizationCancelled(flow_id, result)))
   })
 }
 
@@ -386,13 +386,13 @@ fn schedule_device_poll(
   } else {
     poll_after
   }
-  @cmd.delay(emit(PollDeviceAuthorization(flow_id)), seconds * 1_000)
+  @cmd.delay(emit(Auth(PollDeviceAuthorization(flow_id))), seconds * 1_000)
 }
 
 ///|
 fn auth_logout_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
   extension_rpc_json("auth.logout", "{}", 0, result => {
-    emit(AuthLogoutFinished(result))
+    emit(Auth(AuthLogoutFinished(result)))
   })
 }
 
@@ -416,7 +416,7 @@ fn comments_request(
     "github.comments.list",
     comment_list_args(reference),
     generation,
-    result => emit(CommentsLoaded(generation, result)),
+    result => emit(Review(CommentsLoaded(generation, result))),
   )
 }
 
@@ -435,7 +435,7 @@ fn comment_head_request(
     "",
     0,
     generation,
-    result => emit(CommentHeadChecked(generation, anchor, result)),
+    result => emit(Review(CommentHeadChecked(generation, anchor, result))),
   )
 }
 
@@ -456,7 +456,7 @@ fn create_issue_comment_request(
       body,
     },
     generation,
-    result => emit(IssueCommentCreated(generation, result)),
+    result => emit(Review(IssueCommentCreated(generation, result))),
   )
 }
 
@@ -487,7 +487,7 @@ fn create_review_comment_request(
       body,
     },
     generation,
-    result => emit(ReviewCommentCreated(generation, result)),
+    result => emit(Review(ReviewCommentCreated(generation, result))),
   )
 }
 
@@ -512,7 +512,7 @@ fn create_commit_comment_request(
       body,
     },
     generation,
-    result => emit(CommitCommentCreated(generation, result)),
+    result => emit(Review(CommitCommentCreated(generation, result))),
   )
 }
 
@@ -535,7 +535,7 @@ fn create_review_reply_request(
       body,
     },
     generation,
-    result => emit(ReviewReplyCreated(generation, result)),
+    result => emit(Review(ReviewReplyCreated(generation, result))),
   )
 }
 
