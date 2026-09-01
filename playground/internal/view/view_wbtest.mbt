@@ -78,6 +78,176 @@ fn ready_test_file(
 }
 
 ///|
+fn test_file_tree_state(
+  search_query? : String = "",
+  selected_statuses? : Array[String] = [],
+  collapsed_directories? : Array[String] = [],
+) -> FileTreeState {
+  {
+    drawer_open: false,
+    search_open: !search_query.is_empty(),
+    search_query,
+    selected_statuses,
+    collapsed_directories,
+    selected_file_index: None,
+  }
+}
+
+///|
+fn file_tree_test_rows() -> Array[FileState] {
+  [
+    ready_test_file(fixture_file("src/lib/a.mbt", "modified"), [], []),
+    ready_test_file(fixture_file("README.md", "added"), [], []),
+    ready_test_file(
+      fixture_file(
+        "src/lib/b.mbt",
+        "renamed",
+        previous_filename="legacy/OLD_B.mbt",
+      ),
+      [],
+      [],
+    ),
+    ready_test_file(fixture_file("src/main.mbt", "removed"), [], []),
+  ]
+}
+
+///|
+fn file_tree_row_summary(row : FileTreeRow) -> String {
+  match row {
+    TreeDirectory(path~, depth~, ..) => "D:\{path}:\{depth}"
+    TreeFile(index~, path~, depth~, ..) => "F:\{index}:\{path}:\{depth}"
+  }
+}
+
+///|
+fn file_tree_row_depth(row : FileTreeRow) -> Int {
+  match row {
+    TreeDirectory(depth~, ..) | TreeFile(depth~, ..) => depth
+  }
+}
+
+///|
+test "file tree expands interleaved paths depth first with stable siblings" {
+  let files = file_tree_test_rows()
+  let rows = build_file_tree(files)
+  assert_eq(file_tree_statuses(files), [
+    "modified", "added", "renamed", "removed",
+  ])
+  assert_eq(rows.map(file_tree_row_summary), [
+    "D:src:0", "D:src/lib:1", "F:0:src/lib/a.mbt:2", "F:2:src/lib/b.mbt:2", "F:3:src/main.mbt:1",
+    "F:1:README.md:0",
+  ])
+  let directories : Array[String] = []
+  let mut previous_depth = -1
+  for row in rows {
+    let depth = file_tree_row_depth(row)
+    assert_true(depth <= previous_depth + 1)
+    previous_depth = depth
+    if row is TreeDirectory(path~, ..) {
+      assert_false(directories.contains(path))
+      directories.push(path)
+    }
+  }
+  assert_eq(directories, ["src", "src/lib"])
+  guard rows[3]
+    is TreeFile(
+      name="b.mbt",
+      path="src/lib/b.mbt",
+      previous_path=Some(previous),
+      ..
+    ) else {
+    fail("expected the renamed file to use its new tree path")
+  }
+  assert_eq(previous, "legacy/OLD_B.mbt")
+}
+
+///|
+test "file tree collapse hides descendants without changing row order" {
+  let rows = build_file_tree(file_tree_test_rows())
+  let projection = project_file_tree(
+    rows,
+    test_file_tree_state(collapsed_directories=["src"]),
+  )
+  assert_eq(projection.matching_count, 4)
+  assert_eq(projection.visible_rows.map(file_tree_row_summary), [
+    "D:src:0", "F:1:README.md:0",
+  ])
+}
+
+///|
+test "file tree search is case insensitive and includes renamed ancestors" {
+  let rows = build_file_tree(file_tree_test_rows())
+  let state = test_file_tree_state(search_query="old_b.MBT", collapsed_directories=[
+    "src",
+  ])
+  let renamed = project_file_tree(rows, state)
+  assert_eq(renamed.matching_count, 1)
+  assert_eq(renamed.visible_rows.map(file_tree_row_summary), [
+    "D:src:0", "D:src/lib:1", "F:2:src/lib/b.mbt:2",
+  ])
+
+  let current_path = test_file_tree_state(search_query="LIB/A.MBT")
+  assert_eq(project_file_tree(rows, current_path).matching_count, 1)
+}
+
+///|
+test "file tree status filters use OR and combine with search using AND" {
+  let rows = build_file_tree(file_tree_test_rows())
+  let statuses = test_file_tree_state(selected_statuses=["added", "removed"])
+  let status_projection = project_file_tree(rows, statuses)
+  assert_eq(status_projection.matching_count, 2)
+  assert_eq(status_projection.visible_rows.map(file_tree_row_summary), [
+    "D:src:0", "F:3:src/main.mbt:1", "F:1:README.md:0",
+  ])
+
+  let combined = test_file_tree_state(search_query="SRC/MAIN", selected_statuses=[
+    "added", "removed",
+  ])
+  let combined_projection = project_file_tree(rows, combined)
+  assert_eq(combined_projection.matching_count, 1)
+  assert_eq(combined_projection.visible_rows.map(file_tree_row_summary), [
+    "D:src:0", "F:3:src/main.mbt:1",
+  ])
+
+  let empty = test_file_tree_state(search_query="missing", selected_statuses=[
+    "renamed",
+  ])
+  let empty_projection = project_file_tree(rows, empty)
+  assert_eq(empty_projection.matching_count, 0)
+  assert_true(empty_projection.visible_rows.is_empty())
+}
+
+///|
+test "file tree projection scales to the maximum supported file count" {
+  let files : Array[FileState] = []
+  for index in 0..<3000 {
+    files.push(
+      ready_test_file(
+        fixture_file("src/group-\{index}/nested/file-\{index}.mbt", "modified"),
+        [],
+        [],
+      ),
+    )
+  }
+  let rows = build_file_tree(files)
+  let missing = project_file_tree(
+    rows,
+    test_file_tree_state(search_query="does-not-exist"),
+  )
+  assert_eq(missing.matching_count, 0)
+  assert_true(missing.visible_rows.is_empty())
+
+  let last = project_file_tree(
+    rows,
+    test_file_tree_state(search_query="file-2999.mbt"),
+  )
+  assert_eq(last.matching_count, 1)
+  assert_eq(last.visible_rows.map(file_tree_row_summary), [
+    "D:src:0", "D:src/group-2999:1", "D:src/group-2999/nested:2", "F:2999:src/group-2999/nested/file-2999.mbt:3",
+  ])
+}
+
+///|
 test "line and MoonBit caches retain distinct semantic variants" {
   let text_file = ensure_file_document(
     ready_test_file(fixture_file("README.md", "modified"), ["old"], ["new"]),
