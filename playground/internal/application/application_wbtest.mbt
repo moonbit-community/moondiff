@@ -518,6 +518,22 @@ test "file tree UI state toggles filters and closing search clears its query" {
 }
 
 ///|
+test "file tree drawer remains narrow and exits at the desktop breakpoint" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let model = { ..initial_model(), file_tree: changed_file_tree_state(), }
+  let (narrow, _) = update_ui(model, FileTreeViewportChanged(767), emit)
+  assert_true(narrow == model)
+
+  let (desktop, _) = update_ui(model, FileTreeViewportChanged(768), emit)
+  assert_false(desktop.file_tree.drawer_open)
+  assert_true(desktop.file_tree.search_open)
+  assert_eq(desktop.file_tree.search_query, "src")
+  assert_eq(desktop.file_tree.selected_statuses, ["modified"])
+  assert_eq(desktop.file_tree.collapsed_directories, ["src"])
+  assert_eq(desktop.file_tree.selected_file_index, Some(3))
+}
+
+///|
 test "new changes landing routes and load failures reset file tree state" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let reference = commit_reference("owner", "repo", "abcdef1")
