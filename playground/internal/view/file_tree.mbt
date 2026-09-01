@@ -405,6 +405,55 @@ fn file_tree_status_filters(
 }
 
 ///|
+extern "js" fn trap_file_tree_tab(event : @dom.KeyboardEvent) -> Unit =
+  #| (event) => {
+  #|   if (event.key !== "Tab") return
+  #|   const sidebar = event.currentTarget
+  #|   if (!(sidebar instanceof HTMLElement)) return
+  #|   const selector = [
+  #|     "a[href]",
+  #|     "button:not([disabled])",
+  #|     "input:not([disabled])",
+  #|     "select:not([disabled])",
+  #|     "textarea:not([disabled])",
+  #|     '[tabindex]:not([tabindex="-1"])',
+  #|   ].join(",")
+  #|   const focusable = Array.from(sidebar.querySelectorAll(selector)).filter(element => {
+  #|     if (!(element instanceof HTMLElement) || element.hidden) return false
+  #|     const style = getComputedStyle(element)
+  #|     return style.display !== "none" && style.visibility !== "hidden"
+  #|   })
+  #|   if (focusable.length === 0) return
+  #|   const first = focusable[0]
+  #|   const last = focusable[focusable.length - 1]
+  #|   if (event.shiftKey && document.activeElement === first) {
+  #|     event.preventDefault()
+  #|     last.focus({ preventScroll: true })
+  #|   } else if (!event.shiftKey && document.activeElement === last) {
+  #|     event.preventDefault()
+  #|     first.focus({ preventScroll: true })
+  #|   }
+  #| }
+
+///|
+fn file_tree_drawer_keydown(
+  event : @dom.KeyboardEvent,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  match event.key() {
+    "Escape" => {
+      event.prevent_default()
+      emit(Ui(CloseFileTreeDrawer))
+    }
+    "Tab" => {
+      trap_file_tree_tab(event)
+      @rabbita.none
+    }
+    _ => @rabbita.none
+  }
+}
+
+///|
 fn file_tree_view(
   commit : ChangeView,
   model : Model,
@@ -419,7 +468,7 @@ fn file_tree_view(
       type_="button",
       class="file-tree-backdrop",
       hidden=!model.file_tree.drawer_open,
-      attrs=@html.Attrs::build().aria_label("Close file tree"),
+      attrs=@html.Attrs::build().aria_label("Close file tree").tabindex(-1),
       on_click=emit(Ui(CloseFileTreeDrawer)),
       "",
     ),
@@ -430,7 +479,15 @@ fn file_tree_view(
       } else {
         "file-tree-sidebar"
       },
-      attrs=@html.Attrs::build().aria_label("Changed files"),
+      attrs=if model.file_tree.drawer_open {
+        @html.Attrs::build()
+        .role("dialog")
+        .aria_modal("true")
+        .aria_label("Changed files")
+        .on_keydown(event => file_tree_drawer_keydown(event, emit))
+      } else {
+        @html.Attrs::build().role("complementary").aria_label("Changed files")
+      },
       [
         @html.div(class="file-tree-header", [
           @html.div(class="file-tree-heading", [

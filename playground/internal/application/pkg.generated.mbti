@@ -123,6 +123,7 @@ pub(all) enum UiMsg {
   ToggleView
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
+  FileTreeViewportChanged(Int)
   ToggleFileTreeSearch
   FileTreeSearchChanged(String)
   ToggleFileTreeStatus(String)

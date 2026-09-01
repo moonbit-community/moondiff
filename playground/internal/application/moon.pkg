@@ -8,6 +8,7 @@ import {
   "moonbit-community/rabbita",
   "moonbit-community/rabbita/clipboard",
   "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/dom",
   "moonbit-community/rabbita/nav",
   "moonbit-community/rabbita/sub",
   "moonbit-community/rabbita/url",

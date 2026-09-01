@@ -140,13 +140,17 @@ fn hero_view(
       ]),
     ])
   } else {
-    @html.header(class="hero hero-workspace", [
-      @html.div(class="hero-copy", brand_view()),
-      @html.div(class="hero-controls", [
-        @html.div(class="input-panel", commit_form(model, emit)),
-      ]),
-      workspace_actions(model, emit),
-    ])
+    @html.header(
+      class="hero hero-workspace",
+      attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
+      [
+        @html.div(class="hero-copy", brand_view()),
+        @html.div(class="hero-controls", [
+          @html.div(class="input-panel", commit_form(model, emit)),
+        ]),
+        workspace_actions(model, emit),
+      ],
+    )
   }
 }
 
@@ -326,6 +330,39 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
             title=source_label,
             attrs=@html.Attrs::build().aria_label(source_label),
             @html.span(class="source-icon", "↗"),
+          ),
+          @html.button(
+            type_="button",
+            class="toolbar-button file-tree-trigger",
+            title=if model.file_tree.drawer_open {
+              "Close files"
+            } else {
+              "Browse files"
+            },
+            attrs=@html.Attrs::build()
+              .aria_label(
+                if model.file_tree.drawer_open {
+                  "Close file tree"
+                } else {
+                  "Open file tree"
+                },
+              )
+              .aria_expanded(
+                if model.file_tree.drawer_open {
+                  "true"
+                } else {
+                  "false"
+                },
+              )
+              .aria_controls("file-tree-sidebar"),
+            on_click=emit(Ui(ToggleFileTreeDrawer)),
+            [
+              @html.span(class="file-tree-trigger-icon", ""),
+              @html.span(
+                class="file-tree-trigger-count",
+                commit.files.length().to_string(),
+              ),
+            ],
           ),
           algorithm_control(model.diff_algorithm, emit),
           ignore_comments_control(model.ignore_comments, emit),
@@ -929,25 +966,29 @@ fn change_view(
   @html.section(class="results", [
     @html.div(class="change-layout", [
       file_tree_view(commit, model, emit),
-      @html.div(class="change-main", [
-        @html.div(class="commit-card", [
-          @html.div(class="commit-title", [
-            @html.div(class="commit-identity", [
-              @html.p(class="section-label", section_label),
-              @html.a(
-                href=commit.html_url,
-                target=Blank,
-                rel="noopener noreferrer",
-                identity,
-              ),
-              @html.p(class="parent", comparison),
+      @html.div(
+        class="change-main",
+        attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
+        [
+          @html.div(class="commit-card", [
+            @html.div(class="commit-title", [
+              @html.div(class="commit-identity", [
+                @html.p(class="section-label", section_label),
+                @html.a(
+                  href=commit.html_url,
+                  target=Blank,
+                  rel="noopener noreferrer",
+                  identity,
+                ),
+                @html.p(class="parent", comparison),
+              ]),
+              @html.pre(class="commit-message", commit.message),
             ]),
-            @html.pre(class="commit-message", commit.message),
           ]),
-        ]),
-        comments_overview(commit, model.review, emit),
-        file_list_view(commit, model, emit),
-      ]),
+          comments_overview(commit, model.review, emit),
+          file_list_view(commit, model, emit),
+        ],
+      ),
     ]),
   ])
 }
