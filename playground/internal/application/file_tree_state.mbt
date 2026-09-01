@@ -21,6 +21,11 @@ fn initial_file_tree_state() -> FileTreeState {
 }
 
 ///|
+pub fn file_dom_id(index : Int) -> String {
+  "moondiff-file-\{index}"
+}
+
+///|
 fn toggle_file_tree_value(
   values : Array[String],
   value : String,

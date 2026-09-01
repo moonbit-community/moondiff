@@ -813,6 +813,7 @@ fn file_card(
 ) -> @rabbita.Html {
   let toggle_label = if file.expanded { "Collapse" } else { "Expand" }
   @html.article(
+    id=file_dom_id(index),
     class=if file.expanded { "file-card expanded" } else { "file-card" },
     [
       @html.div(class="file-heading", [

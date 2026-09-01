@@ -16,6 +16,8 @@ pub fn app_init(@cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
 pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
 
+pub fn file_dom_id(Int) -> String
+
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
 // Errors
@@ -54,6 +56,7 @@ pub(all) struct FileTreeState {
 pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[@github.ApiCommit, Error])
   ToggleFile(Int, Int)
+  OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, @change.SourceSide, Result[(String, Bytes), Error])
   PullMetadataLoaded(Int, Int, Result[@github.ApiPull, Error])
