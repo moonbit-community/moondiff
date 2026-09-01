@@ -46,7 +46,8 @@ const builtJavaScript = join(
   "js",
   "release",
   "build",
-  "playground",
+  "moonbit-community",
+  "moondiff-playground",
   "main",
   "main.js",
 );

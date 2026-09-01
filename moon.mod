@@ -5,7 +5,6 @@ version = "0.0.6"
 import {
   "moonbit-community/prettyprinter@0.4.10",
   "moonbit-community/chalk@0.0.1",
-  "moonbit-community/rabbita@0.14.2",
   "moonbitlang/lexer@0.3.15",
   "moonbitlang/parser@0.3.17",
   "moonbitlang/async@0.20.3",
@@ -24,5 +23,5 @@ description = "Difftool that aware MoonBit language syntax"
 preferred_target = "wasm"
 
 options(
-  exclude: [ "extension", "playground", "cli_test", "scripts" ],
+  exclude: [ "extension", "cli_test", "scripts" ],
 )

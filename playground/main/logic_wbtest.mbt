@@ -200,9 +200,7 @@ test "raw content URLs percent-encode each path byte" {
 
 ///|
 test "decode local GitHub fixtures and select the first merge parent" {
-  let merge = decode_commit(
-    read_fixture("playground/main/fixtures/commit_page1.json"),
-  )
+  let merge = decode_commit(read_fixture("main/fixtures/commit_page1.json"))
   assert_eq(merge.sha, "abcdef1234567890abcdef1234567890abcdef12")
   assert_eq(
     merge.commit.message,
@@ -216,22 +214,16 @@ test "decode local GitHub fixtures and select the first merge parent" {
   assert_eq(merge.files[0].previous_filename, None)
   assert_eq(merge.files[1].previous_filename, Some("src/old_name.txt"))
 
-  let root = decode_commit(
-    read_fixture("playground/main/fixtures/root_commit.json"),
-  )
+  let root = decode_commit(read_fixture("main/fixtures/root_commit.json"))
   assert_eq(first_parent(root), None)
   assert_eq(root.stats.additions, 2)
 }
 
 ///|
 test "decode pull request metadata and choose merge base and head" {
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let compare = decode_compare(
-    read_fixture("playground/main/fixtures/pull_compare.json"),
-  )
-  let files = decode_pull_files(
-    read_fixture("playground/main/fixtures/pull_files.json"),
-  )
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
+  let compare = decode_compare(read_fixture("main/fixtures/pull_compare.json"))
+  let files = decode_pull_files(read_fixture("main/fixtures/pull_files.json"))
   assert_eq(pull.title, "Aggregate the whole pull request")
   assert_eq(pull.head.sha, "cccccccccccccccccccccccccccccccccccccccc")
   assert_eq(
@@ -296,10 +288,8 @@ test "pagination appends file metadata and stops at GitHub's 30-page cap" {
 
 ///|
 test "pull request files must be complete and within GitHub's limit" {
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let files = decode_pull_files(
-    read_fixture("playground/main/fixtures/pull_files.json"),
-  )
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
+  let files = decode_pull_files(read_fixture("main/fixtures/pull_files.json"))
   guard validate_pull_files({ ..pull, changed_files: 3_001, }, files)
     is Err(over_limit) else {
     fail("expected the 3,000-file limit to be rejected")
@@ -406,9 +396,7 @@ test "stale commit responses are discarded by generation" {
     copy_status: CopyReady,
     review: initial_review_state(),
   }
-  let fixture = decode_commit(
-    read_fixture("playground/main/fixtures/root_commit.json"),
-  )
+  let fixture = decode_commit(read_fixture("main/fixtures/root_commit.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (after, _) = update_load(model, CommitPageLoaded(1, 1, Ok(fixture)), emit)
   assert_true(after == model)
@@ -438,7 +426,7 @@ fn pull_test_model(
 ///|
 test "pull metadata starts a pinned snapshot and enforces the file limit" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let loading = pull_test_model(
     reference,
@@ -490,13 +478,9 @@ test "pull metadata starts a pinned snapshot and enforces the file limit" {
 ///|
 test "pull compare and files can arrive out of order but wait for validation" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let compare = decode_compare(
-    read_fixture("playground/main/fixtures/pull_compare.json"),
-  )
-  let files = decode_pull_files(
-    read_fixture("playground/main/fixtures/pull_files.json"),
-  )
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
+  let compare = decode_compare(read_fixture("main/fixtures/pull_compare.json"))
+  let files = decode_pull_files(read_fixture("main/fixtures/pull_files.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let loading = pull_test_model(
     reference,
@@ -568,13 +552,9 @@ test "pull compare and files can arrive out of order but wait for validation" {
 ///|
 test "a changed pull head retries once and discards the old attempt" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let compare = decode_compare(
-    read_fixture("playground/main/fixtures/pull_compare.json"),
-  )
-  let files = decode_pull_files(
-    read_fixture("playground/main/fixtures/pull_files.json"),
-  )
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
+  let compare = decode_compare(read_fixture("main/fixtures/pull_compare.json"))
+  let files = decode_pull_files(read_fixture("main/fixtures/pull_files.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let validating = pull_test_model(
     reference,
@@ -679,13 +659,9 @@ test "a changed pull head retries once and discards the old attempt" {
 ///|
 test "a pull request that changes during both attempts fails explicitly" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let compare = decode_compare(
-    read_fixture("playground/main/fixtures/pull_compare.json"),
-  )
-  let files = decode_pull_files(
-    read_fixture("playground/main/fixtures/pull_files.json"),
-  )
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
+  let compare = decode_compare(read_fixture("main/fixtures/pull_compare.json"))
+  let files = decode_pull_files(read_fixture("main/fixtures/pull_files.json"))
   let validating = pull_test_model(
     reference,
     10,
@@ -713,13 +689,9 @@ test "a pull request that changes during both attempts fails explicitly" {
 ///|
 test "incomplete pull pagination retries once then keeps the incomplete error" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("playground/main/fixtures/pull.json"))
-  let compare = decode_compare(
-    read_fixture("playground/main/fixtures/pull_compare.json"),
-  )
-  let files = decode_pull_files(
-    read_fixture("playground/main/fixtures/pull_files.json"),
-  )
+  let pull = decode_pull(read_fixture("main/fixtures/pull.json"))
+  let compare = decode_compare(read_fixture("main/fixtures/pull_compare.json"))
+  let files = decode_pull_files(read_fixture("main/fixtures/pull_files.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let loading = pull_test_model(
     reference,
@@ -770,9 +742,7 @@ test "incomplete pull pagination retries once then keeps the incomplete error" {
 
 ///|
 test "all files remain listed but only the first twenty MoonBit diffs auto-load" {
-  let fixture = decode_commit(
-    read_fixture("playground/main/fixtures/root_commit.json"),
-  )
+  let fixture = decode_commit(read_fixture("main/fixtures/root_commit.json"))
   let files : Array[ApiFile] = []
   files.push(fixture_file("README.md", "added"))
   for index in 0..<21 {
@@ -851,9 +821,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
 
 ///|
 fn diff_test_view(files : Array[ApiFile]) -> ChangeView raise {
-  let fixture = decode_commit(
-    read_fixture("playground/main/fixtures/commit_page1.json"),
-  )
+  let fixture = decode_commit(read_fixture("main/fixtures/commit_page1.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (view, _) = finish_commit(
     commit_reference("example", "project", fixture.sha),
@@ -1141,9 +1109,7 @@ test "ignore comments has independent algorithm caches" {
 test "ignore comments survives commit navigation but stays out of routes" {
   let reference = commit_reference("owner", "repo", "abcdef1")
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let fixture = decode_commit(
-    read_fixture("playground/main/fixtures/root_commit.json"),
-  )
+  let fixture = decode_commit(read_fixture("main/fixtures/root_commit.json"))
   let loading = {
     ..initial_model(),
     generation: 1,
@@ -1187,9 +1153,7 @@ test "ignore tests toggles independently and survives navigation without routes"
   )
 
   let reference = commit_reference("owner", "repo", "abcdef1")
-  let fixture = decode_commit(
-    read_fixture("playground/main/fixtures/root_commit.json"),
-  )
+  let fixture = decode_commit(read_fixture("main/fixtures/root_commit.json"))
   let loading = {
     ..toggled,
     generation: 1,
