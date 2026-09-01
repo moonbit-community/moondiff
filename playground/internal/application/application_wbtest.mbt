@@ -32,6 +32,7 @@ test "stale commit responses are discarded by generation" {
     route: None,
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
   let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
@@ -57,6 +58,7 @@ fn pull_test_model(
     route: Some(reference),
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
 }
@@ -429,6 +431,7 @@ fn diff_test_model(view : ChangeView) -> Model {
     route: Some(view.reference),
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
 }
@@ -987,6 +990,7 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     route: Some(view.reference),
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: {
       auth: SignedIn(Some("reviewer")),
       comments: CommentsLoading,
@@ -1097,6 +1101,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     route: Some(view.reference),
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: {
       auth: SignedIn(Some("reviewer")),
       comments: CommentsReady({
@@ -1244,6 +1249,7 @@ fn device_auth_test_model(
     route,
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: {
       auth,
       comments: CommentsFailed("private repository"),
