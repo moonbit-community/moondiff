@@ -176,17 +176,19 @@ fn gateway_source_request(
             Err(ExtensionRequestError(status~, code~, detail=status_text))
           }
         }
-        scheduler.add(emit(SourceLoaded(generation, index, side, result)))
+        scheduler.add(emit(Load(SourceLoaded(generation, index, side, result))))
       },
       failed=detail => {
         scheduler.add(
           emit(
-            SourceLoaded(
-              generation,
-              index,
-              side,
-              Err(
-                GitHubRequestError("GitHub content request failed: \{detail}"),
+            Load(
+              SourceLoaded(
+                generation,
+                index,
+                side,
+                Err(
+                  GitHubRequestError("GitHub content request failed: \{detail}"),
+                ),
               ),
             ),
           ),

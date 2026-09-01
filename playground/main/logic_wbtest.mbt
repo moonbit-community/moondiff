@@ -410,7 +410,7 @@ test "stale commit responses are discarded by generation" {
     read_fixture("playground/main/fixtures/root_commit.json"),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (after, _) = update(model, CommitPageLoaded(1, 1, Ok(fixture)), emit)
+  let (after, _) = update_load(model, CommitPageLoaded(1, 1, Ok(fixture)), emit)
   assert_true(after == model)
 }
 
@@ -445,19 +445,23 @@ test "pull metadata starts a pinned snapshot and enforces the file limit" {
     8,
     LoadingPullMetadata(reference~, attempt=0),
   )
-  let (stale_generation, _) = update(
+  let (stale_generation, _) = update_load(
     loading,
     PullMetadataLoaded(7, 0, Ok(pull)),
     emit,
   )
   assert_true(stale_generation == loading)
-  let (stale_attempt, _) = update(
+  let (stale_attempt, _) = update_load(
     loading,
     PullMetadataLoaded(8, 1, Ok(pull)),
     emit,
   )
   assert_true(stale_attempt == loading)
-  let (started, _) = update(loading, PullMetadataLoaded(8, 0, Ok(pull)), emit)
+  let (started, _) = update_load(
+    loading,
+    PullMetadataLoaded(8, 0, Ok(pull)),
+    emit,
+  )
   guard started.phase
     is LoadingPullSnapshot(
       attempt=0,
@@ -472,7 +476,7 @@ test "pull metadata starts a pinned snapshot and enforces the file limit" {
   assert_eq(pinned.base.sha, pull.base.sha)
   assert_eq(pinned.head.sha, pull.head.sha)
 
-  let (over_limit, _) = update(
+  let (over_limit, _) = update_load(
     loading,
     PullMetadataLoaded(8, 0, Ok({ ..pull, changed_files: 3_001, })),
     emit,
@@ -506,19 +510,19 @@ test "pull compare and files can arrive out of order but wait for validation" {
       files=[],
     ),
   )
-  let (wrong_page, _) = update(
+  let (wrong_page, _) = update_load(
     loading,
     PullFilesPageLoaded(7, 0, 2, Ok(files)),
     emit,
   )
   assert_true(wrong_page == loading)
-  let (wrong_attempt, _) = update(
+  let (wrong_attempt, _) = update_load(
     loading,
     PullCompareLoaded(7, 1, Ok(compare)),
     emit,
   )
   assert_true(wrong_attempt == loading)
-  let (after_files, _) = update(
+  let (after_files, _) = update_load(
     loading,
     PullFilesPageLoaded(7, 0, 1, Ok(files)),
     emit,
@@ -530,20 +534,20 @@ test "pull compare and files can arrive out of order but wait for validation" {
   assert_eq(loaded_files.map(file => file.filename), [
     "src/first.mbt", "README.md",
   ])
-  let (early_validation, _) = update(
+  let (early_validation, _) = update_load(
     after_files,
     PullValidationLoaded(7, 0, Ok(pull)),
     emit,
   )
   assert_true(early_validation == after_files)
-  let (validating, _) = update(
+  let (validating, _) = update_load(
     after_files,
     PullCompareLoaded(7, 0, Ok(compare)),
     emit,
   )
   assert_true(validating.phase is ValidatingPullSnapshot(attempt=0, ..))
   let verified = { ..pull, title: "Verified pull title", additions: 11, }
-  let (shown, _) = update(
+  let (shown, _) = update_load(
     validating,
     PullValidationLoaded(7, 0, Ok(verified)),
     emit,
@@ -590,7 +594,7 @@ test "a changed pull head retries once and discards the old attempt" {
     additions: 13,
   }
   assert_eq(latest.changed_files, pull.changed_files)
-  let (retrying, _) = update(
+  let (retrying, _) = update_load(
     validating,
     PullValidationLoaded(9, 0, Ok(latest)),
     emit,
@@ -607,31 +611,31 @@ test "a changed pull head retries once and discards the old attempt" {
     fail("expected the latest metadata to start one retry")
   }
   assert_eq(retry_metadata.head.sha, latest.head.sha)
-  let (stale_generation, _) = update(
+  let (stale_generation, _) = update_load(
     retrying,
     PullCompareLoaded(8, 1, Ok(compare)),
     emit,
   )
   assert_true(stale_generation == retrying)
-  let (stale_compare, _) = update(
+  let (stale_compare, _) = update_load(
     retrying,
     PullCompareLoaded(9, 0, Ok(compare)),
     emit,
   )
   assert_true(stale_compare == retrying)
-  let (stale_files, _) = update(
+  let (stale_files, _) = update_load(
     retrying,
     PullFilesPageLoaded(9, 0, 1, Ok(files)),
     emit,
   )
   assert_true(stale_files == retrying)
-  let (stale_files_generation, _) = update(
+  let (stale_files_generation, _) = update_load(
     retrying,
     PullFilesPageLoaded(8, 1, 1, Ok(files)),
     emit,
   )
   assert_true(stale_files_generation == retrying)
-  let (stale_validation, _) = update(
+  let (stale_validation, _) = update_load(
     retrying,
     PullValidationLoaded(9, 0, Ok(latest)),
     emit,
@@ -641,24 +645,24 @@ test "a changed pull head retries once and discards the old attempt" {
   let latest_compare : ApiCompare = {
     merge_base_commit: { sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", },
   }
-  let (with_compare, _) = update(
+  let (with_compare, _) = update_load(
     retrying,
     PullCompareLoaded(9, 1, Ok(latest_compare)),
     emit,
   )
-  let (validating_latest, _) = update(
+  let (validating_latest, _) = update_load(
     with_compare,
     PullFilesPageLoaded(9, 1, 1, Ok(files)),
     emit,
   )
   assert_true(validating_latest.phase is ValidatingPullSnapshot(attempt=1, ..))
-  let (stale_validation_generation, _) = update(
+  let (stale_validation_generation, _) = update_load(
     validating_latest,
     PullValidationLoaded(8, 1, Ok(latest)),
     emit,
   )
   assert_true(stale_validation_generation == validating_latest)
-  let (shown, _) = update(
+  let (shown, _) = update_load(
     validating_latest,
     PullValidationLoaded(9, 1, Ok(latest)),
     emit,
@@ -698,7 +702,7 @@ test "a pull request that changes during both attempts fails explicitly" {
     base: { sha: "ffffffffffffffffffffffffffffffffffffffff", repo: None, },
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (failed, _) = update(
+  let (failed, _) = update_load(
     validating,
     PullValidationLoaded(10, 1, Ok(changed_again)),
     emit,
@@ -729,13 +733,13 @@ test "incomplete pull pagination retries once then keeps the incomplete error" {
       files=[],
     ),
   )
-  let (validating, _) = update(
+  let (validating, _) = update_load(
     loading,
     PullFilesPageLoaded(11, 0, 1, Ok([files[0]])),
     emit,
   )
   assert_true(validating.phase is ValidatingPullSnapshot(attempt=0, ..))
-  let (retrying, _) = update(
+  let (retrying, _) = update_load(
     validating,
     PullValidationLoaded(11, 0, Ok(pull)),
     emit,
@@ -752,7 +756,7 @@ test "incomplete pull pagination retries once then keeps the incomplete error" {
       files=[files[0]],
     ),
   }
-  let (incomplete, _) = update(
+  let (incomplete, _) = update_load(
     final_validation,
     PullValidationLoaded(11, 1, Ok(pull)),
     emit,
@@ -837,7 +841,7 @@ test "all files remain listed but only the first twenty MoonBit diffs auto-load"
     copy_status: CopyReady,
     review: initial_review_state(),
   }
-  let (after, _) = update(
+  let (after, _) = update_load(
     model,
     SourceLoaded(6, 0, New, Ok(("text/plain", @utf8.encode("stale")))),
     emit,
@@ -1049,7 +1053,7 @@ test "algorithm switching fills the second cache and reuses the first" {
   assert_true(lexical_file.diff_cache.get(ast_key) is None)
   let view = set_file_state(diff_test_view([file]), 0, lexical_file)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (switched, _) = update(
+  let (switched, _) = update_ui(
     diff_test_model(view),
     SelectDiffAlgorithm(AstAlgorithm),
     emit,
@@ -1065,7 +1069,7 @@ test "algorithm switching fills the second cache and reuses the first" {
   }
   guard ast is MoonBit(status~, ..) else { fail("expected MoonBit cache") }
   assert_true(status is NoStructuralChanges)
-  let (switched_back, _) = update(
+  let (switched_back, _) = update_ui(
     switched,
     SelectDiffAlgorithm(LexicalAlgorithm),
     emit,
@@ -1120,7 +1124,11 @@ test "ignore comments has independent algorithm caches" {
 
   let view = set_file_state(diff_test_view([file]), 0, cached)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (toggled, _) = update(diff_test_model(view), ToggleIgnoreComments, emit)
+  let (toggled, _) = update_ui(
+    diff_test_model(view),
+    ToggleIgnoreComments,
+    emit,
+  )
   assert_true(toggled.ignore_comments)
   assert_true(toggled.diff_algorithm is LexicalAlgorithm)
   guard toggled.phase is Showing(toggled_view) else {
@@ -1149,7 +1157,11 @@ test "ignore comments survives commit navigation but stays out of routes" {
       files=[],
     ),
   }
-  let (loaded, _) = update(loading, CommitPageLoaded(1, 1, Ok(fixture)), emit)
+  let (loaded, _) = update_load(
+    loading,
+    CommitPageLoaded(1, 1, Ok(fixture)),
+    emit,
+  )
   assert_true(loaded.ignore_comments)
   assert_true(loaded.phase is Showing(_))
   assert_false(playground_route(reference).contains("ignore"))
@@ -1163,7 +1175,7 @@ test "ignore tests toggles independently and survives navigation without routes"
   ])
   let view = set_file_state(diff_test_view([file]), 0, ready)
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (toggled, _) = update(diff_test_model(view), ToggleIgnoreTests, emit)
+  let (toggled, _) = update_ui(diff_test_model(view), ToggleIgnoreTests, emit)
   assert_true(toggled.ignore_tests)
   assert_false(toggled.ignore_comments)
   guard toggled.phase is Showing(toggled_view) else {
@@ -1190,7 +1202,11 @@ test "ignore tests toggles independently and survives navigation without routes"
       files=[],
     ),
   }
-  let (loaded, _) = update(loading, CommitPageLoaded(1, 1, Ok(fixture)), emit)
+  let (loaded, _) = update_load(
+    loading,
+    CommitPageLoaded(1, 1, Ok(fixture)),
+    emit,
+  )
   assert_true(loaded.ignore_tests)
   assert_false(playground_route(reference).contains("ignore"))
 }
@@ -1224,7 +1240,7 @@ test "new source invalidates every MoonBit filter cache" {
     ignore_tests: true,
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (updated, _) = update(
+  let (updated, _) = update_load(
     model,
     SourceLoaded(
       model.generation,
