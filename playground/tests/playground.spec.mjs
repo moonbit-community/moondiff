@@ -383,6 +383,54 @@ const apiCommit = {
   ],
 };
 
+const treeSha = "3333333333333333333333333333333333333333";
+const treeUrl = `https://github.com/example/tree/commit/${treeSha}`;
+const treeCommit = {
+  sha: treeSha,
+  html_url: treeUrl,
+  commit: { message: "Exercise the changed-file tree" },
+  parents: [{ sha: parentSha }],
+  stats: { additions: 7, deletions: 6, total: 13 },
+  files: [
+    {
+      filename: "src/core/main.mbt",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+    },
+    {
+      filename: "src/utils/helper.mbt",
+      status: "added",
+      additions: 2,
+      deletions: 0,
+      changes: 2,
+    },
+    {
+      filename: "docs/guide.md",
+      status: "removed",
+      additions: 0,
+      deletions: 2,
+      changes: 2,
+    },
+    {
+      filename: "src/renamed/new_name.mbt",
+      previous_filename: "legacy/Old_Name.mbt",
+      status: "renamed",
+      additions: 2,
+      deletions: 2,
+      changes: 4,
+    },
+    {
+      filename: "COPYING",
+      status: "copied",
+      additions: 2,
+      deletions: 1,
+      changes: 3,
+    },
+  ],
+};
+
 const pullNumber = 4082;
 const pullUrl = `https://github.com/example/project/pull/${pullNumber}`;
 const pullFilesUrl = `${pullUrl}/files`;
@@ -559,6 +607,54 @@ async function installMockRoutes(page) {
       body,
     });
   });
+}
+
+async function installTreeRoutes(page) {
+  const rawRequests = [];
+  await page.route("https://**", route => route.abort("blockedbyclient"));
+  await page.route("https://api.github.com/**", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    headers: { "access-control-allow-origin": "*" },
+    body: JSON.stringify(treeCommit),
+  }));
+  await page.route("https://raw.githubusercontent.com/**", async route => {
+    const url = new URL(route.request().url());
+    const parts = url.pathname.split("/");
+    const revision = parts[3];
+    const filename = decodeURIComponent(parts.slice(4).join("/"));
+    rawRequests.push(filename);
+    const old = revision === parentSha;
+    let body;
+    if (filename === "src/core/main.mbt") {
+      body = [
+        "fn main() {",
+        ...Array.from({ length: 32 }, (_, index) => `  ${old ? "old" : "new"}_value_${index}()`),
+        "}",
+      ].join("\n");
+    } else if (filename === "src/utils/helper.mbt") {
+      body = [
+        "fn helper() {",
+        ...Array.from({ length: 24 }, (_, index) => `  added_value_${index}()`),
+        "}",
+      ].join("\n");
+    } else if (filename === "docs/guide.md") {
+      body = "# Removed guide\nOld instructions";
+    } else if (filename === "legacy/Old_Name.mbt") {
+      body = "fn old_name() { old_value() }";
+    } else if (filename === "src/renamed/new_name.mbt") {
+      body = "fn new_name() { new_value() }";
+    } else {
+      body = old ? "Copyright old" : "Copyright copied\nAll rights reserved";
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "text/plain",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+  return rawRequests;
 }
 
 async function installAlgorithmRoutes(
@@ -783,6 +879,15 @@ async function loadMockedCommit(page) {
   await expect(page.getByRole("button", { name: "Lexical" })).toHaveAttribute("aria-pressed", "true");
 }
 
+async function loadTreeCommit(page) {
+  const rawRequests = await installTreeRoutes(page);
+  await page.goto("/");
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(treeUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page.locator("table.split").first()).toBeVisible();
+  return rawRequests;
+}
+
 async function openMockedShareLink(page) {
   await installMockRoutes(page);
   await page.goto(`/#/example/project/commit/${commitSha}`);
@@ -877,6 +982,234 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
   await expect(page.locator("table.split")).toHaveCount(0);
   await page.getByRole("button", { name: "Use split view" }).click();
   await expect(page.locator("table.split")).toBeVisible();
+});
+
+test("desktop file tree supports collapse search status filters and file navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const rawRequests = await loadTreeCommit(page);
+  const sidebar = page.getByRole("complementary", { name: "Changed files" });
+  await expect(sidebar).toBeVisible();
+  const sidebarLayout = await sidebar.evaluate(element => ({
+    width: element.getBoundingClientRect().width,
+    position: getComputedStyle(element).position,
+    overflow: getComputedStyle(element.querySelector(".file-tree-scroll")).overflowY,
+    rowFontSize: getComputedStyle(element.querySelector(".file-tree-row")).fontSize,
+  }));
+  expect(sidebarLayout.width).toBe(320);
+  expect(sidebarLayout.position).toBe("sticky");
+  expect(sidebarLayout.overflow).toBe("auto");
+  expect(sidebarLayout.rowFontSize).toBe("13px");
+  await expect(page.getByRole("button", { name: "Open file tree" })).toBeHidden();
+  await expect(sidebar.locator(".file-tree-row.file-row")).toHaveCount(5);
+
+  await page.getByRole("treeitem", { name: "Collapse directory src", exact: true }).click();
+  await expect(page.getByRole("treeitem", { name: "Expand directory src", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(sidebar.getByRole("treeitem", { name: /new_name\.mbt/u })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Search files" }).click();
+  await page.getByRole("searchbox", { name: "Search changed files" }).fill("OLD_NAME.MBT");
+  await expect(sidebar.locator(".file-tree-row.file-row")).toHaveCount(1);
+  const renamed = sidebar.getByRole("treeitem", {
+    name: "Open src/renamed/new_name.mbt, renamed from legacy/Old_Name.mbt",
+  });
+  await expect(renamed).toBeVisible();
+  await expect(renamed).toHaveAttribute("title", /renamed from legacy\/Old_Name\.mbt/u);
+  const filteredSrc = page.getByRole("treeitem", {
+    name: "Directory src, expanded while filtering",
+    exact: true,
+  });
+  await expect(filteredSrc).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await expect(filteredSrc).toHaveAttribute("aria-disabled", "true");
+  await expect(filteredSrc).toBeDisabled();
+  await filteredSrc.dispatchEvent("click");
+
+  await page.getByRole("button", { name: "Close file search" }).click();
+  await expect(page.getByRole("treeitem", { name: "Expand directory src", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await page.getByRole("button", { name: "Search files" }).click();
+  await expect(page.getByRole("searchbox", { name: "Search changed files" })).toHaveValue("");
+  await page.getByRole("button", { name: "Close file search" }).click();
+
+  const expandSrc = page.getByRole("treeitem", { name: "Expand directory src", exact: true });
+  await expandSrc.focus();
+  await expandSrc.press("Enter");
+  const collapseSrc = page.getByRole("treeitem", { name: "Collapse directory src", exact: true });
+  await expect(collapseSrc).toHaveAttribute("aria-expanded", "true");
+  await collapseSrc.focus();
+  await collapseSrc.press("Space");
+  const keyboardCollapsed = page.getByRole("treeitem", { name: "Expand directory src", exact: true });
+  await expect(keyboardCollapsed).toHaveAttribute("aria-expanded", "false");
+  await keyboardCollapsed.press("Enter");
+
+  await page.getByRole("button", { name: "Filter added files" }).click();
+  await page.getByRole("button", { name: "Filter deleted files" }).click();
+  await expect(sidebar.locator(".file-tree-row.file-row")).toHaveCount(2);
+  await expect(sidebar.getByRole("treeitem", { name: "Open src/utils/helper.mbt" })).toBeVisible();
+  await expect(sidebar.getByRole("treeitem", { name: "Open docs/guide.md" })).toBeVisible();
+  await page.getByRole("button", { name: "Filter added files" }).click();
+  await page.getByRole("button", { name: "Filter deleted files" }).click();
+  await expect(sidebar.locator(".file-tree-row.file-row")).toHaveCount(5);
+
+  const guideCard = page.locator("#moondiff-file-2");
+  await expect(guideCard.getByRole("button", { name: "Expand docs/guide.md" })).toBeVisible();
+  expect(await guideCard.evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThan(900);
+  expect(rawRequests).not.toContain("docs/guide.md");
+  const guideTreeItem = sidebar.getByRole("treeitem", { name: "Open docs/guide.md" });
+  await guideTreeItem.click();
+  await expect(guideTreeItem).toHaveAttribute("aria-selected", "true");
+  await expect(guideCard.getByRole("button", { name: "Collapse docs/guide.md" })).toBeVisible();
+  await expect(guideCard).toContainText("Removed guide");
+  await expect.poll(() => rawRequests.includes("docs/guide.md")).toBe(true);
+  await expect.poll(() => guideCard.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.top >= 0 && bounds.top < innerHeight;
+  })).toBe(true);
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+});
+
+test("tablet-width layout keeps the sidebar without widening the document", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 900 });
+  await loadTreeCommit(page);
+  const sidebar = page.locator("#file-tree-sidebar");
+  const treeTrigger = page.locator("button.file-tree-trigger");
+
+  for (const width of [800, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar).toHaveAttribute("role", "complementary");
+    await expect(treeTrigger).toBeHidden();
+    const layout = await page.evaluate(() => ({
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      sidebarWidth: document.querySelector("#file-tree-sidebar").getBoundingClientRect().width,
+    }));
+    expect(layout.sidebarWidth).toBe(320);
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  }
+
+  await page.setViewportSize({ width: 767, height: 900 });
+  await expect(sidebar).toBeHidden();
+  await expect(treeTrigger).toBeVisible();
+  const narrowLayout = await page.evaluate(() => ({
+    documentClientWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(narrowLayout.documentScrollWidth).toBeLessThanOrEqual(
+    narrowLayout.documentClientWidth,
+  );
+
+  await page.setViewportSize({ width: 766, height: 900 });
+  const openTree = page.getByRole("button", { name: "Open file tree" });
+  await openTree.click();
+  await expect(sidebar).toHaveAttribute("role", "dialog");
+  await expect(sidebar.locator("button.drawer-close")).toBeFocused();
+
+  await page.setViewportSize({ width: 767, height: 900 });
+  await expect(sidebar).toHaveClass(/\bopen\b/u);
+  await expect(sidebar).toHaveAttribute("role", "dialog");
+  await expect(treeTrigger).toHaveAttribute("aria-expanded", "true");
+
+  await page.setViewportSize({ width: 768, height: 900 });
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar).not.toHaveClass(/\bopen\b/u);
+  await expect(sidebar).toHaveAttribute("role", "complementary");
+  await expect(sidebar).not.toHaveAttribute("aria-modal", "true");
+  await expect(treeTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(sidebar.locator("button.search-toggle")).toBeFocused();
+  await expect(page.locator(".hero-workspace")).not.toHaveAttribute("inert", "");
+  await expect(page.locator(".change-main")).not.toHaveAttribute("inert", "");
+});
+
+test("mobile file tree is a modal focus trap and restores focus after dismissal", async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 900 });
+  await loadTreeCommit(page);
+  const sidebar = page.locator("#file-tree-sidebar");
+  const openTree = page.getByRole("button", { name: "Open file tree" });
+  const treeTrigger = page.locator("button.file-tree-trigger");
+  await expect(openTree).toBeVisible();
+  await expect(treeTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(sidebar).toHaveAttribute("role", "complementary");
+  await expect(sidebar).toBeHidden();
+
+  await openTree.click();
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar).toHaveAttribute("role", "dialog");
+  await expect(sidebar).toHaveAttribute("aria-modal", "true");
+  await expect(page.locator(".hero-workspace")).toHaveAttribute("inert", "");
+  await expect(page.locator(".change-main")).toHaveAttribute("inert", "");
+  const drawerClose = sidebar.locator("button.drawer-close");
+  await expect(drawerClose).toBeFocused();
+
+  const backdrop = page.locator("button.file-tree-backdrop");
+  await expect(backdrop).toHaveAttribute("tabindex", "-1");
+  await expect(backdrop).toHaveCSS("background-color", "rgba(0, 0, 0, 0.42)");
+  await backdrop.hover({ position: { x: 10, y: 10 } });
+  await expect(backdrop).toHaveCSS("background-color", "rgba(0, 0, 0, 0.42)");
+  await expect(backdrop).toHaveCSS("transform", "none");
+
+  const focusable = sidebar.locator("button:not([disabled]), input:not([disabled])");
+  const firstFocusable = focusable.first();
+  const lastFocusable = focusable.last();
+  await firstFocusable.focus();
+  await firstFocusable.press("Shift+Tab");
+  await expect(lastFocusable).toBeFocused();
+  await lastFocusable.press("Tab");
+  await expect(firstFocusable).toBeFocused();
+
+  await firstFocusable.press("Escape");
+  await expect(sidebar).toBeHidden();
+  await expect(sidebar).toHaveAttribute("role", "complementary");
+  await expect(openTree).toBeFocused();
+  await expect(page.locator(".hero-workspace")).not.toHaveAttribute("inert", "");
+  await expect(page.locator(".change-main")).not.toHaveAttribute("inert", "");
+
+  await openTree.click();
+  await expect(drawerClose).toBeFocused();
+  await backdrop.click({ position: { x: 10, y: 10 } });
+  await expect(sidebar).toBeHidden();
+  await expect(openTree).toBeFocused();
+
+  await openTree.click();
+  await expect(drawerClose).toBeFocused();
+  await drawerClose.click();
+  await expect(sidebar).toBeHidden();
+  await expect(openTree).toBeFocused();
+});
+
+test("mobile file tree closes after selection and focuses the file card", async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 900 });
+  await loadTreeCommit(page);
+  const sidebar = page.locator("#file-tree-sidebar");
+  const openTree = page.getByRole("button", { name: "Open file tree" });
+  const treeTrigger = page.locator("button.file-tree-trigger");
+  const copyingCard = page.locator("#moondiff-file-4");
+  expect(await copyingCard.evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThan(900);
+
+  await openTree.click();
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar).toHaveAttribute("role", "dialog");
+  await expect(sidebar.locator("button.drawer-close")).toBeFocused();
+  await expect(treeTrigger).toHaveAttribute("aria-expanded", "true");
+  await sidebar.getByRole("treeitem", { name: "Open COPYING" }).click();
+
+  await expect(sidebar).toBeHidden();
+  await expect(treeTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(copyingCard.getByRole("button", { name: "Collapse COPYING" })).toBeVisible();
+  await expect(copyingCard).toContainText("Copyright copied");
+  await expect.poll(() => copyingCard.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.top >= 0 && bounds.top < innerHeight;
+  })).toBe(true);
+  await expect(copyingCard.locator("button.file-toggle")).toBeFocused();
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
 });
 
 test("mixed commits use lazy line diffs and preserve binary file cards", async ({ page }) => {
