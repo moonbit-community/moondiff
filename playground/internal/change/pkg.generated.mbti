@@ -1,0 +1,98 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/change"
+
+import {
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff/model",
+  "moonbitlang/core/immut/hashmap",
+}
+
+// Values
+pub fn cached_file_document(FileState, DiffAlgorithm, ignore_comments? : Bool, ignore_tests? : Bool) -> CachedDiffResult?
+
+pub fn ensure_expanded_file_documents(ChangeView, DiffAlgorithm, ignore_comments? : Bool, ignore_tests? : Bool) -> ChangeView
+
+pub fn ensure_file_document(FileState, DiffAlgorithm, ignore_comments? : Bool, ignore_tests? : Bool) -> FileState
+
+pub fn finish_change(@github.CommitRef, @github.Revision?, @github.Revision, String, String, @github.ApiStats, Array[@github.ApiFile]) -> ChangeView
+
+pub fn finish_commit(@github.CommitRef, @github.RepositoryRef, @github.ApiCommit, Array[@github.ApiFile]) -> ChangeView
+
+pub fn finish_pull(@github.CommitRef, @github.ApiPull, @github.ApiCompare, Array[@github.ApiFile]) -> Result[ChangeView, String]
+
+pub fn ignored_change_subject(Bool, Bool) -> String
+
+pub fn initial_side(String?, Bool) -> SideLoad
+
+pub fn set_file_state(ChangeView, Int, FileState) -> ChangeView
+
+pub fn source_requests_for_file(ChangeView, Int) -> Array[(SourceSide, @github.SourceLocation)]
+
+// Errors
+
+// Types and methods
+pub(all) enum CacheKey {
+  Line
+  MoonBit(DiffAlgorithm, Bool, Bool)
+} derive(Eq, Hash)
+
+pub(all) enum CachedDiffResult {
+  Line(@model.HunkDocument)
+  MoonBit(document~ : @model.DiffDocument, status~ : @model.DiffStatus)
+} derive(Eq)
+
+pub(all) struct ChangeView {
+  reference : @github.CommitRef
+  sha : String
+  parent_sha : String?
+  old_revision : @github.Revision?
+  new_revision : @github.Revision
+  message : String
+  html_url : String
+  stats : @github.ApiStats
+  total_files : Int
+  files : Array[FileState]
+} derive(Eq)
+
+pub(all) enum DiffAlgorithm {
+  LexicalAlgorithm
+  AstAlgorithm
+} derive(Eq, Hash)
+
+pub(all) struct DiffCache {
+  entries : @hashmap.HashMap[CacheKey, CachedDiffResult]
+} derive(Eq)
+pub fn DiffCache::empty() -> Self
+pub fn DiffCache::get(Self, CacheKey) -> CachedDiffResult?
+pub fn DiffCache::put(Self, CacheKey, CachedDiffResult) -> Self
+
+pub(all) struct FileState {
+  file : @github.ApiFile
+  diff_mode : @github.FileDiffMode
+  expanded : Bool
+  old_side : SideLoad
+  new_side : SideLoad
+  diff_cache : DiffCache
+} derive(Eq)
+
+pub(all) enum SideLoad {
+  NotRequested
+  Loading
+  Ready(Array[String])
+  CannotRender(String, Bool)
+  LoadFailed(String)
+} derive(Eq)
+
+pub(all) enum SourceSide {
+  Old
+  New
+} derive(Eq)
+
+pub(all) enum ViewMode {
+  Split
+  Unified
+} derive(Eq)
+
+// Type aliases
+
+// Traits

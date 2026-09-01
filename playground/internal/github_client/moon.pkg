@@ -1,0 +1,8 @@
+import {
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/cmd",
+  "moonbitlang/core/json",
+}
+
+supported_targets = "js"

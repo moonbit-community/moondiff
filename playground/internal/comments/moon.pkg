@@ -1,0 +1,15 @@
+import {
+  "moonbit-community/moondiff-playground/internal/change",
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff-playground/internal/github_client",
+  "moonbit-community/moondiff-playground/internal/review",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/cmd",
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonbit-community/moondiff-playground/internal/routing",
+} for "wbtest"
+
+supported_targets = "js"

@@ -1,0 +1,66 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/review"
+
+import {
+  "moonbit-community/moondiff/model",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn canonical_anchor(CanonicalPatch, ReviewSide, Int) -> ReviewAnchor?
+
+pub fn parse_canonical_patch(String, String?) -> CanonicalPatch
+
+pub fn patch_is_commentable(CanonicalPatch) -> Bool
+
+pub fn project_review_items(Int, String, @model.HunkDocument, CanonicalPatch, old_base? : Int, new_base? : Int, show_hunk_headers? : Bool, hunk_context? : String) -> Array[ReviewItem]
+
+pub fn project_review_rows(Int, String, @model.HunkDocument, CanonicalPatch, old_base? : Int, new_base? : Int) -> Array[ReviewRow]
+
+// Errors
+
+// Types and methods
+pub(all) enum CanonicalPatch {
+  Commentable(Array[ReviewAnchor])
+  NotCommentable
+}
+
+pub(all) struct ReviewAnchor {
+  path : String
+  line : Int
+  side : ReviewSide
+  position : Int?
+} derive(Eq, @debug.Debug)
+
+pub(all) enum ReviewItem {
+  ReviewHunk(String)
+  ReviewLine(ReviewRow)
+}
+
+pub(all) struct ReviewRow {
+  file_index : Int
+  old_line : Int?
+  new_line : Int?
+  old_text : String?
+  new_text : String?
+  old_segments : ArrayView[@model.DiffSegment]?
+  new_segments : ArrayView[@model.DiffSegment]?
+  kind : ReviewRowKind
+  old_anchor : ReviewAnchor?
+  new_anchor : ReviewAnchor?
+}
+
+pub(all) enum ReviewRowKind {
+  ContextRow
+  ChangeRow
+  IgnoredRow
+}
+
+pub(all) enum ReviewSide {
+  Left
+  Right
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

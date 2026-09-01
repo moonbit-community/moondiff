@@ -1,0 +1,185 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/comments"
+
+import {
+  "moonbit-community/moondiff-playground/internal/change",
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff-playground/internal/review",
+  "moonbit-community/rabbita/cmd",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn auth_device_cancel_request(String, @cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_device_poll_request(String, @cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_device_start_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_logout_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_status_from_api(ApiAuthStatus) -> AuthStatus
+
+pub fn auth_status_from_api_preserving(ApiAuthStatus, AuthStatus) -> AuthStatus
+
+pub fn auth_status_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn author_label(ApiCommentUser?) -> String
+
+pub fn comment_head_request(@github.CommitRef, String, Int, @cmd.Emit[Result[@github.ApiPull, Error]]) -> @cmd.Cmd
+
+pub fn comments_request(@github.CommitRef, Int, @cmd.Emit[Result[ApiCommentBundle, Error]]) -> @cmd.Cmd
+
+pub fn commit_discussions(@change.ChangeView, ArrayView[ApiCommitComment]) -> Array[CommitDiscussion]
+
+pub fn create_commit_comment_request(@github.CommitRef, String, @review.ReviewAnchor, String, Int, @cmd.Emit[Result[ApiCommitComment, Error]]) -> @cmd.Cmd
+
+pub fn create_issue_comment_request(@github.CommitRef, String, String, Int, @cmd.Emit[Result[ApiIssueComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_comment_request(@github.CommitRef, String, String, @review.ReviewAnchor, String, Int, @cmd.Emit[Result[ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_reply_request(@github.CommitRef, String, Int64, String, Int, @cmd.Emit[Result[ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn initial_review_state() -> ReviewState
+
+pub fn notify_github_page_command() -> @cmd.Cmd
+
+pub fn review_can_comment(ReviewState) -> Bool
+
+pub fn review_state_with_auth(ReviewState, AuthStatus) -> ReviewState
+
+pub fn review_state_with_comments(ReviewState, CommentsStatus) -> ReviewState
+
+pub fn review_state_with_draft(ReviewState, CommentDraft?) -> ReviewState
+
+pub fn review_threads(@change.ChangeView, ArrayView[ApiReviewComment]) -> Array[ReviewThread]
+
+// Errors
+
+// Types and methods
+pub(all) struct ApiAuthStatus {
+  authenticated : Bool
+  login : String?
+  install_url : String?
+  device_flow : ApiDeviceFlow?
+} derive(@json.FromJson)
+
+pub(all) struct ApiCommentBundle {
+  issue_comments : Array[ApiIssueComment]
+  review_comments : Array[ApiReviewComment]
+  commit_comments : Array[ApiCommitComment]
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiCommentUser {
+  login : String
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiCommitComment {
+  id : Int64
+  body : String
+  html_url : String
+  created_at : String
+  user : ApiCommentUser?
+  path : String?
+  position : Int?
+  line : Int?
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiDeviceFlow {
+  flow_id : String
+  user_code : String
+  verification_uri : String
+  expires_in : Int
+  poll_after : Int
+} derive(@json.FromJson)
+
+pub(all) struct ApiIssueComment {
+  id : Int64
+  body : String
+  html_url : String
+  created_at : String
+  user : ApiCommentUser?
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiReviewComment {
+  id : Int64
+  body : String
+  html_url : String
+  created_at : String
+  user : ApiCommentUser?
+  path : String
+  line : Int?
+  side : String?
+  position : Int?
+  commit_id : String
+  in_reply_to_id : Int64?
+} derive(Eq, @json.FromJson)
+
+pub(all) enum AuthStatus {
+  WebReadOnly
+  AuthChecking
+  Anonymous(String?)
+  DeviceAuthorizing(DeviceAuthorization)
+  DeviceCancelling(DeviceAuthorization)
+  SignedIn(String?)
+  AuthFailed(String)
+} derive(Eq)
+
+pub(all) struct CommentDraft {
+  kind : DraftKind
+  body : String
+  submitting : Bool
+  error : String?
+} derive(Eq)
+
+pub(all) enum CommentsStatus {
+  CommentsDisabled
+  CommentsLoading
+  CommentsReady(ApiCommentBundle)
+  CommentsFailed(String)
+} derive(Eq)
+
+pub(all) struct CommitDiscussion {
+  comment : ApiCommitComment
+  file_index : Int?
+  outdated : Bool
+}
+
+pub(all) struct DeviceAuthorization {
+  flow_id : String
+  user_code : String
+  verification_uri : String
+  expires_in : Int
+  poll_after : Int
+  install_url : String?
+  copy_status : DeviceCodeCopyStatus
+} derive(Eq)
+
+pub(all) enum DeviceCodeCopyStatus {
+  DeviceCodeCopyReady
+  DeviceCodeCopyDone
+  DeviceCodeCopyError(String)
+} derive(Eq)
+
+pub(all) enum DraftKind {
+  OverallDraft
+  InlineDraft(Int, @review.ReviewAnchor)
+  ReplyDraft(Int64)
+} derive(Eq)
+
+pub(all) struct ReviewState {
+  auth : AuthStatus
+  comments : CommentsStatus
+  draft : CommentDraft?
+} derive(Eq)
+
+pub(all) struct ReviewThread {
+  root : ApiReviewComment
+  replies : Array[ApiReviewComment]
+  file_index : Int?
+  outdated : Bool
+}
+
+// Type aliases
+
+// Traits
