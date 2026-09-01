@@ -15,8 +15,8 @@ pub fn app_init(emit : @rabbita.Emit[Msg]) -> (Model, @rabbita.Cmd) {
 }
 
 ///|
-pub fn app_subscriptions(_model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
-  if extension_host_enabled() {
+pub fn app_subscriptions(model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
+  let base = if extension_host_enabled() {
     @sub.batch([
       @sub.on_url_changed(url => emit(Ui(RouteChanged(url)))),
       @sub.on_visibility_change(hidden => {
@@ -25,5 +25,15 @@ pub fn app_subscriptions(_model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub 
     ])
   } else {
     @sub.on_url_changed(url => emit(Ui(RouteChanged(url))))
+  }
+  if model.file_tree.drawer_open {
+    @sub.batch([
+      base,
+      @sub.on_resize(viewport => {
+        emit(Ui(FileTreeViewportChanged(viewport.width)))
+      }),
+    ])
+  } else {
+    base
   }
 }

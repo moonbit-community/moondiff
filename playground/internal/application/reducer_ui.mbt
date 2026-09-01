@@ -6,6 +6,7 @@ pub(all) enum UiMsg {
   ToggleView
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
+  FileTreeViewportChanged(Int)
   ToggleFileTreeSearch
   FileTreeSearchChanged(String)
   ToggleFileTreeStatus(String)
@@ -35,22 +36,38 @@ fn update_ui(
       }
       ({ ..model, view_mode, }, @rabbita.none)
     }
-    ToggleFileTreeDrawer =>
+    ToggleFileTreeDrawer => {
+      let drawer_open = !model.file_tree.drawer_open
+      let focus_command = if drawer_open {
+        focus_selector_after_render("#file-tree-sidebar .drawer-close")
+      } else {
+        focus_selector_after_render(".file-tree-trigger")
+      }
       (
-        {
-          ..model,
-          file_tree: {
-            ..model.file_tree,
-            drawer_open: !model.file_tree.drawer_open,
-          },
-        },
-        @rabbita.none,
+        { ..model, file_tree: { ..model.file_tree, drawer_open, }, },
+        focus_command,
       )
-    CloseFileTreeDrawer =>
+    }
+    CloseFileTreeDrawer => {
+      let focus_command = if model.file_tree.drawer_open {
+        focus_selector_after_render(".file-tree-trigger")
+      } else {
+        @rabbita.none
+      }
       (
         { ..model, file_tree: { ..model.file_tree, drawer_open: false, }, },
-        @rabbita.none,
+        focus_command,
       )
+    }
+    FileTreeViewportChanged(width) =>
+      if model.file_tree.drawer_open && width >= 768 {
+        (
+          { ..model, file_tree: { ..model.file_tree, drawer_open: false, }, },
+          focus_selector_after_render("#file-tree-sidebar .search-toggle"),
+        )
+      } else {
+        (model, @rabbita.none)
+      }
     ToggleFileTreeSearch => {
       let search_open = !model.file_tree.search_open
       (

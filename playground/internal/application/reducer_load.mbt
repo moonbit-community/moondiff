@@ -267,15 +267,25 @@ fn update_load(
       guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
         return (model, @rabbita.none)
       }
+      let drawer_was_open = model.file_tree.drawer_open
       let selected = select_file(model, index)
       let (opened, load_command) = if file.expanded {
         (selected, @rabbita.none)
       } else {
         expand_file(selected, view, generation, index, file, emit)
       }
+      let focus_command = if drawer_was_open {
+        focus_selector_after_render("#\{file_dom_id(index)} .file-toggle")
+      } else {
+        @rabbita.none
+      }
       (
         opened,
-        @rabbita.batch([load_command, @nav.scroll_to(file_dom_id(index))]),
+        @rabbita.batch([
+          load_command,
+          @nav.scroll_to(file_dom_id(index)),
+          focus_command,
+        ]),
       )
     }
     RetryFile(generation, index) => {
