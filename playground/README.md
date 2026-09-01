@@ -101,6 +101,27 @@ all other files load on demand. LineDiff keeps one shared cache. MoonBit files
 cache all eight Lexical/AST × comments/tests combinations independently, so
 layout switches reuse the same semantic document and stable fragment hunks.
 
+The result workspace also includes a changed-file tree without replacing the
+vertical file cards. At widths of 768 pixels and above it occupies a sticky,
+independently scrolling 320-pixel sidebar; below 768 pixels the same controls
+open in a bottom drawer with a backdrop and explicit close button. Each
+directory appears once in a depth-first tree. Siblings follow the order in which
+they are first encountered in GitHub's file list, while the file cards below
+remain in GitHub's original order. Directories start expanded and can be
+collapsed with the mouse or keyboard. Choosing a file selects it in the tree,
+closes the mobile drawer, expands its existing card, starts the same on-demand
+source loading when necessary, and scrolls the card into view. Already loaded
+diffs and cached algorithm/filter variants are reused.
+
+Tree search matches the complete current path and, for renamed files, the old
+path without regard to case. Status buttons support multiple selections (OR
+within statuses), while status selection and search combine with AND. Active
+search or status filters reveal every ancestor of a matching file without
+overwriting the user's collapsed-directory choices; clearing the filters
+restores those choices. Tree search, filters, collapse state, drawer state, and
+the selected file reset for each newly loaded change and are not stored in the
+share URL or local storage.
+
 Each downloaded side is limited to 1 MiB and 20,000 universal-newline lines.
 LF (`\n`), CRLF (`\r\n`), and bare CR (`\r`) each terminate one line; empty
 input is one line, and a trailing terminator retains the final empty line.

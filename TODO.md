@@ -15,6 +15,19 @@
 
 ## Medium Priority
 
+- [ ] Keep changed-file navigation responsive at the supported 3,000-file limit.
+  - Affected areas: `playground/internal/view/file_tree.mbt`,
+    `playground/internal/view/view.mbt`, and
+    `playground/tests/playground.spec.mjs`.
+  - The current worst-case probe renders 9,001 tree rows, 3,000 file cards,
+    and roughly 66,000 DOM elements; entering a 13-character search takes
+    about 2.5 seconds in headless Chromium.
+  - [ ] Cache the file-tree structure and avoid rebuilding every file card on
+    each search keystroke.
+  - [ ] Debounce search updates and/or virtualize the tree and file-card lists.
+  - [ ] Add a browser performance regression test for the unfiltered 3,000-file
+    view and sequential search input.
+
 - [ ] Show fallback notices when an AST diff has no structural changes.
   - Affected area: `playground/main/view.mbt`.
   - [ ] Collect and display fallback metadata before returning early for
