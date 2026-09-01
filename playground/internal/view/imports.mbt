@@ -1,5 +1,11 @@
 ///|
-using @application {type CopyStatus, type Model, type Msg, file_dom_id}
+using @application {
+  type CopyStatus,
+  type FileTreeState,
+  type Model,
+  type Msg,
+  file_dom_id,
+}
 
 ///|
 using @change {

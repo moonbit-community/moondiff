@@ -6,6 +6,7 @@ import {
   "moonbit-community/moondiff/model",
   "moonbit-community/rabbita/cmd",
   "moonbit-community/rabbita/html",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -25,6 +26,8 @@ pub(all) struct DiffNotice {
   label : String
   message : String
 }
+
+type FileTreeRow derive(Eq, @debug.Debug)
 
 // Type aliases
 
