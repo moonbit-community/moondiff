@@ -337,6 +337,52 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.locator(".line-comment-button")).toHaveCount(0);
 });
 
+test("shared file tree uses a wide sidebar and a narrow bottom drawer", async ({ page }) => {
+  await installHost(page);
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.goto("/panel.html");
+  await expect(page.getByText("Fork PR")).toBeVisible();
+
+  const sidebar = page.locator("#file-tree-sidebar");
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar).toHaveAttribute("role", "complementary");
+  expect(await sidebar.evaluate(element => element.getBoundingClientRect().width)).toBe(320);
+  await expect(page.getByRole("button", { name: "Open file tree" })).toBeHidden();
+
+  for (const width of [800, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(sidebar).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open file tree" })).toBeHidden();
+    const layout = await page.evaluate(() => ({
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  }
+
+  await page.setViewportSize({ width: 420, height: 900 });
+  const openTree = page.getByRole("button", { name: "Open file tree" });
+  await expect(openTree).toBeVisible();
+  await expect(sidebar).toBeHidden();
+  await openTree.click();
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar).toHaveAttribute("role", "dialog");
+  await expect(sidebar).toHaveAttribute("aria-modal", "true");
+  const drawerClose = sidebar.locator("button.drawer-close");
+  await expect(drawerClose).toBeFocused();
+  await drawerClose.press("Escape");
+  await expect(sidebar).toBeHidden();
+  await expect(openTree).toBeFocused();
+
+  await openTree.click();
+  await expect(drawerClose).toBeFocused();
+  await sidebar.getByRole("treeitem", { name: "Open src/main.mbt" }).click();
+  await expect(sidebar).toBeHidden();
+  await expect(openTree).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#moondiff-file-0")).toBeVisible();
+  await expect(page.locator("#moondiff-file-0 .file-toggle")).toBeFocused();
+});
+
 test("AST highlights inserted internal whitespace continuously in split and unified views", async ({ page }) => {
   const stable = "fn stable() {}";
   const added = "fn inserted() { let total = 1 }";
