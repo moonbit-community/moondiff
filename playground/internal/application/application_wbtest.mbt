@@ -454,6 +454,177 @@ fn ready_test_file(
 }
 
 ///|
+fn changed_file_tree_state() -> FileTreeState {
+  {
+    drawer_open: true,
+    search_open: true,
+    search_query: "src",
+    selected_statuses: ["modified"],
+    collapsed_directories: ["src"],
+    selected_file_index: Some(3),
+  }
+}
+
+///|
+test "file tree UI state toggles filters and closing search clears its query" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let model = { ..initial_model(), file_tree: changed_file_tree_state(), }
+  let (closed_search, _) = update_ui(model, ToggleFileTreeSearch, emit)
+  assert_false(closed_search.file_tree.search_open)
+  assert_eq(closed_search.file_tree.search_query, "")
+  assert_true(closed_search.file_tree.drawer_open)
+
+  let (opened_search, _) = update_ui(closed_search, ToggleFileTreeSearch, emit)
+  assert_true(opened_search.file_tree.search_open)
+  let (queried, _) = update_ui(
+    opened_search,
+    FileTreeSearchChanged("README"),
+    emit,
+  )
+  assert_eq(queried.file_tree.search_query, "README")
+
+  let (added_status, _) = update_ui(
+    queried,
+    ToggleFileTreeStatus("added"),
+    emit,
+  )
+  assert_eq(added_status.file_tree.selected_statuses, ["modified", "added"])
+  let (removed_status, _) = update_ui(
+    added_status,
+    ToggleFileTreeStatus("modified"),
+    emit,
+  )
+  assert_eq(removed_status.file_tree.selected_statuses, ["added"])
+
+  let (expanded_directory, _) = update_ui(
+    removed_status,
+    ToggleFileTreeDirectory("src"),
+    emit,
+  )
+  assert_true(expanded_directory.file_tree.collapsed_directories.is_empty())
+  let (collapsed_directory, _) = update_ui(
+    expanded_directory,
+    ToggleFileTreeDirectory("src"),
+    emit,
+  )
+  assert_eq(collapsed_directory.file_tree.collapsed_directories, ["src"])
+
+  let (closed_drawer, _) = update_ui(
+    collapsed_directory,
+    CloseFileTreeDrawer,
+    emit,
+  )
+  assert_false(closed_drawer.file_tree.drawer_open)
+}
+
+///|
+test "new changes landing routes and load failures reset file tree state" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let reference = commit_reference("owner", "repo", "abcdef1")
+  let dirty = { ..initial_model(), file_tree: changed_file_tree_state(), }
+  let (loading, _) = begin_change_load(dirty, reference, emit)
+  assert_true(loading.file_tree == initial_file_tree_state())
+
+  let showing = {
+    ..dirty,
+    generation: 4,
+    route: Some(reference),
+    phase: Showing(diff_test_view([fixture_file("README.md", "modified")])),
+  }
+  let landing_url = try! @url.parse("http://localhost/")
+  let (landing, _) = update_ui(showing, RouteChanged(landing_url), emit)
+  assert_true(landing.phase is Idle)
+  assert_true(landing.file_tree == initial_file_tree_state())
+
+  let failing = {
+    ..dirty,
+    generation: 6,
+    phase: LoadingCommit(
+      reference~,
+      repository=reference_repository(reference),
+      page=1,
+      first=None,
+      files=[],
+    ),
+  }
+  let (failed, _) = update_load(
+    failing,
+    CommitPageLoaded(
+      6,
+      1,
+      Err(GitHubRequestError::GitHubRequestError("load failed")),
+    ),
+    emit,
+  )
+  assert_true(failed.phase is LoadFailed(_))
+  assert_true(failed.file_tree == initial_file_tree_state())
+}
+
+///|
+test "opening a tree file selects expands lazy loads and reuses cached sources" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let lazy_file = fixture_file("docs/guide.md", "modified")
+  let lazy_view = diff_test_view([lazy_file])
+  let lazy_model = {
+    ..diff_test_model(lazy_view),
+    file_tree: { ..initial_file_tree_state(), drawer_open: true, },
+  }
+  let (stale, _) = update_load(
+    lazy_model,
+    OpenFile(lazy_model.generation - 1, 0),
+    emit,
+  )
+  assert_true(stale == lazy_model)
+
+  let (opened, _) = update_load(
+    lazy_model,
+    OpenFile(lazy_model.generation, 0),
+    emit,
+  )
+  assert_eq(opened.file_tree.selected_file_index, Some(0))
+  assert_false(opened.file_tree.drawer_open)
+  guard opened.phase is Showing(opened_view) else {
+    fail("expected the selected file to stay visible")
+  }
+  assert_true(opened_view.files[0].expanded)
+  assert_true(opened_view.files[0].old_side is Loading)
+  assert_true(opened_view.files[0].new_side is Loading)
+
+  let ready = ensure_file_document(
+    ready_test_file(lazy_file, ["old"], ["new"], expanded=false),
+    LexicalAlgorithm,
+  )
+  guard ready.diff_cache.get(Line) is Some(cached) else {
+    fail("expected a cached line diff")
+  }
+  let cached_view = set_file_state(diff_test_view([lazy_file]), 0, ready)
+  let cached_model = {
+    ..diff_test_model(cached_view),
+    file_tree: { ..initial_file_tree_state(), drawer_open: true, },
+  }
+  let (reopened, _) = update_load(
+    cached_model,
+    OpenFile(cached_model.generation, 0),
+    emit,
+  )
+  guard reopened.phase is Showing(reopened_view) else {
+    fail("expected the cached file to open")
+  }
+  assert_true(reopened_view.files[0].expanded)
+  assert_true(reopened_view.files[0].old_side is Ready(_))
+  assert_true(reopened_view.files[0].new_side is Ready(_))
+  assert_true(reopened_view.files[0].diff_cache.get(Line) == Some(cached))
+
+  let (selected_again, _) = update_load(
+    reopened,
+    OpenFile(reopened.generation, 0),
+    emit,
+  )
+  assert_true(selected_again.phase == reopened.phase)
+  assert_eq(selected_again.file_tree.selected_file_index, Some(0))
+}
+
+///|
 fn all_moonbit_cache_keys() -> Array[CacheKey] {
   [
     MoonBit(LexicalAlgorithm, false, false),
