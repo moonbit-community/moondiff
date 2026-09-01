@@ -1,6 +1,14 @@
 ///|
 fn with_phase(model : Model, phase : Phase) -> Model {
-  { ..model, phase, }
+  {
+    ..model,
+    phase,
+    file_tree: if phase is LoadFailed(_) {
+      initial_file_tree_state()
+    } else {
+      model.file_tree
+    },
+  }
 }
 
 ///|

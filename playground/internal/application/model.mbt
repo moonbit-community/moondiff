@@ -48,6 +48,7 @@ pub(all) struct Model {
   route : CommitRef?
   share_url : String?
   copy_status : CopyStatus
+  file_tree : FileTreeState
   review : ReviewState
 } derive(Eq)
 
@@ -64,6 +65,7 @@ fn initial_model() -> Model {
     route: None,
     share_url: None,
     copy_status: CopyReady,
+    file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
 }

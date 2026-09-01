@@ -4,6 +4,12 @@ pub(all) enum UiMsg {
   Submit
   RouteChanged(@url.Url)
   ToggleView
+  ToggleFileTreeDrawer
+  CloseFileTreeDrawer
+  ToggleFileTreeSearch
+  FileTreeSearchChanged(String)
+  ToggleFileTreeStatus(String)
+  ToggleFileTreeDirectory(String)
   SelectDiffAlgorithm(DiffAlgorithm)
   ToggleIgnoreComments
   ToggleIgnoreTests
@@ -29,6 +35,73 @@ fn update_ui(
       }
       ({ ..model, view_mode, }, @rabbita.none)
     }
+    ToggleFileTreeDrawer =>
+      (
+        {
+          ..model,
+          file_tree: {
+            ..model.file_tree,
+            drawer_open: !model.file_tree.drawer_open,
+          },
+        },
+        @rabbita.none,
+      )
+    CloseFileTreeDrawer =>
+      (
+        { ..model, file_tree: { ..model.file_tree, drawer_open: false, }, },
+        @rabbita.none,
+      )
+    ToggleFileTreeSearch => {
+      let search_open = !model.file_tree.search_open
+      (
+        {
+          ..model,
+          file_tree: {
+            ..model.file_tree,
+            search_open,
+            search_query: if search_open {
+              model.file_tree.search_query
+            } else {
+              ""
+            },
+          },
+        },
+        @rabbita.none,
+      )
+    }
+    FileTreeSearchChanged(query) =>
+      (
+        { ..model, file_tree: { ..model.file_tree, search_query: query, }, },
+        @rabbita.none,
+      )
+    ToggleFileTreeStatus(status) =>
+      (
+        {
+          ..model,
+          file_tree: {
+            ..model.file_tree,
+            selected_statuses: toggle_file_tree_value(
+              model.file_tree.selected_statuses,
+              status,
+            ),
+          },
+        },
+        @rabbita.none,
+      )
+    ToggleFileTreeDirectory(path) =>
+      (
+        {
+          ..model,
+          file_tree: {
+            ..model.file_tree,
+            collapsed_directories: toggle_file_tree_value(
+              model.file_tree.collapsed_directories,
+              path,
+            ),
+          },
+        },
+        @rabbita.none,
+      )
     SelectDiffAlgorithm(algorithm) => {
       if algorithm == model.diff_algorithm {
         return (model, @rabbita.none)
@@ -88,6 +161,7 @@ fn update_ui(
               generation: model.generation + 1,
               phase: LoadFailed(message),
               copy_status: CopyReady,
+              file_tree: initial_file_tree_state(),
             },
             @rabbita.none,
           )
@@ -114,6 +188,7 @@ fn update_ui(
               route: None,
               share_url: None,
               copy_status: CopyReady,
+              file_tree: initial_file_tree_state(),
             },
             @rabbita.none,
           )
@@ -127,6 +202,7 @@ fn update_ui(
               route: None,
               share_url: None,
               copy_status: CopyReady,
+              file_tree: initial_file_tree_state(),
             },
             @rabbita.none,
           )
