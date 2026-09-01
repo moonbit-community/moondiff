@@ -1,0 +1,14 @@
+import {
+  "moonbit-community/moondiff-playground/internal/application",
+  "moonbit-community/moondiff-playground/internal/change",
+  "moonbit-community/moondiff-playground/internal/comments",
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff-playground/internal/github_client",
+  "moonbit-community/moondiff-playground/internal/review",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/mbtdiff",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/html",
+}
+
+supported_targets = "js"

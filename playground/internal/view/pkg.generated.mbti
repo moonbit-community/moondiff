@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/view"
+
+import {
+  "moonbit-community/moondiff-playground/internal/application",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/html",
+}
+
+// Values
+pub fn app_view(@application.Model, @cmd.Emit[@application.Msg]) -> @html.Html
+
+pub fn diff_notice(ArrayView[@model.FallbackReason], Bool) -> DiffNotice?
+
+pub fn semantic_section_fragment(@model.DiffSection) -> @model.DiffFragment
+
+pub fn semantic_section_title(Int, @model.DiffSection) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct DiffNotice {
+  class_name : String
+  label : String
+  message : String
+}
+
+// Type aliases
+
+// Traits

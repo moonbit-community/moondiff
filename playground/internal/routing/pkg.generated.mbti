@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/routing"
+
+import {
+  "moonbit-community/moondiff-playground/internal/github",
+}
+
+// Values
+pub fn browser_current_url() -> String
+
+pub fn canonical_github_url(@github.CommitRef) -> String
+
+pub fn playground_route(@github.CommitRef) -> String
+
+pub fn playground_share_url(@github.CommitRef) -> String
+
+pub fn reference_from_playground_url(String) -> Result[@github.CommitRef?, String]
+
+pub fn reference_from_route(String?) -> Result[@github.CommitRef?, String]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

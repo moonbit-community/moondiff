@@ -1,0 +1,189 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/github"
+
+import {
+  "moonbitlang/core/json",
+}
+
+// Values
+pub const MAX_PULL_FILES : Int = 3_000
+
+pub const MAX_SOURCE_BYTES : Int = 1_048_576
+
+pub const MAX_SOURCE_LINES : Int = 20_000
+
+pub const PULL_FILE_LIMIT_ERROR : String = "This pull request changes more than GitHub's 3,000-file API limit, so its complete diff cannot be loaded."
+
+pub fn branch_repository(ApiPullBranch, RepositoryRef) -> RepositoryRef
+
+pub fn check_source(Bytes) -> CheckedSource
+
+pub fn commit_api_url(CommitRef, Int) -> String
+
+pub fn commit_reference(String, String, String) -> CommitRef
+
+pub fn compare_api_url(CommitRef, String, String) -> String
+
+pub fn decode_commit(String) -> ApiCommit raise
+
+pub fn decode_compare(String) -> ApiCompare raise
+
+pub fn decode_pull(String) -> ApiPull raise
+
+pub fn decode_pull_files(String) -> Array[ApiFile] raise
+
+pub fn file_diff_mode(ApiFile) -> FileDiffMode
+
+pub fn first_parent(ApiCommit) -> String?
+
+pub fn merge_file_pages(ArrayView[ApiFile], ArrayView[ApiFile]) -> Array[ApiFile]
+
+pub fn parse_change_url(String) -> Result[CommitRef, String]
+
+pub fn pull_api_url(CommitRef) -> String
+
+pub fn pull_commit_reference(String, String, String, String) -> CommitRef
+
+pub fn pull_files_api_url(CommitRef, Int) -> String
+
+pub fn pull_merge_base(ApiCompare) -> String
+
+pub fn pull_reference(String, String, String) -> CommitRef
+
+pub fn pull_revisions(CommitRef, ApiPull, ApiCompare) -> (Revision?, Revision)
+
+pub fn pull_stats(ApiPull) -> ApiStats
+
+pub fn raw_url(CommitRef, String, String) -> String
+
+pub fn reference_repository(CommitRef) -> RepositoryRef
+
+pub fn repository_commit_revisions(RepositoryRef, String, String?) -> (Revision?, Revision)
+
+pub fn same_pull_snapshot(ApiPull, ApiPull) -> Bool
+
+pub fn should_fetch_next_page(Int, Int) -> Bool
+
+pub fn should_fetch_next_pull_page(Int, Int, Int, Int?) -> Bool
+
+pub fn source_pair(CommitRef, String, String?, ApiFile) -> SourcePair
+
+pub fn source_pair_for_revisions(Revision?, Revision, ApiFile) -> SourcePair
+
+pub fn valid_owner(String) -> Bool
+
+pub fn valid_pull_number(String) -> Bool
+
+pub fn valid_repo(String) -> Bool
+
+pub fn valid_sha(String) -> Bool
+
+pub fn validate_pull_files(ApiPull, ArrayView[ApiFile]) -> Result[Unit, String]
+
+// Errors
+
+// Types and methods
+pub(all) struct ApiCommit {
+  sha : String
+  html_url : String
+  commit : ApiCommitInfo
+  parents : Array[ApiParent]
+  stats : ApiStats
+  files : Array[ApiFile]
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiCommitInfo {
+  message : String
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiCompare {
+  merge_base_commit : ApiParent
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiFile {
+  filename : String
+  previous_filename : String?
+  status : String
+  additions : Int
+  deletions : Int
+  changes : Int
+  patch : String?
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiParent {
+  sha : String
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiPull {
+  title : String
+  html_url : String
+  base : ApiPullBranch
+  head : ApiPullBranch
+  additions : Int
+  deletions : Int
+  changed_files : Int
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiPullBranch {
+  sha : String
+  repo : ApiRepository?
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiRepository {
+  full_name : String
+} derive(Eq, @json.FromJson)
+
+pub(all) struct ApiStats {
+  additions : Int
+  deletions : Int
+  total : Int
+} derive(Eq, @json.FromJson)
+
+pub(all) enum ChangeTarget {
+  Commit(String)
+  PullRequest(String)
+  PullCommit(String, String)
+} derive(Eq)
+
+pub(all) enum CheckedSource {
+  Renderable(Array[String])
+  Rejected(String, Bool)
+}
+
+pub(all) struct CommitRef {
+  owner : String
+  repo : String
+  target : ChangeTarget
+} derive(Eq)
+
+pub(all) enum FileDiffMode {
+  MoonBitDiff
+  LineDiff
+} derive(Eq)
+
+pub(all) struct RepositoryRef {
+  owner : String
+  repo : String
+} derive(Eq)
+
+pub(all) struct Revision {
+  repository : RepositoryRef
+  sha : String
+} derive(Eq)
+
+pub(all) struct SourceLocation {
+  repository : RepositoryRef
+  revision : String
+  path : String
+}
+
+pub(all) struct SourcePair {
+  old_url : String?
+  new_url : String?
+  old_location : SourceLocation?
+  new_location : SourceLocation?
+}
+
+// Type aliases
+
+// Traits

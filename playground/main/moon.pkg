@@ -1,17 +1,7 @@
 import {
-  "moonbit-community/moondiff/model",
-  "moonbit-community/moondiff/mbtdiff",
-  "moonbit-community/moondiff/linediff",
+  "moonbit-community/moondiff-playground/internal/application",
+  "moonbit-community/moondiff-playground/internal/view",
   "moonbit-community/rabbita",
-  "moonbit-community/rabbita/clipboard",
-  "moonbit-community/rabbita/cmd",
-  "moonbit-community/rabbita/html",
-  "moonbit-community/rabbita/nav",
-  "moonbit-community/rabbita/sub",
-  "moonbit-community/rabbita/url",
-  "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/immut/hashmap" @immut_hashmap,
-  "moonbitlang/core/json",
 }
 
 supported_targets = "js"

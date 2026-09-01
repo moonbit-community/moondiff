@@ -1,0 +1,121 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/application"
+
+import {
+  "moonbit-community/moondiff-playground/internal/change",
+  "moonbit-community/moondiff-playground/internal/comments",
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff-playground/internal/review",
+  "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/sub",
+  "moonbit-community/rabbita/url",
+}
+
+// Values
+pub fn app_init(@cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
+
+pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
+
+pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
+
+// Errors
+
+// Types and methods
+pub(all) enum AuthMsg {
+  AuthStatusLoaded(Result[@comments.ApiAuthStatus, Error])
+  StartDeviceAuthorization
+  DeviceAuthorizationStarted(Result[@comments.ApiAuthStatus, Error])
+  PollDeviceAuthorization(String)
+  DeviceAuthorizationPolled(String, Result[@comments.ApiAuthStatus, Error])
+  CancelDeviceAuthorization(String)
+  DeviceAuthorizationCancelled(String, Result[@comments.ApiAuthStatus, Error])
+  CopyDeviceCode
+  DeviceCodeCopied(String)
+  DeviceCodeCopyFailed(String, String)
+  Logout
+  AuthLogoutFinished(Result[@comments.ApiAuthStatus, Error])
+}
+
+pub(all) enum CopyStatus {
+  CopyReady
+  Copied
+  CopyError(String)
+} derive(Eq)
+
+pub(all) enum LoadMsg {
+  CommitPageLoaded(Int, Int, Result[@github.ApiCommit, Error])
+  ToggleFile(Int, Int)
+  RetryFile(Int, Int)
+  SourceLoaded(Int, Int, @change.SourceSide, Result[(String, Bytes), Error])
+  PullMetadataLoaded(Int, Int, Result[@github.ApiPull, Error])
+  PullCompareLoaded(Int, Int, Result[@github.ApiCompare, Error])
+  PullFilesPageLoaded(Int, Int, Int, Result[Array[@github.ApiFile], Error])
+  PullValidationLoaded(Int, Int, Result[@github.ApiPull, Error])
+  PullCommitMetadataLoaded(Int, Result[@github.ApiPull, Error])
+}
+
+pub(all) struct Model {
+  input : String
+  generation : Int
+  view_mode : @change.ViewMode
+  diff_algorithm : @change.DiffAlgorithm
+  ignore_comments : Bool
+  ignore_tests : Bool
+  phase : Phase
+  route : @github.CommitRef?
+  share_url : String?
+  copy_status : CopyStatus
+  review : @comments.ReviewState
+} derive(Eq)
+
+pub(all) enum Msg {
+  Auth(AuthMsg)
+  Review(ReviewMsg)
+  Load(LoadMsg)
+  Ui(UiMsg)
+}
+
+pub(all) enum Phase {
+  Idle
+  LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int, first~ : @github.ApiCommit?, files~ : Array[@github.ApiFile])
+  LoadingPullMetadata(reference~ : @github.CommitRef, attempt~ : Int)
+  LoadingPullCommitMetadata(reference~ : @github.CommitRef)
+  LoadingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @github.ApiPull, compare~ : @github.ApiCompare?, page~ : Int, files~ : Array[@github.ApiFile])
+  ValidatingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @github.ApiPull, compare~ : @github.ApiCompare, files~ : Array[@github.ApiFile])
+  LoadFailed(String)
+  Showing(@change.ChangeView)
+} derive(Eq)
+
+pub(all) enum ReviewMsg {
+  RefreshComments
+  CommentsLoaded(Int, Result[@comments.ApiCommentBundle, Error])
+  VisibilityChanged(Bool)
+  OpenOverallDraft
+  OpenInlineDraft(Int, @review.ReviewAnchor)
+  OpenReplyDraft(Int64)
+  DraftBodyChanged(String)
+  CancelDraft
+  SubmitDraft
+  CommentHeadChecked(Int, @review.ReviewAnchor, Result[@github.ApiPull, Error])
+  IssueCommentCreated(Int, Result[@comments.ApiIssueComment, Error])
+  ReviewCommentCreated(Int, Result[@comments.ApiReviewComment, Error])
+  CommitCommentCreated(Int, Result[@comments.ApiCommitComment, Error])
+  ReviewReplyCreated(Int, Result[@comments.ApiReviewComment, Error])
+}
+
+pub(all) enum UiMsg {
+  InputChanged(String)
+  Submit
+  RouteChanged(@url.Url)
+  ToggleView
+  SelectDiffAlgorithm(@change.DiffAlgorithm)
+  ToggleIgnoreComments
+  ToggleIgnoreTests
+  CopyShareLink
+  ShareCopied
+  ShareCopyFailed(String)
+}
+
+// Type aliases
+
+// Traits

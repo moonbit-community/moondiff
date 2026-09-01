@@ -1,0 +1,9 @@
+import {
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/moondiff/mbtdiff",
+  "moonbit-community/moondiff/linediff",
+  "moonbitlang/core/immut/hashmap" @immut_hashmap,
+}
+
+supported_targets = "js"

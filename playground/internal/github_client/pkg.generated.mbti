@@ -1,0 +1,36 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/github_client"
+
+import {
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/rabbita/cmd",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn extension_error_code(Error) -> String?
+
+pub fn extension_host_enabled() -> Bool
+
+pub fn[T : @json.FromJson] extension_rpc_json(String, String, Int, @cmd.Emit[Result[T, Error]]) -> @cmd.Cmd
+
+pub fn[A : ToJson, T : @json.FromJson] extension_rpc_request(String, A, Int, @cmd.Emit[Result[T, Error]]) -> @cmd.Cmd
+
+pub fn[T : @json.FromJson] gateway_json_request(String, @github.RepositoryRef, String, String, Int, Int, @cmd.Emit[Result[T, Error]]) -> @cmd.Cmd
+
+pub fn source_request(@github.SourceLocation, Int, @cmd.Emit[Result[(String, Bytes), Error]]) -> @cmd.Cmd
+
+// Errors
+pub(all) suberror ExtensionRequestError {
+  ExtensionRequestError(status~ : Int, code~ : String, detail~ : String)
+}
+
+pub(all) suberror GitHubRequestError {
+  GitHubRequestError(String)
+}
+
+// Types and methods
+
+// Type aliases
+
+// Traits

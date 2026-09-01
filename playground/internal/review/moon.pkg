@@ -1,0 +1,9 @@
+import {
+  "moonbit-community/moondiff/model",
+}
+
+import {
+  "moonbit-community/moondiff/linediff",
+} for "wbtest"
+
+supported_targets = "js"
