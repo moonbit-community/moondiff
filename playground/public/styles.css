@@ -28,6 +28,7 @@
   --hunk: #f3f3f3;
   --empty-stripe: #e4e4e4;
   --toolbar-height: 3rem;
+  --file-tree-width: 320px;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
@@ -702,6 +703,341 @@ button.copy-button.copied {
   margin-top: 0;
 }
 
+.change-layout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: var(--file-tree-width) minmax(0, 1fr);
+  align-items: start;
+}
+
+.change-main {
+  min-width: 0;
+}
+
+.file-tree-backdrop {
+  display: none;
+}
+
+.file-tree-backdrop[hidden] {
+  display: none !important;
+}
+
+.file-tree-sidebar {
+  display: flex;
+  position: sticky;
+  z-index: 20;
+  top: var(--toolbar-height);
+  width: var(--file-tree-width);
+  min-width: 0;
+  height: calc(100svh - var(--toolbar-height));
+  align-self: start;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  flex-direction: column;
+}
+
+.file-tree-header,
+.file-tree-heading,
+.file-tree-actions {
+  display: flex;
+  align-items: center;
+}
+
+.file-tree-header {
+  min-height: 2.75rem;
+  padding: 0.42rem 0.55rem 0.42rem 0.72rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.file-tree-heading {
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.file-tree-heading h2 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.file-tree-count {
+  min-width: 1.35rem;
+  border-radius: 999px;
+  padding: 0.16rem 0.38rem;
+  color: var(--muted);
+  background: var(--surface-subtle);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.file-tree-actions {
+  flex: 0 0 auto;
+  gap: 0.12rem;
+}
+
+button.file-tree-action {
+  width: 1.8rem;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  min-height: 1.8rem;
+  border: 0;
+  border-radius: 0.32rem;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+button.file-tree-action:hover,
+button.file-tree-action.active {
+  color: var(--foreground);
+  background: var(--surface-subtle);
+}
+
+button.file-tree-action:active {
+  transform: none;
+}
+
+.drawer-close {
+  display: none !important;
+  font-size: 1.15rem;
+  font-weight: 400;
+}
+
+.tree-search-icon {
+  position: relative;
+  width: 0.68rem;
+  height: 0.68rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.tree-search-icon::after {
+  content: "";
+  position: absolute;
+  width: 0.34rem;
+  border-top: 1.5px solid currentColor;
+  right: -0.27rem;
+  bottom: -0.14rem;
+  transform: rotate(45deg);
+}
+
+.file-tree-search {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.file-tree-search input {
+  width: 100%;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  padding: 0 0.55rem;
+  color: var(--foreground);
+  background: var(--surface-subtle);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  outline: none;
+}
+
+.file-tree-search input:focus-visible {
+  border-color: var(--muted);
+  background: var(--surface);
+}
+
+.file-tree-status-filters {
+  display: flex;
+  min-height: 2.35rem;
+  padding: 0.34rem 0.55rem;
+  align-items: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+button.tree-status-filter {
+  width: 2rem;
+  min-width: 2rem;
+  min-height: 1.65rem;
+  border: 1px solid transparent;
+  border-radius: 0.32rem;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+button.tree-status-filter:hover {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--surface-subtle);
+}
+
+button.tree-status-filter.active {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--surface-subtle);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+}
+
+button.tree-status-filter:active,
+button.file-tree-row:active {
+  transform: none;
+}
+
+.tree-status-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.file-tree-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0.28rem 0;
+  scrollbar-gutter: stable;
+}
+
+button.file-tree-row {
+  display: flex;
+  width: 100%;
+  min-height: 1.78rem;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.38rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding-top: 0.25rem;
+  padding-right: 0.5rem;
+  padding-bottom: 0.25rem;
+  color: var(--muted-strong);
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 480;
+  line-height: 1.2;
+  text-align: left;
+}
+
+button.file-tree-row:hover {
+  color: var(--foreground);
+  background: var(--surface-subtle);
+}
+
+button.file-tree-row:disabled,
+button.file-tree-row:disabled:hover {
+  color: var(--muted-strong);
+  background: transparent;
+  cursor: default;
+  opacity: 1;
+}
+
+button.file-tree-row.selected {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 8%, var(--surface));
+  box-shadow: inset 2px 0 0 var(--foreground);
+}
+
+.tree-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-disclosure {
+  width: 0.36rem;
+  height: 0.36rem;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.directory-row[aria-expanded="true"] .tree-disclosure {
+  transform: rotate(45deg);
+}
+
+.tree-directory-icon {
+  position: relative;
+  width: 0.82rem;
+  height: 0.58rem;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--muted) 70%, var(--border));
+  border-radius: 0.1rem;
+  background: var(--surface-subtle);
+}
+
+.tree-directory-icon::before {
+  content: "";
+  position: absolute;
+  top: -0.25rem;
+  left: -1px;
+  width: 0.38rem;
+  height: 0.22rem;
+  border: 1px solid color-mix(in srgb, var(--muted) 70%, var(--border));
+  border-bottom: 0;
+  border-radius: 0.1rem 0.1rem 0 0;
+  background: var(--surface-subtle);
+}
+
+.tree-file-status {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.2rem;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.tree-status-added {
+  color: var(--green);
+  background: var(--green-bg);
+}
+
+.tree-status-removed {
+  color: var(--red);
+  background: var(--red-bg);
+}
+
+.tree-status-renamed,
+.tree-status-copied {
+  color: #896d15;
+  background: rgba(229, 184, 35, 0.12);
+}
+
+.tree-status-modified {
+  color: var(--muted-strong);
+  background: var(--border-soft);
+}
+
+.file-tree-empty {
+  margin: 1.5rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
 .empty-state,
 .commit-card,
 .file-card {
@@ -866,6 +1202,7 @@ button.copy-button.copied {
   min-width: 0;
   overflow: visible;
   border-width: 1px 0;
+  scroll-margin-top: calc(var(--toolbar-height) + 0.5rem);
 }
 
 .file-card.expanded {
