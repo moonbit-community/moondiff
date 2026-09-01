@@ -196,7 +196,7 @@ export function buildExtension({ env = process.env, log = process.stdout, mode =
     ], { cwd: repositoryRoot, stdio: "inherit" });
     if (build.error) throw build.error;
     if (build.status !== 0) throw new Error(`MoonBit extension build failed with exit code ${build.status}.`);
-    const builtJavaScript = join(targetRoot, "js", "release", "build", "playground", "main", "main.js");
+    const builtJavaScript = join(targetRoot, "js", "release", "build", "moonbit-community", "moondiff-playground", "main", "main.js");
     if (!existsSync(builtJavaScript)) throw new Error(`MoonBit extension artifact was not found at ${builtJavaScript}.`);
 
     mkdirSync(join(stagingRoot, "icons"), { recursive: true });
