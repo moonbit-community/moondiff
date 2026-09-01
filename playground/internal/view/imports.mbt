@@ -1,5 +1,5 @@
 ///|
-using @application {type CopyStatus, type Model, type Msg}
+using @application {type CopyStatus, type Model, type Msg, file_dom_id}
 
 ///|
 using @change {

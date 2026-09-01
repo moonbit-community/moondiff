@@ -2,6 +2,7 @@
 pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[ApiCommit, Error])
   ToggleFile(Int, Int)
+  OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, SourceSide, Result[(String, Bytes), Error])
   PullMetadataLoaded(Int, Int, Result[ApiPull, Error])
@@ -256,53 +257,26 @@ fn update_load(
           @rabbita.none,
         )
       } else {
-        let pair = source_pair_for_revisions(
-          view.old_revision,
-          view.new_revision,
-          file.file,
-        )
-        let first_load = file.old_side is NotRequested ||
-          file.new_side is NotRequested
-        let changed = @change.FileState::{
-          file: file.file,
-          diff_mode: file.diff_mode,
-          expanded: true,
-          old_side: if file.old_side is NotRequested {
-            initial_side(pair.old_url, true)
-          } else {
-            file.old_side
-          },
-          new_side: if file.new_side is NotRequested {
-            initial_side(pair.new_url, true)
-          } else {
-            file.new_side
-          },
-          diff_cache: file.diff_cache,
-        }
-        let command = if first_load {
-          @rabbita.batch(commands_for_file(view, generation, index, emit))
-        } else {
-          @rabbita.none
-        }
-        (
-          with_phase(
-            model,
-            Showing(
-              set_file_state(
-                view,
-                index,
-                ensure_file_document(
-                  changed,
-                  model.diff_algorithm,
-                  ignore_comments=model.ignore_comments,
-                  ignore_tests=model.ignore_tests,
-                ),
-              ),
-            ),
-          ),
-          command,
-        )
+        expand_file(model, view, generation, index, file, emit)
       }
+    }
+    OpenFile(generation, index) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
+        return (model, @rabbita.none)
+      }
+      let selected = select_file(model, index)
+      let (opened, load_command) = if file.expanded {
+        (selected, @rabbita.none)
+      } else {
+        expand_file(selected, view, generation, index, file, emit)
+      }
+      (
+        opened,
+        @rabbita.batch([load_command, @nav.scroll_to(file_dom_id(index))]),
+      )
     }
     RetryFile(generation, index) => {
       if generation != model.generation {
