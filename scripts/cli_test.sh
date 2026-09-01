@@ -3,20 +3,18 @@ set -euox pipefail
 
 ast_diff() {
   name=$1
-  moonrun ./_build/wasm/release/build/moondiff.wasm "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
+  moon run --target wasm --release . "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
 }
 
 ast_diff_ignore_comments() {
   name=$1
-  moonrun ./_build/wasm/release/build/moondiff.wasm --ignore-comments "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
+  moon run --target wasm --release . --ignore-comments "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
 }
 
 ast_diff_ignore_tests() {
   name=$1
-  moonrun ./_build/wasm/release/build/moondiff.wasm --ignore-tests "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
+  moon run --target wasm --release . --ignore-tests "cli_test/source/${name}.old.mbt" "cli_test/source/${name}.new.mbt" >"cli_test/snapshot/${name}.txt"
 }
-
-moon build --target wasm --release
 
 ast_diff "20251114"
 ast_diff "20260601"
