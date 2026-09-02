@@ -462,7 +462,25 @@ fn changed_file_tree_state() -> FileTreeState {
     selected_statuses: ["modified"],
     collapsed_directories: ["src"],
     selected_file_index: Some(3),
+    preferred_width: 512,
   }
+}
+
+///|
+test "file tree width defaults changes and clamps to absolute limits" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let initial = initial_model()
+  assert_eq(initial.file_tree.preferred_width, 320)
+
+  let (changed, _) = update_ui(initial, FileTreeWidthChanged(486), emit)
+  assert_eq(changed.file_tree.preferred_width, 486)
+  let (minimum, _) = update_ui(changed, FileTreeWidthChanged(120), emit)
+  assert_eq(minimum.file_tree.preferred_width, 240)
+  let (maximum, _) = update_ui(minimum, FileTreeWidthChanged(900), emit)
+  assert_eq(maximum.file_tree.preferred_width, 640)
+
+  // A new model is what a full page load initializes.
+  assert_eq(initial_model().file_tree.preferred_width, 320)
 }
 
 ///|
@@ -534,12 +552,14 @@ test "file tree drawer remains narrow and exits at the desktop breakpoint" {
 }
 
 ///|
-test "new changes landing routes and load failures reset file tree state" {
+test "file tree UI state resets preserve the preferred width" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let reference = commit_reference("owner", "repo", "abcdef1")
   let dirty = { ..initial_model(), file_tree: changed_file_tree_state(), }
   let (loading, _) = begin_change_load(dirty, reference, emit)
-  assert_true(loading.file_tree == initial_file_tree_state())
+  assert_true(
+    loading.file_tree == { ..initial_file_tree_state(), preferred_width: 512, },
+  )
 
   let showing = {
     ..dirty,
@@ -550,7 +570,9 @@ test "new changes landing routes and load failures reset file tree state" {
   let landing_url = try! @url.parse("http://localhost/")
   let (landing, _) = update_ui(showing, RouteChanged(landing_url), emit)
   assert_true(landing.phase is Idle)
-  assert_true(landing.file_tree == initial_file_tree_state())
+  assert_true(
+    landing.file_tree == { ..initial_file_tree_state(), preferred_width: 512, },
+  )
 
   let failing = {
     ..dirty,
@@ -573,7 +595,9 @@ test "new changes landing routes and load failures reset file tree state" {
     emit,
   )
   assert_true(failed.phase is LoadFailed(_))
-  assert_true(failed.file_tree == initial_file_tree_state())
+  assert_true(
+    failed.file_tree == { ..initial_file_tree_state(), preferred_width: 512, },
+  )
 }
 
 ///|

@@ -51,6 +51,7 @@ pub(all) struct FileTreeState {
   selected_statuses : Array[String]
   collapsed_directories : Array[String]
   selected_file_index : Int?
+  preferred_width : Int
 } derive(Eq)
 
 pub(all) enum LoadMsg {
@@ -124,6 +125,7 @@ pub(all) enum UiMsg {
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
   FileTreeViewportChanged(Int)
+  FileTreeWidthChanged(Int)
   ToggleFileTreeSearch
   FileTreeSearchChanged(String)
   ToggleFileTreeStatus(String)

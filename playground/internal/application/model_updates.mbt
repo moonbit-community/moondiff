@@ -4,7 +4,7 @@ fn with_phase(model : Model, phase : Phase) -> Model {
     ..model,
     phase,
     file_tree: if phase is LoadFailed(_) {
-      initial_file_tree_state()
+      reset_file_tree_state(model.file_tree)
     } else {
       model.file_tree
     },

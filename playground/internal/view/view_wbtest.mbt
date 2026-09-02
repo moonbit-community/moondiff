@@ -90,6 +90,7 @@ fn test_file_tree_state(
     selected_statuses,
     collapsed_directories,
     selected_file_index: None,
+    preferred_width: 320,
   }
 }
 
