@@ -1,7 +1,7 @@
 # Moondiff Chrome extension
 
 This Manifest V3 Chrome extension adds an **Open in Moondiff** button to GitHub commit
-and pull-request pages and opens the diff in a Side Panel. Public changes work
+and pull-request pages and opens the full diff in a new extension tab. Public changes work
 anonymously; GitHub App sign-in adds private repository access and PR or commit
 comments. Pending and batched reviews are not supported. Chrome 116 or newer is
 required.
@@ -47,5 +47,5 @@ the repository root:
 npm run test:extension
 ```
 
-This covers the extension scripts, packaging policy, and Side Panel browser
+This covers the extension scripts, packaging policy, and review-page browser
 scenarios.
