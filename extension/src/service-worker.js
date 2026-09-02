@@ -14,14 +14,12 @@ if (typeof importScripts === "function") {
   const SESSION_DEVICE_FLOW = "github_device_flow";
   const LOCAL_REFRESH = "github_refresh_token";
   const LOCAL_REFRESH_EXPIRES = "github_refresh_expires_at";
-  const TARGET_PREFIX = "tab_target_";
   const DEVICE_VERIFICATION_URI = "https://github.com/login/device";
   const DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
   const DEVICE_START_MAX_AGE_MS = 60_000;
 
   const RPC_OPERATIONS = new Set([
-    "panel.open",
-    "target.current",
+    "review.open",
     "page.comments.changed",
     "request.cancel",
     "auth.status",
@@ -346,7 +344,7 @@ if (typeof importScripts === "function") {
   // MoonBit's JavaScript JSON codec represents Int64 values as decimal
   // strings, and optional fields as absent keys. Keep that detail inside the
   // extension RPC boundary instead of leaking GitHub's nullable JSON shape
-  // into the shared panel model.
+  // into the shared review model.
   function commentForProtocol(comment) {
     if (!comment || typeof comment !== "object" || Array.isArray(comment)) {
       throw new RpcError(502, "invalid_github_response", "GitHub returned an invalid comment.");
@@ -809,44 +807,53 @@ if (typeof importScripts === "function") {
     throw new RpcError(400, "operation_not_allowed", "This GitHub operation is not allowed.");
   }
 
-  function isPanelSender(sender) {
-    if (!sender?.url || !chrome?.runtime?.getURL) return false;
-    return sender.url.split(/[?#]/u)[0] === chrome.runtime.getURL("panel.html");
+  function isReviewSender(sender) {
+    if (typeof sender?.url !== "string" || !chrome?.runtime?.getURL) return false;
+    return sender.url.split("#", 1)[0] === chrome.runtime.getURL("review.html");
   }
 
-  async function currentTarget(sender = {}) {
-    const [activeTab] = sender.tab?.id
-      ? [sender.tab]
-      : await chrome.tabs.query({ active: true, currentWindow: true });
-    const tab = activeTab;
-    if (!tab?.id) throw new RpcError(404, "active_tab_missing", "No active GitHub tab was found.");
-    const parsed = root.MoondiffTarget.parseGitHubTarget(tab.url || "");
-    if (parsed) return parsed;
-    const stored = await chrome.storage.session.get(`${TARGET_PREFIX}${tab.id}`);
-    const target = stored[`${TARGET_PREFIX}${tab.id}`];
-    if (!target) throw new RpcError(400, "unsupported_github_page", "Open Moondiff from a supported GitHub pull request or commit page.");
+  async function openReview(sender) {
+    const openerTabId = sender?.tab?.id;
+    const windowId = sender?.tab?.windowId;
+    const target = root.MoondiffTarget.parseGitHubTarget(sender?.url || "");
+    const route = root.MoondiffTarget.targetHash(target);
+    if (
+      !Number.isInteger(openerTabId) ||
+      openerTabId < 0 ||
+      !Number.isInteger(windowId) ||
+      windowId < 0 ||
+      !route
+    ) {
+      throw new RpcError(400, "unsupported_github_page", "This is not a supported GitHub pull request or commit page.");
+    }
+    await chrome.tabs.create({
+      url: `${chrome.runtime.getURL("review.html")}${route}`,
+      active: true,
+      windowId,
+      openerTabId,
+    });
     return target;
   }
 
-  async function openPanel(sender) {
-    const tabId = sender?.tab?.id;
-    const target = root.MoondiffTarget.parseGitHubTarget(sender?.tab?.url || sender?.url || "");
-    if (!tabId || !target) throw new RpcError(400, "unsupported_github_page", "This is not a supported GitHub pull request or commit page.");
-    await Promise.all([
-      chrome.storage.session.set({ [`${TARGET_PREFIX}${tabId}`]: target }),
-      chrome.sidePanel.setOptions({ tabId, path: "panel.html", enabled: true }),
-      chrome.sidePanel.open({ tabId }),
-    ]);
-    return target;
-  }
-
-  async function notifyPage(sender = {}) {
-    const [activeTab] = sender.tab?.id
-      ? [sender.tab]
-      : await chrome.tabs.query({ active: true, currentWindow: true });
-    const tab = activeTab;
-    if (tab?.id) await chrome.tabs.sendMessage(tab.id, { v: 1, op: "page.comments.changed" }).catch(() => {});
-    return { notified: Boolean(tab?.id) };
+  async function notifyPage(sender, route) {
+    const target = root.MoondiffTarget.parseTargetHash(route);
+    if (!target || root.MoondiffTarget.targetHash(target) !== route) {
+      throw new RpcError(400, "invalid_target", "The comment notification route is invalid.");
+    }
+    const openerTabId = sender?.tab?.openerTabId;
+    if (!Number.isInteger(openerTabId) || openerTabId < 0) {
+      return { notified: false };
+    }
+    try {
+      await chrome.tabs.sendMessage(openerTabId, {
+        v: 1,
+        op: "page.comments.changed",
+        args: { route },
+      });
+      return { notified: true };
+    } catch {
+      return { notified: false };
+    }
   }
 
   function serializeError(error) {
@@ -869,18 +876,14 @@ if (typeof importScripts === "function") {
     )) {
       throw new RpcError(400, "invalid_request_id", "The RPC request id is invalid.");
     }
-    if (message.op === "panel.open") {
+    if (message.op === "review.open") {
       exactKeys(message.args || {}, []);
-      return openPanel(sender);
+      return openReview(sender);
     }
-    if (!isPanelSender(sender)) throw new RpcError(403, "untrusted_sender", "Only the Moondiff side panel may use this operation.");
-    if (message.op === "target.current") {
-      exactKeys(message.args || {}, []);
-      return currentTarget(sender);
-    }
+    if (!isReviewSender(sender)) throw new RpcError(403, "untrusted_sender", "Only the Moondiff review page may use this operation.");
     if (message.op === "page.comments.changed") {
-      exactKeys(message.args || {}, []);
-      return notifyPage(sender);
+      const args = exactKeys(message.args || {}, ["route"]);
+      return notifyPage(sender, args.route);
     }
     if (message.op === "request.cancel") {
       exactKeys(message.args || {}, ["requestId"]);
@@ -941,20 +944,12 @@ if (typeof importScripts === "function") {
     configureStorageAccess().catch(() => {});
     chrome.runtime.onInstalled.addListener(() => {
       configureStorageAccess().catch(() => {});
-      chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
-      chrome.sidePanel.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
     });
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleMessage(message, sender)
         .then(value => sendResponse({ ok: true, value }))
         .catch(error => sendResponse({ ok: false, error: serializeError(error) }));
       return true;
-    });
-    chrome.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
-      if (!changeInfo.url) return;
-      const enabled = Boolean(root.MoondiffTarget.parseGitHubTarget(tab.url || changeInfo.url));
-      chrome.sidePanel.setOptions({ tabId, path: "panel.html", enabled }).catch(() => {});
-      if (!enabled) chrome.storage.session.remove(`${TARGET_PREFIX}${tabId}`).catch(() => {});
     });
   }
 })(globalThis);

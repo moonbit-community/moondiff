@@ -53,8 +53,8 @@ function storageArea(initial = {}) {
 
 const session = storageArea();
 const local = storageArea();
-const opened = [];
-const panelOptions = [];
+const createdTabs = [];
+const sentTabMessages = [];
 const runtimeListeners = [];
 
 globalThis.chrome = {
@@ -64,15 +64,14 @@ globalThis.chrome = {
     onInstalled: { addListener() {} },
   },
   storage: { session, local },
-  sidePanel: {
-    async setOptions(options) { panelOptions.push(options); },
-    async open(options) { opened.push(options); },
-    async setPanelBehavior() {},
-  },
   tabs: {
-    async query() { return [{ id: 12, url: "https://github.com/acme/widgets/pull/7/files" }]; },
-    async sendMessage() {},
-    onUpdated: { addListener() {} },
+    async create(options) {
+      createdTabs.push(options);
+      return { id: 100 + createdTabs.length, ...options };
+    },
+    async sendMessage(tabId, message) {
+      sentTabMessages.push({ tabId, message });
+    },
   },
 };
 globalThis.MoondiffConfig = {
@@ -85,7 +84,9 @@ await import("../src/service-worker.js");
 
 const Target = globalThis.MoondiffTarget;
 const Worker = globalThis.MoondiffWorker;
-const panelSender = { url: chrome.runtime.getURL("panel.html") };
+const reviewSender = {
+  url: `${chrome.runtime.getURL("review.html")}#/acme/widgets/pull/7`,
+};
 const authenticationKeys = [
   "github_access_token",
   "github_access_expires_at",
@@ -133,6 +134,8 @@ function assertReportedRemainingSeconds(reported, deadline, maximum) {
 }
 
 async function resetAuthentication() {
+  createdTabs.length = 0;
+  sentTabMessages.length = 0;
   await session.remove(authenticationKeys);
   await local.remove(["github_refresh_token", "github_refresh_expires_at"]);
 }
@@ -163,41 +166,151 @@ test("target parser covers GitHub SPA route variants without broadening hosts", 
   ]) assert.equal(Target.parseGitHubTarget(value), null, value);
 });
 
-test("panel open reparses sender.tab.url and RPC rejects untrusted or unknown operations", async () => {
+test("target hashes strictly round-trip commit, pull, and pull-commit routes", () => {
+  const targets = [{
+    owner: "acme", repo: "widgets", kind: "commit", sha: "abcdef1",
+  }, {
+    owner: "acme", repo: "widgets", kind: "pull", number: "17",
+  }, {
+    owner: "acme", repo: "widgets", kind: "pull_commit", number: "17", sha: "abcdef1",
+  }];
+  for (const target of targets) {
+    assert.deepEqual(Target.parseTargetHash(Target.targetHash(target)), target);
+  }
+  for (const value of [
+    "",
+    "/acme/widgets/pull/17",
+    "#acme/widgets/pull/17",
+    "#/acme/widgets/pull/0",
+    "#/acme/widgets/pull/017",
+    "#/acme/widgets/pull/17/files",
+    "#/acme/widgets/pull/17/changes/abcdef1",
+    "#/acme/widgets/commit/abcdef",
+    "#/acme/widgets/commit/abcdef1/extra",
+    "#/acme%2Fescape/widgets/commit/abcdef1",
+    "#/acme/widgets/commit/abcdef1?diff=split",
+  ]) assert.equal(Target.parseTargetHash(value), null, value);
+  assert.equal(Target.targetHash({ owner: "acme", repo: "widgets", kind: "pull", number: "0" }), "");
+});
+
+test("review.open trusts sender.url and creates a fresh tab with its opener", async () => {
   assert.equal(Worker.RPC_OPERATIONS.has("auth.login"), false);
+  assert.equal(Worker.RPC_OPERATIONS.has("panel.open"), false);
+  assert.equal(Worker.RPC_OPERATIONS.has("target.current"), false);
+  assert.equal(Worker.RPC_OPERATIONS.has("review.open"), true);
   assert.equal(Worker.RPC_OPERATIONS.has("auth.device.start"), true);
   assert.equal(Worker.RPC_OPERATIONS.has("auth.device.poll"), true);
   assert.equal(Worker.RPC_OPERATIONS.has("auth.device.cancel"), true);
-  const target = await Worker.handleMessage(
-    { v: 1, op: "panel.open" },
-    { tab: { id: 44, url: "https://github.com/acme/widgets/pull/9/files" }, url: "https://github.com/acme/widgets/pull/9/files" },
-  );
-  assert.deepEqual(target, { owner: "acme", repo: "widgets", kind: "pull", number: "9" });
-  assert.deepEqual(opened.at(-1), { tabId: 44 });
-  assert.deepEqual(panelOptions.at(-1), { tabId: 44, path: "panel.html", enabled: true });
+  const sender = {
+    tab: { id: 44, windowId: 6, url: "https://evil.example/ignored" },
+    url: "https://github.com/acme/widgets/pull/9/files",
+  };
+  for (let click = 0; click < 2; click += 1) {
+    const target = await Worker.handleMessage({ v: 1, op: "review.open" }, sender);
+    assert.deepEqual(target, { owner: "acme", repo: "widgets", kind: "pull", number: "9" });
+  }
+  assert.equal(createdTabs.length, 2);
+  for (const options of createdTabs) {
+    assert.deepEqual(options, {
+      url: `${chrome.runtime.getURL("review.html")}#/acme/widgets/pull/9`,
+      active: true,
+      windowId: 6,
+      openerTabId: 44,
+    });
+  }
   await assert.rejects(
     Worker.handleMessage(
-      { v: 1, op: "panel.open", args: { owner: "attacker", repo: "ignored" } },
-      { tab: { id: 44, url: "https://github.com/acme/widgets/pull/9/files" } },
+      { v: 1, op: "review.open", args: { owner: "attacker", repo: "ignored" } },
+      sender,
     ),
     error => error.code === "invalid_arguments",
   );
+  await assert.rejects(
+    Worker.handleMessage(
+      { v: 1, op: "review.open" },
+      { tab: { id: 44, windowId: 6, url: sender.url }, url: "https://evil.example/unsupported" },
+    ),
+    error => error.code === "unsupported_github_page",
+  );
+  assert.equal(createdTabs.length, 2);
+});
+
+test("RPC rejects untrusted review senders and unknown operations", async () => {
   await assert.rejects(
     Worker.handleMessage({ v: 1, op: "github.pull.get", args: {} }, { url: "https://github.com/acme/widgets/pull/9" }),
     error => error.code === "untrusted_sender",
   );
   await assert.rejects(
-    Worker.handleMessage({ v: 1, op: "fetch.any.url", args: { url: "https://evil.example" } }, panelSender),
+    Worker.handleMessage(
+      { v: 1, op: "auth.status", args: {} },
+      { url: chrome.runtime.getURL("panel.html") },
+    ),
+    error => error.code === "untrusted_sender",
+  );
+  await assert.rejects(
+    Worker.handleMessage(
+      { v: 1, op: "auth.status", args: {} },
+      { url: `${chrome.runtime.getURL("review.html")}?unexpected=1` },
+    ),
+    error => error.code === "untrusted_sender",
+  );
+  await assert.rejects(
+    Worker.handleMessage({ v: 1, op: "fetch.any.url", args: { url: "https://evil.example" } }, reviewSender),
     error => error.code === "operation_not_allowed",
   );
   await assert.rejects(
-    Worker.handleMessage({ v: 1, op: "auth.status", args: { url: "https://evil.example" } }, panelSender),
+    Worker.handleMessage({ v: 1, op: "auth.status", args: { url: "https://evil.example" } }, reviewSender),
     error => error.code === "invalid_arguments",
   );
   await assert.rejects(
-    Worker.handleMessage({ v: 1, op: "auth.status", args: {}, requestId: "bad id" }, panelSender),
+    Worker.handleMessage({ v: 1, op: "auth.status", args: {}, requestId: "bad id" }, reviewSender),
     error => error.code === "invalid_request_id",
   );
+});
+
+test("comment notifications validate the route and target the review opener", async () => {
+  const route = "#/acme/widgets/pull/7";
+  const result = await Worker.handleMessage({
+    v: 1,
+    op: "page.comments.changed",
+    args: { route },
+  }, {
+    ...reviewSender,
+    tab: { id: 91, openerTabId: 44, windowId: 6 },
+  });
+  assert.deepEqual(result, { notified: true });
+  assert.deepEqual(sentTabMessages, [{
+    tabId: 44,
+    message: { v: 1, op: "page.comments.changed", args: { route } },
+  }]);
+
+  for (const invalidRoute of ["", "#/acme/widgets/pull/0", "#/acme/widgets/pull/7/files"]) {
+    await assert.rejects(
+      Worker.handleMessage({
+        v: 1,
+        op: "page.comments.changed",
+        args: { route: invalidRoute },
+      }, reviewSender),
+      error => error.code === "invalid_target",
+    );
+  }
+});
+
+test("comment notifications silently skip a closed opener tab", async t => {
+  const originalSendMessage = chrome.tabs.sendMessage;
+  t.after(() => { chrome.tabs.sendMessage = originalSendMessage; });
+  chrome.tabs.sendMessage = async () => {
+    throw new Error("No tab with id: 44");
+  };
+  const result = await Worker.handleMessage({
+    v: 1,
+    op: "page.comments.changed",
+    args: { route: "#/acme/widgets/pull/7" },
+  }, {
+    ...reviewSender,
+    tab: { id: 91, openerTabId: 44, windowId: 6 },
+  });
+  assert.deepEqual(result, { notified: false });
 });
 
 test("repository and path validation blocks URL and path injection", async () => {
@@ -206,7 +319,7 @@ test("repository and path validation blocks URL and path injection", async () =>
       v: 1,
       op: "github.commit.get",
       args: { owner: "acme/../../evil", repo: "widgets", sha: "abcdef1", page: 1 },
-    }, panelSender),
+    }, reviewSender),
     error => error.code === "invalid_repository",
   );
   for (const path of ["/etc/passwd", "src/../secret", "src\\secret", "src//main.mbt", "src/\0bad"]) {
@@ -233,7 +346,7 @@ test("device authorization requests only the client id and keeps the device code
   };
   const status = await Worker.handleMessage(
     { v: 1, op: "auth.device.start", args: {} },
-    panelSender,
+    reviewSender,
   );
   assert.equal(status.authenticated, false);
   assert.equal(status.device_flow.user_code, "ABCD-EFGH");
@@ -255,14 +368,14 @@ test("auth.status restores a live device authorization and removes an expired on
     nextPollAt: Date.now() + 12_000,
   });
   await session.set({ github_device_flow: live });
-  const restored = await Worker.handleMessage({ v: 1, op: "auth.status", args: {} }, panelSender);
+  const restored = await Worker.handleMessage({ v: 1, op: "auth.status", args: {} }, reviewSender);
   assert.equal(restored.device_flow.flow_id, live.flowId);
   assertReportedRemainingSeconds(restored.device_flow.expires_in, live.expiresAt, 125);
   assertReportedRemainingSeconds(restored.device_flow.poll_after, live.nextPollAt, 12);
   assert.doesNotMatch(JSON.stringify(restored), /device-code-secret/u);
 
   await session.set({ github_device_flow: storedDeviceFlow("c".repeat(43), { expiresAt: Date.now() - 1 }) });
-  const expired = await Worker.handleMessage({ v: 1, op: "auth.status", args: {} }, panelSender);
+  const expired = await Worker.handleMessage({ v: 1, op: "auth.status", args: {} }, reviewSender);
   assert.equal(expired.device_flow, undefined);
   assert.equal(session.values.github_device_flow, undefined);
 });
@@ -277,7 +390,7 @@ test("an early device poll returns the remaining wait without contacting GitHub"
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
-  }, panelSender);
+  }, reviewSender);
   assert.equal(status.device_flow.flow_id, flow.flowId);
   assertReportedRemainingSeconds(status.device_flow.poll_after, flow.nextPollAt, 20);
 });
@@ -300,7 +413,7 @@ test("authorization_pending advances the server-owned poll deadline", async t =>
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
-  }, panelSender);
+  }, reviewSender);
   assert.equal(status.device_flow.flow_id, flow.flowId);
   const deadline = session.values.github_device_flow.nextPollAt;
   assert.ok(deadline >= pollStartedAt + flow.intervalSeconds * 1000);
@@ -318,7 +431,7 @@ test("slow_down raises the interval by at least five seconds", async t => {
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
-  }, panelSender);
+  }, reviewSender);
   const stored = session.values.github_device_flow;
   assert.equal(stored.intervalSeconds, 10);
   assert.ok(stored.nextPollAt >= pollStartedAt + stored.intervalSeconds * 1000);
@@ -345,7 +458,7 @@ test("expired, denied, invalid, and disabled device flows fail stably and are cl
         v: 1,
         op: "auth.device.poll",
         args: { flow_id: flow.flowId },
-      }, panelSender),
+      }, reviewSender),
       error => error.code === rpcCode,
     );
     assert.equal(session.values.github_device_flow, undefined);
@@ -370,8 +483,8 @@ test("concurrent device polls share one GitHub request", async t => {
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
   };
-  const left = Worker.handleMessage(message, panelSender);
-  const right = Worker.handleMessage(message, panelSender);
+  const left = Worker.handleMessage(message, reviewSender);
+  const right = Worker.handleMessage(message, reviewSender);
   await waitForTestSignal(fetchStarted.promise, "the shared device poll request");
   assert.equal(calls, 1);
   fetchResponse.resolve(Response.json({ error: "authorization_pending" }));
@@ -397,13 +510,13 @@ test("cancelling an in-flight poll prevents a late token response from being sto
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
-  }, panelSender);
+  }, reviewSender);
   await waitForTestSignal(tokenRequestStarted.promise, "the cancellable device token request");
   const cancelled = await Worker.handleMessage({
     v: 1,
     op: "auth.device.cancel",
     args: { flow_id: flow.flowId },
-  }, panelSender);
+  }, reviewSender);
   assert.equal(cancelled.authenticated, false);
   tokenResponse.resolve(Response.json({
     access_token: "late-access",
@@ -443,11 +556,11 @@ test("starting a replacement flow prevents the old poll from storing a late toke
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: oldFlow.flowId },
-  }, panelSender);
+  }, reviewSender);
   await waitForTestSignal(oldTokenRequestStarted.promise, "the replaceable device token request");
   const replacement = await Worker.handleMessage(
     { v: 1, op: "auth.device.start", args: {} },
-    panelSender,
+    reviewSender,
   );
   assert.notEqual(replacement.device_flow.flow_id, oldFlow.flowId);
   oldTokenResponse.resolve(Response.json({
@@ -484,7 +597,7 @@ test("successful device authorization stores rotated tokens, reads /user, and cl
     v: 1,
     op: "auth.device.poll",
     args: { flow_id: flow.flowId },
-  }, panelSender);
+  }, reviewSender);
   assert.deepEqual(urls, [
     "https://github.com/login/oauth/access_token",
     "https://api.github.com/user",
@@ -609,12 +722,12 @@ test("request.cancel aborts an in-flight GitHub operation", async t => {
     op: "github.pull.get",
     args: { owner: "acme", repo: "widgets", number: "7" },
     requestId: "generation_7",
-  }, panelSender);
+  }, reviewSender);
   await Worker.handleMessage({
     v: 1,
     op: "request.cancel",
     args: { requestId: "generation_7" },
-  }, panelSender);
+  }, reviewSender);
   await assert.rejects(pending, error => error.name === "AbortError");
 });
 
@@ -790,11 +903,17 @@ test("Web Store package remains MV3-local and source-map free", () => {
     });
     assert.ok(entries.includes("manifest.json"));
     assert.ok(entries.includes("icons/icon-128.png"));
+    assert.ok(entries.includes("review.html"));
+    assert.ok(entries.includes("review-bootstrap.js"));
+    assert.equal(entries.includes("panel.html"), false);
+    assert.equal(entries.includes("panel-bootstrap.js"), false);
     assert.ok(entries.every(name => !name.endsWith(".map") && !name.includes(".dist-")));
     const manifest = JSON.parse(readStoredZipEntry(destination, "manifest.json").toString("utf8"));
     assert.equal(manifest.manifest_version, 3);
     assert.equal(manifest.minimum_chrome_version, "116");
-    assert.deepEqual(manifest.permissions, ["sidePanel", "storage"]);
+    assert.deepEqual(manifest.permissions, ["storage"]);
+    assert.equal("side_panel" in manifest, false);
+    assert.equal(manifest.permissions.includes("sidePanel"), false);
     assert.deepEqual(manifest.host_permissions, [
       "https://api.github.com/*",
       "https://github.com/login/device/code",

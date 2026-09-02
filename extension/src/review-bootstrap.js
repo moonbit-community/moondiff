@@ -32,7 +32,7 @@ function cancelOlderRequests(generation) {
 function hostRequest(op, args, options = {}) {
   const generation = Number.isInteger(options.generation) ? options.generation : 0;
   cancelOlderRequests(generation);
-  const requestId = `panel_${Date.now().toString(36)}_${(sequence += 1).toString(36)}`;
+  const requestId = `review_${Date.now().toString(36)}_${(sequence += 1).toString(36)}`;
   return new Promise((resolve, reject) => {
     pending.set(requestId, { generation, reject });
     rpc(op, args, requestId).then(resolve, reject).finally(() => pending.delete(requestId));
@@ -42,38 +42,28 @@ function hostRequest(op, args, options = {}) {
 function showBootstrapError(error) {
   const app = document.getElementById("app");
   app.replaceChildren();
-  const panel = document.createElement("main");
-  panel.className = "panel-bootstrap-error";
+  const review = document.createElement("main");
+  review.className = "review-bootstrap-error";
   const heading = document.createElement("h1");
   heading.textContent = "Moondiff could not open this page";
   const message = document.createElement("p");
   message.textContent = error?.message || String(error);
-  panel.append(heading, message);
-  app.append(panel);
+  review.append(heading, message);
+  app.append(review);
 }
 
 try {
-  const target = await rpc("target.current");
-  const hash = globalThis.MoondiffTarget.targetHash(target);
-  if (!hash) throw new Error("Open Moondiff from a supported GitHub pull request or commit page.");
-  history.replaceState(null, "", `${location.pathname}${hash}`);
+  const target = globalThis.MoondiffTarget.parseTargetHash(location.hash);
+  if (!target) throw new Error("Open Moondiff from a supported GitHub pull request or commit page.");
   globalThis.__MOONDIFF_EXTENSION_HOST__ = Object.freeze({
     target,
     request: hostRequest,
     notifyCommentsChanged() {
-      rpc("page.comments.changed").catch(() => {});
+      rpc("page.comments.changed", { route: location.hash }).catch(() => {});
     },
   });
   addEventListener("focus", () => {
-    rpc("target.current").then(current => {
-      if (!globalThis.MoondiffTarget.sameTarget(target, current)) {
-        location.reload();
-        return;
-      }
-      document.dispatchEvent(new Event("visibilitychange"));
-    }).catch(() => {
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
+    document.dispatchEvent(new Event("visibilitychange"));
   });
   await import("./index.js");
 } catch (error) {

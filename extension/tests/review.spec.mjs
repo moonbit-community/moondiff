@@ -24,6 +24,13 @@ function pullCommitTarget() {
   return { owner: "upstream", repo: "project", kind: "pull_commit", number: "17", sha: commitSha };
 }
 
+function reviewPath(target = pullTarget()) {
+  const root = `/review.html#/${target.owner}/${target.repo}`;
+  if (target.kind === "commit") return `${root}/commit/${target.sha}`;
+  if (target.kind === "pull") return `${root}/pull/${target.number}`;
+  return `${root}/pull/${target.number}/commits/${target.sha}`;
+}
+
 async function installHost(page, target = pullTarget(), options = {}) {
   await page.addInitScript(({ target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch }) => {
     let savedAuth = {};
@@ -158,7 +165,6 @@ async function installHost(page, target = pullTarget(), options = {}) {
     async function dispatch(message) {
       const { op, args = {} } = message;
       state.calls.push({ op, args });
-      if (op === "target.current") return state.target;
       if (op === "request.cancel" || op === "page.comments.changed") return { ok: true };
       if (op === "auth.status") return authStatus();
       if (op === "auth.device.start") {
@@ -318,7 +324,7 @@ async function openNewLineComment(page, line) {
 test("anonymous public PR loads comments and a safe narrow diff without Analyze", async ({ page }) => {
   await installHost(page);
   await page.setViewportSize({ width: 420, height: 900 });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await expect(page.getByText("Fork PR")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
   await expect(page.getByText("Existing overall comment")).toBeVisible();
@@ -340,7 +346,7 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
 test("shared file tree uses a wide sidebar and a narrow bottom drawer", async ({ page }) => {
   await installHost(page);
   await page.setViewportSize({ width: 1100, height: 900 });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await expect(page.getByText("Fork PR")).toBeVisible();
 
   const sidebar = page.locator("#file-tree-sidebar");
@@ -393,7 +399,7 @@ test("AST highlights inserted internal whitespace continuously in split and unif
     newSource: `${stable}\n${added}`,
     patch: `@@ -1 +1,2 @@\n ${stable}\n+${added}`,
   });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
 
   const ast = page.getByRole("button", { name: "AST", exact: true });
   await ast.click();
@@ -421,7 +427,7 @@ test("extension validation failures use a neutral Moondiff error message", async
       detail: "Missing RPC argument: sha",
     },
   });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await expect(page.getByText("Fork PR")).toBeVisible();
   await expect(page.getByText(
     "Moondiff extension request failed (status 400, invalid_arguments): Missing RPC argument: sha",
@@ -436,7 +442,7 @@ test("device sign-in displays and copies the code and only opens GitHub from the
     body: "<!doctype html><title>GitHub device verification</title>",
   }));
   await installHost(page, pullTarget(), { pendingPolls: 1_000, pollAfter: 1 });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.locator(".device-user-code")).toHaveText("ABCD-EFGH");
   await expect(page.locator("table.split.review-diff")).toBeVisible();
@@ -463,15 +469,15 @@ test("device sign-in displays and copies the code and only opens GitHub from the
 
 test("device polling survives pending responses and signs in", async ({ page }) => {
   await installHost(page, pullTarget(), { pendingPolls: 2 });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.getByText("Signed in as tester")).toBeVisible();
   expect(await page.evaluate(() => window.__fake.devicePollCalls)).toBeGreaterThanOrEqual(3);
 });
 
-test("reloading the panel restores an unexpired device authorization", async ({ page }) => {
+test("reloading the review page restores an unexpired device authorization", async ({ page }) => {
   await installHost(page, pullTarget(), { pendingPolls: 1_000, pollAfter: 1 });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.locator(".device-user-code")).toHaveText("ABCD-EFGH");
   await page.reload();
@@ -485,7 +491,7 @@ for (const terminalError of ["denied", "expired"]) {
   const article = terminalError === "expired" ? "an" : "a";
   test(`${article} ${terminalError} device authorization can be retried`, async ({ page }) => {
     await installHost(page, pullTarget(), { terminalError });
-    await page.goto("/panel.html");
+    await page.goto(reviewPath());
     await page.getByRole("button", { name: "Sign in with GitHub" }).click();
     await expect(page.getByText(new RegExp(terminalError, "iu"))).toBeVisible();
     await page.getByRole("button", { name: "Try sign-in" }).click();
@@ -496,7 +502,7 @@ for (const terminalError of ["denied", "expired"]) {
 
 test("login, overall comment, inline comment, reply, focus refresh, and view toggle", async ({ page }) => {
   await installHost(page);
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await expect(page.getByText("Existing inline comment")).toBeVisible();
   await expect(page.locator("table.split.review-diff")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
@@ -518,6 +524,11 @@ test("login, overall comment, inline comment, reply, focus refresh, and view tog
   await page.locator(".comment-editor textarea").fill("New overall comment");
   await page.getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("New overall comment")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__fake.calls
+    .filter(call => call.op === "page.comments.changed").length)).toBeGreaterThan(0);
+  const notification = await page.evaluate(() => window.__fake.calls
+    .find(call => call.op === "page.comments.changed"));
+  expect(notification.args).toEqual({ route: "#/upstream/project/pull/17" });
 
   await openNewLineComment(page, 2);
   await page.locator(".inline-comment-editor-row textarea").fill("New inline comment");
@@ -545,7 +556,7 @@ test("login, overall comment, inline comment, reply, focus refresh, and view tog
 
 test("expired credentials during comment refresh offer sign-in and hide authoring", async ({ page }) => {
   await installHost(page, pullTarget(), { authenticated: true });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await waitForSignedInComments(page);
 
   await page.evaluate(() => {
@@ -569,7 +580,7 @@ test("expired credentials during comment refresh offer sign-in and hide authorin
 
 test("expired credentials during comment submission preserve the draft for retry", async ({ page }) => {
   await installHost(page, pullTarget(), { authenticated: true });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await waitForSignedInComments(page);
 
   await page.getByRole("button", { name: "Add overall comment" }).click();
@@ -595,7 +606,7 @@ test("expired credentials during comment submission preserve the draft for retry
 
 test("private PR prompts for GitHub App access and retries after login", async ({ page }) => {
   await installHost(page, pullTarget(), { privateUntilAuth: true });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await expect(page.getByText(/private repositories/u)).toBeVisible();
   await expect(page.getByRole("link", { name: /Install GitHub App/u })).toBeVisible();
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
@@ -605,7 +616,7 @@ test("private PR prompts for GitHub App access and retries after login", async (
 
 test("PR head race preserves the draft and refreshes the snapshot without posting", async ({ page }) => {
   await installHost(page, pullTarget(), { authenticated: true });
-  await page.goto("/panel.html");
+  await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
   await page.locator(".inline-comment-editor-row textarea").fill("Keep this draft");
@@ -619,7 +630,7 @@ test("PR head race preserves the draft and refreshes the snapshot without postin
 for (const target of [commitTarget(), pullCommitTarget()]) {
   test(`${target.kind} posts canonical position comments to the URL repository`, async ({ page }) => {
     await installHost(page, target, { authenticated: true });
-    await page.goto(`/panel.html?kind=${target.kind}`);
+    await page.goto(reviewPath(target));
     await waitForSignedInComments(page);
     await expect(page.getByText("Existing commit comment")).toBeVisible();
     const commentArgs = await page.evaluate(() => window.__fake.calls
@@ -646,11 +657,25 @@ test("content script activates when GitHub SPA navigation first enters a pull re
   }));
   await page.addInitScript(() => {
     const listeners = [];
-    window.__content = { listeners, messages: [] };
+    const content = {
+      listeners,
+      messages: [],
+      holdOpen: false,
+      finishOpen: null,
+    };
+    window.__content = content;
     window.chrome = {
       runtime: {
         onMessage: { addListener(listener) { listeners.push(listener); } },
-        async sendMessage(message) { window.__content.messages.push(message); return { ok: true }; },
+        async sendMessage(message) {
+          content.messages.push(message);
+          if (message.op === "review.open" && content.holdOpen) {
+            return new Promise(resolve => {
+              content.finishOpen = () => resolve({ ok: true });
+            });
+          }
+          return { ok: true };
+        },
       },
     };
   });
@@ -664,7 +689,11 @@ test("content script activates when GitHub SPA navigation first enters a pull re
   const hasButtonRoot = () => page.evaluate(() => Boolean(document.getElementById("moondiff-extension-root")));
 
   await expect.poll(hasButtonRoot).toBe(false);
-  await page.evaluate(() => window.__content.listeners[0]({ v: 1, op: "page.comments.changed" }));
+  await page.evaluate(() => window.__content.listeners[0]({
+    v: 1,
+    op: "page.comments.changed",
+    args: { route: "#/acme/widgets/pull/7" },
+  }));
   await expect.poll(hasButtonRoot).toBe(false);
 
   await page.evaluate(() => {
@@ -686,8 +715,33 @@ test("content script activates when GitHub SPA navigation first enters a pull re
   await page.evaluate(() => document
     .getElementById("moondiff-extension-root")
     .shadowRoot.querySelector("button").click());
-  expect(await page.evaluate(() => window.__content.messages.at(-1))).toEqual({ v: 1, op: "panel.open" });
+  expect(await page.evaluate(() => window.__content.messages)).toEqual([]);
 
-  await page.evaluate(() => window.__content.listeners[0]({ v: 1, op: "page.comments.changed" }));
+  await page.evaluate(() => { window.__content.holdOpen = true; });
+  const button = page.locator("#moondiff-extension-root button");
+  await button.click();
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveAttribute("aria-busy", "true");
+  const box = await button.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  expect(await page.evaluate(() => window.__content.messages)).toEqual([{
+    v: 1,
+    op: "review.open",
+  }]);
+  await page.evaluate(() => window.__content.finishOpen());
+  await expect(button).toBeEnabled();
+  await expect(button).not.toHaveAttribute("aria-busy", "true");
+
+  await page.evaluate(() => window.__content.listeners[0]({
+    v: 1,
+    op: "page.comments.changed",
+    args: { route: "#/acme/widgets/pull/7" },
+  }));
+  await expect.poll(buttonText).toBe("Open in Moondiff");
+  await page.evaluate(() => window.__content.listeners[0]({
+    v: 1,
+    op: "page.comments.changed",
+    args: { route: "#/acme/widgets/pull/8/commits/abcdef1" },
+  }));
   await expect.poll(buttonText).toBe("GitHub 上有新评论，刷新查看");
 });

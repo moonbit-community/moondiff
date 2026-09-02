@@ -160,14 +160,13 @@ function manifest() {
     description: "Review and comment on GitHub pull requests and commits with MoonBit-aware diffs.",
     version: "0.0.1",
     minimum_chrome_version: "116",
-    permissions: ["sidePanel", "storage"],
+    permissions: ["storage"],
     host_permissions: [
       "https://api.github.com/*",
       "https://github.com/login/device/code",
       "https://github.com/login/oauth/access_token",
     ],
     background: { service_worker: "service-worker.js" },
-    side_panel: { default_path: "panel.html" },
     content_scripts: [{
       // GitHub can SPA-navigate into a PR or commit without creating a new document,
       // so the route watcher must already be present before that transition.
@@ -200,7 +199,7 @@ export function buildExtension({ env = process.env, log = process.stdout, mode =
     if (!existsSync(builtJavaScript)) throw new Error(`MoonBit extension artifact was not found at ${builtJavaScript}.`);
 
     mkdirSync(join(stagingRoot, "icons"), { recursive: true });
-    for (const file of ["target.js", "content-script.js", "service-worker.js", "panel-bootstrap.js", "panel.html"]) {
+    for (const file of ["target.js", "content-script.js", "service-worker.js", "review-bootstrap.js", "review.html"]) {
       copyFileSync(join(extensionRoot, "src", file), join(stagingRoot, file));
     }
     copyFileSync(builtJavaScript, join(stagingRoot, "index.js"));

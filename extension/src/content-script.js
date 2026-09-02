@@ -4,6 +4,7 @@
   const ROOT_ID = "moondiff-extension-root";
   let lastHref = "";
   let dirty = false;
+  let opening = false;
   let host;
   let button;
 
@@ -34,15 +35,28 @@
       button:hover { background: #2b2b2b; transform: translateY(-1px); }
       button:focus-visible { outline: 3px solid #54aeff; outline-offset: 2px; }
       button[data-dirty="true"] { border-color: #d29922; background: #6e4b00; }
+      button:disabled { cursor: progress; opacity: .72; transform: none; }
     `;
     button = document.createElement("button");
     button.type = "button";
-    button.addEventListener("click", () => {
+    button.addEventListener("click", event => {
+      if (!event.isTrusted || opening) return;
       if (dirty) {
         location.reload();
         return;
       }
-      chrome.runtime.sendMessage({ v: 1, op: "panel.open" }).catch(() => {});
+      opening = true;
+      renderButton();
+      (async () => {
+        try {
+          await chrome.runtime.sendMessage({ v: 1, op: "review.open" });
+        } catch {
+          // The button becomes available again so the user can retry.
+        } finally {
+          opening = false;
+          renderButton();
+        }
+      })();
     });
     host.shadowRoot.append(style, button);
     document.documentElement.append(host);
@@ -52,6 +66,9 @@
   function renderButton() {
     if (!button) return;
     button.dataset.dirty = String(dirty);
+    button.disabled = opening;
+    if (opening) button.setAttribute("aria-busy", "true");
+    else button.removeAttribute("aria-busy");
     button.textContent = dirty
       ? "GitHub 上有新评论，刷新查看"
       : "Open in Moondiff";
@@ -79,7 +96,8 @@
   chrome.runtime.onMessage.addListener(message => {
     if (message?.v === 1 && message?.op === "page.comments.changed") {
       const target = globalThis.MoondiffTarget?.parseGitHubTarget(location.href);
-      if (!target) return;
+      const changed = globalThis.MoondiffTarget?.parseTargetHash(message?.args?.route);
+      if (!globalThis.MoondiffTarget?.sameTarget(target, changed)) return;
       dirty = true;
       ensureButton();
       renderButton();

@@ -7,7 +7,7 @@ const repositoryRoot = resolve(extensionRoot, "..");
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "panel.spec.mjs",
+  testMatch: "review.spec.mjs",
   fullyParallel: false,
   reporter: "line",
   expect: { timeout: 7_000 },
@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: {
     command: "node extension/tests/serve.mjs",
     cwd: repositoryRoot,
-    url: "http://127.0.0.1:4184/panel.html",
+    url: "http://127.0.0.1:4184/review.html",
     reuseExistingServer: false,
     timeout: 120_000,
   },
