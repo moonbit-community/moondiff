@@ -888,6 +888,31 @@ async function loadTreeCommit(page) {
   return rawRequests;
 }
 
+async function fileTreeWidth(page) {
+  return page.locator("#file-tree-sidebar").evaluate(
+    element => element.getBoundingClientRect().width,
+  );
+}
+
+async function moveFileTreeDivider(page, targetWidth) {
+  const divider = page.getByRole("separator", { name: "Resize file tree" });
+  const box = await divider.boundingBox();
+  if (!box) throw new Error("File tree resize divider is not visible.");
+  const startWidth = await fileTreeWidth(page);
+  const startX = box.x + box.width / 2;
+  const y = box.y + Math.min(24, box.height / 2);
+  await page.mouse.move(startX, y);
+  await page.mouse.down();
+  await page.mouse.move(startX + targetWidth - startWidth, y, { steps: 4 });
+  return divider;
+}
+
+async function dragFileTree(page, targetWidth) {
+  const divider = await moveFileTreeDivider(page, targetWidth);
+  await page.mouse.up();
+  return divider;
+}
+
 async function openMockedShareLink(page) {
   await installMockRoutes(page);
   await page.goto(`/#/example/project/commit/${commitSha}`);
@@ -1073,6 +1098,87 @@ test("desktop file tree supports collapse search status filters and file navigat
     return bounds.top >= 0 && bounds.top < innerHeight;
   })).toBe(true);
   expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+});
+
+test("desktop file tree resizes live, persists across changes, and resets on refresh", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loadTreeCommit(page);
+  const divider = page.getByRole("separator", { name: "Resize file tree" });
+
+  await expect(divider).toBeVisible();
+  await expect(divider).toHaveCSS("cursor", "col-resize");
+  await expect(divider).toHaveCSS("touch-action", "none");
+  expect(await fileTreeWidth(page)).toBe(320);
+
+  await moveFileTreeDivider(page, 440);
+  expect(await fileTreeWidth(page)).toBe(440);
+  await divider.evaluate(element => {
+    const pointerId = element.__moondiffFileTreeResize.pointerId;
+    element.dispatchEvent(new PointerEvent("pointercancel", {
+      bubbles: true,
+      isPrimary: true,
+      pointerId,
+      pointerType: "mouse",
+    }));
+  });
+  await page.mouse.up();
+  await expect(divider).not.toHaveClass(/\bis-resizing\b/u);
+  expect(await fileTreeWidth(page)).toBe(320);
+
+  await moveFileTreeDivider(page, 480);
+  await expect(divider).toHaveClass(/\bis-resizing\b/u);
+  expect(await fileTreeWidth(page)).toBe(480);
+  await page.mouse.up();
+  await expect(divider).not.toHaveClass(/\bis-resizing\b/u);
+  expect(await fileTreeWidth(page)).toBe(480);
+
+  const nextSha = "5555555555555555555555555555555555555555";
+  const nextUrl = "https://github.com/example/tree/commit/" + nextSha;
+  await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
+  await page.getByRole("button", { name: "View diff" }).click();
+  await expect(page).toHaveURL("/#/example/tree/commit/" + nextSha);
+  await expect(page.locator("table.split").first()).toBeVisible();
+  expect(await fileTreeWidth(page)).toBe(480);
+
+  await page.reload();
+  await expect(page.locator("table.split").first()).toBeVisible();
+  expect(await fileTreeWidth(page)).toBe(320);
+});
+
+test("file tree width obeys minimum, absolute maximum, and viewport maximum", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await loadTreeCommit(page);
+  const divider = page.getByRole("separator", { name: "Resize file tree" });
+
+  await dragFileTree(page, 0);
+  expect(await fileTreeWidth(page)).toBe(240);
+  await expect(divider).toHaveAttribute("aria-valuenow", "240");
+
+  await dragFileTree(page, 900);
+  expect(await fileTreeWidth(page)).toBe(640);
+  await expect(divider).toHaveAttribute("aria-valuenow", "640");
+
+  for (const [width, expectedSidebarWidth] of [[800, 400], [768, 384]]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(divider).toBeVisible();
+    expect(await fileTreeWidth(page)).toBe(expectedSidebarWidth);
+    const documentWidth = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth,
+    }));
+    expect(documentWidth.scroll).toBeLessThanOrEqual(documentWidth.client);
+  }
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  expect(await fileTreeWidth(page)).toBe(640);
+
+  await page.setViewportSize({ width: 767, height: 900 });
+  await expect(divider).toBeHidden();
+  const mobileWidth = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(mobileWidth.scroll).toBeLessThanOrEqual(mobileWidth.client);
 });
 
 test("tablet-width layout keeps the sidebar without widening the document", async ({ page }) => {
