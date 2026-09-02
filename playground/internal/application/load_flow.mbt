@@ -170,7 +170,7 @@ fn begin_change_load(
       route: Some(reference),
       share_url: Some(playground_share_url(reference)),
       copy_status: CopyReady,
-      file_tree: initial_file_tree_state(),
+      file_tree: reset_file_tree_state(model.file_tree),
       review: if extension_host_enabled() {
         { auth: model.review.auth, comments: CommentsLoading, draft: None, }
       } else {

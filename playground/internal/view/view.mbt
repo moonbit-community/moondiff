@@ -964,32 +964,39 @@ fn change_view(
       }
   }
   @html.section(class="results", [
-    @html.div(class="change-layout", [
-      file_tree_view(commit, model, emit),
-      @html.div(
-        class="change-main",
-        attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
-        [
-          @html.div(class="commit-card", [
-            @html.div(class="commit-title", [
-              @html.div(class="commit-identity", [
-                @html.p(class="section-label", section_label),
-                @html.a(
-                  href=commit.html_url,
-                  target=Blank,
-                  rel="noopener noreferrer",
-                  identity,
-                ),
-                @html.p(class="parent", comparison),
+    @html.div(
+      class="change-layout",
+      style=[
+        "--file-tree-preferred-width: \{model.file_tree.preferred_width}px",
+      ],
+      [
+        file_tree_view(commit, model, emit),
+        file_tree_resizer_view(model.file_tree, emit),
+        @html.div(
+          class="change-main",
+          attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
+          [
+            @html.div(class="commit-card", [
+              @html.div(class="commit-title", [
+                @html.div(class="commit-identity", [
+                  @html.p(class="section-label", section_label),
+                  @html.a(
+                    href=commit.html_url,
+                    target=Blank,
+                    rel="noopener noreferrer",
+                    identity,
+                  ),
+                  @html.p(class="parent", comparison),
+                ]),
+                @html.pre(class="commit-message", commit.message),
               ]),
-              @html.pre(class="commit-message", commit.message),
             ]),
-          ]),
-          comments_overview(commit, model.review, emit),
-          file_list_view(commit, model, emit),
-        ],
-      ),
-    ]),
+            comments_overview(commit, model.review, emit),
+            file_list_view(commit, model, emit),
+          ],
+        ),
+      ],
+    ),
   ])
 }
 

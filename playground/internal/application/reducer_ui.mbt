@@ -7,6 +7,7 @@ pub(all) enum UiMsg {
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
   FileTreeViewportChanged(Int)
+  FileTreeWidthChanged(Int)
   ToggleFileTreeSearch
   FileTreeSearchChanged(String)
   ToggleFileTreeStatus(String)
@@ -68,6 +69,17 @@ fn update_ui(
       } else {
         (model, @rabbita.none)
       }
+    FileTreeWidthChanged(width) =>
+      (
+        {
+          ..model,
+          file_tree: {
+            ..model.file_tree,
+            preferred_width: normalize_file_tree_width(width),
+          },
+        },
+        @rabbita.none,
+      )
     ToggleFileTreeSearch => {
       let search_open = !model.file_tree.search_open
       (
@@ -178,7 +190,7 @@ fn update_ui(
               generation: model.generation + 1,
               phase: LoadFailed(message),
               copy_status: CopyReady,
-              file_tree: initial_file_tree_state(),
+              file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
           )
@@ -205,7 +217,7 @@ fn update_ui(
               route: None,
               share_url: None,
               copy_status: CopyReady,
-              file_tree: initial_file_tree_state(),
+              file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
           )
@@ -219,7 +231,7 @@ fn update_ui(
               route: None,
               share_url: None,
               copy_status: CopyReady,
-              file_tree: initial_file_tree_state(),
+              file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
           )

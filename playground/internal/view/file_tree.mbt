@@ -436,6 +436,112 @@ extern "js" fn trap_file_tree_tab(event : @dom.KeyboardEvent) -> Unit =
   #| }
 
 ///|
+extern "js" fn update_file_tree_resize(
+  event : @dom.MouseEvent,
+  action : String,
+  preferred_width : Int,
+) -> Int =
+  #| (event, action, preferredWidth) => {
+  #|   const handle = event.currentTarget
+  #|   if (!(handle instanceof HTMLElement)) return -1
+  #|   if (action === "start") {
+  #|     if (!event.isPrimary) return -1
+  #|     if (event.pointerType === "mouse" && event.button !== 0) return -1
+  #|     if (handle.__moondiffFileTreeResize) return -1
+  #|     const layout = handle.closest(".change-layout")
+  #|     const sidebar = layout?.querySelector("#file-tree-sidebar")
+  #|     if (!(layout instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
+  #|       return -1
+  #|     }
+  #|     handle.__moondiffFileTreeResize = {
+  #|       pointerId: event.pointerId,
+  #|       startX: event.clientX,
+  #|       startWidth: sidebar.getBoundingClientRect().width,
+  #|       initialPreferredWidth: preferredWidth,
+  #|       width: preferredWidth,
+  #|       layout,
+  #|     }
+  #|     handle.setPointerCapture(event.pointerId)
+  #|     handle.classList.add("is-resizing")
+  #|     layout.classList.add("is-resizing")
+  #|     document.body.classList.add("file-tree-resizing")
+  #|     event.preventDefault()
+  #|     return -1
+  #|   }
+  #|   const active = handle.__moondiffFileTreeResize
+  #|   if (!active || active.pointerId !== event.pointerId) return -1
+  #|   if (action === "move") {
+  #|     const maximum = Math.max(240, Math.min(640, window.innerWidth * 0.5))
+  #|     const next = Math.round(Math.max(
+  #|       240,
+  #|       Math.min(maximum, active.startWidth + event.clientX - active.startX),
+  #|     ))
+  #|     active.width = next
+  #|     active.layout.style.setProperty("--file-tree-preferred-width", `${next}px`)
+  #|     handle.setAttribute("aria-valuenow", String(next))
+  #|     event.preventDefault()
+  #|     return -1
+  #|   }
+  #|   if (action !== "end" && action !== "cancel") return -1
+  #|   if (action === "cancel") {
+  #|     active.layout.style.setProperty(
+  #|       "--file-tree-preferred-width",
+  #|       `${active.initialPreferredWidth}px`,
+  #|     )
+  #|     handle.setAttribute("aria-valuenow", String(active.initialPreferredWidth))
+  #|   }
+  #|   const finalWidth = action === "end" ? active.width : -1
+  #|   if (handle.hasPointerCapture(event.pointerId)) {
+  #|     handle.releasePointerCapture(event.pointerId)
+  #|   }
+  #|   handle.classList.remove("is-resizing")
+  #|   active.layout.classList.remove("is-resizing")
+  #|   document.body.classList.remove("file-tree-resizing")
+  #|   delete handle.__moondiffFileTreeResize
+  #|   event.preventDefault()
+  #|   return finalWidth
+  #| }
+
+///|
+fn file_tree_resizer_view(
+  state : FileTreeState,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  @html.div(
+    class="file-tree-resizer",
+    title="Drag to resize the file tree",
+    attrs=@html.Attrs::build()
+      .role("separator")
+      .aria_label("Resize file tree")
+      .aria_orientation("vertical")
+      .aria_valuemin("240")
+      .aria_valuemax("640")
+      .aria_valuenow(state.preferred_width.to_string())
+      .on_pointerdown(event => {
+        ignore(update_file_tree_resize(event, "start", state.preferred_width))
+        @rabbita.none
+      })
+      .on_pointermove(event => {
+        ignore(update_file_tree_resize(event, "move", state.preferred_width))
+        @rabbita.none
+      })
+      .on_pointerup(event => {
+        let width = update_file_tree_resize(event, "end", state.preferred_width)
+        if width < 0 {
+          @rabbita.none
+        } else {
+          emit(Ui(FileTreeWidthChanged(width)))
+        }
+      })
+      .on_pointercancel(event => {
+        ignore(update_file_tree_resize(event, "cancel", state.preferred_width))
+        @rabbita.none
+      }),
+    "",
+  )
+}
+
+///|
 fn file_tree_drawer_keydown(
   event : @dom.KeyboardEvent,
   emit : @rabbita.Emit[Msg],

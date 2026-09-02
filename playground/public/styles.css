@@ -28,7 +28,8 @@
   --hunk: #f3f3f3;
   --empty-stripe: #e4e4e4;
   --toolbar-height: 3rem;
-  --file-tree-width: 320px;
+  --file-tree-preferred-width: 320px;
+  --file-tree-resizer-width: 8px;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
@@ -730,9 +731,10 @@ button.copy-button.copied {
 }
 
 .change-layout {
+  --file-tree-width: clamp(240px, var(--file-tree-preferred-width), min(640px, 50vw));
   display: grid;
   min-width: 0;
-  grid-template-columns: var(--file-tree-width) minmax(0, 1fr);
+  grid-template-columns: var(--file-tree-width) var(--file-tree-resizer-width) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -761,6 +763,46 @@ button.copy-button.copied {
   border-right: 1px solid var(--border);
   background: var(--surface);
   flex-direction: column;
+}
+
+.file-tree-resizer {
+  position: sticky;
+  z-index: 21;
+  top: var(--toolbar-height);
+  width: var(--file-tree-resizer-width);
+  height: calc(100svh - var(--toolbar-height));
+  align-self: start;
+  background: var(--workspace);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.file-tree-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: var(--border);
+  transition: left 120ms ease, width 120ms ease, background 120ms ease;
+}
+
+.file-tree-resizer:hover::before,
+.file-tree-resizer.is-resizing::before {
+  left: calc(50% - 1.5px);
+  width: 3px;
+  background: var(--muted-strong);
+}
+
+.file-tree-resizer.is-resizing {
+  background: color-mix(in srgb, var(--muted) 10%, var(--workspace));
+}
+
+body.file-tree-resizing,
+body.file-tree-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .file-tree-header,
@@ -1942,6 +1984,10 @@ footer {
 @media (max-width: 767px) {
   .change-layout {
     display: block;
+  }
+
+  .file-tree-resizer {
+    display: none;
   }
 
   .file-tree-trigger {
