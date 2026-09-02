@@ -21,7 +21,7 @@ const types = {
 createServer(async (request, response) => {
   try {
     const pathname = new URL(request.url, "http://localhost").pathname;
-    const relative = pathname === "/" ? "panel.html" : pathname.slice(1);
+    const relative = pathname === "/" ? "review.html" : pathname.slice(1);
     const safe = normalize(relative);
     if (safe.startsWith("..") || safe.includes("\0")) {
       response.writeHead(403).end("Forbidden");

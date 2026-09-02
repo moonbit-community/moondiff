@@ -1704,20 +1704,20 @@ button.file-tree-row.selected {
   display: block;
 }
 
-.extension-panel .line-comment-button {
+.extension-review .line-comment-button {
   display: block;
   opacity: 0;
   pointer-events: none;
 }
 
-.extension-panel .review-gutter:hover .line-comment-button,
-.extension-panel .line-comment-button:focus-visible {
+.extension-review .review-gutter:hover .line-comment-button,
+.extension-review .line-comment-button:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
 .review-gutter:hover .line-number-value,
-.extension-panel .review-gutter:focus-within .line-number-value {
+.extension-review .review-gutter:focus-within .line-number-value {
   opacity: 0;
 }
 
