@@ -118,6 +118,7 @@ pub(all) struct CommentDraft {
 ///|
 pub(all) struct ReviewState {
   auth : AuthStatus
+  last_authenticated_login : String?
   comments : CommentsStatus
   draft : CommentDraft?
 } derive(Eq)
@@ -125,9 +126,19 @@ pub(all) struct ReviewState {
 ///|
 pub fn initial_review_state() -> ReviewState {
   if extension_host_enabled() {
-    { auth: AuthChecking, comments: CommentsLoading, draft: None, }
+    {
+      auth: AuthChecking,
+      last_authenticated_login: None,
+      comments: CommentsLoading,
+      draft: None,
+    }
   } else {
-    { auth: WebReadOnly, comments: CommentsDisabled, draft: None, }
+    {
+      auth: WebReadOnly,
+      last_authenticated_login: None,
+      comments: CommentsDisabled,
+      draft: None,
+    }
   }
 }
 
@@ -177,7 +188,12 @@ pub fn review_state_with_auth(
   review : ReviewState,
   auth : AuthStatus,
 ) -> ReviewState {
-  { auth, comments: review.comments, draft: review.draft, }
+  {
+    auth,
+    last_authenticated_login: review.last_authenticated_login,
+    comments: review.comments,
+    draft: review.draft,
+  }
 }
 
 ///|
@@ -185,7 +201,12 @@ pub fn review_state_with_comments(
   review : ReviewState,
   comments : CommentsStatus,
 ) -> ReviewState {
-  { auth: review.auth, comments, draft: review.draft, }
+  {
+    auth: review.auth,
+    last_authenticated_login: review.last_authenticated_login,
+    comments,
+    draft: review.draft,
+  }
 }
 
 ///|
@@ -193,7 +214,12 @@ pub fn review_state_with_draft(
   review : ReviewState,
   draft : CommentDraft?,
 ) -> ReviewState {
-  { auth: review.auth, comments: review.comments, draft, }
+  {
+    auth: review.auth,
+    last_authenticated_login: review.last_authenticated_login,
+    comments: review.comments,
+    draft,
+  }
 }
 
 ///|

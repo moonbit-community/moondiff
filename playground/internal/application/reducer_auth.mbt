@@ -24,7 +24,12 @@ fn update_auth(
   match msg {
     AuthStatusLoaded(result) =>
       match result {
-        Ok(status) => apply_auth_status(model, status, true, false, emit)
+        Ok(status) => {
+          let (next, command, _) = apply_auth_status(
+            model, status, true, false, false, emit,
+          )
+          (next, command)
+        }
         Err(error) =>
           (
             with_review(
@@ -56,12 +61,15 @@ fn update_auth(
         Ok(status) => {
           let restart_change = status.authenticated &&
             sign_in_restarts_change_load(model)
-          let (synced, poll_command) = apply_auth_status(
-            model, status, true, false, emit,
+          let (synced, poll_command, identity_transition) = apply_auth_status(
+            model, status, true, false, false, emit,
           )
+          if identity_transition is AuthIdentityBoundary {
+            return (synced, poll_command)
+          }
           if restart_change {
-            let (reloading, load_command) = begin_change_load(
-              synced, reference, emit,
+            let (reloading, load_command) = begin_sign_in_change_reload(
+              synced, reference, identity_transition, emit,
             )
             return (reloading, @rabbita.batch([poll_command, load_command]))
           }
@@ -72,7 +80,7 @@ fn update_auth(
             ),
             @rabbita.batch([
               poll_command,
-              comments_request(reference, generation, emit),
+              comments_request(reference, synced.generation, emit),
             ]),
           )
         }
@@ -91,7 +99,12 @@ fn update_auth(
       match result {
         Ok(status) if status.authenticated =>
           finish_device_sign_in(model, status, emit)
-        Ok(status) => apply_auth_status(model, status, false, false, emit)
+        Ok(status) => {
+          let (next, command, _) = apply_auth_status(
+            model, status, false, false, false, emit,
+          )
+          (next, command)
+        }
         Err(error) =>
           (
             with_review(
@@ -124,7 +137,10 @@ fn update_auth(
           guard status.device_flow is Some(flow) && flow.flow_id == flow_id else {
             return (model, @rabbita.none)
           }
-          apply_auth_status(model, status, true, true, emit)
+          let (next, command, _) = apply_auth_status(
+            model, status, true, true, false, emit,
+          )
+          (next, command)
         }
         Err(error) =>
           (
@@ -158,7 +174,12 @@ fn update_auth(
         return (model, @rabbita.none)
       }
       match result {
-        Ok(status) => apply_auth_status(model, status, false, false, emit)
+        Ok(status) => {
+          let (next, command, _) = apply_auth_status(
+            model, status, false, false, false, emit,
+          )
+          (next, command)
+        }
         Err(error) =>
           (
             with_review(
@@ -233,15 +254,12 @@ fn update_auth(
       }
     AuthLogoutFinished(result) =>
       match result {
-        Ok(status) =>
-          (
-            with_review(model, {
-              auth: auth_status_from_api(status),
-              comments: model.review.comments,
-              draft: None,
-            }),
-            @rabbita.none,
+        Ok(status) => {
+          let (next, command, _) = apply_auth_status(
+            model, status, false, false, true, emit,
           )
+          (next, command)
+        }
         Err(error) =>
           (
             with_review(
