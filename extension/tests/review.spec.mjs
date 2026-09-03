@@ -52,6 +52,9 @@ async function installHost(page, target = pullTarget(), options = {}) {
       headRace: false,
       metadataCalls: 0,
       commentListCalls: 0,
+      anonymousPullDelayed: false,
+      anonymousPullReleased: false,
+      releaseAnonymousPull: null,
       documentHidden: false,
       documentFocused: true,
       authenticationFailureOps: [],
@@ -236,6 +239,19 @@ async function installHost(page, target = pullTarget(), options = {}) {
         });
       }
       if (op === "github.pull.get") {
+        if (options.delayAnonymousPull && !state.authenticated && !state.anonymousPullDelayed) {
+          state.anonymousPullDelayed = true;
+          return new Promise((_, reject) => {
+            state.releaseAnonymousPull = () => {
+              state.releaseAnonymousPull = null;
+              state.anonymousPullReleased = true;
+              reject(Object.assign(new Error("GitHub could not find this resource. For private repositories, sign in and install the GitHub App."), {
+                status: 404,
+                code: "not_found_or_not_installed",
+              }));
+            };
+          });
+        }
         if (options.privateUntilAuth && !state.authenticated) {
           throw Object.assign(new Error("GitHub could not find this resource. For private repositories, sign in and install the GitHub App."), { status: 404, code: "not_found_or_not_installed" });
         }
@@ -686,6 +702,31 @@ test("cross-tab login on reactivation reloads a private repository", async ({ pa
   await expect(page.getByText("Signed in as tester")).toBeVisible();
   expect(await page.evaluate(() => window.__fake.calls
     .filter(call => call.op === "github.pull.get").length)).toBeGreaterThan(before);
+});
+
+test("cross-tab login supersedes a pending anonymous private-repository failure", async ({ page }) => {
+  await installHost(page, pullTarget(), {
+    privateUntilAuth: true,
+    delayAnonymousPull: true,
+  });
+  await page.goto(reviewPath());
+  await expect.poll(() => page.evaluate(() => window.__fake.anonymousPullDelayed)).toBe(true);
+
+  await page.evaluate(() => { window.__fake.authenticated = true; });
+  await reactivatePage(page);
+  await expect(page.getByText("Fork PR")).toBeVisible();
+  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__fake.calls
+    .filter(call => call.op === "github.pull.get").length)).toBeGreaterThanOrEqual(2);
+
+  await page.evaluate(async () => {
+    window.__fake.releaseAnonymousPull();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
+  await expect.poll(() => page.evaluate(() => window.__fake.anonymousPullReleased)).toBe(true);
+  await expect(page.getByText("Fork PR")).toBeVisible();
+  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByText(/private repositories/u)).toHaveCount(0);
 });
 
 test("PR head race preserves the draft and refreshes the snapshot without posting", async ({ page }) => {

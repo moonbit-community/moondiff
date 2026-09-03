@@ -52,10 +52,11 @@ if (typeof importScripts === "function") {
   const devicePollPromises = new Map();
   let refreshPromise;
   let refreshController;
+  let authenticationEpoch = 0;
+  let authenticationMutation = Promise.resolve();
   let authenticationCleanupPromise;
   let authenticationClearing = false;
-  let deviceStartPromise;
-  let deviceMutation = Promise.resolve();
+  let deviceStartRequest;
 
   function config() {
     const value = root.MoondiffConfig;
@@ -176,9 +177,9 @@ if (typeof importScripts === "function") {
     return base64Url(bytes);
   }
 
-  function withDeviceMutation(task) {
-    const run = deviceMutation.then(task, task);
-    deviceMutation = run.catch(() => {});
+  function withAuthenticationMutation(task) {
+    const run = authenticationMutation.then(task, task);
+    authenticationMutation = run.catch(() => {});
     return run;
   }
 
@@ -197,13 +198,15 @@ if (typeof importScripts === "function") {
   }
 
   async function clearAuthentication() {
+    authenticationEpoch += 1;
+    deviceStartRequest?.controller.abort();
     if (authenticationCleanupPromise) return authenticationCleanupPromise;
     authenticationClearing = true;
     const cleanup = (async () => {
       const activeRefresh = refreshPromise;
       refreshController?.abort();
       if (activeRefresh) await activeRefresh.catch(() => {});
-      await withDeviceMutation(async () => {
+      await withAuthenticationMutation(async () => {
         await Promise.all([
           clearCredentials(),
           chrome.storage.session.remove(SESSION_DEVICE_FLOW),
@@ -221,13 +224,23 @@ if (typeof importScripts === "function") {
     }
   }
 
-  async function persistTokens(payload, login) {
+  function authenticationIsActive(epoch) {
+    return epoch === authenticationEpoch && !authenticationClearing;
+  }
+
+  function authenticationRequiredError() {
+    return new RpcError(401, "authentication_required", "Sign in with GitHub to continue.");
+  }
+
+  function anonymousAuthStatus() {
+    return authForProtocol(false, null, config().installUrl);
+  }
+
+  async function persistTokensWithoutLock(payload, login, epoch) {
     if (typeof payload.access_token !== "string" || !payload.access_token) {
       throw new RpcError(502, "oauth_exchange_failed", payload.error_description || payload.error || "GitHub did not return an access token.");
     }
-    if (authenticationClearing) {
-      throw new RpcError(401, "authentication_required", "Sign in with GitHub to continue.");
-    }
+    if (!authenticationIsActive(epoch)) throw authenticationRequiredError();
     const now = Date.now();
     const session = {
       [SESSION_ACCESS]: payload.access_token,
@@ -241,6 +254,20 @@ if (typeof importScripts === "function") {
         [LOCAL_REFRESH_EXPIRES]: now + Math.max(0, Number(payload.refresh_token_expires_in || 0)) * 1000,
       });
     }
+    if (!authenticationIsActive(epoch)) throw authenticationRequiredError();
+  }
+
+  async function persistTokens(payload, login, epoch) {
+    return withAuthenticationMutation(() => (
+      persistTokensWithoutLock(payload, login, epoch)
+    ));
+  }
+
+  async function clearCredentialsIfCurrent(epoch) {
+    await withAuthenticationMutation(async () => {
+      if (epoch !== authenticationEpoch) return;
+      await clearCredentials();
+    });
   }
 
   async function oauthPost(url, parameters, signal) {
@@ -299,13 +326,14 @@ if (typeof importScripts === "function") {
   }
 
   function beginAccessTokenRefresh() {
+    const epoch = authenticationEpoch;
     const controller = new AbortController();
     const pending = (async () => {
       const local = await chrome.storage.local.get([LOCAL_REFRESH, LOCAL_REFRESH_EXPIRES]);
       const token = local[LOCAL_REFRESH];
       if (!token || Number(local[LOCAL_REFRESH_EXPIRES] || 0) <= Date.now()) {
-        await clearCredentials();
-        throw new RpcError(401, "authentication_required", "Sign in with GitHub to continue.");
+        await clearCredentialsIfCurrent(epoch);
+        throw authenticationRequiredError();
       }
       const app = config();
       const payload = await tokenRequest({
@@ -313,7 +341,7 @@ if (typeof importScripts === "function") {
         grant_type: "refresh_token",
         refresh_token: token,
       }, controller.signal);
-      await persistTokens(payload);
+      await persistTokens(payload, null, epoch);
       return payload.access_token;
     })();
     refreshController = controller;
@@ -328,43 +356,65 @@ if (typeof importScripts === "function") {
     return pending;
   }
 
-  async function refreshAccessToken(signal) {
+  async function refreshAccessToken(signal, expectedEpoch) {
     throwIfAborted(signal);
-    if (authenticationClearing) {
-      throw new RpcError(401, "authentication_required", "Sign in with GitHub to continue.");
+    if (
+      authenticationClearing ||
+      (expectedEpoch !== undefined && expectedEpoch !== authenticationEpoch)
+    ) {
+      throw authenticationRequiredError();
     }
     return waitForSharedPromise(refreshPromise || beginAccessTokenRefresh(), signal);
   }
 
-  async function accessToken(signal) {
+  async function accessToken(signal, expectedEpoch) {
     throwIfAborted(signal);
     if (authenticationClearing) return null;
     const session = await chrome.storage.session.get([SESSION_ACCESS, SESSION_EXPIRES]);
     throwIfAborted(signal);
+    if (
+      authenticationClearing ||
+      (expectedEpoch !== undefined && expectedEpoch !== authenticationEpoch)
+    ) return null;
     if (session[SESSION_ACCESS] && Number(session[SESSION_EXPIRES] || 0) > Date.now() + 30_000) {
       return session[SESSION_ACCESS];
     }
     const local = await chrome.storage.local.get([LOCAL_REFRESH, LOCAL_REFRESH_EXPIRES]);
+    if (
+      authenticationClearing ||
+      (expectedEpoch !== undefined && expectedEpoch !== authenticationEpoch)
+    ) return null;
     if (local[LOCAL_REFRESH] && Number(local[LOCAL_REFRESH_EXPIRES] || 0) > Date.now()) {
-      return refreshAccessToken(signal);
+      return refreshAccessToken(signal, expectedEpoch);
     }
     if (session[SESSION_ACCESS]) return session[SESSION_ACCESS];
     return null;
   }
 
   async function githubFetch(path, options = {}, retry = true) {
-    const token = await accessToken(options.signal);
+    const expectedEpoch = options.authenticationEpoch;
+    const token = await accessToken(options.signal, expectedEpoch);
+    if (expectedEpoch !== undefined && expectedEpoch !== authenticationEpoch) {
+      throw authenticationRequiredError();
+    }
     const headers = new Headers(options.headers || {});
     headers.set("Accept", options.accept || "application/vnd.github+json");
     headers.set("X-GitHub-Api-Version", API_VERSION);
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    const { accept: _accept, ...requestOptions } = options;
+    const {
+      accept: _accept,
+      authenticationEpoch: _authenticationEpoch,
+      ...requestOptions
+    } = options;
     const response = await fetch(apiUrl(path), {
       ...requestOptions,
       headers,
     });
     if (response.status === 401 && token && retry) {
-      await refreshAccessToken(options.signal);
+      if (expectedEpoch !== undefined && expectedEpoch !== authenticationEpoch) {
+        return response;
+      }
+      await refreshAccessToken(options.signal, expectedEpoch);
       return githubFetch(path, options, false);
     }
     return response;
@@ -482,9 +532,11 @@ if (typeof importScripts === "function") {
     return true;
   }
 
-  async function resumableDeviceFlow() {
-    return withDeviceMutation(async () => {
+  async function resumableDeviceFlow(epoch) {
+    return withAuthenticationMutation(async () => {
+      if (!authenticationIsActive(epoch)) return null;
       const flow = await storedDeviceFlow();
+      if (!authenticationIsActive(epoch)) return null;
       if (isStoredDeviceFlow(flow)) {
         if (flow.expiresAt > Date.now()) return flow;
         await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
@@ -535,14 +587,20 @@ if (typeof importScripts === "function") {
     return new RpcError(502, "device_flow_failed", message);
   }
 
-  async function startDeviceAuthorizationOnce(signal) {
+  async function startDeviceAuthorizationOnce(epoch, signal) {
     const status = await authStatus(signal);
+    if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
     if (status.authenticated || status.device_flow) return status;
     const app = config();
     const flowId = randomFlowId();
-    await withDeviceMutation(() => chrome.storage.session.set({
-      [SESSION_DEVICE_FLOW]: { starting: true, flowId, startedAt: Date.now() },
-    }));
+    const started = await withAuthenticationMutation(async () => {
+      if (!authenticationIsActive(epoch)) return false;
+      await chrome.storage.session.set({
+        [SESSION_DEVICE_FLOW]: { starting: true, flowId, startedAt: Date.now() },
+      });
+      return authenticationIsActive(epoch);
+    });
+    if (!started) return anonymousAuthStatus();
     let response;
     let payload;
     try {
@@ -552,11 +610,14 @@ if (typeof importScripts === "function") {
         signal,
       ));
     } catch (error) {
-      await withDeviceMutation(() => clearDeviceFlowIfCurrent(flowId));
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+      await withAuthenticationMutation(() => clearDeviceFlowIfCurrent(flowId));
       throw error;
     }
+    if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
     if (!response.ok || payload.error) {
-      await withDeviceMutation(() => clearDeviceFlowIfCurrent(flowId));
+      await withAuthenticationMutation(() => clearDeviceFlowIfCurrent(flowId));
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       throw deviceFlowError(
         payload.error,
         payload.error_description || `GitHub device authorization failed with HTTP ${response.status}.`,
@@ -571,7 +632,8 @@ if (typeof importScripts === "function") {
       !/^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/u.test(payload.user_code) ||
       expiresIn === 0
     ) {
-      await withDeviceMutation(() => clearDeviceFlowIfCurrent(flowId));
+      await withAuthenticationMutation(() => clearDeviceFlowIfCurrent(flowId));
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       throw new RpcError(502, "invalid_github_response", "GitHub returned an invalid device authorization response.");
     }
     const now = Date.now();
@@ -583,27 +645,45 @@ if (typeof importScripts === "function") {
       intervalSeconds,
       nextPollAt: now + intervalSeconds * 1000,
     };
-    const installed = await withDeviceMutation(async () => {
+    const installed = await withAuthenticationMutation(async () => {
+      if (!authenticationIsActive(epoch)) return "stale";
       const current = await storedDeviceFlow();
-      if (!isStartingDeviceFlow(current) || current.flowId !== flowId) return false;
+      if (!authenticationIsActive(epoch)) return "stale";
+      if (!isStartingDeviceFlow(current) || current.flowId !== flowId) return "replaced";
       await chrome.storage.session.set({ [SESSION_DEVICE_FLOW]: flow });
-      return true;
+      return authenticationIsActive(epoch) ? "installed" : "stale";
     });
-    if (!installed) {
+    if (installed === "stale") return anonymousAuthStatus();
+    if (installed === "replaced") {
       throw new RpcError(409, "device_flow_replaced", "A newer GitHub device authorization replaced this request.");
     }
     return authForProtocol(false, null, app.installUrl, flow);
   }
 
   function startDeviceAuthorization(signal) {
-    if (deviceStartPromise) return deviceStartPromise;
-    const pending = startDeviceAuthorizationOnce(signal);
-    deviceStartPromise = pending;
+    const epoch = authenticationEpoch;
+    if (deviceStartRequest?.epoch === epoch) {
+      return waitForSharedPromise(deviceStartRequest.promise, signal);
+    }
+    const controller = new AbortController();
+    const pending = (async () => {
+      try {
+        const cleanup = authenticationCleanupPromise;
+        if (cleanup) await cleanup;
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+        return await startDeviceAuthorizationOnce(epoch, controller.signal);
+      } catch (error) {
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+        throw error;
+      }
+    })();
+    const request = { epoch, controller, promise: pending };
+    deviceStartRequest = request;
     const clear = () => {
-      if (deviceStartPromise === pending) deviceStartPromise = undefined;
+      if (deviceStartRequest === request) deviceStartRequest = undefined;
     };
     pending.then(clear, clear);
-    return pending;
+    return waitForSharedPromise(pending, signal);
   }
 
   async function githubUserWithToken(token, signal) {
@@ -619,9 +699,11 @@ if (typeof importScripts === "function") {
     return response.json();
   }
 
-  async function pendingDeviceStatus(flowId, payload, slowDown) {
-    return withDeviceMutation(async () => {
+  async function pendingDeviceStatus(flowId, payload, slowDown, epoch) {
+    return withAuthenticationMutation(async () => {
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       const flow = await storedDeviceFlow();
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       if (!isStoredDeviceFlow(flow) || flow.flowId !== flowId) {
         throw new RpcError(409, "device_flow_replaced", "This GitHub device authorization is no longer active.");
       }
@@ -641,14 +723,17 @@ if (typeof importScripts === "function") {
           : Math.max(flow.nextPollAt, Date.now()),
       };
       await chrome.storage.session.set({ [SESSION_DEVICE_FLOW]: updated });
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       return authForProtocol(false, null, config().installUrl, updated);
     });
   }
 
-  async function pollDeviceAuthorizationOnce(flowId, signal) {
+  async function pollDeviceAuthorizationOnce(flowId, signal, epoch) {
     const app = config();
-    const reservation = await withDeviceMutation(async () => {
+    const reservation = await withAuthenticationMutation(async () => {
+      if (!authenticationIsActive(epoch)) return { stale: true };
       const flow = await storedDeviceFlow();
+      if (!authenticationIsActive(epoch)) return { stale: true };
       if (!isStoredDeviceFlow(flow) || flow.flowId !== flowId) {
         throw new RpcError(409, "device_flow_replaced", "This GitHub device authorization is no longer active.");
       }
@@ -665,6 +750,7 @@ if (typeof importScripts === "function") {
       await chrome.storage.session.set({ [SESSION_DEVICE_FLOW]: reserved });
       return { flow: reserved, fetch: true };
     });
+    if (reservation.stale) return anonymousAuthStatus();
     if (!reservation.fetch) {
       return authForProtocol(false, null, app.installUrl, reservation.flow);
     }
@@ -677,15 +763,17 @@ if (typeof importScripts === "function") {
       },
       signal,
     );
+    if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
     if (payload.error === "authorization_pending") {
-      return pendingDeviceStatus(flowId, payload, false);
+      return pendingDeviceStatus(flowId, payload, false, epoch);
     }
     if (payload.error === "slow_down") {
-      return pendingDeviceStatus(flowId, payload, true);
+      return pendingDeviceStatus(flowId, payload, true, epoch);
     }
     if (!response.ok || payload.error) {
       if (payload.error) {
-        await withDeviceMutation(() => clearDeviceFlowIfCurrent(flowId));
+        await withAuthenticationMutation(() => clearDeviceFlowIfCurrent(flowId));
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
         throw deviceFlowError(payload.error, payload.error_description);
       }
       throw new RpcError(
@@ -695,59 +783,111 @@ if (typeof importScripts === "function") {
       );
     }
     if (typeof payload.access_token !== "string" || !payload.access_token) {
-      await withDeviceMutation(() => clearDeviceFlowIfCurrent(flowId));
+      await withAuthenticationMutation(() => clearDeviceFlowIfCurrent(flowId));
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       throw new RpcError(502, "invalid_github_response", "GitHub did not return a user access token.");
     }
     const user = await githubUserWithToken(payload.access_token, signal);
+    if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
     const loginName = typeof user.login === "string" && user.login ? user.login : null;
-    return withDeviceMutation(async () => {
-      const current = await storedDeviceFlow();
-      if (!isStoredDeviceFlow(current) || current.flowId !== flowId) {
-        throw new RpcError(409, "device_flow_replaced", "This GitHub device authorization is no longer active.");
-      }
-      await persistTokens(payload, loginName);
-      await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
-      return authForProtocol(true, loginName, app.installUrl);
-    });
+    try {
+      return await withAuthenticationMutation(async () => {
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+        const current = await storedDeviceFlow();
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+        if (!isStoredDeviceFlow(current) || current.flowId !== flowId) {
+          throw new RpcError(409, "device_flow_replaced", "This GitHub device authorization is no longer active.");
+        }
+        await persistTokensWithoutLock(payload, loginName, epoch);
+        await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+        return authForProtocol(true, loginName, app.installUrl);
+      });
+    } catch (error) {
+      if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+      throw error;
+    }
   }
 
   function pollDeviceAuthorization(flowId, signal) {
     validateFlowId(flowId);
+    const epoch = authenticationEpoch;
     const existing = devicePollPromises.get(flowId);
-    if (existing) return existing;
-    const pending = pollDeviceAuthorizationOnce(flowId, signal)
-      .finally(() => devicePollPromises.delete(flowId));
-    devicePollPromises.set(flowId, pending);
+    if (existing?.epoch === epoch) return existing.promise;
+    const pending = pollDeviceAuthorizationOnce(flowId, signal, epoch)
+      .catch(error => {
+        if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
+        throw error;
+      })
+      .finally(() => {
+        if (devicePollPromises.get(flowId)?.promise === pending) {
+          devicePollPromises.delete(flowId);
+        }
+      });
+    devicePollPromises.set(flowId, { epoch, promise: pending });
     return pending;
   }
 
   async function cancelDeviceAuthorization(flowId) {
     validateFlowId(flowId);
-    await withDeviceMutation(() => clearDeviceFlowIfCurrent(flowId));
+    await withAuthenticationMutation(() => clearDeviceFlowIfCurrent(flowId));
     return authStatus();
   }
 
   async function authStatus(signal) {
     const app = config();
-    let token;
-    try {
-      token = await accessToken(signal);
-    } catch (error) {
-      if (error?.status !== 401) throw error;
-      token = null;
+    for (;;) {
+      throwIfAborted(signal);
+      const epoch = authenticationEpoch;
+      if (authenticationClearing) return anonymousAuthStatus();
+      let token;
+      try {
+        token = await accessToken(signal, epoch);
+      } catch (error) {
+        if (epoch !== authenticationEpoch) continue;
+        if (error?.status !== 401) throw error;
+        token = null;
+      }
+      if (epoch !== authenticationEpoch) continue;
+      if (authenticationClearing) return anonymousAuthStatus();
+      if (!token) {
+        const flow = await resumableDeviceFlow(epoch);
+        if (epoch !== authenticationEpoch) continue;
+        if (authenticationClearing) return anonymousAuthStatus();
+        return authForProtocol(false, null, app.installUrl, flow);
+      }
+      const session = await chrome.storage.session.get(SESSION_LOGIN);
+      if (epoch !== authenticationEpoch) continue;
+      if (authenticationClearing) return anonymousAuthStatus();
+      let loginName = session[SESSION_LOGIN] || null;
+      if (!loginName) {
+        let user;
+        try {
+          user = await githubJson("/user", {
+            signal,
+            authenticationEpoch: epoch,
+          });
+        } catch (error) {
+          if (epoch !== authenticationEpoch) continue;
+          throw error;
+        }
+        if (epoch !== authenticationEpoch) continue;
+        if (authenticationClearing) return anonymousAuthStatus();
+        loginName = typeof user.login === "string" ? user.login : null;
+        if (loginName) {
+          const stored = await withAuthenticationMutation(async () => {
+            if (!authenticationIsActive(epoch)) return false;
+            await chrome.storage.session.set({ [SESSION_LOGIN]: loginName });
+            return authenticationIsActive(epoch);
+          });
+          if (epoch !== authenticationEpoch) continue;
+          if (!stored || authenticationClearing) return anonymousAuthStatus();
+        }
+      }
+      if (epoch !== authenticationEpoch) continue;
+      if (authenticationClearing) return anonymousAuthStatus();
+      return authForProtocol(true, loginName, app.installUrl);
     }
-    if (!token) {
-      const flow = await resumableDeviceFlow();
-      return authForProtocol(false, null, app.installUrl, flow);
-    }
-    const session = await chrome.storage.session.get(SESSION_LOGIN);
-    let loginName = session[SESSION_LOGIN] || null;
-    if (!loginName) {
-      const user = await githubJson("/user", { signal });
-      loginName = typeof user.login === "string" ? user.login : null;
-      if (loginName) await chrome.storage.session.set({ [SESSION_LOGIN]: loginName });
-    }
-    return authForProtocol(true, loginName, app.installUrl);
   }
 
   function bytesToBase64(bytes) {

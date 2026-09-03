@@ -1643,6 +1643,41 @@ test "reactivation login retries a private repository load" {
 }
 
 ///|
+test "reactivation login restarts an anonymous load and ignores its late failure" {
+  let reference = pull_reference("upstream", "private-project", "17")
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let model = device_auth_test_model(
+    Anonymous(None),
+    LoadingPullMetadata(reference~, attempt=0),
+    Some(reference),
+  )
+  let old_generation = model.generation
+  let (restarted, _) = update_auth(
+    model,
+    ReactivationAuthStatusLoaded(
+      old_generation,
+      reference,
+      Ok(signed_in_api_status("cross-tab-user")),
+    ),
+    emit,
+  )
+  assert_eq(restarted.generation, old_generation + 1)
+  assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(restarted.review.auth is SignedIn(Some("cross-tab-user")))
+
+  let (after_late_failure, _) = update_load(
+    restarted,
+    PullMetadataLoaded(
+      old_generation,
+      0,
+      Err(GitHubRequestError::GitHubRequestError("late anonymous 404")),
+    ),
+    emit,
+  )
+  assert_true(after_late_failure == restarted)
+}
+
+///|
 test "device code copy feedback and cancellation stay scoped to the current flow" {
   let flow_id = "flow-copy"
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
@@ -1753,6 +1788,38 @@ test "device sign-in retries a private repository load" {
   assert_eq(retried.generation, 6)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
   assert_true(retried.review.auth is SignedIn(Some("reviewer")))
+}
+
+///|
+test "device sign-in restarts an anonymous load and ignores its late failure" {
+  let reference = pull_reference("upstream", "private-project", "17")
+  let flow_id = "flow-loading-private"
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let model = device_auth_test_model(
+    auth_status_from_api(device_api_status(flow_id)),
+    LoadingPullMetadata(reference~, attempt=0),
+    Some(reference),
+  )
+  let old_generation = model.generation
+  let (restarted, _) = update_auth(
+    model,
+    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("reviewer"))),
+    emit,
+  )
+  assert_eq(restarted.generation, old_generation + 1)
+  assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(restarted.review.auth is SignedIn(Some("reviewer")))
+
+  let (after_late_failure, _) = update_load(
+    restarted,
+    PullMetadataLoaded(
+      old_generation,
+      0,
+      Err(GitHubRequestError::GitHubRequestError("late anonymous 404")),
+    ),
+    emit,
+  )
+  assert_true(after_late_failure == restarted)
 }
 
 ///|
