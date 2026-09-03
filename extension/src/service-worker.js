@@ -51,6 +51,10 @@ if (typeof importScripts === "function") {
   const controllers = new Map();
   const devicePollPromises = new Map();
   let refreshPromise;
+  let refreshController;
+  let authenticationCleanupPromise;
+  let authenticationClearing = false;
+  let deviceStartPromise;
   let deviceMutation = Promise.resolve();
 
   function config() {
@@ -193,17 +197,36 @@ if (typeof importScripts === "function") {
   }
 
   async function clearAuthentication() {
-    await withDeviceMutation(async () => {
-      await Promise.all([
-        clearCredentials(),
-        chrome.storage.session.remove(SESSION_DEVICE_FLOW),
-      ]);
-    });
+    if (authenticationCleanupPromise) return authenticationCleanupPromise;
+    authenticationClearing = true;
+    const cleanup = (async () => {
+      const activeRefresh = refreshPromise;
+      refreshController?.abort();
+      if (activeRefresh) await activeRefresh.catch(() => {});
+      await withDeviceMutation(async () => {
+        await Promise.all([
+          clearCredentials(),
+          chrome.storage.session.remove(SESSION_DEVICE_FLOW),
+        ]);
+      });
+    })();
+    authenticationCleanupPromise = cleanup;
+    try {
+      await cleanup;
+    } finally {
+      if (authenticationCleanupPromise === cleanup) {
+        authenticationCleanupPromise = undefined;
+        authenticationClearing = false;
+      }
+    }
   }
 
   async function persistTokens(payload, login) {
     if (typeof payload.access_token !== "string" || !payload.access_token) {
       throw new RpcError(502, "oauth_exchange_failed", payload.error_description || payload.error || "GitHub did not return an access token.");
+    }
+    if (authenticationClearing) {
+      throw new RpcError(401, "authentication_required", "Sign in with GitHub to continue.");
     }
     const now = Date.now();
     const session = {
@@ -246,9 +269,38 @@ if (typeof importScripts === "function") {
     return payload;
   }
 
-  async function refreshAccessToken(signal) {
-    if (refreshPromise) return refreshPromise;
-    refreshPromise = (async () => {
+  function abortError(signal) {
+    if (signal?.reason?.name === "AbortError") return signal.reason;
+    return new DOMException("The request was cancelled.", "AbortError");
+  }
+
+  function throwIfAborted(signal) {
+    if (signal?.aborted) throw abortError(signal);
+  }
+
+  function waitForSharedPromise(promise, signal) {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(abortError(signal));
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        callback(value);
+      };
+      const onAbort = () => finish(reject, abortError(signal));
+      signal.addEventListener("abort", onAbort, { once: true });
+      promise.then(
+        value => finish(resolve, value),
+        error => finish(reject, error),
+      );
+    });
+  }
+
+  function beginAccessTokenRefresh() {
+    const controller = new AbortController();
+    const pending = (async () => {
       const local = await chrome.storage.local.get([LOCAL_REFRESH, LOCAL_REFRESH_EXPIRES]);
       const token = local[LOCAL_REFRESH];
       if (!token || Number(local[LOCAL_REFRESH_EXPIRES] || 0) <= Date.now()) {
@@ -260,19 +312,35 @@ if (typeof importScripts === "function") {
         client_id: app.clientId,
         grant_type: "refresh_token",
         refresh_token: token,
-      }, signal);
+      }, controller.signal);
       await persistTokens(payload);
       return payload.access_token;
     })();
-    try {
-      return await refreshPromise;
-    } finally {
-      refreshPromise = undefined;
+    refreshController = controller;
+    refreshPromise = pending;
+    const clear = () => {
+      if (refreshPromise === pending) {
+        refreshPromise = undefined;
+        refreshController = undefined;
+      }
+    };
+    pending.then(clear, clear);
+    return pending;
+  }
+
+  async function refreshAccessToken(signal) {
+    throwIfAborted(signal);
+    if (authenticationClearing) {
+      throw new RpcError(401, "authentication_required", "Sign in with GitHub to continue.");
     }
+    return waitForSharedPromise(refreshPromise || beginAccessTokenRefresh(), signal);
   }
 
   async function accessToken(signal) {
+    throwIfAborted(signal);
+    if (authenticationClearing) return null;
     const session = await chrome.storage.session.get([SESSION_ACCESS, SESSION_EXPIRES]);
+    throwIfAborted(signal);
     if (session[SESSION_ACCESS] && Number(session[SESSION_EXPIRES] || 0) > Date.now() + 30_000) {
       return session[SESSION_ACCESS];
     }
@@ -822,6 +890,17 @@ if (typeof importScripts === "function") {
     }
   }
 
+  function requestControllerKey(sender, requestId) {
+    if (typeof sender?.documentId === "string" && sender.documentId) {
+      return `document:${sender.documentId}:${requestId}`;
+    }
+    const tabId = sender?.tab?.id;
+    if (Number.isInteger(tabId) && tabId >= 0) {
+      return `tab:${tabId}:${requestId}`;
+    }
+    throw new RpcError(400, "invalid_sender", "The RPC sender cannot be associated with a browser document.");
+  }
+
   async function openReview(sender, route) {
     if (!isGitHubSender(sender)) {
       throw new RpcError(403, "untrusted_sender", "Only GitHub pages may open a Moondiff review.");
@@ -900,7 +979,8 @@ if (typeof importScripts === "function") {
     }
     if (message.op === "request.cancel") {
       exactKeys(message.args || {}, ["requestId"]);
-      controllers.get(message.args.requestId)?.abort();
+      const controllerKey = requestControllerKey(sender, message.args.requestId);
+      controllers.get(controllerKey)?.abort();
       return { cancelled: true };
     }
     if (message.op === "auth.status") {
@@ -926,11 +1006,14 @@ if (typeof importScripts === "function") {
     }
     const requestId = message.requestId || null;
     const controller = new AbortController();
-    if (requestId) controllers.set(requestId, controller);
+    const controllerKey = requestId ? requestControllerKey(sender, requestId) : null;
+    if (controllerKey) controllers.set(controllerKey, controller);
     try {
       return await dispatchGithub(message.op, message.args, controller.signal);
     } finally {
-      if (requestId) controllers.delete(requestId);
+      if (controllerKey && controllers.get(controllerKey) === controller) {
+        controllers.delete(controllerKey);
+      }
     }
   }
 

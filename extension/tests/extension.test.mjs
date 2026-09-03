@@ -86,6 +86,8 @@ const Target = globalThis.MoondiffTarget;
 const Worker = globalThis.MoondiffWorker;
 const reviewSender = {
   url: `${chrome.runtime.getURL("review.html")}#/acme/widgets/pull/7`,
+  documentId: "review-document",
+  tab: { id: 91, windowId: 6 },
 };
 const authenticationKeys = [
   "github_access_token",
@@ -724,6 +726,178 @@ test("an authenticated 401 refreshes and retries exactly once", async t => {
   assert.equal(tokenCalls, 1);
 });
 
+test("cancelling one document during initial token refresh does not abort the shared refresh", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await local.set({
+    github_refresh_token: "refresh-shared",
+    github_refresh_expires_at: Date.now() + 60_000,
+  });
+  const refreshStarted = deferred();
+  const refreshResponse = deferred();
+  let refreshSignal;
+  let refreshCalls = 0;
+  const apiCalls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url === "https://github.com/login/oauth/access_token") {
+      refreshCalls += 1;
+      refreshSignal = init.signal;
+      refreshStarted.resolve();
+      return refreshResponse.promise;
+    }
+    apiCalls.push({ url, authorization: new Headers(init.headers).get("authorization") });
+    return Response.json({ number: Number(url.split("/").at(-1)) });
+  };
+  const leftSender = { ...reviewSender, documentId: "refresh-left" };
+  const rightSender = { ...reviewSender, documentId: "refresh-right" };
+  const request = number => ({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number },
+    requestId: "initial_refresh",
+  });
+  const left = Worker.handleMessage(request("7"), leftSender);
+  const leftOutcome = left.catch(error => error);
+  const right = Worker.handleMessage(request("8"), rightSender);
+  await waitForTestSignal(refreshStarted.promise, "the initial shared refresh");
+  await Worker.handleMessage({
+    v: 1,
+    op: "request.cancel",
+    args: { requestId: "initial_refresh" },
+  }, leftSender);
+  assert.equal((await leftOutcome).name, "AbortError");
+  assert.equal(refreshSignal.aborted, false);
+  refreshResponse.resolve(Response.json({
+    access_token: "access-shared",
+    expires_in: 3600,
+    refresh_token: "refresh-rotated",
+    refresh_token_expires_in: 7200,
+  }));
+  assert.deepEqual(await right, { number: 8 });
+  assert.equal(refreshCalls, 1);
+  assert.deepEqual(apiCalls, [{
+    url: "https://api.github.com/repos/acme/widgets/pulls/8",
+    authorization: "Bearer access-shared",
+  }]);
+});
+
+test("cancelling one document during a 401 retry does not abort the shared refresh", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await session.set({
+    github_access_token: "access-stale",
+    github_access_expires_at: Date.now() + 60_000,
+  });
+  await local.set({
+    github_refresh_token: "refresh-shared",
+    github_refresh_expires_at: Date.now() + 60_000,
+  });
+  const bothRejected = deferred();
+  const refreshStarted = deferred();
+  const refreshResponse = deferred();
+  let staleCalls = 0;
+  let refreshCalls = 0;
+  let refreshSignal;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url === "https://github.com/login/oauth/access_token") {
+      refreshCalls += 1;
+      refreshSignal = init.signal;
+      refreshStarted.resolve();
+      return refreshResponse.promise;
+    }
+    const authorization = new Headers(init.headers).get("authorization");
+    if (authorization === "Bearer access-stale") {
+      staleCalls += 1;
+      if (staleCalls === 2) bothRejected.resolve();
+      return Response.json(
+        { message: "Bad credentials" },
+        { status: 401, statusText: "Unauthorized" },
+      );
+    }
+    return Response.json({ number: Number(url.split("/").at(-1)) });
+  };
+  const leftSender = { ...reviewSender, documentId: "retry-left" };
+  const rightSender = { ...reviewSender, documentId: "retry-right" };
+  const request = number => ({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number },
+    requestId: "retry_refresh",
+  });
+  const left = Worker.handleMessage(request("7"), leftSender);
+  const leftOutcome = left.catch(error => error);
+  const right = Worker.handleMessage(request("8"), rightSender);
+  await waitForTestSignal(bothRejected.promise, "both stale-token requests");
+  await waitForTestSignal(refreshStarted.promise, "the shared 401 refresh");
+  await Worker.handleMessage({
+    v: 1,
+    op: "request.cancel",
+    args: { requestId: "retry_refresh" },
+  }, leftSender);
+  assert.equal((await leftOutcome).name, "AbortError");
+  assert.equal(refreshSignal.aborted, false);
+  refreshResponse.resolve(Response.json({
+    access_token: "access-after-401",
+    expires_in: 3600,
+    refresh_token: "refresh-after-401",
+    refresh_token_expires_in: 7200,
+  }));
+  assert.deepEqual(await right, { number: 8 });
+  assert.equal(refreshCalls, 1);
+});
+
+test("logout aborts and drains a shared refresh before clearing credentials", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await local.set({
+    github_refresh_token: "refresh-before-logout",
+    github_refresh_expires_at: Date.now() + 60_000,
+  });
+  const refreshStarted = deferred();
+  const refreshResponse = deferred();
+  let refreshSignal;
+  globalThis.fetch = async (input, init = {}) => {
+    if (String(input) === "https://github.com/login/oauth/access_token") {
+      refreshSignal = init.signal;
+      refreshStarted.resolve();
+      // Deliberately ignore abort so the test covers a late response.
+      return refreshResponse.promise;
+    }
+    throw new Error("the GitHub request must not continue after logout");
+  };
+  const pending = Worker.handleMessage({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number: "7" },
+    requestId: "logout_refresh",
+  }, reviewSender);
+  const pendingOutcome = pending.catch(error => error);
+  await waitForTestSignal(refreshStarted.promise, "the refresh being logged out");
+  const logout = Worker.handleMessage(
+    { v: 1, op: "auth.logout", args: {} },
+    reviewSender,
+  );
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(refreshSignal.aborted, true);
+  refreshResponse.resolve(Response.json({
+    access_token: "late-access",
+    expires_in: 3600,
+    refresh_token: "late-refresh",
+    refresh_token_expires_in: 7200,
+  }));
+  assert.deepEqual(await logout, {
+    authenticated: false,
+    install_url: "https://github.com/apps/moondiff-test/installations/new",
+  });
+  const refreshError = await pendingOutcome;
+  assert.equal(refreshError.code, "authentication_required");
+  assert.equal(session.values.github_access_token, undefined);
+  assert.equal(session.values.github_login, undefined);
+  assert.equal(local.values.github_refresh_token, undefined);
+});
+
 test("Contents API enforces the one MiB limit before returning base64", async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -750,18 +924,119 @@ test("request.cancel aborts an in-flight GitHub operation", async t => {
     }
     signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
   });
+  const tabOnlySender = { url: reviewSender.url, tab: reviewSender.tab };
   const pending = Worker.handleMessage({
     v: 1,
     op: "github.pull.get",
     args: { owner: "acme", repo: "widgets", number: "7" },
     requestId: "generation_7",
-  }, reviewSender);
+  }, tabOnlySender);
   await Worker.handleMessage({
     v: 1,
     op: "request.cancel",
     args: { requestId: "generation_7" },
-  }, reviewSender);
+  }, tabOnlySender);
   await assert.rejects(pending, error => error.name === "AbortError");
+});
+
+test("request.cancel only aborts a matching request from the same document", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await session.remove(["github_access_token", "github_access_expires_at"]);
+  await local.remove(["github_refresh_token", "github_refresh_expires_at"]);
+  const fetches = new Map();
+  const bothStarted = deferred();
+  globalThis.fetch = async (input, { signal } = {}) => new Promise((resolve, reject) => {
+    const entry = { resolve, signal };
+    fetches.set(String(input), entry);
+    if (fetches.size === 2) bothStarted.resolve();
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener(
+      "abort",
+      () => reject(new DOMException("Aborted", "AbortError")),
+      { once: true },
+    );
+  });
+  const leftSender = { ...reviewSender, documentId: "document-left" };
+  const rightSender = { ...reviewSender, documentId: "document-right" };
+  const left = Worker.handleMessage({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number: "7" },
+    requestId: "shared_request",
+  }, leftSender);
+  const leftOutcome = left.catch(error => error);
+  const right = Worker.handleMessage({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number: "8" },
+    requestId: "shared_request",
+  }, rightSender);
+  await waitForTestSignal(bothStarted.promise, "both isolated requests to start");
+
+  await Worker.handleMessage({
+    v: 1,
+    op: "request.cancel",
+    args: { requestId: "shared_request" },
+  }, leftSender);
+  await waitForTestSignal(leftOutcome, "the isolated left request to abort");
+  const leftError = await leftOutcome;
+  assert.equal(leftError.name, "AbortError");
+  const rightFetch = fetches.get("https://api.github.com/repos/acme/widgets/pulls/8");
+  assert.equal(rightFetch.signal.aborted, false);
+  rightFetch.resolve(Response.json({ number: 8 }));
+  assert.deepEqual(await right, { number: 8 });
+});
+
+test("finishing an older reused request id does not remove the current controller", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await session.remove(["github_access_token", "github_access_expires_at"]);
+  await local.remove(["github_refresh_token", "github_refresh_expires_at"]);
+  const fetches = new Map();
+  const bothStarted = deferred();
+  globalThis.fetch = async (input, { signal } = {}) => new Promise((resolve, reject) => {
+    const entry = { resolve, signal };
+    fetches.set(String(input), entry);
+    if (fetches.size === 2) bothStarted.resolve();
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener(
+      "abort",
+      () => reject(new DOMException("Aborted", "AbortError")),
+      { once: true },
+    );
+  });
+  const first = Worker.handleMessage({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number: "7" },
+    requestId: "reused_request",
+  }, reviewSender);
+  const second = Worker.handleMessage({
+    v: 1,
+    op: "github.pull.get",
+    args: { owner: "acme", repo: "widgets", number: "8" },
+    requestId: "reused_request",
+  }, reviewSender);
+  const secondOutcome = second.catch(error => error);
+  await waitForTestSignal(bothStarted.promise, "both reused-id requests to start");
+
+  fetches.get("https://api.github.com/repos/acme/widgets/pulls/7")
+    .resolve(Response.json({ number: 7 }));
+  assert.deepEqual(await first, { number: 7 });
+  await Worker.handleMessage({
+    v: 1,
+    op: "request.cancel",
+    args: { requestId: "reused_request" },
+  }, reviewSender);
+  await waitForTestSignal(secondOutcome, "the current reused-id request to abort");
+  assert.equal((await secondOutcome).name, "AbortError");
 });
 
 test("comment RPC normalizes GitHub ids and nullable fields for MoonBit", () => {
