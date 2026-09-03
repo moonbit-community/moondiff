@@ -41,6 +41,7 @@ fn node_has_type_atoms(kind : @cst.NodeKind) -> Bool {
     | @cst.Name_ConstrId
     | @cst.Expr_Constr
     | @cst.Pattern_Constr
+    | @cst.Pattern_ConstrAny
     | @cst.Pattern_SpecialConstr => true
     _ => false
   })
