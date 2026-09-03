@@ -99,6 +99,42 @@ test "default and explicit AST modes are identical" {
 }
 
 ///|
+test "parser 0.3.19 syntax stays on the structural pipeline" {
+  let old_source =
+    #|fn modern(value : Error) nocancel {
+    #|  errdefer old_cleanup()
+    #|  match value {
+    #|    &@pkg.T::_ => lexmatch "a" { re"a" => old_value(); _ => 0 }
+    #|    _ => 0
+    #|  }
+    #|}
+  let new_source =
+    #|fn modern(value : Error) nocancel {
+    #|  errdefer new_cleanup()
+    #|  match value {
+    #|    &@pkg.T::_ => lexmatch "a" { re"a" => new_value(); _ => 0 }
+    #|    _ => 0
+    #|  }
+    #|}
+  let result = @mbtdiff.diff(old_source, new_source)
+  assert_true(result.status() is Changed)
+  assert_true(result.document() is TopLevel(_))
+  assert_true(public_fallbacks(result.document()).is_empty())
+  assert_true(
+    public_document_has_changed_segment_containing(
+      result.document(),
+      "new_cleanup",
+    ),
+  )
+  assert_true(
+    public_document_has_changed_segment_containing(
+      result.document(),
+      "new_value",
+    ),
+  )
+}
+
+///|
 test "top-level sections preserve both source orders and local ranges" {
   let result = @mbtdiff.diff(
     "fn first() { old_value() }\nfn removed() {}", "fn inserted() {}\nfn first() { new_value() }",
