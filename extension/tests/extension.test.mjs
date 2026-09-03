@@ -161,6 +161,7 @@ test("target parser covers GitHub SPA route variants without broadening hosts", 
     "http://github.com/acme/widgets/pull/17",
     "https://evil.example/acme/widgets/pull/17",
     "https://github.com/acme/widgets/pull/0",
+    "https://github.com/acme/widgets/pull/017",
     "https://github.com/acme%2Fescape/widgets/commit/abcdef1",
     "https://github.com/acme/widgets/compare/abcdef1...abcdef2",
   ]) assert.equal(Target.parseGitHubTarget(value), null, value);
@@ -193,7 +194,7 @@ test("target hashes strictly round-trip commit, pull, and pull-commit routes", (
   assert.equal(Target.targetHash({ owner: "acme", repo: "widgets", kind: "pull", number: "0" }), "");
 });
 
-test("review.open trusts sender.url and creates a fresh tab with its opener", async () => {
+test("review.open uses the explicit route and only trusts sender.url as the GitHub origin", async () => {
   assert.equal(Worker.RPC_OPERATIONS.has("auth.login"), false);
   assert.equal(Worker.RPC_OPERATIONS.has("panel.open"), false);
   assert.equal(Worker.RPC_OPERATIONS.has("target.current"), false);
@@ -202,17 +203,21 @@ test("review.open trusts sender.url and creates a fresh tab with its opener", as
   assert.equal(Worker.RPC_OPERATIONS.has("auth.device.poll"), true);
   assert.equal(Worker.RPC_OPERATIONS.has("auth.device.cancel"), true);
   const sender = {
-    tab: { id: 44, windowId: 6, url: "https://evil.example/ignored" },
-    url: "https://github.com/acme/widgets/pull/9/files",
+    tab: { id: 44, windowId: 6, url: "https://github.com/acme/widgets/pull/8" },
+    url: "https://github.com/acme/widgets/pull/7/files",
   };
   for (let click = 0; click < 2; click += 1) {
-    const target = await Worker.handleMessage({ v: 1, op: "review.open" }, sender);
-    assert.deepEqual(target, { owner: "acme", repo: "widgets", kind: "pull", number: "9" });
+    const target = await Worker.handleMessage({
+      v: 1,
+      op: "review.open",
+      args: { route: "#/acme/widgets/pull/8" },
+    }, sender);
+    assert.deepEqual(target, { owner: "acme", repo: "widgets", kind: "pull", number: "8" });
   }
   assert.equal(createdTabs.length, 2);
   for (const options of createdTabs) {
     assert.deepEqual(options, {
-      url: `${chrome.runtime.getURL("review.html")}#/acme/widgets/pull/9`,
+      url: `${chrome.runtime.getURL("review.html")}#/acme/widgets/pull/8`,
       active: true,
       windowId: 6,
       openerTabId: 44,
@@ -228,10 +233,33 @@ test("review.open trusts sender.url and creates a fresh tab with its opener", as
   await assert.rejects(
     Worker.handleMessage(
       { v: 1, op: "review.open" },
-      { tab: { id: 44, windowId: 6, url: sender.url }, url: "https://evil.example/unsupported" },
+      {
+        tab: { id: 44, windowId: 6, url: "https://github.com/acme/widgets/pull/8" },
+        url: "https://evil.example/unsupported",
+      },
     ),
-    error => error.code === "unsupported_github_page",
+    error => error.code === "invalid_arguments",
   );
+  await assert.rejects(
+    Worker.handleMessage(
+      { v: 1, op: "review.open", args: { route: "#/acme/widgets/pull/8" } },
+      {
+        tab: { id: 44, windowId: 6, url: "https://github.com/acme/widgets/pull/8" },
+        url: "https://evil.example/unsupported",
+      },
+    ),
+    error => error.code === "untrusted_sender",
+  );
+  for (const route of [
+    "#/acme/widgets/pull/017",
+    "#/acme/widgets/pull/8/files",
+    "https://github.com/acme/widgets/pull/8",
+  ]) {
+    await assert.rejects(
+      Worker.handleMessage({ v: 1, op: "review.open", args: { route } }, sender),
+      error => error.code === "unsupported_github_page",
+    );
+  }
   assert.equal(createdTabs.length, 2);
 });
 
@@ -284,7 +312,12 @@ test("comment notifications validate the route and target the review opener", as
     message: { v: 1, op: "page.comments.changed", args: { route } },
   }]);
 
-  for (const invalidRoute of ["", "#/acme/widgets/pull/0", "#/acme/widgets/pull/7/files"]) {
+  for (const invalidRoute of [
+    "",
+    "#/acme/widgets/pull/0",
+    "#/acme/widgets/pull/017",
+    "#/acme/widgets/pull/7/files",
+  ]) {
     await assert.rejects(
       Worker.handleMessage({
         v: 1,

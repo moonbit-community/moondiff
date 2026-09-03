@@ -90,7 +90,7 @@ pub fn valid_sha(sha : String) -> Bool {
 
 ///|
 pub fn valid_pull_number(number : String) -> Bool {
-  if number.length() == 0 || number == "0" {
+  if number.length() == 0 || number.get_char(0) == Some('0') {
     return false
   }
   for c in number {

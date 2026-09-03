@@ -45,11 +45,18 @@
         location.reload();
         return;
       }
+      const target = globalThis.MoondiffTarget?.parseGitHubTarget(location.href);
+      const route = globalThis.MoondiffTarget?.targetHash(target);
+      if (!route) return;
       opening = true;
       renderButton();
       (async () => {
         try {
-          await chrome.runtime.sendMessage({ v: 1, op: "review.open" });
+          await chrome.runtime.sendMessage({
+            v: 1,
+            op: "review.open",
+            args: { route },
+          });
         } catch {
           // The button becomes available again so the user can retry.
         } finally {
