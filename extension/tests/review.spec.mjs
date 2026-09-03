@@ -52,6 +52,8 @@ async function installHost(page, target = pullTarget(), options = {}) {
       headRace: false,
       metadataCalls: 0,
       commentListCalls: 0,
+      documentHidden: false,
+      documentFocused: true,
       authenticationFailureOps: [],
       issueComments: [{
         id: "10",
@@ -106,6 +108,11 @@ async function installHost(page, target = pullTarget(), options = {}) {
       }],
     };
     window.__fake = state;
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => state.documentHidden,
+    });
+    document.hasFocus = () => state.documentFocused;
 
     function saveAuth() {
       sessionStorage.setItem("moondiff-fake-auth", JSON.stringify({
@@ -301,6 +308,19 @@ async function waitForSignedInComments(page) {
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
+}
+
+async function reactivatePage(page) {
+  await page.evaluate(() => {
+    window.__fake.documentFocused = false;
+    dispatchEvent(new Event("blur"));
+    window.__fake.documentHidden = true;
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.__fake.documentHidden = false;
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.__fake.documentFocused = true;
+    dispatchEvent(new Event("focus"));
+  });
 }
 
 function newLineCommentGutter(page, line) {
@@ -502,7 +522,7 @@ for (const terminalError of ["denied", "expired"]) {
   });
 }
 
-test("login, overall comment, inline comment, reply, focus refresh, and view toggle", async ({ page }) => {
+test("login, overall comment, inline comment, reply, reactivation refresh, and view toggle", async ({ page }) => {
   await installHost(page);
   await page.goto(reviewPath());
   await expect(page.getByText("Existing inline comment")).toBeVisible();
@@ -544,9 +564,30 @@ test("login, overall comment, inline comment, reply, focus refresh, and view tog
   await page.locator(".review-thread").getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("Thread reply")).toBeVisible();
 
-  const before = await page.evaluate(() => window.__fake.commentListCalls);
-  await page.evaluate(() => dispatchEvent(new Event("focus")));
-  await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(before);
+  const before = await page.evaluate(() => ({
+    auth: window.__fake.calls.filter(call => call.op === "auth.status").length,
+    comments: window.__fake.commentListCalls,
+    callIndex: window.__fake.calls.length,
+  }));
+  await reactivatePage(page);
+  await expect.poll(() => page.evaluate(() => ({
+    auth: window.__fake.calls.filter(call => call.op === "auth.status").length,
+    comments: window.__fake.commentListCalls,
+  }))).toEqual({ auth: before.auth + 1, comments: before.comments + 1 });
+  const refreshOrder = await page.evaluate(callIndex => window.__fake.calls
+    .slice(callIndex)
+    .filter(call => call.op === "auth.status" || call.op === "github.comments.list")
+    .map(call => call.op), before.callIndex);
+  expect(refreshOrder).toEqual(["auth.status", "github.comments.list"]);
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+    dispatchEvent(new Event("focus"));
+  });
+  await page.waitForTimeout(50);
+  expect(await page.evaluate(() => ({
+    auth: window.__fake.calls.filter(call => call.op === "auth.status").length,
+    comments: window.__fake.commentListCalls,
+  }))).toEqual({ auth: before.auth + 1, comments: before.comments + 1 });
 
   const beforeManual = await page.evaluate(() => window.__fake.commentListCalls);
   await page.getByRole("button", { name: "Refresh" }).click();
@@ -614,6 +655,37 @@ test("private PR prompts for GitHub App access and retries after login", async (
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.getByText("Fork PR")).toBeVisible();
   await expect(page.getByText("Signed in as tester")).toBeVisible();
+});
+
+test("reactivation synchronizes cross-tab login and logout", async ({ page }) => {
+  await installHost(page);
+  await page.goto(reviewPath());
+  await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
+
+  await page.evaluate(() => { window.__fake.authenticated = true; });
+  await reactivatePage(page);
+  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeVisible();
+
+  await page.evaluate(() => { window.__fake.authenticated = false; });
+  await reactivatePage(page);
+  await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
+  await expect(page.getByText("Signed in as tester")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+});
+
+test("cross-tab login on reactivation reloads a private repository", async ({ page }) => {
+  await installHost(page, pullTarget(), { privateUntilAuth: true });
+  await page.goto(reviewPath());
+  await expect(page.getByText(/private repositories/u)).toBeVisible();
+  const before = await page.evaluate(() => window.__fake.calls
+    .filter(call => call.op === "github.pull.get").length);
+  await page.evaluate(() => { window.__fake.authenticated = true; });
+  await reactivatePage(page);
+  await expect(page.getByText("Fork PR")).toBeVisible();
+  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  expect(await page.evaluate(() => window.__fake.calls
+    .filter(call => call.op === "github.pull.get").length)).toBeGreaterThan(before);
 });
 
 test("PR head race preserves the draft and refreshes the snapshot without posting", async ({ page }) => {

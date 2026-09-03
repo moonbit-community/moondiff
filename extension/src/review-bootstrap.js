@@ -62,9 +62,6 @@ try {
       rpc("page.comments.changed", { route: location.hash }).catch(() => {});
     },
   });
-  addEventListener("focus", () => {
-    document.dispatchEvent(new Event("visibilitychange"));
-  });
   await import("./index.js");
 } catch (error) {
   showBootstrapError(error);

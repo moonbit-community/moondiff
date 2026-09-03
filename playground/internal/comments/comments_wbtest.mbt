@@ -65,6 +65,15 @@ test "authentication DTOs map to review auth state and preserve device copy feed
     fail("expected the same device flow to remain active")
   }
   assert_true(preserved.copy_status is DeviceCodeCopyDone)
+  guard auth_status_from_api_preserving(
+      pending,
+      DeviceCancelling({ ..device, copy_status: DeviceCodeCopyDone, }),
+    )
+    is DeviceCancelling(cancelling) else {
+    fail("expected cancellation of the same device flow to be preserved")
+  }
+  assert_eq(cancelling.flow_id, "flow-1")
+  assert_true(cancelling.copy_status is DeviceCodeCopyDone)
 }
 
 ///|

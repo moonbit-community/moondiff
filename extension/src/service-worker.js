@@ -535,7 +535,9 @@ if (typeof importScripts === "function") {
     return new RpcError(502, "device_flow_failed", message);
   }
 
-  async function startDeviceAuthorization(signal) {
+  async function startDeviceAuthorizationOnce(signal) {
+    const status = await authStatus(signal);
+    if (status.authenticated || status.device_flow) return status;
     const app = config();
     const flowId = randomFlowId();
     await withDeviceMutation(() => chrome.storage.session.set({
@@ -591,6 +593,17 @@ if (typeof importScripts === "function") {
       throw new RpcError(409, "device_flow_replaced", "A newer GitHub device authorization replaced this request.");
     }
     return authForProtocol(false, null, app.installUrl, flow);
+  }
+
+  function startDeviceAuthorization(signal) {
+    if (deviceStartPromise) return deviceStartPromise;
+    const pending = startDeviceAuthorizationOnce(signal);
+    deviceStartPromise = pending;
+    const clear = () => {
+      if (deviceStartPromise === pending) deviceStartPromise = undefined;
+    };
+    pending.then(clear, clear);
+    return pending;
   }
 
   async function githubUserWithToken(token, signal) {

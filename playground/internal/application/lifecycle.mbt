@@ -19,9 +19,7 @@ pub fn app_subscriptions(model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
   let base = if extension_host_enabled() {
     @sub.batch([
       @sub.on_url_changed(url => emit(Ui(RouteChanged(url)))),
-      @sub.on_visibility_change(hidden => {
-        emit(Review(VisibilityChanged(hidden)))
-      }),
+      page_reactivation_subscription(emit),
     ])
   } else {
     @sub.on_url_changed(url => emit(Ui(RouteChanged(url))))

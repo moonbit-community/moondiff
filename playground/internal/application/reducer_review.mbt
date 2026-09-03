@@ -2,7 +2,7 @@
 pub(all) enum ReviewMsg {
   RefreshComments
   CommentsLoaded(Int, Result[ApiCommentBundle, Error])
-  VisibilityChanged(Bool)
+  PageReactivated
   OpenOverallDraft
   OpenInlineDraft(Int, ReviewAnchor)
   OpenReplyDraft(Int64)
@@ -35,18 +35,13 @@ fn update_review(
         comments_request(reference, model.generation, emit),
       )
     }
-    VisibilityChanged(hidden) => {
-      guard !hidden &&
-        extension_host_enabled() &&
-        model.route is Some(reference) else {
+    PageReactivated => {
+      guard extension_host_enabled() && model.route is Some(reference) else {
         return (model, @rabbita.none)
       }
       (
-        with_review(
-          model,
-          review_state_with_comments(model.review, CommentsLoading),
-        ),
-        comments_request(reference, model.generation, emit),
+        model,
+        reactivation_auth_status_request(reference, model.generation, emit),
       )
     }
     CommentsLoaded(generation, result) => {
