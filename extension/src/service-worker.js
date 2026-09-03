@@ -53,6 +53,7 @@ if (typeof importScripts === "function") {
   let refreshPromise;
   let refreshController;
   let authenticationEpoch = 0;
+  let authenticationRevision = 0;
   let authenticationMutation = Promise.resolve();
   let authenticationCleanupPromise;
   let authenticationClearing = false;
@@ -183,6 +184,26 @@ if (typeof importScripts === "function") {
     return run;
   }
 
+  async function setSessionAuthentication(values) {
+    await chrome.storage.session.set(values);
+    authenticationRevision += 1;
+  }
+
+  async function removeSessionAuthentication(keys) {
+    await chrome.storage.session.remove(keys);
+    authenticationRevision += 1;
+  }
+
+  async function setLocalAuthentication(values) {
+    await chrome.storage.local.set(values);
+    authenticationRevision += 1;
+  }
+
+  async function removeLocalAuthentication(keys) {
+    await chrome.storage.local.remove(keys);
+    authenticationRevision += 1;
+  }
+
   async function configureStorageAccess() {
     await Promise.all([
       chrome.storage.session.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" }),
@@ -192,8 +213,8 @@ if (typeof importScripts === "function") {
 
   async function clearCredentials() {
     await Promise.all([
-      chrome.storage.session.remove([SESSION_ACCESS, SESSION_EXPIRES, SESSION_LOGIN]),
-      chrome.storage.local.remove([LOCAL_REFRESH, LOCAL_REFRESH_EXPIRES]),
+      removeSessionAuthentication([SESSION_ACCESS, SESSION_EXPIRES, SESSION_LOGIN]),
+      removeLocalAuthentication([LOCAL_REFRESH, LOCAL_REFRESH_EXPIRES]),
     ]);
   }
 
@@ -209,7 +230,7 @@ if (typeof importScripts === "function") {
       await withAuthenticationMutation(async () => {
         await Promise.all([
           clearCredentials(),
-          chrome.storage.session.remove(SESSION_DEVICE_FLOW),
+          removeSessionAuthentication(SESSION_DEVICE_FLOW),
         ]);
       });
     })();
@@ -247,9 +268,9 @@ if (typeof importScripts === "function") {
       [SESSION_EXPIRES]: now + Math.max(0, Number(payload.expires_in || 0)) * 1000,
     };
     if (login) session[SESSION_LOGIN] = login;
-    await chrome.storage.session.set(session);
+    await setSessionAuthentication(session);
     if (typeof payload.refresh_token === "string" && payload.refresh_token) {
-      await chrome.storage.local.set({
+      await setLocalAuthentication({
         [LOCAL_REFRESH]: payload.refresh_token,
         [LOCAL_REFRESH_EXPIRES]: now + Math.max(0, Number(payload.refresh_token_expires_in || 0)) * 1000,
       });
@@ -528,7 +549,7 @@ if (typeof importScripts === "function") {
   async function clearDeviceFlowIfCurrent(flowId) {
     const current = await storedDeviceFlow();
     if (current?.flowId !== flowId) return false;
-    await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+    await removeSessionAuthentication(SESSION_DEVICE_FLOW);
     return true;
   }
 
@@ -539,13 +560,13 @@ if (typeof importScripts === "function") {
       if (!authenticationIsActive(epoch)) return null;
       if (isStoredDeviceFlow(flow)) {
         if (flow.expiresAt > Date.now()) return flow;
-        await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+        await removeSessionAuthentication(SESSION_DEVICE_FLOW);
         return null;
       }
       if (isStartingDeviceFlow(flow) && Date.now() - flow.startedAt <= DEVICE_START_MAX_AGE_MS) {
         return null;
       }
-      if (flow) await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+      if (flow) await removeSessionAuthentication(SESSION_DEVICE_FLOW);
       return null;
     });
   }
@@ -595,7 +616,7 @@ if (typeof importScripts === "function") {
     const flowId = randomFlowId();
     const started = await withAuthenticationMutation(async () => {
       if (!authenticationIsActive(epoch)) return false;
-      await chrome.storage.session.set({
+      await setSessionAuthentication({
         [SESSION_DEVICE_FLOW]: { starting: true, flowId, startedAt: Date.now() },
       });
       return authenticationIsActive(epoch);
@@ -650,7 +671,7 @@ if (typeof importScripts === "function") {
       const current = await storedDeviceFlow();
       if (!authenticationIsActive(epoch)) return "stale";
       if (!isStartingDeviceFlow(current) || current.flowId !== flowId) return "replaced";
-      await chrome.storage.session.set({ [SESSION_DEVICE_FLOW]: flow });
+      await setSessionAuthentication({ [SESSION_DEVICE_FLOW]: flow });
       return authenticationIsActive(epoch) ? "installed" : "stale";
     });
     if (installed === "stale") return anonymousAuthStatus();
@@ -708,7 +729,7 @@ if (typeof importScripts === "function") {
         throw new RpcError(409, "device_flow_replaced", "This GitHub device authorization is no longer active.");
       }
       if (flow.expiresAt <= Date.now()) {
-        await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+        await removeSessionAuthentication(SESSION_DEVICE_FLOW);
         throw deviceFlowError("expired_token");
       }
       const reportedInterval = positiveInteger(payload.interval, 0);
@@ -722,7 +743,7 @@ if (typeof importScripts === "function") {
           ? Date.now() + intervalSeconds * 1000
           : Math.max(flow.nextPollAt, Date.now()),
       };
-      await chrome.storage.session.set({ [SESSION_DEVICE_FLOW]: updated });
+      await setSessionAuthentication({ [SESSION_DEVICE_FLOW]: updated });
       if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
       return authForProtocol(false, null, config().installUrl, updated);
     });
@@ -739,7 +760,7 @@ if (typeof importScripts === "function") {
       }
       const now = Date.now();
       if (flow.expiresAt <= now) {
-        await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+        await removeSessionAuthentication(SESSION_DEVICE_FLOW);
         throw deviceFlowError("expired_token");
       }
       if (flow.nextPollAt > now) return { flow, fetch: false };
@@ -747,7 +768,7 @@ if (typeof importScripts === "function") {
         ...flow,
         nextPollAt: now + flow.intervalSeconds * 1000,
       };
-      await chrome.storage.session.set({ [SESSION_DEVICE_FLOW]: reserved });
+      await setSessionAuthentication({ [SESSION_DEVICE_FLOW]: reserved });
       return { flow: reserved, fetch: true };
     });
     if (reservation.stale) return anonymousAuthStatus();
@@ -799,7 +820,7 @@ if (typeof importScripts === "function") {
           throw new RpcError(409, "device_flow_replaced", "This GitHub device authorization is no longer active.");
         }
         await persistTokensWithoutLock(payload, loginName, epoch);
-        await chrome.storage.session.remove(SESSION_DEVICE_FLOW);
+        await removeSessionAuthentication(SESSION_DEVICE_FLOW);
         if (!authenticationIsActive(epoch)) return anonymousAuthStatus();
         return authForProtocol(true, loginName, app.installUrl);
       });
@@ -834,31 +855,35 @@ if (typeof importScripts === "function") {
     return authStatus();
   }
 
+  function authenticationSnapshotIsCurrent(epoch, revision) {
+    return epoch === authenticationEpoch &&
+      revision === authenticationRevision &&
+      !authenticationClearing;
+  }
+
   async function authStatus(signal) {
     const app = config();
     for (;;) {
       throwIfAborted(signal);
       const epoch = authenticationEpoch;
+      const revision = authenticationRevision;
       if (authenticationClearing) return anonymousAuthStatus();
       let token;
       try {
         token = await accessToken(signal, epoch);
       } catch (error) {
-        if (epoch !== authenticationEpoch) continue;
+        if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
         if (error?.status !== 401) throw error;
         token = null;
       }
-      if (epoch !== authenticationEpoch) continue;
-      if (authenticationClearing) return anonymousAuthStatus();
+      if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
       if (!token) {
         const flow = await resumableDeviceFlow(epoch);
-        if (epoch !== authenticationEpoch) continue;
-        if (authenticationClearing) return anonymousAuthStatus();
+        if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
         return authForProtocol(false, null, app.installUrl, flow);
       }
       const session = await chrome.storage.session.get(SESSION_LOGIN);
-      if (epoch !== authenticationEpoch) continue;
-      if (authenticationClearing) return anonymousAuthStatus();
+      if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
       let loginName = session[SESSION_LOGIN] || null;
       if (!loginName) {
         let user;
@@ -868,24 +893,22 @@ if (typeof importScripts === "function") {
             authenticationEpoch: epoch,
           });
         } catch (error) {
-          if (epoch !== authenticationEpoch) continue;
+          if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
           throw error;
         }
-        if (epoch !== authenticationEpoch) continue;
-        if (authenticationClearing) return anonymousAuthStatus();
+        if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
         loginName = typeof user.login === "string" ? user.login : null;
         if (loginName) {
           const stored = await withAuthenticationMutation(async () => {
-            if (!authenticationIsActive(epoch)) return false;
-            await chrome.storage.session.set({ [SESSION_LOGIN]: loginName });
+            if (!authenticationSnapshotIsCurrent(epoch, revision)) return false;
+            await setSessionAuthentication({ [SESSION_LOGIN]: loginName });
             return authenticationIsActive(epoch);
           });
-          if (epoch !== authenticationEpoch) continue;
+          if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
           if (!stored || authenticationClearing) return anonymousAuthStatus();
         }
       }
-      if (epoch !== authenticationEpoch) continue;
-      if (authenticationClearing) return anonymousAuthStatus();
+      if (!authenticationSnapshotIsCurrent(epoch, revision)) continue;
       return authForProtocol(true, loginName, app.installUrl);
     }
   }
