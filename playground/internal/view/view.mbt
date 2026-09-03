@@ -581,6 +581,17 @@ fn fragment_has_output(fragment : @mbtdiff.DiffFragment) -> Bool {
 }
 
 ///|
+fn semantic_document_has_fallback(document : @mbtdiff.DiffDocument) -> Bool {
+  match document {
+    Whole(fragment) => !fragment.fallbacks.is_empty()
+    TopLevel(top) =>
+      top.sections.any(section => {
+        !semantic_section_fragment(section).fallbacks.is_empty()
+      })
+  }
+}
+
+///|
 fn semantic_fragment_view(
   file : ApiFile,
   file_index : Int,
@@ -726,6 +737,39 @@ fn top_level_diff_view(
 }
 
 ///|
+fn semantic_document_view(
+  file : ApiFile,
+  file_index : Int,
+  document : @mbtdiff.DiffDocument,
+  mode : ViewMode,
+  show_hunk_headers : Bool,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  match document {
+    Whole(fragment) =>
+      semantic_fragment_view(
+        file,
+        file_index,
+        None,
+        fragment,
+        None,
+        None,
+        None,
+        None,
+        mode,
+        review,
+        emit,
+        true,
+      )
+    TopLevel(top) =>
+      top_level_diff_view(
+        file, file_index, top, mode, show_hunk_headers, review, emit,
+      )
+  }
+}
+
+///|
 fn file_diff_view(
   file : FileState,
   generation : Int,
@@ -794,39 +838,39 @@ fn file_diff_view(
           }
           if algorithm is AstAlgorithm &&
             status is (Identical | NoStructuralChanges) {
-            return @html.div(class="file-message structural-empty", [
-              @html.p(
-                "No structural changes found. Switch to Lexical to view text changes.",
-              ),
-            ])
+            let structural_empty = @html.div(
+              class="file-message structural-empty",
+              [
+                @html.p(
+                  "No structural changes found. Switch to Lexical to view text changes.",
+                ),
+              ],
+            )
+            if semantic_document_has_fallback(document) {
+              return @html.fragment([
+                semantic_document_view(
+                  file.file,
+                  index,
+                  document,
+                  mode,
+                  true,
+                  review,
+                  emit,
+                ),
+                structural_empty,
+              ])
+            }
+            return structural_empty
           }
-          match document {
-            Whole(fragment) =>
-              semantic_fragment_view(
-                file.file,
-                index,
-                None,
-                fragment,
-                None,
-                None,
-                None,
-                None,
-                mode,
-                review,
-                emit,
-                true,
-              )
-            TopLevel(top) =>
-              top_level_diff_view(
-                file.file,
-                index,
-                top,
-                mode,
-                algorithm is AstAlgorithm,
-                review,
-                emit,
-              )
-          }
+          semantic_document_view(
+            file.file,
+            index,
+            document,
+            mode,
+            algorithm is AstAlgorithm,
+            review,
+            emit,
+          )
         }
       }
     }
