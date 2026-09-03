@@ -812,17 +812,30 @@ if (typeof importScripts === "function") {
     return sender.url.split("#", 1)[0] === chrome.runtime.getURL("review.html");
   }
 
-  async function openReview(sender) {
+  function isGitHubSender(sender) {
+    if (typeof sender?.url !== "string") return false;
+    try {
+      const url = new URL(sender.url);
+      return url.protocol === "https:" && url.hostname.toLowerCase() === "github.com" && !url.port;
+    } catch {
+      return false;
+    }
+  }
+
+  async function openReview(sender, route) {
+    if (!isGitHubSender(sender)) {
+      throw new RpcError(403, "untrusted_sender", "Only GitHub pages may open a Moondiff review.");
+    }
     const openerTabId = sender?.tab?.id;
     const windowId = sender?.tab?.windowId;
-    const target = root.MoondiffTarget.parseGitHubTarget(sender?.url || "");
-    const route = root.MoondiffTarget.targetHash(target);
+    const target = root.MoondiffTarget.parseTargetHash(route);
     if (
       !Number.isInteger(openerTabId) ||
       openerTabId < 0 ||
       !Number.isInteger(windowId) ||
       windowId < 0 ||
-      !route
+      !target ||
+      root.MoondiffTarget.targetHash(target) !== route
     ) {
       throw new RpcError(400, "unsupported_github_page", "This is not a supported GitHub pull request or commit page.");
     }
@@ -877,8 +890,8 @@ if (typeof importScripts === "function") {
       throw new RpcError(400, "invalid_request_id", "The RPC request id is invalid.");
     }
     if (message.op === "review.open") {
-      exactKeys(message.args || {}, []);
-      return openReview(sender);
+      const args = exactKeys(message.args || {}, ["route"]);
+      return openReview(sender, args.route);
     }
     if (!isReviewSender(sender)) throw new RpcError(403, "untrusted_sender", "Only the Moondiff review page may use this operation.");
     if (message.op === "page.comments.changed") {

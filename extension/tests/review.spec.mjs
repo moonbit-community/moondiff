@@ -1,5 +1,7 @@
-import { expect, test } from "../../playground/node_modules/@playwright/test/index.mjs";
-import { dirname, resolve } from "node:path";
+import { chromium, expect, test } from "../../playground/node_modules/@playwright/test/index.mjs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const extensionRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -727,6 +729,7 @@ test("content script activates when GitHub SPA navigation first enters a pull re
   expect(await page.evaluate(() => window.__content.messages)).toEqual([{
     v: 1,
     op: "review.open",
+    args: { route: "#/acme/widgets/pull/8/commits/abcdef1" },
   }]);
   await page.evaluate(() => window.__content.finishOpen());
   await expect(button).toBeEnabled();
@@ -744,4 +747,52 @@ test("content script activates when GitHub SPA navigation first enters a pull re
     args: { route: "#/acme/widgets/pull/8/commits/abcdef1" },
   }));
   await expect.poll(buttonText).toBe("GitHub 上有新评论，刷新查看");
+});
+
+test("loaded extension opens the current GitHub SPA route", async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), "moondiff-extension-chromium-"));
+  let context;
+  try {
+    const extensionPath = resolve(extensionRoot, "dist");
+    context = await chromium.launchPersistentContext(userDataDir, {
+      channel: "chromium",
+      headless: true,
+      args: [
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`,
+      ],
+    });
+    await context.route("https://github.com/**", route => route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>GitHub fixture</title><main>fixture</main>",
+    }));
+    await context.route("https://api.github.com/**", route => route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Not Found" }),
+    }));
+    const githubPage = context.pages()[0] || await context.newPage();
+    await githubPage.goto("https://github.com/acme/widgets/pull/7");
+    const button = githubPage.locator("#moondiff-extension-root button");
+    await expect(button).toHaveText("Open in Moondiff");
+
+    await githubPage.evaluate(() => {
+      history.pushState(null, "", "/acme/widgets/pull/8");
+      dispatchEvent(new Event("turbo:load"));
+    });
+    const openedPagePromise = context.waitForEvent("page");
+    await button.click();
+    const openedPage = await openedPagePromise;
+    await expect.poll(() => {
+      const url = new URL(openedPage.url());
+      return `${url.protocol}//${url.host}${url.pathname}${url.hash}`;
+    }).toMatch(/^chrome-extension:\/\/[^/]+\/review\.html#\/acme\/widgets\/pull\/8$/u);
+  } finally {
+    try {
+      await context?.close();
+    } finally {
+      rmSync(userDataDir, { recursive: true, force: true });
+    }
+  }
 });

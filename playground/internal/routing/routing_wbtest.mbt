@@ -79,6 +79,12 @@ test "shared playground routes round-trip to canonical GitHub commit URLs" {
   )
   assert_true(
     reference_from_playground_url(
+      "https://example.com/moondiff/#/moonbit-community/moondiff/pull/017",
+    )
+    is Err(_),
+  )
+  assert_true(
+    reference_from_playground_url(
       "https://example.com/moondiff/#/bad owner/moondiff/commit/abcdef1",
     )
     is Err(_),
@@ -94,7 +100,7 @@ test "reject unsupported or malformed URLs" {
       "https://github.com/-bad/b/commit/abcdef1", "https://github.com/a/bad%2Frepo/commit/abcdef1",
       "https://github.com/a/b/commit/abcdef", "https://github.com/a/b/pull/nope/changes/abcdef1",
       "https://github.com/a/b/pull/0/changes/abcdef1", "https://github.com/a/b/pull/nope",
-      "https://github.com/a/b/pull/0/files", "https://github.com:443/a/b/commit/abcdef1",
+      "https://github.com/a/b/pull/0/files", "https://github.com/a/b/pull/017", "https://github.com:443/a/b/commit/abcdef1",
     ] {
     assert_true(parse_change_url(url) is Err(_), msg=url)
   }
