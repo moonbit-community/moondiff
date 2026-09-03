@@ -39,10 +39,12 @@ async function installHost(page, target = pullTarget(), options = {}) {
     try {
       savedAuth = JSON.parse(sessionStorage.getItem("moondiff-fake-auth") || "{}");
     } catch {}
+    const initialLogin = options.login ?? savedAuth.login ?? "tester";
     const state = {
       target,
       calls: [],
       authenticated: options.authenticated ?? Boolean(savedAuth.authenticated),
+      login: initialLogin,
       deviceFlow: savedAuth.deviceFlow || null,
       deviceStartCalls: savedAuth.deviceStartCalls || 0,
       devicePollCalls: savedAuth.devicePollCalls || 0,
@@ -55,6 +57,9 @@ async function installHost(page, target = pullTarget(), options = {}) {
       anonymousPullDelayed: false,
       anonymousPullReleased: false,
       releaseAnonymousPull: null,
+      accountSwitchPullDelayed: false,
+      accountSwitchPullReleased: false,
+      releaseAccountSwitchPull: null,
       documentHidden: false,
       documentFocused: true,
       authenticationFailureOps: [],
@@ -120,6 +125,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
     function saveAuth() {
       sessionStorage.setItem("moondiff-fake-auth", JSON.stringify({
         authenticated: state.authenticated,
+        login: state.login,
         deviceFlow: state.deviceFlow,
         deviceStartCalls: state.deviceStartCalls,
         devicePollCalls: state.devicePollCalls,
@@ -129,7 +135,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
 
     function authStatus() {
       const status = state.authenticated
-        ? { authenticated: true, login: "tester", install_url: "https://github.com/apps/moondiff-test/installations/new" }
+        ? { authenticated: true, login: state.login, install_url: "https://github.com/apps/moondiff-test/installations/new" }
         : { authenticated: false, install_url: "https://github.com/apps/moondiff-test/installations/new" };
       if (!state.authenticated && state.deviceFlow) status.device_flow = state.deviceFlow;
       return status;
@@ -137,7 +143,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
 
     function pullMetadata() {
       return {
-        title: "Fork PR",
+        title: options.identitySpecificDiff ? `Fork PR for ${state.login}` : "Fork PR",
         html_url: "https://github.com/upstream/project/pull/17",
         base: { sha: base, repo: { full_name: "upstream/project" } },
         head: { sha: state.currentHead, repo: { full_name: "contributor/project-fork" } },
@@ -149,13 +155,16 @@ async function installHost(page, target = pullTarget(), options = {}) {
     function file() {
       const additions = options.additions ?? 1;
       const deletions = options.deletions ?? 1;
+      const identityPatch = options.identitySpecificDiff
+        ? patch.replace("+new value", `+new value for ${state.login}`)
+        : patch;
       return {
         filename: "src/main.mbt",
         status: "modified",
         additions,
         deletions,
         changes: additions + deletions,
-        patch: options.patch ?? patch,
+        patch: options.patch ?? identityPatch,
       };
     }
     function commit() {
@@ -170,7 +179,10 @@ async function installHost(page, target = pullTarget(), options = {}) {
     }
     function content(ref) {
       const oldSource = options.oldSource ?? "context\nold value\ntail";
-      const newSource = options.newSource ?? "context\nnew value\ntail";
+      const defaultNewSource = options.identitySpecificDiff
+        ? `context\nnew value for ${state.login}\ntail`
+        : "context\nnew value\ntail";
+      const newSource = options.newSource ?? defaultNewSource;
       const text = ref === mergeBase || ref === parentSha ? oldSource : newSource;
       return { base64: btoa(text), size: text.length, contentType: "text/plain" };
     }
@@ -254,6 +266,22 @@ async function installHost(page, target = pullTarget(), options = {}) {
         }
         if (options.privateUntilAuth && !state.authenticated) {
           throw Object.assign(new Error("GitHub could not find this resource. For private repositories, sign in and install the GitHub App."), { status: 404, code: "not_found_or_not_installed" });
+        }
+        if (
+          options.delayAccountSwitchPull &&
+          state.authenticated &&
+          state.login !== initialLogin &&
+          !state.accountSwitchPullDelayed
+        ) {
+          state.accountSwitchPullDelayed = true;
+          return new Promise(resolve => {
+            state.releaseAccountSwitchPull = () => {
+              state.releaseAccountSwitchPull = null;
+              state.accountSwitchPullReleased = true;
+              state.metadataCalls += 1;
+              resolve(pullMetadata());
+            };
+          });
         }
         state.metadataCalls += 1;
         if (state.headRace) {
@@ -688,6 +716,40 @@ test("reactivation synchronizes cross-tab login and logout", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
   await expect(page.getByText("Signed in as tester")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+});
+
+test("cross-tab account switch clears the old draft and diff before reloading", async ({ page }) => {
+  await installHost(page, pullTarget(), {
+    authenticated: true,
+    login: "alice",
+    identitySpecificDiff: true,
+    delayAccountSwitchPull: true,
+  });
+  await page.goto(reviewPath());
+  await expect(page.getByText("Signed in as alice")).toBeVisible();
+  await expect(page.getByText("Fork PR for alice")).toBeVisible();
+  await expect(page.getByText("new value for alice", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Add overall comment" }).click();
+  await page.locator(".comment-editor textarea").fill("Alice-only draft");
+  const pullCallsBeforeSwitch = await page.evaluate(() => window.__fake.calls
+    .filter(call => call.op === "github.pull.get").length);
+
+  await page.evaluate(() => { window.__fake.login = "bob"; });
+  await reactivatePage(page);
+  await expect.poll(() => page.evaluate(() => window.__fake.accountSwitchPullDelayed)).toBe(true);
+  await expect(page.getByText("Loading pull request metadata…")).toBeVisible();
+  await expect(page.locator(".comment-editor textarea")).toHaveCount(0);
+  await expect(page.getByText("Alice-only draft")).toHaveCount(0);
+  await expect(page.getByText("Fork PR for alice")).toHaveCount(0);
+  await expect(page.getByText("new value for alice", { exact: false })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fake.calls
+    .filter(call => call.op === "github.pull.get").length)).toBeGreaterThan(pullCallsBeforeSwitch);
+
+  await page.evaluate(() => window.__fake.releaseAccountSwitchPull());
+  await expect.poll(() => page.evaluate(() => window.__fake.accountSwitchPullReleased)).toBe(true);
+  await expect(page.getByText("Signed in as bob")).toBeVisible();
+  await expect(page.getByText("Fork PR for bob")).toBeVisible();
+  await expect(page.getByText("new value for bob", { exact: false })).toBeVisible();
 });
 
 test("cross-tab login on reactivation reloads a private repository", async ({ page }) => {
