@@ -28,14 +28,6 @@
   - [ ] Add a browser performance regression test for the unfiltered 3,000-file
     view and sequential search input.
 
-- [ ] Show fallback notices when an AST diff has no structural changes.
-  - Affected area: `playground/main/view.mbt`.
-  - [ ] Collect and display fallback metadata before returning early for
-    `Identical` or `NoStructuralChanges`, or use the shared fragment-rendering
-    path for these states.
-  - [ ] Add a view regression test for `NoStructuralChanges` with fallback
-    metadata.
-
 - [ ] Ensure real textual changes never result in empty CLI output.
   - Affected areas: `alignment/root_alignment.mbt`, `render/terminal/diff_text.mbt`, and `main.mbt`.
   - [ ] Define and implement an explicit output contract for `has_changes && rendered.is_empty()`.
