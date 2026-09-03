@@ -5,9 +5,9 @@ version = "0.0.6"
 import {
   "moonbit-community/prettyprinter@0.4.10",
   "moonbit-community/chalk@0.0.1",
-  "moonbitlang/lexer@0.3.15",
-  "moonbitlang/parser@0.3.17",
-  "moonbitlang/async@0.20.3",
+  "moonbitlang/lexer@0.3.16",
+  "moonbitlang/parser@0.3.19",
+  "moonbitlang/async@0.21.2",
 }
 
 readme = "README.md"
