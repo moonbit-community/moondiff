@@ -602,6 +602,65 @@ test("auth.status restores a live device authorization and removes an expired on
   assert.equal(session.values.github_device_flow, undefined);
 });
 
+test("auth.status reloads an anonymous snapshot after device authorization signs in", async t => {
+  const originalFetch = globalThis.fetch;
+  const originalGet = session.get;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    session.get = originalGet;
+  });
+  const flow = storedDeviceFlow("v".repeat(43), { nextPollAt: Date.now() - 1 });
+  await session.set({ github_device_flow: flow });
+  const statusReadStarted = deferred();
+  const resumeStatusRead = deferred();
+  let heldCredentialRead = false;
+  session.get = async keys => {
+    if (
+      !heldCredentialRead &&
+      Array.isArray(keys) &&
+      keys.includes("github_access_token") &&
+      keys.includes("github_access_expires_at")
+    ) {
+      heldCredentialRead = true;
+      const snapshot = await originalGet(keys);
+      statusReadStarted.resolve();
+      await resumeStatusRead.promise;
+      return snapshot;
+    }
+    return originalGet(keys);
+  };
+  globalThis.fetch = async input => {
+    if (String(input) === "https://github.com/login/oauth/access_token") {
+      return Response.json({
+        access_token: "device-access",
+        expires_in: 3600,
+      });
+    }
+    assert.equal(String(input), "https://api.github.com/user");
+    return Response.json({ login: "new-account" });
+  };
+
+  const oldStatus = Worker.handleMessage(
+    { v: 1, op: "auth.status", args: {} },
+    reviewSender,
+  );
+  await waitForTestSignal(statusReadStarted.promise, "the paused authentication status read");
+  const signedIn = await Worker.handleMessage({
+    v: 1,
+    op: "auth.device.poll",
+    args: { flow_id: flow.flowId },
+  }, reviewSender);
+  resumeStatusRead.resolve();
+
+  const expected = {
+    authenticated: true,
+    login: "new-account",
+    install_url: "https://github.com/apps/moondiff-test/installations/new",
+  };
+  assert.deepEqual(signedIn, expected);
+  assert.deepEqual(await oldStatus, expected);
+});
+
 test("a user response arriving after logout cannot restore authentication", async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
