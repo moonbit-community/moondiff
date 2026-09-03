@@ -54,13 +54,12 @@ fn update_auth(
             @rabbita.none,
           )
         Ok(status) => {
-          let was_signed_in = model.review.auth is SignedIn(_)
+          let restart_change = status.authenticated &&
+            sign_in_restarts_change_load(model)
           let (synced, poll_command) = apply_auth_status(
             model, status, true, false, emit,
           )
-          if !was_signed_in &&
-            status.authenticated &&
-            model.phase is LoadFailed(_) {
+          if restart_change {
             let (reloading, load_command) = begin_change_load(
               synced, reference, emit,
             )

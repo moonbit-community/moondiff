@@ -456,6 +456,134 @@ test("concurrent device authorization starts share one GitHub request", async t 
   assert.equal(first.device_flow.flow_id, session.values.github_device_flow.flowId);
 });
 
+test("logout invalidates a device start still checking the signed-in user", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await session.set({
+    github_access_token: "access-before-logout",
+    github_access_expires_at: Date.now() + 60_000,
+  });
+  const userRequestStarted = deferred();
+  const userResponse = deferred();
+  let userSignal;
+  let deviceCodeCalls = 0;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url === "https://api.github.com/user") {
+      userSignal = init.signal;
+      userRequestStarted.resolve();
+      // Deliberately ignore abort so the preflight can complete late.
+      return userResponse.promise;
+    }
+    if (url === "https://github.com/login/device/code") deviceCodeCalls += 1;
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const start = Worker.handleMessage(
+    { v: 1, op: "auth.device.start", args: {} },
+    reviewSender,
+  );
+  await waitForTestSignal(userRequestStarted.promise, "the device start user preflight");
+  const logout = await Worker.handleMessage(
+    { v: 1, op: "auth.logout", args: {} },
+    reviewSender,
+  );
+  assert.equal(userSignal.aborted, true);
+  userResponse.resolve(Response.json({ login: "too-late" }));
+  assert.deepEqual(await start, logout);
+  assert.equal(deviceCodeCalls, 0);
+  assert.equal(session.values.github_access_token, undefined);
+  assert.equal(session.values.github_login, undefined);
+  assert.equal(session.values.github_device_flow, undefined);
+});
+
+test("logout invalidates a late device-code response without leaving a flow", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const requestStarted = deferred();
+  const response = deferred();
+  let requestSignal;
+  globalThis.fetch = async (input, init = {}) => {
+    assert.equal(String(input), "https://github.com/login/device/code");
+    requestSignal = init.signal;
+    requestStarted.resolve();
+    // Deliberately ignore abort so the response arrives after logout.
+    return response.promise;
+  };
+  const start = Worker.handleMessage(
+    { v: 1, op: "auth.device.start", args: {} },
+    reviewSender,
+  );
+  await waitForTestSignal(requestStarted.promise, "the device-code request");
+  const logout = await Worker.handleMessage(
+    { v: 1, op: "auth.logout", args: {} },
+    reviewSender,
+  );
+  assert.equal(requestSignal.aborted, true);
+  response.resolve(Response.json({
+    device_code: "late-device-code",
+    user_code: "LATE-CODE",
+    expires_in: 900,
+    interval: 5,
+  }));
+  assert.deepEqual(await start, logout);
+  assert.equal(session.values.github_device_flow, undefined);
+});
+
+test("a device start after logout does not reuse the invalidated request", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const oldRequestStarted = deferred();
+  const oldResponse = deferred();
+  let calls = 0;
+  let oldSignal;
+  globalThis.fetch = async (input, init = {}) => {
+    assert.equal(String(input), "https://github.com/login/device/code");
+    calls += 1;
+    if (calls === 1) {
+      oldSignal = init.signal;
+      oldRequestStarted.resolve();
+      return oldResponse.promise;
+    }
+    return Response.json({
+      device_code: "new-device-code",
+      user_code: "WXYZ-1234",
+      expires_in: 900,
+      interval: 5,
+    });
+  };
+  const oldStart = Worker.handleMessage(
+    { v: 1, op: "auth.device.start", args: {} },
+    reviewSender,
+  );
+  await waitForTestSignal(oldRequestStarted.promise, "the invalidated device start");
+  await Worker.handleMessage(
+    { v: 1, op: "auth.logout", args: {} },
+    reviewSender,
+  );
+  assert.equal(oldSignal.aborted, true);
+
+  const replacement = await Worker.handleMessage(
+    { v: 1, op: "auth.device.start", args: {} },
+    reviewSender,
+  );
+  assert.equal(calls, 2);
+  assert.equal(replacement.device_flow.user_code, "WXYZ-1234");
+  const replacementFlowId = replacement.device_flow.flow_id;
+
+  oldResponse.resolve(Response.json({
+    device_code: "old-device-code",
+    user_code: "ABCD-EFGH",
+    expires_in: 900,
+    interval: 5,
+  }));
+  assert.deepEqual(await oldStart, {
+    authenticated: false,
+    install_url: "https://github.com/apps/moondiff-test/installations/new",
+  });
+  assert.equal(session.values.github_device_flow.flowId, replacementFlowId);
+  assert.equal(session.values.github_device_flow.userCode, "WXYZ-1234");
+});
+
 test("auth.status restores a live device authorization and removes an expired one", async () => {
   const live = storedDeviceFlow("b".repeat(43), {
     expiresAt: Date.now() + 125_000,
@@ -472,6 +600,36 @@ test("auth.status restores a live device authorization and removes an expired on
   const expired = await Worker.handleMessage({ v: 1, op: "auth.status", args: {} }, reviewSender);
   assert.equal(expired.device_flow, undefined);
   assert.equal(session.values.github_device_flow, undefined);
+});
+
+test("a user response arriving after logout cannot restore authentication", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  await session.set({
+    github_access_token: "access-before-logout",
+    github_access_expires_at: Date.now() + 60_000,
+  });
+  const userRequestStarted = deferred();
+  const userResponse = deferred();
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://api.github.com/user");
+    userRequestStarted.resolve();
+    return userResponse.promise;
+  };
+  const status = Worker.handleMessage(
+    { v: 1, op: "auth.status", args: {} },
+    reviewSender,
+  );
+  await waitForTestSignal(userRequestStarted.promise, "the delayed user request");
+  const logout = await Worker.handleMessage(
+    { v: 1, op: "auth.logout", args: {} },
+    reviewSender,
+  );
+  userResponse.resolve(Response.json({ login: "too-late" }));
+  assert.deepEqual(await status, logout);
+  assert.equal(session.values.github_access_token, undefined);
+  assert.equal(session.values.github_login, undefined);
+  assert.equal(local.values.github_refresh_token, undefined);
 });
 
 test("an early device poll returns the remaining wait without contacting GitHub", async t => {

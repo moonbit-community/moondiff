@@ -37,17 +37,29 @@ fn auth_snapshot_starts_device_poll(
 }
 
 ///|
+fn sign_in_restarts_change_load(model : Model) -> Bool {
+  if model.review.auth is SignedIn(_) {
+    return false
+  }
+  match model.phase {
+    Idle | Showing(_) => false
+    _ => true
+  }
+}
+
+///|
 fn finish_device_sign_in(
   model : Model,
   status : ApiAuthStatus,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
+  let restart_change = sign_in_restarts_change_load(model)
   let next = with_review(
     model,
     review_state_with_auth(model.review, auth_status_from_api(status)),
   )
   guard model.route is Some(reference) else { return (next, @rabbita.none) }
-  if model.phase is LoadFailed(_) {
+  if restart_change {
     return begin_change_load(next, reference, emit)
   }
   (
