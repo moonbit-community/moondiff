@@ -169,6 +169,7 @@ pub(all) enum DraftKind {
 
 pub(all) struct ReviewState {
   auth : AuthStatus
+  last_authenticated_login : String?
   comments : CommentsStatus
   draft : CommentDraft?
 } derive(Eq)

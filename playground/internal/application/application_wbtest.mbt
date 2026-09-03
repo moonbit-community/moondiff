@@ -1032,6 +1032,10 @@ fn review_test_model(auth : AuthStatus) -> Model {
     route: Some(view.reference),
     review: {
       auth,
+      last_authenticated_login: match auth {
+        SignedIn(login) => login
+        _ => None
+      },
       comments: CommentsReady({
         issue_comments: [],
         review_comments: [],
@@ -1204,6 +1208,7 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     file_tree: initial_file_tree_state(),
     review: {
       auth: SignedIn(Some("reviewer")),
+      last_authenticated_login: Some("reviewer"),
       comments: CommentsLoading,
       draft: Some({
         kind: InlineDraft(0, anchor),
@@ -1315,6 +1320,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     file_tree: initial_file_tree_state(),
     review: {
       auth: SignedIn(Some("reviewer")),
+      last_authenticated_login: Some("reviewer"),
       comments: CommentsReady({
         issue_comments: [],
         review_comments: [],
@@ -1444,10 +1450,21 @@ fn anonymous_api_status() -> ApiAuthStatus {
 }
 
 ///|
+fn signed_in_api_status_without_login() -> ApiAuthStatus {
+  {
+    authenticated: true,
+    login: None,
+    install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
+    device_flow: None,
+  }
+}
+
+///|
 fn device_auth_test_model(
   auth : AuthStatus,
   phase : Phase,
   route : CommitRef?,
+  last_authenticated_login? : String? = None,
 ) -> Model {
   {
     input: "",
@@ -1463,10 +1480,259 @@ fn device_auth_test_model(
     file_tree: initial_file_tree_state(),
     review: {
       auth,
+      last_authenticated_login,
       comments: CommentsFailed("private repository"),
       draft: None,
     },
   }
+}
+
+///|
+fn auth_identity_test_model(auth : AuthStatus, login : String?) -> Model {
+  let model = review_test_model(auth)
+  {
+    ..model,
+    file_tree: {
+      ..model.file_tree,
+      drawer_open: true,
+      search_open: true,
+      search_query: "main",
+      selected_file_index: Some(0),
+    },
+    review: {
+      auth,
+      last_authenticated_login: login,
+      comments: model.review.comments,
+      draft: Some({
+        kind: OverallDraft,
+        body: "account-owned draft",
+        submitting: false,
+        error: None,
+      }),
+    },
+  }
+}
+
+///|
+test "account changes and confirmed anonymity clear review state and reload" {
+  let view = review_test_view()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let alice = auth_identity_test_model(SignedIn(Some("alice")), Some("alice"))
+  let old_generation = alice.generation
+  let (bob, _) = update_auth(
+    alice,
+    ReactivationAuthStatusLoaded(
+      old_generation,
+      view.reference,
+      Ok(signed_in_api_status("bob")),
+    ),
+    emit,
+  )
+  assert_eq(bob.generation, old_generation + 1)
+  assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(bob.review.auth is SignedIn(Some("bob")))
+  assert_eq(bob.review.last_authenticated_login, Some("bob"))
+  assert_true(bob.review.comments is CommentsLoading)
+  assert_true(bob.review.draft is None)
+  assert_true(bob.file_tree == reset_file_tree_state(alice.file_tree))
+
+  let (anonymous, _) = update_auth(
+    alice,
+    ReactivationAuthStatusLoaded(
+      old_generation,
+      view.reference,
+      Ok(anonymous_api_status()),
+    ),
+    emit,
+  )
+  assert_eq(anonymous.generation, old_generation + 1)
+  assert_true(anonymous.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(anonymous.review.auth is Anonymous(_))
+  assert_true(anonymous.review.last_authenticated_login is None)
+  assert_true(anonymous.review.comments is CommentsLoading)
+  assert_true(anonymous.review.draft is None)
+  assert_true(anonymous.file_tree == reset_file_tree_state(alice.file_tree))
+}
+
+///|
+test "account boundary generation ignores old diff comment and submission responses" {
+  let view = review_test_view()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let alice = auth_identity_test_model(SignedIn(Some("alice")), Some("alice"))
+  let old_generation = alice.generation
+  let (bob, _) = update_auth(
+    alice,
+    ReactivationAuthStatusLoaded(
+      old_generation,
+      view.reference,
+      Ok(signed_in_api_status("bob")),
+    ),
+    emit,
+  )
+  let (after_diff, _) = update_load(
+    bob,
+    PullMetadataLoaded(
+      old_generation,
+      0,
+      Err(GitHubRequestError::GitHubRequestError("late Alice diff")),
+    ),
+    emit,
+  )
+  assert_true(after_diff == bob)
+  let (after_comments, _) = update_review(
+    bob,
+    CommentsLoaded(
+      old_generation,
+      Ok({ issue_comments: [], review_comments: [], commit_comments: [], }),
+    ),
+    emit,
+  )
+  assert_true(after_comments == bob)
+  let bob_with_comments = with_review(
+    bob,
+    review_state_with_comments(
+      bob.review,
+      CommentsReady({
+        issue_comments: [],
+        review_comments: [],
+        commit_comments: [],
+      }),
+    ),
+  )
+  let late_comment = ApiIssueComment::{
+    id: Int64::from_int(42),
+    body: "late Alice comment",
+    html_url: "https://github.com/upstream/project/issues/17#issuecomment-42",
+    created_at: "2026-09-03T08:00:00Z",
+    user: Some({ login: "alice", }),
+  }
+  let (after_submission, _) = update_review(
+    bob_with_comments,
+    IssueCommentCreated(old_generation, Ok(late_comment)),
+    emit,
+  )
+  assert_true(after_submission == bob_with_comments)
+}
+
+///|
+test "same-account device recovery preserves drafts while another account clears them" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let failed = auth_identity_test_model(
+    AuthFailed("Your GitHub session expired."),
+    Some("alice"),
+  )
+  let checking = with_review(
+    failed,
+    review_state_with_auth(failed.review, AuthChecking),
+  )
+  assert_true(checking.review.auth is AuthChecking)
+  assert_eq(checking.review.last_authenticated_login, Some("alice"))
+  assert_true(checking.review.draft == failed.review.draft)
+  let flow_id = "flow-recovery"
+  let (pending, _) = update_auth(
+    checking,
+    DeviceAuthorizationStarted(Ok(device_api_status(flow_id))),
+    emit,
+  )
+  assert_eq(pending.review.last_authenticated_login, Some("alice"))
+  assert_true(pending.review.draft == failed.review.draft)
+
+  let (alice, _) = update_auth(
+    pending,
+    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("alice"))),
+    emit,
+  )
+  assert_eq(alice.generation, failed.generation)
+  assert_true(alice.phase is Showing(_))
+  assert_true(alice.review.auth is SignedIn(Some("alice")))
+  assert_eq(alice.review.last_authenticated_login, Some("alice"))
+  assert_true(alice.review.draft == failed.review.draft)
+
+  let retrying = { ..failed, phase: LoadFailed("private repository"), }
+  let (retried, _) = update_auth(
+    retrying,
+    DeviceAuthorizationStarted(Ok(signed_in_api_status("alice"))),
+    emit,
+  )
+  assert_eq(retried.generation, retrying.generation + 1)
+  assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(retried.review.draft == failed.review.draft)
+
+  let (bob, _) = update_auth(
+    pending,
+    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("bob"))),
+    emit,
+  )
+  assert_eq(bob.generation, failed.generation + 1)
+  assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(bob.review.auth is SignedIn(Some("bob")))
+  assert_eq(bob.review.last_authenticated_login, Some("bob"))
+  assert_true(bob.review.draft is None)
+
+  guard pending.review.auth is DeviceAuthorizing(device) else {
+    fail("expected a pending device authorization")
+  }
+  let cancelling = with_review(
+    pending,
+    review_state_with_auth(pending.review, DeviceCancelling(device)),
+  )
+  let (cancelled, _) = update_auth(
+    cancelling,
+    DeviceAuthorizationCancelled(flow_id, Ok(anonymous_api_status())),
+    emit,
+  )
+  assert_eq(cancelled.generation, failed.generation + 1)
+  assert_true(cancelled.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(cancelled.review.last_authenticated_login is None)
+  assert_true(cancelled.review.draft is None)
+}
+
+///|
+test "an authenticated result without a login cannot reuse known account state" {
+  let view = review_test_view()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let alice = auth_identity_test_model(
+    AuthFailed("Your GitHub session expired."),
+    Some("alice"),
+  )
+  let (unverified, _) = update_auth(
+    alice,
+    ReactivationAuthStatusLoaded(
+      alice.generation,
+      view.reference,
+      Ok(signed_in_api_status_without_login()),
+    ),
+    emit,
+  )
+  assert_eq(unverified.generation, alice.generation + 1)
+  assert_true(unverified.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(unverified.review.auth is SignedIn(None))
+  assert_true(unverified.review.last_authenticated_login is None)
+  assert_true(unverified.review.draft is None)
+}
+
+///|
+test "successful local logout clears account state and reloads" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let alice = auth_identity_test_model(SignedIn(Some("alice")), Some("alice"))
+  let checking = with_review(
+    alice,
+    review_state_with_auth(alice.review, AuthChecking),
+  )
+  assert_true(checking.review.auth is AuthChecking)
+  assert_eq(checking.review.last_authenticated_login, Some("alice"))
+  assert_true(checking.review.draft == alice.review.draft)
+  let (logged_out, _) = update_auth(
+    checking,
+    AuthLogoutFinished(Ok(anonymous_api_status())),
+    emit,
+  )
+  assert_eq(logged_out.generation, alice.generation + 1)
+  assert_true(logged_out.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(logged_out.review.auth is Anonymous(_))
+  assert_true(logged_out.review.last_authenticated_login is None)
+  assert_true(logged_out.review.comments is CommentsLoading)
+  assert_true(logged_out.review.draft is None)
 }
 
 ///|

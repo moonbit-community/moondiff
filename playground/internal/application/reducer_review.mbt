@@ -256,6 +256,7 @@ fn update_review(
           (
             with_review(refreshed, {
               auth: model.review.auth,
+              last_authenticated_login: model.review.last_authenticated_login,
               comments: CommentsLoading,
               draft: Some({
                 kind: draft.kind,
@@ -284,7 +285,10 @@ fn update_review(
           )
       }
     }
-    IssueCommentCreated(generation, result) =>
+    IssueCommentCreated(generation, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
       finish_comment_submission(
         match result {
           Ok(comment) => insert_issue_comment(model, comment)
@@ -297,7 +301,11 @@ fn update_review(
         },
         emit,
       )
-    ReviewCommentCreated(generation, result) =>
+    }
+    ReviewCommentCreated(generation, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
       finish_comment_submission(
         match result {
           Ok(comment) => insert_review_comment(model, comment)
@@ -310,7 +318,11 @@ fn update_review(
         },
         emit,
       )
-    CommitCommentCreated(generation, result) =>
+    }
+    CommitCommentCreated(generation, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
       finish_comment_submission(
         match result {
           Ok(comment) => insert_commit_comment(model, comment)
@@ -323,7 +335,11 @@ fn update_review(
         },
         emit,
       )
-    ReviewReplyCreated(generation, result) =>
+    }
+    ReviewReplyCreated(generation, result) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
       finish_comment_submission(
         match result {
           Ok(comment) => insert_review_comment(model, comment)
@@ -336,5 +352,6 @@ fn update_review(
         },
         emit,
       )
+    }
   }
 }

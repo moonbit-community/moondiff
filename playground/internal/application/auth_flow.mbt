@@ -4,24 +4,40 @@ fn apply_auth_status(
   status : ApiAuthStatus,
   preserve_device_copy : Bool,
   continue_device_poll : Bool,
+  force_identity_boundary : Bool,
   emit : @rabbita.Emit[Msg],
-) -> (Model, @rabbita.Cmd) {
+) -> (Model, @rabbita.Cmd, AuthIdentityTransition) {
   let auth = if preserve_device_copy {
     auth_status_from_api_preserving(status, model.review.auth)
   } else {
     auth_status_from_api(status)
   }
-  let next = with_review(model, review_state_with_auth(model.review, auth))
-  match auth {
+  let (review, detected_transition) = review_state_with_auth_identity(
+    model.review,
+    auth,
+  )
+  let transition = if force_identity_boundary {
+    AuthIdentityBoundary
+  } else {
+    detected_transition
+  }
+  let next = with_review(model, review)
+  let (transitioned, transition_command) = if transition is AuthIdentityBoundary {
+    reload_after_auth_identity_boundary(next, emit)
+  } else {
+    (next, @rabbita.none)
+  }
+  let poll_command = match auth {
     DeviceAuthorizing(device) =>
       if continue_device_poll ||
         auth_snapshot_starts_device_poll(model.review.auth, device.flow_id) {
-        (next, schedule_device_poll(device.flow_id, device.poll_after, emit))
+        schedule_device_poll(device.flow_id, device.poll_after, emit)
       } else {
-        (next, @rabbita.none)
+        @rabbita.none
       }
-    _ => (next, @rabbita.none)
+    _ => @rabbita.none
   }
+  (transitioned, @rabbita.batch([transition_command, poll_command]), transition)
 }
 
 ///|
@@ -54,17 +70,25 @@ fn finish_device_sign_in(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   let restart_change = sign_in_restarts_change_load(model)
-  let next = with_review(
-    model,
-    review_state_with_auth(model.review, auth_status_from_api(status)),
+  let (next, auth_command, identity_transition) = apply_auth_status(
+    model, status, false, false, false, emit,
   )
-  guard model.route is Some(reference) else { return (next, @rabbita.none) }
+  if identity_transition is AuthIdentityBoundary {
+    return (next, auth_command)
+  }
+  guard next.route is Some(reference) else { return (next, auth_command) }
   if restart_change {
-    return begin_change_load(next, reference, emit)
+    let (reloading, load_command) = begin_sign_in_change_reload(
+      next, reference, identity_transition, emit,
+    )
+    return (reloading, @rabbita.batch([auth_command, load_command]))
   }
   (
     with_review(next, review_state_with_comments(next.review, CommentsLoading)),
-    comments_request(reference, model.generation, emit),
+    @rabbita.batch([
+      auth_command,
+      comments_request(reference, next.generation, emit),
+    ]),
   )
 }
 

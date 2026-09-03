@@ -172,7 +172,12 @@ fn begin_change_load(
       copy_status: CopyReady,
       file_tree: reset_file_tree_state(model.file_tree),
       review: if extension_host_enabled() {
-        { auth: model.review.auth, comments: CommentsLoading, draft: None, }
+        {
+          auth: model.review.auth,
+          last_authenticated_login: model.review.last_authenticated_login,
+          comments: CommentsLoading,
+          draft: None,
+        }
       } else {
         model.review
       },
