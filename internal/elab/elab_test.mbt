@@ -133,6 +133,20 @@ fn syntax_contains(syntax : Syntax, content : String) -> Bool {
 }
 
 ///|
+fn cst_contains_kind(
+  node : @cst.CstNode,
+  predicate : (@cst.NodeKind) -> Bool,
+) -> Bool {
+  if predicate(node.kind) {
+    return true
+  }
+  node.children.any(fn(entry) {
+    let (_, child) = entry
+    cst_contains_kind(child, predicate)
+  })
+}
+
+///|
 fn atom_kind(syntax : Syntax, wanted : String) -> @dsyntax.AtomKind? {
   match syntax {
     Syntax::Atom(content~, kind~, ..) =>
@@ -418,4 +432,40 @@ test "new CST syntax kinds retain display atom categories" {
   assert_true(
     atom_kind(comment_syntax, "// note") == Some(@dsyntax.AtomKind::Comment),
   )
+}
+
+///|
+test "parser 0.3.19 CST additions elaborate source-faithfully" {
+  let source =
+    #|fn modern(value : Error) nocancel {
+    #|  errdefer cleanup()
+    #|  match value {
+    #|    &@pkg.T::_ => lexmatch "a" {
+    #|      re"a" => 1
+    #|      _ => 0
+    #|    }
+    #|    _ => 0
+    #|  }
+    #|}
+  let parsed = @cst.parse_structure(source)
+  assert_true(parsed.diagnostics_view().is_empty())
+  let root = parsed.root()
+  for
+    predicate in [
+      fn(kind) { kind is @cst.Expr_ErrDefer },
+      fn(kind) { kind is @cst.Pattern_ConstrAny },
+      fn(kind) { kind is @cst.Expr_LexMatch },
+      fn(kind) { kind is @cst.Case_LexScanCase },
+      fn(kind) { kind is @cst.List_LexScanCaseList },
+    ] {
+    assert_true(cst_contains_kind(root, predicate))
+  }
+  let syntax = @elab.elab_cst(source, root)
+  assert_source_faithful(source, syntax)
+  assert_non_whitespace_covered_once(source, syntax)
+  for keyword in ["nocancel", "errdefer", "lexmatch"] {
+    assert_true(atom_kind(syntax, keyword) == Some(@dsyntax.AtomKind::Keyword))
+  }
+  assert_true(atom_kind(syntax, "@pkg") == Some(@dsyntax.AtomKind::Type))
+  assert_true(atom_kind(syntax, "T") == Some(@dsyntax.AtomKind::Type))
 }
