@@ -349,3 +349,106 @@ test "semantic section titles format declaration contexts" {
     "Section #5 · Matched · old line 7 · new line 7",
   )
 }
+
+///|
+#warnings("-alert_unstable")
+test "AST structural-empty view preserves section fallback notices" {
+  let fragment : @mbtdiff.DiffFragment = {
+    document: { hunks: [], },
+    fallbacks: [GraphLimitExceeded(limit=23)],
+  }
+  let document : @mbtdiff.DiffDocument = TopLevel({
+    sections: [
+      Matched(
+        old={ start: 0, len: 1, },
+        new={ start: 0, len: 1, },
+        old_context=Some("fn target() {}"),
+        new_context=Some("fn target() {}"),
+        diff=fragment,
+      ),
+    ],
+    old_order: [0],
+    new_order: [0],
+    reordered: false,
+  })
+  let base = ready_test_file(
+    fixture_file("src/target.mbt", "modified"),
+    ["fn target() {}"],
+    ["fn target( ) {}"],
+  )
+  let file = {
+    ..base,
+    diff_cache: base.diff_cache.put(
+      MoonBit(AstAlgorithm, false, false),
+      MoonBit(document~, status=NoStructuralChanges),
+    ),
+  }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let rendered = @rabbita.render_to_string(() => {
+    @rabbita.Val::constant(
+      file_diff_view(
+        file,
+        0,
+        0,
+        Split,
+        AstAlgorithm,
+        false,
+        false,
+        @comments.initial_review_state(),
+        emit,
+      ),
+    )
+  })
+  assert_true(rendered.contains("Section #1 · Matched"), msg=rendered)
+  assert_true(rendered.contains("partial-fallback"), msg=rendered)
+  assert_true(rendered.contains("graph limit exceeded (23)"), msg=rendered)
+  assert_true(rendered.contains("structural-empty"), msg=rendered)
+  assert_true(rendered.contains("No structural changes found."), msg=rendered)
+  assert_true(
+    rendered.find("partial-fallback").unwrap_or(-1) <
+    rendered.find("structural-empty").unwrap_or(-1),
+    msg=rendered,
+  )
+  assert_false(rendered.contains("hunk-header"), msg=rendered)
+  assert_false(rendered.contains("<table"), msg=rendered)
+}
+
+///|
+#warnings("-alert_unstable")
+test "AST structural-empty view without fallback keeps its original DOM" {
+  let document : @mbtdiff.DiffDocument = Whole({
+    document: { hunks: [], },
+    fallbacks: [],
+  })
+  let base = ready_test_file(
+    fixture_file("src/formatted.mbt", "modified"),
+    ["fn formatted() {}"],
+    ["fn formatted( ) {}"],
+  )
+  let file = {
+    ..base,
+    diff_cache: base.diff_cache.put(
+      MoonBit(AstAlgorithm, false, false),
+      MoonBit(document~, status=NoStructuralChanges),
+    ),
+  }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let rendered = @rabbita.render_to_string(() => {
+    @rabbita.Val::constant(
+      file_diff_view(
+        file,
+        0,
+        0,
+        Split,
+        AstAlgorithm,
+        false,
+        false,
+        @comments.initial_review_state(),
+        emit,
+      ),
+    )
+  })
+  assert_eq(
+    rendered, "<div class=\"file-message structural-empty\"><p>No structural changes found. Switch to Lexical to view text changes.</p></div>",
+  )
+}
