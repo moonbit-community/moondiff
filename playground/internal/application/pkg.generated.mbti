@@ -25,6 +25,7 @@ pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 // Types and methods
 pub(all) enum AuthMsg {
   AuthStatusLoaded(Result[@comments.ApiAuthStatus, Error])
+  ReactivationAuthStatusLoaded(Int, @github.CommitRef, Result[@comments.ApiAuthStatus, Error])
   StartDeviceAuthorization
   DeviceAuthorizationStarted(Result[@comments.ApiAuthStatus, Error])
   PollDeviceAuthorization(String)
@@ -103,7 +104,7 @@ pub(all) enum Phase {
 pub(all) enum ReviewMsg {
   RefreshComments
   CommentsLoaded(Int, Result[@comments.ApiCommentBundle, Error])
-  VisibilityChanged(Bool)
+  PageReactivated
   OpenOverallDraft
   OpenInlineDraft(Int, @review.ReviewAnchor)
   OpenReplyDraft(Int64)

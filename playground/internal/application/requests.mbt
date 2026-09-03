@@ -47,6 +47,17 @@ fn auth_status_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
 }
 
 ///|
+fn reactivation_auth_status_request(
+  reference : CommitRef,
+  generation : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  @comments.auth_status_request(result => {
+    emit(Auth(ReactivationAuthStatusLoaded(generation, reference, result)))
+  })
+}
+
+///|
 fn auth_device_start_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
   @comments.auth_device_start_request(result => {
     emit(Auth(DeviceAuthorizationStarted(result)))

@@ -1515,6 +1515,134 @@ test "device authorization moves from code through pending to signed in" {
 }
 
 ///|
+test "authentication snapshots only start polling new or resumed device flows" {
+  let current = review_test_device_authorization()
+  assert_false(
+    auth_snapshot_starts_device_poll(
+      DeviceAuthorizing(current),
+      current.flow_id,
+    ),
+  )
+  assert_false(
+    auth_snapshot_starts_device_poll(DeviceCancelling(current), current.flow_id),
+  )
+  assert_true(
+    auth_snapshot_starts_device_poll(DeviceAuthorizing(current), "flow-new"),
+  )
+  assert_true(
+    auth_snapshot_starts_device_poll(Anonymous(None), current.flow_id),
+  )
+}
+
+///|
+test "reactivation synchronizes login and logout before refreshing comments" {
+  let view = review_test_view()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let anonymous = review_test_model(Anonymous(None))
+  let (signed_in, _) = update_auth(
+    anonymous,
+    ReactivationAuthStatusLoaded(
+      anonymous.generation,
+      view.reference,
+      Ok(signed_in_api_status("cross-tab-user")),
+    ),
+    emit,
+  )
+  assert_true(signed_in.review.auth is SignedIn(Some("cross-tab-user")))
+  assert_true(signed_in.review.comments is CommentsLoading)
+
+  let ready = with_review(
+    signed_in,
+    review_state_with_comments(
+      signed_in.review,
+      CommentsReady({
+        issue_comments: [],
+        review_comments: [],
+        commit_comments: [],
+      }),
+    ),
+  )
+  let (signed_out, _) = update_auth(
+    ready,
+    ReactivationAuthStatusLoaded(
+      ready.generation,
+      view.reference,
+      Ok(anonymous_api_status()),
+    ),
+    emit,
+  )
+  assert_true(signed_out.review.auth is Anonymous(_))
+  assert_true(signed_out.review.comments is CommentsLoading)
+}
+
+///|
+test "reactivation preserves cancellation and ignores stale generations" {
+  let view = review_test_view()
+  let device = review_test_device_authorization()
+  let model = review_test_model(DeviceCancelling(device))
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (cancelling, _) = update_auth(
+    model,
+    ReactivationAuthStatusLoaded(
+      model.generation,
+      view.reference,
+      Ok(device_api_status(device.flow_id, poll_after=9)),
+    ),
+    emit,
+  )
+  guard cancelling.review.auth is DeviceCancelling(updated) else {
+    fail("expected the current cancellation to remain in progress")
+  }
+  assert_eq(updated.poll_after, 9)
+  assert_true(cancelling.review.comments is CommentsLoading)
+
+  let (stale_generation, _) = update_auth(
+    model,
+    ReactivationAuthStatusLoaded(
+      model.generation - 1,
+      view.reference,
+      Ok(signed_in_api_status("stale-user")),
+    ),
+    emit,
+  )
+  assert_true(stale_generation == model)
+  let other = commit_reference("upstream", "project", "abcdef1")
+  let (stale_route, _) = update_auth(
+    model,
+    ReactivationAuthStatusLoaded(
+      model.generation,
+      other,
+      Ok(signed_in_api_status("stale-user")),
+    ),
+    emit,
+  )
+  assert_true(stale_route == model)
+}
+
+///|
+test "reactivation login retries a private repository load" {
+  let reference = pull_reference("upstream", "private-project", "17")
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let model = device_auth_test_model(
+    Anonymous(None),
+    LoadFailed("private repository"),
+    Some(reference),
+  )
+  let (retried, _) = update_auth(
+    model,
+    ReactivationAuthStatusLoaded(
+      model.generation,
+      reference,
+      Ok(signed_in_api_status("cross-tab-user")),
+    ),
+    emit,
+  )
+  assert_eq(retried.generation, model.generation + 1)
+  assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
+  assert_true(retried.review.auth is SignedIn(Some("cross-tab-user")))
+}
+
+///|
 test "device code copy feedback and cancellation stay scoped to the current flow" {
   let flow_id = "flow-copy"
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
@@ -1637,7 +1765,7 @@ test "top-level reducer routes every message domain" {
   let (auth_direct, _) = update_auth(model, auth_msg, emit)
   assert_true(auth_routed == auth_direct)
 
-  let review_msg : ReviewMsg = VisibilityChanged(true)
+  let review_msg : ReviewMsg = PageReactivated
   let (review_routed, _) = update(model, Review(review_msg), emit)
   let (review_direct, _) = update_review(model, review_msg, emit)
   assert_true(review_routed == review_direct)

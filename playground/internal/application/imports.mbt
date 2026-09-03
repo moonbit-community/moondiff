@@ -53,6 +53,7 @@ using @comments {
   type ApiCommitComment,
   type ApiIssueComment,
   type ApiReviewComment,
+  type AuthStatus,
   type ReviewState,
   auth_status_from_api,
   auth_status_from_api_preserving,

@@ -1,6 +1,7 @@
 ///|
 pub(all) enum AuthMsg {
   AuthStatusLoaded(Result[ApiAuthStatus, Error])
+  ReactivationAuthStatusLoaded(Int, CommitRef, Result[ApiAuthStatus, Error])
   StartDeviceAuthorization
   DeviceAuthorizationStarted(Result[ApiAuthStatus, Error])
   PollDeviceAuthorization(String)
@@ -23,7 +24,7 @@ fn update_auth(
   match msg {
     AuthStatusLoaded(result) =>
       match result {
-        Ok(status) => apply_auth_status(model, status, true, emit)
+        Ok(status) => apply_auth_status(model, status, true, false, emit)
         Err(error) =>
           (
             with_review(
@@ -36,6 +37,48 @@ fn update_auth(
             @rabbita.none,
           )
       }
+    ReactivationAuthStatusLoaded(generation, reference, result) => {
+      guard generation == model.generation && model.route == Some(reference) else {
+        return (model, @rabbita.none)
+      }
+      match result {
+        Err(error) =>
+          (
+            with_review(
+              model,
+              review_state_with_auth(
+                model.review,
+                AuthFailed(comment_failure_message(error)),
+              ),
+            ),
+            @rabbita.none,
+          )
+        Ok(status) => {
+          let was_signed_in = model.review.auth is SignedIn(_)
+          let (synced, poll_command) = apply_auth_status(
+            model, status, true, false, emit,
+          )
+          if !was_signed_in &&
+            status.authenticated &&
+            model.phase is LoadFailed(_) {
+            let (reloading, load_command) = begin_change_load(
+              synced, reference, emit,
+            )
+            return (reloading, @rabbita.batch([poll_command, load_command]))
+          }
+          (
+            with_review(
+              synced,
+              review_state_with_comments(synced.review, CommentsLoading),
+            ),
+            @rabbita.batch([
+              poll_command,
+              comments_request(reference, generation, emit),
+            ]),
+          )
+        }
+      }
+    }
     StartDeviceAuthorization =>
       if extension_host_enabled() {
         (
@@ -49,7 +92,7 @@ fn update_auth(
       match result {
         Ok(status) if status.authenticated =>
           finish_device_sign_in(model, status, emit)
-        Ok(status) => apply_auth_status(model, status, false, emit)
+        Ok(status) => apply_auth_status(model, status, false, false, emit)
         Err(error) =>
           (
             with_review(
@@ -82,7 +125,7 @@ fn update_auth(
           guard status.device_flow is Some(flow) && flow.flow_id == flow_id else {
             return (model, @rabbita.none)
           }
-          apply_auth_status(model, status, true, emit)
+          apply_auth_status(model, status, true, true, emit)
         }
         Err(error) =>
           (
@@ -116,7 +159,7 @@ fn update_auth(
         return (model, @rabbita.none)
       }
       match result {
-        Ok(status) => apply_auth_status(model, status, false, emit)
+        Ok(status) => apply_auth_status(model, status, false, false, emit)
         Err(error) =>
           (
             with_review(

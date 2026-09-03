@@ -397,6 +397,65 @@ test("device authorization requests only the client id and keeps the device code
   assert.equal(session.values.github_device_flow.intervalSeconds, 7);
 });
 
+test("device authorization start reuses signed-in identity and a live flow", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => { throw new Error("an idempotent start must not contact GitHub"); };
+  await session.set({
+    github_access_token: "access-current",
+    github_access_expires_at: Date.now() + 60_000,
+    github_login: "octocat",
+  });
+  assert.deepEqual(
+    await Worker.handleMessage({ v: 1, op: "auth.device.start", args: {} }, reviewSender),
+    {
+      authenticated: true,
+      login: "octocat",
+      install_url: "https://github.com/apps/moondiff-test/installations/new",
+    },
+  );
+
+  await session.remove(["github_access_token", "github_access_expires_at", "github_login"]);
+  const flow = storedDeviceFlow("r".repeat(43), {
+    nextPollAt: Date.now() + 15_000,
+  });
+  await session.set({ github_device_flow: flow });
+  const reused = await Worker.handleMessage(
+    { v: 1, op: "auth.device.start", args: {} },
+    reviewSender,
+  );
+  assert.equal(reused.device_flow.flow_id, flow.flowId);
+  assertReportedRemainingSeconds(reused.device_flow.poll_after, flow.nextPollAt, 15);
+});
+
+test("concurrent device authorization starts share one GitHub request", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const requestStarted = deferred();
+  const response = deferred();
+  let calls = 0;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://github.com/login/device/code");
+    calls += 1;
+    requestStarted.resolve();
+    return response.promise;
+  };
+  const message = { v: 1, op: "auth.device.start", args: {} };
+  const left = Worker.handleMessage(message, reviewSender);
+  const right = Worker.handleMessage(message, reviewSender);
+  await waitForTestSignal(requestStarted.promise, "the shared device authorization request");
+  assert.equal(calls, 1);
+  response.resolve(Response.json({
+    device_code: "shared-device-code",
+    user_code: "ABCD-EFGH",
+    expires_in: 900,
+    interval: 5,
+  }));
+  const [first, second] = await Promise.all([left, right]);
+  assert.deepEqual(first, second);
+  assert.equal(first.device_flow.flow_id, session.values.github_device_flow.flowId);
+});
+
 test("auth.status restores a live device authorization and removes an expired one", async () => {
   const live = storedDeviceFlow("b".repeat(43), {
     expiresAt: Date.now() + 125_000,
@@ -564,13 +623,14 @@ test("cancelling an in-flight poll prevents a late token response from being sto
   assert.equal(local.values.github_refresh_token, undefined);
 });
 
-test("starting a replacement flow prevents the old poll from storing a late token", async t => {
+test("starting while a live flow is polling reuses that flow", async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   const oldFlow = storedDeviceFlow("q".repeat(43), { nextPollAt: Date.now() - 1 });
   await session.set({ github_device_flow: oldFlow });
   const oldTokenRequestStarted = deferred();
   const oldTokenResponse = deferred();
+  let deviceCodeCalls = 0;
   globalThis.fetch = async input => {
     const url = String(input);
     if (url === "https://github.com/login/oauth/access_token") {
@@ -578,12 +638,8 @@ test("starting a replacement flow prevents the old poll from storing a late toke
       return oldTokenResponse.promise;
     }
     if (url === "https://github.com/login/device/code") {
-      return Response.json({
-        device_code: "new-device-code",
-        user_code: "WXYZ-1234",
-        expires_in: 900,
-        interval: 5,
-      });
+      deviceCodeCalls += 1;
+      throw new Error("a live device flow must be reused");
     }
     return Response.json({ login: "too-late" });
   };
@@ -593,21 +649,52 @@ test("starting a replacement flow prevents the old poll from storing a late toke
     args: { flow_id: oldFlow.flowId },
   }, reviewSender);
   await waitForTestSignal(oldTokenRequestStarted.promise, "the replaceable device token request");
-  const replacement = await Worker.handleMessage(
+  const reused = await Worker.handleMessage(
     { v: 1, op: "auth.device.start", args: {} },
     reviewSender,
   );
-  assert.notEqual(replacement.device_flow.flow_id, oldFlow.flowId);
+  assert.equal(reused.device_flow.flow_id, oldFlow.flowId);
+  assert.equal(deviceCodeCalls, 0);
   oldTokenResponse.resolve(Response.json({
     access_token: "old-access",
     expires_in: 3600,
     refresh_token: "old-refresh",
     refresh_token_expires_in: 7200,
   }));
-  await assert.rejects(oldPoll, error => error.code === "device_flow_replaced");
-  assert.equal(session.values.github_access_token, undefined);
-  assert.equal(local.values.github_refresh_token, undefined);
-  assert.equal(session.values.github_device_flow.flowId, replacement.device_flow.flow_id);
+  const signedIn = await oldPoll;
+  assert.equal(signedIn.authenticated, true);
+  assert.equal(session.values.github_access_token, "old-access");
+  assert.equal(local.values.github_refresh_token, "old-refresh");
+  assert.equal(session.values.github_device_flow, undefined);
+});
+
+test("a new device code can be generated after explicitly cancelling the live flow", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const oldFlow = storedDeviceFlow("s".repeat(43));
+  await session.set({ github_device_flow: oldFlow });
+  await Worker.handleMessage({
+    v: 1,
+    op: "auth.device.cancel",
+    args: { flow_id: oldFlow.flowId },
+  }, reviewSender);
+  let calls = 0;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://github.com/login/device/code");
+    calls += 1;
+    return Response.json({
+      device_code: "new-device-code",
+      user_code: "WXYZ-1234",
+      expires_in: 900,
+      interval: 5,
+    });
+  };
+  const replacement = await Worker.handleMessage(
+    { v: 1, op: "auth.device.start", args: {} },
+    reviewSender,
+  );
+  assert.equal(calls, 1);
+  assert.notEqual(replacement.device_flow.flow_id, oldFlow.flowId);
 });
 
 test("successful device authorization stores rotated tokens, reads /user, and clears the flow", async t => {

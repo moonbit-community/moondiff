@@ -17,7 +17,7 @@ using @review {canonical_anchor, parse_canonical_patch}
 using @change {type CacheKey, type FileState, finish_change}
 
 ///|
-using @comments {type AuthStatus, type CommentDraft, type DeviceAuthorization}
+using @comments {type CommentDraft, type DeviceAuthorization}
 
 ///|
 using @github_client {type ExtensionRequestError, type GitHubRequestError}

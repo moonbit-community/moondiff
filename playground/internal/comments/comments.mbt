@@ -165,6 +165,9 @@ pub fn auth_status_from_api_preserving(
     (DeviceAuthorizing(device), DeviceAuthorizing(old)) if device.flow_id ==
       old.flow_id =>
       DeviceAuthorizing({ ..device, copy_status: old.copy_status, })
+    (DeviceAuthorizing(device), DeviceCancelling(old)) if device.flow_id ==
+      old.flow_id =>
+      DeviceCancelling({ ..device, copy_status: old.copy_status, })
     _ => next
   }
 }
