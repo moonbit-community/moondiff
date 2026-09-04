@@ -9,6 +9,7 @@ import {
   readBuildConfig,
 } from "../scripts/build.mjs";
 import { packageExtension } from "../scripts/package.mjs";
+import { extensionVersion } from "../scripts/version.mjs";
 
 const PRODUCTION_BUILD_ENV = Object.freeze({
   MOONDIFF_GITHUB_CLIENT_ID: "Iv1.production-shaped-client",
@@ -1522,6 +1523,7 @@ test("Web Store package remains MV3-local and source-map free", () => {
     assert.ok(entries.every(name => !name.endsWith(".map") && !name.includes(".dist-")));
     const manifest = JSON.parse(readStoredZipEntry(destination, "manifest.json").toString("utf8"));
     assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.version, extensionVersion);
     assert.equal(manifest.minimum_chrome_version, "116");
     assert.deepEqual(manifest.permissions, ["storage"]);
     assert.equal("side_panel" in manifest, false);

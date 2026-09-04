@@ -36,7 +36,8 @@ npm run package:extension
 ```
 
 The Chrome Web Store ZIP is written to
-`extension/artifacts/moondiff-chrome-0.0.1.zip`.
+`extension/artifacts/moondiff-chrome-<version>.zip`. Change `extensionVersion` in
+`extension/scripts/version.mjs` when releasing a new version.
 
 ## Tests
 
