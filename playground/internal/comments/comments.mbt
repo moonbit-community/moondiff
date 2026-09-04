@@ -88,7 +88,7 @@ pub(all) enum AuthStatus {
   Anonymous(String?)
   DeviceAuthorizing(DeviceAuthorization)
   DeviceCancelling(DeviceAuthorization)
-  SignedIn(String?)
+  SignedIn(login~ : String?, install_url~ : String?)
   AuthFailed(String)
 } derive(Eq)
 
@@ -144,13 +144,13 @@ pub fn initial_review_state() -> ReviewState {
 
 ///|
 pub fn review_can_comment(review : ReviewState) -> Bool {
-  review.auth is SignedIn(_)
+  review.auth is SignedIn(..)
 }
 
 ///|
 pub fn auth_status_from_api(status : ApiAuthStatus) -> AuthStatus {
   if status.authenticated {
-    SignedIn(status.login)
+    SignedIn(login=status.login, install_url=status.install_url)
   } else if status.device_flow is Some(flow) {
     DeviceAuthorizing({
       flow_id: flow.flow_id,

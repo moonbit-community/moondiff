@@ -581,9 +581,19 @@ fn auth_controls(
     WebReadOnly => @html.nothing
     AuthChecking =>
       @html.span(class="auth-status", "Checking GitHub session…")
-    SignedIn(login) =>
+    SignedIn(login~, install_url~) =>
       @html.div(class="auth-controls", [
         @html.span("Signed in\{login.map(name => " as \{name}").unwrap_or("")}"),
+        if install_url is Some(url) {
+          @html.a(
+            href=url,
+            target=Blank,
+            rel="noopener noreferrer",
+            "Install GitHub App ↗",
+          )
+        } else {
+          @html.nothing
+        },
         @html.button(
           type_="button",
           class="secondary",

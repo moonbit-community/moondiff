@@ -54,7 +54,7 @@ fn auth_snapshot_starts_device_poll(
 
 ///|
 fn sign_in_restarts_change_load(model : Model) -> Bool {
-  if model.review.auth is SignedIn(_) {
+  if model.review.auth is SignedIn(..) {
     return false
   }
   match model.phase {

@@ -1033,7 +1033,7 @@ fn review_test_model(auth : AuthStatus) -> Model {
     review: {
       auth,
       last_authenticated_login: match auth {
-        SignedIn(login) => login
+        SignedIn(login~, ..) => login
         _ => None
       },
       comments: CommentsReady({
@@ -1100,7 +1100,9 @@ test "only signed-in reviews can open comment drafts" {
     }
   }
 
-  let signed_in = review_test_model(SignedIn(Some("reviewer")))
+  let signed_in = review_test_model(
+    SignedIn(login=Some("reviewer"), install_url=None),
+  )
   assert_true(review_can_comment(signed_in.review))
   let (overall, _) = update_review(signed_in, OpenOverallDraft, emit)
   guard overall.review.draft is Some(overall_draft) else {
@@ -1150,7 +1152,9 @@ test "submitting a retained draft still requires sign-in" {
 
 ///|
 test "comment loading authentication failure signs out and preserves the draft" {
-  let model = review_test_model(SignedIn(Some("reviewer")))
+  let model = review_test_model(
+    SignedIn(login=Some("reviewer"), install_url=None),
+  )
   let draft = CommentDraft::{
     kind: OverallDraft,
     body: "keep this draft",
@@ -1207,7 +1211,7 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: {
-      auth: SignedIn(Some("reviewer")),
+      auth: SignedIn(login=Some("reviewer"), install_url=None),
       last_authenticated_login: Some("reviewer"),
       comments: CommentsLoading,
       draft: Some({
@@ -1267,7 +1271,9 @@ test "PR comment head authentication failure signs out and preserves the draft" 
     Right,
     2,
   ).unwrap()
-  let base = review_test_model(SignedIn(Some("reviewer")))
+  let base = review_test_model(
+    SignedIn(login=Some("reviewer"), install_url=None),
+  )
   let original = CommentDraft::{
     kind: InlineDraft(0, anchor),
     body: "keep this line draft",
@@ -1319,7 +1325,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: {
-      auth: SignedIn(Some("reviewer")),
+      auth: SignedIn(login=Some("reviewer"), install_url=None),
       last_authenticated_login: Some("reviewer"),
       comments: CommentsReady({
         issue_comments: [],
@@ -1368,12 +1374,14 @@ test "comment completion inserts GitHub response and failures retain the draft" 
   assert_eq(retained.body, "new comment")
   assert_false(retained.submitting)
   assert_true(retained.error.unwrap().contains("anchor"))
-  assert_true(failed.review.auth is SignedIn(Some("reviewer")))
+  assert_true(failed.review.auth is SignedIn(login=Some("reviewer"), ..))
 }
 
 ///|
 test "comment creation authentication failures sign out and retain the draft" {
-  let base = review_test_model(SignedIn(Some("reviewer")))
+  let base = review_test_model(
+    SignedIn(login=Some("reviewer"), install_url=None),
+  )
   let original = CommentDraft::{
     kind: OverallDraft,
     body: "keep this comment",
@@ -1517,7 +1525,10 @@ fn auth_identity_test_model(auth : AuthStatus, login : String?) -> Model {
 test "account changes and confirmed anonymity clear review state and reload" {
   let view = review_test_view()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let alice = auth_identity_test_model(SignedIn(Some("alice")), Some("alice"))
+  let alice = auth_identity_test_model(
+    SignedIn(login=Some("alice"), install_url=None),
+    Some("alice"),
+  )
   let old_generation = alice.generation
   let (bob, _) = update_auth(
     alice,
@@ -1530,7 +1541,7 @@ test "account changes and confirmed anonymity clear review state and reload" {
   )
   assert_eq(bob.generation, old_generation + 1)
   assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(bob.review.auth is SignedIn(Some("bob")))
+  assert_true(bob.review.auth is SignedIn(login=Some("bob"), ..))
   assert_eq(bob.review.last_authenticated_login, Some("bob"))
   assert_true(bob.review.comments is CommentsLoading)
   assert_true(bob.review.draft is None)
@@ -1558,7 +1569,10 @@ test "account changes and confirmed anonymity clear review state and reload" {
 test "account boundary generation ignores old diff comment and submission responses" {
   let view = review_test_view()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let alice = auth_identity_test_model(SignedIn(Some("alice")), Some("alice"))
+  let alice = auth_identity_test_model(
+    SignedIn(login=Some("alice"), install_url=None),
+    Some("alice"),
+  )
   let old_generation = alice.generation
   let (bob, _) = update_auth(
     alice,
@@ -1644,7 +1658,7 @@ test "same-account device recovery preserves drafts while another account clears
   )
   assert_eq(alice.generation, failed.generation)
   assert_true(alice.phase is Showing(_))
-  assert_true(alice.review.auth is SignedIn(Some("alice")))
+  assert_true(alice.review.auth is SignedIn(login=Some("alice"), ..))
   assert_eq(alice.review.last_authenticated_login, Some("alice"))
   assert_true(alice.review.draft == failed.review.draft)
 
@@ -1665,7 +1679,7 @@ test "same-account device recovery preserves drafts while another account clears
   )
   assert_eq(bob.generation, failed.generation + 1)
   assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(bob.review.auth is SignedIn(Some("bob")))
+  assert_true(bob.review.auth is SignedIn(login=Some("bob"), ..))
   assert_eq(bob.review.last_authenticated_login, Some("bob"))
   assert_true(bob.review.draft is None)
 
@@ -1706,7 +1720,7 @@ test "an authenticated result without a login cannot reuse known account state" 
   )
   assert_eq(unverified.generation, alice.generation + 1)
   assert_true(unverified.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(unverified.review.auth is SignedIn(None))
+  assert_true(unverified.review.auth is SignedIn(login=None, ..))
   assert_true(unverified.review.last_authenticated_login is None)
   assert_true(unverified.review.draft is None)
 }
@@ -1714,7 +1728,10 @@ test "an authenticated result without a login cannot reuse known account state" 
 ///|
 test "successful local logout clears account state and reloads" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let alice = auth_identity_test_model(SignedIn(Some("alice")), Some("alice"))
+  let alice = auth_identity_test_model(
+    SignedIn(login=Some("alice"), install_url=None),
+    Some("alice"),
+  )
   let checking = with_review(
     alice,
     review_state_with_auth(alice.review, AuthChecking),
@@ -1776,7 +1793,7 @@ test "device authorization moves from code through pending to signed in" {
     DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("octocat"))),
     emit,
   )
-  assert_true(signed_in.review.auth is SignedIn(Some("octocat")))
+  assert_true(signed_in.review.auth is SignedIn(login=Some("octocat"), ..))
   assert_true(signed_in.review.comments is CommentsLoading)
 }
 
@@ -1814,7 +1831,9 @@ test "reactivation synchronizes login and logout before refreshing comments" {
     ),
     emit,
   )
-  assert_true(signed_in.review.auth is SignedIn(Some("cross-tab-user")))
+  assert_true(
+    signed_in.review.auth is SignedIn(login=Some("cross-tab-user"), ..),
+  )
   assert_true(signed_in.review.comments is CommentsLoading)
 
   let ready = with_review(
@@ -1905,7 +1924,7 @@ test "reactivation login retries a private repository load" {
   )
   assert_eq(retried.generation, model.generation + 1)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.review.auth is SignedIn(Some("cross-tab-user")))
+  assert_true(retried.review.auth is SignedIn(login=Some("cross-tab-user"), ..))
 }
 
 ///|
@@ -1929,7 +1948,9 @@ test "reactivation login restarts an anonymous load and ignores its late failure
   )
   assert_eq(restarted.generation, old_generation + 1)
   assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(restarted.review.auth is SignedIn(Some("cross-tab-user")))
+  assert_true(
+    restarted.review.auth is SignedIn(login=Some("cross-tab-user"), ..),
+  )
 
   let (after_late_failure, _) = update_load(
     restarted,
@@ -2053,7 +2074,7 @@ test "device sign-in retries a private repository load" {
   )
   assert_eq(retried.generation, 6)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.review.auth is SignedIn(Some("reviewer")))
+  assert_true(retried.review.auth is SignedIn(login=Some("reviewer"), ..))
 }
 
 ///|
@@ -2074,7 +2095,7 @@ test "device sign-in restarts an anonymous load and ignores its late failure" {
   )
   assert_eq(restarted.generation, old_generation + 1)
   assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(restarted.review.auth is SignedIn(Some("reviewer")))
+  assert_true(restarted.review.auth is SignedIn(login=Some("reviewer"), ..))
 
   let (after_late_failure, _) = update_load(
     restarted,
