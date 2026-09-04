@@ -31,14 +31,19 @@ test "comment list arguments omit fields that do not apply to the target" {
 
 ///|
 test "authentication DTOs map to review auth state and preserve device copy feedback" {
-  assert_true(
-    auth_status_from_api({
+  guard auth_status_from_api({
       authenticated: true,
       login: Some("octocat"),
-      install_url: None,
+      install_url: Some("https://github.com/apps/moondiff/installations/new"),
       device_flow: None,
     })
-    is SignedIn(login=Some("octocat"), install_url=None),
+    is SignedIn(login~, install_url~) else {
+    fail("expected an authenticated status")
+  }
+  assert_eq(login, Some("octocat"))
+  assert_eq(
+    install_url,
+    Some("https://github.com/apps/moondiff/installations/new"),
   )
   let pending : ApiAuthStatus = {
     authenticated: false,

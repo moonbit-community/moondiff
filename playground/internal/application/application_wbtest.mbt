@@ -1566,6 +1566,49 @@ test "account changes and confirmed anonymity clear review state and reload" {
 }
 
 ///|
+test "installation URL changes do not cross the signed-in account boundary" {
+  let view = review_test_view()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let alice = auth_identity_test_model(
+    SignedIn(
+      login=Some("alice"),
+      install_url=Some("https://github.com/apps/moondiff-old/installations/new"),
+    ),
+    Some("alice"),
+  )
+  let old_generation = alice.generation
+  let (updated, _) = update_auth(
+    alice,
+    ReactivationAuthStatusLoaded(
+      old_generation,
+      view.reference,
+      Ok({
+        authenticated: true,
+        login: Some("alice"),
+        install_url: Some(
+          "https://github.com/apps/moondiff-new/installations/new",
+        ),
+        device_flow: None,
+      }),
+    ),
+    emit,
+  )
+  assert_eq(updated.generation, old_generation)
+  assert_true(updated.phase == alice.phase)
+  guard updated.review.auth is SignedIn(login~, install_url~) else {
+    fail("expected Alice to remain signed in")
+  }
+  assert_eq(login, Some("alice"))
+  assert_eq(
+    install_url,
+    Some("https://github.com/apps/moondiff-new/installations/new"),
+  )
+  assert_eq(updated.review.last_authenticated_login, Some("alice"))
+  assert_true(updated.review.draft == alice.review.draft)
+  assert_true(updated.file_tree == alice.file_tree)
+}
+
+///|
 test "account boundary generation ignores old diff comment and submission responses" {
   let view = review_test_view()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
