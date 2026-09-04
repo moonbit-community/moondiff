@@ -38,7 +38,7 @@ test "authentication DTOs map to review auth state and preserve device copy feed
       install_url: None,
       device_flow: None,
     })
-    is SignedIn(Some("octocat")),
+    is SignedIn(login=Some("octocat"), install_url=None),
   )
   let pending : ApiAuthStatus = {
     authenticated: false,

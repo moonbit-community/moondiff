@@ -121,7 +121,7 @@ pub(all) enum AuthStatus {
   Anonymous(String?)
   DeviceAuthorizing(DeviceAuthorization)
   DeviceCancelling(DeviceAuthorization)
-  SignedIn(String?)
+  SignedIn(login~ : String?, install_url~ : String?)
   AuthFailed(String)
 } derive(Eq)
 

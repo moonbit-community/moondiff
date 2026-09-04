@@ -11,7 +11,7 @@ fn auth_identity_transition(
   auth : AuthStatus,
 ) -> AuthIdentityTransition {
   match auth {
-    SignedIn(login) =>
+    SignedIn(login~, ..) =>
       match (review.last_authenticated_login, login) {
         (Some(previous), Some(current)) =>
           if previous == current {
@@ -21,13 +21,13 @@ fn auth_identity_transition(
           }
         (Some(_), None) => AuthIdentityBoundary
         (None, Some(_)) =>
-          if review.auth is SignedIn(None) {
+          if review.auth is SignedIn(login=None, ..) {
             AuthIdentityBoundary
           } else {
             AuthInitialSignIn
           }
         (None, None) =>
-          if review.auth is SignedIn(_) {
+          if review.auth is SignedIn(..) {
             AuthIdentityBoundary
           } else {
             AuthInitialSignIn
@@ -35,7 +35,7 @@ fn auth_identity_transition(
       }
     Anonymous(_) =>
       if review.last_authenticated_login is Some(_) ||
-        review.auth is SignedIn(_) {
+        review.auth is SignedIn(..) {
         AuthIdentityBoundary
       } else {
         AuthIdentityUnchanged
@@ -51,7 +51,7 @@ fn review_state_with_auth_identity(
 ) -> (ReviewState, AuthIdentityTransition) {
   let transition = auth_identity_transition(review, auth)
   let last_authenticated_login = match auth {
-    SignedIn(login) => login
+    SignedIn(login~, ..) => login
     Anonymous(_) | WebReadOnly => None
     _ => review.last_authenticated_login
   }
