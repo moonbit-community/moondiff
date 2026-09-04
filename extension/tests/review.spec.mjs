@@ -699,6 +699,14 @@ test("private PR prompts for GitHub App access and retries after login", async (
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.getByText("Fork PR")).toBeVisible();
   await expect(page.getByText("Signed in as tester")).toBeVisible();
+  const installLink = page.getByRole("link", { name: /Install GitHub App/u });
+  await expect(installLink).toBeVisible();
+  await expect(installLink).toHaveAttribute(
+    "href",
+    "https://github.com/apps/moondiff-test/installations/new",
+  );
+  await expect(installLink).toHaveAttribute("target", "_blank");
+  await expect(installLink).toHaveAttribute("rel", "noopener noreferrer");
 });
 
 test("reactivation synchronizes cross-tab login and logout", async ({ page }) => {
