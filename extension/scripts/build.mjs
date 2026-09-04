@@ -13,6 +13,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { deflateSync } from "node:zlib";
 
+import { extensionVersion } from "./version.mjs";
+
 const scriptsDirectory = dirname(fileURLToPath(import.meta.url));
 export const extensionRoot = resolve(scriptsDirectory, "..");
 export const repositoryRoot = resolve(extensionRoot, "..");
@@ -158,7 +160,7 @@ function manifest() {
     manifest_version: 3,
     name: "Moondiff",
     description: "Review and comment on GitHub pull requests and commits with MoonBit-aware diffs.",
-    version: "0.0.1",
+    version: extensionVersion,
     minimum_chrome_version: "116",
     permissions: ["storage"],
     host_permissions: [

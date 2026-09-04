@@ -10,6 +10,7 @@ import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { buildExtension, extensionRoot, outputRoot } from "./build.mjs";
+import { extensionVersion } from "./version.mjs";
 
 function crc32(buffer) {
   let crc = 0xffffffff;
@@ -103,7 +104,7 @@ export function createZip(source, destination) {
 
 export function packageExtension(options = {}) {
   const {
-    destination = join(extensionRoot, "artifacts", "moondiff-chrome-0.0.1.zip"),
+    destination = join(extensionRoot, "artifacts", `moondiff-chrome-${extensionVersion}.zip`),
     ...buildOptions
   } = options;
   buildExtension({ ...buildOptions, mode: "webstore" });
