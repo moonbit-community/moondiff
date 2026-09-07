@@ -1,0 +1,4 @@
+[34m--- /dev/null[39m
+[34m+++ cli_test/source/helper_test.mbt[39m
+Test file comparison ignored (--ignore-tests).
+

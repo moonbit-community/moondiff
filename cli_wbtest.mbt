@@ -54,9 +54,7 @@ test "moondiff command help uses README command name" {
   assert_true(
     help.contains("Ignore MoonBit comment-only and blank-line-only differences"),
   )
-  assert_true(
-    help.contains("Ignore top-level MoonBit test and async test blocks"),
-  )
+  assert_true(help.contains("Ignore *_test.mbt / *_wbtest.mbt file pairs"))
 }
 
 ///|UUID(fad12a14-0144-4f4f-8891-706c7971b622)
