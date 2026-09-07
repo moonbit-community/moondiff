@@ -103,6 +103,10 @@ pub(all) enum Phase {
 
 pub(all) enum ReviewMsg {
   RefreshComments
+  AskDelete(@comments.CommentId)
+  CancelDelete
+  ConfirmCommentDelete(@comments.CommentId)
+  CommentDeleted(Int, @comments.CommentId, Result[@comments.DeleteResult, Error])
   CommentsLoaded(Int, Result[@comments.ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft

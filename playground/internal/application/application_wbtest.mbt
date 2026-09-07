@@ -971,7 +971,7 @@ test "extension request codes retain actionable GitHub guidance" {
         detail="Resource not accessible by integration",
       ),
     ),
-    "GitHub denied this action. Install the app for this repository and check its Pull requests permission.",
+    "GitHub denied this action. Install the app for this repository and check its Contents and Pull requests permissions.",
   )
   assert_eq(
     comment_failure_message(
@@ -1032,6 +1032,8 @@ fn review_test_model(auth : AuthStatus) -> Model {
     route: Some(view.reference),
     review: {
       auth,
+      deletion: None,
+      deleted: [],
       last_authenticated_login: match auth {
         SignedIn(login~, ..) => login
         _ => None
@@ -1213,6 +1215,8 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     review: {
       auth: SignedIn(login=Some("reviewer"), install_url=None),
       last_authenticated_login: Some("reviewer"),
+      deletion: None,
+      deleted: [],
       comments: CommentsLoading,
       draft: Some({
         kind: InlineDraft(0, anchor),
@@ -1327,6 +1331,8 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     review: {
       auth: SignedIn(login=Some("reviewer"), install_url=None),
       last_authenticated_login: Some("reviewer"),
+      deletion: None,
+      deleted: [],
       comments: CommentsReady({
         issue_comments: [],
         review_comments: [],
@@ -1489,6 +1495,8 @@ fn device_auth_test_model(
     review: {
       auth,
       last_authenticated_login,
+      deletion: None,
+      deleted: [],
       comments: CommentsFailed("private repository"),
       draft: None,
     },
@@ -1510,6 +1518,8 @@ fn auth_identity_test_model(auth : AuthStatus, login : String?) -> Model {
     review: {
       auth,
       last_authenticated_login: login,
+      deletion: None,
+      deleted: [],
       comments: model.review.comments,
       draft: Some({
         kind: OverallDraft,
@@ -2182,4 +2192,98 @@ test "top-level reducer routes every message domain" {
   let (ui_routed, _) = update(model, Ui(ui_msg), emit)
   let (ui_direct, _) = update_ui(model, ui_msg, emit)
   assert_true(ui_routed == ui_direct)
+}
+
+///|
+test "deletion requires ownership and confirmation, preserves failures, and rejects stale results" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let initial = review_test_model(
+    SignedIn(login=Some("reviewer"), install_url=None),
+  )
+  let comment : ApiIssueComment = {
+    id: 100L,
+    body: "owned",
+    html_url: "https://github.com/comment/100",
+    created_at: "2026-09-07",
+    user: Some({ login: "reviewer", }),
+  }
+  let bundle : ApiCommentBundle = {
+    issue_comments: [comment],
+    review_comments: [],
+    commit_comments: [],
+  }
+  let model = with_review(initial, {
+    ..initial.review,
+    comments: CommentsReady(bundle),
+  })
+  let id = @comments.IssueComment(100L)
+  let (unconfirmed, _) = update_review(model, ConfirmCommentDelete(id), emit)
+  assert_true(unconfirmed.review == model.review)
+  let other = with_review(model, {
+    ..model.review,
+    auth: SignedIn(login=Some("someone-else"), install_url=None),
+  })
+  let (denied, _) = update_review(other, AskDelete(id), emit)
+  assert_true(denied.review.deletion is None)
+  let (confirming, _) = update_review(model, AskDelete(id), emit)
+  assert_true(confirming.review.deletion == Some(ConfirmDelete(id)))
+  let (cancelled, _) = update_review(confirming, CancelDelete, emit)
+  assert_true(cancelled.review.deletion is None)
+  let (pending, _) = update_review(confirming, ConfirmCommentDelete(id), emit)
+  assert_true(pending.review.deletion == Some(Deleting(id)))
+  let (duplicate, _) = update_review(pending, ConfirmCommentDelete(id), emit)
+  assert_true(duplicate.review == pending.review)
+  let (failed, _) = update_review(
+    pending,
+    CommentDeleted(model.generation, id, Err(authentication_required_error())),
+    emit,
+  )
+  assert_true(failed.review.deletion is Some(DeleteFailed(_, _)))
+  assert_true(failed.review.comments == CommentsReady(bundle))
+  assert_true(failed.review.auth is AuthFailed(_))
+  let signed_in = with_review(failed, {
+    ..failed.review,
+    auth: model.review.auth,
+  })
+  let (retrying, _) = update_review(signed_in, ConfirmCommentDelete(id), emit)
+  let (deleted, _) = update_review(
+    retrying,
+    CommentDeleted(model.generation, id, Ok({ deleted: true, })),
+    emit,
+  )
+  guard deleted.review.comments is CommentsReady(empty) else {
+    fail("expected comments")
+  }
+  assert_true(empty.issue_comments.is_empty())
+  let (stale_refresh, _) = update_review(
+    deleted,
+    CommentsLoaded(model.generation, Ok(bundle)),
+    emit,
+  )
+  assert_true(stale_refresh.review.comments == deleted.review.comments)
+  let navigated = {
+    ..pending,
+    generation: pending.generation + 1,
+    review: initial.review,
+  }
+  let (stale_delete, _) = update_review(
+    navigated,
+    CommentDeleted(model.generation, id, Ok({ deleted: true, })),
+    emit,
+  )
+  assert_true(stale_delete.review == navigated.review)
+  let (changed_review, _) = review_state_with_auth_identity(
+    pending.review,
+    SignedIn(login=Some("new-account"), install_url=None),
+  )
+  let (changed, _) = reload_after_auth_identity_boundary(
+    with_review(pending, changed_review),
+    emit,
+  )
+  let (old_account_delete, _) = update_review(
+    changed,
+    CommentDeleted(model.generation, id, Ok({ deleted: true, })),
+    emit,
+  )
+  assert_true(old_account_delete.review == changed.review)
 }

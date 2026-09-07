@@ -175,6 +175,8 @@ fn begin_change_load(
         {
           auth: model.review.auth,
           last_authenticated_login: model.review.last_authenticated_login,
+          deletion: None,
+          deleted: [],
           comments: CommentsLoading,
           draft: None,
         }

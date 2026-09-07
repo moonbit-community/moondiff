@@ -80,6 +80,8 @@ fn finish_comment_submission(
     with_review(model, {
       auth: model.review.auth,
       last_authenticated_login: model.review.last_authenticated_login,
+      deletion: model.review.deletion,
+      deleted: model.review.deleted,
       // Keep the object returned by GitHub visible while the authoritative
       // comment list refresh runs in the background.
       comments: model.review.comments,
