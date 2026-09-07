@@ -10,7 +10,7 @@ required.
 
 Create a dedicated GitHub App with these repository permissions:
 
-- Contents: read
+- Contents: read and write
 - Pull requests: read and write
 
 Enable **Device Flow** and **expiring user access tokens**. No client secret is
@@ -59,3 +59,7 @@ border, and strong blue (`#2A55CC`) text when on in either theme. On narrow
 screens they show only their icons (**//**
 and **T**), without On/Off badges; their pressed states remain available to
 assistive technology.
+
+Existing GitHub App installations need an administrator to accept the updated
+**Contents: write** and **Pull requests: write** permissions for full comment
+deletion support.
