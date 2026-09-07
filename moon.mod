@@ -1,6 +1,6 @@
 name = "moonbit-community/moondiff"
 
-version = "0.0.7"
+version = "0.0.8"
 
 import {
   "moonbit-community/prettyprinter@0.4.10",
