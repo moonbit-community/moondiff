@@ -1553,3 +1553,50 @@ test("Web Store package remains MV3-local and source-map free", () => {
     rmSync(temporary, { recursive: true, force: true });
   }
 });
+
+for (const [kind, path] of [["issue", "issues/comments"], ["review", "pulls/comments"], ["commit", "comments"]]) {
+  test(`delete ${kind} comment verifies the current author and accepts an empty 204`, async t => {
+    const originalFetch = globalThis.fetch;
+    t.after(() => { globalThis.fetch = originalFetch; });
+    await session.set({ github_access_token: "current", github_access_expires_at: Date.now() + 60000 });
+    const calls = [];
+    globalThis.fetch = async (input, init) => {
+      calls.push([String(input), init.method || "GET"]);
+      if (String(input).endsWith("/user")) return Response.json({ id: 5, login: "tester" });
+      if (init.method === "DELETE") return new Response(null, { status: 204 });
+      return Response.json({ id: 123, user: { id: 5, login: "tester" } });
+    };
+    assert.deepEqual(await Worker.dispatchGithub(`github.${kind}.comment.delete`, {
+      owner: "acme", repo: "widgets", comment_id: "123",
+    }), { deleted: true });
+    assert.deepEqual(calls, [
+      ["https://api.github.com/user", "GET"],
+      [`https://api.github.com/repos/acme/widgets/${path}/123`, "GET"],
+      [`https://api.github.com/repos/acme/widgets/${path}/123`, "DELETE"],
+    ]);
+  });
+}
+
+for (const failure of ["other-author", "missing-identity", "anonymous", "permission", "expired", "network", "account-switch"]) {
+  test(`comment deletion safely handles ${failure}`, async t => {
+    const originalFetch = globalThis.fetch;
+    t.after(() => { globalThis.fetch = originalFetch; });
+    if (failure !== "anonymous") await session.set({ github_access_token: "current", github_access_expires_at: Date.now() + 60000 });
+    let deletes = 0;
+    globalThis.fetch = async (input, init) => {
+      if (String(input).endsWith("/user")) {
+        if (failure === "expired") return Response.json({ message: "Expired" }, { status: 401 });
+        return Response.json(failure === "missing-identity" ? {} : { id: 5, login: "tester" });
+      }
+      if (init.method === "DELETE") {
+        deletes += 1;
+        if (failure === "network") throw new TypeError("Network unavailable");
+        return Response.json({ message: "Permission denied" }, { status: 403 });
+      }
+      if (failure === "account-switch") await Worker.handleMessage({ v: 1, op: "auth.logout", args: {} }, reviewSender);
+      return Response.json({ user: { id: failure === "other-author" ? 6 : 5 } });
+    };
+    await assert.rejects(Worker.dispatchGithub("github.review.comment.delete", { owner: "acme", repo: "widgets", comment_id: "123" }));
+    assert.equal(deletes, ["permission", "network"].includes(failure) ? 1 : 0);
+  });
+}
