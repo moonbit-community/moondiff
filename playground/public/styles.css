@@ -1524,6 +1524,7 @@ button.file-tree-row.selected {
 }
 
 .diff-scroll table {
+  table-layout: fixed;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -1534,16 +1535,17 @@ button.file-tree-row.selected {
 }
 
 .diff-scroll table.split {
-  min-width: 64rem;
+  min-width: 0;
 }
 
 .diff-scroll table.unified {
-  min-width: 44rem;
+  min-width: 0;
 }
 
 .diff-scroll td {
   vertical-align: top;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .diff-scroll table.split td.ctx,
@@ -1551,9 +1553,7 @@ button.file-tree-row.selected {
 .diff-scroll table.split td.add,
 .diff-scroll table.split td.empty {
   width: calc(50% - 3rem);
-  /* Keep a long source line from expanding one half over the other. */
-  max-width: 1px;
-  overflow: hidden;
+
   padding: 0 0.72rem;
 }
 
@@ -1944,11 +1944,11 @@ button.file-tree-row.selected {
   }
 
   .diff-scroll table.split {
-    min-width: 48rem;
+    min-width: 0;
   }
 
   .diff-scroll table.unified {
-    min-width: 34rem;
+    min-width: 0;
   }
 }
 
@@ -2284,4 +2284,13 @@ button.toolbar-button.ignore-tests-toggle.active {
     width: 2rem;
     padding: 0;
   }
+}
+
+.diff-scroll col.gutter-column {
+  width: 3rem;
+}
+
+.diff-scroll .line-number {
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
