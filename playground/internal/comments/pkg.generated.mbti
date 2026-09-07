@@ -109,6 +109,7 @@ pub(all) struct ApiReviewComment {
   user : ApiCommentUser?
   path : String
   line : Int?
+  original_line : Int?
   side : String?
   position : Int?
   commit_id : String
