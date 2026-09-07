@@ -833,6 +833,11 @@ async function loadTestsCommit(page, options) {
   await page.goto("/");
   await page.getByLabel("Public GitHub commit or pull request URL").fill(testsUrl);
   await page.getByRole("button", { name: "View diff" }).click();
+  if (options?.wholeFiles) {
+    const toggle = page.getByRole("button", { name: "Ignore tests" });
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await toggle.click();
+  }
   await expect(page.locator("table.split").first()).toBeVisible();
 }
 
@@ -1634,6 +1639,62 @@ test("long semantic section titles wrap without widening narrow pages", async ({
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
 });
 
+for (const width of [1280, 420]) for (const colorScheme of ["light", "dark"]) {
+  test(`Ignore comments and Ignore tests have compact OpenSeek-blue pressed states at ${width}px in ${colorScheme} mode`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme });
+    await loadCommentsCommit(page);
+    for (const [name, icon, prefix] of [
+      ["Ignore comments", "//", "ignore-comments"],
+      ["Ignore tests", "T", "ignore-tests"],
+    ]) {
+      const toggle = page.getByRole("button", { name, exact: true });
+      for (const pressed of [true, false, true]) {
+        await expect(toggle).toHaveAttribute("aria-pressed", String(pressed));
+        await expect(toggle).toHaveText(`${icon}${name}`);
+        await expect(toggle.locator(".filter-state")).toHaveCount(0);
+        await expect(toggle.locator(`.${prefix}-icon`)).toBeVisible();
+        if (width === 420) {
+          await expect(toggle.locator(`.${prefix}-label`)).toBeHidden();
+          await expect(toggle).toHaveCSS("width", "32px");
+        } else {
+          await expect(toggle.locator(`.${prefix}-label`)).toBeVisible();
+        }
+        if (pressed) {
+          await expect(toggle).toHaveCSS("background-color", "rgb(238, 242, 254)");
+          await expect(toggle).toHaveCSS("color", "rgb(42, 85, 204)");
+          await expect(toggle).toHaveCSS("border-top-color", "rgb(59, 110, 245)");
+        } else {
+          await expect(toggle).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
+        }
+        const contrast = await toggle.evaluate(button => {
+          const rgba = value => {
+            const channels = value.match(/[\d.]+/g).map(Number);
+            // color-mix() backgrounds serialize as normalized color(srgb ...).
+            if (value.startsWith("color(srgb ")) return channels.map((v, i) => i < 3 ? v * 255 : v);
+            return channels;
+          };
+          const background = element => {
+            if (!element) return [255, 255, 255];
+            const color = rgba(getComputedStyle(element).backgroundColor);
+            const alpha = color[3] ?? 1;
+            if (alpha === 1) return color.slice(0, 3);
+            const beneath = background(element.parentElement);
+            return color.slice(0, 3).map((v, i) => v * alpha + beneath[i] * (1 - alpha));
+          };
+          const luminance = values => values.slice(0, 3).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+          const ratio = (a, b) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
+          const style = getComputedStyle(button);
+          return { text: ratio(rgba(style.color), background(button)), border: ratio(rgba(style.borderTopColor), background(button.parentElement)) };
+        });
+        expect(contrast.text).toBeGreaterThanOrEqual(4.5);
+        expect(contrast.border).toBeGreaterThanOrEqual(3);
+        await toggle.click();
+      }
+    }
+  });
+}
+
 test("Ignore comments works across algorithms and layouts without changing plain text", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await loadCommentsCommit(page);
@@ -1644,6 +1705,10 @@ test("Ignore comments works across algorithms and layouts without changing plain
   const blankLinesOnlyCard = page.locator(".file-card").filter({ hasText: "src/blank_lines_only.mbt" });
   const plainCard = page.locator(".file-card").filter({ hasText: "notes.txt" });
   const plainBlankLinesCard = page.locator(".file-card").filter({ hasText: "blank_lines.txt" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toHaveText("//Ignore comments");
+  await toggle.click();
+  await page.getByRole("button", { name: "Ignore tests" }).click();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(toggle).toHaveAttribute(
     "title",
@@ -1734,7 +1799,8 @@ test("Ignore comments works across algorithms and layouts without changing plain
   }));
   expect(compactToggle.left).toBeGreaterThanOrEqual(0);
   expect(compactToggle.right).toBeLessThanOrEqual(420);
-  expect(compactToggle.width).toBeLessThanOrEqual(36);
+  expect(compactToggle.width).toBe(32);
+  await expect(toggle.locator(".filter-state")).toHaveCount(0);
   expect(compactToggle.labelDisplay).toBe("none");
   expect(compactToggle.pageWidth).toBeLessThanOrEqual(compactToggle.viewportWidth);
 });
@@ -1751,6 +1817,9 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   const plainCard = page.locator(".file-card").filter({ hasText: "tests.txt" });
   const urlBeforeFilters = page.url();
 
+  await expect(testsToggle).toHaveAttribute("aria-pressed", "true");
+  await testsToggle.click();
+  await commentsToggle.click();
   await expect(testsToggle).toHaveAttribute("aria-pressed", "false");
   await expect(testsToggle).toHaveAttribute(
     "title",
@@ -1802,7 +1871,8 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   }));
   expect(compact.left).toBeGreaterThanOrEqual(0);
   expect(compact.right).toBeLessThanOrEqual(420);
-  expect(compact.width).toBeLessThanOrEqual(36);
+  expect(compact.width).toBe(32);
+  await expect(testsToggle.locator(".filter-state")).toHaveCount(0);
   expect(compact.labelDisplay).toBe("none");
   expect(compact.pageWidth).toBeLessThanOrEqual(compact.viewportWidth);
 });
@@ -2044,8 +2114,8 @@ test("the selected algorithm survives later commit navigation without entering t
   await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".structural-empty")).toBeVisible();
   await expect(page).toHaveURL(`/#/example/algorithms/commit/${nextSha}`);
   expect(new URL(page.url()).search).toBe("");

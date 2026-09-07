@@ -2244,3 +2244,44 @@ footer {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Filter controls retain distinct pressed states in both themes. */
+button.toolbar-button.ignore-comments-toggle,
+button.toolbar-button.ignore-tests-toggle {
+  transition: transform 120ms ease;
+  width: auto;
+  padding: 0 0.5rem;
+  color: #353535;
+  border: 1px solid #737373;
+  background: #fff;
+}
+
+button.toolbar-button.ignore-comments-toggle .ignore-comments-icon,
+button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  button.toolbar-button.ignore-comments-toggle,
+  button.toolbar-button.ignore-tests-toggle {
+    color: #eee;
+    border-color: #999;
+    background: #242424;
+  }
+}
+
+/* OpenSeek GUI soft and strong accents (desktop/styles/tokens.css). */
+button.toolbar-button.ignore-comments-toggle.active,
+button.toolbar-button.ignore-tests-toggle.active {
+  color: #2a55cc;
+  border-color: #3b6ef5;
+  background: #eef2fe;
+}
+
+@media (max-width: 680px) {
+  button.toolbar-button.ignore-comments-toggle,
+  button.toolbar-button.ignore-tests-toggle {
+    width: 2rem;
+    padding: 0;
+  }
+}
