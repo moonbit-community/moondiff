@@ -34,6 +34,9 @@ if (typeof importScripts === "function") {
     "github.content.get",
     "github.comments.list",
     "github.issue.comment.create",
+    "github.issue.comment.delete",
+    "github.review.comment.delete",
+    "github.commit.comment.delete",
     "github.review.comment.create",
     "github.commit.comment.create",
     "github.review.reply.create",
@@ -465,7 +468,7 @@ if (typeof importScripts === "function") {
   async function githubJson(path, options = {}) {
     const response = await githubFetch(path, options);
     if (!response.ok) throw await githubError(response);
-    return response.json();
+    return response.status === 204 ? null : response.json();
   }
 
   async function githubJsonPages(path, signal) {
@@ -1000,6 +1003,28 @@ if (typeof importScripts === "function") {
         review_comments: [],
         commit_comments: commit_comments.map(commentForProtocol),
       };
+    }
+    const deletionPaths = {
+      "github.issue.comment.delete": "issues/comments",
+      "github.review.comment.delete": "pulls/comments",
+      "github.commit.comment.delete": "comments",
+    };
+    if (Object.hasOwn(deletionPaths, operation)) {
+      exactKeys(args, ["owner", "repo", "comment_id"]);
+      const base = repositoryPath(args);
+      const id = validateCommentId(args.comment_id);
+      const epoch = authenticationEpoch;
+      if (!await accessToken(signal, epoch)) throw authenticationRequiredError();
+      const options = { signal, authenticationEpoch: epoch };
+      const user = await githubJson("/user", options);
+      if (!user?.login || !user?.id) throw authenticationRequiredError();
+      const path = `${base}/${deletionPaths[operation]}/${id}`;
+      const comment = await githubJson(path, options);
+      if (!comment?.user?.id || comment.user.id !== user.id) {
+        throw new RpcError(403, "permission_denied", "You can only delete your own comments.");
+      }
+      await githubJson(path, { ...options, method: "DELETE" });
+      return { deleted: true };
     }
     const jsonHeaders = { "Content-Type": "application/json" };
     if (operation === "github.issue.comment.create") {
