@@ -1549,7 +1549,7 @@ test("a PR metadata 403 keeps the anonymous rate-limit guidance", async ({ page 
   );
 });
 
-test("narrow viewport scrolls only the diff and keeps controls usable", async ({ page }) => {
+test("narrow viewport wraps code and keeps controls usable", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await loadMockedCommit(page);
 
@@ -1572,20 +1572,20 @@ test("narrow viewport scrolls only the diff and keeps controls usable", async ({
     return {
       clientWidth: scroller.clientWidth,
       scrollWidth: scroller.scrollWidth,
-      codeDoesNotWrap: codeCells.every(cell => getComputedStyle(cell).whiteSpace === "pre"),
+      codeWraps: codeCells.every(cell => getComputedStyle(cell).whiteSpace === "pre-wrap"),
       documentClientWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
     };
   });
-  expect(splitOverflow.scrollWidth).toBeGreaterThan(splitOverflow.clientWidth);
-  expect(splitOverflow.codeDoesNotWrap).toBe(true);
+  expect(splitOverflow.scrollWidth).toBeLessThanOrEqual(splitOverflow.clientWidth);
+  expect(splitOverflow.codeWraps).toBe(true);
   expect(splitOverflow.documentScrollWidth).toBeLessThanOrEqual(splitOverflow.documentClientWidth);
 
   const scroller = page.locator(".diff-scroll");
   await scroller.evaluate(element => {
     element.scrollLeft = 120;
   });
-  expect(await scroller.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  expect(await scroller.evaluate(element => element.scrollLeft)).toBe(0);
 
   const fileButton = page
     .locator(".file-card")
@@ -1604,7 +1604,7 @@ test("narrow viewport scrolls only the diff and keeps controls usable", async ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
   }));
-  expect(unifiedOverflow.scrollWidth).toBeGreaterThan(unifiedOverflow.clientWidth);
+  expect(unifiedOverflow.scrollWidth).toBeLessThanOrEqual(unifiedOverflow.clientWidth);
 });
 
 test("long semantic section titles wrap without widening narrow pages", async ({ page }) => {
@@ -2092,7 +2092,7 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
     pageWidth: document.documentElement.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
   }));
-  expect(astOverflow.scrollWidth).toBeGreaterThan(astOverflow.clientWidth);
+  expect(astOverflow.scrollWidth).toBeLessThanOrEqual(astOverflow.clientWidth);
   expect(astOverflow.pageWidth).toBeLessThanOrEqual(astOverflow.viewportWidth);
 
   await page.getByRole("button", { name: "Lexical" }).click();

@@ -411,7 +411,25 @@ fn safe_review_diff(
       } else {
         "unified numbered review-diff"
       },
-      @html.tbody(rows),
+      [
+        @html.colgroup(
+          if mode is Split {
+            [
+              @html.col(class="gutter-column"),
+              @html.col(),
+              @html.col(class="gutter-column"),
+              @html.col(),
+            ]
+          } else {
+            [
+              @html.col(class="gutter-column"),
+              @html.col(class="gutter-column"),
+              @html.col(),
+            ]
+          },
+        ),
+        @html.tbody(rows),
+      ],
     ),
   ])
 }
