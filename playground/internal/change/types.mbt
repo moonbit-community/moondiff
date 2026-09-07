@@ -28,7 +28,11 @@ pub(all) enum SideLoad {
 ///|
 pub(all) enum CachedDiffResult {
   Line(@mbtdiff.HunkDocument)
-  MoonBit(document~ : @mbtdiff.DiffDocument, status~ : @mbtdiff.DiffStatus)
+  MoonBit(
+    document~ : @mbtdiff.DiffDocument,
+    status~ : @mbtdiff.DiffStatus,
+    ignore_reason~ : @mbtdiff.IgnoreReason?
+  )
 } derive(Eq)
 
 ///|

@@ -290,9 +290,9 @@ fn ignore_tests_control(
       "toolbar-button ignore-tests-toggle"
     },
     title=if ignore_tests {
-      "Show MoonBit test changes"
+      "Show MoonBit test files and test blocks"
     } else {
-      "Ignore top-level MoonBit test and async test blocks"
+      "Ignore *_test.mbt / *_wbtest.mbt file pairs and top-level MoonBit test and async test blocks"
     },
     attrs=@html.Attrs::build()
       .aria_label("Ignore tests")
@@ -816,8 +816,15 @@ fn file_diff_view(
       match result {
         Line(document) =>
           safe_review_diff(file.file, index, document, mode, review, emit)
-        MoonBit(document~, status~) => {
+        MoonBit(document~, status~, ignore_reason~) => {
           if status is IgnoredOnly {
+            if ignore_reason is Some(TestFile) {
+              return @html.div(class="file-message test-file-empty", [
+                @html.p(
+                  "Test file comparison ignored. Turn off Ignore tests to view this diff.",
+                ),
+              ])
+            }
             let structural = if algorithm is AstAlgorithm {
               "structural "
             } else {

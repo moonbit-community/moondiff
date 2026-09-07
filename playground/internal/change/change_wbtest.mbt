@@ -187,6 +187,72 @@ test "MoonBit files cache all eight algorithm and filter combinations" {
 }
 
 ///|
+test "test file caches use both rename paths and restore unfiltered results" {
+  for
+    file in [
+      fixture_file("src/helper_test.mbt", "modified"),
+      fixture_file("src/helper_wbtest.mbt", "added"),
+      fixture_file("src/deleted_test.mbt", "removed"),
+      fixture_file(
+        "src/ordinary.mbt",
+        "renamed",
+        previous_filename="src/old_test.mbt",
+      ),
+      fixture_file(
+        "src/ordinary.txt",
+        "renamed",
+        previous_filename="src/old_wbtest.mbt",
+      ),
+      fixture_file(
+        "src/new_test.mbt",
+        "renamed",
+        previous_filename="src/old.txt",
+      ),
+    ] {
+    let old = if file.status == "added" { [] } else { ["fn broken( {"] }
+    let new = if file.status == "removed" { [] } else { ["fn broken( ["] }
+    let mut cached = ready_test_file(file, old, new)
+    let algorithms : Array[DiffAlgorithm] = [LexicalAlgorithm, AstAlgorithm]
+    for algorithm in algorithms {
+      for ignore_comments in [false, true] {
+        cached = ensure_file_document(cached, algorithm, ignore_comments~)
+        let original = cached_file_document(cached, algorithm, ignore_comments~)
+        assert_true(original is Some(MoonBit(status=Changed, ..)))
+        cached = ensure_file_document(
+          cached,
+          algorithm,
+          ignore_comments~,
+          ignore_tests=true,
+        )
+        guard cached_file_document(
+            cached,
+            algorithm,
+            ignore_comments~,
+            ignore_tests=true,
+          )
+          is Some(
+            MoonBit(
+              document=Whole(fragment),
+              status=IgnoredOnly,
+              ignore_reason=Some(TestFile)
+            )
+          ) else {
+          fail("expected ignored test-file cache for \{file.filename}")
+        }
+        assert_true(fragment.document.hunks.is_empty())
+        assert_true(fragment.fallbacks.is_empty())
+        assert_true(cached.expanded)
+        assert_true(cached.file == file)
+        cached = ensure_file_document(cached, algorithm, ignore_comments~)
+        assert_true(
+          cached_file_document(cached, algorithm, ignore_comments~) == original,
+        )
+      }
+    }
+  }
+}
+
+///|
 test "non-MoonBit line document is shared across algorithm switches" {
   let file = fixture_file("README.md", "modified")
   let line_key = CacheKey::Line

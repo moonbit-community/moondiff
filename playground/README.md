@@ -60,13 +60,24 @@ count changes, and a missing or added final newline. Pure comment and blank-line
 changes produce no hunks. When nearby code also changes, the original comments
 and blank lines remain visible as neutral context without addition, deletion,
 or intraline highlighting. The separate default-off **Ignore tests** control
-excludes top-level `test` and `async test` blocks after both MoonBit inputs parse
+ignores an entire file comparison if the current or previous filename ends in
+`_test.mbt` or `_wbtest.mbt` (case-sensitive), including additions, deletions,
+renames to or from ordinary files, helper functions, imports, and invalid syntax.
+Once sources are loaded, expanded cards show an ignored-file notice based on
+the diff result. Identical sources retain the normal unchanged state; loading
+errors remain visible. The file list, statistics, expansion
+state, and source loading stay intact. Turning the control off restores the
+normal diff using the existing caches.
+
+For other MoonBit files, the control excludes top-level `test` and `async test`
+blocks after both inputs parse
 successfully, including their leading documentation comments, UUID markers,
 and `///|` separators. Test-only changes produce no hunks; mixed changes report
 only production code, while an `import { ... } for "test"` declaration remains
 part of the diff. Ignore comments and Ignore tests compose independently. If
-parsing fails, the existing whole-file lexical fallback is retained and test
-filtering is not guaranteed. Other valid UTF-8 text files always use a
+parsing fails outside a matched test file, the existing whole-file lexical
+fallback is retained and test-block filtering is not guaranteed. Other valid
+UTF-8 text files use a
 Patience line diff. Equal-width replacement blocks receive bounded,
 position-by-position whitespace-word highlights; unequal replacements and
 pure insertions or deletions retain their plain line structure. These files

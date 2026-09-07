@@ -780,9 +780,20 @@ async function loadAlgorithmCommit(page, options) {
 
 async function installTestsRoutes(
   page,
-  { testsOnly = false } = {},
+  { testsOnly = false, wholeFiles = false } = {},
 ) {
-  const commit = testsOnly
+  const commit = wholeFiles ? {
+    ...testsCommit,
+    files: [
+      { filename: "src/helper_test.mbt", status: "modified" },
+      { filename: "src/helper_wbtest.mbt", status: "modified" },
+      { filename: "src/added_test.mbt", status: "added" },
+      { filename: "src/removed_wbtest.mbt", status: "removed" },
+      { filename: "src/ordinary.mbt", previous_filename: "src/old_test.mbt", status: "renamed" },
+      { filename: "src/ordinary.txt", previous_filename: "src/old_wbtest.mbt", status: "renamed" },
+      { filename: "src/new_test.mbt", previous_filename: "src/old.txt", status: "renamed" },
+    ].map(file => ({ ...file, additions: 1, deletions: 1, changes: 2 })),
+  } : testsOnly
     ? { ...testsCommit, files: [testsCommit.files[1]] }
     : testsCommit;
   await page.route("https://**", route => route.abort("blockedbyclient"));
@@ -797,7 +808,9 @@ async function installTestsRoutes(
     const revision = parts[3];
     const filename = decodeURIComponent(parts.slice(4).join("/"));
     let body;
-    if (filename === "src/mixed_tests.mbt") {
+    if (wholeFiles) {
+      body = revision === parentSha ? "fn broken( {" : "fn broken( [";
+    } else if (filename === "src/mixed_tests.mbt") {
       body = revision === parentSha ? mixedTestsOld : mixedTestsNew;
     } else if (filename === "src/tests_only.mbt") {
       body = revision === parentSha ? testsOnlyOld : testsOnlyNew;
@@ -1741,14 +1754,14 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   await expect(testsToggle).toHaveAttribute("aria-pressed", "false");
   await expect(testsToggle).toHaveAttribute(
     "title",
-    "Ignore top-level MoonBit test and async test blocks",
+    "Ignore *_test.mbt / *_wbtest.mbt file pairs and top-level MoonBit test and async test blocks",
   );
   await plainCard.getByRole("button", { name: "Expand" }).click();
   const plainHtml = await plainCard.locator(".diff-scroll").innerHTML();
 
   await testsToggle.click();
   await expect(testsToggle).toHaveAttribute("aria-pressed", "true");
-  await expect(testsToggle).toHaveAttribute("title", "Show MoonBit test changes");
+  await expect(testsToggle).toHaveAttribute("title", "Show MoonBit test files and test blocks");
   await expect(testsOnlyCard).toContainText(
     "No changes besides MoonBit test blocks found. Turn off Ignore tests",
   );
@@ -1792,6 +1805,58 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   expect(compact.width).toBeLessThanOrEqual(36);
   expect(compact.labelDisplay).toBe("none");
   expect(compact.pageWidth).toBeLessThanOrEqual(compact.viewportWidth);
+});
+
+test("Ignore tests keeps whole-file cards and restores renamed, added, and deleted diffs", async ({ page }) => {
+  const requests = [];
+  page.on("request", request => {
+    if (request.url().startsWith("https://raw.githubusercontent.com/")) {
+      requests.push(request.url());
+    }
+  });
+  await loadTestsCommit(page, { wholeFiles: true });
+  const cards = page.locator(".file-card");
+  const toggle = page.getByRole("button", { name: "Ignore tests" });
+  const commentsToggle = page.getByRole("button", { name: "Ignore comments" });
+  await expect(cards).toHaveCount(7);
+  for (const card of await cards.all()) {
+    await expect(card.locator("table.split")).toBeVisible();
+  }
+  const headers = await cards.locator(".file-heading").allTextContents();
+  const requestCount = requests.length;
+  expect(requests.some(url => url.endsWith("/src/old_test.mbt"))).toBe(true);
+  expect(requests.some(url => url.endsWith("/src/old_wbtest.mbt"))).toBe(true);
+  const notice = "Test file comparison ignored. Turn off Ignore tests to view this diff.";
+  for (const algorithm of ["Lexical", "AST"]) {
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const layout of ["split", "unified"]) {
+      const layoutToggle = page.getByRole("button", {
+        name: layout === "split" ? "Use split view" : "Use unified view",
+      });
+      if (await layoutToggle.isVisible()) await layoutToggle.click();
+      for (const ignoreComments of [false, true]) {
+        if (await commentsToggle.getAttribute("aria-pressed") !== String(ignoreComments)) {
+          await commentsToggle.click();
+        }
+        await toggle.click();
+        await expect(cards).toHaveCount(7);
+        await expect(cards.locator(".test-file-empty")).toHaveCount(7);
+        await expect(cards.locator("table")).toHaveCount(0);
+        await expect(cards.locator(".diff-notice")).toHaveCount(0);
+        for (const card of await cards.all()) {
+          await expect(card).toContainText(notice);
+          await expect(card.getByRole("button", { name: /^Collapse / })).toBeVisible();
+        }
+        expect(await cards.locator(".file-heading").allTextContents()).toEqual(headers);
+        await toggle.click();
+        await expect(cards.locator(".test-file-empty")).toHaveCount(0);
+        for (const card of await cards.all()) {
+          await expect(card.locator(`table.${layout}`)).toBeVisible();
+        }
+      }
+    }
+  }
+  expect(requests.length).toBe(requestCount);
 });
 
 test("complete Lexical sections hide only hunk headings in both review layouts", async ({ page }) => {
