@@ -60,6 +60,11 @@ screens they show only their icons (**//**
 and **T**), without On/Off badges; their pressed states remain available to
 assistive technology.
 
+Published line comments and editors appear above their source line, with file,
+side and line labels. Hidden lines fall back to file discussions; outdated
+comments show their original line when available. Only your own comments offer
+deletion, with an inline confirmation and retryable errors.
+
 Existing GitHub App installations need an administrator to accept the updated
 **Contents: write** and **Pull requests: write** permissions for full comment
 deletion support.
