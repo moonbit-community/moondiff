@@ -59,6 +59,8 @@ fn calculate_file_document(
       let result = @mbtdiff.diff(
         old.join("\n"),
         new.join("\n"),
+        old_name=file.file.previous_filename.unwrap_or(file.file.filename),
+        new_name=file.file.filename,
         options=DiffOptions(
           context_lines=3,
           graph_limit=3_000_000,
@@ -67,7 +69,13 @@ fn calculate_file_document(
           mode=mbtdiff_mode(algorithm),
         ),
       )
-      Some(MoonBit(document=result.document(), status=result.status()))
+      Some(
+        MoonBit(
+          document=result.document(),
+          status=result.status(),
+          ignore_reason=result.ignore_reason(),
+        ),
+      )
     }
   }
 }

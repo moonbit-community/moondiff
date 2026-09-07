@@ -38,7 +38,7 @@ pub(all) enum CacheKey {
 
 pub(all) enum CachedDiffResult {
   Line(@model.HunkDocument)
-  MoonBit(document~ : @model.DiffDocument, status~ : @model.DiffStatus)
+  MoonBit(document~ : @model.DiffDocument, status~ : @model.DiffStatus, ignore_reason~ : @model.IgnoreReason?)
 } derive(Eq)
 
 pub(all) struct ChangeView {

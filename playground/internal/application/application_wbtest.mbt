@@ -769,7 +769,7 @@ test "ignore comments has independent algorithm caches" {
   guard cached.diff_cache.get(filtered_key) is Some(filtered) else {
     fail("expected filtered lexical cache")
   }
-  guard filtered is MoonBit(document=Whole(fragment), status=IgnoredOnly) else {
+  guard filtered is MoonBit(document=Whole(fragment), status=IgnoredOnly, ..) else {
     fail("expected an ignored-only semantic cache")
   }
   assert_true(fragment.document.hunks.is_empty())

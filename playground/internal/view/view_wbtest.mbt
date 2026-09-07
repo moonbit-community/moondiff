@@ -268,7 +268,7 @@ test "line and MoonBit caches retain distinct semantic variants" {
     AstAlgorithm,
   )
   guard moonbit_file.diff_cache.get(MoonBit(AstAlgorithm, false, false))
-    is Some(MoonBit(document=TopLevel(top), status=Reordered)) else {
+    is Some(MoonBit(document=TopLevel(top), status=Reordered, ..)) else {
     fail("expected a semantic reorder cache")
   }
   assert_true(top.reordered)
@@ -352,6 +352,62 @@ test "semantic section titles format declaration contexts" {
 
 ///|
 #warnings("-alert_unstable")
+test "test file notices follow diff results and preserve source load states" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let render = fn(file : FileState) {
+    @rabbita.render_to_string(() => {
+      @rabbita.Val::constant(
+        file_diff_view(
+          file,
+          0,
+          0,
+          Split,
+          AstAlgorithm,
+          false,
+          true,
+          @comments.initial_review_state(),
+          emit,
+        ),
+      )
+    })
+  }
+  let base = ready_test_file(
+    fixture_file("src/helper_test.mbt", "modified"),
+    ["fn broken( {"],
+    ["fn broken( ["],
+  )
+  let ignored = ensure_file_document(base, AstAlgorithm, ignore_tests=true)
+  assert_true(render(ignored).contains("test-file-empty"))
+  assert_false(render(ignored).contains("Lexical fallback"))
+  let identical = ensure_file_document(
+    { ..base, new_side: base.old_side, },
+    AstAlgorithm,
+    ignore_tests=true,
+  )
+  assert_true(render(identical).contains("structural-empty"))
+  assert_false(render(identical).contains("test-file-empty"))
+  let blocks = ensure_file_document(
+    ready_test_file(
+      fixture_file("src/ordinary.mbt", "modified"),
+      ["test { old_value() }"],
+      ["test { new_value() }"],
+    ),
+    AstAlgorithm,
+    ignore_tests=true,
+  )
+  assert_true(render(blocks).contains("comment-empty"))
+  assert_false(render(blocks).contains("test-file-empty"))
+  let loading = render({ ..base, new_side: Loading, })
+  assert_true(loading.contains("Loading"), msg=loading)
+  assert_false(loading.contains("test-file-empty"))
+  let failed = render({ ..base, new_side: LoadFailed("source request failed"), })
+  assert_true(failed.contains("source request failed"), msg=failed)
+  assert_true(failed.contains("Retry file"), msg=failed)
+  assert_false(failed.contains("test-file-empty"))
+}
+
+///|
+#warnings("-alert_unstable")
 test "AST structural-empty view preserves section fallback notices" {
   let fragment : @mbtdiff.DiffFragment = {
     document: { hunks: [], },
@@ -380,7 +436,7 @@ test "AST structural-empty view preserves section fallback notices" {
     ..base,
     diff_cache: base.diff_cache.put(
       MoonBit(AstAlgorithm, false, false),
-      MoonBit(document~, status=NoStructuralChanges),
+      MoonBit(document~, status=NoStructuralChanges, ignore_reason=None),
     ),
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
@@ -429,7 +485,7 @@ test "AST structural-empty view without fallback keeps its original DOM" {
     ..base,
     diff_cache: base.diff_cache.put(
       MoonBit(AstAlgorithm, false, false),
-      MoonBit(document~, status=NoStructuralChanges),
+      MoonBit(document~, status=NoStructuralChanges, ignore_reason=None),
     ),
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
