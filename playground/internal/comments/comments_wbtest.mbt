@@ -129,6 +129,7 @@ fn review_comment_fixture(
     position,
     commit_id,
     in_reply_to_id: reply_to,
+    original_line: None,
   }
 }
 
@@ -153,7 +154,8 @@ test "review threads group replies and mark every stale anchor condition outdate
   assert_false(threads[0].outdated)
   assert_true(threads[1].outdated)
   assert_true(threads[2].outdated)
-  assert_true(threads[3].outdated)
+  // GitHub may retain the original commit id while updating a valid anchor.
+  assert_false(threads[3].outdated)
 }
 
 ///|
@@ -187,4 +189,15 @@ test "commit discussions use only canonical patch positions" {
   assert_eq(discussions.map(item => item.file_index), [Some(0), Some(0)])
   assert_false(discussions[0].outdated)
   assert_true(discussions[1].outdated)
+}
+
+///|
+test "orphan replies form one thread after their root is deleted" {
+  let view = review_test_view()
+  let first = review_comment_fixture(2, reply_to=Some(1L))
+  let second = review_comment_fixture(3, reply_to=Some(1L))
+  let threads = review_threads(view, [second, first])
+  assert_eq(threads.length(), 1)
+  assert_eq(threads[0].root.id, 2L)
+  assert_eq(threads[0].replies.map(c => c.id), [3L])
 }

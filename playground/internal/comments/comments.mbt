@@ -21,6 +21,7 @@ pub(all) struct ApiReviewComment {
   user : ApiCommentUser?
   path : String
   line : Int?
+  original_line : Int?
   side : String?
   position : Int?
   commit_id : String
@@ -502,7 +503,7 @@ fn review_comment_outdated(
   view : ChangeView,
   comment : ApiReviewComment,
 ) -> Bool {
-  if comment.position is None || comment.commit_id != view.sha {
+  if comment.position is None || comment.line is None {
     return true
   }
   guard comment.line is Some(line) &&
@@ -547,12 +548,26 @@ pub fn review_threads(
 ) -> Array[ReviewThread] {
   let threads : Array[ReviewThread] = []
   for root in comments {
-    if root.in_reply_to_id is Some(_) {
-      continue
+    // GitHub can retain replies after deleting their root. Promote the oldest
+    // remaining reply so the rest of the thread stays visible.
+    if root.in_reply_to_id is Some(parent) {
+      if comments.any(comment => comment.id == parent) ||
+        comments.any(comment => {
+          comment.in_reply_to_id == Some(parent) && comment.id < root.id
+        }) {
+        continue
+      }
     }
     let replies : Array[ApiReviewComment] = []
     for reply in comments {
-      if reply.in_reply_to_id == Some(root.id) {
+      if reply.id != root.id &&
+        (
+          reply.in_reply_to_id == Some(root.id) ||
+          (
+            root.in_reply_to_id is Some(parent) &&
+            reply.in_reply_to_id == Some(parent)
+          )
+        ) {
         replies.push(reply)
       }
     }
