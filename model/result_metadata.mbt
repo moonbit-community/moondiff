@@ -15,6 +15,15 @@ pub(all) enum DiffStatus {
 } derive(Debug, Eq)
 
 ///|
+/// Why differing inputs produced an `IgnoredOnly` result.
+pub(all) enum IgnoreReason {
+  /// A test-file path excluded the entire comparison before parsing.
+  TestFile
+  /// Test-block, comment, or blank-line filters excluded all changes.
+  FilteredContent
+} derive(Debug, Eq)
+
+///|
 /// The input side associated with a calculation fallback.
 pub(all) enum DiffSide {
   Old

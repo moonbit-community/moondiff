@@ -29,6 +29,10 @@ struct DiffOptions {
 /// Construct safe options, clamping a negative context radius to zero. The
 /// radius controls Whole documents, AST documents, and lexical AST fallbacks;
 /// reliable top-level Lexical sections always include complete declarations.
+/// `ignore_tests` defaults to false. When enabled, it ignores the entire pair
+/// if either source path is a test file; otherwise it filters top-level `test`
+/// and `async test` blocks after successful parsing. It composes independently
+/// with `ignore_comments`.
 pub fn DiffOptions::DiffOptions(
   context_lines? : Int = 3,
   graph_limit? : UInt = 3_000_000,
@@ -88,6 +92,9 @@ pub type ContextLine = @model.ContextLine
 pub type DiffStatus = @model.DiffStatus
 
 ///|
+pub type IgnoreReason = @model.IgnoreReason
+
+///|
 pub type DiffSide = @model.DiffSide
 
 ///|
@@ -109,5 +116,6 @@ pub type DiffSection = @model.DiffSection
 pub type TopLevelDiff = @model.TopLevelDiff
 
 ///|
-/// An opaque calculation result exposing only `status` and `document`.
+/// An opaque calculation result exposing `status`, `document`, and the reason
+/// for an ignored comparison.
 pub type DiffResult = @model.DiffResult

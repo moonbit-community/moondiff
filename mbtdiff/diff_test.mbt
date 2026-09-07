@@ -298,6 +298,7 @@ test "comment and test filters classify IgnoredOnly" {
       options=DiffOptions(ignore_comments=true, mode~),
     )
     assert_true(comments.status() is IgnoredOnly)
+    assert_true(comments.ignore_reason() is Some(FilteredContent))
     assert_true(public_document_is_empty(comments.document()))
 
     let tests = @mbtdiff.diff(
@@ -306,6 +307,7 @@ test "comment and test filters classify IgnoredOnly" {
       options=DiffOptions(ignore_tests=true, mode~),
     )
     assert_true(tests.status() is IgnoredOnly)
+    assert_true(tests.ignore_reason() is Some(FilteredContent))
     assert_true(public_document_is_empty(tests.document()))
   }
 }

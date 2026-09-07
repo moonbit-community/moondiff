@@ -54,7 +54,8 @@ pub fn DiffLine::text(Self) -> String
 
 type DiffResult
 pub fn DiffResult::document(Self) -> DiffDocument
-pub fn DiffResult::make(DiffDocument, DiffStatus) -> Self
+pub fn DiffResult::ignore_reason(Self) -> IgnoreReason?
+pub fn DiffResult::make(DiffDocument, DiffStatus, ignore_reason? : IgnoreReason) -> Self
 pub fn DiffResult::status(Self) -> DiffStatus
 
 pub(all) enum DiffRow {
@@ -104,6 +105,11 @@ pub(all) struct HunkDocument {
   hunks : ArrayView[DiffHunk]
 } derive(Eq)
 pub fn HunkDocument::rebase(Self, Int, Int) -> Self
+
+pub(all) enum IgnoreReason {
+  TestFile
+  FilteredContent
+} derive(Eq, @debug.Debug)
 
 pub(all) struct LineRange {
   start : Int

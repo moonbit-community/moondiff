@@ -54,6 +54,8 @@ pub using @model {type FallbackReason}
 
 pub using @model {type HunkDocument}
 
+pub using @model {type IgnoreReason}
+
 pub using @model {type LineRange}
 
 pub using @model {type TopLevelDiff}
