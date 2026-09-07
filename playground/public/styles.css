@@ -2294,3 +2294,40 @@ button.toolbar-button.ignore-tests-toggle.active {
   white-space: nowrap;
   overflow-wrap: normal;
 }
+
+.diff-scroll .inline-discussion-row > td,
+.diff-scroll .inline-comment-editor-row > td {
+  white-space: normal;
+  padding: 0.65rem;
+}
+
+.inline-discussion-row > td,
+.inline-comment-editor-row > td {
+  border-left: 3px solid #8064c8;
+  border-bottom: 2px solid #8064c8;
+}
+
+.comment-location {
+  font: 600 0.78rem/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.comment-location::before {
+  content: "↳ ";
+}
+
+.diff-scroll tr.comment-target > td {
+  border-top: 2px solid #8064c8;
+  border-bottom: 2px solid #8064c8;
+}
+
+.github-comment {
+  overflow-wrap: anywhere;
+}
+
+.comment-delete-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}

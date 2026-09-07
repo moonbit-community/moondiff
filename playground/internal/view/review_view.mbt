@@ -124,7 +124,13 @@ fn inline_editor_row(
 ) -> @rabbita.Html {
   if inline_draft_for_anchor(review, anchor) is Some(draft) {
     @html.tr(class="inline-comment-editor-row", [
-      @html.td(colspan=columns, comment_editor(draft, emit)),
+      @html.td(colspan=columns, [
+        @html.p(
+          class="comment-location",
+          anchor.map(anchor_location).unwrap_or(""),
+        ),
+        comment_editor(draft, emit),
+      ]),
     ])
   } else {
     @html.nothing
@@ -157,42 +163,61 @@ fn split_review_line(
   row : ReviewRow,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> Array[@rabbita.Html] {
   let (old_class, new_class) = review_row_classes(row)
+  let cards = inline_cards(
+    discussions,
+    row.file_index,
+    row.old_line,
+    row.new_line,
+    4,
+  )
   let items : Array[@rabbita.Html] = [
-    @html.tr([
-      review_gutter(
-        row.file_index,
-        row.old_line,
-        row.old_anchor,
-        "old-line-number",
-        review,
-        emit,
-      ),
-      @html.td(
-        class=old_class,
-        review_segment_nodes(row.old_text, row.old_segments, "wd", ""),
-      ),
-      review_gutter(
-        row.file_index,
-        row.new_line,
-        row.new_anchor,
-        "new-line-number",
-        review,
-        emit,
-      ),
-      @html.td(
-        class=new_class,
-        review_segment_nodes(row.new_text, row.new_segments, "wa", ""),
-      ),
-    ]),
+    @html.tr(
+      class=if cards.is_empty() &&
+        inline_draft_for_anchor(review, row.old_anchor) is None &&
+        inline_draft_for_anchor(review, row.new_anchor) is None {
+        ""
+      } else {
+        "comment-target"
+      },
+      [
+        review_gutter(
+          row.file_index,
+          row.old_line,
+          row.old_anchor,
+          "old-line-number",
+          review,
+          emit,
+        ),
+        @html.td(
+          class=old_class,
+          review_segment_nodes(row.old_text, row.old_segments, "wd", ""),
+        ),
+        review_gutter(
+          row.file_index,
+          row.new_line,
+          row.new_anchor,
+          "new-line-number",
+          review,
+          emit,
+        ),
+        @html.td(
+          class=new_class,
+          review_segment_nodes(row.new_text, row.new_segments, "wa", ""),
+        ),
+      ],
+    ),
   ]
   if inline_draft_for_anchor(review, row.old_anchor) is Some(_) {
-    items.push(inline_editor_row(review, row.old_anchor, 4, emit))
+    discussions.draft_shown = true
+    items.insert(0, inline_editor_row(review, row.old_anchor, 4, emit))
   } else if inline_draft_for_anchor(review, row.new_anchor) is Some(_) {
-    items.push(inline_editor_row(review, row.new_anchor, 4, emit))
+    discussions.draft_shown = true
+    items.insert(0, inline_editor_row(review, row.new_anchor, 4, emit))
   }
-  items
+  cards + items
 }
 
 ///|
@@ -208,43 +233,54 @@ fn unified_source_line(
   prefix : String,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> Array[@rabbita.Html] {
+  let cards = inline_cards(discussions, file_index, old_line, new_line, 3)
   let items : Array[@rabbita.Html] = [
-    @html.tr([
-      review_gutter(
-        file_index,
-        old_line,
-        if anchor.map(a => a.side is Left).unwrap_or(false) {
-          anchor
-        } else {
-          None
-        },
-        "old-line-number",
-        review,
-        emit,
-      ),
-      review_gutter(
-        file_index,
-        new_line,
-        if anchor.map(a => a.side is Right).unwrap_or(false) {
-          anchor
-        } else {
-          None
-        },
-        "new-line-number",
-        review,
-        emit,
-      ),
-      @html.td(
-        class=class_name,
-        review_segment_nodes(text, segments, changed_class, prefix),
-      ),
-    ]),
+    @html.tr(
+      class=if cards.is_empty() &&
+        inline_draft_for_anchor(review, anchor) is None {
+        ""
+      } else {
+        "comment-target"
+      },
+      [
+        review_gutter(
+          file_index,
+          old_line,
+          if anchor.map(a => a.side is Left).unwrap_or(false) {
+            anchor
+          } else {
+            None
+          },
+          "old-line-number",
+          review,
+          emit,
+        ),
+        review_gutter(
+          file_index,
+          new_line,
+          if anchor.map(a => a.side is Right).unwrap_or(false) {
+            anchor
+          } else {
+            None
+          },
+          "new-line-number",
+          review,
+          emit,
+        ),
+        @html.td(
+          class=class_name,
+          review_segment_nodes(text, segments, changed_class, prefix),
+        ),
+      ],
+    ),
   ]
   if inline_draft_for_anchor(review, anchor) is Some(_) {
-    items.push(inline_editor_row(review, anchor, 3, emit))
+    discussions.draft_shown = true
+    items.insert(0, inline_editor_row(review, anchor, 3, emit))
   }
-  items
+  cards + items
 }
 
 ///|
@@ -252,6 +288,7 @@ fn unified_review_line(
   row : ReviewRow,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> Array[@rabbita.Html] {
   match row.kind {
     ContextRow =>
@@ -267,6 +304,7 @@ fn unified_review_line(
         " ",
         review,
         emit,
+        discussions~,
       )
     IgnoredRow =>
       if row.old_text == row.new_text {
@@ -282,6 +320,7 @@ fn unified_review_line(
           " ",
           review,
           emit,
+          discussions~,
         )
       } else {
         let items = unified_source_line(
@@ -296,6 +335,7 @@ fn unified_review_line(
           " ",
           review,
           emit,
+          discussions~,
         )
         items.push_iter(
           unified_source_line(
@@ -310,6 +350,7 @@ fn unified_review_line(
             " ",
             review,
             emit,
+            discussions~,
           ).iter(),
         )
         items
@@ -330,6 +371,7 @@ fn unified_review_line(
             "-",
             review,
             emit,
+            discussions~,
           ).iter(),
         )
       }
@@ -347,6 +389,7 @@ fn unified_review_line(
             "+",
             review,
             emit,
+            discussions~,
           ).iter(),
         )
       }
@@ -367,6 +410,7 @@ fn safe_review_diff(
   new_base? : Int = 0,
   show_hunk_headers? : Bool = true,
   hunk_context? : String = "",
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Array[@rabbita.Html] = []
@@ -397,8 +441,8 @@ fn safe_review_diff(
         // canonical anchor. This makes the selected draft stable across views.
         let row = { ..row, file_index, }
         let rendered = match mode {
-          Split => split_review_line(row, review, emit)
-          Unified => unified_review_line(row, review, emit)
+          Split => split_review_line(row, review, emit, discussions~)
+          Unified => unified_review_line(row, review, emit, discussions~)
         }
         rows.push_iter(rendered.iter())
       }
@@ -440,6 +484,9 @@ fn comment_body_view(
   created_at : String,
   body : String,
   html_url : String,
+  id : @comments.CommentId,
+  review : ReviewState,
+  emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   @html.article(class="github-comment", [
     @html.div(class="github-comment-meta", [
@@ -453,6 +500,7 @@ fn comment_body_view(
       ),
     ]),
     @html.p(class="github-comment-body", body),
+    comment_delete_controls(id, review, emit),
   ])
 }
 
@@ -469,6 +517,9 @@ fn review_thread_view(
       thread.root.created_at,
       thread.root.body,
       thread.root.html_url,
+      ReviewComment(thread.root.id),
+      review,
+      emit,
     ),
   ]
   for reply in thread.replies {
@@ -478,6 +529,9 @@ fn review_thread_view(
         reply.created_at,
         reply.body,
         reply.html_url,
+        ReviewComment(reply.id),
+        review,
+        emit,
       ),
     )
   }
@@ -502,92 +556,13 @@ fn review_thread_view(
 
 ///|
 fn file_discussions_view(
-  view : ChangeView,
+  _view : ChangeView,
   file_index : Int,
-  review : ReviewState,
-  emit : @rabbita.Emit[Msg],
+  _review : ReviewState,
+  _emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
-  guard review.comments is CommentsReady(bundle) else { return @html.nothing }
-  match view.reference.target {
-    PullRequest(_) => {
-      let active : Array[@rabbita.Html] = []
-      let outdated : Array[@rabbita.Html] = []
-      for thread in review_threads(view, bundle.review_comments) {
-        if thread.file_index == Some(file_index) {
-          if thread.outdated {
-            outdated.push(review_thread_view(thread, review, emit))
-          } else {
-            active.push(review_thread_view(thread, review, emit))
-          }
-        }
-      }
-      if active.is_empty() && outdated.is_empty() {
-        return @html.nothing
-      }
-      @html.section(class="file-discussions", [
-        if !active.is_empty() {
-          @html.div(class="active-discussions", [
-            @html.h3("Discussion"),
-            @html.div(active),
-          ])
-        } else {
-          @html.nothing
-        },
-        if !outdated.is_empty() {
-          @html.div(class="outdated-discussions", [
-            @html.h3("Outdated discussion"),
-            @html.p(
-              "These comments no longer map to the current canonical patch.",
-            ),
-            @html.div(outdated),
-          ])
-        } else {
-          @html.nothing
-        },
-      ])
-    }
-    Commit(_) | PullCommit(_, _) => {
-      let active : Array[@rabbita.Html] = []
-      let outdated : Array[@rabbita.Html] = []
-      for discussion in commit_discussions(view, bundle.commit_comments) {
-        if discussion.file_index == Some(file_index) {
-          let rendered = comment_body_view(
-            author_label(discussion.comment.user),
-            discussion.comment.created_at,
-            discussion.comment.body,
-            discussion.comment.html_url,
-          )
-          if discussion.outdated {
-            outdated.push(rendered)
-          } else {
-            active.push(rendered)
-          }
-        }
-      }
-      if active.is_empty() && outdated.is_empty() {
-        return @html.nothing
-      }
-      @html.section(class="file-discussions", [
-        if !active.is_empty() {
-          @html.div(class="active-discussions", [
-            @html.h3("Commit comments"),
-            @html.div(active),
-          ])
-        } else {
-          @html.nothing
-        },
-        if !outdated.is_empty() {
-          @html.div(class="outdated-discussions", [
-            @html.h3("Outdated comments"),
-            @html.p("These comments no longer map to the canonical patch."),
-            @html.div(outdated),
-          ])
-        } else {
-          @html.nothing
-        },
-      ])
-    }
-  }
+  fallback_discussions(discussions, Some(file_index))
 }
 
 ///|
@@ -736,6 +711,9 @@ fn comments_overview(
           comment.created_at,
           comment.body,
           comment.html_url,
+          IssueComment(comment.id),
+          review,
+          emit,
         ),
       )
     }
@@ -763,6 +741,7 @@ fn comments_overview(
       CommentsFailed(message) => @html.p(class="comment-error", message)
       _ => @html.nothing
     },
+    fallback_discussions(prepare_discussions(view, review, emit), None),
     if view.reference.target is PullRequest(_) {
       @html.div(class="overall-comments", [
         @html.div(issue_views),

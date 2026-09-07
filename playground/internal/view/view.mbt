@@ -606,6 +606,7 @@ fn semantic_fragment_view(
   emit : @rabbita.Emit[Msg],
   whole : Bool,
   show_hunk_headers? : Bool = true,
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let title = section_index.map(index => {
     semantic_section_title(
@@ -643,6 +644,7 @@ fn semantic_fragment_view(
         new_base~,
         show_hunk_headers~,
         hunk_context~,
+        discussions~,
       )
     },
   ]
@@ -662,6 +664,7 @@ fn top_level_diff_view(
   show_hunk_headers : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let sections : Array[@rabbita.Html] = []
   if top.reordered {
@@ -694,6 +697,7 @@ fn top_level_diff_view(
           emit,
           false,
           show_hunk_headers~,
+          discussions~,
         ),
       )
     }
@@ -720,6 +724,7 @@ fn top_level_diff_view(
             emit,
             false,
             show_hunk_headers~,
+            discussions~,
           ),
         )
       }
@@ -745,6 +750,7 @@ fn semantic_document_view(
   show_hunk_headers : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   match document {
     Whole(fragment) =>
@@ -761,10 +767,18 @@ fn semantic_document_view(
         review,
         emit,
         true,
+        discussions~,
       )
     TopLevel(top) =>
       top_level_diff_view(
-        file, file_index, top, mode, show_hunk_headers, review, emit,
+        file,
+        file_index,
+        top,
+        mode,
+        show_hunk_headers,
+        review,
+        emit,
+        discussions~,
       )
   }
 }
@@ -780,6 +794,7 @@ fn file_diff_view(
   ignore_tests : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let problem = if source_problem(file.old_side) is Some(message) {
     Some(message)
@@ -815,7 +830,15 @@ fn file_diff_view(
       }
       match result {
         Line(document) =>
-          safe_review_diff(file.file, index, document, mode, review, emit)
+          safe_review_diff(
+            file.file,
+            index,
+            document,
+            mode,
+            review,
+            emit,
+            discussions~,
+          )
         MoonBit(document~, status~, ignore_reason~) => {
           if status is IgnoredOnly {
             if ignore_reason is Some(TestFile) {
@@ -863,6 +886,7 @@ fn file_diff_view(
                   true,
                   review,
                   emit,
+                  discussions~,
                 ),
                 structural_empty,
               ])
@@ -877,6 +901,7 @@ fn file_diff_view(
             algorithm is AstAlgorithm,
             review,
             emit,
+            discussions~,
           )
         }
       }
@@ -898,6 +923,7 @@ fn file_card(
   ignore_tests : Bool,
   review : ReviewState,
   emit : @rabbita.Emit[Msg],
+  discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let toggle_label = if file.expanded { "Collapse" } else { "Expand" }
   @html.article(
@@ -929,8 +955,16 @@ fn file_card(
       ]),
       if file.expanded {
         file_diff_view(
-          file, generation, index, mode, algorithm, ignore_comments, ignore_tests,
-          review, emit,
+          file,
+          generation,
+          index,
+          mode,
+          algorithm,
+          ignore_comments,
+          ignore_tests,
+          review,
+          emit,
+          discussions~,
         )
       } else {
         @html.nothing
@@ -952,6 +986,7 @@ fn file_list_view(
     )
   }
   let file_views : Array[@rabbita.Html] = []
+  let discussions = prepare_discussions(commit, model.review, emit)
   for index, file in commit.files {
     file_views.push(
       file_card(
@@ -964,9 +999,12 @@ fn file_list_view(
         model.ignore_tests,
         model.review,
         emit,
+        discussions~,
       ),
     )
-    file_views.push(file_discussions_view(commit, index, model.review, emit))
+    file_views.push(
+      file_discussions_view(commit, index, model.review, emit, discussions~),
+    )
   }
   @html.div(class="file-list", file_views)
 }
