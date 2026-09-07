@@ -2,6 +2,7 @@ import {
   "moonbitlang/core/cmp",
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/mbtdiff",
+  "moonbit-community/moondiff/internal/diff_ignore",
   "moonbit-community/moondiff/internal/source_text",
   "moonbit-community/moondiff/linediff",
   "moonbit-community/moondiff/render/terminal",

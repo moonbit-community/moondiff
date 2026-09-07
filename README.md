@@ -12,8 +12,15 @@ Try it in playground: https://moonbit-community.github.io/moondiff/
 moondiff [--ignore-comments] [--ignore-tests] old-file new-file
 ```
 
-`--ignore-tests` is off by default and applies only when both paths end in
-`.mbt`. After both MoonBit inputs parse successfully, top-level `test` and
+`--ignore-tests` is off by default. If either path ends in `_test.mbt` or
+`_wbtest.mbt` (case-sensitive), the entire comparison is ignored before parsing,
+including helper functions, imports, and invalid syntax. This also covers
+additions, deletions (`/dev/null`), and renames to or from ordinary files. File
+headers remain visible with an ignored-file notice; identical content still
+reports no changes.
+
+For other pairs where both paths end in `.mbt`, after both inputs parse
+successfully, top-level `test` and
 `async test` blocks are removed from lexical and AST comparison, together with
 their leading documentation comments, `///|UUID(...)` markers, and `///|`
 separators. Test-only changes report no changes; when production code also
@@ -22,9 +29,22 @@ changes, only that production change is highlighted. Imports such as
 
 `--ignore-comments` independently excludes comments and blank-line-only
 changes. The flags can be combined. If either MoonBit input fails to parse,
-the CLI retains its existing whole-file lexical fallback; `--ignore-tests` is
-not guaranteed to filter that fallback. Non-`.mbt` inputs always use the plain
-line diff and are unaffected by either MoonBit filter.
+the CLI retains its existing whole-file lexical fallback unless a test-file
+path matched; test-block filtering is not guaranteed in that fallback. Other
+pairs, including ordinary `.mbt`/text comparisons and ordinary `.mbt` additions
+or deletions, go directly to the plain line diff without MoonBit parsing and
+are unaffected by either MoonBit filter.
+
+The library's `mbtdiff.diff` uses `old_name` and `new_name` for both path
+filtering and parser diagnostics. With `DiffOptions(ignore_tests=true)`, a
+matching path returns `IgnoredOnly`, an empty `Whole` document, and no fallbacks
+when content differs; `Identical` retains priority. Omitting names keeps the
+defaults `"old"` and `"new"` and only applies test-block filtering.
+`DiffResult.ignore_reason()` returns `Some(TestFile)` for a whole-file exclusion
+and `Some(FilteredContent)` when content filters exclude all changes. Other
+statuses return `None`. The CLI uses the shared internal test-file path rule
+to decide whether MoonBit calculation is needed; displayed statuses and ignore
+notices still come from the core result.
 
 For reliably aligned MoonBit declarations, each CLI section title ends with
 the trimmed source line containing that declaration's keyword, and every

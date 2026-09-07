@@ -432,21 +432,10 @@ fn render_moonbit(
   new_label : String,
   new_source : String,
   options : Options,
+  result : @mbtdiff.DiffResult,
 ) -> String {
   let old = source_lines(old_source)
   let new = source_lines(new_source)
-  let result = @mbtdiff.diff(
-    old_source,
-    new_source,
-    old_name=old_label,
-    new_name=new_label,
-    options=@mbtdiff.DiffOptions(
-      context_lines=options.context_lines,
-      graph_limit=options.graph_limit,
-      ignore_comments=options.ignore_comments,
-      ignore_tests=options.ignore_tests,
-    ),
-  )
   match result.status() {
     Identical =>
       render_empty_state(old_label, new_label, "No changes.\n", options)
@@ -454,7 +443,11 @@ fn render_moonbit(
       render_empty_state(
         old_label,
         new_label,
-        ignored_only_message(options),
+        if result.ignore_reason() is Some(TestFile) {
+          "Test file comparison ignored (--ignore-tests).\n"
+        } else {
+          ignored_only_message(options)
+        },
         options,
       )
     NoStructuralChanges =>
@@ -533,9 +526,11 @@ fn render_moonbit(
 }
 
 ///|
-/// Calculate and render one CLI diff. Both labels must end in `.mbt` to select
-/// MoonBit-aware calculation; all other pairs use the canonical plain Patience
-/// line diff. Semantic fragments are explicitly selected and independently
+/// Calculate and render one CLI diff. Call MoonBit calculation only when both
+/// labels end in `.mbt`, or when `ignore_tests` is enabled and the shared path
+/// rule matches a test file. The core result still owns the displayed status
+/// and ignore reason. Other pairs go directly to the canonical plain Patience
+/// line diff without MoonBit parsing. Semantic fragments are independently
 /// rebased before the terminal renderer receives each `HunkDocument`.
 pub fn render(
   old_label : String,
@@ -544,9 +539,34 @@ pub fn render(
   new_source : String,
   options? : Options = Default::default(),
 ) -> String {
-  if old_label.has_suffix(".mbt") && new_label.has_suffix(".mbt") {
-    render_moonbit(old_label, old_source, new_label, new_source, options)
-  } else {
-    render_plain_text(old_label, old_source, new_label, new_source, options)
+  let old_is_moonbit = old_label.has_suffix(".mbt")
+  let new_is_moonbit = new_label.has_suffix(".mbt")
+  let moonbit_pair = old_is_moonbit && new_is_moonbit
+  if moonbit_pair ||
+    (
+      options.ignore_tests &&
+      (
+        @diff_ignore.is_test_file(old_label) ||
+        @diff_ignore.is_test_file(new_label)
+      )
+    ) {
+    let result = @mbtdiff.diff(
+      old_source,
+      new_source,
+      old_name=old_label,
+      new_name=new_label,
+      options=@mbtdiff.DiffOptions(
+        context_lines=options.context_lines,
+        graph_limit=options.graph_limit,
+        ignore_comments=options.ignore_comments,
+        ignore_tests=options.ignore_tests,
+      ),
+    )
+    if moonbit_pair || result.ignore_reason() is Some(TestFile) {
+      return render_moonbit(
+        old_label, old_source, new_label, new_source, options, result,
+      )
+    }
   }
+  render_plain_text(old_label, old_source, new_label, new_source, options)
 }

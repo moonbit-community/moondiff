@@ -71,7 +71,7 @@ fn moondiff_command() -> @argparse.Command {
       ),
       @argparse.FlagArg(
         "ignore-tests",
-        about="Ignore top-level MoonBit test and async test blocks",
+        about="Ignore *_test.mbt / *_wbtest.mbt file pairs and top-level MoonBit test and async test blocks",
         action=@argparse.FlagAction::SetTrue,
       ),
     ],
