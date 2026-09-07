@@ -682,8 +682,8 @@ fn all_moonbit_cache_keys() -> Array[CacheKey] {
 test "Lexical is the default and algorithm selection is not part of routes" {
   let model = initial_model()
   assert_true(model.diff_algorithm is LexicalAlgorithm)
-  assert_false(model.ignore_comments)
-  assert_false(model.ignore_tests)
+  assert_true(model.ignore_comments)
+  assert_true(model.ignore_tests)
   let reference = commit_reference("owner", "repo", "abcdef1")
   assert_eq(playground_route(reference), "#/owner/repo/commit/abcdef1")
   assert_false(playground_route(reference).contains("algorithm"))
