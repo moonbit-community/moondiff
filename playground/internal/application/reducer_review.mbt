@@ -1,6 +1,14 @@
 ///|
 pub(all) enum ReviewMsg {
   RefreshComments
+  AskDelete(@comments.CommentId)
+  CancelDelete
+  ConfirmCommentDelete(@comments.CommentId)
+  CommentDeleted(
+    Int,
+    @comments.CommentId,
+    Result[@comments.DeleteResult, Error]
+  )
   CommentsLoaded(Int, Result[ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
@@ -23,17 +31,21 @@ fn update_review(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   match msg {
+    AskDelete(id) => update_deletion(model, id, false, emit)
+    ConfirmCommentDelete(id) => update_deletion(model, id, true, emit)
+    CancelDelete =>
+      if model.review.deletion is Some(Deleting(_)) {
+        (model, @rabbita.none)
+      } else {
+        (with_review(model, { ..model.review, deletion: None, }), @rabbita.none)
+      }
+    CommentDeleted(generation, id, result) =>
+      finish_deletion(model, generation, id, result, emit)
     RefreshComments => {
       guard extension_host_enabled() && model.route is Some(reference) else {
         return (model, @rabbita.none)
       }
-      (
-        with_review(
-          model,
-          review_state_with_comments(model.review, CommentsLoading),
-        ),
-        comments_request(reference, model.generation, emit),
-      )
+      (model, comments_request(reference, model.generation, emit))
     }
     PageReactivated => {
       guard extension_host_enabled() && model.route is Some(reference) else {
@@ -53,7 +65,12 @@ fn update_review(
           (
             with_review(
               model,
-              review_state_with_comments(model.review, CommentsReady(bundle)),
+              review_state_with_comments(
+                model.review,
+                CommentsReady(
+                  @comments.without_deleted(bundle, model.review.deleted),
+                ),
+              ),
             ),
             @rabbita.none,
           )
@@ -257,6 +274,8 @@ fn update_review(
             with_review(refreshed, {
               auth: model.review.auth,
               last_authenticated_login: model.review.last_authenticated_login,
+              deletion: None,
+              deleted: [],
               comments: CommentsLoading,
               draft: Some({
                 kind: draft.kind,

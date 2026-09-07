@@ -26,6 +26,8 @@ pub fn auth_status_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
 
 pub fn author_label(ApiCommentUser?) -> String
 
+pub fn can_delete_comment(ReviewState, CommentId) -> Bool
+
 pub fn comment_head_request(@github.CommitRef, String, Int, @cmd.Emit[Result[@github.ApiPull, Error]]) -> @cmd.Cmd
 
 pub fn comments_request(@github.CommitRef, Int, @cmd.Emit[Result[ApiCommentBundle, Error]]) -> @cmd.Cmd
@@ -40,6 +42,8 @@ pub fn create_review_comment_request(@github.CommitRef, String, String, @review.
 
 pub fn create_review_reply_request(@github.CommitRef, String, Int64, String, Int, @cmd.Emit[Result[ApiReviewComment, Error]]) -> @cmd.Cmd
 
+pub fn delete_comment_request(@github.CommitRef, CommentId, Int, @cmd.Emit[Result[DeleteResult, Error]]) -> @cmd.Cmd
+
 pub fn initial_review_state() -> ReviewState
 
 pub fn notify_github_page_command() -> @cmd.Cmd
@@ -53,6 +57,8 @@ pub fn review_state_with_comments(ReviewState, CommentsStatus) -> ReviewState
 pub fn review_state_with_draft(ReviewState, CommentDraft?) -> ReviewState
 
 pub fn review_threads(@change.ChangeView, ArrayView[ApiReviewComment]) -> Array[ReviewThread]
+
+pub fn without_deleted(ApiCommentBundle, Array[CommentId]) -> ApiCommentBundle
 
 // Errors
 
@@ -126,11 +132,23 @@ pub(all) enum AuthStatus {
   AuthFailed(String)
 } derive(Eq)
 
+pub(all) enum CommentDeletion {
+  ConfirmDelete(CommentId)
+  Deleting(CommentId)
+  DeleteFailed(CommentId, String)
+} derive(Eq)
+
 pub(all) struct CommentDraft {
   kind : DraftKind
   body : String
   submitting : Bool
   error : String?
+} derive(Eq)
+
+pub(all) enum CommentId {
+  IssueComment(Int64)
+  ReviewComment(Int64)
+  CommitComment(Int64)
 } derive(Eq)
 
 pub(all) enum CommentsStatus {
@@ -145,6 +163,10 @@ pub(all) struct CommitDiscussion {
   file_index : Int?
   outdated : Bool
 }
+
+pub(all) struct DeleteResult {
+  deleted : Bool
+} derive(@json.FromJson)
 
 pub(all) struct DeviceAuthorization {
   flow_id : String
@@ -173,6 +195,8 @@ pub(all) struct ReviewState {
   last_authenticated_login : String?
   comments : CommentsStatus
   draft : CommentDraft?
+  deletion : CommentDeletion?
+  deleted : Array[CommentId]
 } derive(Eq)
 
 pub(all) struct ReviewThread {

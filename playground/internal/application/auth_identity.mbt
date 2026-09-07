@@ -59,6 +59,8 @@ fn review_state_with_auth_identity(
     {
       auth,
       last_authenticated_login,
+      deletion: review.deletion,
+      deleted: review.deleted,
       comments: review.comments,
       draft: review.draft,
     },
@@ -74,6 +76,8 @@ fn reload_after_auth_identity_boundary(
   let cleared = with_review(model, {
     auth: model.review.auth,
     last_authenticated_login: model.review.last_authenticated_login,
+    deletion: None,
+    deleted: [],
     comments: CommentsLoading,
     draft: None,
   })

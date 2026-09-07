@@ -44,7 +44,7 @@ fn comment_failure_message(error : Error) -> String {
     Some("not_found_or_not_installed") =>
       return "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
     Some("permission_denied") =>
-      return "GitHub denied this action. Install the app for this repository and check its Pull requests permission."
+      return "GitHub denied this action. Install the app for this repository and check its Contents and Pull requests permissions."
     Some("invalid_comment_anchor") =>
       return "GitHub rejected this comment anchor. Refresh the diff and choose the line again."
     _ => ()
@@ -53,7 +53,7 @@ fn comment_failure_message(error : Error) -> String {
   if detail.contains("HTTP 401") {
     "Your GitHub session expired. Sign in again, then retry."
   } else if detail.contains("HTTP 403") {
-    "GitHub denied this action. Install the app for this repository and check its Pull requests permission."
+    "GitHub denied this action. Install the app for this repository and check its Contents and Pull requests permissions."
   } else if detail.contains("HTTP 404") {
     "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
   } else if detail.contains("HTTP 422") {

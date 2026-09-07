@@ -122,6 +122,9 @@ pub(all) struct ReviewState {
   last_authenticated_login : String?
   comments : CommentsStatus
   draft : CommentDraft?
+  deletion : CommentDeletion?
+  // Successful deletions remain excluded from refreshes until the route generation changes.
+  deleted : Array[CommentId]
 } derive(Eq)
 
 ///|
@@ -130,6 +133,8 @@ pub fn initial_review_state() -> ReviewState {
     {
       auth: AuthChecking,
       last_authenticated_login: None,
+      deletion: None,
+      deleted: [],
       comments: CommentsLoading,
       draft: None,
     }
@@ -137,6 +142,8 @@ pub fn initial_review_state() -> ReviewState {
     {
       auth: WebReadOnly,
       last_authenticated_login: None,
+      deletion: None,
+      deleted: [],
       comments: CommentsDisabled,
       draft: None,
     }
@@ -189,12 +196,7 @@ pub fn review_state_with_auth(
   review : ReviewState,
   auth : AuthStatus,
 ) -> ReviewState {
-  {
-    auth,
-    last_authenticated_login: review.last_authenticated_login,
-    comments: review.comments,
-    draft: review.draft,
-  }
+  { ..review, auth, }
 }
 
 ///|
@@ -202,12 +204,7 @@ pub fn review_state_with_comments(
   review : ReviewState,
   comments : CommentsStatus,
 ) -> ReviewState {
-  {
-    auth: review.auth,
-    last_authenticated_login: review.last_authenticated_login,
-    comments,
-    draft: review.draft,
-  }
+  { ..review, comments, }
 }
 
 ///|
@@ -215,12 +212,7 @@ pub fn review_state_with_draft(
   review : ReviewState,
   draft : CommentDraft?,
 ) -> ReviewState {
-  {
-    auth: review.auth,
-    last_authenticated_login: review.last_authenticated_login,
-    comments: review.comments,
-    draft,
-  }
+  { ..review, draft, }
 }
 
 ///|
