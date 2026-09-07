@@ -307,9 +307,22 @@ async function installHost(page, target = pullTarget(), options = {}) {
           throw Object.assign(new Error("Sign in and install the GitHub App for private repositories."), { status: 404, code: "not_found_or_not_installed" });
         }
         state.commentListCalls += 1;
+        if (state.delayNextList) {
+          state.delayNextList = false;
+          const snapshot = structuredClone({ issue_comments: state.issueComments, review_comments: state.reviewComments, commit_comments: [] });
+          await new Promise(resolve => { state.releaseList = resolve; });
+          return snapshot;
+        }
         return state.target.kind === "pull"
           ? { issue_comments: state.issueComments, review_comments: state.reviewComments, commit_comments: [] }
           : { issue_comments: [], review_comments: [], commit_comments: state.commitComments };
+      }
+      if (op.endsWith(".comment.delete")) {
+        if (state.deleteDelay) await new Promise(resolve => { state.releaseDelete = resolve; });
+        if (state.deleteError) throw Object.assign(new Error(state.deleteError), { status: 403, code: "permission_denied" });
+        const field = op.includes(".issue.") ? "issueComments" : op.includes(".review.") ? "reviewComments" : "commitComments";
+        state[field] = state[field].filter(comment => comment.id !== args.comment_id);
+        return { deleted: true };
       }
       if (op === "github.issue.comment.create") {
         const created = { id: "11", body: args.body, html_url: "https://github.com/comment/11", created_at: "2026-08-18T09:00:00Z", user: { login: "tester" } };
@@ -396,7 +409,7 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.getByText("Existing overall comment")).toBeVisible();
   await expect(page.getByText("Existing inline comment")).toBeVisible();
   await expect(page.getByText("Outdated inline comment")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Outdated discussion" })).toBeVisible();
+  await expect(page.locator(".outdated-discussions .comment-location")).toContainText("Outdated");
   const commentArgs = await page.evaluate(() => window.__fake.calls
     .find(call => call.op === "github.comments.list").args);
   expect(commentArgs).toEqual({ owner: "upstream", repo: "project", kind: "pull", number: "17" });
@@ -980,6 +993,104 @@ test("loaded extension opens the current GitHub SPA route", async () => {
   }
 });
 
+test("inline cards anchor both sides once, keep replies, and place editors above the target", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await page.addInitScript(() => {
+    const root = window.__fake.reviewComments[0];
+    window.__fake.reviewComments.push({ ...root, id: "40", side: "LEFT", position: 2, body: "Left thread" });
+    window.__fake.reviewComments.push({ ...root, id: "41", body: "Second right thread" });
+  });
+  await page.goto(reviewPath());
+  for (const layout of ["split", "unified", "split"]) {
+    const toggle = page.getByRole("button", { name: `Use ${layout} view` });
+    if (await toggle.isVisible()) await toggle.click();
+    for (const body of ["Existing inline comment", "Left thread", "Second right thread"]) {
+      const card = page.locator(".inline-discussion-row").filter({ hasText: body });
+      await expect(card).toHaveCount(1);
+      await expect(card.locator(".comment-location")).toContainText("src/main.mbt");
+      expect(await card.evaluate(row => {
+        let target = row.nextElementSibling;
+        while (target?.classList.contains("inline-discussion-row")) target = target.nextElementSibling;
+        return target?.classList.contains("comment-target");
+      })).toBe(true);
+    }
+  }
+  await openNewLineComment(page, 2);
+  const editor = page.locator(".inline-comment-editor-row");
+  await expect(editor.locator(".comment-location")).toContainText("New · 2");
+  expect(await editor.evaluate(row => row.nextElementSibling.classList.contains("comment-target"))).toBe(true);
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  const own = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
+  await expect(page.locator(".github-comment").filter({ hasText: "Existing reply" }).getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+  await own.getByRole("button", { name: "Delete", exact: true }).click();
+  await own.getByRole("button", { name: "Cancel deletion" }).click();
+  await expect(own).toBeVisible();
+  await own.getByRole("button", { name: "Delete", exact: true }).click();
+  await own.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(own).toHaveCount(0);
+  await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing reply" })).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => window.__fake.calls.filter(c => c.op === "page.comments.changed").length)).toBeGreaterThan(0);
+});
+
+test("delete failures can retry without duplicate requests or stale refresh resurrection", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await page.goto(reviewPath());
+  const own = page.locator(".github-comment").filter({ hasText: "Existing overall comment" });
+  await own.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.evaluate(() => { window.__fake.deleteError = "Permission denied"; });
+  await own.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(own.locator(".comment-error")).toContainText("GitHub denied this action");
+  await page.evaluate(() => {
+    window.__fake.deleteError = null;
+    window.__fake.deleteDelay = true;
+    window.__fake.delayNextList = true;
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => !!window.__fake.releaseList)).toBe(true);
+  await own.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(own.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+  await expect(own.getByRole("button", { name: "Cancel deletion" })).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => !!window.__fake.releaseDelete)).toBe(true);
+  await page.evaluate(() => window.__fake.releaseDelete());
+  await expect(own).toHaveCount(0);
+  await page.evaluate(() => window.__fake.releaseList());
+  await expect(own).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.issue.comment.delete").length)).toBe(2);
+});
+
+for (const [target, body, operation] of [[commitTarget(), "Existing commit comment", "github.commit.comment.delete"], [pullTarget(), "Existing reply", "github.review.comment.delete"]]) {
+  test(`delete ${body}`, async ({ page }) => {
+    await installHost(page, target, { authenticated: true, login: body === "Existing reply" ? "author" : "reviewer" });
+    await page.goto(reviewPath(target));
+    const card = page.locator(".github-comment").filter({ hasText: body });
+    await card.getByRole("button", { name: "Delete", exact: true }).click();
+    await card.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(card).toHaveCount(0);
+    expect(await page.evaluate(op => window.__fake.calls.filter(c => c.op === op).length, operation)).toBe(1);
+  });
+}
+
+test("filtered comments fall back with location, and return inline after filters change", async ({ page }) => {
+  await installHost(page, pullTarget(), {
+    authenticated: true,
+    oldSource: "fn example() {\n  // old comment\n  1\n}",
+    newSource: "fn example() {\n  // new comment\n  1\n}",
+    patch: "@@ -1,4 +1,4 @@\n fn example() {\n-  // old comment\n+  // new comment\n   1\n }",
+  });
+  await page.addInitScript(() => { window.__fake.reviewComments[2].original_line = 17; });
+  await page.goto(reviewPath());
+  await expect(page.locator(".file-discussions").filter({ hasText: "Existing inline comment" })).toContainText("Not shown in current view");
+  await expect(page.locator(".outdated-discussions .comment-location")).toContainText("17");
+  await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
+  await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
+  await page.getByRole("button", { name: "AST", exact: true }).click();
+  await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
+  await expect(page.locator(".file-discussions").filter({ hasText: "Existing inline comment" })).toContainText("Not shown in current view");
+  await page.getByRole("button", { name: "Lexical", exact: true }).click();
+  await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
+  await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
+});
+
 for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
   test(`long code soft wraps at ${width}px in ${colorScheme} mode`, async ({ page }) => {
     const oldLine = `  let identifier_${"long".repeat(100)} = "${"a".repeat(400)}"`;
@@ -1059,3 +1170,79 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
     }
   });
 }
+
+test("declaration reordering preserves absolute comment lines across algorithms and layouts", async ({ page }) => {
+  const oldLines = ["fn alpha() {", "  old_alpha()", "}", "fn beta() {", "  old_beta()", "}"];
+  const newLines = ["fn beta() {", "  new_beta()", "}", "fn alpha() {", "  new_alpha()", "}"];
+  await installHost(page, pullTarget(), {
+    oldSource: oldLines.join("\n"), newSource: newLines.join("\n"),
+    patch: "@@ -1,6 +1,6 @@\n" + oldLines.map(s => "-" + s).concat(newLines.map(s => "+" + s)).join("\n"),
+  });
+  await page.addInitScript(() => {
+    const root = window.__fake.reviewComments[0];
+    window.__fake.reviewComments = [
+      { ...root, line: 5, position: 11, body: "New alpha location" },
+      { ...root, id: "45", side: "LEFT", line: 2, position: 2, body: "Old alpha location" },
+    ];
+  });
+  await page.goto(reviewPath());
+  for (const algorithm of ["Lexical", "AST"]) {
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const layout of ["split", "unified"]) {
+      const toggle = page.getByRole("button", { name: `Use ${layout} view` });
+      if (await toggle.isVisible()) await toggle.click();
+      for (const [body, code] of [["New alpha location", "new_alpha"], ["Old alpha location", "old_alpha"]]) {
+        const card = page.locator(".inline-discussion-row").filter({ hasText: body });
+        await expect(card).toHaveCount(1);
+        await expect.poll(() => card.evaluate(row => {
+          let target = row.nextElementSibling;
+          while (target?.classList.contains("inline-discussion-row")) target = target.nextElementSibling;
+          return target.textContent;
+        })).toContain(code);
+      }
+    }
+  }
+});
+
+test("comments without a matching file stay in the overall discussion", async ({ page }) => {
+  await installHost(page, commitTarget());
+  await page.addInitScript(() => {
+    // The worker protocol omits GitHub null fields before decoding in MoonBit.
+    delete window.__fake.commitComments[0].path;
+    delete window.__fake.commitComments[0].position;
+  });
+  await page.goto(reviewPath(commitTarget()));
+  await expect(page.locator(".comments-overview").getByText("Existing commit comment")).toHaveCount(1);
+});
+
+test("filter choices reset on reload and a collapsed file keeps its draft in discussion", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await openNewLineComment(page, 2);
+  await page.locator(".inline-comment-editor-row textarea").fill("Preserved draft");
+  await page.getByRole("button", { name: "Collapse src/main.mbt", exact: true }).click();
+  await expect(page.locator(".file-discussions textarea")).toHaveValue("Preserved draft");
+  await expect(page.locator(".file-discussions").filter({ hasText: "Existing inline comment" })).toContainText("Not shown in current view");
+  await page.getByRole("button", { name: "Expand src/main.mbt", exact: true }).click();
+  await expect(page.locator(".inline-comment-editor-row textarea")).toHaveValue("Preserved draft");
+  for (const name of ["Ignore comments", "Ignore tests"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "false");
+  }
+  expect(page.url()).not.toContain("ignore");
+  await page.reload();
+  for (const name of ["Ignore comments", "Ignore tests"]) await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("expired credentials during deletion keep the card and offer sign-in", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await page.goto(reviewPath());
+  const card = page.locator(".github-comment").filter({ hasText: "Existing overall comment" });
+  await card.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.evaluate(() => window.__fake.authenticationFailureOps.push("github.issue.comment.delete"));
+  await card.getByRole("button", { name: "Confirm delete" }).click();
+  await expect(card.locator(".comment-error")).toContainText("Your GitHub session expired");
+  await expect(page.getByRole("button", { name: "Try sign-in", exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+  await expect(card).toBeVisible();
+});
