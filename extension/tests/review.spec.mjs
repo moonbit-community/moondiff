@@ -979,3 +979,83 @@ test("loaded extension opens the current GitHub SPA route", async () => {
     }
   }
 });
+
+for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
+  test(`long code soft wraps at ${width}px in ${colorScheme} mode`, async ({ page }) => {
+    const oldLine = `  let identifier_${"long".repeat(100)} = "${"a".repeat(400)}"`;
+    const newLine = oldLine.replace('= "a', '= "b');
+    await installHost(page, pullTarget(), {
+      oldSource: `fn main() {\n${oldLine}\n}`,
+      newSource: `fn main() {\n${newLine}\n}`,
+      patch: `@@ -1,3 +1,3 @@\n fn main() {\n-${oldLine}\n+${newLine}\n }`,
+    });
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme });
+    await page.goto(reviewPath());
+    for (const name of ["Ignore comments", "Ignore tests"]) {
+      const toggle = page.getByRole("button", { name, exact: true });
+      await expect(toggle).toHaveAttribute("aria-pressed", "true");
+      for (const state of ["on", "off"]) {
+        {
+          const prefix = name === "Ignore comments" ? "ignore-comments" : "ignore-tests";
+          const icon = name === "Ignore comments" ? "//" : "T";
+          await expect(toggle).toHaveText(`${icon}${name}`);
+          await expect(toggle.locator(".filter-state")).toHaveCount(0);
+          await expect(toggle.locator(`.${prefix}-icon`)).toBeVisible();
+          if (width === 420) await expect(toggle.locator(`.${prefix}-label`)).toBeHidden();
+          else await expect(toggle.locator(`.${prefix}-label`)).toBeVisible();
+          if (state === "on") {
+            await expect(toggle).toHaveCSS("background-color", "rgb(238, 242, 254)");
+            await expect(toggle).toHaveCSS("color", "rgb(42, 85, 204)");
+            await expect(toggle).toHaveCSS("border-top-color", "rgb(59, 110, 245)");
+          } else {
+            await expect(toggle).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
+          }
+        }
+        const contrast = await toggle.evaluate(button => {
+          const rgba = value => {
+            const channels = value.match(/[\d.]+/g).map(Number);
+            // color-mix() backgrounds serialize as normalized color(srgb ...).
+            if (value.startsWith("color(srgb ")) return channels.map((v, i) => i < 3 ? v * 255 : v);
+            return channels;
+          };
+          const background = element => {
+            if (!element) return [255, 255, 255];
+            const color = rgba(getComputedStyle(element).backgroundColor);
+            const alpha = color[3] ?? 1;
+            if (alpha === 1) return color.slice(0, 3);
+            const beneath = background(element.parentElement);
+            return color.slice(0, 3).map((v, i) => v * alpha + beneath[i] * (1 - alpha));
+          };
+          const luminance = values => values.slice(0, 3).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+          const ratio = (a, b) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
+          const style = getComputedStyle(button);
+          return { text: ratio(rgba(style.color), background(button)), border: ratio(rgba(style.borderTopColor), background(button.parentElement)) };
+        });
+        expect(contrast.text).toBeGreaterThanOrEqual(4.5);
+        expect(contrast.border).toBeGreaterThanOrEqual(3);
+        await toggle.click();
+        await expect(toggle).toHaveAttribute("aria-pressed", state === "on" ? "false" : "true");
+      }
+    }
+    for (const layout of ["split", "unified"]) {
+      if (layout === "unified") await page.getByRole("button", { name: "Use unified view" }).click();
+      const cell = page.locator(`table.${layout} td.add`).filter({ hasText: "identifier_" });
+      await expect(cell).toBeVisible();
+      const metrics = await cell.evaluate(cell => ({
+        height: cell.getBoundingClientRect().height,
+        lineHeight: parseFloat(getComputedStyle(cell).lineHeight),
+        width: cell.clientWidth, scroll: cell.scrollWidth,
+        tableWidth: cell.closest("table").getBoundingClientRect().width,
+        containerWidth: cell.closest(".diff-scroll").clientWidth,
+      }));
+      expect(metrics.height).toBeGreaterThan(metrics.lineHeight * 2);
+      expect(metrics.scroll).toBeLessThanOrEqual(metrics.width);
+      expect(metrics.tableWidth).toBeLessThanOrEqual(metrics.containerWidth + 1);
+      if (layout === "split") {
+        const widths = await page.locator("table.split td.del, table.split td.add").evaluateAll(cells => cells.map(c => c.getBoundingClientRect().width));
+        expect(Math.abs(widths[0] - widths[1])).toBeLessThan(1);
+      }
+    }
+  });
+}
