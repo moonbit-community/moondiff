@@ -51,7 +51,7 @@ limits produce one whole-file lexical fragment. When a graph limit, invalid
 syntax position, or local computation limit affects only one aligned top-level
 declaration, the playground labels that declaration as a partial lexical
 fallback and keeps AST diffing the rest of the file. The
-default-off **Ignore comments** control applies to MoonBit
+default-on **Ignore comments** control applies to MoonBit
 files in both Lexical and AST mode. It ignores ordinary and documentation
 comments, generated `///|UUID(...)` markers, and the separating whitespace
 before a comment while keeping strings such as `"//not a comment"` intact. It
@@ -59,7 +59,7 @@ also ignores empty lines, lines containing only Unicode whitespace, blank-line
 count changes, and a missing or added final newline. Pure comment and blank-line
 changes produce no hunks. When nearby code also changes, the original comments
 and blank lines remain visible as neutral context without addition, deletion,
-or intraline highlighting. The separate default-off **Ignore tests** control
+or intraline highlighting. The separate default-on **Ignore tests** control
 ignores an entire file comparison if the current or previous filename ends in
 `_test.mbt` or `_wbtest.mbt` (case-sensitive), including additions, deletions,
 renames to or from ordinary files, helper functions, imports, and invalid syntax.
@@ -213,3 +213,11 @@ npm run test:e2e
 On a machine that is missing Chromium system libraries, use
 `npx playwright install --with-deps chromium` instead. For an interactive
 Playwright session, run `npm run test:e2e:ui`.
+
+Ignore comments and Ignore tests start on each page load; choices stay in the
+current session and are never saved in share links or local storage. Both controls show an icon and label,
+with OpenSeek GUI's soft blue (`#EEF2FE`) background, primary blue (`#3B6EF5`)
+border, and strong blue (`#2A55CC`) text when on in either theme. On narrow
+screens they show only their icons (**//**
+and **T**), without On/Off badges; their pressed states remain available to
+assistive technology.

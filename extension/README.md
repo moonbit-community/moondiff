@@ -50,3 +50,11 @@ npm run test:extension
 
 This covers the extension scripts, packaging policy, and review-page browser
 scenarios.
+
+Ignore comments and Ignore tests start on each page load; choices stay in the
+current session and are never saved in share links or local storage. Both controls show an icon and label,
+with OpenSeek GUI's soft blue (`#EEF2FE`) background, primary blue (`#3B6EF5`)
+border, and strong blue (`#2A55CC`) text when on in either theme. On narrow
+screens they show only their icons (**//**
+and **T**), without On/Off badges; their pressed states remain available to
+assistive technology.
