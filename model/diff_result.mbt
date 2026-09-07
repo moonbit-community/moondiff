@@ -3,6 +3,7 @@
 struct DiffResult {
   status : DiffStatus
   document : DiffDocument
+  ignore_reason : IgnoreReason?
 }
 
 ///|
@@ -11,8 +12,17 @@ struct DiffResult {
 pub fn DiffResult::make(
   document : DiffDocument,
   status : DiffStatus,
+  ignore_reason? : IgnoreReason = FilteredContent,
 ) -> DiffResult {
-  { status, document, }
+  {
+    status,
+    document,
+    ignore_reason: if status is IgnoredOnly {
+      Some(ignore_reason)
+    } else {
+      None
+    },
+  }
 }
 
 ///|
@@ -25,4 +35,11 @@ pub fn DiffResult::status(self : DiffResult) -> DiffStatus {
 /// Return the sole semantic document retained by this result.
 pub fn DiffResult::document(self : DiffResult) -> DiffDocument {
   self.document
+}
+
+///|
+/// Return the filtering reason for `IgnoredOnly`, or `None` for every other
+/// status, including `Identical`.
+pub fn DiffResult::ignore_reason(self : DiffResult) -> IgnoreReason? {
+  self.ignore_reason
 }

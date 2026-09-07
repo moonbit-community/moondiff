@@ -1,6 +1,7 @@
 import {
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/internal/alignment",
+  "moonbit-community/moondiff/internal/diff_ignore",
 }
 
 import {
