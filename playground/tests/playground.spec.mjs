@@ -1633,7 +1633,7 @@ for (const width of [1280, 420]) for (const colorScheme of ["light", "dark"]) {
     await loadCommentsCommit(page);
     for (const [name, icon, prefix] of [
       ["Ignore comments", "//", "ignore-comments"],
-      ["Ignore tests", "T", "ignore-tests"],
+      ["Ignore tests", "{}", "ignore-tests"],
     ]) {
       const toggle = page.getByRole("button", { name, exact: true });
       for (const pressed of [true, false, true]) {
