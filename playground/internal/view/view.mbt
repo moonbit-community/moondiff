@@ -282,7 +282,7 @@ fn ignore_tests_control(
       .aria_pressed(if ignore_tests { "true" } else { "false" }),
     on_click=emit(Ui(ToggleIgnoreTests)),
     [
-      @html.span(class="ignore-tests-icon", "T"),
+      @html.span(class="ignore-tests-icon", "{}"),
       @html.span(class="ignore-tests-label", "Ignore tests"),
     ],
   )

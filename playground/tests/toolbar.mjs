@@ -7,7 +7,7 @@ export async function checkToolbar(page) {
   await expect(url).toBeVisible();
   await expect(url).toHaveAttribute("title", await url.textContent());
   await expect(hero.locator(".workspace-actions button:not(.file-tree-trigger)")).toHaveText([
-    "Token", "Tree", "Split", "Unified", "//Ignore comments", "TIgnore tests",
+    "Token", "Tree", "Split", "Unified", "//Ignore comments", "{}Ignore tests",
   ]);
   for (const mode of ["Split", "Unified", "Unified", "Split", "Split"]) {
     await page.getByRole("button", { name: mode, exact: true }).click();

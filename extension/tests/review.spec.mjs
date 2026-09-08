@@ -1112,7 +1112,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
       for (const state of ["on", "off"]) {
         {
           const prefix = name === "Ignore comments" ? "ignore-comments" : "ignore-tests";
-          const icon = name === "Ignore comments" ? "//" : "T";
+          const icon = name === "Ignore comments" ? "//" : "{}";
           await expect(toggle).toHaveText(`${icon}${name}`);
           await expect(toggle.locator(".filter-state")).toHaveCount(0);
           await expect(toggle.locator(`.${prefix}-icon`)).toBeVisible();
