@@ -1,3 +1,4 @@
+import { checkToolbar } from "../../playground/tests/toolbar.mjs";
 import { chromium, expect, test } from "../../playground/node_modules/@playwright/test/index.mjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -490,7 +491,7 @@ test("AST highlights inserted internal whitespace continuously in split and unif
   await expect(splitHighlight).toHaveCount(1);
   await expect(splitHighlight).toContainText("let total");
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   const unifiedHighlight = page.locator("table.unified.review-diff b.wa", {
     hasText: "let total",
   });
@@ -650,7 +651,7 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(beforeManual);
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(page.locator("table.unified.review-diff")).toBeVisible();
 });
 
@@ -1002,8 +1003,10 @@ test("inline cards anchor both sides once, keep replies, and place editors above
   });
   await page.goto(reviewPath());
   for (const layout of ["split", "unified", "split"]) {
-    const toggle = page.getByRole("button", { name: `Use ${layout} view` });
-    if (await toggle.isVisible()) await toggle.click();
+    const toggle = page.getByRole("button", { name: layout === "split" ? "Split" : "Unified", exact: true });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(`table.${layout}.review-diff`).first()).toBeVisible();
     for (const body of ["Existing inline comment", "Left thread", "Second right thread"]) {
       const card = page.locator(".inline-discussion-row").filter({ hasText: body });
       await expect(card).toHaveCount(1);
@@ -1152,7 +1155,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
       }
     }
     for (const layout of ["split", "unified"]) {
-      if (layout === "unified") await page.getByRole("button", { name: "Use unified view" }).click();
+      if (layout === "unified") await page.getByRole("button", { name: "Unified" }).click();
       const cell = page.locator(`table.${layout} td.add`).filter({ hasText: "identifier_" });
       await expect(cell).toBeVisible();
       const metrics = await cell.evaluate(cell => ({
@@ -1191,8 +1194,10 @@ test("declaration reordering preserves absolute comment lines across algorithms 
   for (const algorithm of ["Token", "Tree"]) {
     await page.getByRole("button", { name: algorithm, exact: true }).click();
     for (const layout of ["split", "unified"]) {
-      const toggle = page.getByRole("button", { name: `Use ${layout} view` });
-      if (await toggle.isVisible()) await toggle.click();
+      const toggle = page.getByRole("button", { name: layout === "split" ? "Split" : "Unified", exact: true });
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator(`table.${layout}.review-diff`).first()).toBeVisible();
       for (const [body, code] of [["New alpha location", "new_alpha"], ["Old alpha location", "old_alpha"]]) {
         const card = page.locator(".inline-discussion-row").filter({ hasText: body });
         await expect(card).toHaveCount(1);
@@ -1247,4 +1252,12 @@ test("expired credentials during deletion keep the card and offer sign-in", asyn
   await expect(page.getByRole("button", { name: "Try sign-in", exact: true })).toBeVisible();
   await expect(card.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
   await expect(card).toBeVisible();
+});
+
+
+test("shared toolbar controls fit desktop and narrow screens in both themes", async ({ page }) => {
+  await installHost(page, pullTarget());
+  await page.goto(reviewPath());
+  await expect(page.locator("table.split").first()).toBeVisible();
+  await checkToolbar(page);
 });
