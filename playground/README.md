@@ -33,7 +33,7 @@ The files endpoint is fetched in 100-file pages. GitHub caps that endpoint at
 so larger or incomplete responses fail explicitly instead of showing a partial
 PR. Every changed file receives a card in GitHub's order. Files
 whose old or new path ends in `.mbt` use the bundled `mbtdiff` engine's
-MoonBit-aware lexical diff by default. The global **Lexical / AST** control
+MoonBit-aware lexical diff by default. The global **Token / Tree** control
 switches those files to structural diffing. After reliable top-level alignment,
 Lexical compares declaration-owned sections independently and displays every
 changed declaration in full, including its documentation, internal blank lines,

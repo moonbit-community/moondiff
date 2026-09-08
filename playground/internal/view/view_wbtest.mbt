@@ -505,6 +505,6 @@ test "AST structural-empty view without fallback keeps its original DOM" {
     )
   })
   assert_eq(
-    rendered, "<div class=\"file-message structural-empty\"><p>No structural changes found. Switch to Lexical to view text changes.</p></div>",
+    rendered, "<div class=\"file-message structural-empty\"><p>No structural changes found. Switch to Token to view text changes.</p></div>",
   )
 }
