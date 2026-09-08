@@ -1,3 +1,4 @@
+import { checkToolbar } from "./toolbar.mjs";
 import { expect, test } from "@playwright/test";
 
 const commitSha = "abcdef1234567890abcdef1234567890abcdef12";
@@ -959,9 +960,8 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
 
   await expect(page.getByText("example/project@", { exact: false })).toBeVisible();
   await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
-  await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
-  await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy link" })).toHaveCount(0);
   await expect(page.locator(".summary-grid, .share-panel")).toHaveCount(0);
 
   const heroLayout = await page.locator(".hero").evaluate(hero => {
@@ -1020,10 +1020,10 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
   expect(changedRowColors.newNumber).toBe(changedRowColors.newCode);
   expect(changedRowColors.oldCode).not.toBe(changedRowColors.newCode);
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(page.locator("table.unified")).toBeVisible();
   await expect(page.locator("table.split")).toHaveCount(0);
-  await page.getByRole("button", { name: "Use split view" }).click();
+  await page.getByRole("button", { name: "Split" }).click();
   await expect(page.locator("table.split")).toBeVisible();
 });
 
@@ -1152,8 +1152,7 @@ test("desktop file tree resizes live, persists across changes, and resets on ref
 
   const nextSha = "5555555555555555555555555555555555555555";
   const nextUrl = "https://github.com/example/tree/commit/" + nextSha;
-  await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
-  await page.getByRole("button", { name: "View diff" }).click();
+  await page.evaluate(url => { location.hash = new URL(url).pathname; }, nextUrl);
   await expect(page).toHaveURL("/#/example/tree/commit/" + nextSha);
   await expect(page.locator("table.split").first()).toBeVisible();
   expect(await fileTreeWidth(page)).toBe(480);
@@ -1368,7 +1367,7 @@ test("mixed commits use lazy line diffs and preserve binary file cards", async (
   await expect(binaryCard).toContainText("Cannot render: the file is binary or is not valid UTF-8.");
   await expect(binaryCard.locator(".diff-scroll")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(moonbitCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
   await expect(page.locator("table.unified")).toHaveCount(2);
@@ -1376,24 +1375,21 @@ test("mixed commits use lazy line diffs and preserve binary file cards", async (
   await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 });
 
-test("a shared playground URL restores the commit and can be copied", async ({ page }) => {
+test("a shared playground URL restores the commit after refresh", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await openMockedShareLink(page);
 
-  await expect(page.getByLabel("Public GitHub commit or pull request URL")).toHaveValue(commitUrl);
-  await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
-  await page.getByRole("button", { name: "Copy link" }).click();
-  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
+  await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
+  await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
 
   await page.reload();
+  await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
+  await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
   await expect(page.locator("table.split")).toBeVisible();
 });
 
 test("a PR URL loads every paginated file and preserves the PR share route", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   const requests = await installPullRoutes(page);
   await page.goto("/");
   await page
@@ -1407,8 +1403,8 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
   await expect(aggregateCard.locator("table.split")).toBeVisible();
   await expect(page).toHaveURL(`/#/example/project/pull/${pullNumber}`);
   await expect(
-    page.getByLabel("Public GitHub commit or pull request URL"),
-  ).toHaveValue(pullUrl);
+    page.locator(".workspace-url"),
+  ).toHaveText(pullUrl);
   await expect(page.locator(".file-card")).toHaveCount(101);
   await expect(page.getByText("Public pull request", { exact: true })).toBeVisible();
   await expect(
@@ -1421,8 +1417,7 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
   await expect(page.locator(".parent")).toContainText(pullHeadOne);
   await expect(
     page.getByRole("link", { name: "Open pull request on GitHub" }),
-  ).toHaveAttribute("href", pullUrl);
-  await expect(page.getByLabel("Shareable playground URL")).toHaveValue(page.url());
+  ).toHaveCount(0);
   expect(requests.apiRequests).toContain(
     `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadOne}`,
   );
@@ -1452,8 +1447,6 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
     ),
   );
 
-  await page.getByRole("button", { name: "Copy link" }).click();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
 });
 
 test("opening the same PR share route refreshes its head", async ({ page }) => {
@@ -1554,18 +1547,12 @@ test("narrow viewport wraps code and keeps controls usable", async ({ page }) =>
   await loadMockedCommit(page);
 
   const heroLayout = await page.locator(".hero").evaluate(hero => {
-    const copy = hero.querySelector(".hero-copy").getBoundingClientRect();
-    const controls = hero.querySelector(".hero-controls").getBoundingClientRect();
-    return { copyBottom: copy.bottom, controlsTop: controls.top };
+    const url = hero.querySelector(".workspace-url").getBoundingClientRect();
+    const actions = hero.querySelector(".workspace-actions").getBoundingClientRect();
+    return { urlBottom: url.bottom, actionsTop: actions.top, urlRight: url.right };
   });
-  expect(heroLayout.controlsTop).toBeGreaterThanOrEqual(heroLayout.copyBottom);
-
-  const formFitsViewport = await page.locator(".commit-form").evaluate(form => {
-    const input = form.querySelector("input").getBoundingClientRect();
-    const button = form.querySelector("button").getBoundingClientRect();
-    return input.left >= 0 && input.right <= innerWidth && button.left >= 0 && button.right <= innerWidth;
-  });
-  expect(formFitsViewport).toBe(true);
+  expect(heroLayout.actionsTop).toBeGreaterThanOrEqual(heroLayout.urlBottom);
+  expect(heroLayout.urlRight).toBeLessThanOrEqual(640);
 
   const splitOverflow = await page.locator(".diff-scroll").evaluate(scroller => {
     const codeCells = [...scroller.querySelectorAll("table.split td.ctx, table.split td.del, table.split td.add")];
@@ -1598,7 +1585,7 @@ test("narrow viewport wraps code and keeps controls usable", async ({ page }) =>
   await expect(fileButton).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".file-card .diff-scroll")).toBeVisible();
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(page.locator("table.unified")).toBeVisible();
   const unifiedOverflow = await page.locator(".diff-scroll").evaluate(element => ({
     clientWidth: element.clientWidth,
@@ -1772,7 +1759,7 @@ test("Ignore comments works across algorithms and layouts without changing plain
   await expect(
     mixedCard.locator(".ignored-context").filter({ hasText: "old trailing" }),
   ).toHaveCount(1);
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(mixedCard.locator("table.unified")).toBeVisible();
   expect(await mixedCard.locator("td.ctx.ignored").count()).toBeGreaterThan(2);
   await expect(blankLinesOnlyCard.locator("table")).toHaveCount(0);
@@ -1855,7 +1842,7 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
     "No structural changes besides MoonBit test blocks, comments, or blank lines found",
   );
   await expect(mixedCard.locator("b.wd")).toContainText("old_value");
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(mixedCard.locator("table.unified")).toBeVisible();
   await expect(plainCard.locator("table.unified")).toBeVisible();
   expect(page.url()).toBe(urlBeforeFilters);
@@ -1903,9 +1890,10 @@ test("Ignore tests keeps whole-file cards and restores renamed, added, and delet
     await page.getByRole("button", { name: algorithm, exact: true }).click();
     for (const layout of ["split", "unified"]) {
       const layoutToggle = page.getByRole("button", {
-        name: layout === "split" ? "Use split view" : "Use unified view",
+        name: layout === "split" ? "Split" : "Unified",
       });
-      if (await layoutToggle.isVisible()) await layoutToggle.click();
+      await layoutToggle.click();
+      await expect(layoutToggle).toHaveAttribute("aria-pressed", "true");
       for (const ignoreComments of [false, true]) {
         if (await commentsToggle.getAttribute("aria-pressed") !== String(ignoreComments)) {
           await commentsToggle.click();
@@ -1954,7 +1942,7 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
     section.locator('.new-line-number button[aria-label="Comment on line 15"]'),
   ).toHaveCount(1);
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(section.locator("table.unified")).toBeVisible();
   await expect(section.locator(".hunk-header")).toHaveCount(0);
   await expect(section).toContainText("/// structural docs");
@@ -1978,7 +1966,7 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
   await expect(readmeCard.locator("table.unified")).toBeVisible();
   expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
 
-  await page.getByRole("button", { name: "Use split view" }).click();
+  await page.getByRole("button", { name: "Split" }).click();
   await expect(structuralCard.locator("table.split")).toBeVisible();
   const astSplitHeaders = structuralCard.locator(".hunk-header");
   expect(await astSplitHeaders.count()).toBeGreaterThan(0);
@@ -2029,7 +2017,7 @@ test("MoonBit toplevel sections fold independently with mouse and keyboard", asy
   await commentAnchor.locator("xpath=..").hover();
   await expect(commentAnchor).toBeVisible();
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(first.locator("table.unified")).toBeVisible();
   await expect(second.locator("table.unified")).toBeVisible();
   await expect(first.locator("table.split")).toHaveCount(0);
@@ -2073,7 +2061,7 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await expect(readmeCard.locator("b.wd")).toHaveText("<old>");
   await expect(readmeCard.locator("b.wa")).toHaveText("&new");
 
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(structuralCard.locator("table.unified")).toBeVisible();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
   const structuralUnifiedHeaders = structuralCard.locator(".hunk-header");
@@ -2099,7 +2087,7 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
 
   await page.getByRole("button", { name: "Token" }).click();
   await expect(formattingCard.locator("table.unified")).toBeVisible();
-  await page.getByRole("button", { name: "Use split view" }).click();
+  await page.getByRole("button", { name: "Split" }).click();
   await expect(readmeCard.locator(".diff-scroll")).toHaveJSProperty("innerHTML", lineHtmlInAstMode);
   expect(page.url()).toBe(urlBeforeSwitch);
   expect(new URL(page.url()).search).toBe("");
@@ -2111,14 +2099,15 @@ test("the selected algorithm survives later commit navigation without entering t
   await page.getByRole("button", { name: "Tree" }).click();
   await page.getByRole("button", { name: "Ignore comments" }).click();
   await page.getByRole("button", { name: "Ignore tests" }).click();
+  await page.getByRole("button", { name: "Unified", exact: true }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
-  await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
-  await page.getByRole("button", { name: "View diff" }).click();
+  await page.evaluate(url => { location.hash = new URL(url).pathname; }, nextUrl);
   await expect(page.getByRole("button", { name: "Tree" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".structural-empty")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unified", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page).toHaveURL(`/#/example/algorithms/commit/${nextSha}`);
   expect(new URL(page.url()).search).toBe("");
   expect(page.url()).not.toContain("ignore");
@@ -2135,8 +2124,33 @@ test("parse failures show their lexical fallback reason above both layouts", asy
   await page.getByRole("button", { name: "Tree" }).click();
   await expect(card.locator(".diff-notice")).toContainText("Lexical fallback");
   await expect(card.locator(".diff-notice")).toContainText("this entire file");
-  await page.getByRole("button", { name: "Use unified view" }).click();
+  await page.getByRole("button", { name: "Unified" }).click();
   await expect(card.locator("table.unified")).toBeVisible();
   expect(await card.locator(".hunk-header").count()).toBeGreaterThan(0);
   await expect(card.locator(".diff-notice")).toContainText("old:");
+});
+
+
+test("shared toolbar controls fit desktop and narrow screens in both themes", async ({ page }) => {
+  await loadMockedCommit(page);
+  await checkToolbar(page);
+});
+
+test("workspace keeps a static URL while loading and after a retryable failure", async ({ page }) => {
+  await installMockRoutes(page);
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  await page.route("https://api.github.com/**", async route => {
+    await pending;
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Unavailable" }) });
+  }, { times: 1 });
+  await page.goto(`/#/example/project/commit/${commitSha}`);
+  await expect(page.locator(".loading")).toBeVisible();
+  await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
+  await expect(page.locator(".hero-workspace input, .hero-workspace form")).toHaveCount(0);
+  release();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(page.locator(".workspace-url")).toHaveAttribute("title", commitUrl);
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.locator("table.split")).toBeVisible();
 });
