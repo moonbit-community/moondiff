@@ -365,7 +365,7 @@ test "test file notices follow diff results and preserve source load states" {
           AstAlgorithm,
           false,
           true,
-          @comments.initial_review_state(),
+          @comments.Session::new(),
           emit,
         ),
       )
@@ -450,7 +450,7 @@ test "AST structural-empty view preserves section fallback notices" {
         AstAlgorithm,
         false,
         false,
-        @comments.initial_review_state(),
+        @comments.Session::new(),
         emit,
       ),
     )
@@ -499,7 +499,7 @@ test "AST structural-empty view without fallback keeps its original DOM" {
         AstAlgorithm,
         false,
         false,
-        @comments.initial_review_state(),
+        @comments.Session::new(),
         emit,
       ),
     )
@@ -507,4 +507,94 @@ test "AST structural-empty view without fallback keeps its original DOM" {
   assert_eq(
     rendered, "<div class=\"file-message structural-empty\"><p>No structural changes found. Switch to Token to view text changes.</p></div>",
   )
+}
+
+///|
+#warnings("-alert_unstable")
+test "same-line declarations retain every modified inserted and deleted section" {
+  let before = "let first = 11; let second = 22"
+  let after = "let first = 33; let second = 44"
+  for
+    (old, new) in [
+      (before, after),
+      ("fn keep() {}", after + "\nfn keep() {}"),
+      (before + "\nfn keep() {}", "fn keep() {}"),
+    ] {
+    for algorithm in [@change.LexicalAlgorithm, AstAlgorithm] {
+      let file = ensure_file_document(
+        ready_test_file(fixture_file("src/same_line.mbt", "modified"), [old], [
+          new,
+        ]),
+        algorithm,
+      )
+      guard file.diff_cache.get(MoonBit(algorithm, false, false))
+        is Some(MoonBit(document=TopLevel(top), ..)) else {
+        fail("expected parsed top-level declarations: \{old} => \{new}")
+      }
+      assert_eq(
+        top.sections
+        .filter(s => fragment_has_output(semantic_section_fragment(s)))
+        .length(),
+        2,
+      )
+      let keys = semantic_section_keys(top.sections)
+      assert_true(keys[0] != keys[1])
+      for mode in [@change.Split, Unified] {
+        let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+        let rendered = @rabbita.render_to_string(() => {
+          @rabbita.Val::constant(
+            top_level_diff_view(
+              file.file,
+              0,
+              top,
+              mode,
+              false,
+              @comments.Session::new(),
+              emit,
+            ),
+          )
+        })
+        assert_eq(rendered.split("class=\"semantic-section\"").count(), 3)
+        assert_true(rendered.contains("let first"))
+        assert_true(rendered.contains("let second"))
+      }
+    }
+  }
+}
+
+///|
+test "section keys count hidden siblings and isolate unrelated ranges" {
+  let hidden : @mbtdiff.DiffFragment = {
+    document: { hunks: [], },
+    fallbacks: [],
+  }
+  let visible : @mbtdiff.DiffFragment = {
+    document: projection_document_fixture(),
+    fallbacks: [],
+  }
+  let section = fn(start, diff) {
+    @mbtdiff.DiffSection::Matched(
+      old={ start, len: 1, },
+      new={ start, len: 1, },
+      old_context=None,
+      new_context=None,
+      diff~,
+    )
+  }
+  let keys = semantic_section_keys([section(0, hidden), section(0, visible)])
+  assert_false(fragment_has_output(hidden))
+  assert_true(fragment_has_output(visible))
+  assert_true(keys[0] != keys[1])
+  assert_eq(
+    semantic_section_keys([section(0, visible), section(0, visible)]),
+    keys,
+  )
+  let interleaved = semantic_section_keys([
+    section(1, visible),
+    section(0, hidden),
+    section(2, visible),
+    section(0, visible),
+  ])
+  assert_eq(interleaved[1], keys[0])
+  assert_eq(interleaved[3], keys[1])
 }

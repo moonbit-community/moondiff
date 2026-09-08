@@ -40,7 +40,9 @@ pub(all) struct Model {
   phase : Phase
   route : CommitRef?
   file_tree : FileTreeState
-  review : ReviewState
+  auth : AuthStatus
+  last_authenticated_login : String?
+  review : Session
 } derive(Eq)
 
 ///|
@@ -55,6 +57,17 @@ fn initial_model() -> Model {
     phase: Idle,
     route: None,
     file_tree: initial_file_tree_state(),
+    auth: if extension_host_enabled() {
+      AuthChecking
+    } else {
+      WebReadOnly
+    },
+    last_authenticated_login: None,
     review: initial_review_state(),
   }
+}
+
+///|
+fn initial_review_state() -> Session {
+  @comments.Session::new(enabled=extension_host_enabled())
 }

@@ -78,6 +78,7 @@ pub(all) struct FileState {
 ///|
 pub(all) struct ChangeView {
   reference : CommitRef
+  pull_snapshot : ApiPull?
   sha : String
   parent_sha : String?
   old_revision : Revision?

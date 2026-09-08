@@ -3,6 +3,7 @@ package "moonbit-community/moondiff-playground/internal/application"
 
 import {
   "moonbit-community/moondiff-playground/internal/change",
+  "moonbit-community/moondiff-playground/internal/comment_requests",
   "moonbit-community/moondiff-playground/internal/comments",
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff-playground/internal/review",
@@ -16,6 +17,10 @@ pub fn app_init(@cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
 pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
 
+pub fn auth_status_from_api(@comment_requests.ApiAuthStatus) -> AuthStatus
+
+pub fn auth_status_from_api_preserving(@comment_requests.ApiAuthStatus, AuthStatus) -> AuthStatus
+
 pub fn file_dom_id(Int) -> String
 
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
@@ -24,20 +29,46 @@ pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
 // Types and methods
 pub(all) enum AuthMsg {
-  AuthStatusLoaded(Result[@comments.ApiAuthStatus, Error])
-  ReactivationAuthStatusLoaded(Int, @github.CommitRef, Result[@comments.ApiAuthStatus, Error])
+  AuthStatusLoaded(Result[@comment_requests.ApiAuthStatus, Error])
+  ReactivationAuthStatusLoaded(Int, @github.CommitRef, Result[@comment_requests.ApiAuthStatus, Error])
   StartDeviceAuthorization
-  DeviceAuthorizationStarted(Result[@comments.ApiAuthStatus, Error])
+  DeviceAuthorizationStarted(Result[@comment_requests.ApiAuthStatus, Error])
   PollDeviceAuthorization(String)
-  DeviceAuthorizationPolled(String, Result[@comments.ApiAuthStatus, Error])
+  DeviceAuthorizationPolled(String, Result[@comment_requests.ApiAuthStatus, Error])
   CancelDeviceAuthorization(String)
-  DeviceAuthorizationCancelled(String, Result[@comments.ApiAuthStatus, Error])
+  DeviceAuthorizationCancelled(String, Result[@comment_requests.ApiAuthStatus, Error])
   CopyDeviceCode
   DeviceCodeCopied(String)
   DeviceCodeCopyFailed(String, String)
   Logout
-  AuthLogoutFinished(Result[@comments.ApiAuthStatus, Error])
+  AuthLogoutFinished(Result[@comment_requests.ApiAuthStatus, Error])
 }
+
+pub(all) enum AuthStatus {
+  WebReadOnly
+  AuthChecking
+  Anonymous(String?)
+  DeviceAuthorizing(DeviceAuthorization)
+  DeviceCancelling(DeviceAuthorization)
+  SignedIn(login~ : String?, install_url~ : String?)
+  AuthFailed(String)
+} derive(Eq)
+
+pub(all) struct DeviceAuthorization {
+  flow_id : String
+  user_code : String
+  verification_uri : String
+  expires_in : Int
+  poll_after : Int
+  install_url : String?
+  copy_status : DeviceCodeCopyStatus
+} derive(Eq)
+
+pub(all) enum DeviceCodeCopyStatus {
+  DeviceCodeCopyReady
+  DeviceCodeCopyDone
+  DeviceCodeCopyError(String)
+} derive(Eq)
 
 pub(all) struct FileTreeState {
   drawer_open : Bool
@@ -72,7 +103,9 @@ pub(all) struct Model {
   phase : Phase
   route : @github.CommitRef?
   file_tree : FileTreeState
-  review : @comments.ReviewState
+  auth : AuthStatus
+  last_authenticated_login : String?
+  review : @comments.Session
 } derive(Eq)
 
 pub(all) enum Msg {
@@ -94,12 +127,17 @@ pub(all) enum Phase {
 } derive(Eq)
 
 pub(all) enum ReviewMsg {
+  Domain(@comments.Event)
   RefreshComments
+  LoadLatestSnapshot
+  BeginCommentsRefresh(Int, @github.CommitRef)
+  CommentsMetadataLoaded(Int, Int, Result[@github.ApiPull, Error])
+  CommentsValidated(Int, Int, Result[@github.ApiPull, Error])
   AskDelete(@comments.CommentId)
   CancelDelete
   ConfirmCommentDelete(@comments.CommentId)
-  CommentDeleted(Int, @comments.CommentId, Result[@comments.DeleteResult, Error])
-  CommentsLoaded(Int, Result[@comments.ApiCommentBundle, Error])
+  CommentDeleted(Int, Int, @comments.CommentId, Result[@comments.DeleteResult, Error])
+  CommentsLoaded(Int, Int, Result[@comments.ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
   OpenInlineDraft(Int, @review.ReviewAnchor)
@@ -107,11 +145,11 @@ pub(all) enum ReviewMsg {
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, @review.ReviewAnchor, Result[@github.ApiPull, Error])
-  IssueCommentCreated(Int, Result[@comments.ApiIssueComment, Error])
-  ReviewCommentCreated(Int, Result[@comments.ApiReviewComment, Error])
-  CommitCommentCreated(Int, Result[@comments.ApiCommitComment, Error])
-  ReviewReplyCreated(Int, Result[@comments.ApiReviewComment, Error])
+  CommentHeadChecked(Int, Int, @review.ReviewAnchor, Result[@github.ApiPull, Error])
+  IssueCommentCreated(Int, Int, Result[@comments.ApiIssueComment, Error])
+  ReviewCommentCreated(Int, Int, Result[@comments.ApiReviewComment, Error])
+  CommitCommentCreated(Int, Int, Result[@comments.ApiCommitComment, Error])
+  ReviewReplyCreated(Int, Int, Result[@comments.ApiReviewComment, Error])
 }
 
 pub(all) enum UiMsg {

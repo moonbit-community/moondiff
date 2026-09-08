@@ -1,5 +1,5 @@
 ///|
-fn error_message(error : Error, api : Bool) -> String {
+pub fn error_message(error : Error, api : Bool) -> String {
   let detail = error.to_string()
   let lower = detail.to_lower()
   if api {
@@ -37,7 +37,7 @@ fn error_message(error : Error, api : Bool) -> String {
 }
 
 ///|
-fn comment_failure_message(error : Error) -> String {
+pub fn comment_failure_message(error : Error) -> String {
   match extension_error_code(error) {
     Some("authentication_required") =>
       return "Your GitHub session expired. Sign in again, then retry."
@@ -60,5 +60,13 @@ fn comment_failure_message(error : Error) -> String {
     "GitHub rejected this comment anchor. Refresh the diff and choose the line again."
   } else {
     detail
+  }
+}
+
+///|
+pub fn comment_failure(error : Error) -> @comments.Failure {
+  {
+    message: comment_failure_message(error),
+    code: extension_error_code(error),
   }
 }

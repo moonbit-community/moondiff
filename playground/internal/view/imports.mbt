@@ -15,7 +15,7 @@ using @change {
 ///|
 using @comments {
   type CommentDraft,
-  type ReviewState,
+  type Session,
   type ReviewThread,
   author_label,
   commit_discussions,

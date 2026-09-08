@@ -1,0 +1,206 @@
+///|
+fn projection_document_fixture() -> @model.HunkDocument {
+  {
+    hunks: [
+      {
+        old_start: 0,
+        old_len: 1,
+        new_start: 0,
+        new_len: 1,
+        blocks: [
+          ChangeBlock([
+            Paired({ index: 0, segments: [{ kind: Changed, text: "old", }], }, {
+              index: 0,
+              segments: [{ kind: Changed, text: "new", }],
+            }),
+          ]),
+        ],
+      },
+    ],
+  }
+}
+
+///|
+test "projection chooses the first visible occurrence independently of rendering" {
+  let file = {
+    ..fixture_file("a.txt", "modified"),
+    patch: Some("@@ -1 +1 @@\n-old\n+new"),
+  }
+  for mode in [@change.Split, Unified] {
+    let projection = ReviewProjection::{ lines: Map([]), editors: Map([]), }
+    project_document(
+      projection,
+      file,
+      0,
+      projection_document_fixture(),
+      mode,
+      0,
+      0,
+      fragment="first",
+    )
+    project_document(
+      projection,
+      file,
+      0,
+      projection_document_fixture(),
+      mode,
+      0,
+      0,
+      fragment="second",
+    )
+    for side in [@review.Left, Right] {
+      let key = discussion_key(0, side, 1)
+      assert_eq(projection.lines.get(key), Some("0:first:0:0:0"))
+      assert_eq(projection.editors.get(key), Some("0:first:0:0:0"))
+    }
+    let item = InlineDiscussion::{
+      id: ReviewComment(1L),
+      file_index: Some(0),
+      anchor: Some({ path: "a.txt", side: Right, line: 1, position: Some(2), }),
+      location: "a.txt",
+      outdated: false,
+      content: @html.div("thread"),
+    }
+    let discussions = {
+      ..empty_discussions(),
+      projection,
+      items: [item],
+      index: Map([(discussion_key(0, Right, 1), [item])]),
+    }
+    // Render second first: it still cannot claim the discussion.
+    assert_eq(
+      inline_cards(discussions, 0, Some(1), Some(1), 4, "0:second:0:0:0").length(),
+      0,
+    )
+    let first = inline_cards(
+      discussions,
+      0,
+      Some(1),
+      Some(1),
+      4,
+      "0:first:0:0:0",
+    )
+    let repeated = inline_cards(
+      discussions,
+      0,
+      Some(1),
+      Some(1),
+      4,
+      "0:first:0:0:0",
+    )
+    assert_eq(first.length(), 1)
+    assert_eq(first[0].0, repeated[0].0)
+    assert_eq(projection.lines.length(), 2)
+  }
+}
+
+///|
+#warnings("-alert_unstable")
+test "projection source identity does not depend on hunk headings" {
+  let file = {
+    ..fixture_file("a.txt", "modified"),
+    patch: Some("@@ -1 +1 @@\n-old\n+new"),
+  }
+  let projection = ReviewProjection::{ lines: Map([]), editors: Map([]), }
+  let document = projection_document_fixture()
+  project_document(projection, file, 0, document, Split, 0, 0)
+  let anchor = ReviewAnchor::{
+    path: "a.txt",
+    side: Right,
+    line: 1,
+    position: Some(2),
+  }
+  let reference = @github.commit_reference("owner", "repo", "head")
+  let (session, _) = @comments.update(
+    @comments.Session::new(enabled=true),
+    ContextChanged({
+      generation: 1,
+      route: Some(reference),
+      snapshot: Some({ reference, sha: "head", pull_snapshot: None, }),
+      enabled: true,
+    }),
+  )
+  let (session, _) = @comments.update(session, Identity(true, Some("me")))
+  let (session, _) = @comments.update(session, OpenInlineDraft(0, anchor))
+  let discussions = { ..empty_discussions(), projection, }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for headers in [false, true] {
+    let html = safe_review_diff(
+      file,
+      0,
+      document,
+      Split,
+      session,
+      emit,
+      show_hunk_headers=headers,
+      discussions~,
+    )
+    let rendered = @rabbita.render_to_string(() => @rabbita.Val::constant(html))
+    assert_true(rendered.contains("inline-comment-editor-row"))
+  }
+}
+
+///|
+#warnings("-alert_unstable")
+test "projection omits collapsed filtered and structural-placeholder documents" {
+  let api = {
+    ..fixture_file("a.mbt", "modified"),
+    patch: Some("@@ -1 +1 @@\n-old\n+new"),
+  }
+  let reference = @github.commit_reference("owner", "repo", "head")
+  let repository = @github.RepositoryRef::{ owner: "owner", repo: "repo", }
+  let base_view = @change.finish_change(
+    reference,
+    None,
+    { repository, sha: "head", },
+    "",
+    "",
+    { additions: 1, deletions: 1, total: 2, },
+    [api],
+  )
+  for
+    (algorithm, status, expanded, visible) in [
+      (@change.AstAlgorithm, @model.NoStructuralChanges, true, false),
+      (LexicalAlgorithm, NoStructuralChanges, true, true),
+      (LexicalAlgorithm, IgnoredOnly, true, false),
+      (LexicalAlgorithm, Changed, false, false),
+    ] {
+    let base_file = ready_test_file(api, ["old"], ["new"], expanded~)
+    let file = {
+      ..base_file,
+      diff_cache: base_file.diff_cache.put(
+        MoonBit(algorithm, false, false),
+        MoonBit(
+          document=Whole({
+            document: projection_document_fixture(),
+            fallbacks: [],
+          }),
+          status~,
+          ignore_reason=None,
+        ),
+      ),
+    }
+    let view = { ..base_view, files: [file], }
+    let model = Model::{
+      input: "",
+      generation: 1,
+      view_mode: Split,
+      diff_algorithm: algorithm,
+      ignore_comments: false,
+      ignore_tests: false,
+      phase: Showing(view),
+      route: Some(reference),
+      file_tree: test_file_tree_state(),
+      auth: WebReadOnly,
+      last_authenticated_login: None,
+      review: @comments.Session::new(),
+    }
+    let projection = review_projection(view, model)
+    assert_eq(!projection.lines.is_empty(), visible)
+    let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+    let html = @rabbita.render_to_string(() => {
+      @rabbita.Val::constant(file_list_view(view, model, emit))
+    })
+    assert_eq(html.contains("<table"), visible)
+  }
+}

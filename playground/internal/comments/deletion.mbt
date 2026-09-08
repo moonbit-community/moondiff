@@ -18,33 +18,6 @@ pub(all) struct DeleteResult {
 } derive(FromJson)
 
 ///|
-priv struct DeleteArgs {
-  owner : String
-  repo : String
-  comment_id : Int64
-} derive(ToJson)
-
-///|
-pub fn delete_comment_request(
-  reference : CommitRef,
-  id : CommentId,
-  generation : Int,
-  emit : @rabbita.Emit[Result[DeleteResult, Error]],
-) -> @rabbita.Cmd {
-  let (operation, comment_id) = match id {
-    IssueComment(id) => ("github.issue.comment.delete", id)
-    ReviewComment(id) => ("github.review.comment.delete", id)
-    CommitComment(id) => ("github.commit.comment.delete", id)
-  }
-  extension_rpc_request(
-    operation,
-    DeleteArgs::{ owner: reference.owner, repo: reference.repo, comment_id, },
-    generation,
-    emit,
-  )
-}
-
-///|
 pub fn without_deleted(
   bundle : ApiCommentBundle,
   deleted : Array[CommentId],
@@ -63,8 +36,9 @@ pub fn without_deleted(
 }
 
 ///|
-pub fn can_delete_comment(review : ReviewState, id : CommentId) -> Bool {
-  guard review.auth is SignedIn(login=Some(login), ..) &&
+pub fn can_delete_comment(review : Session, id : CommentId) -> Bool {
+  guard review.can_comment &&
+    review.login is Some(login) &&
     !login.is_empty() &&
     review.comments is CommentsReady(bundle) else {
     return false
@@ -82,5 +56,30 @@ pub fn can_delete_comment(review : ReviewState, id : CommentId) -> Bool {
       bundle.commit_comments.any(c => {
         c.id == id && c.user.map(u => u.login) == Some(login)
       })
+  }
+}
+
+///|
+/// Only a live top-level review comment can receive replies.
+pub fn valid_reply_target(review : Session, id : Int64) -> Bool {
+  guard review.comments is CommentsReady(bundle) else { return false }
+  !review.deleted.contains(ReviewComment(id)) &&
+  review.deletion != Some(Deleting(ReviewComment(id))) &&
+  bundle.review_comments.any(c => c.id == id && c.in_reply_to_id is None)
+}
+
+///|
+/// Even an empty or submitting reply draft protects its target from deletion.
+pub fn draft_blocks_deletion(review : Session, id : CommentId) -> Bool {
+  review.draft() is Some({ kind: ReplyDraft(target), .. }) &&
+  id == ReviewComment(target)
+}
+
+///|
+pub fn CommentId::key(self : CommentId) -> String {
+  match self {
+    IssueComment(id) => "issue:\{id}"
+    ReviewComment(id) => "review:\{id}"
+    CommitComment(id) => "commit:\{id}"
   }
 }

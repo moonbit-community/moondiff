@@ -119,6 +119,7 @@ pub fn ensure_expanded_file_documents(
     }
   }
   {
+    ..view,
     reference: view.reference,
     sha: view.sha,
     parent_sha: view.parent_sha,

@@ -556,7 +556,7 @@ fn semantic_fragment_view(
   old_context : String?,
   new_context : String?,
   mode : ViewMode,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
   whole : Bool,
   show_hunk_headers? : Bool = true,
@@ -598,6 +598,7 @@ fn semantic_fragment_view(
         new_base~,
         show_hunk_headers~,
         hunk_context~,
+        fragment=section_index.map(i => "section:\{i}").unwrap_or("whole"),
         discussions~,
       )
     },
@@ -616,17 +617,16 @@ fn top_level_diff_view(
   top : @mbtdiff.TopLevelDiff,
   mode : ViewMode,
   show_hunk_headers : Bool,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
-  let sections : Array[@rabbita.Html] = []
+  let sections : Map[String, @rabbita.Html] = Map([])
+  let section_keys = semantic_section_keys(top.sections)
   if top.reordered {
-    sections.push(
-      @html.div(
-        class="semantic-reorder",
-        "Top-level declarations are reordered; fragment diffs remain paired by declaration identity.",
-      ),
+    sections["reorder-notice"] = @html.div(
+      class="semantic-reorder",
+      "Top-level declarations are reordered; fragment diffs remain paired by declaration identity.",
     )
   }
   for section_index in top.new_order {
@@ -636,60 +636,54 @@ fn top_level_diff_view(
     }
     let fragment = semantic_section_fragment(section)
     if fragment_has_output(fragment) {
-      sections.push(
-        semantic_fragment_view(
+      sections[section_keys[section_index]] = semantic_fragment_view(
+        file,
+        file_index,
+        Some(section_index),
+        fragment,
+        semantic_section_old_range(section),
+        semantic_section_new_range(section),
+        semantic_section_old_context(section),
+        semantic_section_new_context(section),
+        mode,
+        review,
+        emit,
+        false,
+        show_hunk_headers~,
+        discussions~,
+      )
+    }
+  }
+
+  let deleted : Map[String, @rabbita.Html] = Map([])
+  for section_index in top.old_order {
+    guard top.sections.get(section_index) is Some(section) else { continue }
+    if section is Deleted(..) {
+      let fragment = semantic_section_fragment(section)
+      if fragment_has_output(fragment) {
+        deleted[section_keys[section_index]] = semantic_fragment_view(
           file,
           file_index,
           Some(section_index),
           fragment,
           semantic_section_old_range(section),
-          semantic_section_new_range(section),
+          None,
           semantic_section_old_context(section),
-          semantic_section_new_context(section),
+          None,
           mode,
           review,
           emit,
           false,
           show_hunk_headers~,
           discussions~,
-        ),
-      )
-    }
-  }
-
-  let deleted : Array[@rabbita.Html] = []
-  for section_index in top.old_order {
-    guard top.sections.get(section_index) is Some(section) else { continue }
-    if section is Deleted(..) {
-      let fragment = semantic_section_fragment(section)
-      if fragment_has_output(fragment) {
-        deleted.push(
-          semantic_fragment_view(
-            file,
-            file_index,
-            Some(section_index),
-            fragment,
-            semantic_section_old_range(section),
-            None,
-            semantic_section_old_context(section),
-            None,
-            mode,
-            review,
-            emit,
-            false,
-            show_hunk_headers~,
-            discussions~,
-          ),
         )
       }
     }
   }
   if !deleted.is_empty() {
-    sections.push(
-      @html.section(class="semantic-deleted-group", [
-        @html.h4("Deleted declarations (old order)"),
-        @html.fragment(deleted),
-      ]),
+    sections["deleted-sections"] = @html.section(
+      class="semantic-deleted-group",
+      [@html.h4("Deleted declarations (old order)"), @html.div(deleted)],
     )
   }
   @html.div(class="semantic-document", sections)
@@ -702,7 +696,7 @@ fn semantic_document_view(
   document : @mbtdiff.DiffDocument,
   mode : ViewMode,
   show_hunk_headers : Bool,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -746,7 +740,7 @@ fn file_diff_view(
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
   ignore_tests : Bool,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -830,7 +824,7 @@ fn file_diff_view(
                 ),
               ],
             )
-            if semantic_document_has_fallback(document) {
+            if semantic_document_visible(document, status, algorithm) {
               return @html.fragment([
                 semantic_document_view(
                   file.file,
@@ -875,7 +869,7 @@ fn file_card(
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
   ignore_tests : Bool,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -939,25 +933,32 @@ fn file_list_view(
       "No changed files were returned for this change.",
     )
   }
-  let file_views : Array[@rabbita.Html] = []
-  let discussions = prepare_discussions(commit, model.review, emit)
+  let file_views : Map[String, @rabbita.Html] = Map([])
+  let discussions = prepare_discussions(
+    commit,
+    model.review,
+    emit,
+    projection=review_projection(commit, model),
+  )
   for index, file in commit.files {
-    file_views.push(
-      file_card(
-        file,
-        model.generation,
-        index,
-        model.view_mode,
-        model.diff_algorithm,
-        model.ignore_comments,
-        model.ignore_tests,
-        model.review,
-        emit,
-        discussions~,
-      ),
+    file_views["file:\{model.generation}:\{file.file.filename}"] = file_card(
+      file,
+      model.generation,
+      index,
+      model.view_mode,
+      model.diff_algorithm,
+      model.ignore_comments,
+      model.ignore_tests,
+      model.review,
+      emit,
+      discussions~,
     )
-    file_views.push(
-      file_discussions_view(commit, index, model.review, emit, discussions~),
+    file_views["discussions:\{model.generation}:\{file.file.filename}"] = file_discussions_view(
+      commit,
+      index,
+      model.review,
+      emit,
+      discussions~,
     )
   }
   @html.div(class="file-list", file_views)
@@ -1034,7 +1035,7 @@ fn change_view(
                 @html.pre(class="commit-message", commit.message),
               ]),
             ]),
-            comments_overview(commit, model.review, emit),
+            comments_overview(commit, model.review, model.auth, emit),
             file_list_view(commit, model, emit),
           ],
         ),
@@ -1084,7 +1085,7 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
       @html.div(class="empty-state error", [
         @html.p(message),
         if extension_host_enabled() {
-          auth_controls(model.review, emit)
+          auth_controls(model.auth, emit)
         } else {
           @html.nothing
         },
@@ -1124,4 +1125,29 @@ pub fn app_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
       ),
     ]),
   ])
+}
+
+///|
+fn semantic_section_key(section : @mbtdiff.DiffSection) -> String {
+  let old = semantic_section_old_range(section)
+    .map(r => "\{r.start}:\{r.len}")
+    .unwrap_or("-")
+  let new = semantic_section_new_range(section)
+    .map(r => "\{r.start}:\{r.len}")
+    .unwrap_or("-")
+  "section:\{old}:\{new}"
+}
+
+///|
+fn semantic_section_keys(
+  sections : ArrayView[@mbtdiff.DiffSection],
+) -> Array[String] {
+  let occurrences : Map[String, Int] = Map([])
+  // Count every section before filtering so visibility cannot renumber siblings.
+  sections.map(section => {
+    let base = semantic_section_key(section)
+    let ordinal = occurrences.get(base).unwrap_or(0)
+    occurrences[base] = ordinal + 1
+    "\{base}:\{ordinal}"
+  })
 }

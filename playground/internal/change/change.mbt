@@ -62,6 +62,7 @@ pub fn finish_change(
   }
   {
     reference,
+    pull_snapshot: None,
     sha: new_revision.sha,
     parent_sha: old_revision.map(revision => revision.sha),
     old_revision,
@@ -110,17 +111,16 @@ pub fn finish_pull(
       let (old_revision, new_revision) = pull_revisions(
         reference, pull, compare,
       )
-      Ok(
-        finish_change(
-          reference,
-          old_revision,
-          new_revision,
-          pull.title,
-          pull.html_url,
-          pull_stats(pull),
-          all_files,
-        ),
+      let view = finish_change(
+        reference,
+        old_revision,
+        new_revision,
+        pull.title,
+        pull.html_url,
+        pull_stats(pull),
+        all_files,
       )
+      Ok({ ..view, pull_snapshot: Some(pull), })
     }
   }
 }

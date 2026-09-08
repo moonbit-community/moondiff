@@ -8,20 +8,19 @@ fn apply_auth_status(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd, AuthIdentityTransition) {
   let auth = if preserve_device_copy {
-    auth_status_from_api_preserving(status, model.review.auth)
+    auth_status_from_api_preserving(status, model.auth)
   } else {
     auth_status_from_api(status)
   }
   let (review, detected_transition) = review_state_with_auth_identity(
-    model.review,
-    auth,
+    model, auth,
   )
   let transition = if force_identity_boundary {
     AuthIdentityBoundary
   } else {
     detected_transition
   }
-  let next = with_review(model, review)
+  let next = review
   let (transitioned, transition_command) = if transition is AuthIdentityBoundary {
     reload_after_auth_identity_boundary(next, emit)
   } else {
@@ -30,7 +29,7 @@ fn apply_auth_status(
   let poll_command = match auth {
     DeviceAuthorizing(device) =>
       if continue_device_poll ||
-        auth_snapshot_starts_device_poll(model.review.auth, device.flow_id) {
+        auth_snapshot_starts_device_poll(model.auth, device.flow_id) {
         schedule_device_poll(device.flow_id, device.poll_after, emit)
       } else {
         @rabbita.none
@@ -54,7 +53,7 @@ fn auth_snapshot_starts_device_poll(
 
 ///|
 fn sign_in_restarts_change_load(model : Model) -> Bool {
-  if model.review.auth is SignedIn(..) {
+  if model.auth is SignedIn(..) {
     return false
   }
   match model.phase {
@@ -84,7 +83,7 @@ fn finish_device_sign_in(
     return (reloading, @rabbita.batch([auth_command, load_command]))
   }
   (
-    with_review(next, review_state_with_comments(next.review, CommentsLoading)),
+    next,
     @rabbita.batch([
       auth_command,
       comments_request(reference, next.generation, emit),
@@ -94,7 +93,7 @@ fn finish_device_sign_in(
 
 ///|
 fn device_flow_is_current(model : Model, flow_id : String) -> Bool {
-  match model.review.auth {
+  match model.auth {
     DeviceAuthorizing(device) | DeviceCancelling(device) =>
       device.flow_id == flow_id
     _ => false
@@ -103,10 +102,10 @@ fn device_flow_is_current(model : Model, flow_id : String) -> Bool {
 
 ///|
 fn device_flow_is_cancelling(model : Model, flow_id : String) -> Bool {
-  model.review.auth is DeviceCancelling(device) && device.flow_id == flow_id
+  model.auth is DeviceCancelling(device) && device.flow_id == flow_id
 }
 
 ///|
 fn device_flow_is_authorizing(model : Model, flow_id : String) -> Bool {
-  model.review.auth is DeviceAuthorizing(device) && device.flow_id == flow_id
+  model.auth is DeviceAuthorizing(device) && device.flow_id == flow_id
 }

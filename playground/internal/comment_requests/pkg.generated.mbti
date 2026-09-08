@@ -1,0 +1,65 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground/internal/comment_requests"
+
+import {
+  "moonbit-community/moondiff-playground/internal/comments",
+  "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff-playground/internal/review",
+  "moonbit-community/rabbita/cmd",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn auth_device_cancel_request(String, @cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_device_poll_request(String, @cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_device_start_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_logout_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_status_request(@cmd.Emit[Result[ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn comment_failure(Error) -> @comments.Failure
+
+pub fn comment_failure_message(Error) -> String
+
+pub fn comment_head_request(@github.CommitRef, String, Int, @cmd.Emit[Result[@github.ApiPull, Error]]) -> @cmd.Cmd
+
+pub fn comments_request(@github.CommitRef, Int, @cmd.Emit[Result[@comments.ApiCommentBundle, Error]]) -> @cmd.Cmd
+
+pub fn create_commit_comment_request(@github.CommitRef, String, @review.ReviewAnchor, String, Int, @cmd.Emit[Result[@comments.ApiCommitComment, Error]]) -> @cmd.Cmd
+
+pub fn create_issue_comment_request(@github.CommitRef, String, String, Int, @cmd.Emit[Result[@comments.ApiIssueComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_comment_request(@github.CommitRef, String, String, @review.ReviewAnchor, String, Int, @cmd.Emit[Result[@comments.ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_reply_request(@github.CommitRef, String, Int64, String, Int, @cmd.Emit[Result[@comments.ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn delete_comment_request(@github.CommitRef, @comments.CommentId, Int, @cmd.Emit[Result[@comments.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn error_message(Error, Bool) -> String
+
+pub fn notify_github_page_command() -> @cmd.Cmd
+
+// Errors
+
+// Types and methods
+pub(all) struct ApiAuthStatus {
+  authenticated : Bool
+  login : String?
+  install_url : String?
+  device_flow : ApiDeviceFlow?
+} derive(@json.FromJson)
+
+pub(all) struct ApiDeviceFlow {
+  flow_id : String
+  user_code : String
+  verification_uri : String
+  expires_in : Int
+  poll_after : Int
+} derive(@json.FromJson)
+
+// Type aliases
+
+// Traits
