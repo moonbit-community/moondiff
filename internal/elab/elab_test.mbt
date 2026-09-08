@@ -3,7 +3,7 @@ using @dsyntax {type ListKind, type Syntax}
 
 ///|
 fn source_lines(source : String) -> Array[Array[Char]] {
-  let lines = Array::new()
+  let lines = Array()
   for line in source.split("\n") {
     lines.push(line.to_owned().to_array())
   } nobreak {
@@ -211,7 +211,7 @@ fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
 
 ///|
 fn syntax_lines(syntax : Syntax) -> Array[Int] {
-  let lines = Array::new()
+  let lines = Array()
   collect_syntax_lines(syntax, lines)
   lines.sort()
   lines
@@ -290,7 +290,7 @@ test "CST atoms and delimiters map back to source" {
     #|}
   let syntax = @elab.elab_cst(source, only_item(source))
   assert_source_faithful(source, syntax)
-  let delims = Array::new()
+  let delims = Array()
   collect_delims(syntax, delims)
   assert_true(has_delim(delims, "(", ")"))
   assert_true(has_delim(delims, "[", "]"))
@@ -333,7 +333,7 @@ test "CST elaboration exposes block statements as siblings" {
     #|  println(fib(8))
     #|}
   let syntax = @elab.elab_cst(source, only_item(source))
-  let blocks = Array::new()
+  let blocks = Array()
   collect_brace_blocks(syntax, blocks)
   assert_eq(blocks.length(), 1)
   guard blocks[0] is Syntax::List(children~, ..) else {

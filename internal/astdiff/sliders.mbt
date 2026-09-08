@@ -206,7 +206,7 @@ fn fix_nested_slider_prefer_inner(
   if node is Syntax::List(children~, ..) {
     match change_map.get(node) {
       Some(Novel) => {
-        let found = Array::new()
+        let found = Array()
         unchanged_descendants(children, found, change_map)
         if found is [candidate] && candidate is Syntax::List(..) {
           push_unchanged_to_ancestor(node, candidate, change_map)
@@ -228,7 +228,7 @@ fn fix_nested_slider_prefer_outer(
   if node is Syntax::List(children~, ..) {
     match change_map.get(node) {
       Some(Unchanged(_)) => {
-        let found = Array::new()
+        let found = Array()
         unchanged_descendants_for_outer_slider(children, found, change_map)
         if found is [candidate] &&
           candidate is Syntax::List(..) &&
@@ -249,7 +249,7 @@ fn novel_regions_after_unchanged(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
 ) -> Array[(Int, Int)] {
-  let regions = Array::new()
+  let regions = Array()
   let mut region_start : Int? = None
   let mut region_end : Int? = None
   let mut after_unchanged = false
@@ -291,7 +291,7 @@ fn novel_regions_before_unchanged(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
 ) -> Array[(Int, Int)] {
-  let regions = Array::new()
+  let regions = Array()
   let mut region_start : Int? = None
   let mut region_end : Int? = None
   for i, node in nodes.iter2() {

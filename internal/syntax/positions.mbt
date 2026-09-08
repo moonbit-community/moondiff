@@ -87,7 +87,7 @@ fn split_word_parts(content : String) -> Array[WordPart] {
   if chars.is_empty() {
     return []
   }
-  let parts = Array::new()
+  let parts = Array()
   let mut start = 0
   let mut kind = word_part_kind(chars[0])
   let mut i = 1
@@ -129,7 +129,7 @@ fn relative_region_positions(
     return []
   }
 
-  let spans = Array::new()
+  let spans = Array()
   for i in 0..<line_ranges.length() {
     let (line_start, line_end) = line_ranges[i]
     let overlap_start = @cmp.maximum(start, line_start)
@@ -187,7 +187,7 @@ fn first_line_padding_for_content(
 fn whole_novel_positions(
   positions : ArrayView[@span.SingleLineSpan],
 ) -> Array[MatchedPos] {
-  let matched = Array::new(capacity=positions.length())
+  let matched = Array(capacity=positions.length())
   for span in positions {
     if positions.length() == 1 && span.start_col == span.end_col {
       continue
@@ -207,7 +207,7 @@ fn unchanged_positions(
   } else {
     opposite_pos.length()
   }
-  let matched = Array::new(capacity=limit)
+  let matched = Array(capacity=limit)
   let opposite = opposite_pos.to_owned()
   for i in 0..<limit {
     let span = positions[i]
@@ -258,7 +258,7 @@ fn word_diffs_impl(
     i -= 1
   }
 
-  let diffs = Array::new()
+  let diffs = Array()
   let lhs_i = Ref(0)
   let rhs_i = Ref(0)
   while lhs_i.val < lhs_parts.length() && rhs_i.val < rhs_parts.length() {
@@ -350,7 +350,7 @@ fn split_replaced_atom_positions(
     return whole_novel_positions(positions)
   }
 
-  let matched = Array::new()
+  let matched = Array()
   for diff in diffs {
     match diff {
       DeletedPart(part) => {
@@ -405,7 +405,7 @@ fn split_replaced_atom_positions(
 fn filter_empty_ends(
   positions : ArrayView[@span.SingleLineSpan],
 ) -> Array[@span.SingleLineSpan] {
-  let filtered = Array::new(capacity=positions.length())
+  let filtered = Array(capacity=positions.length())
   for i in 0..<positions.length() {
     let span = positions[i]
     if (i == 0 || i == positions.length() - 1) && span.start_col == span.end_col {
@@ -461,7 +461,7 @@ fn change_positions_impl(
   change_map : ChangeMap,
   budget : @computation.ScopeBudget,
 ) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
-  let positions = Array::new()
+  let positions = Array()
   fn walk(node : Syntax) -> Unit raise @computation.ScopeLimitExceeded {
     let change = change_map.get(node).unwrap_or_else(() => panic())
     match node {

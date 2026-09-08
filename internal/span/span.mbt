@@ -13,7 +13,7 @@ pub struct LineWidths {
 
 ///|UUID(472aa521-7ba5-4817-9180-4838b8416b23)
 pub impl Debug for LineWidths with fn to_repr(self) {
-  let views : Array[ArrayView[Char]] = Array::new()
+  let views : Array[ArrayView[Char]] = Array()
   for line in self.lines {
     views.push(self.contents[line.0:line.1])
   }
@@ -35,7 +35,7 @@ pub fn LineWidths::get_line_width(self : Self, line : Int) -> Int {
 ///|UUID(5c80b453-f09d-4200-8831-7c4175671747)
 pub fn LineWidths::from_str(str : StringView) -> Self {
   let contents = str.to_array()
-  let lines = Array::new()
+  let lines = Array()
   lines.push((0, 0)) // dummy for line 0
   let mut current_line_start = 0
   let mut current_column = 0
@@ -118,7 +118,7 @@ pub fn LineWidths::loc_to_spans(
 ) -> Array[SingleLineSpan] {
   let start_line = loc.start.lnum
   let end_line = loc.end.lnum
-  let spans = Array::new()
+  let spans = Array()
   if start_line == end_line {
     return [
       SingleLineSpan::{

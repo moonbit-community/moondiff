@@ -1,0 +1,5 @@
+# Exclude development tools and applications from the published package.
+/extension/
+/cli_test/
+/scripts/
+/playground/

@@ -1018,7 +1018,7 @@ fn align_fuzzy_impl_units(
     }
   }
 
-  let pairs = Array::new()
+  let pairs = Array()
   for old_index in 0..<old_units.length() {
     if old_best[old_index].unique_index() is Some(new_index) &&
       new_best[new_index].unique_index() == Some(old_index) {

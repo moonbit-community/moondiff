@@ -257,7 +257,7 @@ pub fn Syntax::comment_positions(
     }
   }
 
-  let positions = Array::new(capacity=50)
+  let positions = Array(capacity=50)
   for node in nodes {
     walk_comment_positions(node, positions)
   } nobreak {
