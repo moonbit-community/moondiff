@@ -894,7 +894,7 @@ async function loadMockedCommit(page) {
   await page.getByLabel("Public GitHub commit or pull request URL").fill(commitUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   await expect(page.locator("table.split")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Lexical" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Token" })).toHaveAttribute("aria-pressed", "true");
 }
 
 async function loadTreeCommit(page) {
@@ -1761,7 +1761,7 @@ test("Ignore comments works across algorithms and layouts without changing plain
     plainBlankSplitHtml,
   );
 
-  await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Tree" }).click();
   await expect(commentsOnlyCard).toContainText(
     "No structural changes besides comments or blank lines found",
   );
@@ -1784,7 +1784,7 @@ test("Ignore comments works across algorithms and layouts without changing plain
     unifiedPlainBlankLineNumber.locator("xpath=..").locator("td.old-line-number"),
   ).toHaveText("");
 
-  await page.getByRole("button", { name: "Lexical" }).click();
+  await page.getByRole("button", { name: "Token" }).click();
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(commentsOnlyCard.locator("table.unified")).toBeVisible();
@@ -1850,7 +1850,7 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   );
   await expect(combinedCard.locator("table")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Tree" }).click();
   await expect(testsOnlyCard).toContainText(
     "No structural changes besides MoonBit test blocks, comments, or blank lines found",
   );
@@ -1899,7 +1899,7 @@ test("Ignore tests keeps whole-file cards and restores renamed, added, and delet
   expect(requests.some(url => url.endsWith("/src/old_test.mbt"))).toBe(true);
   expect(requests.some(url => url.endsWith("/src/old_wbtest.mbt"))).toBe(true);
   const notice = "Test file comparison ignored. Turn off Ignore tests to view this diff.";
-  for (const algorithm of ["Lexical", "AST"]) {
+  for (const algorithm of ["Token", "Tree"]) {
     await page.getByRole("button", { name: algorithm, exact: true }).click();
     for (const layout of ["split", "unified"]) {
       const layoutToggle = page.getByRole("button", {
@@ -1963,7 +1963,7 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
     section.locator('.new-line-number button[aria-label="Comment on line 15"]'),
   ).toHaveCount(1);
 
-  await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Tree" }).click();
   const astUnifiedHeaders = structuralCard.locator(".hunk-header");
   expect(await astUnifiedHeaders.count()).toBeGreaterThan(0);
   expect(
@@ -2045,12 +2045,12 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   const readmeCard = page.locator(".file-card").filter({ hasText: "README.md" });
   const urlBeforeSwitch = page.url();
 
-  await expect(page.getByRole("button", { name: "Lexical" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Token" })).toHaveAttribute("aria-pressed", "true");
   await expect(formattingCard.locator("table.split")).toBeVisible();
-  await page.getByRole("button", { name: "AST" }).click();
-  await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Tree" }).click();
+  await expect(page.getByRole("button", { name: "Tree" })).toHaveAttribute("aria-pressed", "true");
   await expect(formattingCard).toContainText(
-    "No structural changes found. Switch to Lexical to view text changes.",
+    "No structural changes found. Switch to Token to view text changes.",
   );
   await expect(formattingCard.locator("table")).toHaveCount(0);
 
@@ -2097,7 +2097,7 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   expect(astOverflow.scrollWidth).toBeLessThanOrEqual(astOverflow.clientWidth);
   expect(astOverflow.pageWidth).toBeLessThanOrEqual(astOverflow.viewportWidth);
 
-  await page.getByRole("button", { name: "Lexical" }).click();
+  await page.getByRole("button", { name: "Token" }).click();
   await expect(formattingCard.locator("table.unified")).toBeVisible();
   await page.getByRole("button", { name: "Use split view" }).click();
   await expect(readmeCard.locator(".diff-scroll")).toHaveJSProperty("innerHTML", lineHtmlInAstMode);
@@ -2108,14 +2108,14 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
 
 test("the selected algorithm survives later commit navigation without entering the URL", async ({ page }) => {
   await loadAlgorithmCommit(page);
-  await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Tree" }).click();
   await page.getByRole("button", { name: "Ignore comments" }).click();
   await page.getByRole("button", { name: "Ignore tests" }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
   await page.getByLabel("Public GitHub commit or pull request URL").fill(nextUrl);
   await page.getByRole("button", { name: "View diff" }).click();
-  await expect(page.getByRole("button", { name: "AST" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Tree" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".structural-empty")).toBeVisible();
@@ -2132,7 +2132,7 @@ test("parse failures show their lexical fallback reason above both layouts", asy
   await expect(card.locator(".diff-notice")).toContainText("old:");
   await expect(card.locator("table.split")).toBeVisible();
   expect(await card.locator(".hunk-header").count()).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "AST" }).click();
+  await page.getByRole("button", { name: "Tree" }).click();
   await expect(card.locator(".diff-notice")).toContainText("Lexical fallback");
   await expect(card.locator(".diff-notice")).toContainText("this entire file");
   await page.getByRole("button", { name: "Use unified view" }).click();

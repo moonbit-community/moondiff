@@ -226,7 +226,7 @@ fn algorithm_control(
           },
         ),
         on_click=emit(Ui(SelectDiffAlgorithm(LexicalAlgorithm))),
-        "Lexical",
+        "Token",
       ),
       @html.button(
         type_="button",
@@ -243,7 +243,7 @@ fn algorithm_control(
           },
         ),
         on_click=emit(Ui(SelectDiffAlgorithm(AstAlgorithm))),
-        "AST",
+        "Tree",
       ),
     ],
   )
@@ -872,7 +872,7 @@ fn file_diff_view(
               class="file-message structural-empty",
               [
                 @html.p(
-                  "No structural changes found. Switch to Lexical to view text changes.",
+                  "No structural changes found. Switch to Token to view text changes.",
                 ),
               ],
             )

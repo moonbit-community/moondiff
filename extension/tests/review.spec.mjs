@@ -480,7 +480,7 @@ test("AST highlights inserted internal whitespace continuously in split and unif
   });
   await page.goto(reviewPath());
 
-  const ast = page.getByRole("button", { name: "AST", exact: true });
+  const ast = page.getByRole("button", { name: "Tree", exact: true });
   await ast.click();
   await expect(ast).toHaveAttribute("aria-pressed", "true");
 
@@ -1083,10 +1083,10 @@ test("filtered comments fall back with location, and return inline after filters
   await expect(page.locator(".outdated-discussions .comment-location")).toContainText("17");
   await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
-  await page.getByRole("button", { name: "AST", exact: true }).click();
+  await page.getByRole("button", { name: "Tree", exact: true }).click();
   await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
   await expect(page.locator(".file-discussions").filter({ hasText: "Existing inline comment" })).toContainText("Not shown in current view");
-  await page.getByRole("button", { name: "Lexical", exact: true }).click();
+  await page.getByRole("button", { name: "Token", exact: true }).click();
   await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
 });
@@ -1188,7 +1188,7 @@ test("declaration reordering preserves absolute comment lines across algorithms 
     ];
   });
   await page.goto(reviewPath());
-  for (const algorithm of ["Lexical", "AST"]) {
+  for (const algorithm of ["Token", "Tree"]) {
     await page.getByRole("button", { name: algorithm, exact: true }).click();
     for (const layout of ["split", "unified"]) {
       const toggle = page.getByRole("button", { name: `Use ${layout} view` });
