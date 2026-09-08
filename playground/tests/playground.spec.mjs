@@ -1663,9 +1663,12 @@ for (const width of [1280, 420]) for (const colorScheme of ["light", "dark"]) {
         if (pressed) {
           await expect(toggle).toHaveCSS("background-color", "rgb(238, 242, 254)");
           await expect(toggle).toHaveCSS("color", "rgb(42, 85, 204)");
-          await expect(toggle).toHaveCSS("border-top-color", "rgb(59, 110, 245)");
         } else {
           await expect(toggle).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
+        }
+        await toggle.hover();
+        for (const side of ["top", "right", "bottom", "left"]) {
+          await expect(toggle).toHaveCSS(`border-${side}-width`, "0px");
         }
         const contrast = await toggle.evaluate(button => {
           const rgba = value => {
@@ -1685,10 +1688,9 @@ for (const width of [1280, 420]) for (const colorScheme of ["light", "dark"]) {
           const luminance = values => values.slice(0, 3).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
           const ratio = (a, b) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
           const style = getComputedStyle(button);
-          return { text: ratio(rgba(style.color), background(button)), border: ratio(rgba(style.borderTopColor), background(button.parentElement)) };
+          return ratio(rgba(style.color), background(button));
         });
-        expect(contrast.text).toBeGreaterThanOrEqual(4.5);
-        expect(contrast.border).toBeGreaterThanOrEqual(3);
+        expect(contrast).toBeGreaterThanOrEqual(4.5);
         await toggle.click();
       }
     }

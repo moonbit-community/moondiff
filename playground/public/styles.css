@@ -2252,7 +2252,7 @@ button.toolbar-button.ignore-tests-toggle {
   width: auto;
   padding: 0 0.5rem;
   color: #353535;
-  border: 1px solid #737373;
+  border: 0;
   background: #fff;
 }
 
@@ -2265,7 +2265,6 @@ button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
   button.toolbar-button.ignore-comments-toggle,
   button.toolbar-button.ignore-tests-toggle {
     color: #eee;
-    border-color: #999;
     background: #242424;
   }
 }
@@ -2274,7 +2273,6 @@ button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
 button.toolbar-button.ignore-comments-toggle.active,
 button.toolbar-button.ignore-tests-toggle.active {
   color: #2a55cc;
-  border-color: #3b6ef5;
   background: #eef2fe;
 }
 
