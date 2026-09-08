@@ -1,6 +1,6 @@
 ///|
 fn with_phase(model : Model, phase : Phase) -> Model {
-  {
+  let next = {
     ..model,
     phase,
     file_tree: if phase is LoadFailed(_) {
@@ -9,141 +9,37 @@ fn with_phase(model : Model, phase : Phase) -> Model {
       model.file_tree
     },
   }
-}
-
-///|
-fn with_review(model : Model, review : ReviewState) -> Model {
-  { ..model, review, }
-}
-
-///|
-fn update_draft(
-  model : Model,
-  body? : String,
-  submitting? : Bool,
-  error? : String?,
-) -> Model {
-  guard model.review.draft is Some(draft) else { return model }
-  with_review(
-    model,
-    review_state_with_draft(
-      model.review,
-      Some({
-        kind: draft.kind,
-        body: body.unwrap_or(draft.body),
-        submitting: submitting.unwrap_or(draft.submitting),
-        error: if error is Some(value) {
-          value
-        } else {
-          draft.error
-        },
-      }),
-    ),
-  )
-}
-
-///|
-fn model_with_comment_auth_failure(model : Model, error : Error) -> Model {
-  match extension_error_code(error) {
-    Some("authentication_required") =>
-      with_review(
-        model,
-        review_state_with_auth(
-          model.review,
-          AuthFailed(comment_failure_message(error)),
-        ),
-      )
-    _ => model
+  // Comments can finish before a commit diff. Publish the loaded snapshot to
+  // the domain before the view asks whether line comment actions are allowed.
+  {
+    ..next,
+    review: comment_session_context(next.review, comment_context(next)),
   }
 }
 
 ///|
-fn finish_comment_submission(
-  model : Model,
-  generation : Int,
-  error : Error?,
-  emit : @rabbita.Emit[Msg],
-) -> (Model, @rabbita.Cmd) {
-  if generation != model.generation {
-    return (model, @rabbita.none)
+fn with_review(model : Model, review : Session) -> Model {
+  {
+    ..model,
+    review,
+    auth: if review.authentication_error is Some(message) {
+      AuthFailed(message)
+    } else {
+      model.auth
+    },
   }
-  if error is Some(error) {
-    let failed = update_draft(
-      model,
-      submitting=false,
-      error=Some(comment_failure_message(error)),
-    )
-    return (model_with_comment_auth_failure(failed, error), @rabbita.none)
+}
+
+///|
+fn with_auth(model : Model, auth : AuthStatus) -> Model {
+  let login = match auth {
+    SignedIn(login~, ..) => login
+    Anonymous(_) | WebReadOnly => None
+    _ => model.last_authenticated_login
   }
-  guard model.route is Some(reference) else { return (model, @rabbita.none) }
-  (
-    with_review(model, {
-      auth: model.review.auth,
-      last_authenticated_login: model.review.last_authenticated_login,
-      deletion: model.review.deletion,
-      deleted: model.review.deleted,
-      // Keep the object returned by GitHub visible while the authoritative
-      // comment list refresh runs in the background.
-      comments: model.review.comments,
-      draft: None,
-    }),
-    @rabbita.batch([
-      comments_request(reference, generation, emit),
-      @comments.notify_github_page_command(),
-    ]),
+  let (review, _) = @comments.update(
+    comment_session_context(model.review, comment_context(model)),
+    Identity(auth is SignedIn(..), login),
   )
-}
-
-///|
-fn insert_issue_comment(model : Model, comment : ApiIssueComment) -> Model {
-  guard model.review.comments is CommentsReady(bundle) else { return model }
-  let comments = bundle.issue_comments.copy()
-  comments.push(comment)
-  with_review(
-    model,
-    review_state_with_comments(
-      model.review,
-      CommentsReady({
-        issue_comments: comments,
-        review_comments: bundle.review_comments,
-        commit_comments: bundle.commit_comments,
-      }),
-    ),
-  )
-}
-
-///|
-fn insert_review_comment(model : Model, comment : ApiReviewComment) -> Model {
-  guard model.review.comments is CommentsReady(bundle) else { return model }
-  let comments = bundle.review_comments.copy()
-  comments.push(comment)
-  with_review(
-    model,
-    review_state_with_comments(
-      model.review,
-      CommentsReady({
-        issue_comments: bundle.issue_comments,
-        review_comments: comments,
-        commit_comments: bundle.commit_comments,
-      }),
-    ),
-  )
-}
-
-///|
-fn insert_commit_comment(model : Model, comment : ApiCommitComment) -> Model {
-  guard model.review.comments is CommentsReady(bundle) else { return model }
-  let comments = bundle.commit_comments.copy()
-  comments.push(comment)
-  with_review(
-    model,
-    review_state_with_comments(
-      model.review,
-      CommentsReady({
-        issue_comments: bundle.issue_comments,
-        review_comments: bundle.review_comments,
-        commit_comments: comments,
-      }),
-    ),
-  )
+  { ..model, auth, last_authenticated_login: login, review, }
 }

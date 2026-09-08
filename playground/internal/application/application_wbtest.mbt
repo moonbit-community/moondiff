@@ -31,6 +31,8 @@ test "stale commit responses are discarded by generation" {
     phase: Idle,
     route: None,
     file_tree: initial_file_tree_state(),
+    auth: WebReadOnly,
+    last_authenticated_login: None,
     review: initial_review_state(),
   }
   let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
@@ -55,6 +57,8 @@ fn pull_test_model(
     phase,
     route: Some(reference),
     file_tree: initial_file_tree_state(),
+    auth: WebReadOnly,
+    last_authenticated_login: None,
     review: initial_review_state(),
   }
 }
@@ -426,6 +430,8 @@ fn diff_test_model(view : ChangeView) -> Model {
     phase: Showing(view),
     route: Some(view.reference),
     file_tree: initial_file_tree_state(),
+    auth: WebReadOnly,
+    last_authenticated_login: None,
     review: initial_review_state(),
   }
 }
@@ -1012,7 +1018,56 @@ fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
       },
     ],
   )
-  view
+  {
+    ..view,
+    pull_snapshot: if target is PullRequest(_) {
+      Some(review_test_pull())
+    } else {
+      None
+    },
+  }
+}
+
+///|
+fn review_test_pull() -> ApiPull {
+  {
+    title: "Review fixture",
+    html_url: "https://github.com/upstream/project/pull/17",
+    base: {
+      sha: "1111111111111111111111111111111111111111",
+      repo: Some({ full_name: "upstream/project", }),
+    },
+    head: {
+      sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      repo: Some({ full_name: "upstream/project", }),
+    },
+    additions: 1,
+    deletions: 1,
+    changed_files: 1,
+  }
+}
+
+///|
+fn review_test_refresh(
+  model : Model,
+  bundle : ApiCommentBundle,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let pull = review_test_pull()
+  let pending = with_review(
+    model,
+    review_fixture(model.review, refresh=RefreshList(Some(pull))),
+  )
+  let (loaded, _) = update_review(
+    pending,
+    CommentsLoaded(model.generation, pending.review.refresh_id, Ok(bundle)),
+    emit,
+  )
+  update_review(
+    loaded,
+    CommentsValidated(model.generation, pending.review.refresh_id, Ok(pull)),
+    emit,
+  )
 }
 
 ///|
@@ -1024,21 +1079,28 @@ fn review_test_model(auth : AuthStatus) -> Model {
     generation: 5,
     phase: Showing(view),
     route: Some(view.reference),
-    review: {
-      auth,
-      deletion: None,
-      deleted: [],
-      last_authenticated_login: match auth {
-        SignedIn(login~, ..) => login
-        _ => None
-      },
-      comments: CommentsReady({
+    auth,
+    last_authenticated_login: match auth {
+      SignedIn(login~, ..) => login
+      _ => None
+    },
+    review: review_fixture(
+      initial_review_state(),
+      deletion=None,
+      deleted=[],
+      comments=CommentsReady({
         issue_comments: [],
         review_comments: [],
         commit_comments: [],
       }),
-      draft: None,
-    },
+      draft=None,
+      stage=initial_review_state().submission(),
+      can_comment=auth is SignedIn(..),
+      login=match auth {
+        SignedIn(login~, ..) => login
+        _ => None
+      },
+    ),
   }
 }
 
@@ -1101,20 +1163,21 @@ test "only signed-in reviews can open comment drafts" {
   )
   assert_true(review_can_comment(signed_in.review))
   let (overall, _) = update_review(signed_in, OpenOverallDraft, emit)
-  guard overall.review.draft is Some(overall_draft) else {
+  guard overall.review.draft() is Some(overall_draft) else {
     fail("expected an overall draft")
   }
   assert_true(overall_draft.kind is OverallDraft)
   let (inline, _) = update_review(signed_in, OpenInlineDraft(0, anchor), emit)
-  guard inline.review.draft is Some(inline_draft) else {
+  guard inline.review.draft() is Some(inline_draft) else {
     fail("expected an inline draft")
   }
   assert_true(
     inline_draft.kind is InlineDraft(0, selected) && selected == anchor,
   )
+  let signed_in = review_reply_test_model()
   let comment_id = Int64::from_int(20)
   let (reply, _) = update_review(signed_in, OpenReplyDraft(comment_id), emit)
-  guard reply.review.draft is Some(reply_draft) else {
+  guard reply.review.draft() is Some(reply_draft) else {
     fail("expected a reply draft")
   }
   assert_true(
@@ -1130,6 +1193,8 @@ test "submitting a retained draft still requires sign-in" {
     review_state_with_draft(
       model.review,
       Some({
+        snapshot: None,
+        id: { generation: 0, sequence: 0, },
         kind: OverallDraft,
         body: "comment body",
         submitting: false,
@@ -1139,7 +1204,7 @@ test "submitting a retained draft still requires sign-in" {
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (blocked, _) = update_review(with_draft, SubmitDraft, emit)
-  guard blocked.review.draft is Some(draft) else {
+  guard blocked.review.draft() is Some(draft) else {
     fail("expected the blocked draft to be retained")
   }
   assert_false(draft.submitting)
@@ -1152,6 +1217,8 @@ test "comment loading authentication failure signs out and preserves the draft" 
     SignedIn(login=Some("reviewer"), install_url=None),
   )
   let draft = CommentDraft::{
+    snapshot: None,
+    id: { generation: 0, sequence: 0, },
     kind: OverallDraft,
     body: "keep this draft",
     submitting: false,
@@ -1163,31 +1230,39 @@ test "comment loading authentication failure signs out and preserves the draft" 
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (failed, _) = update_review(
-    with_draft,
-    CommentsLoaded(5, Err(authentication_required_error())),
+    with_review(
+      with_draft,
+      review_fixture(
+        with_draft.review,
+        refresh=RefreshList(Some(review_test_pull())),
+      ),
+    ),
+    CommentsLoaded(
+      5,
+      with_draft.review.refresh_id + 1,
+      Err(authentication_required_error()),
+    ),
     emit,
   )
-  guard failed.review.auth is AuthFailed(auth_message) else {
+  guard failed.auth is AuthFailed(auth_message) else {
     fail("expected comment loading to invalidate authentication")
   }
   assert_true(auth_message.contains("expired"))
   assert_false(review_can_comment(failed.review))
-  guard failed.review.comments is CommentsFailed(comments_message) else {
-    fail("expected comment loading to retain its failure")
-  }
-  assert_true(comments_message.contains("expired"))
-  assert_true(failed.review.draft == Some(draft))
+  assert_true(failed.review.comments() == model.review.comments())
+  assert_true(failed.review.refresh_error.unwrap().contains("expired"))
+  assert_true(failed.review.draft() == with_draft.review.draft())
 
   let (stale, _) = update_review(
     with_draft,
-    CommentsLoaded(4, Err(authentication_required_error())),
+    CommentsLoaded(4, 0, Err(authentication_required_error())),
     emit,
   )
   assert_true(stale == with_draft)
 }
 
 ///|
-test "PR head race preserves the line draft and starts a fresh snapshot" {
+test "PR head race preserves the line draft and waits for manual snapshot loading" {
   let view = review_test_view()
   let anchor = canonical_anchor(
     parse_canonical_patch("src/main.mbt", view.files[0].file.patch),
@@ -1204,19 +1279,31 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     phase: Showing(view),
     route: Some(view.reference),
     file_tree: initial_file_tree_state(),
-    review: {
-      auth: SignedIn(login=Some("reviewer"), install_url=None),
-      last_authenticated_login: Some("reviewer"),
-      deletion: None,
-      deleted: [],
-      comments: CommentsLoading,
-      draft: Some({
+    auth: SignedIn(login=Some("reviewer"), install_url=None),
+    last_authenticated_login: Some("reviewer"),
+    review: review_fixture(
+      initial_review_state(),
+      refresh=RefreshIdle,
+      snapshot_stale=false,
+      deletion=None,
+      deleted=[],
+      comments=CommentsLoading,
+      draft=Some({
+        snapshot: None,
+        id: { generation: 0, sequence: 0, },
         kind: InlineDraft(0, anchor),
         body: "keep this draft",
         submitting: true,
         error: None,
       }),
-    },
+      stage=Some(CheckingHead),
+      can_comment=SignedIn(login=Some("reviewer"), install_url=None)
+        is SignedIn(..),
+      login=match SignedIn(login=Some("reviewer"), install_url=None) {
+        SignedIn(login~, ..) => login
+        _ => None
+      },
+    ),
   }
   let changed = ApiPull::{
     title: "Moved head",
@@ -1236,22 +1323,24 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (next, _) = update_review(
     model,
-    CommentHeadChecked(5, anchor, Ok(changed)),
+    CommentHeadChecked(5, model.review.submission_id, anchor, Ok(changed)),
     emit,
   )
-  assert_eq(next.generation, 6)
-  assert_true(next.phase is LoadingPullMetadata(attempt=0, ..))
-  guard next.review.draft is Some(draft) else {
+  assert_eq(next.generation, 5)
+  assert_true(next.phase == model.phase)
+  assert_true(next.review.snapshot_stale)
+  guard next.review.draft() is Some(draft) else {
     fail("expected the draft to survive the head refresh")
   }
   assert_eq(draft.body, "keep this draft")
   assert_false(draft.submitting)
-  assert_true(draft.error.unwrap().contains("head changed"))
+  assert_true(draft.error.unwrap().contains("PR updated"))
 
   let (stale, _) = update_review(
     next,
     CommentsLoaded(
       5,
+      0,
       Ok({ issue_comments: [], review_comments: [], commit_comments: [], }),
     ),
     emit,
@@ -1271,6 +1360,8 @@ test "PR comment head authentication failure signs out and preserves the draft" 
     SignedIn(login=Some("reviewer"), install_url=None),
   )
   let original = CommentDraft::{
+    snapshot: None,
+    id: { generation: 0, sequence: 0, },
     kind: InlineDraft(0, anchor),
     body: "keep this line draft",
     submitting: true,
@@ -1281,16 +1372,25 @@ test "PR comment head authentication failure signs out and preserves the draft" 
     review_state_with_draft(base.review, Some(original)),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (failed, _) = update_review(
+  let pending = with_review(
     model,
-    CommentHeadChecked(5, anchor, Err(authentication_required_error())),
+    review_fixture(model.review, stage=Some(CheckingHead)),
+  )
+  let (failed, _) = update_review(
+    pending,
+    CommentHeadChecked(
+      5,
+      pending.review.submission_id,
+      anchor,
+      Err(authentication_required_error()),
+    ),
     emit,
   )
-  guard failed.review.auth is AuthFailed(message) else {
+  guard failed.auth is AuthFailed(message) else {
     fail("expected the head check to invalidate authentication")
   }
   assert_true(message.contains("expired"))
-  guard failed.review.draft is Some(draft) else {
+  guard failed.review.draft() is Some(draft) else {
     fail("expected the line draft to survive the authentication failure")
   }
   assert_true(draft.kind == original.kind)
@@ -1303,6 +1403,8 @@ test "PR comment head authentication failure signs out and preserves the draft" 
 test "comment completion inserts GitHub response and failures retain the draft" {
   let view = review_test_view()
   let draft = CommentDraft::{
+    snapshot: None,
+    id: { generation: 0, sequence: 0, },
     kind: OverallDraft,
     body: "new comment",
     submitting: true,
@@ -1318,18 +1420,28 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     phase: Showing(view),
     route: Some(view.reference),
     file_tree: initial_file_tree_state(),
-    review: {
-      auth: SignedIn(login=Some("reviewer"), install_url=None),
-      last_authenticated_login: Some("reviewer"),
-      deletion: None,
-      deleted: [],
-      comments: CommentsReady({
+    auth: SignedIn(login=Some("reviewer"), install_url=None),
+    last_authenticated_login: Some("reviewer"),
+    review: review_fixture(
+      initial_review_state(),
+      refresh=RefreshIdle,
+      snapshot_stale=false,
+      deletion=None,
+      deleted=[],
+      comments=CommentsReady({
         issue_comments: [],
         review_comments: [],
         commit_comments: [],
       }),
-      draft: Some(draft),
-    },
+      draft=Some(draft),
+      stage=Some(PostingIssue),
+      can_comment=SignedIn(login=Some("reviewer"), install_url=None)
+        is SignedIn(..),
+      login=match SignedIn(login=Some("reviewer"), install_url=None) {
+        SignedIn(login~, ..) => login
+        _ => None
+      },
+    ),
   }
   let created = ApiIssueComment::{
     id: Int64::from_int(42),
@@ -1341,11 +1453,11 @@ test "comment completion inserts GitHub response and failures retain the draft" 
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (posted, _) = update_review(
     model,
-    IssueCommentCreated(5, Ok(created)),
+    IssueCommentCreated(5, model.review.submission_id, Ok(created)),
     emit,
   )
-  assert_true(posted.review.draft is None)
-  guard posted.review.comments is CommentsReady(bundle) else {
+  assert_true(posted.review.draft() is None)
+  guard posted.review.comments() is CommentsReady(bundle) else {
     fail("expected optimistic comments to stay visible")
   }
   assert_eq(bundle.issue_comments.map(comment => comment.id), [created.id])
@@ -1354,6 +1466,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     model,
     IssueCommentCreated(
       5,
+      model.review.submission_id,
       Err(
         ExtensionRequestError::ExtensionRequestError(
           status=422,
@@ -1364,51 +1477,81 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     ),
     emit,
   )
-  guard failed.review.draft is Some(retained) else {
+  guard failed.review.draft() is Some(retained) else {
     fail("expected failed submission to retain the draft")
   }
   assert_eq(retained.body, "new comment")
   assert_false(retained.submitting)
   assert_true(retained.error.unwrap().contains("anchor"))
-  assert_true(failed.review.auth is SignedIn(login=Some("reviewer"), ..))
+  assert_true(failed.auth is SignedIn(login=Some("reviewer"), ..))
 }
 
 ///|
 test "comment creation authentication failures sign out and retain the draft" {
-  let base = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
-  )
-  let original = CommentDraft::{
-    kind: OverallDraft,
-    body: "keep this comment",
-    submitting: true,
-    error: None,
-  }
-  let model = with_review(
-    base,
-    review_state_with_draft(base.review, Some(original)),
-  )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let messages : Array[ReviewMsg] = [
-    IssueCommentCreated(5, Err(authentication_required_error())),
-    ReviewCommentCreated(5, Err(authentication_required_error())),
-    CommitCommentCreated(5, Err(authentication_required_error())),
-    ReviewReplyCreated(5, Err(authentication_required_error())),
-  ]
-  for msg in messages {
-    let (failed, _) = update_review(model, msg, emit)
-    guard failed.review.auth is AuthFailed(message) else {
-      fail("expected comment creation to invalidate authentication")
+  for
+    stage in [
+      @comments.PostingIssue,
+      PostingReview,
+      PostingCommit,
+      PostingReply,
+    ] {
+    let base = review_reply_test_model()
+    let view = review_test_view()
+    let anchor = ReviewAnchor::{
+      path: "src/main.mbt",
+      side: Right,
+      line: 2,
+      position: Some(3),
+    }
+    let kind : @comments.DraftKind = match stage {
+      PostingIssue => OverallDraft
+      PostingReply => ReplyDraft(20L)
+      _ => InlineDraft(0, anchor)
+    }
+    let review = review_fixture(
+      base.review,
+      draft=Some({
+        snapshot: None,
+        id: { generation: 5, sequence: 1, },
+        kind,
+        body: "keep this comment",
+        submitting: false,
+        error: None,
+      }),
+      stage=Some(stage),
+    )
+    let model = if stage is PostingCommit {
+      let commit = {
+        ..view,
+        reference: @github.commit_reference("upstream", "project", view.sha),
+      }
+      { ..base, review, route: Some(commit.reference), phase: Showing(commit), }
+    } else {
+      with_review(base, review)
+    }
+    let id = model.review.submission_id
+    let message : ReviewMsg = match stage {
+      PostingIssue =>
+        IssueCommentCreated(5, id, Err(authentication_required_error()))
+      PostingReview =>
+        ReviewCommentCreated(5, id, Err(authentication_required_error()))
+      PostingCommit =>
+        CommitCommentCreated(5, id, Err(authentication_required_error()))
+      _ => ReviewReplyCreated(5, id, Err(authentication_required_error()))
+    }
+    let (failed, _) = update_review(model, message, emit)
+    guard failed.auth is AuthFailed(message) else {
+      fail("expected auth failure")
     }
     assert_true(message.contains("expired"))
     assert_false(review_can_comment(failed.review))
-    guard failed.review.draft is Some(draft) else {
-      fail("expected the comment draft to survive authentication failure")
-    }
-    assert_true(draft.kind == original.kind)
-    assert_eq(draft.body, original.body)
+    let draft = failed.review.draft().unwrap()
+    assert_true(draft.kind == kind)
+    assert_eq(draft.body, "keep this comment")
     assert_false(draft.submitting)
     assert_true(draft.error.unwrap().contains("expired"))
+    ignore(view)
   }
 }
 
@@ -1480,14 +1623,21 @@ fn device_auth_test_model(
     phase,
     route,
     file_tree: initial_file_tree_state(),
-    review: {
-      auth,
-      last_authenticated_login,
-      deletion: None,
-      deleted: [],
-      comments: CommentsFailed("private repository"),
-      draft: None,
-    },
+    auth,
+    last_authenticated_login,
+    review: review_fixture(
+      initial_review_state(),
+      deletion=None,
+      deleted=[],
+      comments=CommentsFailed("private repository"),
+      draft=None,
+      stage=initial_review_state().submission(),
+      can_comment=auth is SignedIn(..),
+      login=match auth {
+        SignedIn(login~, ..) => login
+        _ => None
+      },
+    ),
   }
 }
 
@@ -1503,19 +1653,28 @@ fn auth_identity_test_model(auth : AuthStatus, login : String?) -> Model {
       search_query: "main",
       selected_file_index: Some(0),
     },
-    review: {
-      auth,
-      last_authenticated_login: login,
-      deletion: None,
-      deleted: [],
-      comments: model.review.comments,
-      draft: Some({
+    auth,
+    last_authenticated_login: login,
+    review: review_fixture(
+      initial_review_state(),
+      deletion=None,
+      deleted=[],
+      comments=model.review.comments(),
+      draft=Some({
+        snapshot: None,
+        id: { generation: 0, sequence: 0, },
         kind: OverallDraft,
         body: "account-owned draft",
         submitting: false,
         error: None,
       }),
-    },
+      stage=initial_review_state().submission(),
+      can_comment=auth is SignedIn(..),
+      login=match auth {
+        SignedIn(login~, ..) => login
+        _ => None
+      },
+    ),
   }
 }
 
@@ -1539,10 +1698,10 @@ test "account changes and confirmed anonymity clear review state and reload" {
   )
   assert_eq(bob.generation, old_generation + 1)
   assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(bob.review.auth is SignedIn(login=Some("bob"), ..))
-  assert_eq(bob.review.last_authenticated_login, Some("bob"))
-  assert_true(bob.review.comments is CommentsLoading)
-  assert_true(bob.review.draft is None)
+  assert_true(bob.auth is SignedIn(login=Some("bob"), ..))
+  assert_eq(bob.last_authenticated_login, Some("bob"))
+  assert_true(bob.review.comments() is CommentsLoading)
+  assert_true(bob.review.draft() is None)
   assert_true(bob.file_tree == reset_file_tree_state(alice.file_tree))
 
   let (anonymous, _) = update_auth(
@@ -1556,10 +1715,10 @@ test "account changes and confirmed anonymity clear review state and reload" {
   )
   assert_eq(anonymous.generation, old_generation + 1)
   assert_true(anonymous.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(anonymous.review.auth is Anonymous(_))
-  assert_true(anonymous.review.last_authenticated_login is None)
-  assert_true(anonymous.review.comments is CommentsLoading)
-  assert_true(anonymous.review.draft is None)
+  assert_true(anonymous.auth is Anonymous(_))
+  assert_true(anonymous.last_authenticated_login is None)
+  assert_true(anonymous.review.comments() is CommentsLoading)
+  assert_true(anonymous.review.draft() is None)
   assert_true(anonymous.file_tree == reset_file_tree_state(alice.file_tree))
 }
 
@@ -1593,7 +1752,7 @@ test "installation URL changes do not cross the signed-in account boundary" {
   )
   assert_eq(updated.generation, old_generation)
   assert_true(updated.phase == alice.phase)
-  guard updated.review.auth is SignedIn(login~, install_url~) else {
+  guard updated.auth is SignedIn(login~, install_url~) else {
     fail("expected Alice to remain signed in")
   }
   assert_eq(login, Some("alice"))
@@ -1601,8 +1760,8 @@ test "installation URL changes do not cross the signed-in account boundary" {
     install_url,
     Some("https://github.com/apps/moondiff-new/installations/new"),
   )
-  assert_eq(updated.review.last_authenticated_login, Some("alice"))
-  assert_true(updated.review.draft == alice.review.draft)
+  assert_eq(updated.last_authenticated_login, Some("alice"))
+  assert_true(updated.review.draft() == alice.review.draft())
   assert_true(updated.file_tree == alice.file_tree)
 }
 
@@ -1638,6 +1797,7 @@ test "account boundary generation ignores old diff comment and submission respon
     bob,
     CommentsLoaded(
       old_generation,
+      0,
       Ok({ issue_comments: [], review_comments: [], commit_comments: [], }),
     ),
     emit,
@@ -1663,7 +1823,7 @@ test "account boundary generation ignores old diff comment and submission respon
   }
   let (after_submission, _) = update_review(
     bob_with_comments,
-    IssueCommentCreated(old_generation, Ok(late_comment)),
+    IssueCommentCreated(old_generation, 0, Ok(late_comment)),
     emit,
   )
   assert_true(after_submission == bob_with_comments)
@@ -1676,21 +1836,18 @@ test "same-account device recovery preserves drafts while another account clears
     AuthFailed("Your GitHub session expired."),
     Some("alice"),
   )
-  let checking = with_review(
-    failed,
-    review_state_with_auth(failed.review, AuthChecking),
-  )
-  assert_true(checking.review.auth is AuthChecking)
-  assert_eq(checking.review.last_authenticated_login, Some("alice"))
-  assert_true(checking.review.draft == failed.review.draft)
+  let checking = with_auth(failed, AuthChecking)
+  assert_true(checking.auth is AuthChecking)
+  assert_eq(checking.last_authenticated_login, Some("alice"))
+  assert_true(checking.review.draft() == failed.review.draft())
   let flow_id = "flow-recovery"
   let (pending, _) = update_auth(
     checking,
     DeviceAuthorizationStarted(Ok(device_api_status(flow_id))),
     emit,
   )
-  assert_eq(pending.review.last_authenticated_login, Some("alice"))
-  assert_true(pending.review.draft == failed.review.draft)
+  assert_eq(pending.last_authenticated_login, Some("alice"))
+  assert_true(pending.review.draft() == failed.review.draft())
 
   let (alice, _) = update_auth(
     pending,
@@ -1699,9 +1856,9 @@ test "same-account device recovery preserves drafts while another account clears
   )
   assert_eq(alice.generation, failed.generation)
   assert_true(alice.phase is Showing(_))
-  assert_true(alice.review.auth is SignedIn(login=Some("alice"), ..))
-  assert_eq(alice.review.last_authenticated_login, Some("alice"))
-  assert_true(alice.review.draft == failed.review.draft)
+  assert_true(alice.auth is SignedIn(login=Some("alice"), ..))
+  assert_eq(alice.last_authenticated_login, Some("alice"))
+  assert_true(alice.review.draft() == failed.review.draft())
 
   let retrying = { ..failed, phase: LoadFailed("private repository"), }
   let (retried, _) = update_auth(
@@ -1711,7 +1868,7 @@ test "same-account device recovery preserves drafts while another account clears
   )
   assert_eq(retried.generation, retrying.generation + 1)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.review.draft == failed.review.draft)
+  assert_true(retried.review.draft() == failed.review.draft())
 
   let (bob, _) = update_auth(
     pending,
@@ -1720,17 +1877,14 @@ test "same-account device recovery preserves drafts while another account clears
   )
   assert_eq(bob.generation, failed.generation + 1)
   assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(bob.review.auth is SignedIn(login=Some("bob"), ..))
-  assert_eq(bob.review.last_authenticated_login, Some("bob"))
-  assert_true(bob.review.draft is None)
+  assert_true(bob.auth is SignedIn(login=Some("bob"), ..))
+  assert_eq(bob.last_authenticated_login, Some("bob"))
+  assert_true(bob.review.draft() is None)
 
-  guard pending.review.auth is DeviceAuthorizing(device) else {
+  guard pending.auth is DeviceAuthorizing(device) else {
     fail("expected a pending device authorization")
   }
-  let cancelling = with_review(
-    pending,
-    review_state_with_auth(pending.review, DeviceCancelling(device)),
-  )
+  let cancelling = with_auth(pending, DeviceCancelling(device))
   let (cancelled, _) = update_auth(
     cancelling,
     DeviceAuthorizationCancelled(flow_id, Ok(anonymous_api_status())),
@@ -1738,8 +1892,8 @@ test "same-account device recovery preserves drafts while another account clears
   )
   assert_eq(cancelled.generation, failed.generation + 1)
   assert_true(cancelled.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(cancelled.review.last_authenticated_login is None)
-  assert_true(cancelled.review.draft is None)
+  assert_true(cancelled.last_authenticated_login is None)
+  assert_true(cancelled.review.draft() is None)
 }
 
 ///|
@@ -1761,9 +1915,9 @@ test "an authenticated result without a login cannot reuse known account state" 
   )
   assert_eq(unverified.generation, alice.generation + 1)
   assert_true(unverified.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(unverified.review.auth is SignedIn(login=None, ..))
-  assert_true(unverified.review.last_authenticated_login is None)
-  assert_true(unverified.review.draft is None)
+  assert_true(unverified.auth is SignedIn(login=None, ..))
+  assert_true(unverified.last_authenticated_login is None)
+  assert_true(unverified.review.draft() is None)
 }
 
 ///|
@@ -1773,13 +1927,10 @@ test "successful local logout clears account state and reloads" {
     SignedIn(login=Some("alice"), install_url=None),
     Some("alice"),
   )
-  let checking = with_review(
-    alice,
-    review_state_with_auth(alice.review, AuthChecking),
-  )
-  assert_true(checking.review.auth is AuthChecking)
-  assert_eq(checking.review.last_authenticated_login, Some("alice"))
-  assert_true(checking.review.draft == alice.review.draft)
+  let checking = with_auth(alice, AuthChecking)
+  assert_true(checking.auth is AuthChecking)
+  assert_eq(checking.last_authenticated_login, Some("alice"))
+  assert_true(checking.review.draft() == alice.review.draft())
   let (logged_out, _) = update_auth(
     checking,
     AuthLogoutFinished(Ok(anonymous_api_status())),
@@ -1787,10 +1938,10 @@ test "successful local logout clears account state and reloads" {
   )
   assert_eq(logged_out.generation, alice.generation + 1)
   assert_true(logged_out.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(logged_out.review.auth is Anonymous(_))
-  assert_true(logged_out.review.last_authenticated_login is None)
-  assert_true(logged_out.review.comments is CommentsLoading)
-  assert_true(logged_out.review.draft is None)
+  assert_true(logged_out.auth is Anonymous(_))
+  assert_true(logged_out.last_authenticated_login is None)
+  assert_true(logged_out.review.comments() is CommentsLoading)
+  assert_true(logged_out.review.draft() is None)
 }
 
 ///|
@@ -1808,7 +1959,7 @@ test "device authorization moves from code through pending to signed in" {
     DeviceAuthorizationStarted(Ok(device_api_status(flow_id))),
     emit,
   )
-  guard started.review.auth is DeviceAuthorizing(device) else {
+  guard started.auth is DeviceAuthorizing(device) else {
     fail("expected the device code to be displayed")
   }
   assert_eq(device.flow_id, flow_id)
@@ -1823,7 +1974,7 @@ test "device authorization moves from code through pending to signed in" {
     ),
     emit,
   )
-  guard pending.review.auth is DeviceAuthorizing(waiting) else {
+  guard pending.auth is DeviceAuthorizing(waiting) else {
     fail("expected authorization to remain pending")
   }
   assert_eq(waiting.expires_in, 895)
@@ -1834,8 +1985,8 @@ test "device authorization moves from code through pending to signed in" {
     DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("octocat"))),
     emit,
   )
-  assert_true(signed_in.review.auth is SignedIn(login=Some("octocat"), ..))
-  assert_true(signed_in.review.comments is CommentsLoading)
+  assert_true(signed_in.auth is SignedIn(login=Some("octocat"), ..))
+  assert_true(signed_in.review.comments() == pending.review.comments())
 }
 
 ///|
@@ -1872,10 +2023,8 @@ test "reactivation synchronizes login and logout before refreshing comments" {
     ),
     emit,
   )
-  assert_true(
-    signed_in.review.auth is SignedIn(login=Some("cross-tab-user"), ..),
-  )
-  assert_true(signed_in.review.comments is CommentsLoading)
+  assert_true(signed_in.auth is SignedIn(login=Some("cross-tab-user"), ..))
+  assert_true(signed_in.review.comments() is CommentsReady(_))
 
   let ready = with_review(
     signed_in,
@@ -1897,8 +2046,8 @@ test "reactivation synchronizes login and logout before refreshing comments" {
     ),
     emit,
   )
-  assert_true(signed_out.review.auth is Anonymous(_))
-  assert_true(signed_out.review.comments is CommentsLoading)
+  assert_true(signed_out.auth is Anonymous(_))
+  assert_true(signed_out.review.comments() is CommentsLoading)
 }
 
 ///|
@@ -1916,11 +2065,11 @@ test "reactivation preserves cancellation and ignores stale generations" {
     ),
     emit,
   )
-  guard cancelling.review.auth is DeviceCancelling(updated) else {
+  guard cancelling.auth is DeviceCancelling(updated) else {
     fail("expected the current cancellation to remain in progress")
   }
   assert_eq(updated.poll_after, 9)
-  assert_true(cancelling.review.comments is CommentsLoading)
+  assert_true(cancelling.review.comments() == model.review.comments())
 
   let (stale_generation, _) = update_auth(
     model,
@@ -1965,7 +2114,7 @@ test "reactivation login retries a private repository load" {
   )
   assert_eq(retried.generation, model.generation + 1)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.review.auth is SignedIn(login=Some("cross-tab-user"), ..))
+  assert_true(retried.auth is SignedIn(login=Some("cross-tab-user"), ..))
 }
 
 ///|
@@ -1989,9 +2138,7 @@ test "reactivation login restarts an anonymous load and ignores its late failure
   )
   assert_eq(restarted.generation, old_generation + 1)
   assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(
-    restarted.review.auth is SignedIn(login=Some("cross-tab-user"), ..),
-  )
+  assert_true(restarted.auth is SignedIn(login=Some("cross-tab-user"), ..))
 
   let (after_late_failure, _) = update_load(
     restarted,
@@ -2017,7 +2164,7 @@ test "device code copy feedback and cancellation stay scoped to the current flow
   let (copying, _) = update_auth(model, CopyDeviceCode, emit)
   assert_true(copying == model)
   let (copied, _) = update_auth(model, DeviceCodeCopied(flow_id), emit)
-  guard copied.review.auth is DeviceAuthorizing(done) else {
+  guard copied.auth is DeviceAuthorizing(done) else {
     fail("expected a device authorization")
   }
   assert_true(done.copy_status is DeviceCodeCopyDone)
@@ -2033,15 +2180,12 @@ test "device code copy feedback and cancellation stay scoped to the current flow
     DeviceCodeCopyFailed(flow_id, "clipboard denied"),
     emit,
   )
-  guard failed_copy.review.auth is DeviceAuthorizing(failed) else {
+  guard failed_copy.auth is DeviceAuthorizing(failed) else {
     fail("expected a device authorization")
   }
   assert_true(failed.copy_status is DeviceCodeCopyError("clipboard denied"))
 
-  let cancelling = with_review(
-    failed_copy,
-    review_state_with_auth(failed_copy.review, DeviceCancelling(failed)),
-  )
+  let cancelling = with_auth(failed_copy, DeviceCancelling(failed))
   let (late_poll, _) = update_auth(
     cancelling,
     DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("too-late"))),
@@ -2053,7 +2197,7 @@ test "device code copy feedback and cancellation stay scoped to the current flow
     DeviceAuthorizationCancelled(flow_id, Ok(anonymous_api_status())),
     emit,
   )
-  assert_true(cancelled.review.auth is Anonymous(_))
+  assert_true(cancelled.auth is Anonymous(_))
 }
 
 ///|
@@ -2094,7 +2238,7 @@ test "expired and stale device responses cannot authenticate another flow" {
     emit,
   )
   assert_true(
-    expired.review.auth is AuthFailed(message) && message.contains("expired"),
+    expired.auth is AuthFailed(message) && message.contains("expired"),
   )
 }
 
@@ -2115,7 +2259,7 @@ test "device sign-in retries a private repository load" {
   )
   assert_eq(retried.generation, 6)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.review.auth is SignedIn(login=Some("reviewer"), ..))
+  assert_true(retried.auth is SignedIn(login=Some("reviewer"), ..))
 }
 
 ///|
@@ -2136,7 +2280,7 @@ test "device sign-in restarts an anonymous load and ignores its late failure" {
   )
   assert_eq(restarted.generation, old_generation + 1)
   assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(restarted.review.auth is SignedIn(login=Some("reviewer"), ..))
+  assert_true(restarted.auth is SignedIn(login=Some("reviewer"), ..))
 
   let (after_late_failure, _) = update_load(
     restarted,
@@ -2200,17 +2344,17 @@ test "deletion requires ownership and confirmation, preserves failures, and reje
     review_comments: [],
     commit_comments: [],
   }
-  let model = with_review(initial, {
-    ..initial.review,
-    comments: CommentsReady(bundle),
-  })
+  let model = with_review(
+    initial,
+    review_fixture(initial.review, comments=CommentsReady(bundle)),
+  )
   let id = @comments.IssueComment(100L)
   let (unconfirmed, _) = update_review(model, ConfirmCommentDelete(id), emit)
   assert_true(unconfirmed.review == model.review)
-  let other = with_review(model, {
-    ..model.review,
-    auth: SignedIn(login=Some("someone-else"), install_url=None),
-  })
+  let other = with_auth(
+    model,
+    SignedIn(login=Some("someone-else"), install_url=None),
+  )
   let (denied, _) = update_review(other, AskDelete(id), emit)
   assert_true(denied.review.deletion is None)
   let (confirming, _) = update_review(model, AskDelete(id), emit)
@@ -2223,32 +2367,35 @@ test "deletion requires ownership and confirmation, preserves failures, and reje
   assert_true(duplicate.review == pending.review)
   let (failed, _) = update_review(
     pending,
-    CommentDeleted(model.generation, id, Err(authentication_required_error())),
+    CommentDeleted(
+      model.generation,
+      1,
+      id,
+      Err(authentication_required_error()),
+    ),
     emit,
   )
   assert_true(failed.review.deletion is Some(DeleteFailed(_, _)))
-  assert_true(failed.review.comments == CommentsReady(bundle))
-  assert_true(failed.review.auth is AuthFailed(_))
-  let signed_in = with_review(failed, {
-    ..failed.review,
-    auth: model.review.auth,
-  })
+  assert_true(failed.review.comments() == CommentsReady(bundle))
+  assert_true(failed.auth is AuthFailed(_))
+  let signed_in = with_auth(failed, model.auth)
   let (retrying, _) = update_review(signed_in, ConfirmCommentDelete(id), emit)
   let (deleted, _) = update_review(
     retrying,
-    CommentDeleted(model.generation, id, Ok({ deleted: true, })),
+    CommentDeleted(
+      model.generation,
+      retrying.review.deletion_id,
+      id,
+      Ok({ deleted: true, }),
+    ),
     emit,
   )
-  guard deleted.review.comments is CommentsReady(empty) else {
+  guard deleted.review.comments() is CommentsReady(empty) else {
     fail("expected comments")
   }
   assert_true(empty.issue_comments.is_empty())
-  let (stale_refresh, _) = update_review(
-    deleted,
-    CommentsLoaded(model.generation, Ok(bundle)),
-    emit,
-  )
-  assert_true(stale_refresh.review.comments == deleted.review.comments)
+  let (stale_refresh, _) = review_test_refresh(deleted, bundle, emit)
+  assert_true(stale_refresh.review.comments() == deleted.review.comments())
   let navigated = {
     ..pending,
     generation: pending.generation + 1,
@@ -2256,22 +2403,178 @@ test "deletion requires ownership and confirmation, preserves failures, and reje
   }
   let (stale_delete, _) = update_review(
     navigated,
-    CommentDeleted(model.generation, id, Ok({ deleted: true, })),
+    CommentDeleted(
+      model.generation,
+      retrying.review.deletion_id,
+      id,
+      Ok({ deleted: true, }),
+    ),
     emit,
   )
   assert_true(stale_delete.review == navigated.review)
   let (changed_review, _) = review_state_with_auth_identity(
-    pending.review,
+    pending,
     SignedIn(login=Some("new-account"), install_url=None),
   )
-  let (changed, _) = reload_after_auth_identity_boundary(
-    with_review(pending, changed_review),
-    emit,
-  )
+  let (changed, _) = reload_after_auth_identity_boundary(changed_review, emit)
   let (old_account_delete, _) = update_review(
     changed,
-    CommentDeleted(model.generation, id, Ok({ deleted: true, })),
+    CommentDeleted(
+      model.generation,
+      retrying.review.deletion_id,
+      id,
+      Ok({ deleted: true, }),
+    ),
     emit,
   )
   assert_true(old_account_delete.review == changed.review)
+}
+
+///|
+fn review_reply_test_model() -> Model {
+  let model = review_test_model(
+    SignedIn(login=Some("reviewer"), install_url=None),
+  )
+  let root : ApiReviewComment = {
+    id: 20L,
+    body: "root",
+    html_url: "",
+    created_at: "",
+    user: Some({ login: "reviewer", }),
+    path: "src/main.mbt",
+    line: Some(2),
+    original_line: Some(2),
+    side: Some("RIGHT"),
+    position: Some(3),
+    commit_id: "head",
+    in_reply_to_id: None,
+  }
+  with_review(
+    model,
+    review_fixture(
+      model.review,
+      comments=CommentsReady({
+        issue_comments: [],
+        review_comments: [root, { ..root, id: 21L, in_reply_to_id: Some(20L), }],
+        commit_comments: [],
+      }),
+    ),
+  )
+}
+
+///|
+test "reply targets and drafts guard deletion in every ordering" {
+  let model = review_reply_test_model()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let id = @comments.ReviewComment(20L)
+  assert_true(@comments.valid_reply_target(model.review, 20L))
+  for target in [21L, 99L] {
+    assert_false(@comments.valid_reply_target(model.review, target))
+    let (blocked, _) = update_review(model, OpenReplyDraft(target), emit)
+    assert_true(blocked == model)
+  }
+  let (confirming, _) = update_review(model, AskDelete(id), emit)
+  let (drafting, _) = update_review(confirming, OpenReplyDraft(20L), emit)
+  for submitting in [false, true] {
+    for body in ["", "preserve me"] {
+      let guarded = with_review(
+        drafting,
+        review_fixture(
+          drafting.review,
+          draft=Some({
+            snapshot: None,
+            id: { generation: 0, sequence: 0, },
+            kind: ReplyDraft(20L),
+            body,
+            submitting,
+            error: None,
+          }),
+          stage=drafting.review.submission(),
+        ),
+      )
+      assert_true(@comments.draft_blocks_deletion(guarded.review, id))
+      assert_false(
+        @comments.draft_blocks_deletion(
+          guarded.review,
+          @comments.ReviewComment(21L),
+        ),
+      )
+      for
+        deletion in [
+          None,
+          Some(@comments.ConfirmDelete(id)),
+          Some(@comments.DeleteFailed(id, "retry")),
+        ] {
+        let guarded = with_review(
+          guarded,
+          review_fixture(guarded.review, deletion~),
+        )
+        for msg in [AskDelete(id), ConfirmCommentDelete(id)] {
+          let (blocked, _) = update_review(guarded, msg, emit)
+          assert_true(blocked == guarded)
+        }
+      }
+    }
+  }
+  let (cancelled, _) = update_review(drafting, CancelDraft, emit)
+  let (deleting, _) = update_review(cancelled, ConfirmCommentDelete(id), emit)
+  assert_true(deleting.review.deletion == Some(Deleting(id)))
+  let (blocked, _) = update_review(deleting, OpenReplyDraft(20L), emit)
+  assert_true(blocked == deleting)
+  let (drafting, _) = update_review(model, OpenReplyDraft(20L), emit)
+  let (drafting, _) = update_review(
+    drafting,
+    DraftBodyChanged("preserve me"),
+    emit,
+  )
+  let (submitted, _) = update_review(drafting, SubmitDraft, emit)
+  assert_true(submitted.review.draft().unwrap().submitting)
+  guard drafting.review.comments() is CommentsReady(current) else {
+    fail("comments")
+  }
+  let missing = {
+    ..current,
+    review_comments: current.review_comments.filter(c => c.id != 20L),
+  }
+  let (invalid, _) = review_test_refresh(drafting, missing, emit)
+  let (blocked, _) = update_review(invalid, SubmitDraft, emit)
+  assert_false(blocked.review.draft().unwrap().submitting)
+  assert_eq(blocked.review.draft().unwrap().body, "preserve me")
+  assert_true(blocked.review.draft().unwrap().error is Some(_))
+  for target in [21L, 99L] {
+    let (cancelled, _) = update_review(invalid, CancelDraft, emit)
+    let (rejected, _) = update_review(cancelled, OpenReplyDraft(target), emit)
+    assert_true(rejected.review.draft() is None)
+  }
+  let empty : ApiCommentBundle = {
+    issue_comments: [],
+    review_comments: [],
+    commit_comments: [],
+  }
+  let (removed, _) = review_test_refresh(drafting, empty, emit)
+  assert_true(removed.review.draft() == drafting.review.draft())
+  let (blocked, _) = update_review(removed, SubmitDraft, emit)
+  assert_false(blocked.review.draft().unwrap().submitting)
+  let (deletion_blocked, _) = update_review(
+    drafting,
+    ConfirmCommentDelete(id),
+    emit,
+  )
+  assert_true(deletion_blocked == drafting)
+  let (pending_removed, _) = review_test_refresh(submitted, empty, emit)
+  assert_true(pending_removed.review.draft().unwrap().submitting)
+  guard model.review.comments() is CommentsReady(bundle) else {
+    fail("expected comments")
+  }
+  let reply = { ..bundle.review_comments[1], body: "preserve me", }
+  let (finished, _) = update_review(
+    pending_removed,
+    ReviewReplyCreated(
+      model.generation,
+      submitted.review.submission_id,
+      Ok(reply),
+    ),
+    emit,
+  )
+  assert_true(finished.review.draft() is None)
 }

@@ -24,7 +24,10 @@ fn show_pull(
       )
       (
         with_phase(model, Showing(shown)),
-        commands_for_change(view, model.generation, emit),
+        @rabbita.batch([
+          commands_for_change(view, model.generation, emit),
+          comments_request(reference, model.generation, emit),
+        ]),
       )
     }
   }
@@ -140,6 +143,7 @@ fn begin_change_load(
   model : Model,
   reference : CommitRef,
   emit : @rabbita.Emit[Msg],
+  preserve_draft? : Bool = false,
 ) -> (Model, @rabbita.Cmd) {
   let generation = model.generation + 1
   let (phase, command) = match reference.target {
@@ -170,19 +174,20 @@ fn begin_change_load(
       route: Some(reference),
       file_tree: reset_file_tree_state(model.file_tree),
       review: if extension_host_enabled() {
-        {
-          auth: model.review.auth,
-          last_authenticated_login: model.review.last_authenticated_login,
-          deletion: None,
-          deleted: [],
-          comments: CommentsLoading,
-          draft: None,
-        }
+        @comments.update(
+          comment_session_context(model.review, {
+            generation,
+            route: Some(reference),
+            snapshot: None,
+            enabled: true,
+          }),
+          Reset(true, preserve_draft),
+        ).0
       } else {
         model.review
       },
     },
-    if extension_host_enabled() {
+    if extension_host_enabled() && !(reference.target is PullRequest(_)) {
       @rabbita.batch([command, comments_request(reference, generation, emit)])
     } else {
       command

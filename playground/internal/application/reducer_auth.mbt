@@ -32,13 +32,7 @@ fn update_auth(
         }
         Err(error) =>
           (
-            with_review(
-              model,
-              review_state_with_auth(
-                model.review,
-                AuthFailed(comment_failure_message(error)),
-              ),
-            ),
+            with_auth(model, AuthFailed(comment_failure_message(error))),
             @rabbita.none,
           )
       }
@@ -49,13 +43,7 @@ fn update_auth(
       match result {
         Err(error) =>
           (
-            with_review(
-              model,
-              review_state_with_auth(
-                model.review,
-                AuthFailed(comment_failure_message(error)),
-              ),
-            ),
+            with_auth(model, AuthFailed(comment_failure_message(error))),
             @rabbita.none,
           )
         Ok(status) => {
@@ -74,10 +62,7 @@ fn update_auth(
             return (reloading, @rabbita.batch([poll_command, load_command]))
           }
           (
-            with_review(
-              synced,
-              review_state_with_comments(synced.review, CommentsLoading),
-            ),
+            synced,
             @rabbita.batch([
               poll_command,
               comments_request(reference, synced.generation, emit),
@@ -88,10 +73,7 @@ fn update_auth(
     }
     StartDeviceAuthorization =>
       if extension_host_enabled() {
-        (
-          with_review(model, review_state_with_auth(model.review, AuthChecking)),
-          auth_device_start_request(emit),
-        )
+        (with_auth(model, AuthChecking), auth_device_start_request(emit))
       } else {
         (model, @rabbita.none)
       }
@@ -107,13 +89,7 @@ fn update_auth(
         }
         Err(error) =>
           (
-            with_review(
-              model,
-              review_state_with_auth(
-                model.review,
-                AuthFailed(comment_failure_message(error)),
-              ),
-            ),
+            with_auth(model, AuthFailed(comment_failure_message(error))),
             @rabbita.none,
           )
       }
@@ -144,28 +120,19 @@ fn update_auth(
         }
         Err(error) =>
           (
-            with_review(
-              model,
-              review_state_with_auth(
-                model.review,
-                AuthFailed(comment_failure_message(error)),
-              ),
-            ),
+            with_auth(model, AuthFailed(comment_failure_message(error))),
             @rabbita.none,
           )
       }
     }
     CancelDeviceAuthorization(flow_id) => {
       guard extension_host_enabled() &&
-        model.review.auth is DeviceAuthorizing(device) &&
+        model.auth is DeviceAuthorizing(device) &&
         device.flow_id == flow_id else {
         return (model, @rabbita.none)
       }
       (
-        with_review(
-          model,
-          review_state_with_auth(model.review, DeviceCancelling(device)),
-        ),
+        with_auth(model, DeviceCancelling(device)),
         auth_device_cancel_request(flow_id, emit),
       )
     }
@@ -182,19 +149,13 @@ fn update_auth(
         }
         Err(error) =>
           (
-            with_review(
-              model,
-              review_state_with_auth(
-                model.review,
-                AuthFailed(comment_failure_message(error)),
-              ),
-            ),
+            with_auth(model, AuthFailed(comment_failure_message(error))),
             @rabbita.none,
           )
       }
     }
     CopyDeviceCode => {
-      guard model.review.auth is DeviceAuthorizing(device) else {
+      guard model.auth is DeviceAuthorizing(device) else {
         return (model, @rabbita.none)
       }
       (
@@ -209,46 +170,35 @@ fn update_auth(
       )
     }
     DeviceCodeCopied(flow_id) => {
-      guard model.review.auth is DeviceAuthorizing(device) &&
-        device.flow_id == flow_id else {
+      guard model.auth is DeviceAuthorizing(device) && device.flow_id == flow_id else {
         return (model, @rabbita.none)
       }
       (
-        with_review(
+        with_auth(
           model,
-          review_state_with_auth(
-            model.review,
-            DeviceAuthorizing({ ..device, copy_status: DeviceCodeCopyDone, }),
-          ),
+          DeviceAuthorizing({ ..device, copy_status: DeviceCodeCopyDone, }),
         ),
         @rabbita.none,
       )
     }
     DeviceCodeCopyFailed(flow_id, message) => {
-      guard model.review.auth is DeviceAuthorizing(device) &&
-        device.flow_id == flow_id else {
+      guard model.auth is DeviceAuthorizing(device) && device.flow_id == flow_id else {
         return (model, @rabbita.none)
       }
       (
-        with_review(
+        with_auth(
           model,
-          review_state_with_auth(
-            model.review,
-            DeviceAuthorizing({
-              ..device,
-              copy_status: DeviceCodeCopyError(message),
-            }),
-          ),
+          DeviceAuthorizing({
+            ..device,
+            copy_status: DeviceCodeCopyError(message),
+          }),
         ),
         @rabbita.none,
       )
     }
     Logout =>
       if extension_host_enabled() {
-        (
-          with_review(model, review_state_with_auth(model.review, AuthChecking)),
-          auth_logout_request(emit),
-        )
+        (with_auth(model, AuthChecking), auth_logout_request(emit))
       } else {
         (model, @rabbita.none)
       }
@@ -262,13 +212,7 @@ fn update_auth(
         }
         Err(error) =>
           (
-            with_review(
-              model,
-              review_state_with_auth(
-                model.review,
-                AuthFailed(comment_failure_message(error)),
-              ),
-            ),
+            with_auth(model, AuthFailed(comment_failure_message(error))),
             @rabbita.none,
           )
       }

@@ -12,23 +12,25 @@ priv struct InlineDiscussion {
 // Render-local bookkeeping: one absolute-line index, shared across the file
 // fragments, and a record of cards already placed before a source row.
 priv struct InlineDiscussions {
+  generation : Int
   items : Array[InlineDiscussion]
-  shown : Array[@comments.CommentId]
+  projection : ReviewProjection
   index : Map[String, Array[InlineDiscussion]]
+  draft_file_index : Int?
   draft : CommentDraft?
   editor : @rabbita.Html
-  mut draft_shown : Bool
 }
 
 ///|
 fn empty_discussions() -> InlineDiscussions {
   {
+    generation: 0,
     items: [],
-    shown: [],
+    projection: { lines: Map([]), editors: Map([]), },
     index: {},
+    draft_file_index: None,
     draft: None,
     editor: @html.nothing,
-    draft_shown: false,
   }
 }
 
@@ -41,19 +43,40 @@ fn anchor_location(anchor : ReviewAnchor) -> String {
 ///|
 fn prepare_discussions(
   view : ChangeView,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
+  projection? : ReviewProjection = { lines: Map([]), editors: Map([]), },
 ) -> InlineDiscussions {
   let result = {
     ..empty_discussions(),
-    draft: review.draft,
-    editor: if review.draft is Some(draft) && review_can_comment(review) {
-      comment_editor(draft, emit)
+    generation: review.generation(),
+    projection,
+    draft: review.draft(),
+    draft_file_index: match review.draft() {
+      Some({ kind: InlineDraft(_, anchor), .. }) => {
+        let mut found = None
+        for index, file in view.files {
+          if file.file.filename == anchor.path {
+            found = Some(index)
+            break
+          }
+        }
+        found
+      }
+      _ => None
+    },
+    editor: if review.draft() is Some(draft) && review_can_comment(review) {
+      comment_editor(
+        draft,
+        review,
+        emit,
+        unavailable=review.snapshot_stale && draft.kind is InlineDraft(_, _),
+      )
     } else {
       @html.nothing
     },
   }
-  guard review.comments is CommentsReady(bundle) else { return result }
+  guard review.comments() is CommentsReady(bundle) else { return result }
   for thread in review_threads(view, bundle.review_comments) {
     let root = thread.root
     let side : @review.ReviewSide = if root.side == Some("LEFT") {
@@ -83,7 +106,7 @@ fn prepare_discussions(
       root.path + " · Line unavailable"
     }
     result.items.push({
-      id: ReviewComment(root.id),
+      id: thread.id,
       file_index: thread.file_index,
       anchor,
       location,
@@ -147,8 +170,9 @@ fn inline_cards(
   old_line : Int?,
   new_line : Int?,
   columns : Int,
-) -> Array[@rabbita.Html] {
-  let cards : Array[@rabbita.Html] = []
+  site : String,
+) -> Array[(String, @rabbita.Html)] {
+  let cards : Array[(String, @rabbita.Html)] = []
   let matching : Array[InlineDiscussion] = []
   if old_line is Some(line) {
     matching.push_iter(
@@ -167,21 +191,26 @@ fn inline_cards(
     )
   }
   for item in matching {
-    guard item.file_index == Some(file_index) &&
-      !discussions.shown.contains(item.id) &&
-      item.anchor is Some(anchor) else {
+    guard item.file_index == Some(file_index) && item.anchor is Some(anchor) else {
       continue
     }
     let line = if anchor.side is Left { old_line } else { new_line }
-    if line == Some(anchor.line) {
-      discussions.shown.push(item.id)
+    if line == Some(anchor.line) &&
+      discussions.projection.lines.get(
+        discussion_key(file_index, anchor.side, anchor.line),
+      ) ==
+      Some(site) {
+      let key = "\{discussions.generation}:\{item.id.key()}"
       cards.push(
-        @html.tr(class="inline-discussion-row", [
-          @html.td(colspan=columns, [
-            @html.p(class="comment-location", item.location),
-            item.content,
+        (
+          key,
+          @html.tr(class="inline-discussion-row", [
+            @html.td(colspan=columns, [
+              @html.p(class="comment-location", item.location),
+              item.content,
+            ]),
           ]),
-        ]),
+        ),
       )
     }
   }
@@ -193,46 +222,51 @@ fn fallback_discussions(
   discussions : InlineDiscussions,
   file_index : Int?,
 ) -> @rabbita.Html {
-  let items : Array[@rabbita.Html] = []
+  let items : Map[String, @rabbita.Html] = Map([])
   for item in discussions.items {
-    if item.file_index == file_index && !discussions.shown.contains(item.id) {
-      items.push(
-        @html.div(
-          class=if item.outdated {
-            "outdated-discussions"
-          } else {
-            "active-discussions"
-          },
-          [
-            @html.p(
-              class="comment-location",
-              item.location +
-              (if item.outdated {
-                " · Outdated / 已过期"
-              } else {
-                " · 当前视图未显示 / Not shown in current view"
-              }),
-            ),
-            item.content,
-          ],
-        ),
+    if item.file_index == file_index &&
+      !item.anchor
+      .map(a => {
+        discussions.projection.lines.contains(
+          discussion_key(file_index.unwrap_or(-1), a.side, a.line),
+        )
+      })
+      .unwrap_or(false) {
+      items["\{discussions.generation}:\{item.id.key()}"] = @html.div(
+        class=if item.outdated {
+          "outdated-discussions"
+        } else {
+          "active-discussions"
+        },
+        [
+          @html.p(
+            class="comment-location",
+            item.location +
+            (if item.outdated {
+              " · Outdated / 已过期"
+            } else {
+              " · 当前视图未显示 / Not shown in current view"
+            }),
+          ),
+          item.content,
+        ],
       )
     }
   }
-  if !discussions.draft_shown &&
-    discussions.draft is Some(draft) &&
-    draft.kind is InlineDraft(index, anchor) &&
-    file_index == Some(index) {
-    items.push(
-      @html.div([
-        @html.p(
-          class="comment-location",
-          anchor_location(anchor) +
-          " · 当前视图未显示 / Not shown in current view",
-        ),
-        discussions.editor,
-      ]),
-    )
+  if discussions.draft is Some(draft) &&
+    draft.kind is InlineDraft(_, anchor) &&
+    file_index == discussions.draft_file_index &&
+    !discussions.projection.editors.contains(
+      discussion_key(file_index.unwrap_or(-1), anchor.side, anchor.line),
+    ) {
+    items[draft.id.key()] = @html.div([
+      @html.p(
+        class="comment-location",
+        anchor_location(anchor) +
+        " · 当前视图未显示 / Not shown in current view",
+      ),
+      discussions.editor,
+    ])
   }
   if items.is_empty() {
     @html.nothing
@@ -244,7 +278,7 @@ fn fallback_discussions(
 ///|
 fn comment_delete_controls(
   id : @comments.CommentId,
-  review : ReviewState,
+  review : Session,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   guard @comments.can_delete_comment(review, id) else {
@@ -260,12 +294,19 @@ fn comment_delete_controls(
     | Some(DeleteFailed(current, _)) => current == id
     _ => false
   }
+  let conflict = @comments.draft_blocks_deletion(review, id)
+  let hint = if conflict {
+    "Send or cancel the reply draft before deleting this comment."
+  } else {
+    "Delete this comment"
+  }
   let busy = review.deletion is Some(Deleting(_))
   if !selected {
     return @html.button(
       type_="button",
       class="comment-delete",
-      disabled=busy,
+      title=hint,
+      disabled=busy || conflict,
       on_click=emit(Review(AskDelete(id))),
       "Delete",
     )
@@ -280,7 +321,8 @@ fn comment_delete_controls(
     ),
     @html.button(
       type_="button",
-      disabled=busy,
+      disabled=busy || conflict,
+      title=hint,
       on_click=emit(Review(ConfirmCommentDelete(id))),
       if busy {
         "Deleting…"

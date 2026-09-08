@@ -43,6 +43,7 @@ pub(all) enum CachedDiffResult {
 
 pub(all) struct ChangeView {
   reference : @github.CommitRef
+  pull_snapshot : @github.ApiPull?
   sha : String
   parent_sha : String?
   old_revision : @github.Revision?

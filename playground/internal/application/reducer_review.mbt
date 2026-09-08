@@ -1,15 +1,21 @@
 ///|
 pub(all) enum ReviewMsg {
+  Domain(@comments.Event)
   RefreshComments
+  LoadLatestSnapshot
+  BeginCommentsRefresh(Int, CommitRef)
+  CommentsMetadataLoaded(Int, Int, Result[ApiPull, Error])
+  CommentsValidated(Int, Int, Result[ApiPull, Error])
   AskDelete(@comments.CommentId)
   CancelDelete
   ConfirmCommentDelete(@comments.CommentId)
   CommentDeleted(
     Int,
+    Int,
     @comments.CommentId,
     Result[@comments.DeleteResult, Error]
   )
-  CommentsLoaded(Int, Result[ApiCommentBundle, Error])
+  CommentsLoaded(Int, Int, Result[ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
   OpenInlineDraft(Int, ReviewAnchor)
@@ -17,11 +23,28 @@ pub(all) enum ReviewMsg {
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, ReviewAnchor, Result[ApiPull, Error])
-  IssueCommentCreated(Int, Result[ApiIssueComment, Error])
-  ReviewCommentCreated(Int, Result[ApiReviewComment, Error])
-  CommitCommentCreated(Int, Result[ApiCommitComment, Error])
-  ReviewReplyCreated(Int, Result[ApiReviewComment, Error])
+  CommentHeadChecked(Int, Int, ReviewAnchor, Result[ApiPull, Error])
+  IssueCommentCreated(Int, Int, Result[ApiIssueComment, Error])
+  ReviewCommentCreated(Int, Int, Result[ApiReviewComment, Error])
+  CommitCommentCreated(Int, Int, Result[ApiCommitComment, Error])
+  ReviewReplyCreated(Int, Int, Result[ApiReviewComment, Error])
+}
+
+///|
+fn domain_review(
+  model : Model,
+  event : @comments.Event,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let contextual = comment_session_context(model.review, comment_context(model))
+  let (review, effects) = @comments.update(contextual, event)
+  if review == contextual && effects.is_empty() {
+    return (model, @rabbita.none)
+  }
+  (
+    with_review(model, review),
+    @rabbita.batch(effects.map(effect => run_comment_effect(effect, emit))),
+  )
 }
 
 ///|
@@ -30,347 +53,59 @@ fn update_review(
   msg : ReviewMsg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
-  match msg {
-    AskDelete(id) => update_deletion(model, id, false, emit)
-    ConfirmCommentDelete(id) => update_deletion(model, id, true, emit)
-    CancelDelete =>
-      if model.review.deletion is Some(Deleting(_)) {
-        (model, @rabbita.none)
-      } else {
-        (with_review(model, { ..model.review, deletion: None, }), @rabbita.none)
-      }
-    CommentDeleted(generation, id, result) =>
-      finish_deletion(model, generation, id, result, emit)
-    RefreshComments => {
-      guard extension_host_enabled() && model.route is Some(reference) else {
+  let event : @comments.Event = match msg {
+    Domain(event) => event
+    LoadLatestSnapshot => {
+      guard @comments.permission(model.review, LoadSnapshot).allowed() &&
+        model.route is Some(reference) else {
         return (model, @rabbita.none)
       }
-      (model, comments_request(reference, model.generation, emit))
+      return begin_change_load(model, reference, emit)
     }
     PageReactivated => {
       guard extension_host_enabled() && model.route is Some(reference) else {
         return (model, @rabbita.none)
       }
-      (
+      return (
         model,
         reactivation_auth_status_request(reference, model.generation, emit),
       )
     }
-    CommentsLoaded(generation, result) => {
-      if generation != model.generation {
-        return (model, @rabbita.none)
-      }
-      match result {
-        Ok(bundle) =>
-          (
-            with_review(
-              model,
-              review_state_with_comments(
-                model.review,
-                CommentsReady(
-                  @comments.without_deleted(bundle, model.review.deleted),
-                ),
-              ),
-            ),
-            @rabbita.none,
-          )
-        Err(error) => {
-          let failed = with_review(
-            model,
-            review_state_with_comments(
-              model.review,
-              CommentsFailed(comment_failure_message(error)),
-            ),
-          )
-          (model_with_comment_auth_failure(failed, error), @rabbita.none)
-        }
-      }
-    }
-    OpenOverallDraft => {
-      guard review_can_comment(model.review) else {
-        return (model, @rabbita.none)
-      }
-      (
-        with_review(
-          model,
-          review_state_with_draft(
-            model.review,
-            Some({
-              kind: OverallDraft,
-              body: "",
-              submitting: false,
-              error: None,
-            }),
-          ),
-        ),
-        @rabbita.none,
-      )
-    }
-    OpenInlineDraft(file_index, anchor) => {
-      guard review_can_comment(model.review) else {
-        return (model, @rabbita.none)
-      }
-      (
-        with_review(
-          model,
-          review_state_with_draft(
-            model.review,
-            Some({
-              kind: InlineDraft(file_index, anchor),
-              body: "",
-              submitting: false,
-              error: None,
-            }),
-          ),
-        ),
-        @rabbita.none,
-      )
-    }
-    OpenReplyDraft(comment_id) => {
-      guard review_can_comment(model.review) else {
-        return (model, @rabbita.none)
-      }
-      (
-        with_review(
-          model,
-          review_state_with_draft(
-            model.review,
-            Some({
-              kind: ReplyDraft(comment_id),
-              body: "",
-              submitting: false,
-              error: None,
-            }),
-          ),
-        ),
-        @rabbita.none,
-      )
-    }
-    DraftBodyChanged(body) => {
-      guard model.review.draft is Some(draft) && !draft.submitting else {
-        return (model, @rabbita.none)
-      }
-      (
-        with_review(
-          model,
-          review_state_with_draft(
-            model.review,
-            Some({ kind: draft.kind, body, submitting: false, error: None, }),
-          ),
-        ),
-        @rabbita.none,
-      )
-    }
-    CancelDraft => {
-      guard model.review.draft is Some(draft) && !draft.submitting else {
-        return (model, @rabbita.none)
-      }
-      (
-        with_review(model, review_state_with_draft(model.review, None)),
-        @rabbita.none,
-      )
-    }
-    SubmitDraft => {
-      guard model.review.draft is Some(draft) &&
-        !draft.submitting &&
-        model.phase is Showing(view) else {
-        return (model, @rabbita.none)
-      }
-      guard review_can_comment(model.review) else {
-        return (
-          update_draft(
-            model,
-            submitting=false,
-            error=Some("Sign in with GitHub before posting a comment."),
-          ),
-          @rabbita.none,
-        )
-      }
-      let body = draft.body.trim().to_owned()
-      if body.is_empty() {
-        return (
-          update_draft(
-            model,
-            submitting=false,
-            error=Some("Enter a comment before posting."),
-          ),
-          @rabbita.none,
-        )
-      }
-      let submitting = with_review(
-        model,
-        review_state_with_draft(
-          model.review,
-          Some({ kind: draft.kind, body, submitting: true, error: None, }),
-        ),
-      )
-      let command = match (view.reference.target, draft.kind) {
-        (PullRequest(number), OverallDraft) =>
-          create_issue_comment_request(
-            view.reference,
-            number,
-            body,
-            model.generation,
-            emit,
-          )
-        (PullRequest(number), InlineDraft(_, anchor)) =>
-          comment_head_request(
-            view.reference,
-            number,
-            anchor,
-            model.generation,
-            emit,
-          )
-        (Commit(sha), InlineDraft(_, anchor))
-        | (PullCommit(_, sha), InlineDraft(_, anchor)) =>
-          create_commit_comment_request(
-            view.reference,
-            sha,
-            anchor,
-            body,
-            model.generation,
-            emit,
-          )
-        (PullRequest(number), ReplyDraft(comment_id)) =>
-          create_review_reply_request(
-            view.reference,
-            number,
-            comment_id,
-            body,
-            model.generation,
-            emit,
-          )
-        _ => @rabbita.none
-      }
-      (submitting, command)
-    }
-    CommentHeadChecked(generation, anchor, result) => {
-      if generation != model.generation {
-        return (model, @rabbita.none)
-      }
-      guard model.review.draft is Some(draft) &&
-        draft.kind is InlineDraft(_, selected) &&
-        selected == anchor &&
-        model.phase is Showing(view) &&
-        view.reference.target is PullRequest(number) else {
-        return (model, @rabbita.none)
-      }
-      match result {
-        Err(error) => {
-          let failed = update_draft(
-            model,
-            submitting=false,
-            error=Some(comment_failure_message(error)),
-          )
-          (model_with_comment_auth_failure(failed, error), @rabbita.none)
-        }
-        Ok(pull) if pull.head.sha != view.sha => {
-          let (refreshed, command) = begin_change_load(
-            model,
-            view.reference,
-            emit,
-          )
-          (
-            with_review(refreshed, {
-              auth: model.review.auth,
-              last_authenticated_login: model.review.last_authenticated_login,
-              deletion: None,
-              deleted: [],
-              comments: CommentsLoading,
-              draft: Some({
-                kind: draft.kind,
-                body: draft.body,
-                submitting: false,
-                error: Some(
-                  "The pull request head changed. Moondiff refreshed the snapshot; review the new diff before retrying.",
-                ),
-              }),
-            }),
-            command,
-          )
-        }
-        Ok(_) =>
-          (
-            model,
-            create_review_comment_request(
-              view.reference,
-              number,
-              view.sha,
-              anchor,
-              draft.body,
-              generation,
-              emit,
-            ),
-          )
-      }
-    }
-    IssueCommentCreated(generation, result) => {
-      if generation != model.generation {
-        return (model, @rabbita.none)
-      }
-      finish_comment_submission(
-        match result {
-          Ok(comment) => insert_issue_comment(model, comment)
-          Err(_) => model
-        },
+    RefreshComments => RefreshComments
+    CancelDelete => CancelDelete
+    OpenOverallDraft => OpenOverallDraft
+    CancelDraft => CancelDraft
+    SubmitDraft => SubmitDraft
+    BeginCommentsRefresh(generation, reference) =>
+      BeginCommentsRefresh(generation, reference)
+    AskDelete(id) => AskDelete(id)
+    ConfirmCommentDelete(id) => ConfirmCommentDelete(id)
+    OpenInlineDraft(index, anchor) => OpenInlineDraft(index, anchor)
+    OpenReplyDraft(id) => OpenReplyDraft(id)
+    DraftBodyChanged(body) => DraftBodyChanged(body)
+    CommentsMetadataLoaded(generation, id, result) =>
+      CommentsMetadataLoaded(generation, id, result.map_err(comment_failure))
+    CommentsValidated(generation, id, result) =>
+      CommentsValidated(generation, id, result.map_err(comment_failure))
+    CommentDeleted(generation, operation, id, result) =>
+      CommentDeleted(generation, operation, id, result.map_err(comment_failure))
+    CommentsLoaded(generation, id, result) =>
+      CommentsLoaded(generation, id, result.map_err(comment_failure))
+    CommentHeadChecked(generation, id, anchor, result) =>
+      CommentHeadChecked(
         generation,
-        match result {
-          Ok(_) => None
-          Err(error) => Some(error)
-        },
-        emit,
+        id,
+        anchor,
+        result.map_err(comment_failure),
       )
-    }
-    ReviewCommentCreated(generation, result) => {
-      if generation != model.generation {
-        return (model, @rabbita.none)
-      }
-      finish_comment_submission(
-        match result {
-          Ok(comment) => insert_review_comment(model, comment)
-          Err(_) => model
-        },
-        generation,
-        match result {
-          Ok(_) => None
-          Err(error) => Some(error)
-        },
-        emit,
-      )
-    }
-    CommitCommentCreated(generation, result) => {
-      if generation != model.generation {
-        return (model, @rabbita.none)
-      }
-      finish_comment_submission(
-        match result {
-          Ok(comment) => insert_commit_comment(model, comment)
-          Err(_) => model
-        },
-        generation,
-        match result {
-          Ok(_) => None
-          Err(error) => Some(error)
-        },
-        emit,
-      )
-    }
-    ReviewReplyCreated(generation, result) => {
-      if generation != model.generation {
-        return (model, @rabbita.none)
-      }
-      finish_comment_submission(
-        match result {
-          Ok(comment) => insert_review_comment(model, comment)
-          Err(_) => model
-        },
-        generation,
-        match result {
-          Ok(_) => None
-          Err(error) => Some(error)
-        },
-        emit,
-      )
-    }
+    IssueCommentCreated(generation, id, result) =>
+      IssueCommentCreated(generation, id, result.map_err(comment_failure))
+    ReviewCommentCreated(generation, id, result) =>
+      ReviewCommentCreated(generation, id, result.map_err(comment_failure))
+    CommitCommentCreated(generation, id, result) =>
+      CommitCommentCreated(generation, id, result.map_err(comment_failure))
+    ReviewReplyCreated(generation, id, result) =>
+      ReviewReplyCreated(generation, id, result.map_err(comment_failure))
   }
+  domain_review(model, event, emit)
 }

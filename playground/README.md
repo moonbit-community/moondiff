@@ -227,3 +227,19 @@ Published line comments and editors appear above their source line, with file,
 side and line labels. Hidden lines fall back to file discussions; outdated
 comments show their original line when available. Only your own comments offer
 deletion, with an inline confirmation and retryable errors.
+
+PR discussions load after the diff snapshot is verified. Each refresh checks PR
+metadata before and after fetching comments, comparing base/head SHAs,
+repositories, and file count with the displayed diff. Refreshes from an older
+request or route are ignored; network errors keep verified comments visible.
+A changed PR shows **PR updated** and **Load latest**, preserving the displayed
+diff, comments, and draft. New line comments and line submission are disabled;
+overall comments and replies to available roots remain supported. A successful
+line post shows a GitHub link while its inline placement awaits verification.
+
+Only one draft can be open, including an empty draft. Reopening its target
+preserves its body and error; choosing another target asks you to send or cancel
+the current draft. During posting, comment entry buttons are disabled, and
+responses are checked against the submission number and phase. Failed posts
+retain the draft for retry. **Load latest** is disabled while any draft, post,
+or deletion is pending; cancel or finish the draft to load the new snapshot.

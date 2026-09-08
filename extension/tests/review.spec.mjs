@@ -52,6 +52,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
       terminalUsed: Boolean(savedAuth.terminalUsed),
       authorize: false,
       currentHead: head,
+      currentBase: base,
       headRace: false,
       metadataCalls: 0,
       commentListCalls: 0,
@@ -146,7 +147,7 @@ async function installHost(page, target = pullTarget(), options = {}) {
       return {
         title: options.identitySpecificDiff ? `Fork PR for ${state.login}` : "Fork PR",
         html_url: "https://github.com/upstream/project/pull/17",
-        base: { sha: base, repo: { full_name: "upstream/project" } },
+        base: { sha: state.currentBase, repo: { full_name: "upstream/project" } },
         head: { sha: state.currentHead, repo: { full_name: "contributor/project-fork" } },
         additions: options.additions ?? 1,
         deletions: options.deletions ?? 1,
@@ -251,6 +252,10 @@ async function installHost(page, target = pullTarget(), options = {}) {
           code: "authentication_required",
         });
       }
+      if (op.endsWith(".create") && state.delayCreate) {
+        state.delayCreate = false;
+        await new Promise(resolve => { state.releaseCreate = resolve; });
+      }
       if (op === "github.pull.get") {
         if (options.delayAnonymousPull && !state.authenticated && !state.anonymousPullDelayed) {
           state.anonymousPullDelayed = true;
@@ -298,6 +303,10 @@ async function installHost(page, target = pullTarget(), options = {}) {
       if (op === "github.commit.get") return commit();
       if (op === "github.content.get") return content(args.ref);
       if (op === "github.comments.list") {
+        if (state.updateDuringList || options.updateDuringFirstList && state.commentListCalls === 0) {
+          state.currentBase = changedHead;
+          state.updateDuringList = false;
+        }
         if (options.commentListError) {
           throw Object.assign(new Error(options.commentListError.detail), {
             status: options.commentListError.status,
@@ -310,7 +319,9 @@ async function installHost(page, target = pullTarget(), options = {}) {
         state.commentListCalls += 1;
         if (state.delayNextList) {
           state.delayNextList = false;
-          const snapshot = structuredClone({ issue_comments: state.issueComments, review_comments: state.reviewComments, commit_comments: [] });
+          const snapshot = structuredClone(state.target.kind === "pull"
+            ? { issue_comments: state.issueComments, review_comments: state.reviewComments, commit_comments: [] }
+            : { issue_comments: [], review_comments: [], commit_comments: state.commitComments });
           await new Promise(resolve => { state.releaseList = resolve; });
           return snapshot;
         }
@@ -341,6 +352,8 @@ async function installHost(page, target = pullTarget(), options = {}) {
         return created;
       }
       if (op === "github.review.reply.create") {
+        const root = state.reviewComments.find(c => String(c.id) === String(args.comment_id));
+        if (!root || root.in_reply_to_id != null) throw Object.assign(new Error("Reply target must be an existing root"), { status: 422 });
         const created = { id: "23", body: args.body, html_url: "https://github.com/comment/23", created_at: "2026-08-18T09:03:00Z", user: { login: "tester" }, path: "src/main.mbt", line: 2, side: "RIGHT", position: 3, commit_id: state.currentHead, in_reply_to_id: String(args.comment_id) };
         state.reviewComments.push(created);
         return created;
@@ -813,7 +826,7 @@ test("cross-tab login supersedes a pending anonymous private-repository failure"
   await expect(page.getByText(/private repositories/u)).toHaveCount(0);
 });
 
-test("PR head race preserves the draft and refreshes the snapshot without posting", async ({ page }) => {
+test("PR head race preserves the draft until manually loading the snapshot", async ({ page }) => {
   await installHost(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
@@ -821,9 +834,21 @@ test("PR head race preserves the draft and refreshes the snapshot without postin
   await page.locator(".inline-comment-editor-row textarea").fill("Keep this draft");
   await page.evaluate(() => { window.__fake.headRace = true; });
   await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();
-  await expect(page.getByText(/head changed/u)).toBeVisible();
+  await expect(page.locator(".snapshot-stale")).toContainText("PR updated");
+  await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
+  await expect(page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" })).toBeDisabled();
   await expect(page.locator(".inline-comment-editor-row textarea")).toHaveValue("Keep this draft");
   expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === "github.review.comment.create").length)).toBe(0);
+  await page.locator(".inline-comment-editor-row textarea").fill("Still editable");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Load latest" }).click();
+  await expect(page.locator(".snapshot-stale")).toHaveCount(0);
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
+  await page.locator(".comment-editor textarea").fill("New snapshot comment");
+  await page.getByRole("button", { name: "Post comment", exact: true }).click();
+  await expect(page.getByText("New snapshot comment", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__fake.calls.find(call => call.op === "github.review.comment.create").args.commit_id)).toBe(changedHead);
 });
 
 for (const target of [commitTarget(), pullCommitTarget()]) {
@@ -1261,3 +1286,369 @@ test("shared toolbar controls fit desktop and narrow screens in both themes", as
   await expect(page.locator("table.split").first()).toBeVisible();
   await checkToolbar(page);
 });
+
+for (const external of [false, true]) {
+  test(`reply draft survives ${external ? "external root deletion" : "blocked deletion"} across layouts`, async ({ page }) => {
+    await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+    await page.goto(reviewPath());
+    const thread = page.locator(".review-thread").filter({ hasText: "Existing inline comment" });
+    const own = thread.locator(".github-comment").filter({ hasText: "Existing inline comment" });
+    await own.getByRole("button", { name: "Delete", exact: true }).click();
+    await thread.getByRole("button", { name: "Reply", exact: true }).click();
+    await expect(own.getByRole("button", { name: "Confirm delete", exact: true })).toBeDisabled();
+    await thread.locator("textarea").fill("Preserve this reply");
+    if (external) {
+      await page.evaluate(() => { window.__fake.reviewComments = window.__fake.reviewComments.filter(c => String(c.id) !== "20"); });
+      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await expect(page.locator(".unavailable-reply-draft")).toBeVisible();
+    }
+    for (const algorithm of ["Token", "Tree"]) {
+      await page.getByRole("button", { name: algorithm, exact: true }).click();
+      for (const layout of ["Split", "Unified"]) {
+        await page.getByRole("button", { name: layout, exact: true }).click();
+        await expect(page.locator(".comment-editor")).toHaveCount(1);
+        await expect(page.locator(".comment-editor textarea")).toHaveValue("Preserve this reply");
+        if (external) {
+          await expect(page.locator(".comment-editor textarea")).toBeEnabled();
+          await expect(page.locator(".comment-editor").getByRole("button", { name: "Post comment" })).toBeDisabled();
+          await expect(page.locator(".review-thread").filter({ hasText: "Existing reply" }).getByRole("button", { name: "Reply", exact: true })).toBeDisabled();
+          await page.locator(".comment-editor textarea").evaluate(el => el.select());
+          expect(await page.locator(".comment-editor textarea").evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd))).toBe("Preserve this reply");
+        }
+      }
+    }
+    expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith(".delete") || c.op === "github.review.reply.create").length)).toBe(0);
+    await page.locator(".comment-editor").getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(page.locator(".comment-editor")).toHaveCount(0);
+    if (!external) {
+      await own.getByRole("button", { name: "Confirm delete", exact: true }).click();
+      await expect(own).toHaveCount(0);
+      await expect(page.locator(".review-thread").filter({ hasText: "Existing reply" }).getByRole("button", { name: "Reply", exact: true })).toBeDisabled();
+    }
+  });
+}
+
+test("one draft survives repeated clicks and every entry switch while posting", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await page.getByRole("button", { name: "Add overall comment" }).click();
+  await newLineCommentGutter(page, 2).hover();
+  await expect(newLineCommentButton(page, 2)).toBeDisabled();
+  await expect(page.locator(".overall-comments textarea")).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
+  await expect(page.locator(".overall-comments textarea")).toHaveValue("");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await openNewLineComment(page, 2);
+  await page.locator(".comment-editor textarea").fill("Do not lose this draft");
+  await openNewLineComment(page, 2);
+  await expect(page.locator(".comment-editor textarea")).toHaveValue("Do not lose this draft");
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
+  await expect(page.locator(".inline-comment-editor-row textarea")).toHaveValue("Do not lose this draft");
+  await page.evaluate(() => { window.__fake.delayCreate = true; });
+  await page.getByRole("button", { name: "Post comment", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseCreate)).toBe("function");
+  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
+  await expect(page.locator(".line-comment-button").first()).toBeDisabled();
+  await page.evaluate(() => window.__fake.releaseCreate());
+  await expect(page.getByText("Do not lose this draft", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+  await page.locator(".review-thread textarea").fill("Reply draft");
+  await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+  await expect(page.locator(".review-thread textarea")).toHaveValue("Reply draft");
+});
+
+test("a base update during refresh preserves verified comments and the collapsed draft", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
+  await page.locator(".comment-editor textarea").fill("Old snapshot draft");
+  const before = await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.pull.files").length);
+  await page.evaluate(() => {
+    window.__fake.updateDuringList = true;
+    window.__fake.reviewComments[0].body = "Unverified replacement";
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.locator(".snapshot-stale")).toBeVisible();
+  await expect(page.getByText("Existing inline comment", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unverified replacement", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.pull.files").length)).toBe(before);
+  await page.getByRole("button", { name: "Unified", exact: true }).click();
+  await expect(page.locator(".comment-editor textarea")).toHaveValue("Old snapshot draft");
+  await page.getByRole("button", { name: "Collapse src/main.mbt", exact: true }).click();
+  await expect(page.locator(".file-discussions textarea")).toHaveValue("Old snapshot draft");
+  await expect(page.getByRole("button", { name: "Post comment", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Load latest" }).click();
+  await expect(page.locator(".snapshot-stale")).toHaveCount(0);
+  await expect(page.getByText("Unverified replacement", { exact: true })).toBeVisible();
+});
+
+test("first comment list is withheld if the PR updates after diff validation", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true, updateDuringFirstList: true });
+  await page.goto(reviewPath());
+  await expect(page.locator(".snapshot-stale")).toBeVisible();
+  await expect(page.getByText("Existing inline comment", { exact: true })).toHaveCount(0);
+  const ops = await page.evaluate(() => window.__fake.calls.map(c => c.op));
+  const firstList = ops.indexOf("github.comments.list");
+  expect(ops.slice(0, firstList).filter(op => op === "github.pull.get").length).toBe(3);
+  await page.getByRole("button", { name: "Load latest" }).click();
+  await expect(page.getByText("Existing inline comment", { exact: true })).toBeVisible();
+  await expect(page.locator(".snapshot-stale")).toHaveCount(0);
+});
+
+test("late list cannot replace a newer verified refresh", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await page.evaluate(() => { window.__fake.delayNextList = true; });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+  await page.evaluate(() => { window.__fake.reviewComments[0].body = "Newest verified comment"; });
+  await reactivatePage(page);
+  await expect(page.getByText("Newest verified comment", { exact: true })).toBeVisible();
+  await page.evaluate(() => window.__fake.releaseList());
+  await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled();
+  await expect(page.getByText("Newest verified comment", { exact: true })).toBeVisible();
+  await expect(page.getByText("Existing inline comment", { exact: true })).toHaveCount(0);
+});
+
+test("line creation after a PR update shows a receipt without inserting an unverified anchor", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
+  await page.locator(".comment-editor textarea").fill("Published on the old snapshot");
+  await page.evaluate(() => { window.__fake.delayCreate = true; });
+  await page.getByRole("button", { name: "Post comment", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseCreate)).toBe("function");
+  await page.evaluate(value => { window.__fake.currentHead = value; }, changedHead);
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.locator(".snapshot-stale")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
+  await page.evaluate(() => window.__fake.releaseCreate());
+  await expect(page.locator(".published-comment-link")).toBeVisible();
+  await expect(page.locator(".comment-notice")).toHaveText("Comment published.");
+  await expect(page.getByText("Published on the old snapshot", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load latest" })).toBeEnabled();
+  await page.getByRole("button", { name: "Load latest" }).click();
+  await expect(page.getByText("Published on the old snapshot", { exact: true })).toBeVisible();
+});
+
+test("manual snapshot loading waits for root deletion across layout changes", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await page.goto(reviewPath());
+  await expect(page.getByText("Existing inline comment", { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.__fake.updateDuringList = true; });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.locator(".snapshot-stale")).toBeVisible();
+  await page.evaluate(() => { window.__fake.deleteDelay = true; });
+  const root = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
+  await root.getByRole("button", { name: "Delete", exact: true }).click();
+  await root.getByRole("button", { name: "Confirm delete", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDelete)).toBe("function");
+  await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
+  await page.getByRole("button", { name: "Unified", exact: true }).click();
+  await page.evaluate(() => window.__fake.releaseDelete());
+  await expect(page.getByText("Existing inline comment", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load latest" })).toBeEnabled();
+});
+
+
+for (const kind of ["pull", "commit"]) {
+  for (const layout of ["Split", "Unified"]) {
+    for (const change of ["unchanged", "add same", "delete same", "add earlier", "delete earlier"]) {
+      test(`inline draft retains DOM focus and selection after ${kind} ${layout} refresh: ${change}`, async ({ page }) => {
+        const target = kind === "pull" ? pullTarget() : commitTarget();
+        await installHost(page, target, { authenticated: true });
+        await page.addInitScript(({ kind, change }) => {
+          const field = kind === "pull" ? "reviewComments" : "commitComments";
+          const template = window.__fake[field][0];
+          const line = change.endsWith("earlier") ? 1 : 2;
+          window.__refreshComment = {
+            ...template, id: "99", body: "Refresh regression comment",
+            line, position: line === 1 ? 1 : 3,
+          };
+          if (change.startsWith("delete")) window.__fake[field].push(window.__refreshComment);
+        }, { kind, change });
+        await page.goto(reviewPath(target));
+        await waitForSignedInComments(page);
+        await page.getByRole("button", { name: layout, exact: true }).click();
+        await openNewLineComment(page, 2);
+        const textarea = page.locator(".inline-comment-editor-row textarea");
+        const original = await textarea.elementHandle();
+        const body = "Keep this draft editable";
+        await textarea.fill(body);
+        // Exercise both a nonterminal caret and a backwards selection.
+        const start = 5;
+        const end = change === "unchanged" ? start : 9;
+        const direction = end === start ? "forward" : "backward";
+        await textarea.evaluate((el, { start, end, direction }) => {
+          el.setSelectionRange(start, end, direction);
+        }, { start, end, direction });
+        await page.evaluate(({ kind, change }) => {
+          const state = window.__fake;
+          const field = kind === "pull" ? "reviewComments" : "commitComments";
+          if (change.startsWith("add")) state[field].push(window.__refreshComment);
+          if (change.startsWith("delete")) state[field] = state[field].filter(c => c.id !== "99");
+          state.delayNextList = true;
+        }, { kind, change });
+        const calls = await page.evaluate(() => window.__fake.commentListCalls);
+        await reactivatePage(page);
+        await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+        await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeDisabled();
+        await page.evaluate(() => window.__fake.releaseList());
+        await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled();
+        expect(await page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(calls);
+        await expect(page.getByText("Refresh regression comment", { exact: true }))
+          .toHaveCount(change.startsWith("add") ? 1 : 0);
+        expect(await textarea.evaluate((el, original) => el === original, original)).toBe(true);
+        await expect(textarea).toBeFocused();
+        await expect(textarea).toHaveValue(body);
+        expect(await textarea.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection]))
+          .toEqual([start, end, direction]);
+        await page.keyboard.type("INSERT");
+        await expect(textarea).toHaveValue(body.slice(0, start) + "INSERT" + body.slice(end));
+        await expect(textarea).toBeFocused();
+        await expect(page.locator(".inline-comment-editor-row")).toHaveCount(1);
+        expect(await textarea.evaluate(el => {
+          const row = el.closest("tr");
+          return row.previousElementSibling?.classList.contains("inline-discussion-row") &&
+            row.nextElementSibling?.classList.contains("comment-target");
+        })).toBe(true);
+      });
+    }
+  }
+}
+
+for (const kind of ["overall", "reply", "inline", "collapsed"]) {
+  for (const direction of ["forward", "backward"]) {
+    test(`${kind} editor keeps its DOM and ${direction} selection during background insert/remove and composition`, async ({ page }) => {
+      await installHost(page, pullTarget(), { authenticated: true });
+      await page.goto(reviewPath());
+      await waitForSignedInComments(page);
+      if (kind === "overall") await page.getByRole("button", { name: "Add overall comment" }).click();
+      else if (kind === "reply") await page.locator(".review-thread").filter({ hasText: "Existing inline comment" }).getByRole("button", { name: "Reply", exact: true }).click();
+      else {
+        await openNewLineComment(page, 2);
+        if (kind === "collapsed") {
+          await page.getByRole("button", { name: "Collapse src/main.mbt", exact: true }).click();
+          await expect(page.locator(".file-discussions textarea")).toBeVisible();
+        }
+      }
+      const editor = page.locator(".comment-editor textarea");
+      await editor.fill("Keep composing text");
+      await expect(editor).toHaveValue("Keep composing text");
+      await expect(editor).toBeFocused();
+      const original = await editor.elementHandle();
+      await editor.evaluate((el, direction) => {
+        el.setSelectionRange(5, 14, direction);
+        el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "文" }));
+      }, direction);
+      for (const insert of [true, false]) {
+        await page.evaluate(({ insert, kind }) => {
+          const s = window.__fake;
+          const field = kind === "overall" ? "issueComments" : "reviewComments";
+          if (insert) {
+            const template = s[field][0];
+            s[field].push({ ...template, id: "901", body: "Background addition", ...(kind === "reply" ? { in_reply_to_id: "20" } : {}) });
+          } else s[field] = s[field].filter(c => c.id !== "901");
+        }, { insert, kind });
+        await reactivatePage(page);
+        await expect(page.getByText("Background addition", { exact: true })).toHaveCount(insert ? 1 : 0);
+        expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
+        await expect(editor).toBeFocused();
+        expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([5, 14, direction]);
+      }
+      await editor.evaluate(el => el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "文" })));
+      await page.keyboard.type("NEXT");
+      await expect(editor).toHaveValue("Keep NEXT text");
+    });
+  }
+}
+
+test("draft remount restores selection without taking toolbar focus and cleans up cancelled drafts", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
+  let editor = page.locator(".comment-editor textarea");
+  await editor.fill("Selection survives containers");
+  const draftId = await editor.getAttribute("data-draft-id");
+  await editor.evaluate(el => el.setSelectionRange(3, 12, "backward"));
+  const collapse = page.getByRole("button", { name: "Collapse src/main.mbt", exact: true });
+  await collapse.click();
+  await expect(page.locator(".file-discussions textarea")).toHaveCount(1);
+  expect(await editor.getAttribute("data-draft-id")).toBe(draftId);
+  expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([3, 12, "backward"]);
+  await expect(editor).not.toBeFocused();
+  await editor.focus();
+  // Programmatic toolbar click leaves the editor focused immediately before the update.
+  await page.getByRole("button", { name: "Expand src/main.mbt", exact: true }).evaluate(el => el.click());
+  await expect(page.locator(".inline-comment-editor-row textarea")).toHaveCount(1);
+  await expect(editor).toBeFocused();
+  expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([3, 12, "backward"]);
+  await page.getByRole("button", { name: "Unified", exact: true }).click();
+  await expect(editor).not.toBeFocused();
+  expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([3, 12, "backward"]);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => globalThis.__moondiffEditorInteraction.records.size)).toBe(0);
+  await openNewLineComment(page, 2);
+  await expect(editor).toBeFocused();
+  expect(await editor.getAttribute("data-draft-id")).not.toBe(draftId);
+  await expect(editor).toHaveValue("");
+});
+
+for (const change of ["modified", "inserted", "deleted"]) {
+  test(`same-line ${change} declarations retain both sections across algorithms and layouts`, async ({ page }) => {
+    const before = "let first = 11; let second = 22";
+    const after = "let first = 33; let second = 44";
+    const oldSource = change === "inserted" ? "fn keep() {}" : change === "deleted" ? `${before}\nfn keep() {}` : before;
+    const newSource = change === "deleted" ? "fn keep() {}" : change === "inserted" ? `${after}\nfn keep() {}` : after;
+    const patch = change === "inserted" ? `@@ -1 +1,2 @@\n+${after}\n fn keep() {}`
+      : change === "deleted" ? `@@ -1,2 +1 @@\n-${before}\n fn keep() {}`
+      : `@@ -1 +1 @@\n-${before}\n+${after}`;
+    await installHost(page, pullTarget(), { authenticated: true, oldSource, newSource, patch });
+    await page.addInitScript(({ change }) => {
+      window.__fake.reviewComments = [{
+        ...window.__fake.reviewComments[0], line: 1,
+        side: change === "deleted" ? "LEFT" : "RIGHT",
+        position: change === "modified" ? 2 : 1,
+      }];
+    }, { change });
+    await page.goto(reviewPath());
+    const sections = page.locator("details.semantic-section");
+    for (const algorithm of ["Token", "Tree"]) {
+      await page.getByRole("button", { name: algorithm, exact: true }).click();
+      for (const layout of ["Split", "Unified"]) {
+        await page.getByRole("button", { name: layout, exact: true }).click();
+        await expect(sections).toHaveCount(2);
+        await expect(sections.nth(0).locator("summary")).toContainText("let first");
+        await expect(sections.nth(1).locator("summary")).toContainText("let second");
+        await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
+        if (algorithm === "Tree" && change === "modified") {
+          for (const [index, oldValue, newValue] of [[0, "11", "33"], [1, "22", "44"]]) {
+            await expect(sections.nth(index).locator("b.wd")).toHaveText(oldValue);
+            await expect(sections.nth(index).locator("b.wa")).toHaveText(newValue);
+          }
+        }
+        const side = change === "deleted" ? "old" : "new";
+        const anchor = sections.nth(1).locator(`.${side}-line-number button[aria-label="Comment on line 1"]`);
+        await expect(anchor).toHaveCount(1);
+        await anchor.locator("xpath=..").hover();
+        await anchor.click();
+        const editor = page.locator(".inline-comment-editor-row textarea");
+        await expect(editor).toHaveCount(1);
+        await editor.fill("Same-line draft");
+        await page.getByRole("button", { name: "Refresh", exact: true }).click();
+        await expect(editor).toHaveCount(1);
+        await expect(editor).toHaveValue("Same-line draft");
+        await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Cancel", exact: true }).click();
+      }
+    }
+  });
+}

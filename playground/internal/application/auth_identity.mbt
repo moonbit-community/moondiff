@@ -7,12 +7,12 @@ priv enum AuthIdentityTransition {
 
 ///|
 fn auth_identity_transition(
-  review : ReviewState,
+  model : Model,
   auth : AuthStatus,
 ) -> AuthIdentityTransition {
   match auth {
     SignedIn(login~, ..) =>
-      match (review.last_authenticated_login, login) {
+      match (model.last_authenticated_login, login) {
         (Some(previous), Some(current)) =>
           if previous == current {
             AuthIdentityUnchanged
@@ -21,21 +21,20 @@ fn auth_identity_transition(
           }
         (Some(_), None) => AuthIdentityBoundary
         (None, Some(_)) =>
-          if review.auth is SignedIn(login=None, ..) {
+          if model.auth is SignedIn(login=None, ..) {
             AuthIdentityBoundary
           } else {
             AuthInitialSignIn
           }
         (None, None) =>
-          if review.auth is SignedIn(..) {
+          if model.auth is SignedIn(..) {
             AuthIdentityBoundary
           } else {
             AuthInitialSignIn
           }
       }
     Anonymous(_) =>
-      if review.last_authenticated_login is Some(_) ||
-        review.auth is SignedIn(..) {
+      if model.last_authenticated_login is Some(_) || model.auth is SignedIn(..) {
         AuthIdentityBoundary
       } else {
         AuthIdentityUnchanged
@@ -46,26 +45,11 @@ fn auth_identity_transition(
 
 ///|
 fn review_state_with_auth_identity(
-  review : ReviewState,
+  model : Model,
   auth : AuthStatus,
-) -> (ReviewState, AuthIdentityTransition) {
-  let transition = auth_identity_transition(review, auth)
-  let last_authenticated_login = match auth {
-    SignedIn(login~, ..) => login
-    Anonymous(_) | WebReadOnly => None
-    _ => review.last_authenticated_login
-  }
-  (
-    {
-      auth,
-      last_authenticated_login,
-      deletion: review.deletion,
-      deleted: review.deleted,
-      comments: review.comments,
-      draft: review.draft,
-    },
-    transition,
-  )
+) -> (Model, AuthIdentityTransition) {
+  let transition = auth_identity_transition(model, auth)
+  (with_auth(model, auth), transition)
 }
 
 ///|
@@ -73,14 +57,10 @@ fn reload_after_auth_identity_boundary(
   model : Model,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
-  let cleared = with_review(model, {
-    auth: model.review.auth,
-    last_authenticated_login: model.review.last_authenticated_login,
-    deletion: None,
-    deleted: [],
-    comments: CommentsLoading,
-    draft: None,
-  })
+  let cleared = with_review(
+    model,
+    @comments.update(model.review, Reset(true, false)).0,
+  )
   match cleared.route {
     Some(reference) => begin_change_load(cleared, reference, emit)
     None =>
@@ -103,14 +83,10 @@ fn begin_sign_in_change_reload(
   identity_transition : AuthIdentityTransition,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
-  let draft = model.review.draft
-  let (reloading, command) = begin_change_load(model, reference, emit)
-  if identity_transition is AuthIdentityUnchanged {
-    (
-      with_review(reloading, review_state_with_draft(reloading.review, draft)),
-      command,
-    )
-  } else {
-    (reloading, command)
-  }
+  begin_change_load(
+    model,
+    reference,
+    emit,
+    preserve_draft=identity_transition is AuthIdentityUnchanged,
+  )
 }

@@ -48,52 +48,6 @@ pub(all) struct ApiCommentBundle {
 } derive(Eq, FromJson)
 
 ///|
-pub(all) struct ApiDeviceFlow {
-  flow_id : String
-  user_code : String
-  verification_uri : String
-  expires_in : Int
-  poll_after : Int
-} derive(FromJson)
-
-///|
-pub(all) struct ApiAuthStatus {
-  authenticated : Bool
-  login : String?
-  install_url : String?
-  device_flow : ApiDeviceFlow?
-} derive(FromJson)
-
-///|
-pub(all) enum DeviceCodeCopyStatus {
-  DeviceCodeCopyReady
-  DeviceCodeCopyDone
-  DeviceCodeCopyError(String)
-} derive(Eq)
-
-///|
-pub(all) struct DeviceAuthorization {
-  flow_id : String
-  user_code : String
-  verification_uri : String
-  expires_in : Int
-  poll_after : Int
-  install_url : String?
-  copy_status : DeviceCodeCopyStatus
-} derive(Eq)
-
-///|
-pub(all) enum AuthStatus {
-  WebReadOnly
-  AuthChecking
-  Anonymous(String?)
-  DeviceAuthorizing(DeviceAuthorization)
-  DeviceCancelling(DeviceAuthorization)
-  SignedIn(login~ : String?, install_url~ : String?)
-  AuthFailed(String)
-} derive(Eq)
-
-///|
 pub(all) enum CommentsStatus {
   CommentsDisabled
   CommentsLoading
@@ -110,361 +64,89 @@ pub(all) enum DraftKind {
 
 ///|
 pub(all) struct CommentDraft {
+  snapshot : Snapshot?
+  id : DraftId
   kind : DraftKind
   body : String
+  // Read-only projection of EditorState; never stored as an independent flag.
   submitting : Bool
   error : String?
 } derive(Eq)
 
 ///|
-pub(all) struct ReviewState {
-  auth : AuthStatus
-  last_authenticated_login : String?
-  comments : CommentsStatus
-  draft : CommentDraft?
-  deletion : CommentDeletion?
-  // Successful deletions remain excluded from refreshes until the route generation changes.
-  deleted : Array[CommentId]
+pub(all) enum CommentRefresh {
+  RefreshIdle
+  RefreshMetadata
+  RefreshList(@github.ApiPull?)
+  RefreshValidation(@github.ApiPull, ApiCommentBundle)
 } derive(Eq)
 
 ///|
-pub fn initial_review_state() -> ReviewState {
-  if extension_host_enabled() {
-    {
-      auth: AuthChecking,
-      last_authenticated_login: None,
-      deletion: None,
-      deleted: [],
-      comments: CommentsLoading,
-      draft: None,
-    }
-  } else {
-    {
-      auth: WebReadOnly,
-      last_authenticated_login: None,
-      deletion: None,
-      deleted: [],
-      comments: CommentsDisabled,
-      draft: None,
-    }
+pub(all) enum SubmissionPhase {
+  CheckingHead
+  PostingIssue
+  PostingReview
+  PostingCommit
+  PostingReply
+} derive(Eq)
+
+///|
+pub struct Session {
+  priv draft_sequence : Int
+  priv receipts : ApiCommentBundle
+  priv context : Context
+  verified_snapshot : Snapshot?
+  refresh_id : Int
+  priv refresh : CommentRefresh
+  refresh_error : String?
+  snapshot_stale : Bool
+  submission_id : Int
+  notice : String?
+  published_url : String?
+  can_comment : Bool
+  login : String?
+  authentication_error : String?
+  priv comments : CommentsStatus
+  priv editor : EditorState
+  deletion_id : Int
+  deletion : CommentDeletion?
+  // Successful deletions remain excluded from refreshes until the route generation changes.
+  priv deleted : Array[CommentId]
+} derive(Eq)
+
+///|
+pub fn Session::new(enabled? : Bool = false) -> Session {
+  {
+    draft_sequence: 0,
+    receipts: { issue_comments: [], review_comments: [], commit_comments: [], },
+    context: { generation: 0, route: None, snapshot: None, enabled, },
+    verified_snapshot: None,
+    refresh_id: 0,
+    refresh: RefreshIdle,
+    refresh_error: None,
+    snapshot_stale: false,
+    submission_id: 0,
+    notice: None,
+    published_url: None,
+    can_comment: false,
+    login: None,
+    authentication_error: None,
+    deletion_id: 0,
+    deletion: None,
+    deleted: [],
+    comments: if enabled {
+      CommentsLoading
+    } else {
+      CommentsDisabled
+    },
+    editor: Empty,
   }
 }
 
 ///|
-pub fn review_can_comment(review : ReviewState) -> Bool {
-  review.auth is SignedIn(..)
+pub fn review_can_comment(review : Session) -> Bool {
+  review.can_comment
 }
-
-///|
-pub fn auth_status_from_api(status : ApiAuthStatus) -> AuthStatus {
-  if status.authenticated {
-    SignedIn(login=status.login, install_url=status.install_url)
-  } else if status.device_flow is Some(flow) {
-    DeviceAuthorizing({
-      flow_id: flow.flow_id,
-      user_code: flow.user_code,
-      verification_uri: flow.verification_uri,
-      expires_in: flow.expires_in,
-      poll_after: flow.poll_after,
-      install_url: status.install_url,
-      copy_status: DeviceCodeCopyReady,
-    })
-  } else {
-    Anonymous(status.install_url)
-  }
-}
-
-///|
-pub fn auth_status_from_api_preserving(
-  status : ApiAuthStatus,
-  previous : AuthStatus,
-) -> AuthStatus {
-  let next = auth_status_from_api(status)
-  match (next, previous) {
-    (DeviceAuthorizing(device), DeviceAuthorizing(old)) if device.flow_id ==
-      old.flow_id =>
-      DeviceAuthorizing({ ..device, copy_status: old.copy_status, })
-    (DeviceAuthorizing(device), DeviceCancelling(old)) if device.flow_id ==
-      old.flow_id =>
-      DeviceCancelling({ ..device, copy_status: old.copy_status, })
-    _ => next
-  }
-}
-
-///|
-pub fn review_state_with_auth(
-  review : ReviewState,
-  auth : AuthStatus,
-) -> ReviewState {
-  { ..review, auth, }
-}
-
-///|
-pub fn review_state_with_comments(
-  review : ReviewState,
-  comments : CommentsStatus,
-) -> ReviewState {
-  { ..review, comments, }
-}
-
-///|
-pub fn review_state_with_draft(
-  review : ReviewState,
-  draft : CommentDraft?,
-) -> ReviewState {
-  { ..review, draft, }
-}
-
-///|
-priv struct CommentListArgs {
-  owner : String
-  repo : String
-  kind : String
-  number : String?
-  sha : String?
-} derive(ToJson)
-
-///|
-priv struct IssueCommentArgs {
-  owner : String
-  repo : String
-  number : String
-  body : String
-} derive(ToJson)
-
-///|
-priv struct ReviewCommentArgs {
-  owner : String
-  repo : String
-  number : String
-  commit_id : String
-  path : String
-  line : Int
-  side : String
-  body : String
-} derive(ToJson)
-
-///|
-priv struct CommitCommentArgs {
-  owner : String
-  repo : String
-  sha : String
-  path : String
-  position : Int
-  body : String
-} derive(ToJson)
-
-///|
-priv struct ReviewReplyArgs {
-  owner : String
-  repo : String
-  number : String
-  comment_id : Int64
-  body : String
-} derive(ToJson)
-
-///|
-priv struct DeviceFlowArgs {
-  flow_id : String
-} derive(ToJson)
-
-///|
-pub fn auth_status_request(
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_json("auth.status", "{}", 0, emit)
-}
-
-///|
-pub fn auth_device_start_request(
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_json("auth.device.start", "{}", 0, emit)
-}
-
-///|
-pub fn auth_device_poll_request(
-  flow_id : String,
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "auth.device.poll",
-    DeviceFlowArgs::{ flow_id, },
-    0,
-    emit,
-  )
-}
-
-///|
-pub fn auth_device_cancel_request(
-  flow_id : String,
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "auth.device.cancel",
-    DeviceFlowArgs::{ flow_id, },
-    0,
-    emit,
-  )
-}
-
-///|
-pub fn auth_logout_request(
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_json("auth.logout", "{}", 0, emit)
-}
-
-///|
-fn comment_list_args(reference : CommitRef) -> CommentListArgs {
-  let (kind, number, sha) = match reference.target {
-    PullRequest(number) => ("pull", Some(number), None)
-    Commit(sha) => ("commit", None, Some(sha))
-    PullCommit(number, sha) => ("pull_commit", Some(number), Some(sha))
-  }
-  { owner: reference.owner, repo: reference.repo, kind, number, sha, }
-}
-
-///|
-pub fn comments_request(
-  reference : CommitRef,
-  generation : Int,
-  emit : @rabbita.Emit[Result[ApiCommentBundle, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.comments.list",
-    comment_list_args(reference),
-    generation,
-    emit,
-  )
-}
-
-///|
-pub fn comment_head_request(
-  reference : CommitRef,
-  number : String,
-  generation : Int,
-  emit : @rabbita.Emit[Result[ApiPull, Error]],
-) -> @rabbita.Cmd {
-  gateway_json_request(
-    "github.pull.get",
-    reference_repository(reference),
-    number,
-    "",
-    0,
-    generation,
-    emit,
-  )
-}
-
-///|
-pub fn create_issue_comment_request(
-  reference : CommitRef,
-  number : String,
-  body : String,
-  generation : Int,
-  emit : @rabbita.Emit[Result[ApiIssueComment, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.issue.comment.create",
-    IssueCommentArgs::{
-      owner: reference.owner,
-      repo: reference.repo,
-      number,
-      body,
-    },
-    generation,
-    emit,
-  )
-}
-
-///|
-pub fn create_review_comment_request(
-  reference : CommitRef,
-  number : String,
-  commit_id : String,
-  anchor : ReviewAnchor,
-  body : String,
-  generation : Int,
-  emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.review.comment.create",
-    ReviewCommentArgs::{
-      owner: reference.owner,
-      repo: reference.repo,
-      number,
-      commit_id,
-      path: anchor.path,
-      line: anchor.line,
-      side: if anchor.side is Left {
-        "LEFT"
-      } else {
-        "RIGHT"
-      },
-      body,
-    },
-    generation,
-    emit,
-  )
-}
-
-///|
-pub fn create_commit_comment_request(
-  reference : CommitRef,
-  sha : String,
-  anchor : ReviewAnchor,
-  body : String,
-  generation : Int,
-  emit : @rabbita.Emit[Result[ApiCommitComment, Error]],
-) -> @rabbita.Cmd {
-  guard anchor.position is Some(position) else { return @rabbita.none }
-  extension_rpc_request(
-    "github.commit.comment.create",
-    CommitCommentArgs::{
-      owner: reference.owner,
-      repo: reference.repo,
-      sha,
-      path: anchor.path,
-      position,
-      body,
-    },
-    generation,
-    emit,
-  )
-}
-
-///|
-pub fn create_review_reply_request(
-  reference : CommitRef,
-  number : String,
-  comment_id : Int64,
-  body : String,
-  generation : Int,
-  emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.review.reply.create",
-    ReviewReplyArgs::{
-      owner: reference.owner,
-      repo: reference.repo,
-      number,
-      comment_id,
-      body,
-    },
-    generation,
-    emit,
-  )
-}
-
-///|
-pub fn notify_github_page_command() -> @rabbita.Cmd {
-  @cmd.custom_cmd(_scheduler => notify_github_page())
-}
-
-///|
-extern "js" fn notify_github_page() -> Unit =
-  #| () => globalThis.__MOONDIFF_EXTENSION_HOST__?.notifyCommentsChanged?.()
 
 ///|
 pub fn author_label(user : ApiCommentUser?) -> String {
@@ -527,6 +209,7 @@ fn commit_comment_outdated(
 
 ///|
 pub(all) struct ReviewThread {
+  id : CommentId
   root : ApiReviewComment
   replies : Array[ApiReviewComment]
   file_index : Int?
@@ -564,6 +247,7 @@ pub fn review_threads(
       }
     }
     threads.push({
+      id: ReviewComment(root.in_reply_to_id.unwrap_or(root.id)),
       root,
       replies,
       file_index: find_file_index(view, root.path),
@@ -593,4 +277,15 @@ pub fn commit_discussions(
     }
     { comment, file_index, outdated: commit_comment_outdated(view, comment), }
   })
+}
+
+///|
+pub(all) struct DraftId {
+  generation : Int
+  sequence : Int
+} derive(Eq)
+
+///|
+pub fn DraftId::key(self : DraftId) -> String {
+  "draft:\{self.generation}:\{self.sequence}"
 }

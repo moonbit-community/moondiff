@@ -40,28 +40,15 @@ using @change {
 }
 
 ///|
-using @github_client {
-  extension_error_code,
-  extension_host_enabled,
-  gateway_json_request,
-}
+using @github_client {extension_host_enabled, gateway_json_request}
 
 ///|
 using @comments {
-  type ApiAuthStatus,
   type ApiCommentBundle,
   type ApiCommitComment,
   type ApiIssueComment,
   type ApiReviewComment,
-  type AuthStatus,
-  type ReviewState,
-  auth_status_from_api,
-  auth_status_from_api_preserving,
-  initial_review_state,
-  review_can_comment,
-  review_state_with_auth,
-  review_state_with_comments,
-  review_state_with_draft,
+  type Session,
 }
 
 ///|
@@ -71,4 +58,12 @@ using @routing {
   playground_share_url,
   reference_from_playground_url,
   reference_from_route,
+}
+
+///|
+using @comment_requests {
+  comment_failure,
+  type ApiAuthStatus,
+  error_message,
+  comment_failure_message,
 }
