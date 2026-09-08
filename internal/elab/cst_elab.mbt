@@ -7,7 +7,7 @@ priv struct CstElabCtx {
 
 ///|
 fn CstElabCtx::new(source : String) -> Self {
-  let line_ranges = Array::new()
+  let line_ranges = Array()
   line_ranges.push((0, 0))
   let mut line_start = 0
   let mut i = 0
@@ -316,7 +316,7 @@ fn CstElabCtx::elab_node(
       let type_context = inherited_type_context || node_has_type_atoms(kind)
       let open_index = first_child_with_label(node.children, "open")
       let close_index = last_child_with_label(node.children, "close")
-      let children = Array::new()
+      let children = Array()
       let mut cursor = node.source_span.0
       for i in 0..<node.children.length() {
         let (label, child) = node.children[i]
@@ -378,7 +378,7 @@ fn CstElabCtx::elab_nodes(
   self : Self,
   nodes : ArrayView[@cst.CstNode],
 ) -> Syntax {
-  let children = Array::new()
+  let children = Array()
   for node in nodes {
     if self.elab_node(node, false) is Some(node) {
       children.push(node)
@@ -420,7 +420,7 @@ pub fn elab_cst_node_groups(
   groups : ArrayView[Array[@cst.CstNode]],
 ) -> Array[Syntax] {
   let ctx = CstElabCtx::new(source)
-  let roots = Array::new()
+  let roots = Array()
   for nodes in groups {
     roots.push(ctx.elab_nodes(nodes))
   }

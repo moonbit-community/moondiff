@@ -327,7 +327,7 @@ fn allocate_if_new(v : Vertex, seen : HashMap[Vertex, Array[Vertex]]) -> Vertex 
     // of how many possible parenthesis nestings to explore.
     //
     // never have more than 2 nodes
-    let existing = Array::new(capacity=2)
+    let existing = Array(capacity=2)
     existing.push(v)
     seen[v] = existing
     v
@@ -415,7 +415,7 @@ fn set_neighbours(
   }
 
   // There are only seven pushes in this function, so that's sufficient.
-  let neighbours = Array::new(capacity=7)
+  let neighbours = Array(capacity=7)
   if v.lhs_syntax is Some(lhs_syntax) && v.rhs_syntax is Some(rhs_syntax) {
     if lhs_syntax == rhs_syntax {
       let depth_difference = (lhs_syntax.num_ancestors().reinterpret_as_int() -

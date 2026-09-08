@@ -448,7 +448,7 @@ fn collect_impl_units_detailed(
   root : @cst.CstNode,
   ignore_tests : Bool,
 ) -> ImplCollection {
-  let inputs = Array::new()
+  let inputs = Array()
   let mut pending : Array[@cst.CstNode] = []
   for entry in root.children {
     let (label, child) = entry
@@ -499,13 +499,13 @@ fn collect_impl_units_detailed(
     }
   }
 
-  let node_groups = Array::new()
+  let node_groups = Array()
   for input in retained_inputs {
     node_groups.push(input.nodes)
   }
   let roots = @elab.elab_cst_node_groups(source, node_groups)
   let source_lines = @source_text.split_lines(source)
-  let units = Array::new()
+  let units = Array()
   for i in 0..<retained_inputs.length() {
     let input = retained_inputs[i]
     units.push(

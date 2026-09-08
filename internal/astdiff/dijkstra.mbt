@@ -55,7 +55,7 @@ fn shortest_vertex_path(
     }
   }
   let mut current = Some((0U, end))
-  let vertex_route = Array::new()
+  let vertex_route = Array()
   while current is Some((_, node)) {
     vertex_route.push(node)
     current = node.predecessor.val
@@ -72,7 +72,7 @@ fn shortest_vertex_path(
 fn shortest_path_with_edges(route : Array[Vertex]) -> Array[(Edge, Vertex)] {
   let mut prev = route.get(0).unwrap_or_else(() => panic())
   // let mut cost = 0U
-  let res = Array::new()
+  let res = Array()
   for vertex in route.iter().drop(1) {
     let edge = edge_between(prev, vertex)
     res.push((edge, prev))

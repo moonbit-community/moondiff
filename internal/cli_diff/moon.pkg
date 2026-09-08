@@ -1,5 +1,4 @@
 import {
-  "moonbitlang/core/cmp",
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/mbtdiff",
   "moonbit-community/moondiff/internal/diff_ignore",

@@ -273,7 +273,7 @@ fn align_impl_units_by_key_impl(
 
 ///|UUID(efd8452b-7521-4f76-9171-86843cf72de6)
 fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
-  let roots = Array::new()
+  let roots = Array()
   for unit in units {
     roots.push(unit.root)
   }

@@ -61,7 +61,7 @@ fn root_matches_impl(
     }
   }
 
-  let matches = Array::new()
+  let matches = Array()
   let mut lhs_i = 0
   let mut rhs_i = 0
   while lhs_i < lhs.length() && rhs_i < rhs.length() {
