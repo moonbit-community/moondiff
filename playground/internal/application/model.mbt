@@ -30,13 +30,6 @@ pub(all) enum Phase {
 } derive(Eq)
 
 ///|
-pub(all) enum CopyStatus {
-  CopyReady
-  Copied
-  CopyError(String)
-} derive(Eq)
-
-///|
 pub(all) struct Model {
   input : String
   generation : Int
@@ -46,8 +39,6 @@ pub(all) struct Model {
   ignore_tests : Bool
   phase : Phase
   route : CommitRef?
-  share_url : String?
-  copy_status : CopyStatus
   file_tree : FileTreeState
   review : ReviewState
 } derive(Eq)
@@ -63,8 +54,6 @@ fn initial_model() -> Model {
     ignore_tests: true,
     phase: Idle,
     route: None,
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }

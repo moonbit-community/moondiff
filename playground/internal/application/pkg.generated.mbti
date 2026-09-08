@@ -39,12 +39,6 @@ pub(all) enum AuthMsg {
   AuthLogoutFinished(Result[@comments.ApiAuthStatus, Error])
 }
 
-pub(all) enum CopyStatus {
-  CopyReady
-  Copied
-  CopyError(String)
-} derive(Eq)
-
 pub(all) struct FileTreeState {
   drawer_open : Bool
   search_open : Bool
@@ -77,8 +71,6 @@ pub(all) struct Model {
   ignore_tests : Bool
   phase : Phase
   route : @github.CommitRef?
-  share_url : String?
-  copy_status : CopyStatus
   file_tree : FileTreeState
   review : @comments.ReviewState
 } derive(Eq)
@@ -126,7 +118,7 @@ pub(all) enum UiMsg {
   InputChanged(String)
   Submit
   RouteChanged(@url.Url)
-  ToggleView
+  SelectView(@change.ViewMode)
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
   FileTreeViewportChanged(Int)
@@ -138,9 +130,6 @@ pub(all) enum UiMsg {
   SelectDiffAlgorithm(@change.DiffAlgorithm)
   ToggleIgnoreComments
   ToggleIgnoreTests
-  CopyShareLink
-  ShareCopied
-  ShareCopyFailed(String)
 }
 
 // Type aliases
