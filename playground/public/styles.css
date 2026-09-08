@@ -2132,6 +2132,7 @@ button.toolbar-button.ignore-comments-toggle.active,
 button.toolbar-button.ignore-tests-toggle.active {
   color: #2a55cc;
   background: #eef2fe;
+  font-weight: 700;
 }
 
 @media (max-width: 680px) {
