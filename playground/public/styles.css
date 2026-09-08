@@ -105,15 +105,13 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-button.secondary,
-button.view-toggle {
+button.secondary {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--surface);
 }
 
-button.secondary:hover,
-button.view-toggle:hover {
+button.secondary:hover {
   border-color: #bcbcbc;
   background: var(--surface-subtle);
 }
@@ -170,7 +168,7 @@ button.compact {
   z-index: 30;
   top: 0;
   min-height: var(--toolbar-height);
-  grid-template-columns: auto minmax(12rem, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.7rem;
   border-bottom: 1px solid var(--border);
@@ -354,61 +352,17 @@ button.compact {
   box-shadow: 0 0 0 3px var(--focus);
 }
 
-.hero-workspace .input-panel {
-  border-color: transparent;
-  border-radius: 0.4rem;
-  background: transparent;
-  box-shadow: none;
-}
-
-.hero-workspace .input-panel:hover {
-  background: var(--surface-subtle);
-}
-
-.hero-workspace .input-panel:focus-within {
-  border-color: var(--border);
-  background: var(--surface);
-  box-shadow: 0 0 0 2px var(--focus);
-}
-
-.hero-workspace .input-row {
-  gap: 0.2rem;
-  padding: 0 0.2rem 0 0.6rem;
-}
-
-.hero-workspace .input-row input {
-  height: 2.15rem;
+.workspace-url {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
   color: var(--muted-strong);
   font-size: 0.8rem;
+  line-height: 2rem;
 }
 
-.hero-workspace .submit-button {
-  width: 2rem;
-  min-height: 2rem;
-  border-color: transparent;
-  padding: 0;
-  color: var(--muted);
-  background: transparent;
-  box-shadow: none;
-}
-
-.hero-workspace .submit-button:hover {
-  border-color: transparent;
-  color: var(--foreground);
-  background: var(--border-soft);
-}
-
-.hero-workspace .submit-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
 
 .submit-button {
   min-height: 2.25rem;
@@ -489,23 +443,21 @@ button.toolbar-button:active {
   transform: none;
 }
 
-.toolbar-divider {
-  width: 1px;
-  height: 0.9rem;
-  margin: 0 0.24rem;
-  background: var(--border);
+.display-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.375rem;
 }
 
-.algorithm-toggle {
+.segmented-control {
   display: inline-flex;
   align-items: center;
   gap: 0.12rem;
-  margin-inline-end: 0.375rem;
   border: 1px solid var(--border);
   border-radius: 0.42rem;
 }
 
-button.algorithm-option {
+button.segmented-option {
   height: 2rem;
   min-height: 2rem;
   border: 0;
@@ -515,11 +467,11 @@ button.algorithm-option {
   font-weight: 400;
 }
 
-button.algorithm-option.active {
+button.segmented-option.active {
   font-weight: 700;
 }
 
-button.algorithm-option:active {
+button.segmented-option:active {
   transform: none;
 }
 
@@ -547,88 +499,6 @@ button.ignore-tests-toggle.active {
   font-family: var(--mono);
   font-size: 0.7rem;
   font-weight: 700;
-}
-
-.source-icon {
-  margin-top: -0.06rem;
-  font-size: 1rem;
-}
-
-.view-icon {
-  position: relative;
-  width: 0.88rem;
-  height: 0.78rem;
-  border: 1.35px solid currentColor;
-  border-radius: 0.14rem;
-}
-
-.view-split .view-icon::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  border-left: 1px solid currentColor;
-}
-
-.view-unified .view-icon::before,
-.view-unified .view-icon::after {
-  content: "";
-  position: absolute;
-  right: 0.14rem;
-  left: 0.14rem;
-  height: 1px;
-  background: currentColor;
-}
-
-.view-unified .view-icon::before {
-  top: 0.22rem;
-}
-
-.view-unified .view-icon::after {
-  bottom: 0.2rem;
-}
-
-button.copy-button {
-  width: auto;
-  padding: 0 0.5rem;
-}
-
-.copy-icon {
-  position: relative;
-  width: 0.72rem;
-  height: 0.72rem;
-  border: 1px solid currentColor;
-  border-radius: 0.12rem;
-}
-
-.copy-icon::before {
-  content: "";
-  position: absolute;
-  width: 0.62rem;
-  height: 0.62rem;
-  top: -0.25rem;
-  left: -0.25rem;
-  border: 1px solid currentColor;
-  border-radius: 0.12rem;
-  background: var(--surface);
-}
-
-button.copy-button.copied {
-  color: var(--green);
-  background: var(--green-bg);
-}
-
-.share-accessibility {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 .public-note {
@@ -1926,6 +1796,10 @@ button.file-tree-row.selected {
     width: calc(100% - 1rem);
   }
 
+  .shell.workspace {
+    width: 100%;
+  }
+
   .hero-workspace,
   .commit-title,
   .comments-toolbar {
@@ -2047,7 +1921,7 @@ footer {
   }
 
   .file-card {
-    scroll-margin-top: 6rem;
+    scroll-margin-top: calc(var(--toolbar-height) + 0.5rem);
   }
 }
 
@@ -2059,9 +1933,9 @@ footer {
 
   .hero-workspace {
     grid-template-areas:
-      "brand actions"
-      "form form";
-    grid-template-columns: minmax(0, 1fr) auto;
+      "brand form"
+      "actions actions";
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.3rem 0.65rem;
     padding: 0.38rem 0.55rem;
   }
@@ -2074,8 +1948,14 @@ footer {
     grid-area: form;
   }
 
+  :root {
+    --toolbar-height: 5.25rem;
+  }
+
   .workspace-actions {
     grid-area: actions;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .commit-title {
@@ -2088,7 +1968,7 @@ footer {
   }
 
   .file-heading {
-    top: 5.22rem;
+    top: var(--toolbar-height);
   }
 
   .file-toggle {
@@ -2147,15 +2027,6 @@ footer {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
-  }
-
-  .copy-label {
-    display: none;
-  }
-
-  button.copy-button {
-    width: 2rem;
-    padding: 0;
   }
 
   .commit-card {
@@ -2230,7 +2101,7 @@ footer {
 }
 
 /* Algorithm and filter controls retain distinct pressed states in both themes. */
-button.algorithm-option,
+button.segmented-option,
 button.toolbar-button.ignore-comments-toggle,
 button.toolbar-button.ignore-tests-toggle {
   transition: transform 120ms ease;
@@ -2247,7 +2118,7 @@ button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
 }
 
 @media (prefers-color-scheme: dark) {
-  button.algorithm-option,
+  button.segmented-option,
   button.toolbar-button.ignore-comments-toggle,
   button.toolbar-button.ignore-tests-toggle {
     color: #eee;
@@ -2256,7 +2127,7 @@ button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
 }
 
 /* OpenSeek GUI soft and strong accents (desktop/styles/tokens.css). */
-button.algorithm-option.active,
+button.segmented-option.active,
 button.toolbar-button.ignore-comments-toggle.active,
 button.toolbar-button.ignore-tests-toggle.active {
   color: #2a55cc;
@@ -2268,6 +2139,12 @@ button.toolbar-button.ignore-tests-toggle.active {
   button.toolbar-button.ignore-tests-toggle {
     width: 2rem;
     padding: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  button.segmented-option {
+    padding-inline: 0.375rem;
   }
 }
 

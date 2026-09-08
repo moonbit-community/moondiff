@@ -3,7 +3,7 @@ pub(all) enum UiMsg {
   InputChanged(String)
   Submit
   RouteChanged(@url.Url)
-  ToggleView
+  SelectView(ViewMode)
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
   FileTreeViewportChanged(Int)
@@ -15,9 +15,6 @@ pub(all) enum UiMsg {
   SelectDiffAlgorithm(DiffAlgorithm)
   ToggleIgnoreComments
   ToggleIgnoreTests
-  CopyShareLink
-  ShareCopied
-  ShareCopyFailed(String)
 }
 
 ///|
@@ -27,16 +24,8 @@ fn update_ui(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   match msg {
-    InputChanged(value) =>
-      ({ ..model, input: value, copy_status: CopyReady, }, @rabbita.none)
-    ToggleView => {
-      let view_mode = if model.view_mode is Split {
-        @change.Unified
-      } else {
-        Split
-      }
-      ({ ..model, view_mode, }, @rabbita.none)
-    }
+    InputChanged(value) => ({ ..model, input: value, }, @rabbita.none)
+    SelectView(view_mode) => ({ ..model, view_mode, }, @rabbita.none)
     ToggleFileTreeDrawer => {
       let drawer_open = !model.file_tree.drawer_open
       let focus_command = if drawer_open {
@@ -189,7 +178,6 @@ fn update_ui(
               ..model,
               generation: model.generation + 1,
               phase: LoadFailed(message),
-              copy_status: CopyReady,
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
@@ -215,8 +203,6 @@ fn update_ui(
               generation: model.generation + 1,
               phase: LoadFailed(message),
               route: None,
-              share_url: None,
-              copy_status: CopyReady,
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
@@ -229,8 +215,6 @@ fn update_ui(
               generation: model.generation + 1,
               phase: Idle,
               route: None,
-              share_url: None,
-              copy_status: CopyReady,
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
@@ -242,19 +226,5 @@ fn update_ui(
             begin_change_load(model, reference, emit)
           }
       }
-    CopyShareLink =>
-      if model.share_url is Some(url) {
-        (
-          model,
-          @clipboard.copy(Text(url), copied=emit(Ui(ShareCopied)), failed=message => {
-            emit(Ui(ShareCopyFailed(message)))
-          }),
-        )
-      } else {
-        (model, @rabbita.none)
-      }
-    ShareCopied => ({ ..model, copy_status: Copied, }, @rabbita.none)
-    ShareCopyFailed(message) =>
-      ({ ..model, copy_status: CopyError(message), }, @rabbita.none)
   }
 }

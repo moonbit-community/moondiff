@@ -146,59 +146,11 @@ fn hero_view(
       [
         @html.div(class="hero-copy", brand_view()),
         @html.div(class="hero-controls", [
-          @html.div(class="input-panel", commit_form(model, emit)),
+          @html.span(class="workspace-url", title=model.input, model.input),
         ]),
         workspace_actions(model, emit),
       ],
     )
-  }
-}
-
-///|
-fn copy_button_label(status : CopyStatus) -> String {
-  match status {
-    CopyReady => "Copy link"
-    Copied => "Copied"
-    CopyError(_) => "Try copy again"
-  }
-}
-
-///|
-fn share_control(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
-  if model.share_url is Some(url) {
-    let label = copy_button_label(model.copy_status)
-    @html.fragment([
-      @html.div(class="share-accessibility", [
-        @html.label(for_="share-url", "Shareable playground URL"),
-        @html.input(
-          id="share-url",
-          value=url,
-          read_only=true,
-          class="share-url",
-          attrs=@html.Attrs::build().tabindex(-1),
-        ),
-      ]),
-      @html.button(
-        type_="button",
-        class=if model.copy_status is Copied {
-          "toolbar-button copy-button copied"
-        } else {
-          "toolbar-button copy-button"
-        },
-        title=match model.copy_status {
-          CopyError(message) => "Clipboard access failed: \{message}"
-          _ => label
-        },
-        attrs=@html.Attrs::build().aria_label(label),
-        on_click=emit(Ui(CopyShareLink)),
-        [
-          @html.span(class="copy-icon", ""),
-          @html.span(class="copy-label", label),
-        ],
-      ),
-    ])
-  } else {
-    @html.nothing
   }
 }
 
@@ -208,15 +160,15 @@ fn algorithm_control(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   @html.div(
-    class="algorithm-toggle",
+    class="segmented-control",
     attrs=@html.Attrs::build().role("group").aria_label("Diff algorithm"),
     [
       @html.button(
         type_="button",
         class=if algorithm is LexicalAlgorithm {
-          "algorithm-option active"
+          "segmented-option active"
         } else {
-          "algorithm-option"
+          "segmented-option"
         },
         attrs=@html.Attrs::build().aria_pressed(
           if algorithm is LexicalAlgorithm {
@@ -231,9 +183,9 @@ fn algorithm_control(
       @html.button(
         type_="button",
         class=if algorithm is AstAlgorithm {
-          "algorithm-option active"
+          "segmented-option active"
         } else {
-          "algorithm-option"
+          "segmented-option"
         },
         attrs=@html.Attrs::build().aria_pressed(
           if algorithm is AstAlgorithm {
@@ -246,6 +198,37 @@ fn algorithm_control(
         "Tree",
       ),
     ],
+  )
+}
+
+///|
+fn layout_control(mode : ViewMode, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
+  @html.div(
+    class="segmented-control",
+    attrs=@html.Attrs::build().role("group").aria_label("Diff layout"),
+    [ViewMode::Split, Unified].map(option => {
+      let selected = mode == option
+      @html.button(
+        type_="button",
+        class=if selected {
+          "segmented-option active"
+        } else {
+          "segmented-option"
+        },
+        attrs=@html.Attrs::build().aria_pressed(
+          if selected {
+            "true"
+          } else {
+            "false"
+          },
+        ),
+        on_click=emit(Ui(SelectView(option))),
+        match option {
+          Split => "Split"
+          Unified => "Unified"
+        },
+      )
+    }),
   )
 }
 
@@ -308,29 +291,11 @@ fn ignore_tests_control(
 ///|
 fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
   match model.phase {
-    Showing(commit) => {
-      let view_label = match model.view_mode {
-        Split => "Use unified view"
-        Unified => "Use split view"
-      }
-      let source_label = match commit.reference.target {
-        Commit(_) => "Open commit on GitHub"
-        PullRequest(_) => "Open pull request on GitHub"
-        PullCommit(_, _) => "Open pull request commit on GitHub"
-      }
+    Showing(commit) =>
       @html.nav(
         class="workspace-actions",
         attrs=@html.Attrs::build().aria_label("Diff actions"),
         [
-          @html.a(
-            href=commit.html_url,
-            target=Blank,
-            rel="noopener noreferrer",
-            class="toolbar-button source-button",
-            title=source_label,
-            attrs=@html.Attrs::build().aria_label(source_label),
-            @html.span(class="source-icon", "↗"),
-          ),
           @html.button(
             type_="button",
             class="toolbar-button file-tree-trigger",
@@ -364,25 +329,14 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
               ),
             ],
           ),
-          algorithm_control(model.diff_algorithm, emit),
+          @html.div(class="display-controls", [
+            algorithm_control(model.diff_algorithm, emit),
+            layout_control(model.view_mode, emit),
+          ]),
           ignore_comments_control(model.ignore_comments, emit),
           ignore_tests_control(model.ignore_tests, emit),
-          @html.span(class="toolbar-divider", ""),
-          @html.button(
-            type_="button",
-            class=match model.view_mode {
-              Split => "toolbar-button view-toggle view-split"
-              Unified => "toolbar-button view-toggle view-unified"
-            },
-            title=view_label,
-            attrs=@html.Attrs::build().aria_label(view_label),
-            on_click=emit(Ui(ToggleView)),
-            @html.span(class="view-icon", ""),
-          ),
-          share_control(model, emit),
         ],
       )
-    }
     _ => @html.nothing
   }
 }

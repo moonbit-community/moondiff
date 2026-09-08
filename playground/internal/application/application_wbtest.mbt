@@ -30,8 +30,6 @@ test "stale commit responses are discarded by generation" {
     ignore_tests: false,
     phase: Idle,
     route: None,
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
@@ -56,8 +54,6 @@ fn pull_test_model(
     ignore_tests: false,
     phase,
     route: Some(reference),
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
@@ -429,8 +425,6 @@ fn diff_test_model(view : ChangeView) -> Model {
     ignore_tests: false,
     phase: Showing(view),
     route: Some(view.reference),
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: initial_review_state(),
   }
@@ -1209,8 +1203,6 @@ test "PR head race preserves the line draft and starts a fresh snapshot" {
     ignore_tests: false,
     phase: Showing(view),
     route: Some(view.reference),
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: {
       auth: SignedIn(login=Some("reviewer"), install_url=None),
@@ -1325,8 +1317,6 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     ignore_tests: false,
     phase: Showing(view),
     route: Some(view.reference),
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: {
       auth: SignedIn(login=Some("reviewer"), install_url=None),
@@ -1489,8 +1479,6 @@ fn device_auth_test_model(
     ignore_tests: false,
     phase,
     route,
-    share_url: None,
-    copy_status: CopyReady,
     file_tree: initial_file_tree_state(),
     review: {
       auth,
