@@ -16,9 +16,9 @@
 ## Medium Priority
 
 - [ ] Keep changed-file navigation responsive at the supported 3,000-file limit.
-  - Affected areas: `playground/internal/view/file_tree.mbt`,
-    `playground/internal/view/view.mbt`, and
-    `playground/tests/playground.spec.mjs`.
+  - Affected areas: `playground/frontend/internal/view/file_tree.mbt`,
+    `playground/frontend/internal/view/view.mbt`, and
+    `playground/frontend/tests/playground.spec.mjs`.
   - The current worst-case probe renders 9,001 tree rows, 3,000 file cards,
     and roughly 66,000 DOM elements; entering a 13-character search takes
     about 2.5 seconds in headless Chromium.
