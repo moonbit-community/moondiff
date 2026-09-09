@@ -1,266 +1,305 @@
 # Moondiff playground
 
-The static Rabbita playground accepts these public GitHub URLs:
+English | [简体中文](README_CN.md)
 
-```text
-https://github.com/{owner}/{repo}/commit/{sha}
-https://github.com/{owner}/{repo}/pull/{number}
-https://github.com/{owner}/{repo}/pull/{number}/files
-https://github.com/{owner}/{repo}/pull/{number}/commits
-https://github.com/{owner}/{repo}/pull/{number}/changes/{sha}
-https://github.com/{owner}/{repo}/pull/{number}/commits/{sha}
-```
+## Local development
 
-GitHub may rewrite PR commit-detail URLs between the `changes/{sha}` and
-`commits/{sha}` forms; the playground accepts both and treats them equivalently.
-The PR commits-list form (`pull/{number}/commits`) is treated like the base PR
-URL.
-Commit URLs and either PR commit-detail form compare one commit with its first
-parent (or an empty old side for a root commit). Pull request URLs load the PR's
-current head and aggregate the complete **Files changed** result. The
-old revision is `merge_base_commit.sha` from the
-[Compare API](https://docs.github.com/en/rest/commits/commits#compare-two-commits)
-response for pinned `base.sha...head.sha`, matching GitHub's merge-base-to-head
-[three-dot comparison](https://docs.github.com/en/pull-requests/reference/branches#three-dot-and-two-dot-git-diff-comparisons).
-The playground captures PR metadata before loading the comparison and paginated
-files, then fetches metadata again before showing or downloading any source. If
-the base, head, or changed-file count moved—or the first files response was
-incomplete—it automatically retries once using the latest metadata. A PR that
-changes again fails explicitly; a stable but still incomplete response keeps
-the incomplete-files error.
-The files endpoint is fetched in 100-file pages. GitHub caps that endpoint at
-[3,000 files](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files),
-so larger or incomplete responses fail explicitly instead of showing a partial
-PR. Every changed file receives a card in GitHub's order. Files
-whose old or new path ends in `.mbt` use the bundled `mbtdiff` engine's
-MoonBit-aware lexical diff by default. The global **Token / Tree** control
-switches those files to structural diffing. After reliable top-level alignment,
-Lexical compares declaration-owned sections independently and displays every
-changed declaration in full, including its documentation, internal blank lines,
-and stable lines far from the edits. Unchanged declarations remain omitted.
-Whitespace-only lines outside every section—before the first declaration,
-between declarations, or after the last declaration—are intentionally omitted;
-if they are the only difference, the result is **No structural changes**.
-Whole-file lexical results and AST lexical fallbacks still use compact context.
-Pure formatting inside a declaration
-becomes an explicit no-structural-changes state in AST mode, while pure top-level
-reordering shows a compact reordering summary. Reliable top-level matches retain
-both source orders: the main view follows the new order, and deleted declarations
-appear in a separate old-order group. Parser failures and top-level planning
-limits produce one whole-file lexical fragment. When a graph limit, invalid
-syntax position, or local computation limit affects only one aligned top-level
-declaration, the playground labels that declaration as a partial lexical
-fallback and keeps AST diffing the rest of the file. The
-default-on **Ignore comments** control applies to MoonBit
-files in both Lexical and AST mode. It ignores ordinary and documentation
-comments, generated `///|UUID(...)` markers, and the separating whitespace
-before a comment while keeping strings such as `"//not a comment"` intact. It
-also ignores empty lines, lines containing only Unicode whitespace, blank-line
-count changes, and a missing or added final newline. Pure comment and blank-line
-changes produce no hunks. When nearby code also changes, the original comments
-and blank lines remain visible as neutral context without addition, deletion,
-or intraline highlighting. The separate default-on **Ignore tests** control
-ignores an entire file comparison if the current or previous filename ends in
-`_test.mbt` or `_wbtest.mbt` (case-sensitive), including additions, deletions,
-renames to or from ordinary files, helper functions, imports, and invalid syntax.
-Once sources are loaded, expanded cards show an ignored-file notice based on
-the diff result. Identical sources retain the normal unchanged state; loading
-errors remain visible. The file list, statistics, expansion
-state, and source loading stay intact. Turning the control off restores the
-normal diff using the existing caches.
+Install Node.js 22 and a MoonBit toolchain.
 
-For other MoonBit files, the control excludes top-level `test` and `async test`
-blocks after both inputs parse
-successfully, including their leading documentation comments, UUID markers,
-and `///|` separators. Test-only changes produce no hunks; mixed changes report
-only production code, while an `import { ... } for "test"` declaration remains
-part of the diff. Ignore comments and Ignore tests compose independently. If
-parsing fails outside a matched test file, the existing whole-file lexical
-fallback is retained and test-block filtering is not guaranteed. Other valid
-UTF-8 text files use a
-Patience line diff. Equal-width replacement blocks receive bounded,
-position-by-position whitespace-word highlights; unequal replacements and
-pure insertions or deletions retain their plain line structure. These files
-remain unaffected by either control. Word refinement is capped at 16,384
-UTF-16 code units per side of a line and shares fixed per-document allowances
-of 1,048,576 attempted code units and 65,536 diff tokens. Reaching a limit only
-removes word-level emphasis from later eligible rows; line text, line numbers,
-hunks, and unified patches remain unchanged. At the API level, `line_diff`
-treats a negative context radius as zero.
-
-Each displayed top-level section owns a fragment-local diff rather than an
-implicit whole-file patch. Split and unified layouts render that fragment, then
-map its local line numbers back through the section's exact source ranges.
-Review comments are consequently anchored by side and absolute source line,
-including when matched declarations cross between the old and new orders.
-Section titles also end with the trimmed source line containing the top-level
-declaration keyword, excluding leading documentation, UUID markers, separators,
-and standalone attribute lines. When the old and new declaration lines match,
-the context appears once; otherwise it appears as `old: … → new: …`. Every
-visible `@@ ... @@` heading in that section repeats the same context in both
-split and unified layouts. The playground hides hunk headings only for complete
-top-level Lexical sections, so their context remains available in the section
-title while absolute line numbers and review comment anchors stay visible. AST
-sections and section-local fallbacks keep contextual hunk headings. Whole
-documents, including parse-failure fallbacks, and ordinary text diffs keep
-their hunk headings without a top-level declaration context.
-
-The selected algorithm and both filter settings survive later change navigation
-in the open app but are not written into share URLs; a refresh restores Lexical
-mode with both filters off. The first 20 MoonBit diffs open automatically, while
-all other files load on demand. LineDiff keeps one shared cache. MoonBit files
-cache all eight Lexical/AST × comments/tests combinations independently, so
-layout switches reuse the same semantic document and stable fragment hunks.
-
-The result workspace also includes a changed-file tree without replacing the
-vertical file cards. At widths of 768 pixels and above it occupies a sticky,
-independently scrolling sidebar that starts at 240 pixels and can be dragged
-between 240 pixels and the smaller of 640 pixels or half the viewport width.
-Narrowing the viewport only clamps the displayed width temporarily, so the
-preferred width returns when space is available again. Below 768 pixels the
-same controls open in a bottom drawer with a backdrop and explicit close
-button. Each
-directory appears once in a depth-first tree. Siblings follow the order in which
-they are first encountered in GitHub's file list, while the file cards below
-remain in GitHub's original order. Directories start expanded and can be
-collapsed with the mouse or keyboard. Choosing a file selects it in the tree,
-closes the mobile drawer, expands its existing card, starts the same on-demand
-source loading when necessary, and scrolls the card into view. Already loaded
-diffs and cached algorithm/filter variants are reused.
-
-Tree search matches the complete current path and, for renamed files, the old
-path without regard to case. Status buttons support multiple selections (OR
-within statuses), while status selection and search combine with AND. Active
-search or status filters reveal every ancestor of a matching file without
-overwriting the user's collapsed-directory choices; clearing the filters
-restores those choices. Tree search, filters, collapse state, drawer state, and
-the selected file reset for each newly loaded change. The preferred desktop
-width remains in effect while switching changes in the running app, but a page
-refresh restores 320 pixels. None of this state is stored in the share URL or
-local storage.
-
-Each downloaded side is limited to 1 MiB and 20,000 universal-newline lines.
-LF (`\n`), CRLF (`\r\n`), and bare CR (`\r`) each terminate one line; empty
-input is one line, and a trailing terminator retains the final empty line.
-Exactly 20,000 lines are accepted and 20,001 are rejected. Invalid UTF-8,
-NUL-containing, binary, and over-limit content keeps its file card and shows
-an explanatory message instead of a rendered diff. The browser fetches
-anonymous GitHub REST and raw-content endpoints and never accepts, stores, or
-sends a personal access token. Anonymous GitHub API rate limits therefore
-apply.
-
-Submitting a GitHub URL updates the browser to a static-host-friendly share
-route:
-
-```text
-https://{playground-host}/{base}/#/owner/repo/commit/sha
-https://{playground-host}/{base}/#/owner/repo/pull/number
-https://{playground-host}/{base}/#/owner/repo/pull/number/commits/sha
-```
-
-The playground normalizes either GitHub PR commit-detail form to its
-`pull/number/commits/sha` hash route.
-
-Opening a commit route restores the same SHA automatically. Opening a pull
-request route fetches that PR again, so the same shared URL follows its latest
-head. The result page also exposes the full URL in a read-only field with a
-one-click copy button. Hash routing keeps shared links working on GitHub Pages
-without a server-side rewrite rule.
-
-## Local preview
-
-Build and start the static site on the default `http://127.0.0.1:4173`:
+From the repository root:
 
 ```sh
+moon update
 cd playground
-npm run build
-npm start
+npm ci
 ```
 
-Override `HOST` or `PORT` when needed. A development command that builds once
-and restarts the static server when its module changes is also available:
+Run the remaining commands from `playground/`.
+
+### Runtime configuration
+
+Create `.env` with the following content. Fill in the
+[GitHub App settings](#github-app-setup) and replace the token key
+placeholder with a persistent key generated using the command below.
 
 ```sh
-cd playground
+# Export these variables before starting. The server does not load .env.
+# Values shown below are defaults unless marked Required.
+# Relative paths use the process working directory (playground/ for npm start
+# and npm run dev); absolute paths are also accepted.
+
+# HTTP listener IP and TCP port, without a URL scheme.
+# 127.0.0.1 accepts only loopback connections.
+MOONDIFF_LISTEN=127.0.0.1:4173
+
+# Browser-facing root origin (scheme, hostname and optional port), used to
+# check request Origin for login, logout and writes, and to select secure cookies.
+# Match the browser origin exactly, including any non-default port;
+# localhost and 127.0.0.1 are different origins. No subpath, query or fragment.
+# Production requires HTTPS; HTTP is accepted only for localhost, 127.0.0.1
+# and [::1]. Proxy headers do not override this setting.
+# Example: https://diff.example.com can use a reverse proxy that terminates
+# HTTPS and forwards HTTP to MOONDIFF_LISTEN=127.0.0.1:4173.
+MOONDIFF_PUBLIC_URL=http://localhost:4173
+
+# Built frontend HTML, JavaScript and other assets served by the backend.
+# Created by npm run build; must exist before startup.
+MOONDIFF_STATIC_DIR=dist/static
+
+# SQLite file for sessions, encrypted GitHub credentials and pending device sign-ins.
+# Created if missing; create its parent directory first and make it writable by
+# the server user. Keep it on persistent storage; run one server per database.
+MOONDIFF_DATABASE=moondiff.sqlite3
+
+# Required, including locally: Base64 encoding of exactly 64 random bytes.
+# Encrypts and authenticates stored GitHub tokens and device credentials.
+# Generate once with: openssl rand -base64 64 | tr -d '\n'
+# Keep it private, back it up separately and reuse it with the same database.
+# A different key makes startup fail against an existing database. Losing or
+# replacing the key requires a fresh database and users signing in again.
+MOONDIFF_TOKEN_KEY=replace-with-base64-encoded-64-random-bytes
+
+# Required, including locally: Client ID from your GitHub App settings.
+# Used to start/poll device authorization and refresh user access tokens.
+# Copy the Client ID field; the numeric App ID is a separate identifier.
+MOONDIFF_GITHUB_CLIENT_ID=replace-with-github-app-client-id
+
+# Required, including locally: installation link for the same App as the client ID.
+# Shown in the playground so users can grant the App access to repositories.
+# Must begin with https://github.com/apps/.
+MOONDIFF_GITHUB_INSTALL_URL=https://github.com/apps/your-app/installations/new
+```
+
+See [Sessions and backup](#sessions-and-backup) for database
+backup and restore instructions.
+
+Export the variables and start the server:
+
+```sh
+# Automatically export subsequent new or modified shell variables to child processes.
+set -a
+
+# Read and execute .env in the current shell, exporting its configuration as environment variables.
+. ./.env
+
+# Disable automatic export; already exported variables remain available to the server.
+set +a
+
+# Build once and start the server using these environment variables, without watching for changes.
 npm run dev
 ```
 
-The preview server only serves files from `playground/dist`; it rejects path
-traversal and symbolic links that escape that directory.
+Open `http://localhost:4173`, or the configured `MOONDIFF_PUBLIC_URL`. This value
+must match the browser origin. `npm run dev` rebuilds once and starts the server;
+it does not watch for changes. Use `npm run build` to rebuild and `npm start` to
+run existing artifacts.
 
-## Tests
+To run the backend from source after exporting the configuration, use
+`moon -C playground/backend run main` from the repository root. To select Native,
+add `--target native --release`.
 
-Create the static release site with:
+## GitHub App setup
+
+Enable **Device Flow** in the GitHub App settings. The backend obtains and
+refreshes user access tokens using the client ID, without a client secret or web
+authorization callback. See GitHub's [Device Flow protocol](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token-for-a-github-app)
+and [refresh protocol](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens#refreshing-a-user-access-token-with-a-refresh-token).
+
+Configure repository permissions: Contents read/write and Pull requests
+read/write, plus GitHub's required Metadata permission. Contents write is needed
+for [commit comment deletion](https://docs.github.com/en/rest/commits/comments#delete-a-commit-comment);
+Pull requests write also covers
+[PR discussion comments](https://docs.github.com/en/rest/issues/comments#create-an-issue-comment).
+Existing installations must accept any changed App permissions. Install the app
+on repositories that users need to review. Private access and writing also
+require the signed-in user's own permissions. An App private key or installation
+access token is not used.
+
+Public repositories can be read anonymously. GitHub rate limits still apply.
+
+Sign-in displays a verification code on the playground page. Copy it, open
+GitHub, and authorize the device in the new window; the playground updates
+automatically. A page reload restores an unexpired code. Cancel sign-in before
+starting a new attempt.
+
+## Build and deploy
+
+Build a release from the repository root:
 
 ```sh
-cd playground
+moon update
+npm --prefix playground ci
 npm run build
 ```
 
-The playground also has Chromium end-to-end tests. They build the MoonBit JS
-release into a temporary directory, serve it with the static assets in
-`playground/public`, and mock every GitHub API and raw-content request. Install
-the pinned Node dependencies and Playwright browser once, then run the suite:
+`playground/dist/` contains `moondiff-server.wasm` and `static/`. Copy both into
+the release directory and install a compatible `moonrun` with trusted CA
+certificates. Export the [runtime configuration](#runtime-configuration), then
+run from the release directory:
 
 ```sh
-cd playground
-npm ci
+MOONDIFF_STATIC_DIR=/absolute/release/static moonrun ./moondiff-server.wasm
+```
+
+Use an independent domain or port at `/`; deployment under a subpath is not
+supported. `MOONDIFF_PUBLIC_URL` must equal the browser's origin and is not inferred
+from proxy headers. The backend listener speaks HTTP; terminate production HTTPS
+at a reverse proxy such as the supplied [Nginx example](deploy/nginx.conf.example).
+Use a dedicated OS account and a private persistent data directory. Restrict the
+upstream listener to the proxy. Run exactly one process per SQLite database,
+including during upgrades.
+
+## Sessions and backup
+
+Sessions expire after 30 days. Logout ends the current playground session without
+uninstalling the GitHub App or revoking other GitHub sessions.
+
+Back up **both the database and the original encryption key**, with the key in a
+separate protected secret store. Copying a live main DB file alone is unsafe,
+especially for existing WAL databases. Use SQLite's online backup command,
+adjusting the database path to match `MOONDIFF_DATABASE`:
+
+```sh
+sqlite3 /var/lib/moondiff/moondiff.sqlite3 '.backup /secure-backups/moondiff.sqlite3'
+```
+
+Alternatively, stop the service, checkpoint the WAL with
+`sqlite3 /var/lib/moondiff/moondiff.sqlite3 'PRAGMA wal_checkpoint(TRUNCATE);'`, then
+copy the DB before restarting. On restore, stop the service, restore the database
+and matching key, set file ownership/mode, then start one instance and check
+`/healthz`. Old database backups may contain refresh tokens GitHub has since
+rotated, requiring a new sign-in. Losing or intentionally replacing the key
+requires a fresh database and users signing in again; this version has no
+in-place key rotation command.
+
+## HTTP contract
+
+| Method / path | Response / purpose |
+| --- | --- |
+| `GET /api/auth/status` | `{$tag:"Success",value:{authenticated,user_id?,login?,install_url?,csrf_token,device_flow?}}`; establishes an anonymous session and restores pending login |
+| `POST /api/auth/device/start` | `{attempt_id}` creates or reuses the session's active authorization; returns `{request_id,status}` |
+| `POST /api/auth/device/poll` | `{authorization_id}` advances that authorization when due; returns `{request_id,status}` |
+| `POST /api/auth/device/cancel` | `{authorization_id}` cancels that authorization and returns current session status; returns `{request_id,status}` |
+| `POST /api/auth/logout` | Invalidates the session and returns `Success(value=null)`; requires Origin and X-CSRF-Token |
+| `POST /api/rpc` | `{v:2,request:GitHubRequest}` → `{$tag:"Success",value:RpcValue}` or `{$tag:"Failure",error:{status,code,message}}` |
+| `GET /healthz` | `ok` when the service is ready |
+
+All three device POSTs require the session cookie, configured Origin,
+`X-CSRF-Token` and `Content-Type: application/json`; extra fields are rejected.
+Start identifiers are generated by the browser (16–128 letters, digits, `-` or
+`_`, e.g. a random UUID). Each start/poll/cancel returns the session status in the
+`{$tag:"Success",value:{request_id,status}}` envelope. Logout returns a null success value; the client then queries status again.
+
+`device_flow` contains `id`, `phase`, `user_code`, `verification_uri`,
+`expires_at`, `retry_after` and `message`. Expiration is a numeric Unix timestamp
+in seconds; retry delay is a number of seconds. Phases are `Starting`, `Pending`,
+`Verifying`, `Completed`, `Cancelled`, `Expired`, `Denied` or `Failed`. The client
+polls the returned canonical `id`, which may differ from a new start's attempt ID
+when an existing authorization is reused. Cancellation also accepts the initial
+attempt ID so it works before the start response arrives.
+
+The browser only receives the user code and an allowlisted verification URL;
+device credentials and GitHub tokens remain encrypted on the server. Users open
+the verification page themselves, and this page polls without a login callback.
+Server timing survives refresh and restart, enforces GitHub's minimum interval,
+and adds at least five seconds after each `slow_down`. Temporary network, server
+and rate-limit failures preserve the authorization with retry backoff. Rejected,
+invalid or expired codes require a new attempt. Attempts last at most 15 minutes.
+The former `/auth/login` and `/auth/callback` paths return 404.
+
+RPC requests and responses are defined in the [shared protocol module](protocol/README.md),
+imported by both applications as `@protocol`. `GitHubRequest` covers all 13
+operations and `RpcValue` identifies the successful result type. Authentication
+phases, comment targets and sides also use explicit tags, e.g. `{"$tag":"Pending"}`.
+Source responses contain `{base64,size,content_type}`; comment IDs use decimal
+strings to preserve 64-bit precision. Strict decoding compares re-encoded JSON
+before validating parameter constraints, rejecting extra fields, fractional
+integer values and overflow. The backend sends only modeled fields and reports
+invalid upstream data as `invalid_github_response`; unexpected client result
+kinds produce `invalid_server_response`. Upgrade both applications together:
+there is no v1 compatibility layer, and the SQLite data format is unchanged.
+
+Source responses are bounded to 1 MiB per side, upstream JSON responses to 8 MiB,
+RPC bodies to 128 KiB and comments to 100 pages of 100.
+`authentication_required`, `permission_denied`, `rate_limit`,
+`not_found_or_not_installed`, `invalid_comment_anchor`, `source_too_large` and
+`pagination_limit` remain distinguishable. Unknown operations and extra arguments
+are rejected. Users can only delete their own comments. Write requests require
+the configured Origin and a session CSRF token in `X-CSRF-Token`.
+
+`GET`/`HEAD` serve assets and the app entry at `/`, `/owner/repo/commit/sha`,
+`/owner/repo/pull/number` and `/owner/repo/pull/number/commits/sha`. Unknown paths
+are 404. Old `/#/…` routes show an invalid-link error in the app, without conversion.
+
+## Migration and verification
+
+1. Deploy the Wasm module, compatible `moonrun`, static directory, persistent
+   database location, key and App settings. Verify HTTPS, `/healthz`, and direct
+   change links.
+2. Build the small redirect extension with `MOONDIFF_PLAYGROUND_URL` set to this
+   origin; see [extension instructions](../extension/README.md).
+3. Existing extension credentials are removed on upgrade. Every user signs in
+   again; no browser token or old review-page state is imported.
+4. The Pages publishing workflow has been removed. At release cutover, disable
+   the repository's old GitHub Pages site in Settings → Pages and remove its old
+   custom-domain configuration if applicable. This repository change does not
+   unpublish an already deployed Pages site. Replace old hash share links.
+
+Run the [checks and tests](#checks-and-tests) before cutover. Production
+authorization and installation must also be smoke-tested with your actual App.
+
+## Checks and tests
+
+From `playground/`, check and test all frontend packages from the module root,
+including `internal/`, and run the backend checks:
+
+```sh
+moon -C frontend check --target js --deny-warn
+moon -C frontend test --target js
+moon -C backend check --deny-warn
+
+# Test fixtures set MOONDIFF_TEST_MODE=1 to enable upstream overrides (off by default).
+# MOONDIFF_TEST_GITHUB_URL replaces https://api.github.com for GitHub API requests.
+# MOONDIFF_TEST_OAUTH_URL replaces https://github.com for device/token requests.
+# Both URLs are required in test mode and must use loopback hosts, as must
+# MOONDIFF_PUBLIC_URL. Overrides are ignored unless MOONDIFF_TEST_MODE=1.
+# Leave all three test variables unset for normal development and production.
+npm run test:server
+```
+
+`test:server` runs MoonBit tests, backend integration tests and browser HTTP
+transport tests. After MoonBit changes, run `moon fmt` and
+`moon info --target all` and review any generated interface changes.
+
+For browser tests:
+
+```sh
 npx playwright install chromium
-node --test tests/server.test.mjs
 npm run test:e2e
 ```
 
-On a machine that is missing Chromium system libraries, use
-`npx playwright install --with-deps chromium` instead. For an interactive
-Playwright session, run `npm run test:e2e:ui`.
+Use `npx playwright install --with-deps chromium` if system libraries are missing,
+and `npm run test:e2e:ui` for the interactive runner. Tests start their own Wasm
+server on port 4173, so stop the local development server first. They use temporary
+SQLite databases and a local GitHub/OAuth stub; no real GitHub credentials are
+required. Frontend regression tests mock the same-origin API.
 
-Code soft-wraps in both Split and Unified views. Ignore comments and Ignore tests
-start on each page load; choices stay in the current session and are never saved
-in share links or local storage. Both controls show an icon and label,
-with OpenSeek GUI's soft blue (`#EEF2FE`) background, primary blue (`#3B6EF5`)
-border, and strong blue (`#2A55CC`) text when on in either theme. On narrow
-screens they show only their icons (**//**
-and **T**), without On/Off badges; their pressed states remain available to
-assistive technology.
-
-Published line comments and editors appear above their source line, with file,
-side and line labels. Hidden lines fall back to file discussions; outdated
-comments show their original line when available. Only your own comments offer
-deletion, with an inline confirmation and retryable errors.
-
-PR discussions load after the diff snapshot is verified. Each refresh checks PR
-metadata before and after fetching comments, comparing base/head SHAs,
-repositories, and file count with the displayed diff. Refreshes from an older
-request or route are ignored; network errors keep verified comments visible.
-A changed PR shows **PR updated** and **Load latest**, preserving the displayed
-diff, comments, and draft. New line comments and line submission are disabled;
-overall comments and replies to available roots remain supported. A successful
-line post shows a GitHub link while its inline placement awaits verification.
-
-Only one draft can be open, including an empty draft. Reopening its target
-preserves its identity, body and error; other entry points are disabled until
-the current draft is sent or cancelled. During posting, comment entry buttons are disabled, and
-responses are checked against the submission number and phase. Failed posts
-retain the draft for retry. **Load latest** is disabled while any draft, post,
-or deletion is pending; cancel or finish the draft to load the new snapshot.
-
-
-## Comment architecture
-
-See [comment invariants and extension points](internal/comments/README.md) before
-adding comment actions. `comments.Session` has a read-only interface; all changes
-enter through `comments.update(session, event)`, which returns a new session and
-pure effect descriptions. The application owns authentication and executes those
-effects through `internal/comment_requests`.
-
-Run **all** playground packages, including internal packages, from the module root:
+To verify the redirect extension and release artifacts:
 
 ```sh
-cd playground
-moon check --target js --deny-warn
-moon test --target js
 npm run test:extension
-npm run test:e2e
+npm run build
+npm --prefix .. run test:artifacts
 ```
 
-CI uses this module-wide scope rather than testing only `playground/main`.
+These test suites and artifact checks can also be run from the repository root
+with `npm run test:server`, `npm run test:playground`, `npm run test:extension`,
+then `npm run build && npm run test:artifacts`. See
+[regression coverage](backend/INTERNAL.md#regression-tests) for the implementation
+cases.
+
+## Development references
+
+- [Frontend packages](frontend/)
+- [Backend authentication, encryption, storage and request handling internals](backend/INTERNAL.md)
+- [Redirect extension development](../extension/README.md)
