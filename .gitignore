@@ -12,3 +12,8 @@ extension/artifacts/
 extension/.dist-*/
 playwright-report/
 test-results/
+playground/.dist-*/
+.env
+*.sqlite3
+*.sqlite3-*
+*.sqlite3.lock

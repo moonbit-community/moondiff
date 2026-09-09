@@ -1,0 +1,16 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/http",
+  "moonbitlang/async/io",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/socket",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/env",
+  "moonbitlang/x/crypto",
+  "moonbit-community/sqlite3",
+}
+
+supported_targets = "native+wasm"
