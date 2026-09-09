@@ -186,19 +186,66 @@ fn github_id(value : Json) -> String raise {
 }
 
 ///|
-fn object(value : Json) -> Map[String, Json] raise {
-  guard value is Object(values) else {
-    raise RpcError(400, "invalid_arguments", "Expected an object.")
-  }
-  values
-}
-
-///|
 fn comment_for_protocol(value : Json) -> Json raise {
-  let result = object(normalize(value))
+  guard normalize(value) is Object(result) else {
+    raise RpcError(
+      502, "invalid_github_response", "GitHub returned an invalid comment.",
+    )
+  }
   result["id"] = Json::string(github_id(field(value, "id")))
   if result.get("in_reply_to_id") is Some(id) {
     result["in_reply_to_id"] = Json::string(github_id(id))
   }
+  if result.get("side") is Some(side) {
+    result["side"] = match side {
+      String("LEFT") => @protocol.CommentSide::Left.to_json()
+      String("RIGHT") => @protocol.CommentSide::Right.to_json()
+      _ =>
+        raise RpcError(
+          502, "invalid_github_response", "GitHub returned an invalid side.",
+        )
+    }
+  }
   Json::object(result)
+}
+
+///|
+fn[T : FromJson + ToJson] decode_github(value : Json) -> T raise {
+  let decoded : T = @json.from_json(value) catch {
+    _ =>
+      raise RpcError(
+        502, "invalid_github_response", "GitHub returned invalid data.",
+      )
+  }
+  guard modeled_fields_equal(ToJson::to_json(decoded), value) else {
+    raise RpcError(
+      502, "invalid_github_response", "GitHub returned invalid field values.",
+    )
+  }
+  decoded
+}
+
+///|
+fn modeled_fields_equal(modeled : Json, raw : Json) -> Bool {
+  match (modeled, raw) {
+    (Object(a), Object(b)) =>
+      a
+      .iter()
+      .all(pair => {
+        let (key, value) = pair
+        b.get(key).map(raw => modeled_fields_equal(value, raw)).unwrap_or(false)
+      })
+    (Array(a), Array(b)) => {
+      if a.length() != b.length() {
+        return false
+      }
+      for i, value in a {
+        if !modeled_fields_equal(value, b[i]) {
+          return false
+        }
+      }
+      true
+    }
+    _ => modeled == raw
+  }
 }

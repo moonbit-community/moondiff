@@ -62,3 +62,75 @@ test "public origins canonicalize browser defaults and reject unsafe deployments
     _ => fail("allowed remote test stub")
   }
 }
+
+///|
+test "typed GitHub decoding removes unmodeled fields and rejects malformed modeled values" {
+  let value : @protocol.ApiIssueComment = decode_github(
+    comment_for_protocol(
+      @json.parse(
+        "{\"id\":9007199254740993,\"body\":\"hello\",\"html_url\":\"url\",\"created_at\":\"today\",\"user\":{\"login\":\"alice\",\"id\":1},\"extra\":true}",
+      ),
+    ),
+  )
+  json_inspect(value, content={
+    "id": "9007199254740993",
+    "body": "hello",
+    "html_url": "url",
+    "created_at": "today",
+    "user": { "login": "alice" },
+  })
+  for
+    invalid in [
+      Json::object({}),
+      {
+        "filename": "a",
+        "status": "added",
+        "additions": 1.5,
+        "deletions": 0,
+        "changes": 1,
+      },
+      {
+        "filename": "a",
+        "status": "added",
+        "additions": 4294967297.0,
+        "deletions": 0,
+        "changes": 1,
+      },
+    ] {
+    try {
+      let _ : @protocol.ApiFile = decode_github(invalid)
+    } catch {
+      RpcError(502, "invalid_github_response", _) => ()
+      error => raise error
+    } noraise {
+      _ => fail("Accepted invalid upstream response")
+    }
+  }
+}
+
+///|
+test "malformed upstream comments retain the upstream error category" {
+  for
+    value in [
+      Json::null(),
+      [],
+      "invalid",
+      {
+        "id": "9223372036854775808",
+        "body": "x",
+        "html_url": "url",
+        "created_at": "today",
+      },
+    ] {
+    try {
+      let _ : @protocol.ApiIssueComment = decode_github(
+        comment_for_protocol(value),
+      )
+    } catch {
+      RpcError(502, "invalid_github_response", _) => ()
+      error => raise error
+    } noraise {
+      _ => fail("Accepted invalid upstream comment")
+    }
+  }
+}
