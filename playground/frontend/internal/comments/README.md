@@ -24,8 +24,8 @@ previous session and has no browser, RPC or Rabbita dependency. Collection reads
 
 ## Application boundary
 
-`application/auth_types.mbt` and the auth reducer own device flow, sign-in state
-and account identity. Comments receive only comment permission and the resolved
+`application/auth_types.mbt` and the auth reducer own device sign-in, session state
+and GitHub user-ID identity. Comments receive only comment permission and the resolved
 login. The application converts the route, generation and loaded diff snapshot
 into `ContextChanged`, interprets effects in `comment_effects.mbt`, and converts
 transport errors before delivering response events. RPC operations and JSON
@@ -88,13 +88,12 @@ selection restoration to mask a replacement.
 - `view/review_projection_wbtest.mbt`: first-expanded occurrence placement for
   matched/inserted/deleted declarations, rendering in a different order,
   Split/Unified and hidden hunk headings.
-- `extension/tests/review.spec.mjs`: Token/Tree, Split/Unified, filters, collapsed
+- `playground/frontend/tests/review.spec.mjs`: Token/Tree, Split/Unified, filters, collapsed
   and missing files; node identity, forward/backward selections, subsequent
   typing, synthetic composition events, remount focus and interaction cleanup;
   same-line folding also checks unique placement, scroll, mouse/keyboard
   activation and snapshot reset. Layout measurements wait for the target table's
   layout class and poll dimensions before screenshots.
 
-Run `moon test --target js` from `playground`, the extension scripts/browser suite,
-and the standalone website browser suite. Run `moon fmt` and `moon info --target
+Run `moon test --target js` from `playground/frontend`, the playground browser suite and Wasm API integration tests. Run `moon fmt` and `moon info --target
 js` when changing internal interfaces. CI explicitly checks all internal packages.
