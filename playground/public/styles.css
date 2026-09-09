@@ -28,7 +28,7 @@
   --hunk: #f3f3f3;
   --empty-stripe: #e4e4e4;
   --toolbar-height: 3rem;
-  --file-tree-preferred-width: 320px;
+  --file-tree-preferred-width: 240px;
   --file-tree-resizer-width: 8px;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }

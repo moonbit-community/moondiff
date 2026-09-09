@@ -114,7 +114,7 @@ layout switches reuse the same semantic document and stable fragment hunks.
 
 The result workspace also includes a changed-file tree without replacing the
 vertical file cards. At widths of 768 pixels and above it occupies a sticky,
-independently scrolling sidebar that starts at 320 pixels and can be dragged
+independently scrolling sidebar that starts at 240 pixels and can be dragged
 between 240 pixels and the smaller of 640 pixels or half the viewport width.
 Narrowing the viewport only clamps the displayed width temporarily, so the
 preferred width returns when space is available again. Below 768 pixels the

@@ -1038,7 +1038,7 @@ test("desktop file tree supports collapse search status filters and file navigat
     overflow: getComputedStyle(element.querySelector(".file-tree-scroll")).overflowY,
     rowFontSize: getComputedStyle(element.querySelector(".file-tree-row")).fontSize,
   }));
-  expect(sidebarLayout.width).toBe(320);
+  expect(sidebarLayout.width).toBe(240);
   expect(sidebarLayout.position).toBe("sticky");
   expect(sidebarLayout.overflow).toBe("auto");
   expect(sidebarLayout.rowFontSize).toBe("13px");
@@ -1126,7 +1126,7 @@ test("desktop file tree resizes live, persists across changes, and resets on ref
   await expect(divider).toBeVisible();
   await expect(divider).toHaveCSS("cursor", "col-resize");
   await expect(divider).toHaveCSS("touch-action", "none");
-  expect(await fileTreeWidth(page)).toBe(320);
+  expect(await fileTreeWidth(page)).toBe(240);
 
   await moveFileTreeDivider(page, 440);
   expect(await fileTreeWidth(page)).toBe(440);
@@ -1141,7 +1141,7 @@ test("desktop file tree resizes live, persists across changes, and resets on ref
   });
   await page.mouse.up();
   await expect(divider).not.toHaveClass(/\bis-resizing\b/u);
-  expect(await fileTreeWidth(page)).toBe(320);
+  expect(await fileTreeWidth(page)).toBe(240);
 
   await moveFileTreeDivider(page, 480);
   await expect(divider).toHaveClass(/\bis-resizing\b/u);
@@ -1159,7 +1159,7 @@ test("desktop file tree resizes live, persists across changes, and resets on ref
 
   await page.reload();
   await expect(page.locator("table.split").first()).toBeVisible();
-  expect(await fileTreeWidth(page)).toBe(320);
+  expect(await fileTreeWidth(page)).toBe(240);
 });
 
 test("file tree width obeys minimum, absolute maximum, and viewport maximum", async ({ page }) => {
@@ -1214,7 +1214,7 @@ test("tablet-width layout keeps the sidebar without widening the document", asyn
       documentScrollWidth: document.documentElement.scrollWidth,
       sidebarWidth: document.querySelector("#file-tree-sidebar").getBoundingClientRect().width,
     }));
-    expect(layout.sidebarWidth).toBe(320);
+    expect(layout.sidebarWidth).toBe(240);
     expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
   }
 
