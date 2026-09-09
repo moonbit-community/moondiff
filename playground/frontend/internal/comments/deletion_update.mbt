@@ -64,7 +64,6 @@ fn finish_deletion(
           } else {
             []
           },
-          notify_github_page_command(),
         ]),
       )
     }

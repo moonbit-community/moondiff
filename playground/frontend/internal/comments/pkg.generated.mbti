@@ -158,7 +158,6 @@ pub(all) enum Effect {
   CreateCommitCommentRequest(@github.CommitRef, String, @review.ReviewAnchor, String, Int, (Result[ApiCommitComment, Failure]) -> Event)
   CreateReviewReplyRequest(@github.CommitRef, String, Int64, String, Int, (Result[ApiReviewComment, Failure]) -> Event)
   DeleteCommentRequest(@github.CommitRef, CommentId, Int, (Result[DeleteResult, Failure]) -> Event)
-  Notify
   Dispatch(Event)
 }
 

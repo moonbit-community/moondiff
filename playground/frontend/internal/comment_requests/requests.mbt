@@ -239,12 +239,3 @@ pub fn create_review_reply_request(
     emit,
   )
 }
-
-///|
-pub fn notify_github_page_command() -> @rabbita.Cmd {
-  @cmd.custom_cmd(_scheduler => notify_github_page())
-}
-
-///|
-extern "js" fn notify_github_page() -> Unit =
-  #| () => globalThis.__MOONDIFF_EXTENSION_HOST__?.notifyCommentsChanged?.()

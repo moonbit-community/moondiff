@@ -40,8 +40,6 @@ pub fn delete_comment_request(@github.CommitRef, @comments.CommentId, Int, @cmd.
 
 pub fn error_message(Error, Bool) -> String
 
-pub fn notify_github_page_command() -> @cmd.Cmd
-
 // Errors
 
 // Types and methods

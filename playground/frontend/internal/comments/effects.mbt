@@ -45,7 +45,6 @@ pub(all) enum Effect {
     Int,
     (Result[DeleteResult, Failure]) -> Event
   )
-  Notify
   Dispatch(Event)
 }
 
@@ -136,11 +135,6 @@ fn delete_comment_request(
   respond : (Result[DeleteResult, Failure]) -> Event,
 ) -> Effects {
   [DeleteCommentRequest(reference, id, generation, respond)]
-}
-
-///|
-fn notify_github_page_command() -> Effects {
-  [Notify]
 }
 
 ///|

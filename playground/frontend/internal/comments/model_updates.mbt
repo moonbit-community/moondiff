@@ -40,10 +40,7 @@ fn finish_comment_submission(
       notice: Some("Comment published."),
       editor: Empty,
     }),
-    batch([
-      comments_request(reference, generation),
-      notify_github_page_command(),
-    ]),
+    comments_request(reference, generation),
   )
 }
 

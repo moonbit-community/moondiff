@@ -4,7 +4,6 @@ fn run_comment_effect(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   match effect {
-    Notify => @comment_requests.notify_github_page_command()
     Dispatch(event) => emit(Review(Domain(event)))
     CommentsRequest(reference, generation, respond) =>
       @comment_requests.comments_request(reference, generation, result => {
