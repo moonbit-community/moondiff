@@ -71,6 +71,7 @@ fn ready_test_file(
     file,
     diff_mode: file_diff_mode(file),
     expanded,
+    collapsed_sections: [],
     old_side: Ready(old),
     new_side: Ready(new),
     diff_cache: DiffCache::empty(),
@@ -544,7 +545,8 @@ test "same-line declarations retain every modified inserted and deleted section"
         let rendered = @rabbita.render_to_string(() => {
           @rabbita.Val::constant(
             top_level_diff_view(
-              file.file,
+              file,
+              0,
               0,
               top,
               mode,

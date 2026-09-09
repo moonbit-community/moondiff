@@ -9,8 +9,8 @@ priv struct InlineDiscussion {
 }
 
 ///|
-// Render-local bookkeeping: one absolute-line index, shared across the file
-// fragments, and a record of cards already placed after a source row.
+// Render-local data: one absolute-line index and a precomputed placement map,
+// shared across the file fragments.
 priv struct InlineDiscussions {
   generation : Int
   items : Array[InlineDiscussion]

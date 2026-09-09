@@ -46,11 +46,23 @@ that response only in its expected phase. Put write acknowledgements in
 ## Projection and browser interaction
 
 `view/review_projection.mbt` collects visible source rows before HTML rendering.
-It maps each file/side/line to the first visible fragment and source-row ordinal;
-hunk-heading visibility does not change that ordinal. Both comment cards and
-editors read this projection. Hidden or collapsed lines fall back to the file's
-discussion area; a missing path falls back to the overview. Rendering does not
-claim placements or mutate a `shown` flag.
+It maps each file/side/line to the first expanded, visible fragment and source-row
+ordinal; hunk-heading visibility does not change that ordinal. Both comment
+cards and editors read this projection. When declarations share a line, folding
+the first moves its discussions and draft to the next expanded declaration.
+If none is visible, they fall back to the file's discussion area; a missing path
+falls back to the overview. Each discussion and the active draft have exactly one
+placement. Rendering does not claim placements or mutate a `shown` flag.
+
+`change/FileState.collapsed_sections` owns declaration folding for the current
+snapshot. Section keys use old/new ranges plus a duplicate ordinal counted before
+filtering. The controlled `details.open` and projection use the same state.
+Summary clicks (including native Enter/Space activation) prevent the browser's
+default toggle and dispatch `LoadMsg.ToggleSection`; the reducer checks generation
+and file index and updates the file without mutating earlier states. Layout,
+algorithm and filter changes, background refresh and file reopening retain these
+choices. Loading a new snapshot starts with all declarations expanded. Folding
+does not change draft identity or body, and is not persisted in the URL or storage.
 
 Comment lists use generation plus typed comment IDs. Threads retain the original
 root ID after root deletion. Draft keys use generation plus a separate draft
@@ -70,12 +82,18 @@ selection restoration to mask a replacement.
 - `session_wbtest.mbt`: cache aliasing, immutable previous states, deletion
   retries, duplicate/old responses, receipt merging, draft and orphaned-thread IDs.
 - Application tests: deterministic cross-flow refresh, submit, delete, auth,
-  cancellation and snapshot sequences, constructed through domain events.
-- `view/review_projection_wbtest.mbt`: first-occurrence placement, rendering in a
-  different order, Split/Unified and hidden hunk headings.
+  cancellation and snapshot sequences, constructed through domain events;
+  `section_collapse_wbtest.mbt` covers immutable folding, stale events and snapshot
+  lifetime.
+- `view/review_projection_wbtest.mbt`: first-expanded occurrence placement for
+  matched/inserted/deleted declarations, rendering in a different order,
+  Split/Unified and hidden hunk headings.
 - `extension/tests/review.spec.mjs`: Token/Tree, Split/Unified, filters, collapsed
   and missing files; node identity, forward/backward selections, subsequent
-  typing, synthetic composition events, remount focus and interaction cleanup.
+  typing, synthetic composition events, remount focus and interaction cleanup;
+  same-line folding also checks unique placement, scroll, mouse/keyboard
+  activation and snapshot reset. Layout measurements wait for the target table's
+  layout class and poll dimensions before screenshots.
 
 Run `moon test --target js` from `playground`, the extension scripts/browser suite,
 and the standalone website browser suite. Run `moon fmt` and `moon info --target

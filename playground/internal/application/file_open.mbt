@@ -15,8 +15,7 @@ fn expand_file(
   let first_load = file.old_side is NotRequested ||
     file.new_side is NotRequested
   let changed = @change.FileState::{
-    file: file.file,
-    diff_mode: file.diff_mode,
+    ..file,
     expanded: true,
     old_side: if file.old_side is NotRequested {
       initial_side(pair.old_url, true)
@@ -28,7 +27,6 @@ fn expand_file(
     } else {
       file.new_side
     },
-    diff_cache: file.diff_cache,
   }
   let command = if first_load {
     @rabbita.batch(commands_for_file(view, generation, index, emit))

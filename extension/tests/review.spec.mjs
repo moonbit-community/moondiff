@@ -1153,6 +1153,19 @@ test("comment menu supports keyboard navigation, dismissal and deletion confirma
   await thread.getByRole("button", { name: "Cancel", exact: true }).click();
 });
 
+async function expectInlinePlacement(card, layout, side) {
+  await expect(card.locator("xpath=ancestor::table[1]")).toHaveClass(new RegExp(`\\b${layout.toLowerCase()}\\b`));
+  await expect(card).toBeVisible();
+  await expect.poll(() => card.evaluate((el, { layout, side }) => {
+    const box = el.getBoundingClientRect();
+    const diff = el.closest(".diff-scroll").getBoundingClientRect();
+    const split = layout === "Split" && diff.width >= 720;
+    const width = diff.width / (split ? 2 : 1);
+    const x = split && side === "right" ? diff.width / 2 : 0;
+    return Math.max(Math.abs(box.width - width), Math.abs(box.x - diff.x - x));
+  }, { layout, side })).toBeLessThan(0.5);
+}
+
 for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
   test(`comment cards and editors fit ${width}px in ${colorScheme} mode`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
@@ -1182,14 +1195,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
     for (const layout of ["Split", "Unified"]) {
       await page.getByRole("button", { name: layout, exact: true }).click();
       for (const [row, side] of [[left, "left"], [right, "right"]]) {
-        const placement = await row.locator(".inline-discussion").evaluate(el => {
-          const box = el.getBoundingClientRect();
-          const diff = el.closest(".diff-scroll").getBoundingClientRect();
-          return { x: box.x - diff.x, width: box.width, diff: diff.width };
-        });
-        const split = layout === "Split" && placement.diff >= 720;
-        expect(placement.width).toBeCloseTo(placement.diff / (split ? 2 : 1), 0);
-        expect(placement.x).toBeCloseTo(split && side === "right" ? placement.diff / 2 : 0, 0);
+        await expectInlinePlacement(row.locator(".inline-discussion"), layout, side);
       }
       const thread = right.locator(".review-thread");
       const boxes = await thread.locator(".github-comment").evaluateAll(els => els.map(el => {
@@ -1210,13 +1216,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
         await expect(editor.locator("textarea")).toBeFocused();
         await expect(editor.locator("textarea")).toHaveCSS("font-size", "14px");
         await expect(editor.getByRole("button", { name: "Post comment" })).toBeDisabled();
-        const box = await editor.evaluate(el => {
-          const rect = el.getBoundingClientRect(), diff = el.closest(".diff-scroll").getBoundingClientRect();
-          return { x: rect.x - diff.x, width: rect.width, diff: diff.width };
-        });
-        const split = layout === "Split" && box.diff >= 720;
-        expect(box.width).toBeCloseTo(box.diff / (split ? 2 : 1), 0);
-        expect(box.x).toBeCloseTo(split && side === "new" ? box.diff / 2 : 0, 0);
+        await expectInlinePlacement(editor, layout, side === "new" ? "right" : "left");
         await editor.locator("textarea").fill("Ready to post");
         await expect(editor.getByRole("button", { name: "Post comment" })).toBeEnabled();
         await expect(editor.getByRole("button", { name: "Post comment" })).toHaveCSS("background-color", "rgb(31, 136, 61)");
@@ -1253,10 +1253,11 @@ test("split comment width changes at a 720px diff container without remounting t
   await editor.fill("Keep the caret");
   const original = await editor.elementHandle();
   await editor.evaluate(el => el.setSelectionRange(2, 7, "backward"));
+  await expect(page.locator(".review-diff")).toHaveClass(/\bsplit\b/);
   for (const width of [720, 719, 720]) {
     await page.locator(".review-scroll").evaluate((el, width) => { el.style.width = `${width}px`; }, width);
     for (const item of await page.locator(".inline-discussion").all()) {
-      expect((await item.boundingBox()).width).toBeCloseTo(width === 720 ? 360 : 719, 0);
+      await expect.poll(async () => (await item.boundingBox()).width).toBeCloseTo(width === 720 ? 360 : 719, 0);
     }
     expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
     await expect(editor).toBeFocused();
@@ -1788,7 +1789,7 @@ test("draft remount restores selection without taking toolbar focus and cleans u
 });
 
 for (const change of ["modified", "inserted", "deleted"]) {
-  test(`same-line ${change} declarations retain both sections across algorithms and layouts`, async ({ page }) => {
+  test(`same-line ${change} declarations keep discussions and drafts visible when collapsed across algorithms and layouts`, async ({ page }) => {
     const before = "let first = 11; let second = 22";
     const after = "let first = 33; let second = 44";
     const oldSource = change === "inserted" ? "fn keep() {}" : change === "deleted" ? `${before}\nfn keep() {}` : before;
@@ -1805,34 +1806,124 @@ for (const change of ["modified", "inserted", "deleted"]) {
       }];
     }, { change });
     await page.goto(reviewPath());
+    await waitForSignedInComments(page);
     const sections = page.locator("details.semantic-section");
+    await expect(sections).toHaveCount(2);
+    const first = sections.nth(0), second = sections.nth(1);
+    const firstSummary = first.locator("summary"), secondSummary = second.locator("summary");
+    await expect(first).toHaveJSProperty("open", true);
+    await expect(second).toHaveJSProperty("open", true);
+    await firstSummary.click();
+    await expect(first).toHaveJSProperty("open", false);
+    await expect(second.locator(".review-thread")).toBeVisible();
+    // Original reproduction: start a draft in the second occurrence after closing the first.
+    const side = change === "deleted" ? "old" : "new";
+    const anchor = second.locator(`.${side}-line-number button[aria-label="Comment on line 1"]`);
+    await anchor.locator("xpath=..").hover();
+    await anchor.click();
+    const editor = page.locator(".comment-editor textarea");
+    await expect(editor).toHaveCount(1);
+    await expect(second.locator("textarea")).toBeVisible();
+    await expect(editor).toBeFocused();
+    const body = "Same-line draft with selection\n" + "Keep the scroll position\n".repeat(30);
+    await editor.fill(body);
+    const draftId = await editor.getAttribute("data-draft-id");
+    const interaction = el => [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
+    let saved = await editor.evaluate(el => {
+      el.setSelectionRange(3, 12, "backward");
+      el.scrollTop = 48;
+      return [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
+    });
+    expect(saved[3]).toBeGreaterThan(0);
+    const expectPlacement = async container => {
+      await expect(page.locator(".review-thread")).toHaveCount(1);
+      await expect(container.locator(".review-thread")).toBeVisible();
+      await expect(editor).toHaveCount(1);
+      await expect(container.locator("textarea")).toBeVisible();
+      await expect(editor).toHaveValue(body);
+      await expect(editor).toHaveAttribute("data-draft-id", draftId);
+      await expect.poll(() => editor.evaluate(interaction)).toEqual(saved);
+    };
     for (const algorithm of ["Token", "Tree"]) {
       await page.getByRole("button", { name: algorithm, exact: true }).click();
       for (const layout of ["Split", "Unified"]) {
         await page.getByRole("button", { name: layout, exact: true }).click();
+        await expect(second.locator("table")).toHaveClass(new RegExp(`\\b${layout.toLowerCase()}\\b`));
         await expect(sections).toHaveCount(2);
-        await expect(sections.nth(0).locator("summary")).toContainText("let first");
-        await expect(sections.nth(1).locator("summary")).toContainText("let second");
-        await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
+        await expect(firstSummary).toContainText("let first");
+        await expect(secondSummary).toContainText("let second");
+        await expect(first).toHaveJSProperty("open", false);
+        await expect(second).toHaveJSProperty("open", true);
+        await expectPlacement(second);
         if (algorithm === "Tree" && change === "modified") {
           for (const [index, oldValue, newValue] of [[0, "11", "33"], [1, "22", "44"]]) {
             await expect(sections.nth(index).locator("b.wd")).toHaveText(oldValue);
             await expect(sections.nth(index).locator("b.wa")).toHaveText(newValue);
           }
         }
-        const side = change === "deleted" ? "old" : "new";
-        const anchor = sections.nth(1).locator(`.${side}-line-number button[aria-label="Comment on line 1"]`);
-        await expect(anchor).toHaveCount(1);
-        await anchor.locator("xpath=..").hover();
-        await anchor.click();
-        const editor = page.locator(".inline-comment-editor-row textarea");
-        await expect(editor).toHaveCount(1);
-        await editor.fill("Same-line draft");
-        await page.getByRole("button", { name: "Refresh", exact: true }).click();
-        await expect(editor).toHaveCount(1);
-        await expect(editor).toHaveValue("Same-line draft");
-        await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Cancel", exact: true }).click();
+        saved = await editor.evaluate((el, direction) => {
+          el.setSelectionRange(3, 12, direction);
+          el.scrollTop = 48;
+          return [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
+        }, layout === "Split" ? "backward" : "forward");
+        await secondSummary.click();
+        await expect(second).toHaveJSProperty("open", false);
+        await expect(first).toHaveJSProperty("open", false);
+        await expectPlacement(page.locator(".file-discussions"));
+        await expect(secondSummary).toBeFocused();
+        await expect(editor).not.toBeFocused();
+
+        await secondSummary.press("Enter");
+        await expect(second).toHaveJSProperty("open", true);
+        await expectPlacement(second);
+        await expect(secondSummary).toBeFocused();
+        await firstSummary.press("Space");
+        await expect(first).toHaveJSProperty("open", true);
+        await expectPlacement(first);
+        await expect(firstSummary).toBeFocused();
+
+        // A programmatic activation leaves the editor focused before the remount.
+        await editor.focus();
+        await firstSummary.evaluate(el => el.click());
+        await expect(first).toHaveJSProperty("open", false);
+        await expectPlacement(second);
+        await expect(editor).toBeFocused();
+        const original = await editor.elementHandle();
+        const refreshedBody = `Refreshed ${algorithm} ${layout}`;
+        await page.evaluate(body => { window.__fake.reviewComments[0].body = body; }, refreshedBody);
+        await reactivatePage(page);
+        await expect(second.locator(".github-comment-body")).toHaveText(refreshedBody);
+        await expect(first).toHaveJSProperty("open", false);
+        await expectPlacement(second);
+        expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
+        await expect(editor).toBeFocused();
       }
     }
+    for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
+      await page.getByRole("button", { name: filter, exact: true }).click();
+      await expect(first).toHaveJSProperty("open", false);
+      await expectPlacement(second);
+    }
+    await page.getByRole("button", { name: "Collapse src/main.mbt", exact: true }).click();
+    await expectPlacement(page.locator(".file-discussions"));
+    await page.getByRole("button", { name: "Expand src/main.mbt", exact: true }).click();
+    await expect(first).toHaveJSProperty("open", false);
+    await expect(second).toHaveJSProperty("open", true);
+    await expectPlacement(second);
+    await editor.focus();
+    await page.keyboard.type("NEXT");
+    await expect(editor).toHaveValue(body.slice(0, 3) + "NEXT" + body.slice(12));
+    await page.locator(".comment-editor").getByRole("button", { name: "Cancel", exact: true }).click();
+    await secondSummary.click();
+    await expect(second).toHaveJSProperty("open", false);
+    await page.evaluate(value => { window.__fake.currentHead = value; }, changedHead);
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Load latest", exact: true })).toBeEnabled();
+    await expect(first).toHaveJSProperty("open", false);
+    await expect(second).toHaveJSProperty("open", false);
+    await page.getByRole("button", { name: "Load latest", exact: true }).click();
+    await expect(sections).toHaveCount(2);
+    await expect(first).toHaveJSProperty("open", true);
+    await expect(second).toHaveJSProperty("open", true);
   });
 }

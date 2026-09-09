@@ -142,7 +142,8 @@ fn review_projection(view : ChangeView, model : Model) -> ReviewProjection {
               None,
               None,
             )
-          TopLevel(top) =>
+          TopLevel(top) => {
+            let section_keys = semantic_section_keys(top.sections)
             for deleted in [false, true] {
               for
                 section_index in (if deleted {
@@ -153,7 +154,8 @@ fn review_projection(view : ChangeView, model : Model) -> ReviewProjection {
                 guard top.sections.get(section_index) is Some(section) else {
                   continue
                 }
-                if (section is Deleted(..)) != deleted {
+                if (section is Deleted(..)) != deleted ||
+                  file.collapsed_sections.contains(section_keys[section_index]) {
                   continue
                 }
                 let fragment = semantic_section_fragment(section)
@@ -171,6 +173,7 @@ fn review_projection(view : ChangeView, model : Model) -> ReviewProjection {
                 }
               }
             }
+          }
         }
     }
   }

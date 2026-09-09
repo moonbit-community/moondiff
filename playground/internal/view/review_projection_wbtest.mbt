@@ -21,6 +21,98 @@ fn projection_document_fixture() -> @model.HunkDocument {
 }
 
 ///|
+test "same-line projection uses the first expanded matched inserted or deleted section" {
+  let before = "let first = 11; let second = 22"
+  let after = "let first = 33; let second = 44"
+  for
+    (old, new, patch, side) in [
+      (before, after, "@@ -1 +1 @@\n-\{before}\n+\{after}", @review.Right),
+      (
+        "fn keep() {}",
+        after + "\nfn keep() {}",
+        "@@ -1 +1,2 @@\n+\{after}\n fn keep() {}",
+        Right,
+      ),
+      (
+        before + "\nfn keep() {}",
+        "fn keep() {}",
+        "@@ -1,2 +1 @@\n-\{before}\n fn keep() {}",
+        Left,
+      ),
+    ] {
+    let api = {
+      ..fixture_file("same_line.mbt", "modified"),
+      patch: Some(patch),
+    }
+    let reference = @github.commit_reference("owner", "repo", "head")
+    let base = @change.finish_change(
+      reference,
+      None,
+      { repository: { owner: "owner", repo: "repo", }, sha: "head", },
+      "",
+      "",
+      { additions: 1, deletions: 1, total: 2, },
+      [api],
+    )
+    for algorithm in [@change.LexicalAlgorithm, AstAlgorithm] {
+      let file = ensure_file_document(
+        ready_test_file(api, [old], [new]),
+        algorithm,
+      )
+      guard cached_file_document(file, algorithm)
+        is Some(MoonBit(document=TopLevel(top), ..)) else {
+        fail("expected same-line declarations")
+      }
+      let visible = (if side is Left { top.old_order } else { top.new_order }).filter(i => {
+          fragment_has_output(semantic_section_fragment(top.sections[i]))
+        },
+      )
+      assert_eq(visible.length(), 2)
+      let keys = semantic_section_keys(top.sections)
+      let first = visible[0]
+      let second = visible[1]
+      for mode in [@change.Split, Unified] {
+        for
+          (collapsed, selected) in [
+            ([], Some(first)),
+            ([keys[first]], Some(second)),
+            ([keys[second]], Some(first)),
+            ([keys[first], keys[second]], None),
+          ] {
+          let view = {
+            ..base,
+            files: [{ ..file, collapsed_sections: collapsed, }],
+          }
+          let model = Model::{
+            input: "",
+            generation: 1,
+            view_mode: mode,
+            diff_algorithm: algorithm,
+            ignore_comments: false,
+            ignore_tests: false,
+            phase: Showing(view),
+            route: Some(reference),
+            file_tree: test_file_tree_state(),
+            auth: WebReadOnly,
+            last_authenticated_login: None,
+            review: @comments.Session::new(),
+          }
+          let projection = review_projection(view, model)
+          let key = discussion_key(0, side, 1)
+          let expected = selected.map(i => "0:section:\{i}:0:0:0")
+          assert_eq(projection.lines.get(key), expected)
+          assert_eq(projection.editors.get(key), expected)
+          if selected is None {
+            assert_true(projection.lines.is_empty())
+            assert_true(projection.editors.is_empty())
+          }
+        }
+      }
+    }
+  }
+}
+
+///|
 test "projection chooses the first visible occurrence independently of rendering" {
   let file = {
     ..fixture_file("a.txt", "modified"),
