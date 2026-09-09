@@ -10,7 +10,7 @@ priv struct InlineDiscussion {
 
 ///|
 // Render-local bookkeeping: one absolute-line index, shared across the file
-// fragments, and a record of cards already placed before a source row.
+// fragments, and a record of cards already placed after a source row.
 priv struct InlineDiscussions {
   generation : Int
   items : Array[InlineDiscussion]
@@ -36,7 +36,7 @@ fn empty_discussions() -> InlineDiscussions {
 
 ///|
 fn anchor_location(anchor : ReviewAnchor) -> String {
-  let side = if anchor.side is Left { "旧版 / Old" } else { "新版 / New" }
+  let side = if anchor.side is Left { "Old" } else { "New" }
   "\{anchor.path} · \{side} · \{anchor.line}"
 }
 
@@ -204,17 +204,40 @@ fn inline_cards(
       cards.push(
         (
           key,
-          @html.tr(class="inline-discussion-row", [
-            @html.td(colspan=columns, [
-              @html.p(class="comment-location", item.location),
-              item.content,
-            ]),
-          ]),
+          inline_discussion_row(
+            "inline-discussion-row",
+            anchor,
+            columns,
+            item.location,
+            item.content,
+          ),
         ),
       )
     }
   }
   cards
+}
+
+///|
+fn inline_discussion_row(
+  class_name : String,
+  anchor : ReviewAnchor,
+  columns : Int,
+  location : String,
+  content : @rabbita.Html,
+) -> @rabbita.Html {
+  @html.tr(class=class_name, [
+    @html.td(colspan=columns, [
+      @html.div(
+        class=if anchor.side is Left {
+          "inline-discussion inline-left"
+        } else {
+          "inline-discussion inline-right"
+        },
+        [@html.p(class="comment-location", location), content],
+      ),
+    ]),
+  ])
 }
 
 ///|
@@ -243,9 +266,9 @@ fn fallback_discussions(
             class="comment-location",
             item.location +
             (if item.outdated {
-              " · Outdated / 已过期"
+              " · Outdated"
             } else {
-              " · 当前视图未显示 / Not shown in current view"
+              " · Not shown in current view"
             }),
           ),
           item.content,
@@ -262,8 +285,7 @@ fn fallback_discussions(
     items[draft.id.key()] = @html.div([
       @html.p(
         class="comment-location",
-        anchor_location(anchor) +
-        " · 当前视图未显示 / Not shown in current view",
+        anchor_location(anchor) + " · Not shown in current view",
       ),
       discussions.editor,
     ])
