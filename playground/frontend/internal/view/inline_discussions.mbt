@@ -79,7 +79,7 @@ fn prepare_discussions(
   guard review.comments() is CommentsReady(bundle) else { return result }
   for thread in review_threads(view, bundle.review_comments) {
     let root = thread.root
-    let side : @review.ReviewSide = if root.side == Some("LEFT") {
+    let side : @review.ReviewSide = if root.side == Some(@protocol.Left) {
       Left
     } else {
       Right

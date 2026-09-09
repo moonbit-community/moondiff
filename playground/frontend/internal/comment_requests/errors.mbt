@@ -3,7 +3,7 @@ pub fn error_message(error : Error, api : Bool) -> String {
   let detail = error.to_string()
   let lower = detail.to_lower()
   if api {
-    match extension_error_code(error) {
+    match http_error_code(error) {
       Some("rate_limit") =>
         return "GitHub API rate limit exceeded. Sign in or try again after the reset time."
       Some("authentication_required") =>
@@ -15,22 +15,14 @@ pub fn error_message(error : Error, api : Bool) -> String {
       _ => ()
     }
   }
-  if api && extension_host_enabled() && lower.contains("rate limit") {
+  if api && lower.contains("rate limit") {
     "GitHub API rate limit exceeded. Sign in or try again after the reset time."
-  } else if api && detail.contains("HTTP 401") && extension_host_enabled() {
+  } else if api && detail.contains("HTTP 401") {
     "Your GitHub session expired. Sign in again."
   } else if api && detail.contains("HTTP 403") {
-    if extension_host_enabled() {
-      "GitHub denied this request. Install the app for this repository and check its permissions."
-    } else {
-      "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later."
-    }
+    "GitHub denied this request. Install the app for this repository and check its permissions."
   } else if api && detail.contains("HTTP 404") {
-    if extension_host_enabled() {
-      "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
-    } else {
-      "GitHub could not find that public repository, commit, or pull request."
-    }
+    "GitHub could not access this repository. Sign in and install the GitHub App for private repositories."
   } else {
     detail
   }
@@ -38,7 +30,7 @@ pub fn error_message(error : Error, api : Bool) -> String {
 
 ///|
 pub fn comment_failure_message(error : Error) -> String {
-  match extension_error_code(error) {
+  match http_error_code(error) {
     Some("authentication_required") =>
       return "Your GitHub session expired. Sign in again, then retry."
     Some("not_found_or_not_installed") =>
@@ -65,8 +57,5 @@ pub fn comment_failure_message(error : Error) -> String {
 
 ///|
 pub fn comment_failure(error : Error) -> @comments.Failure {
-  {
-    message: comment_failure_message(error),
-    code: extension_error_code(error),
-  }
+  { message: comment_failure_message(error), code: http_error_code(error), }
 }

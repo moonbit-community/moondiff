@@ -83,7 +83,7 @@ fn route_example() -> @rabbita.Html {
     ]),
     @html.code(class="route-new", [
       @html.span(class="route-prefix", "+ playground"),
-      @html.span("/#/owner/repo/pull/number"),
+      @html.span("/owner/repo/pull/number"),
     ]),
   ])
 }
@@ -93,7 +93,9 @@ fn landing_details() -> @rabbita.Html {
   @html.fragment([
     @html.div(class="public-note", [
       @html.span(class="note-dot", ""),
-      @html.p("Public repositories only."),
+      @html.p(
+        "Public repositories work without signing in. Sign in for private repositories and comments.",
+      ),
     ]),
     @html.section(class="supported-links", [
       @html.h2("Supported links"),
@@ -130,13 +132,14 @@ fn hero_view(
         brand_view(),
         @html.p(
           class="lede",
-          "Review a public GitHub commit or an entire pull request, then share the playground URL with anyone.",
+          "Review a GitHub commit or an entire pull request, then share the playground URL.",
         ),
         route_example(),
       ]),
       @html.div(class="hero-controls", [
         @html.div(class="input-panel", commit_form(model, emit)),
         landing_details(),
+        auth_controls(model.auth, emit),
       ]),
     ])
   } else {
@@ -991,14 +994,10 @@ fn change_view(
   model : Model,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  let section_label = match
-    (extension_host_enabled(), commit.reference.target) {
-    (true, Commit(_)) => "GitHub commit"
-    (true, PullRequest(_)) => "GitHub pull request"
-    (true, PullCommit(_, _)) => "GitHub pull request commit"
-    (false, Commit(_)) => "Public commit"
-    (false, PullRequest(_)) => "Public pull request"
-    (false, PullCommit(_, _)) => "Public pull request commit"
+  let section_label = match commit.reference.target {
+    Commit(_) => "GitHub commit"
+    PullRequest(_) => "GitHub pull request"
+    PullCommit(_, _) => "GitHub pull request commit"
   }
   let identity = match commit.reference.target {
     Commit(_) =>
@@ -1105,11 +1104,7 @@ fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
     LoadFailed(message) =>
       @html.div(class="empty-state error", [
         @html.p(message),
-        if extension_host_enabled() {
-          auth_controls(model.auth, emit)
-        } else {
-          @html.nothing
-        },
+        auth_controls(model.auth, emit),
         @html.button(
           type_="button",
           class="secondary",

@@ -3,7 +3,7 @@ fn comment_context(model : Model) -> @comments.Context {
   {
     generation: model.generation,
     route: model.route,
-    enabled: extension_host_enabled(),
+    enabled: true,
     snapshot: match model.phase {
       Showing(view) =>
         Some({

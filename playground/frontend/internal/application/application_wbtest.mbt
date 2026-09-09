@@ -31,8 +31,10 @@ test "stale commit responses are discarded by generation" {
     phase: Idle,
     route: None,
     file_tree: initial_file_tree_state(),
-    auth: WebReadOnly,
-    last_authenticated_login: None,
+    auth: Anonymous(None),
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: None,
     review: initial_review_state(),
   }
   let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
@@ -57,8 +59,10 @@ fn pull_test_model(
     phase,
     route: Some(reference),
     file_tree: initial_file_tree_state(),
-    auth: WebReadOnly,
-    last_authenticated_login: None,
+    auth: Anonymous(None),
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: None,
     review: initial_review_state(),
   }
 }
@@ -430,8 +434,10 @@ fn diff_test_model(view : ChangeView) -> Model {
     phase: Showing(view),
     route: Some(view.reference),
     file_tree: initial_file_tree_state(),
-    auth: WebReadOnly,
-    last_authenticated_login: None,
+    auth: Anonymous(None),
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: None,
     review: initial_review_state(),
   }
 }
@@ -686,7 +692,7 @@ test "Lexical is the default and algorithm selection is not part of routes" {
   assert_true(model.ignore_comments)
   assert_true(model.ignore_tests)
   let reference = commit_reference("owner", "repo", "abcdef1")
-  assert_eq(playground_route(reference), "#/owner/repo/commit/abcdef1")
+  assert_eq(playground_route(reference), "/owner/repo/commit/abcdef1")
   assert_false(playground_route(reference).contains("algorithm"))
   assert_false(playground_route(reference).contains("ignore"))
 }
@@ -913,14 +919,13 @@ test "new source invalidates every MoonBit filter cache" {
 }
 
 ///|
-test "extension request errors retain diagnostics and format unknown codes neutrally" {
-  let error : Error = ExtensionRequestError::ExtensionRequestError(
+test "HTTP request errors retain diagnostics and format unknown codes neutrally" {
+  let error : Error = HttpRequestError::HttpRequestError(
     status=400,
     code="invalid_arguments",
     detail="Missing RPC argument: sha",
   )
-  guard error
-    is ExtensionRequestError::ExtensionRequestError(status~, code~, detail~) else {
+  guard error is HttpRequestError::HttpRequestError(status~, code~, detail~) else {
     fail("expected a structured extension error")
   }
   assert_eq(status, 400)
@@ -928,15 +933,15 @@ test "extension request errors retain diagnostics and format unknown codes neutr
   assert_eq(detail, "Missing RPC argument: sha")
   assert_eq(
     error_message(error, true),
-    "Moondiff extension request failed (status 400, invalid_arguments): Missing RPC argument: sha",
+    "Moondiff HTTP request failed (status 400, invalid_arguments): Missing RPC argument: sha",
   )
 }
 
 ///|
-test "extension request codes retain actionable GitHub guidance" {
+test "HTTP request codes retain actionable GitHub guidance" {
   assert_eq(
     comment_failure_message(
-      ExtensionRequestError::ExtensionRequestError(
+      HttpRequestError::HttpRequestError(
         status=403,
         code="rate_limit",
         detail="API rate limit exceeded",
@@ -946,7 +951,7 @@ test "extension request codes retain actionable GitHub guidance" {
   )
   assert_eq(
     comment_failure_message(
-      ExtensionRequestError::ExtensionRequestError(
+      HttpRequestError::HttpRequestError(
         status=401,
         code="authentication_required",
         detail="Bad credentials",
@@ -956,7 +961,7 @@ test "extension request codes retain actionable GitHub guidance" {
   )
   assert_eq(
     comment_failure_message(
-      ExtensionRequestError::ExtensionRequestError(
+      HttpRequestError::HttpRequestError(
         status=404,
         code="not_found_or_not_installed",
         detail="Not Found",
@@ -966,7 +971,7 @@ test "extension request codes retain actionable GitHub guidance" {
   )
   assert_eq(
     comment_failure_message(
-      ExtensionRequestError::ExtensionRequestError(
+      HttpRequestError::HttpRequestError(
         status=403,
         code="permission_denied",
         detail="Resource not accessible by integration",
@@ -976,7 +981,7 @@ test "extension request codes retain actionable GitHub guidance" {
   )
   assert_eq(
     comment_failure_message(
-      ExtensionRequestError::ExtensionRequestError(
+      HttpRequestError::HttpRequestError(
         status=422,
         code="invalid_comment_anchor",
         detail="Validation Failed",
@@ -991,7 +996,7 @@ test "extension request codes retain actionable GitHub guidance" {
       ),
       true,
     ),
-    "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later.",
+    "GitHub API rate limit exceeded. Sign in or try again after the reset time.",
   )
 }
 
@@ -1081,8 +1086,10 @@ fn review_test_model(auth : AuthStatus) -> Model {
     phase: Showing(view),
     route: Some(view.reference),
     auth,
-    last_authenticated_login: match auth {
-      SignedIn(login~, ..) => login
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: match auth {
+      SignedIn(user_id~, ..) => user_id
       _ => None
     },
     review: review_fixture(
@@ -1107,24 +1114,11 @@ fn review_test_model(auth : AuthStatus) -> Model {
 
 ///|
 fn authentication_required_error() -> Error {
-  ExtensionRequestError::ExtensionRequestError(
+  HttpRequestError::HttpRequestError(
     status=401,
     code="authentication_required",
     detail="Bad credentials",
   )
-}
-
-///|
-fn review_test_device_authorization() -> DeviceAuthorization {
-  {
-    flow_id: "flow-1",
-    user_code: "ABCD-EFGH",
-    verification_uri: "https://github.com/login/device",
-    expires_in: 900,
-    poll_after: 1,
-    install_url: None,
-    copy_status: DeviceCodeCopyReady,
-  }
 }
 
 ///|
@@ -1135,14 +1129,12 @@ test "only signed-in reviews can open comment drafts" {
     Right,
     2,
   ).unwrap()
-  let device = review_test_device_authorization()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let auths : Array[AuthStatus] = [
-    WebReadOnly,
+    Anonymous(None),
     AuthChecking,
     Anonymous(None),
-    DeviceAuthorizing(device),
-    DeviceCancelling(device),
+    Authorizing(starting_device("test-attempt-00000000"), ""),
     AuthFailed("authentication failed"),
   ]
   for auth in auths {
@@ -1160,7 +1152,7 @@ test "only signed-in reviews can open comment drafts" {
   }
 
   let signed_in = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
+    SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), install_url=None),
   )
   assert_true(review_can_comment(signed_in.review))
   let (overall, _) = update_review(signed_in, OpenOverallDraft, emit)
@@ -1215,7 +1207,7 @@ test "submitting a retained draft still requires sign-in" {
 ///|
 test "comment loading authentication failure signs out and preserves the draft" {
   let model = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
+    SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), install_url=None),
   )
   let draft = CommentDraft::{
     snapshot: None,
@@ -1280,8 +1272,14 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
     phase: Showing(view),
     route: Some(view.reference),
     file_tree: initial_file_tree_state(),
-    auth: SignedIn(login=Some("reviewer"), install_url=None),
-    last_authenticated_login: Some("reviewer"),
+    auth: SignedIn(
+      user_id=Some("reviewer"),
+      login=Some("reviewer"),
+      install_url=None,
+    ),
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: Some("reviewer"),
     review: review_fixture(
       initial_review_state(),
       refresh=RefreshIdle,
@@ -1298,9 +1296,18 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
         error: None,
       }),
       stage=Some(CheckingHead),
-      can_comment=SignedIn(login=Some("reviewer"), install_url=None)
+      can_comment=SignedIn(
+          user_id=Some("reviewer"),
+          login=Some("reviewer"),
+          install_url=None,
+        )
         is SignedIn(..),
-      login=match SignedIn(login=Some("reviewer"), install_url=None) {
+      login=match
+        SignedIn(
+          user_id=Some("reviewer"),
+          login=Some("reviewer"),
+          install_url=None,
+        ) {
         SignedIn(login~, ..) => login
         _ => None
       },
@@ -1358,7 +1365,7 @@ test "PR comment head authentication failure signs out and preserves the draft" 
     2,
   ).unwrap()
   let base = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
+    SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), install_url=None),
   )
   let original = CommentDraft::{
     snapshot: None,
@@ -1421,8 +1428,14 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     phase: Showing(view),
     route: Some(view.reference),
     file_tree: initial_file_tree_state(),
-    auth: SignedIn(login=Some("reviewer"), install_url=None),
-    last_authenticated_login: Some("reviewer"),
+    auth: SignedIn(
+      user_id=Some("reviewer"),
+      login=Some("reviewer"),
+      install_url=None,
+    ),
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: Some("reviewer"),
     review: review_fixture(
       initial_review_state(),
       refresh=RefreshIdle,
@@ -1436,9 +1449,18 @@ test "comment completion inserts GitHub response and failures retain the draft" 
       }),
       draft=Some(draft),
       stage=Some(PostingIssue),
-      can_comment=SignedIn(login=Some("reviewer"), install_url=None)
+      can_comment=SignedIn(
+          user_id=Some("reviewer"),
+          login=Some("reviewer"),
+          install_url=None,
+        )
         is SignedIn(..),
-      login=match SignedIn(login=Some("reviewer"), install_url=None) {
+      login=match
+        SignedIn(
+          user_id=Some("reviewer"),
+          login=Some("reviewer"),
+          install_url=None,
+        ) {
         SignedIn(login~, ..) => login
         _ => None
       },
@@ -1469,7 +1491,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
       5,
       model.review.submission_id,
       Err(
-        ExtensionRequestError::ExtensionRequestError(
+        HttpRequestError::HttpRequestError(
           status=422,
           code="invalid_comment_anchor",
           detail="Validation Failed",
@@ -1484,7 +1506,10 @@ test "comment completion inserts GitHub response and failures retain the draft" 
   assert_eq(retained.body, "new comment")
   assert_false(retained.submitting)
   assert_true(retained.error.unwrap().contains("anchor"))
-  assert_true(failed.auth is SignedIn(login=Some("reviewer"), ..))
+  assert_true(
+    failed.auth
+    is SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), ..),
+  )
 }
 
 ///|
@@ -1557,62 +1582,47 @@ test "comment creation authentication failures sign out and retain the draft" {
 }
 
 ///|
-fn device_api_status(
-  flow_id : String,
-  user_code? : String = "ABCD-EFGH",
-  expires_in? : Int = 900,
-  poll_after? : Int = 5,
-) -> ApiAuthStatus {
-  {
-    authenticated: false,
-    login: None,
-    install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
-    device_flow: Some({
-      flow_id,
-      user_code,
-      verification_uri: "https://github.com/login/device",
-      expires_in,
-      poll_after,
-    }),
-  }
-}
-
-///|
 fn signed_in_api_status(login : String) -> ApiAuthStatus {
   {
+    device_flow: None,
+    csrf_token: "csrf-test",
     authenticated: true,
     login: Some(login),
     install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
-    device_flow: None,
+    user_id: Some(login),
   }
 }
 
 ///|
 fn anonymous_api_status() -> ApiAuthStatus {
   {
+    device_flow: None,
+    csrf_token: "csrf-test",
     authenticated: false,
     login: None,
     install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
-    device_flow: None,
+    user_id: None,
   }
 }
 
 ///|
 fn signed_in_api_status_without_login() -> ApiAuthStatus {
   {
+    device_flow: None,
+    csrf_token: "csrf-test",
     authenticated: true,
     login: None,
     install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
-    device_flow: None,
+    user_id: None,
   }
 }
 
 ///|
-fn device_auth_test_model(
+fn auth_test_model(
   auth : AuthStatus,
   phase : Phase,
   route : CommitRef?,
-  last_authenticated_login? : String? = None,
+  last_authenticated_user_id? : String? = None,
 ) -> Model {
   {
     input: "",
@@ -1625,7 +1635,9 @@ fn device_auth_test_model(
     route,
     file_tree: initial_file_tree_state(),
     auth,
-    last_authenticated_login,
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id,
     review: review_fixture(
       initial_review_state(),
       deletion=None,
@@ -1655,7 +1667,9 @@ fn auth_identity_test_model(auth : AuthStatus, login : String?) -> Model {
       selected_file_index: Some(0),
     },
     auth,
-    last_authenticated_login: login,
+    auth_revision: 0,
+    restore_pending: false,
+    last_authenticated_user_id: login,
     review: review_fixture(
       initial_review_state(),
       deletion=None,
@@ -1684,23 +1698,24 @@ test "account changes and confirmed anonymity clear review state and reload" {
   let view = review_test_view()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let alice = auth_identity_test_model(
-    SignedIn(login=Some("alice"), install_url=None),
+    SignedIn(user_id=Some("alice"), login=Some("alice"), install_url=None),
     Some("alice"),
   )
   let old_generation = alice.generation
   let (bob, _) = update_auth(
     alice,
     ReactivationAuthStatusLoaded(
+      0,
       old_generation,
-      view.reference,
+      Some(view.reference),
       Ok(signed_in_api_status("bob")),
     ),
     emit,
   )
   assert_eq(bob.generation, old_generation + 1)
   assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(bob.auth is SignedIn(login=Some("bob"), ..))
-  assert_eq(bob.last_authenticated_login, Some("bob"))
+  assert_true(bob.auth is SignedIn(user_id=Some("bob"), login=Some("bob"), ..))
+  assert_eq(bob.last_authenticated_user_id, Some("bob"))
   assert_true(bob.review.comments() is CommentsLoading)
   assert_true(bob.review.draft() is None)
   assert_true(bob.file_tree == reset_file_tree_state(alice.file_tree))
@@ -1708,8 +1723,9 @@ test "account changes and confirmed anonymity clear review state and reload" {
   let (anonymous, _) = update_auth(
     alice,
     ReactivationAuthStatusLoaded(
+      0,
       old_generation,
-      view.reference,
+      Some(view.reference),
       Ok(anonymous_api_status()),
     ),
     emit,
@@ -1717,7 +1733,7 @@ test "account changes and confirmed anonymity clear review state and reload" {
   assert_eq(anonymous.generation, old_generation + 1)
   assert_true(anonymous.phase is LoadingPullMetadata(attempt=0, ..))
   assert_true(anonymous.auth is Anonymous(_))
-  assert_true(anonymous.last_authenticated_login is None)
+  assert_true(anonymous.last_authenticated_user_id is None)
   assert_true(anonymous.review.comments() is CommentsLoading)
   assert_true(anonymous.review.draft() is None)
   assert_true(anonymous.file_tree == reset_file_tree_state(alice.file_tree))
@@ -1729,6 +1745,7 @@ test "installation URL changes do not cross the signed-in account boundary" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let alice = auth_identity_test_model(
     SignedIn(
+      user_id=Some("alice"),
       login=Some("alice"),
       install_url=Some("https://github.com/apps/moondiff-old/installations/new"),
     ),
@@ -1738,22 +1755,25 @@ test "installation URL changes do not cross the signed-in account boundary" {
   let (updated, _) = update_auth(
     alice,
     ReactivationAuthStatusLoaded(
+      0,
       old_generation,
-      view.reference,
+      Some(view.reference),
       Ok({
+        device_flow: None,
+        csrf_token: "csrf-test",
         authenticated: true,
         login: Some("alice"),
         install_url: Some(
           "https://github.com/apps/moondiff-new/installations/new",
         ),
-        device_flow: None,
+        user_id: Some("alice"),
       }),
     ),
     emit,
   )
   assert_eq(updated.generation, old_generation)
   assert_true(updated.phase == alice.phase)
-  guard updated.auth is SignedIn(login~, install_url~) else {
+  guard updated.auth is SignedIn(login~, install_url~, ..) else {
     fail("expected Alice to remain signed in")
   }
   assert_eq(login, Some("alice"))
@@ -1761,7 +1781,7 @@ test "installation URL changes do not cross the signed-in account boundary" {
     install_url,
     Some("https://github.com/apps/moondiff-new/installations/new"),
   )
-  assert_eq(updated.last_authenticated_login, Some("alice"))
+  assert_eq(updated.last_authenticated_user_id, Some("alice"))
   assert_true(updated.review.draft() == alice.review.draft())
   assert_true(updated.file_tree == alice.file_tree)
 }
@@ -1771,15 +1791,16 @@ test "account boundary generation ignores old diff comment and submission respon
   let view = review_test_view()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let alice = auth_identity_test_model(
-    SignedIn(login=Some("alice"), install_url=None),
+    SignedIn(user_id=Some("alice"), login=Some("alice"), install_url=None),
     Some("alice"),
   )
   let old_generation = alice.generation
   let (bob, _) = update_auth(
     alice,
     ReactivationAuthStatusLoaded(
+      0,
       old_generation,
-      view.reference,
+      Some(view.reference),
       Ok(signed_in_api_status("bob")),
     ),
     emit,
@@ -1831,73 +1852,6 @@ test "account boundary generation ignores old diff comment and submission respon
 }
 
 ///|
-test "same-account device recovery preserves drafts while another account clears them" {
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let failed = auth_identity_test_model(
-    AuthFailed("Your GitHub session expired."),
-    Some("alice"),
-  )
-  let checking = with_auth(failed, AuthChecking)
-  assert_true(checking.auth is AuthChecking)
-  assert_eq(checking.last_authenticated_login, Some("alice"))
-  assert_true(checking.review.draft() == failed.review.draft())
-  let flow_id = "flow-recovery"
-  let (pending, _) = update_auth(
-    checking,
-    DeviceAuthorizationStarted(Ok(device_api_status(flow_id))),
-    emit,
-  )
-  assert_eq(pending.last_authenticated_login, Some("alice"))
-  assert_true(pending.review.draft() == failed.review.draft())
-
-  let (alice, _) = update_auth(
-    pending,
-    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("alice"))),
-    emit,
-  )
-  assert_eq(alice.generation, failed.generation)
-  assert_true(alice.phase is Showing(_))
-  assert_true(alice.auth is SignedIn(login=Some("alice"), ..))
-  assert_eq(alice.last_authenticated_login, Some("alice"))
-  assert_true(alice.review.draft() == failed.review.draft())
-
-  let retrying = { ..failed, phase: LoadFailed("private repository"), }
-  let (retried, _) = update_auth(
-    retrying,
-    DeviceAuthorizationStarted(Ok(signed_in_api_status("alice"))),
-    emit,
-  )
-  assert_eq(retried.generation, retrying.generation + 1)
-  assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.review.draft() == failed.review.draft())
-
-  let (bob, _) = update_auth(
-    pending,
-    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("bob"))),
-    emit,
-  )
-  assert_eq(bob.generation, failed.generation + 1)
-  assert_true(bob.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(bob.auth is SignedIn(login=Some("bob"), ..))
-  assert_eq(bob.last_authenticated_login, Some("bob"))
-  assert_true(bob.review.draft() is None)
-
-  guard pending.auth is DeviceAuthorizing(device) else {
-    fail("expected a pending device authorization")
-  }
-  let cancelling = with_auth(pending, DeviceCancelling(device))
-  let (cancelled, _) = update_auth(
-    cancelling,
-    DeviceAuthorizationCancelled(flow_id, Ok(anonymous_api_status())),
-    emit,
-  )
-  assert_eq(cancelled.generation, failed.generation + 1)
-  assert_true(cancelled.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(cancelled.last_authenticated_login is None)
-  assert_true(cancelled.review.draft() is None)
-}
-
-///|
 test "an authenticated result without a login cannot reuse known account state" {
   let view = review_test_view()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
@@ -1908,16 +1862,17 @@ test "an authenticated result without a login cannot reuse known account state" 
   let (unverified, _) = update_auth(
     alice,
     ReactivationAuthStatusLoaded(
+      0,
       alice.generation,
-      view.reference,
+      Some(view.reference),
       Ok(signed_in_api_status_without_login()),
     ),
     emit,
   )
   assert_eq(unverified.generation, alice.generation + 1)
   assert_true(unverified.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(unverified.auth is SignedIn(login=None, ..))
-  assert_true(unverified.last_authenticated_login is None)
+  assert_true(unverified.auth is SignedIn(user_id=None, login=None, ..))
+  assert_true(unverified.last_authenticated_user_id is None)
   assert_true(unverified.review.draft() is None)
 }
 
@@ -1925,89 +1880,24 @@ test "an authenticated result without a login cannot reuse known account state" 
 test "successful local logout clears account state and reloads" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let alice = auth_identity_test_model(
-    SignedIn(login=Some("alice"), install_url=None),
+    SignedIn(user_id=Some("alice"), login=Some("alice"), install_url=None),
     Some("alice"),
   )
   let checking = with_auth(alice, AuthChecking)
   assert_true(checking.auth is AuthChecking)
-  assert_eq(checking.last_authenticated_login, Some("alice"))
+  assert_eq(checking.last_authenticated_user_id, Some("alice"))
   assert_true(checking.review.draft() == alice.review.draft())
   let (logged_out, _) = update_auth(
     checking,
-    AuthLogoutFinished(Ok(anonymous_api_status())),
+    AuthLogoutFinished(0, Ok(anonymous_api_status())),
     emit,
   )
   assert_eq(logged_out.generation, alice.generation + 1)
   assert_true(logged_out.phase is LoadingPullMetadata(attempt=0, ..))
   assert_true(logged_out.auth is Anonymous(_))
-  assert_true(logged_out.last_authenticated_login is None)
+  assert_true(logged_out.last_authenticated_user_id is None)
   assert_true(logged_out.review.comments() is CommentsLoading)
   assert_true(logged_out.review.draft() is None)
-}
-
-///|
-test "device authorization moves from code through pending to signed in" {
-  let flow_id = "flow-current"
-  let view = review_test_view()
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let anonymous = device_auth_test_model(
-    Anonymous(Some("https://github.com/apps/moondiff-test/installations/new")),
-    Showing(view),
-    Some(view.reference),
-  )
-  let (started, _) = update_auth(
-    anonymous,
-    DeviceAuthorizationStarted(Ok(device_api_status(flow_id))),
-    emit,
-  )
-  guard started.auth is DeviceAuthorizing(device) else {
-    fail("expected the device code to be displayed")
-  }
-  assert_eq(device.flow_id, flow_id)
-  assert_eq(device.user_code, "ABCD-EFGH")
-  assert_true(device.copy_status is DeviceCodeCopyReady)
-
-  let (pending, _) = update_auth(
-    started,
-    DeviceAuthorizationPolled(
-      flow_id,
-      Ok(device_api_status(flow_id, expires_in=895, poll_after=7)),
-    ),
-    emit,
-  )
-  guard pending.auth is DeviceAuthorizing(waiting) else {
-    fail("expected authorization to remain pending")
-  }
-  assert_eq(waiting.expires_in, 895)
-  assert_eq(waiting.poll_after, 7)
-
-  let (signed_in, _) = update_auth(
-    pending,
-    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("octocat"))),
-    emit,
-  )
-  assert_true(signed_in.auth is SignedIn(login=Some("octocat"), ..))
-  assert_true(signed_in.review.comments() == pending.review.comments())
-}
-
-///|
-test "authentication snapshots only start polling new or resumed device flows" {
-  let current = review_test_device_authorization()
-  assert_false(
-    auth_snapshot_starts_device_poll(
-      DeviceAuthorizing(current),
-      current.flow_id,
-    ),
-  )
-  assert_false(
-    auth_snapshot_starts_device_poll(DeviceCancelling(current), current.flow_id),
-  )
-  assert_true(
-    auth_snapshot_starts_device_poll(DeviceAuthorizing(current), "flow-new"),
-  )
-  assert_true(
-    auth_snapshot_starts_device_poll(Anonymous(None), current.flow_id),
-  )
 }
 
 ///|
@@ -2018,13 +1908,21 @@ test "reactivation synchronizes login and logout before refreshing comments" {
   let (signed_in, _) = update_auth(
     anonymous,
     ReactivationAuthStatusLoaded(
+      0,
       anonymous.generation,
-      view.reference,
+      Some(view.reference),
       Ok(signed_in_api_status("cross-tab-user")),
     ),
     emit,
   )
-  assert_true(signed_in.auth is SignedIn(login=Some("cross-tab-user"), ..))
+  assert_true(
+    signed_in.auth
+    is SignedIn(
+      user_id=Some("cross-tab-user"),
+      login=Some("cross-tab-user"),
+      ..
+    ),
+  )
   assert_true(signed_in.review.comments() is CommentsReady(_))
 
   let ready = with_review(
@@ -2041,8 +1939,9 @@ test "reactivation synchronizes login and logout before refreshing comments" {
   let (signed_out, _) = update_auth(
     ready,
     ReactivationAuthStatusLoaded(
+      0,
       ready.generation,
-      view.reference,
+      Some(view.reference),
       Ok(anonymous_api_status()),
     ),
     emit,
@@ -2052,54 +1951,10 @@ test "reactivation synchronizes login and logout before refreshing comments" {
 }
 
 ///|
-test "reactivation preserves cancellation and ignores stale generations" {
-  let view = review_test_view()
-  let device = review_test_device_authorization()
-  let model = review_test_model(DeviceCancelling(device))
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let (cancelling, _) = update_auth(
-    model,
-    ReactivationAuthStatusLoaded(
-      model.generation,
-      view.reference,
-      Ok(device_api_status(device.flow_id, poll_after=9)),
-    ),
-    emit,
-  )
-  guard cancelling.auth is DeviceCancelling(updated) else {
-    fail("expected the current cancellation to remain in progress")
-  }
-  assert_eq(updated.poll_after, 9)
-  assert_true(cancelling.review.comments() == model.review.comments())
-
-  let (stale_generation, _) = update_auth(
-    model,
-    ReactivationAuthStatusLoaded(
-      model.generation - 1,
-      view.reference,
-      Ok(signed_in_api_status("stale-user")),
-    ),
-    emit,
-  )
-  assert_true(stale_generation == model)
-  let other = commit_reference("upstream", "project", "abcdef1")
-  let (stale_route, _) = update_auth(
-    model,
-    ReactivationAuthStatusLoaded(
-      model.generation,
-      other,
-      Ok(signed_in_api_status("stale-user")),
-    ),
-    emit,
-  )
-  assert_true(stale_route == model)
-}
-
-///|
 test "reactivation login retries a private repository load" {
   let reference = pull_reference("upstream", "private-project", "17")
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let model = device_auth_test_model(
+  let model = auth_test_model(
     Anonymous(None),
     LoadFailed("private repository"),
     Some(reference),
@@ -2107,22 +1962,30 @@ test "reactivation login retries a private repository load" {
   let (retried, _) = update_auth(
     model,
     ReactivationAuthStatusLoaded(
+      0,
       model.generation,
-      reference,
+      Some(reference),
       Ok(signed_in_api_status("cross-tab-user")),
     ),
     emit,
   )
   assert_eq(retried.generation, model.generation + 1)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.auth is SignedIn(login=Some("cross-tab-user"), ..))
+  assert_true(
+    retried.auth
+    is SignedIn(
+      user_id=Some("cross-tab-user"),
+      login=Some("cross-tab-user"),
+      ..
+    ),
+  )
 }
 
 ///|
 test "reactivation login restarts an anonymous load and ignores its late failure" {
   let reference = pull_reference("upstream", "private-project", "17")
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let model = device_auth_test_model(
+  let model = auth_test_model(
     Anonymous(None),
     LoadingPullMetadata(reference~, attempt=0),
     Some(reference),
@@ -2131,15 +1994,23 @@ test "reactivation login restarts an anonymous load and ignores its late failure
   let (restarted, _) = update_auth(
     model,
     ReactivationAuthStatusLoaded(
+      0,
       old_generation,
-      reference,
+      Some(reference),
       Ok(signed_in_api_status("cross-tab-user")),
     ),
     emit,
   )
   assert_eq(restarted.generation, old_generation + 1)
   assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(restarted.auth is SignedIn(login=Some("cross-tab-user"), ..))
+  assert_true(
+    restarted.auth
+    is SignedIn(
+      user_id=Some("cross-tab-user"),
+      login=Some("cross-tab-user"),
+      ..
+    ),
+  )
 
   let (after_late_failure, _) = update_load(
     restarted,
@@ -2154,134 +2025,64 @@ test "reactivation login restarts an anonymous load and ignores its late failure
 }
 
 ///|
-test "device code copy feedback and cancellation stay scoped to the current flow" {
-  let flow_id = "flow-copy"
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let model = device_auth_test_model(
-    auth_status_from_api(device_api_status(flow_id)),
-    Idle,
-    None,
-  )
-  let (copying, _) = update_auth(model, CopyDeviceCode, emit)
-  assert_true(copying == model)
-  let (copied, _) = update_auth(model, DeviceCodeCopied(flow_id), emit)
-  guard copied.auth is DeviceAuthorizing(done) else {
-    fail("expected a device authorization")
-  }
-  assert_true(done.copy_status is DeviceCodeCopyDone)
-
-  let (stale_copy, _) = update_auth(
-    copied,
-    DeviceCodeCopyFailed("old-flow", "no"),
-    emit,
-  )
-  assert_true(stale_copy == copied)
-  let (failed_copy, _) = update_auth(
-    copied,
-    DeviceCodeCopyFailed(flow_id, "clipboard denied"),
-    emit,
-  )
-  guard failed_copy.auth is DeviceAuthorizing(failed) else {
-    fail("expected a device authorization")
-  }
-  assert_true(failed.copy_status is DeviceCodeCopyError("clipboard denied"))
-
-  let cancelling = with_auth(failed_copy, DeviceCancelling(failed))
-  let (late_poll, _) = update_auth(
-    cancelling,
-    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("too-late"))),
-    emit,
-  )
-  assert_true(late_poll == cancelling)
-  let (cancelled, _) = update_auth(
-    cancelling,
-    DeviceAuthorizationCancelled(flow_id, Ok(anonymous_api_status())),
-    emit,
-  )
-  assert_true(cancelled.auth is Anonymous(_))
-}
-
-///|
-test "expired and stale device responses cannot authenticate another flow" {
-  let current = "flow-new"
-  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let model = device_auth_test_model(
-    auth_status_from_api(device_api_status(current)),
-    Idle,
-    None,
-  )
-  let (stale_poll, _) = update_auth(
-    model,
-    DeviceAuthorizationPolled(
-      "flow-old",
-      Ok(signed_in_api_status("wrong-user")),
-    ),
-    emit,
-  )
-  assert_true(stale_poll == model)
-  let (stale_cancel, _) = update_auth(
-    model,
-    DeviceAuthorizationCancelled("flow-old", Ok(anonymous_api_status())),
-    emit,
-  )
-  assert_true(stale_cancel == model)
-
-  let (expired, _) = update_auth(
-    model,
-    DeviceAuthorizationPolled(
-      current,
-      Err(
-        GitHubRequestError::GitHubRequestError(
-          "The GitHub device code expired.",
-        ),
-      ),
-    ),
-    emit,
-  )
-  assert_true(
-    expired.auth is AuthFailed(message) && message.contains("expired"),
-  )
-}
-
-///|
-test "device sign-in retries a private repository load" {
+test "web sign-in retries a private repository load" {
   let reference = pull_reference("upstream", "private-project", "17")
-  let flow_id = "flow-private"
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let model = device_auth_test_model(
-    auth_status_from_api(device_api_status(flow_id)),
+  let model = auth_test_model(
+    Authorizing(starting_device("test-attempt-00000000"), ""),
     LoadFailed("private repository"),
     Some(reference),
   )
   let (retried, _) = update_auth(
     model,
-    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("reviewer"))),
+    DeviceUpdated(
+      0,
+      "test-attempt-00000000",
+      true,
+      Ok({
+        request_id: "test-attempt-00000000",
+        status: { ..signed_in_api_status("reviewer"), },
+      }),
+    ),
     emit,
   )
   assert_eq(retried.generation, 6)
   assert_true(retried.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(retried.auth is SignedIn(login=Some("reviewer"), ..))
+  assert_true(
+    retried.auth
+    is SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), ..),
+  )
 }
 
 ///|
-test "device sign-in restarts an anonymous load and ignores its late failure" {
+test "web sign-in restarts an anonymous load and ignores its late failure" {
   let reference = pull_reference("upstream", "private-project", "17")
-  let flow_id = "flow-loading-private"
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let model = device_auth_test_model(
-    auth_status_from_api(device_api_status(flow_id)),
+  let model = auth_test_model(
+    Authorizing(starting_device("test-attempt-00000000"), ""),
     LoadingPullMetadata(reference~, attempt=0),
     Some(reference),
   )
   let old_generation = model.generation
   let (restarted, _) = update_auth(
     model,
-    DeviceAuthorizationPolled(flow_id, Ok(signed_in_api_status("reviewer"))),
+    DeviceUpdated(
+      0,
+      "test-attempt-00000000",
+      true,
+      Ok({
+        request_id: "test-attempt-00000000",
+        status: { ..signed_in_api_status("reviewer"), },
+      }),
+    ),
     emit,
   )
   assert_eq(restarted.generation, old_generation + 1)
   assert_true(restarted.phase is LoadingPullMetadata(attempt=0, ..))
-  assert_true(restarted.auth is SignedIn(login=Some("reviewer"), ..))
+  assert_true(
+    restarted.auth
+    is SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), ..),
+  )
 
   let (after_late_failure, _) = update_load(
     restarted,
@@ -2300,7 +2101,7 @@ test "top-level reducer routes every message domain" {
   let model = initial_model()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
 
-  let auth_msg : AuthMsg = DeviceCodeCopied("stale-flow")
+  let auth_msg : AuthMsg = AuthStatusLoaded(0, Ok(anonymous_api_status()))
   let (auth_routed, _) = update(model, Auth(auth_msg), emit)
   let (auth_direct, _) = update_auth(model, auth_msg, emit)
   assert_true(auth_routed == auth_direct)
@@ -2331,7 +2132,7 @@ test "top-level reducer routes every message domain" {
 test "deletion requires ownership and confirmation, preserves failures, and rejects stale results" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let initial = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
+    SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), install_url=None),
   )
   let comment : ApiIssueComment = {
     id: 100L,
@@ -2354,7 +2155,11 @@ test "deletion requires ownership and confirmation, preserves failures, and reje
   assert_true(unconfirmed.review == model.review)
   let other = with_auth(
     model,
-    SignedIn(login=Some("someone-else"), install_url=None),
+    SignedIn(
+      user_id=Some("someone-else"),
+      login=Some("someone-else"),
+      install_url=None,
+    ),
   )
   let (denied, _) = update_review(other, AskDelete(id), emit)
   assert_true(denied.review.deletion is None)
@@ -2415,7 +2220,11 @@ test "deletion requires ownership and confirmation, preserves failures, and reje
   assert_true(stale_delete.review == navigated.review)
   let (changed_review, _) = review_state_with_auth_identity(
     pending,
-    SignedIn(login=Some("new-account"), install_url=None),
+    SignedIn(
+      user_id=Some("new-account"),
+      login=Some("new-account"),
+      install_url=None,
+    ),
   )
   let (changed, _) = reload_after_auth_identity_boundary(changed_review, emit)
   let (old_account_delete, _) = update_review(
@@ -2434,7 +2243,7 @@ test "deletion requires ownership and confirmation, preserves failures, and reje
 ///|
 fn review_reply_test_model() -> Model {
   let model = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
+    SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), install_url=None),
   )
   let root : ApiReviewComment = {
     id: 20L,
@@ -2445,7 +2254,7 @@ fn review_reply_test_model() -> Model {
     path: "src/main.mbt",
     line: Some(2),
     original_line: Some(2),
-    side: Some("RIGHT"),
+    side: Some(@protocol.CommentSide::Right),
     position: Some(3),
     commit_id: "head",
     in_reply_to_id: None,

@@ -1,2 +1,2 @@
 ///|
-using @github {type RepositoryRef, type SourceLocation}
+using @github {type SourceLocation}

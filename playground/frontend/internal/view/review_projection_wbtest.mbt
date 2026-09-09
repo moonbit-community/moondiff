@@ -93,8 +93,10 @@ test "same-line projection uses the first expanded matched inserted or deleted s
             phase: Showing(view),
             route: Some(reference),
             file_tree: test_file_tree_state(),
-            auth: WebReadOnly,
-            last_authenticated_login: None,
+            auth: Anonymous(None),
+            auth_revision: 0,
+            restore_pending: false,
+            last_authenticated_user_id: None,
             review: @comments.Session::new(),
           }
           let projection = review_projection(view, model)
@@ -283,8 +285,10 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
       phase: Showing(view),
       route: Some(reference),
       file_tree: test_file_tree_state(),
-      auth: WebReadOnly,
-      last_authenticated_login: None,
+      auth: Anonymous(None),
+      auth_revision: 0,
+      restore_pending: false,
+      last_authenticated_user_id: None,
       review: @comments.Session::new(),
     }
     let projection = review_projection(view, model)

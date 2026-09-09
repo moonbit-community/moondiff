@@ -20,7 +20,7 @@ using @change {type CacheKey, type FileState, finish_change}
 using @comments {type CommentDraft}
 
 ///|
-using @github_client {type ExtensionRequestError, type GitHubRequestError}
+using @github_client {type HttpRequestError, type GitHubRequestError}
 
 ///|
 using @routing {playground_route}

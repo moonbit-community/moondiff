@@ -2,18 +2,18 @@
 package "moonbit-community/moondiff-playground/internal/comments"
 
 import {
+  "moonbit-community/moondiff-playground-protocol",
   "moonbit-community/moondiff-playground/internal/change",
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff-playground/internal/review",
-  "moonbitlang/core/json",
 }
 
 // Values
-pub fn author_label(ApiCommentUser?) -> String
+pub fn author_label(@moondiff-playground-protocol.ApiCommentUser?) -> String
 
 pub fn can_delete_comment(Session, CommentId) -> Bool
 
-pub fn commit_discussions(@change.ChangeView, ArrayView[ApiCommitComment]) -> Array[CommitDiscussion]
+pub fn commit_discussions(@change.ChangeView, ArrayView[@moondiff-playground-protocol.ApiCommitComment]) -> Array[CommitDiscussion]
 
 pub fn draft_blocks_deletion(Session, CommentId) -> Bool
 
@@ -21,7 +21,7 @@ pub fn permission(Session, Action) -> Permission
 
 pub fn review_can_comment(Session) -> Bool
 
-pub fn review_threads(@change.ChangeView, ArrayView[ApiReviewComment]) -> Array[ReviewThread]
+pub fn review_threads(@change.ChangeView, ArrayView[@moondiff-playground-protocol.ApiReviewComment]) -> Array[ReviewThread]
 
 pub fn same_draft_target(DraftKind, DraftKind) -> Bool
 
@@ -29,7 +29,7 @@ pub fn update(Session, Event) -> (Session, Array[Effect])
 
 pub fn valid_reply_target(Session, Int64) -> Bool
 
-pub fn without_deleted(ApiCommentBundle, Array[CommentId]) -> ApiCommentBundle
+pub fn without_deleted(@moondiff-playground-protocol.ApiCommentBundle, Array[CommentId]) -> @moondiff-playground-protocol.ApiCommentBundle
 
 // Errors
 
@@ -40,50 +40,6 @@ pub(all) enum Action {
   Delete(CommentId)
   LoadSnapshot
 } derive(Eq)
-
-pub(all) struct ApiCommentBundle {
-  issue_comments : Array[ApiIssueComment]
-  review_comments : Array[ApiReviewComment]
-  commit_comments : Array[ApiCommitComment]
-} derive(Eq, @json.FromJson)
-
-pub(all) struct ApiCommentUser {
-  login : String
-} derive(Eq, @json.FromJson)
-
-pub(all) struct ApiCommitComment {
-  id : Int64
-  body : String
-  html_url : String
-  created_at : String
-  user : ApiCommentUser?
-  path : String?
-  position : Int?
-  line : Int?
-} derive(Eq, @json.FromJson)
-
-pub(all) struct ApiIssueComment {
-  id : Int64
-  body : String
-  html_url : String
-  created_at : String
-  user : ApiCommentUser?
-} derive(Eq, @json.FromJson)
-
-pub(all) struct ApiReviewComment {
-  id : Int64
-  body : String
-  html_url : String
-  created_at : String
-  user : ApiCommentUser?
-  path : String
-  line : Int?
-  original_line : Int?
-  side : String?
-  position : Int?
-  commit_id : String
-  in_reply_to_id : Int64?
-} derive(Eq, @json.FromJson)
 
 pub(all) enum CommentDeletion {
   ConfirmDelete(CommentId)
@@ -110,19 +66,19 @@ pub fn CommentId::key(Self) -> String
 pub(all) enum CommentRefresh {
   RefreshIdle
   RefreshMetadata
-  RefreshList(@github.ApiPull?)
-  RefreshValidation(@github.ApiPull, ApiCommentBundle)
+  RefreshList(@moondiff-playground-protocol.ApiPull?)
+  RefreshValidation(@moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiCommentBundle)
 } derive(Eq)
 
 pub(all) enum CommentsStatus {
   CommentsDisabled
   CommentsLoading
-  CommentsReady(ApiCommentBundle)
+  CommentsReady(@moondiff-playground-protocol.ApiCommentBundle)
   CommentsFailed(String)
 } derive(Eq)
 
 pub(all) struct CommitDiscussion {
-  comment : ApiCommitComment
+  comment : @moondiff-playground-protocol.ApiCommitComment
   file_index : Int?
   outdated : Bool
 }
@@ -133,10 +89,6 @@ pub(all) struct Context {
   snapshot : Snapshot?
   enabled : Bool
 } derive(Eq)
-
-pub(all) struct DeleteResult {
-  deleted : Bool
-} derive(@json.FromJson)
 
 pub(all) struct DraftId {
   generation : Int
@@ -151,13 +103,13 @@ pub(all) enum DraftKind {
 } derive(Eq)
 
 pub(all) enum Effect {
-  CommentsRequest(@github.CommitRef, Int, (Result[ApiCommentBundle, Failure]) -> Event)
-  CommentHeadRequest(@github.CommitRef, String, Int, (Result[@github.ApiPull, Failure]) -> Event)
-  CreateIssueCommentRequest(@github.CommitRef, String, String, Int, (Result[ApiIssueComment, Failure]) -> Event)
-  CreateReviewCommentRequest(@github.CommitRef, String, String, @review.ReviewAnchor, String, Int, (Result[ApiReviewComment, Failure]) -> Event)
-  CreateCommitCommentRequest(@github.CommitRef, String, @review.ReviewAnchor, String, Int, (Result[ApiCommitComment, Failure]) -> Event)
-  CreateReviewReplyRequest(@github.CommitRef, String, Int64, String, Int, (Result[ApiReviewComment, Failure]) -> Event)
-  DeleteCommentRequest(@github.CommitRef, CommentId, Int, (Result[DeleteResult, Failure]) -> Event)
+  CommentsRequest(@github.CommitRef, Int, (Result[@moondiff-playground-protocol.ApiCommentBundle, Failure]) -> Event)
+  CommentHeadRequest(@github.CommitRef, String, Int, (Result[@moondiff-playground-protocol.ApiPull, Failure]) -> Event)
+  CreateIssueCommentRequest(@github.CommitRef, String, String, Int, (Result[@moondiff-playground-protocol.ApiIssueComment, Failure]) -> Event)
+  CreateReviewCommentRequest(@github.CommitRef, String, String, @review.ReviewAnchor, String, Int, (Result[@moondiff-playground-protocol.ApiReviewComment, Failure]) -> Event)
+  CreateCommitCommentRequest(@github.CommitRef, String, @review.ReviewAnchor, String, Int, (Result[@moondiff-playground-protocol.ApiCommitComment, Failure]) -> Event)
+  CreateReviewReplyRequest(@github.CommitRef, String, Int64, String, Int, (Result[@moondiff-playground-protocol.ApiReviewComment, Failure]) -> Event)
+  DeleteCommentRequest(@github.CommitRef, CommentId, Int, (Result[@moondiff-playground-protocol.DeleteResult, Failure]) -> Event)
   Dispatch(Event)
 }
 
@@ -165,26 +117,27 @@ pub(all) enum Event {
   ContextChanged(Context)
   Reset(Bool, Bool)
   Identity(Bool, String?)
+  RecoverInterrupted
   RefreshComments
   BeginCommentsRefresh(Int, @github.CommitRef)
-  CommentsMetadataLoaded(Int, Int, Result[@github.ApiPull, Failure])
-  CommentsValidated(Int, Int, Result[@github.ApiPull, Failure])
+  CommentsMetadataLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Failure])
+  CommentsValidated(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Failure])
   AskDelete(CommentId)
   CancelDelete
   ConfirmCommentDelete(CommentId)
-  CommentDeleted(Int, Int, CommentId, Result[DeleteResult, Failure])
-  CommentsLoaded(Int, Int, Result[ApiCommentBundle, Failure])
+  CommentDeleted(Int, Int, CommentId, Result[@moondiff-playground-protocol.DeleteResult, Failure])
+  CommentsLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommentBundle, Failure])
   OpenOverallDraft
   OpenInlineDraft(Int, @review.ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, Int, @review.ReviewAnchor, Result[@github.ApiPull, Failure])
-  IssueCommentCreated(Int, Int, Result[ApiIssueComment, Failure])
-  ReviewCommentCreated(Int, Int, Result[ApiReviewComment, Failure])
-  CommitCommentCreated(Int, Int, Result[ApiCommitComment, Failure])
-  ReviewReplyCreated(Int, Int, Result[ApiReviewComment, Failure])
+  CommentHeadChecked(Int, Int, @review.ReviewAnchor, Result[@moondiff-playground-protocol.ApiPull, Failure])
+  IssueCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiIssueComment, Failure])
+  ReviewCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Failure])
+  CommitCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiCommitComment, Failure])
+  ReviewReplyCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Failure])
 }
 
 pub(all) struct Failure {
@@ -200,8 +153,8 @@ pub fn Permission::allowed(Self) -> Bool
 
 pub(all) struct ReviewThread {
   id : CommentId
-  root : ApiReviewComment
-  replies : Array[ApiReviewComment]
+  root : @moondiff-playground-protocol.ApiReviewComment
+  replies : Array[@moondiff-playground-protocol.ApiReviewComment]
   file_index : Int?
   outdated : Bool
 }
@@ -233,7 +186,7 @@ pub fn Session::submission(Self) -> SubmissionPhase?
 pub(all) struct Snapshot {
   reference : @github.CommitRef
   sha : String
-  pull_snapshot : @github.ApiPull?
+  pull_snapshot : @moondiff-playground-protocol.ApiPull?
 } derive(Eq)
 
 pub(all) enum SubmissionPhase {

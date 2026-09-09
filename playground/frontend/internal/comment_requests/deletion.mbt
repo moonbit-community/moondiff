@@ -1,26 +1,24 @@
 ///|
-priv struct DeleteArgs {
-  owner : String
-  repo : String
-  comment_id : Int64
-} derive(ToJson)
-
-///|
 pub fn delete_comment_request(
   reference : CommitRef,
   id : CommentId,
   generation : Int,
   emit : @rabbita.Emit[Result[DeleteResult, Error]],
 ) -> @rabbita.Cmd {
-  let (operation, comment_id) = match id {
-    IssueComment(id) => ("github.issue.comment.delete", id)
-    ReviewComment(id) => ("github.review.comment.delete", id)
-    CommitComment(id) => ("github.commit.comment.delete", id)
+  let comment_id = match id {
+    IssueComment(id) | ReviewComment(id) | CommitComment(id) => id
   }
-  extension_rpc_request(
-    operation,
-    DeleteArgs::{ owner: reference.owner, repo: reference.repo, comment_id, },
-    generation,
-    emit,
-  )
+  let args : @protocol.CommentDelete = {
+    owner: reference.owner,
+    repo: reference.repo,
+    comment_id,
+  }
+  match id {
+    IssueComment(_) =>
+      @github_client.delete_issue_comment(args, generation, emit)
+    ReviewComment(_) =>
+      @github_client.delete_review_comment(args, generation, emit)
+    CommitComment(_) =>
+      @github_client.delete_commit_comment(args, generation, emit)
+  }
 }

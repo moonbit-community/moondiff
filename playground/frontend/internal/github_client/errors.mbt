@@ -1,22 +1,22 @@
 ///|
-pub(all) suberror ExtensionRequestError {
-  ExtensionRequestError(status~ : Int, code~ : String, detail~ : String)
+pub(all) suberror HttpRequestError {
+  HttpRequestError(status~ : Int, code~ : String, detail~ : String)
 }
 
 ///|
-impl Show for ExtensionRequestError with fn output(self, logger) {
+impl Show for HttpRequestError with fn output(self, logger) {
   match self {
-    ExtensionRequestError(status~, code~, detail~) =>
+    HttpRequestError(status~, code~, detail~) =>
       logger.write_string(
-        "Moondiff extension request failed (status \{status}, \{code}): \{detail}",
+        "Moondiff HTTP request failed (status \{status}, \{code}): \{detail}",
       )
   }
 }
 
 ///|
-pub fn extension_error_code(error : Error) -> String? {
+pub fn http_error_code(error : Error) -> String? {
   match error {
-    ExtensionRequestError(status=_, code~, detail=_) => Some(code)
+    HttpRequestError(status=_, code~, detail=_) => Some(code)
     _ => None
   }
 }

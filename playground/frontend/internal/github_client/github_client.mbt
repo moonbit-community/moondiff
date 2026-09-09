@@ -1,146 +1,291 @@
 ///|
-pub fn extension_host_enabled() -> Bool {
-  has_extension_host()
+fn[T] Client::rpc(
+  self : Client,
+  request : @protocol.GitHubRequest,
+  generation : Int,
+  select : (@protocol.RpcValue) -> T raise,
+  done : (Result[T, Error]) -> Unit,
+) -> Unit {
+  request.validate() catch {
+    error => {
+      done(Err(error))
+      return
+    }
+  }
+  self.send(
+    "/api/rpc",
+    request.encode().stringify(),
+    result => {
+      done(
+        match result {
+          Err(error) => Err(error)
+          Ok(value) =>
+            Ok(select(value)) catch {
+              _ => Err(invalid_response("Unexpected RPC result kind."))
+            }
+        },
+      )
+    },
+    generation~,
+  )
 }
 
 ///|
-extern "js" fn has_extension_host() -> Bool =
-  #| () => Boolean(globalThis.__MOONDIFF_EXTENSION_HOST__?.request)
-
-///|
-pub fn[T : FromJson] gateway_json_request(
-  operation : String,
-  repository : RepositoryRef,
-  primary : String,
-  secondary : String,
-  page : Int,
+fn[T] rpc_command(
+  request : @protocol.GitHubRequest,
   generation : Int,
-  msg : @rabbita.Emit[Result[T, Error]],
+  select : (@protocol.RpcValue) -> T raise,
+  emit : @rabbita.Emit[Result[T, Error]],
 ) -> @rabbita.Cmd {
-  @cmd.custom_cmd(scheduler => {
-    send_gateway_json_request(
-      operation,
-      repository.owner,
-      repository.repo,
-      primary,
-      secondary,
-      page,
-      generation,
-      completed=(ok, status, code, status_text, response_body) => {
-        let result : Result[T, Error] = if ok {
-          try @json.from_json(@json.parse(response_body)) catch {
-            error => Err(GitHubRequestError(error.to_string()))
-          } noraise {
-            value => Ok(value)
-          }
-        } else {
-          let suffix = if status_text.trim().is_empty() {
-            ""
-          } else {
-            " \{status_text}"
-          }
-          if code.trim().is_empty() {
-            Err(
-              GitHubRequestError(
-                "GitHub request failed: HTTP \{status}\{suffix}",
-              ),
-            )
-          } else {
-            Err(ExtensionRequestError(status~, code~, detail=status_text))
-          }
-        }
-        scheduler.add(msg(result))
-      },
-      failed=detail => {
-        scheduler.add(
-          msg(Err(GitHubRequestError("GitHub request failed: \{detail}"))),
-        )
-      },
-    )
-  })
+  command(done => client.rpc(request, generation, select, done), emit)
 }
 
 ///|
-extern "js" fn send_gateway_json_request(
-  operation : String,
-  owner : String,
-  repo : String,
-  primary : String,
-  secondary : String,
-  page : Int,
+pub fn get_commit(
+  args : @protocol.CommitGet,
   generation : Int,
-  completed~ : (Bool, Int, String, String, String) -> Unit,
-  failed~ : (String) -> Unit,
-) =
-  #| (operation, owner, repo, primary, secondary, page, generation, completed, failed) => {
-  #|   const args = { owner, repo };
-  #|   const withoutNulls = (value) => {
-  #|     if (Array.isArray(value)) return value.map(withoutNulls);
-  #|     if (!value || typeof value !== "object") return value;
-  #|     return Object.fromEntries(Object.entries(value)
-  #|       .filter(([, child]) => child !== null && child !== undefined)
-  #|       .map(([key, child]) => [key, withoutNulls(child)]));
-  #|   };
-  #|   let path;
-  #|   switch (operation) {
-  #|     case "github.commit.get":
-  #|       args.sha = primary;
-  #|       args.page = page;
-  #|       path = `/repos/${owner}/${repo}/commits/${primary}?per_page=100&page=${page}`;
-  #|       break;
-  #|     case "github.pull.get":
-  #|       args.number = primary;
-  #|       path = `/repos/${owner}/${repo}/pulls/${primary}`;
-  #|       break;
-  #|     case "github.compare.get":
-  #|       args.base = primary;
-  #|       args.head = secondary;
-  #|       path = `/repos/${owner}/${repo}/compare/${primary}...${secondary}`;
-  #|       break;
-  #|     case "github.pull.files":
-  #|       args.number = primary;
-  #|       args.page = page;
-  #|       path = `/repos/${owner}/${repo}/pulls/${primary}/files?per_page=100&page=${page}`;
-  #|       break;
-  #|     default:
-  #|       failed(`Unsupported gateway operation: ${operation}`);
-  #|       return;
-  #|   }
-  #|   const host = globalThis.__MOONDIFF_EXTENSION_HOST__;
-  #|   if (host?.request) {
-  #|     host.request(operation, args, { generation })
-  #|       .then((value) => completed(true, 200, "", "", JSON.stringify(withoutNulls(value))))
-  #|       .catch((error) => completed(
-  #|         false,
-  #|         Number.isInteger(error?.status) ? error.status : 0,
-  #|         typeof error?.code === "string" ? error.code : "extension_error",
-  #|         error?.message || String(error),
-  #|         "",
-  #|       ));
-  #|     return;
-  #|   }
-  #|   fetch(`https://api.github.com${path}`, {
-  #|     method: "GET",
-  #|     cache: "no-cache",
-  #|     headers: {
-  #|       Accept: "application/vnd.github+json",
-  #|       "X-GitHub-Api-Version": "2026-03-10",
-  #|     },
-  #|   }).then((response) => {
-  #|     if (!response.ok) {
-  #|       return response.text().catch(() => "").then((body) => {
-  #|         let detail = response.statusText || "";
-  #|         try { detail = JSON.parse(body)?.message || detail; } catch {}
-  #|         completed(false, response.status, "", detail, "");
-  #|       });
-  #|     }
-  #|     return response.text().then((body) => {
-  #|       let normalized = body;
-  #|       try { normalized = JSON.stringify(withoutNulls(JSON.parse(body))); } catch {}
-  #|       completed(true, response.status, "", response.statusText || "", normalized);
-  #|     });
-  #|   }).catch((error) => failed(error?.message || String(error)));
-  #| }
+  emit : @rabbita.Emit[Result[@protocol.ApiCommit, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    CommitGet(args),
+    generation,
+    value => {
+      guard value is Commit(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn get_pull(
+  args : @protocol.PullGet,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiPull, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    PullGet(args),
+    generation,
+    value => {
+      guard value is Pull(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn get_compare(
+  args : @protocol.CompareGet,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiCompare, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    CompareGet(args),
+    generation,
+    value => {
+      guard value is Compare(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn get_pull_files(
+  args : @protocol.PullFiles,
+  generation : Int,
+  emit : @rabbita.Emit[Result[Array[@protocol.ApiFile], Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    PullFiles(args),
+    generation,
+    value => {
+      guard value is Files(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn get_content(
+  args : @protocol.ContentGet,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiSource, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    ContentGet(args),
+    generation,
+    value => {
+      guard value is Content(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn list_comments(
+  args : @protocol.CommentsList,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiCommentBundle, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    CommentsList(args),
+    generation,
+    value => {
+      guard value is Comments(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn create_issue_comment(
+  args : @protocol.IssueCommentCreate,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiIssueComment, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    IssueCommentCreate(args),
+    generation,
+    value => {
+      guard value is IssueComment(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn create_review_comment(
+  args : @protocol.ReviewCommentCreate,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiReviewComment, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    ReviewCommentCreate(args),
+    generation,
+    value => {
+      guard value is ReviewComment(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn create_commit_comment(
+  args : @protocol.CommitCommentCreate,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiCommitComment, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    CommitCommentCreate(args),
+    generation,
+    value => {
+      guard value is CommitComment(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn create_review_reply(
+  args : @protocol.ReviewReplyCreate,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiReviewComment, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    ReviewReplyCreate(args),
+    generation,
+    value => {
+      guard value is ReviewComment(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn delete_issue_comment(
+  args : @protocol.CommentDelete,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.DeleteResult, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    IssueCommentDelete(args),
+    generation,
+    value => {
+      guard value is Deleted(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn delete_review_comment(
+  args : @protocol.CommentDelete,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.DeleteResult, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    ReviewCommentDelete(args),
+    generation,
+    value => {
+      guard value is Deleted(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn delete_commit_comment(
+  args : @protocol.CommentDelete,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.DeleteResult, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    CommitCommentDelete(args),
+    generation,
+    value => {
+      guard value is Deleted(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
 
 ///|
 pub fn source_request(
@@ -148,93 +293,24 @@ pub fn source_request(
   generation : Int,
   emit : @rabbita.Emit[Result[(String, Bytes), Error]],
 ) -> @rabbita.Cmd {
-  @cmd.custom_cmd(scheduler => {
-    send_gateway_source_request(
-      location.repository.owner,
-      location.repository.repo,
-      location.path,
-      location.revision,
-      generation,
-      completed=(ok, status, code, status_text, content_type, bytes) => {
-        let result : Result[(String, Bytes), Error] = if ok {
-          Ok((content_type, bytes))
-        } else {
-          let suffix = if status_text.trim().is_empty() {
-            ""
-          } else {
-            " \{status_text}"
-          }
-          if code.trim().is_empty() {
-            Err(
-              GitHubRequestError(
-                "GitHub content request failed: HTTP \{status}\{suffix}",
-              ),
-            )
-          } else {
-            Err(ExtensionRequestError(status~, code~, detail=status_text))
-          }
-        }
-        scheduler.add(emit(result))
-      },
-      failed=detail => {
-        scheduler.add(
-          emit(
-            Err(GitHubRequestError("GitHub content request failed: \{detail}")),
-          ),
-        )
-      },
-    )
-  })
+  get_content(
+    {
+      owner: location.repository.owner,
+      repo: location.repository.repo,
+      path: location.path,
+      revision: location.revision,
+    },
+    generation,
+    result => {
+      emit(
+        match result {
+          Err(error) => Err(error)
+          Ok(source) =>
+            Ok((source.content_type, source.decode())) catch {
+              _ => Err(invalid_response("Invalid source encoding."))
+            }
+        },
+      )
+    },
+  )
 }
-
-///|
-extern "js" fn send_gateway_source_request(
-  owner : String,
-  repo : String,
-  path : String,
-  revision : String,
-  generation : Int,
-  completed~ : (Bool, Int, String, String, String, Bytes) -> Unit,
-  failed~ : (String) -> Unit,
-) =
-  #| (owner, repo, path, revision, generation, completed, failed) => {
-  #|   const host = globalThis.__MOONDIFF_EXTENSION_HOST__;
-  #|   if (host?.request) {
-  #|     host.request("github.content.get", { owner, repo, path, ref: revision }, { generation })
-  #|       .then((value) => {
-  #|         const binary = atob(value.base64 || "");
-  #|         const bytes = new Uint8Array(binary.length);
-  #|         for (let index = 0; index < binary.length; index += 1) {
-  #|           bytes[index] = binary.charCodeAt(index);
-  #|         }
-  #|         completed(true, 200, "", "", value.contentType || "application/octet-stream", bytes);
-  #|       })
-  #|       .catch((error) => completed(
-  #|         false,
-  #|         Number.isInteger(error?.status) ? error.status : 0,
-  #|         typeof error?.code === "string" ? error.code : "extension_error",
-  #|         error?.message || String(error),
-  #|         "",
-  #|         new Uint8Array(),
-  #|       ));
-  #|     return;
-  #|   }
-  #|   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
-  #|   const url = `https://raw.githubusercontent.com/${owner}/${repo}/${revision}/${encodedPath}`;
-  #|   fetch(url, { method: "GET", cache: "no-cache" }).then((response) => {
-  #|     if (!response.ok) {
-  #|       completed(false, response.status, "", response.statusText || "", "", new Uint8Array());
-  #|       return;
-  #|     }
-  #|     return response.arrayBuffer().then((buffer) => {
-  #|       completed(
-  #|         true,
-  #|         response.status,
-  #|         "",
-  #|         response.statusText || "",
-  #|         response.headers.get("content-type") || "application/octet-stream",
-  #|         new Uint8Array(buffer),
-  #|       );
-  #|     });
-  #|   }).catch((error) => failed(error?.message || String(error)));
-  #| }

@@ -437,7 +437,7 @@ test "a commit snapshot arriving after its comments enables line authoring" {
     view.sha,
   )
   let model = review_test_model(
-    SignedIn(login=Some("reviewer"), install_url=None),
+    SignedIn(user_id=Some("reviewer"), login=Some("reviewer"), install_url=None),
   )
   let loading = {
     ..model,
