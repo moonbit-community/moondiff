@@ -1,6 +1,6 @@
 members = [
   ".",
   "./playground/protocol",
-  "./playground",
+  "./playground/frontend",
   "./playground/backend",
 ]
