@@ -4,13 +4,14 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "npm run build && node --watch server.mjs",
-    "start": "node server.mjs",
+    "dev": "npm run build && npm start",
+    "start": "moonrun dist/moondiff-server.wasm",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "build:extension": "node ../extension/scripts/build.mjs",
     "test:extension": "node --test ../extension/tests/*.test.mjs && ./node_modules/.bin/playwright test --config ../extension/playwright.config.mjs",
-    "package:extension": "node ../extension/scripts/package.mjs"
+    "package:extension": "node ../extension/scripts/package.mjs",
+    "test:server": "moon test protocol --target all && moon test frontend/internal/github_client --target js && moon -C backend test && node --test backend/tests/server.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"

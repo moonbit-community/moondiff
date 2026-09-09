@@ -7,6 +7,10 @@
     "test:playground": "npm --prefix playground run test:e2e",
     "build:extension": "node extension/scripts/build.mjs",
     "test:extension": "node --test extension/tests/*.test.mjs && playground/node_modules/.bin/playwright test --config extension/playwright.config.mjs",
-    "package:extension": "node extension/scripts/package.mjs"
+    "package:extension": "node extension/scripts/package.mjs",
+    "start": "npm --prefix playground start",
+    "dev": "npm --prefix playground run dev",
+    "test:server": "npm --prefix playground run test:server",
+    "test:artifacts": "node --test playground/tests/artifacts.test.mjs"
   }
 }
