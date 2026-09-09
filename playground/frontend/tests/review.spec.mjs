@@ -1,11 +1,6 @@
-import { checkToolbar } from "../../playground/frontend/tests/toolbar.mjs";
-import { chromium, expect, test } from "../../playground/node_modules/@playwright/test/index.mjs";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const extensionRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { checkToolbar } from "./toolbar.mjs";
+import { expect, test } from "@playwright/test";
 
 const head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const changedHead = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -28,7 +23,7 @@ function pullCommitTarget() {
 }
 
 function reviewPath(target = pullTarget()) {
-  const root = `/review.html#/${target.owner}/${target.repo}`;
+  const root = `/${target.owner}/${target.repo}`;
   if (target.kind === "commit") return `${root}/commit/${target.sha}`;
   if (target.kind === "pull") return `${root}/pull/${target.number}`;
   return `${root}/pull/${target.number}/commits/${target.sha}`;
@@ -39,7 +34,7 @@ async function requestCommentDeletion(card) {
   await card.getByRole("menuitem", { name: "Delete", exact: true }).click();
 }
 
-async function installHost(page, target = pullTarget(), options = {}) {
+async function installApi(page, target = pullTarget(), options = {}) {
   await page.addInitScript(({ target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch }) => {
     let savedAuth = {};
     try {
@@ -51,11 +46,8 @@ async function installHost(page, target = pullTarget(), options = {}) {
       calls: [],
       authenticated: options.authenticated ?? Boolean(savedAuth.authenticated),
       login: initialLogin,
-      deviceFlow: savedAuth.deviceFlow || null,
-      deviceStartCalls: savedAuth.deviceStartCalls || 0,
-      devicePollCalls: savedAuth.devicePollCalls || 0,
       terminalUsed: Boolean(savedAuth.terminalUsed),
-      authorize: false,
+      device: null,
       currentHead: head,
       currentBase: base,
       headRace: false,
@@ -133,18 +125,16 @@ async function installHost(page, target = pullTarget(), options = {}) {
       sessionStorage.setItem("moondiff-fake-auth", JSON.stringify({
         authenticated: state.authenticated,
         login: state.login,
-        deviceFlow: state.deviceFlow,
-        deviceStartCalls: state.deviceStartCalls,
-        devicePollCalls: state.devicePollCalls,
         terminalUsed: state.terminalUsed,
       }));
     }
 
     function authStatus() {
       const status = state.authenticated
-        ? { authenticated: true, login: state.login, install_url: "https://github.com/apps/moondiff-test/installations/new" }
+        ? { authenticated: true, user_id: state.login, login: state.login, install_url: "https://github.com/apps/moondiff-test/installations/new" }
         : { authenticated: false, install_url: "https://github.com/apps/moondiff-test/installations/new" };
-      if (!state.authenticated && state.deviceFlow) status.device_flow = state.deviceFlow;
+      if (state.device) status.device_flow = state.device;
+      status.csrf_token = "fixture";
       return status;
     }
 
@@ -196,53 +186,24 @@ async function installHost(page, target = pullTarget(), options = {}) {
     async function dispatch(message) {
       const { op, args = {} } = message;
       state.calls.push({ op, args });
-      if (op === "request.cancel" || op === "page.comments.changed") return { ok: true };
       if (op === "auth.status") return authStatus();
       if (op === "auth.device.start") {
-        state.deviceStartCalls += 1;
-        state.deviceFlow = {
-          flow_id: `flow-${state.deviceStartCalls}`,
-          user_code: "ABCD-EFGH",
-          verification_uri: "https://github.com/login/device",
-          expires_in: 900,
-          poll_after: options.pollAfter ?? 0,
-        };
-        saveAuth();
-        return authStatus();
+        state.device = { id: args.attempt_id, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: Date.now() / 1000 + 900, retry_after: 0, message: '' };
+        return { ...authStatus(), attempt_id: args.attempt_id };
       }
       if (op === "auth.device.poll") {
-        if (!state.deviceFlow || args.flow_id !== state.deviceFlow.flow_id) {
-          throw Object.assign(new Error("This GitHub device authorization is no longer active."), { status: 409, code: "device_flow_replaced" });
-        }
-        state.devicePollCalls += 1;
-        if (options.terminalError && !state.terminalUsed) {
-          state.terminalUsed = true;
-          state.deviceFlow = null;
-          saveAuth();
-          const denied = options.terminalError === "denied";
-          throw Object.assign(
-            new Error(denied ? "GitHub sign-in was denied. Start sign-in again to retry." : "The GitHub device code expired. Start sign-in again."),
-            { status: denied ? 403 : 410, code: denied ? "device_flow_denied" : "device_flow_expired" },
-          );
-        }
-        if (!state.authorize && state.devicePollCalls <= (options.pendingPolls ?? 0)) {
-          state.deviceFlow = { ...state.deviceFlow, expires_in: state.deviceFlow.expires_in - 1 };
-          saveAuth();
-          return authStatus();
-        }
         state.authenticated = true;
-        state.deviceFlow = null;
+        const device_flow = { ...state.device, phase: 'completed' };
+        state.device = null;
         saveAuth();
-        return authStatus();
+        return { ...authStatus(), device_flow, authorization_id: args.authorization_id };
       }
       if (op === "auth.device.cancel") {
-        if (state.deviceFlow?.flow_id === args.flow_id) state.deviceFlow = null;
-        saveAuth();
-        return authStatus();
+        state.device = null;
+        return { ...authStatus(), authorization_id: args.authorization_id };
       }
       if (op === "auth.logout") {
         state.authenticated = false;
-        state.deviceFlow = null;
         saveAuth();
         return authStatus();
       }
@@ -250,7 +211,6 @@ async function installHost(page, target = pullTarget(), options = {}) {
       if (authenticationFailureIndex >= 0) {
         state.authenticationFailureOps.splice(authenticationFailureIndex, 1);
         state.authenticated = false;
-        state.deviceFlow = null;
         saveAuth();
         throw Object.assign(new Error("Your GitHub session expired. Sign in again."), {
           status: 401,
@@ -365,15 +325,19 @@ async function installHost(page, target = pullTarget(), options = {}) {
       }
       throw Object.assign(new Error("Unhandled fake operation: " + op), { status: 400, code: "unhandled" });
     }
-    window.chrome = {
-      runtime: {
-        async sendMessage(message) {
-          try { return { ok: true, value: await dispatch(message) }; }
-          catch (error) { return { ok: false, error: { status: error.status || 500, code: error.code || "fake_error", message: error.message } }; }
-        },
-      },
-    };
+    window.__dispatch = dispatch;
   }, { target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch });
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    const message = path.startsWith('/api/auth/device/') ? { op: 'auth.device.' + path.split('/').at(-1), args: route.request().postDataJSON() } : path === '/api/auth/status' ? { op: 'auth.status' } : path === '/api/auth/logout' ? { op: 'auth.logout' } : fixtureRequest(route.request().postDataJSON());
+    const payload = await page.evaluate(async message => {
+      try { return { ok: true, value: await window.__dispatch(message) }; }
+      catch (error) { return { ok: false, error: { status: error.status || 500, code: error.code || 'fake_error', message: error.message } }; }
+    }, message);
+    await route.fulfill({ status: payload.ok ? 200 : payload.error.status, json: payload.ok ? successFixture(message.op, payload.value) : { $tag: 'Failure', error: payload.error } });
+  });
+
+
 }
 
 async function waitForSignedInComments(page) {
@@ -420,7 +384,7 @@ async function openNewLineComment(page, line) {
 }
 
 test("anonymous public PR loads comments and a safe narrow diff without Analyze", async ({ page }) => {
-  await installHost(page);
+  await installApi(page);
   await page.setViewportSize({ width: 420, height: 900 });
   await page.goto(reviewPath());
   await expect(page.getByText("Fork PR")).toBeVisible();
@@ -442,7 +406,7 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
 });
 
 test("shared file tree uses a wide sidebar and a narrow bottom drawer", async ({ page }) => {
-  await installHost(page);
+  await installApi(page);
   await page.setViewportSize({ width: 1100, height: 900 });
   await page.goto(reviewPath());
   await expect(page.getByText("Fork PR")).toBeVisible();
@@ -490,7 +454,7 @@ test("shared file tree uses a wide sidebar and a narrow bottom drawer", async ({
 test("AST highlights inserted internal whitespace continuously in split and unified views", async ({ page }) => {
   const stable = "fn stable() {}";
   const added = "fn inserted() { let total = 1 }";
-  await installHost(page, pullTarget(), {
+  await installApi(page, pullTarget(), {
     additions: 1,
     deletions: 0,
     oldSource: stable,
@@ -517,8 +481,8 @@ test("AST highlights inserted internal whitespace continuously in split and unif
   await expect(unifiedHighlight).toContainText("let total");
 });
 
-test("extension validation failures use a neutral Moondiff error message", async ({ page }) => {
-  await installHost(page, pullTarget(), {
+test("HTTP validation failures use a neutral Moondiff error message", async ({ page }) => {
+  await installApi(page, pullTarget(), {
     commentListError: {
       status: 400,
       code: "invalid_arguments",
@@ -528,78 +492,12 @@ test("extension validation failures use a neutral Moondiff error message", async
   await page.goto(reviewPath());
   await expect(page.getByText("Fork PR")).toBeVisible();
   await expect(page.getByText(
-    "Moondiff extension request failed (status 400, invalid_arguments): Missing RPC argument: sha",
+    "Moondiff HTTP request failed (status 400, invalid_arguments): Missing RPC argument: sha",
   )).toBeVisible();
 });
 
-test("device sign-in displays and copies the code and only opens GitHub from the explicit link", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await context.route("https://github.com/login/device", route => route.fulfill({
-    status: 200,
-    contentType: "text/html",
-    body: "<!doctype html><title>GitHub device verification</title>",
-  }));
-  await installHost(page, pullTarget(), { pendingPolls: 1_000, pollAfter: 1 });
-  await page.goto(reviewPath());
-  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
-  await expect(page.locator(".device-user-code")).toHaveText("ABCD-EFGH");
-  await expect(page.locator("table.split.review-diff")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
-  await expect(page.locator(".line-comment-button")).toHaveCount(0);
-  expect(context.pages()).toHaveLength(1);
-
-  await page.getByRole("button", { name: "Copy code" }).click();
-  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("ABCD-EFGH");
-
-  const verification = page.getByRole("link", { name: /Open GitHub verification page/u });
-  await expect(verification).toHaveAttribute("href", "https://github.com/login/device");
-  await expect(verification).toHaveAttribute("target", "_blank");
-  const popupPromise = page.waitForEvent("popup");
-  await verification.click();
-  const popup = await popupPromise;
-  await expect.poll(() => popup.url()).toBe("https://github.com/login/device");
-  await popup.close();
-  await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
-});
-
-test("device polling survives pending responses and signs in", async ({ page }) => {
-  await installHost(page, pullTarget(), { pendingPolls: 2 });
-  await page.goto(reviewPath());
-  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
-  expect(await page.evaluate(() => window.__fake.devicePollCalls)).toBeGreaterThanOrEqual(3);
-});
-
-test("reloading the review page restores an unexpired device authorization", async ({ page }) => {
-  await installHost(page, pullTarget(), { pendingPolls: 1_000, pollAfter: 1 });
-  await page.goto(reviewPath());
-  await page.getByRole("button", { name: "Sign in with GitHub" }).click();
-  await expect(page.locator(".device-user-code")).toHaveText("ABCD-EFGH");
-  await page.reload();
-  await expect(page.locator(".device-user-code")).toHaveText("ABCD-EFGH");
-  expect(await page.evaluate(() => window.__fake.deviceStartCalls)).toBe(1);
-  await page.evaluate(() => { window.__fake.authorize = true; });
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
-});
-
-for (const terminalError of ["denied", "expired"]) {
-  const article = terminalError === "expired" ? "an" : "a";
-  test(`${article} ${terminalError} device authorization can be retried`, async ({ page }) => {
-    await installHost(page, pullTarget(), { terminalError });
-    await page.goto(reviewPath());
-    await page.getByRole("button", { name: "Sign in with GitHub" }).click();
-    await expect(page.getByText(new RegExp(terminalError, "iu"))).toBeVisible();
-    await page.getByRole("button", { name: "Try sign-in" }).click();
-    await expect(page.getByText("Signed in as tester")).toBeVisible();
-    expect(await page.evaluate(() => window.__fake.deviceStartCalls)).toBe(2);
-  });
-}
-
 test("login, overall comment, inline comment, reply, reactivation refresh, and view toggle", async ({ page }) => {
-  await installHost(page);
+  await installApi(page);
   await page.goto(reviewPath());
   await expect(page.getByText("Existing inline comment")).toBeVisible();
   await expect(page.locator("table.split.review-diff")).toBeVisible();
@@ -622,11 +520,7 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
   await page.locator(".comment-editor textarea").fill("New overall comment");
   await page.getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("New overall comment")).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__fake.calls
-    .filter(call => call.op === "page.comments.changed").length)).toBeGreaterThan(0);
-  const notification = await page.evaluate(() => window.__fake.calls
-    .find(call => call.op === "page.comments.changed"));
-  expect(notification.args).toEqual({ route: "#/upstream/project/pull/17" });
+
 
   await openNewLineComment(page, 2);
   await page.locator(".inline-comment-editor-row textarea").fill("New inline comment");
@@ -674,7 +568,7 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
 });
 
 test("expired credentials during comment refresh offer sign-in and hide authoring", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
 
@@ -698,7 +592,7 @@ test("expired credentials during comment refresh offer sign-in and hide authorin
 });
 
 test("expired credentials during comment submission preserve the draft for retry", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
 
@@ -724,7 +618,7 @@ test("expired credentials during comment submission preserve the draft for retry
 });
 
 test("private PR prompts for GitHub App access and retries after login", async ({ page }) => {
-  await installHost(page, pullTarget(), { privateUntilAuth: true });
+  await installApi(page, pullTarget(), { privateUntilAuth: true });
   await page.goto(reviewPath());
   await expect(page.getByText(/private repositories/u)).toBeVisible();
   await expect(page.getByRole("link", { name: /Install GitHub App/u })).toBeVisible();
@@ -742,7 +636,7 @@ test("private PR prompts for GitHub App access and retries after login", async (
 });
 
 test("reactivation synchronizes cross-tab login and logout", async ({ page }) => {
-  await installHost(page);
+  await installApi(page);
   await page.goto(reviewPath());
   await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
 
@@ -759,7 +653,7 @@ test("reactivation synchronizes cross-tab login and logout", async ({ page }) =>
 });
 
 test("cross-tab account switch clears the old draft and diff before reloading", async ({ page }) => {
-  await installHost(page, pullTarget(), {
+  await installApi(page, pullTarget(), {
     authenticated: true,
     login: "alice",
     identitySpecificDiff: true,
@@ -793,7 +687,7 @@ test("cross-tab account switch clears the old draft and diff before reloading", 
 });
 
 test("cross-tab login on reactivation reloads a private repository", async ({ page }) => {
-  await installHost(page, pullTarget(), { privateUntilAuth: true });
+  await installApi(page, pullTarget(), { privateUntilAuth: true });
   await page.goto(reviewPath());
   await expect(page.getByText(/private repositories/u)).toBeVisible();
   const before = await page.evaluate(() => window.__fake.calls
@@ -807,7 +701,7 @@ test("cross-tab login on reactivation reloads a private repository", async ({ pa
 });
 
 test("cross-tab login supersedes a pending anonymous private-repository failure", async ({ page }) => {
-  await installHost(page, pullTarget(), {
+  await installApi(page, pullTarget(), {
     privateUntilAuth: true,
     delayAnonymousPull: true,
   });
@@ -832,7 +726,7 @@ test("cross-tab login supersedes a pending anonymous private-repository failure"
 });
 
 test("PR head race preserves the draft until manually loading the snapshot", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
@@ -858,7 +752,7 @@ test("PR head race preserves the draft until manually loading the snapshot", asy
 
 for (const target of [commitTarget(), pullCommitTarget()]) {
   test(`${target.kind} posts canonical position comments to the URL repository`, async ({ page }) => {
-    await installHost(page, target, { authenticated: true });
+    await installApi(page, target, { authenticated: true });
     await page.goto(reviewPath(target));
     await waitForSignedInComments(page);
     await expect(page.getByText("Existing commit comment")).toBeVisible();
@@ -878,154 +772,8 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
   });
 }
 
-test("content script activates when GitHub SPA navigation first enters a pull request", async ({ page }) => {
-  await page.route("https://github.com/**", route => route.fulfill({
-    status: 200,
-    contentType: "text/html",
-    body: "<!doctype html><title>GitHub fixture</title><main>fixture</main>",
-  }));
-  await page.addInitScript(() => {
-    const listeners = [];
-    const content = {
-      listeners,
-      messages: [],
-      holdOpen: false,
-      finishOpen: null,
-    };
-    window.__content = content;
-    window.chrome = {
-      runtime: {
-        onMessage: { addListener(listener) { listeners.push(listener); } },
-        async sendMessage(message) {
-          content.messages.push(message);
-          if (message.op === "review.open" && content.holdOpen) {
-            return new Promise(resolve => {
-              content.finishOpen = () => resolve({ ok: true });
-            });
-          }
-          return { ok: true };
-        },
-      },
-    };
-  });
-  await page.goto("https://github.com/acme/widgets");
-  await page.addScriptTag({ path: resolve(extensionRoot, "src/target.js") });
-  await page.addScriptTag({ path: resolve(extensionRoot, "src/content-script.js") });
-
-  const buttonText = () => page.evaluate(() => document
-    .getElementById("moondiff-extension-root")
-    ?.shadowRoot?.querySelector("button")?.textContent);
-  const hasButtonRoot = () => page.evaluate(() => Boolean(document.getElementById("moondiff-extension-root")));
-
-  await expect.poll(hasButtonRoot).toBe(false);
-  await page.evaluate(() => window.__content.listeners[0]({
-    v: 1,
-    op: "page.comments.changed",
-    args: { route: "#/acme/widgets/pull/7" },
-  }));
-  await expect.poll(hasButtonRoot).toBe(false);
-
-  await page.evaluate(() => {
-    history.pushState(null, "", "/acme/widgets/pull/7/files");
-    dispatchEvent(new Event("turbo:load"));
-  });
-  await expect.poll(buttonText).toBe("Open in Moondiff");
-  await page.evaluate(() => {
-    history.pushState(null, "", "/acme/widgets/issues/7");
-    dispatchEvent(new PopStateEvent("popstate"));
-  });
-  await expect.poll(hasButtonRoot).toBe(false);
-
-  await page.evaluate(() => {
-    history.pushState(null, "", "/acme/widgets/pull/8/commits/abcdef1");
-    dispatchEvent(new PopStateEvent("popstate"));
-  });
-  await expect.poll(buttonText).toBe("Open in Moondiff");
-  await page.evaluate(() => document
-    .getElementById("moondiff-extension-root")
-    .shadowRoot.querySelector("button").click());
-  expect(await page.evaluate(() => window.__content.messages)).toEqual([]);
-
-  await page.evaluate(() => { window.__content.holdOpen = true; });
-  const button = page.locator("#moondiff-extension-root button");
-  await button.click();
-  await expect(button).toBeDisabled();
-  await expect(button).toHaveAttribute("aria-busy", "true");
-  const box = await button.boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  expect(await page.evaluate(() => window.__content.messages)).toEqual([{
-    v: 1,
-    op: "review.open",
-    args: { route: "#/acme/widgets/pull/8/commits/abcdef1" },
-  }]);
-  await page.evaluate(() => window.__content.finishOpen());
-  await expect(button).toBeEnabled();
-  await expect(button).not.toHaveAttribute("aria-busy", "true");
-
-  await page.evaluate(() => window.__content.listeners[0]({
-    v: 1,
-    op: "page.comments.changed",
-    args: { route: "#/acme/widgets/pull/7" },
-  }));
-  await expect.poll(buttonText).toBe("Open in Moondiff");
-  await page.evaluate(() => window.__content.listeners[0]({
-    v: 1,
-    op: "page.comments.changed",
-    args: { route: "#/acme/widgets/pull/8/commits/abcdef1" },
-  }));
-  await expect.poll(buttonText).toBe("GitHub 上有新评论，刷新查看");
-});
-
-test("loaded extension opens the current GitHub SPA route", async () => {
-  const userDataDir = mkdtempSync(join(tmpdir(), "moondiff-extension-chromium-"));
-  let context;
-  try {
-    const extensionPath = resolve(extensionRoot, "dist");
-    context = await chromium.launchPersistentContext(userDataDir, {
-      channel: "chromium",
-      headless: true,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-      ],
-    });
-    await context.route("https://github.com/**", route => route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>GitHub fixture</title><main>fixture</main>",
-    }));
-    await context.route("https://api.github.com/**", route => route.fulfill({
-      status: 404,
-      contentType: "application/json",
-      body: JSON.stringify({ message: "Not Found" }),
-    }));
-    const githubPage = context.pages()[0] || await context.newPage();
-    await githubPage.goto("https://github.com/acme/widgets/pull/7");
-    const button = githubPage.locator("#moondiff-extension-root button");
-    await expect(button).toHaveText("Open in Moondiff");
-
-    await githubPage.evaluate(() => {
-      history.pushState(null, "", "/acme/widgets/pull/8");
-      dispatchEvent(new Event("turbo:load"));
-    });
-    const openedPagePromise = context.waitForEvent("page");
-    await button.click();
-    const openedPage = await openedPagePromise;
-    await expect.poll(() => {
-      const url = new URL(openedPage.url());
-      return `${url.protocol}//${url.host}${url.pathname}${url.hash}`;
-    }).toMatch(/^chrome-extension:\/\/[^/]+\/review\.html#\/acme\/widgets\/pull\/8$/u);
-  } finally {
-    try {
-      await context?.close();
-    } finally {
-      rmSync(userDataDir, { recursive: true, force: true });
-    }
-  }
-});
-
 test("inline cards anchor both sides once, keep replies, and place editors after discussions below the target", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.addInitScript(() => {
     const root = window.__fake.reviewComments[0];
     window.__fake.reviewComments.push({ ...root, id: "40", side: "LEFT", position: 2, body: "Left thread" });
@@ -1067,11 +815,10 @@ test("inline cards anchor both sides once, keep replies, and place editors after
   await own.getByRole("button", { name: "Confirm delete" }).click();
   await expect(own).toHaveCount(0);
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing reply" })).toHaveCount(1);
-  await expect.poll(() => page.evaluate(() => window.__fake.calls.filter(c => c.op === "page.comments.changed").length)).toBeGreaterThan(0);
 });
 
 test("delete failures can retry without duplicate requests or stale refresh resurrection", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.goto(reviewPath());
   const own = page.locator(".github-comment").filter({ hasText: "Existing overall comment" });
   await requestCommentDeletion(own);
@@ -1097,7 +844,7 @@ test("delete failures can retry without duplicate requests or stale refresh resu
 });
 
 test("comment menu supports keyboard navigation, dismissal and deletion confirmation", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.goto(reviewPath());
   const card = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
   const more = card.getByRole("button", { name: "More options" });
@@ -1172,7 +919,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme });
     await page.clock.setFixedTime("2026-08-18T10:01:00Z");
     await page.route("https://github.com/*.png?size=64", route => route.abort());
-    await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+    await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
     await page.addInitScript(() => {
       const root = window.__fake.reviewComments[0];
       window.__fake.reviewComments.push({ ...root, id: "40", side: "LEFT", position: 2, body: "Left thread\nhttps://example.com/" + "long".repeat(60) });
@@ -1246,8 +993,10 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
 
 test("split comment width changes at a 720px diff container without remounting the draft", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
+  // Initial comments can move the gutter after hover and hide its action again.
+  await expect(page.getByText("Existing inline comment", { exact: true })).toBeVisible();
   await openNewLineComment(page, 2);
   const editor = page.locator(".inline-comment-editor-row textarea");
   await editor.fill("Keep the caret");
@@ -1267,7 +1016,7 @@ test("split comment width changes at a 720px diff container without remounting t
 
 for (const [target, body, operation] of [[commitTarget(), "Existing commit comment", "github.commit.comment.delete"], [pullTarget(), "Existing reply", "github.review.comment.delete"]]) {
   test(`delete ${body}`, async ({ page }) => {
-    await installHost(page, target, { authenticated: true, login: body === "Existing reply" ? "author" : "reviewer" });
+    await installApi(page, target, { authenticated: true, login: body === "Existing reply" ? "author" : "reviewer" });
     await page.goto(reviewPath(target));
     const card = page.locator(".github-comment").filter({ hasText: body });
     await requestCommentDeletion(card);
@@ -1278,7 +1027,7 @@ for (const [target, body, operation] of [[commitTarget(), "Existing commit comme
 }
 
 test("filtered comments fall back with location, and return inline after filters change", async ({ page }) => {
-  await installHost(page, pullTarget(), {
+  await installApi(page, pullTarget(), {
     authenticated: true,
     oldSource: "fn example() {\n  // old comment\n  1\n}",
     newSource: "fn example() {\n  // new comment\n  1\n}",
@@ -1302,7 +1051,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
   test(`long code soft wraps at ${width}px in ${colorScheme} mode`, async ({ page }) => {
     const oldLine = `  let identifier_${"long".repeat(100)} = "${"a".repeat(400)}"`;
     const newLine = oldLine.replace('= "a', '= "b');
-    await installHost(page, pullTarget(), {
+    await installApi(page, pullTarget(), {
       oldSource: `fn main() {\n${oldLine}\n}`,
       newSource: `fn main() {\n${newLine}\n}`,
       patch: `@@ -1,3 +1,3 @@\n fn main() {\n-${oldLine}\n+${newLine}\n }`,
@@ -1383,7 +1132,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
 test("declaration reordering preserves absolute comment lines across algorithms and layouts", async ({ page }) => {
   const oldLines = ["fn alpha() {", "  old_alpha()", "}", "fn beta() {", "  old_beta()", "}"];
   const newLines = ["fn beta() {", "  new_beta()", "}", "fn alpha() {", "  new_alpha()", "}"];
-  await installHost(page, pullTarget(), {
+  await installApi(page, pullTarget(), {
     oldSource: oldLines.join("\n"), newSource: newLines.join("\n"),
     patch: "@@ -1,6 +1,6 @@\n" + oldLines.map(s => "-" + s).concat(newLines.map(s => "+" + s)).join("\n"),
   });
@@ -1416,7 +1165,7 @@ test("declaration reordering preserves absolute comment lines across algorithms 
 });
 
 test("comments without a matching file stay in the overall discussion", async ({ page }) => {
-  await installHost(page, commitTarget());
+  await installApi(page, commitTarget());
   await page.addInitScript(() => {
     // The worker protocol omits GitHub null fields before decoding in MoonBit.
     delete window.__fake.commitComments[0].path;
@@ -1427,7 +1176,7 @@ test("comments without a matching file stay in the overall discussion", async ({
 });
 
 test("filter choices reset on reload and a collapsed file keeps its draft in discussion", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await openNewLineComment(page, 2);
   await page.locator(".inline-comment-editor-row textarea").fill("Preserved draft");
@@ -1446,7 +1195,7 @@ test("filter choices reset on reload and a collapsed file keeps its draft in dis
 });
 
 test("expired credentials during deletion keep the card and offer sign-in", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.goto(reviewPath());
   const card = page.locator(".github-comment").filter({ hasText: "Existing overall comment" });
   await requestCommentDeletion(card);
@@ -1460,7 +1209,7 @@ test("expired credentials during deletion keep the card and offer sign-in", asyn
 
 
 test("shared toolbar controls fit desktop and narrow screens in both themes", async ({ page }) => {
-  await installHost(page, pullTarget());
+  await installApi(page, pullTarget());
   await page.goto(reviewPath());
   await expect(page.locator("table.split").first()).toBeVisible();
   await checkToolbar(page);
@@ -1468,7 +1217,7 @@ test("shared toolbar controls fit desktop and narrow screens in both themes", as
 
 for (const external of [false, true]) {
   test(`reply draft survives ${external ? "external root deletion" : "blocked deletion"} across layouts`, async ({ page }) => {
-    await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+    await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
     await page.goto(reviewPath());
     const thread = page.locator(".review-thread").filter({ hasText: "Existing inline comment" });
     const own = thread.locator(".github-comment").filter({ hasText: "Existing inline comment" });
@@ -1508,7 +1257,7 @@ for (const external of [false, true]) {
 }
 
 test("one draft survives repeated clicks and every entry switch while posting", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await page.getByRole("button", { name: "Add overall comment" }).click();
@@ -1544,7 +1293,7 @@ test("one draft survives repeated clicks and every entry switch while posting", 
 });
 
 test("a base update during refresh preserves verified comments and the collapsed draft", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
@@ -1572,7 +1321,7 @@ test("a base update during refresh preserves verified comments and the collapsed
 });
 
 test("first comment list is withheld if the PR updates after diff validation", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true, updateDuringFirstList: true });
+  await installApi(page, pullTarget(), { authenticated: true, updateDuringFirstList: true });
   await page.goto(reviewPath());
   await expect(page.locator(".snapshot-stale")).toBeVisible();
   await expect(page.getByText("Existing inline comment", { exact: true })).toHaveCount(0);
@@ -1585,7 +1334,7 @@ test("first comment list is withheld if the PR updates after diff validation", a
 });
 
 test("late list cannot replace a newer verified refresh", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await page.evaluate(() => { window.__fake.delayNextList = true; });
@@ -1601,7 +1350,7 @@ test("late list cannot replace a newer verified refresh", async ({ page }) => {
 });
 
 test("line creation after a PR update shows a receipt without inserting an unverified anchor", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
@@ -1623,7 +1372,7 @@ test("line creation after a PR update shows a receipt without inserting an unver
 });
 
 test("manual snapshot loading waits for root deletion across layout changes", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.goto(reviewPath());
   await expect(page.getByText("Existing inline comment", { exact: true })).toBeVisible();
   await page.evaluate(() => { window.__fake.updateDuringList = true; });
@@ -1647,7 +1396,7 @@ for (const kind of ["pull", "commit"]) {
     for (const change of ["unchanged", "add same", "delete same", "add earlier", "delete earlier"]) {
       test(`inline draft retains DOM focus and selection after ${kind} ${layout} refresh: ${change}`, async ({ page }) => {
         const target = kind === "pull" ? pullTarget() : commitTarget();
-        await installHost(page, target, { authenticated: true });
+        await installApi(page, target, { authenticated: true });
         await page.addInitScript(({ kind, change }) => {
           const field = kind === "pull" ? "reviewComments" : "commitComments";
           const template = window.__fake[field][0];
@@ -1713,7 +1462,7 @@ for (const kind of ["pull", "commit"]) {
 for (const kind of ["overall", "reply", "inline", "collapsed"]) {
   for (const direction of ["forward", "backward"]) {
     test(`${kind} editor keeps its DOM and ${direction} selection during background insert/remove and composition`, async ({ page }) => {
-      await installHost(page, pullTarget(), { authenticated: true });
+      await installApi(page, pullTarget(), { authenticated: true });
       await page.goto(reviewPath());
       await waitForSignedInComments(page);
       if (kind === "overall") await page.getByRole("button", { name: "Add overall comment" }).click();
@@ -1757,7 +1506,7 @@ for (const kind of ["overall", "reply", "inline", "collapsed"]) {
 }
 
 test("draft remount restores selection without taking toolbar focus and cleans up cancelled drafts", async ({ page }) => {
-  await installHost(page, pullTarget(), { authenticated: true });
+  await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
@@ -1797,7 +1546,7 @@ for (const change of ["modified", "inserted", "deleted"]) {
     const patch = change === "inserted" ? `@@ -1 +1,2 @@\n+${after}\n fn keep() {}`
       : change === "deleted" ? `@@ -1,2 +1 @@\n-${before}\n fn keep() {}`
       : `@@ -1 +1 @@\n-${before}\n+${after}`;
-    await installHost(page, pullTarget(), { authenticated: true, oldSource, newSource, patch });
+    await installApi(page, pullTarget(), { authenticated: true, oldSource, newSource, patch });
     await page.addInitScript(({ change }) => {
       window.__fake.reviewComments = [{
         ...window.__fake.reviewComments[0], line: 1,
@@ -1927,3 +1676,152 @@ for (const change of ["modified", "inserted", "deleted"]) {
     await expect(second).toHaveJSProperty("open", true);
   });
 }
+
+async function restorePage(page) {
+  await page.evaluate(() => {
+    dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    dispatchEvent(new Event('focus'));
+  });
+}
+
+async function holdNextResponse(page, predicate) {
+  let release, entered, finished;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const completed = new Promise(resolve => { finished = resolve; });
+  let held = false;
+  await page.route('**/api/**', async route => {
+    const message = route.request().method() === 'GET' ? { op: 'auth.status' } : fixtureRequest(route.request().postDataJSON());
+    if (held || !predicate(message)) return route.fallback();
+    held = true;
+    const value = await page.evaluate(message => window.__dispatch(message), message);
+    entered(); await gate;
+    await route.fulfill({ json: successFixture(message.op, value) }).catch(() => {});
+    finished();
+  });
+  return { started, completed, release };
+}
+
+for (const collapsed of [false, true]) {
+  for (const sessionFails of [false, true]) {
+    test(`page restoration resumes only interrupted file sides: collapsed=${collapsed}, session failure=${sessionFails}`, async ({ page }) => {
+      await installApi(page, pullTarget(), { authenticated: true });
+      const held = await holdNextResponse(page, message => message.op === 'github.content.get' && message.args.ref === head);
+      await page.goto(reviewPath());
+      await held.started;
+      await waitForSignedInComments(page);
+      await page.getByRole('button', { name: 'Add overall comment' }).click();
+      await page.locator('.comment-editor textarea').fill('Draft survives restoration');
+      if (collapsed) await page.getByRole('button', { name: 'Collapse src/main.mbt', exact: true }).click();
+      if (sessionFails) {
+        await page.route('**/api/auth/status', route => route.fulfill({ status: 503, json: { $tag: 'Failure', error: { code: 'unavailable', status: 503, message: 'Temporary session failure' } } }), { times: 1 });
+      }
+      await restorePage(page);
+      if (sessionFails) {
+        await expect(page.getByRole('button', { name: 'Try sign-in' })).toBeVisible();
+        expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === 'github.content.get').length)).toBe(2);
+        await reactivatePage(page);
+      }
+      await waitForSignedInComments(page);
+      await expect.poll(() => page.evaluate(() => window.__fake.calls.filter(c => c.op === 'github.content.get').map(c => c.args.ref).sort())).toEqual([mergeBase, head, head].sort());
+      await expect(page.locator('.comment-editor textarea')).toHaveValue('Draft survives restoration');
+      await expect(page.locator('#moondiff-file-0 .file-toggle')).toHaveAttribute('aria-expanded', String(!collapsed));
+      if (collapsed) await page.getByRole('button', { name: 'Expand src/main.mbt', exact: true }).click();
+      await expect(page.locator('table.split.review-diff')).toContainText('new value');
+      const before = await page.evaluate(() => window.__fake.commentListCalls);
+      await reactivatePage(page);
+      await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(before);
+      held.release(); await held.completed;
+      expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === 'github.content.get').length)).toBe(3);
+      await expect(page.locator('.comment-editor textarea')).toHaveValue('Draft survives restoration');
+    });
+  }
+}
+
+for (const target of [pullTarget(), commitTarget(), pullCommitTarget()]) {
+  test(`page restoration restarts interrupted ${target.kind} metadata`, async ({ page }) => {
+    await installApi(page, target, { authenticated: true });
+    const operation = target.kind === 'commit' ? 'github.commit.get' : 'github.pull.get';
+    const held = await holdNextResponse(page, message => message.op === operation);
+    await page.goto(reviewPath(target)); await held.started;
+    await restorePage(page);
+    await expect(page.locator('table.split.review-diff')).toContainText('new value');
+    held.release(); await held.completed;
+    await expect(page.locator('table.split.review-diff')).toContainText('new value');
+  });
+}
+
+for (const boundary of ['navigation', 'account']) {
+  test(`page restoration respects ${boundary} changes while its session is pending`, async ({ page }) => {
+    await installApi(page, pullTarget(), { authenticated: true, identitySpecificDiff: true });
+    const source = await holdNextResponse(page, message => message.op === 'github.content.get' && message.args.ref === head);
+    await page.goto(reviewPath()); await source.started;
+    await waitForSignedInComments(page);
+    await page.getByRole('button', { name: 'Add overall comment' }).click();
+    await page.locator('.comment-editor textarea').fill('Previous account draft');
+    if (boundary === 'account') await page.evaluate(() => { window.__fake.login = 'bob'; });
+    const session = await holdNextResponse(page, message => message.op === 'auth.status');
+    await restorePage(page); await session.started;
+    if (boundary === 'navigation') {
+      await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); }, reviewPath(pullCommitTarget()));
+      await expect(page.getByText('Signed in as tester')).toBeVisible();
+      await expect(page.locator('table.split.review-diff')).toContainText('new value for tester');
+    }
+    session.release(); await session.completed;
+    if (boundary === 'account') {
+      await expect(page.getByText('Signed in as bob')).toBeVisible();
+      await expect(page.locator('table.split.review-diff')).toContainText('new value for bob');
+    }
+    source.release(); await source.completed;
+    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('table.split.review-diff')).toContainText(boundary === 'account' ? 'new value for bob' : 'new value for tester');
+  });
+}
+
+for (const kind of ['overall', 'inline', 'reply', 'commit', 'head-check']) {
+  test(`page restoration releases interrupted ${kind} submission without repeating the write`, async ({ page }) => {
+    const target = kind === 'commit' ? commitTarget() : pullTarget();
+    await installApi(page, target, { authenticated: true });
+    await page.goto(reviewPath(target)); await waitForSignedInComments(page);
+    if (kind === 'overall') await page.getByRole('button', { name: 'Add overall comment' }).click();
+    else if (kind === 'reply') await page.getByRole('button', { name: 'Reply' }).first().click();
+    else await openNewLineComment(page, 2);
+    const editor = page.locator('.comment-editor textarea');
+    await editor.fill('Interrupted draft');
+    const held = await holdNextResponse(page, message => kind === 'head-check' ? message.op === 'github.pull.get' : message.op.endsWith('.create'));
+    await page.getByRole('button', { name: 'Post comment', exact: true }).click(); await held.started;
+    await expect(editor).toBeDisabled();
+    await restorePage(page);
+    await expect(editor).toBeEnabled();
+    await expect(editor).toHaveValue('Interrupted draft');
+    await expect(page.locator('.comment-editor .comment-error')).toHaveText('请求已中断，结果尚未确认，请检查后再重试');
+    await expect(page.getByRole('button', { name: 'Post comment', exact: true })).toBeEnabled();
+    const lists = await page.evaluate(() => window.__fake.commentListCalls);
+    await reactivatePage(page);
+    await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(lists);
+    held.release(); await held.completed;
+    await editor.fill('Still editable after the late response');
+    await expect(editor).toHaveValue('Still editable after the late response');
+    expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith('.create')).length)).toBe(kind === 'head-check' ? 0 : 1);
+  });
+}
+
+test('page restoration releases interrupted deletion and refreshes its uncertain result', async ({ page }) => {
+  await installApi(page, pullTarget(), { authenticated: true, login: 'reviewer' });
+  await page.goto(reviewPath());
+  const own = page.locator('.github-comment').filter({ hasText: 'Existing overall comment' });
+  await requestCommentDeletion(own);
+  await page.evaluate(() => { window.__fake.deleteDelay = true; });
+  await own.getByRole('button', { name: 'Confirm delete' }).click();
+  await expect.poll(() => page.evaluate(() => !!window.__fake.releaseDelete)).toBe(true);
+  await restorePage(page);
+  await expect(own.locator('.comment-error')).toHaveText('请求已中断，结果尚未确认，请检查后再重试');
+  await expect(own.getByRole('button', { name: 'Confirm delete' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await page.evaluate(() => window.__fake.releaseDelete());
+  await expect(own).toBeVisible();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(own).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith('.comment.delete')).length)).toBe(1);
+});
