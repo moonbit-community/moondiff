@@ -2,6 +2,7 @@
 pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[ApiCommit, Error])
   ToggleFile(Int, Int)
+  ToggleSection(Int, Int, String)
   OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, SourceSide, Result[(String, Bytes), Error])
@@ -244,14 +245,7 @@ fn update_load(
         return (model, @rabbita.none)
       }
       if file.expanded {
-        let changed = @change.FileState::{
-          file: file.file,
-          diff_mode: file.diff_mode,
-          expanded: false,
-          old_side: file.old_side,
-          new_side: file.new_side,
-          diff_cache: file.diff_cache,
-        }
+        let changed = @change.FileState::{ ..file, expanded: false, }
         (
           with_phase(model, Showing(set_file_state(view, index, changed))),
           @rabbita.none,
@@ -259,6 +253,28 @@ fn update_load(
       } else {
         expand_file(model, view, generation, index, file, emit)
       }
+    }
+    ToggleSection(generation, index, key) => {
+      if generation != model.generation {
+        return (model, @rabbita.none)
+      }
+      guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
+        return (model, @rabbita.none)
+      }
+      let collapsed_sections = if file.collapsed_sections.contains(key) {
+        file.collapsed_sections.filter(section => section != key)
+      } else {
+        let sections = file.collapsed_sections.copy()
+        sections.push(key)
+        sections
+      }
+      (
+        with_phase(
+          model,
+          Showing(set_file_state(view, index, { ..file, collapsed_sections, })),
+        ),
+        @rabbita.none,
+      )
     }
     OpenFile(generation, index) => {
       if generation != model.generation {
@@ -320,8 +336,7 @@ fn update_load(
         file.new_side
       }
       let changed = @change.FileState::{
-        file: file.file,
-        diff_mode: file.diff_mode,
+        ..file,
         expanded: true,
         old_side,
         new_side,
@@ -343,22 +358,11 @@ fn update_load(
       let changed = match side {
         Old =>
           @change.FileState::{
-            file: file.file,
-            diff_mode: file.diff_mode,
-            expanded: file.expanded,
+            ..file,
             old_side: loaded,
-            new_side: file.new_side,
             diff_cache: DiffCache::empty(),
           }
-        New =>
-          {
-            file: file.file,
-            diff_mode: file.diff_mode,
-            expanded: file.expanded,
-            old_side: file.old_side,
-            new_side: loaded,
-            diff_cache: DiffCache::empty(),
-          }
+        New => { ..file, new_side: loaded, diff_cache: DiffCache::empty(), }
       }
       let changed = if changed.expanded {
         ensure_file_document(

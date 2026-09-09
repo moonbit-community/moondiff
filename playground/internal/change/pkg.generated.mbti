@@ -71,6 +71,7 @@ pub(all) struct FileState {
   file : @github.ApiFile
   diff_mode : @github.FileDiffMode
   expanded : Bool
+  collapsed_sections : Array[String]
   old_side : SideLoad
   new_side : SideLoad
   diff_cache : DiffCache

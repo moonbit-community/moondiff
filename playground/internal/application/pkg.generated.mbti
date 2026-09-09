@@ -83,6 +83,7 @@ pub(all) struct FileTreeState {
 pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[@github.ApiCommit, Error])
   ToggleFile(Int, Int)
+  ToggleSection(Int, Int, String)
   OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, @change.SourceSide, Result[(String, Bytes), Error])

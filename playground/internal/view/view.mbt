@@ -559,6 +559,8 @@ fn semantic_fragment_view(
   review : Session,
   emit : @rabbita.Emit[Msg],
   whole : Bool,
+  expanded? : Bool = true,
+  on_toggle? : @rabbita.Cmd = @rabbita.none,
   show_hunk_headers? : Bool = true,
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -579,7 +581,15 @@ fn semantic_fragment_view(
   let new_base = new_range.map(range => range.start).unwrap_or(0)
   let content = [
     if title is Some(title) {
-      @html.summary(class="semantic-section-title", title)
+      @html.summary(
+        class="semantic-section-title",
+        attrs=@html.Attrs::build().on_click(event => {
+          // Summary clicks include native Enter and Space activation.
+          event.prevent_default()
+          on_toggle
+        }),
+        title,
+      )
     } else {
       @html.nothing
     },
@@ -606,13 +616,14 @@ fn semantic_fragment_view(
   if whole {
     @html.section(class="semantic-whole", content)
   } else {
-    @html.details(class="semantic-section", open=true, content)
+    @html.details(class="semantic-section", open=expanded, content)
   }
 }
 
 ///|
 fn top_level_diff_view(
-  file : ApiFile,
+  file : FileState,
+  generation : Int,
   file_index : Int,
   top : @mbtdiff.TopLevelDiff,
   mode : ViewMode,
@@ -636,8 +647,9 @@ fn top_level_diff_view(
     }
     let fragment = semantic_section_fragment(section)
     if fragment_has_output(fragment) {
-      sections[section_keys[section_index]] = semantic_fragment_view(
-        file,
+      let key = section_keys[section_index]
+      sections[key] = semantic_fragment_view(
+        file.file,
         file_index,
         Some(section_index),
         fragment,
@@ -649,6 +661,8 @@ fn top_level_diff_view(
         review,
         emit,
         false,
+        expanded=!file.collapsed_sections.contains(key),
+        on_toggle=emit(Load(ToggleSection(generation, file_index, key))),
         show_hunk_headers~,
         discussions~,
       )
@@ -661,8 +675,9 @@ fn top_level_diff_view(
     if section is Deleted(..) {
       let fragment = semantic_section_fragment(section)
       if fragment_has_output(fragment) {
-        deleted[section_keys[section_index]] = semantic_fragment_view(
-          file,
+        let key = section_keys[section_index]
+        deleted[key] = semantic_fragment_view(
+          file.file,
           file_index,
           Some(section_index),
           fragment,
@@ -674,6 +689,8 @@ fn top_level_diff_view(
           review,
           emit,
           false,
+          expanded=!file.collapsed_sections.contains(key),
+          on_toggle=emit(Load(ToggleSection(generation, file_index, key))),
           show_hunk_headers~,
           discussions~,
         )
@@ -691,7 +708,8 @@ fn top_level_diff_view(
 
 ///|
 fn semantic_document_view(
-  file : ApiFile,
+  file : FileState,
+  generation : Int,
   file_index : Int,
   document : @mbtdiff.DiffDocument,
   mode : ViewMode,
@@ -703,7 +721,7 @@ fn semantic_document_view(
   match document {
     Whole(fragment) =>
       semantic_fragment_view(
-        file,
+        file.file,
         file_index,
         None,
         fragment,
@@ -720,6 +738,7 @@ fn semantic_document_view(
     TopLevel(top) =>
       top_level_diff_view(
         file,
+        generation,
         file_index,
         top,
         mode,
@@ -827,7 +846,8 @@ fn file_diff_view(
             if semantic_document_visible(document, status, algorithm) {
               return @html.fragment([
                 semantic_document_view(
-                  file.file,
+                  file,
+                  generation,
                   index,
                   document,
                   mode,
@@ -842,7 +862,8 @@ fn file_diff_view(
             return structural_empty
           }
           semantic_document_view(
-            file.file,
+            file,
+            generation,
             index,
             document,
             mode,

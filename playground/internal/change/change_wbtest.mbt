@@ -86,6 +86,7 @@ fn ready_test_file(
     file,
     diff_mode: file_diff_mode(file),
     expanded,
+    collapsed_sections: [],
     old_side: Ready(old),
     new_side: Ready(new),
     diff_cache: DiffCache::empty(),

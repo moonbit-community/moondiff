@@ -70,6 +70,7 @@ pub(all) struct FileState {
   file : ApiFile
   diff_mode : FileDiffMode
   expanded : Bool
+  collapsed_sections : Array[String]
   old_side : SideLoad
   new_side : SideLoad
   diff_cache : DiffCache
