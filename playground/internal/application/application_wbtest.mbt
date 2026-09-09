@@ -470,7 +470,7 @@ fn changed_file_tree_state() -> FileTreeState {
 test "file tree width defaults changes and clamps to absolute limits" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let initial = initial_model()
-  assert_eq(initial.file_tree.preferred_width, 320)
+  assert_eq(initial.file_tree.preferred_width, 240)
 
   let (changed, _) = update_ui(initial, FileTreeWidthChanged(486), emit)
   assert_eq(changed.file_tree.preferred_width, 486)
@@ -480,7 +480,7 @@ test "file tree width defaults changes and clamps to absolute limits" {
   assert_eq(maximum.file_tree.preferred_width, 640)
 
   // A new model is what a full page load initializes.
-  assert_eq(initial_model().file_tree.preferred_width, 320)
+  assert_eq(initial_model().file_tree.preferred_width, 240)
 }
 
 ///|
