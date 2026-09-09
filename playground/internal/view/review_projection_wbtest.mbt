@@ -204,3 +204,96 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
     assert_eq(html.contains("<table"), visible)
   }
 }
+
+///|
+#warnings("-alert_unstable")
+test "source rows precede both sides of discussion and the selected editor" {
+  let file = {
+    ..fixture_file("a.txt", "modified"),
+    patch: Some("@@ -1 +1 @@\n-old\n+new"),
+  }
+  let reference = @github.commit_reference("owner", "repo", "head")
+  let (session, _) = @comments.update(
+    @comments.Session::new(enabled=true),
+    ContextChanged({
+      generation: 1,
+      route: Some(reference),
+      snapshot: Some({ reference, sha: "head", pull_snapshot: None, }),
+      enabled: true,
+    }),
+  )
+  let (session, _) = @comments.update(session, Identity(true, Some("me")))
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for mode in [@change.Split, Unified] {
+    let projection = ReviewProjection::{ lines: Map([]), editors: Map([]), }
+    project_document(
+      projection,
+      file,
+      0,
+      projection_document_fixture(),
+      mode,
+      0,
+      0,
+    )
+    let discussions = { ..empty_discussions(), projection, }
+    for (id, side) in [(1L, @review.Left), (2L, Right), (3L, Right)] {
+      let anchor = ReviewAnchor::{
+        path: "a.txt",
+        side,
+        line: 1,
+        position: Some(if side is Left { 1 } else { 2 }),
+      }
+      let item = InlineDiscussion::{
+        id: ReviewComment(id),
+        file_index: Some(0),
+        anchor: Some(anchor),
+        location: anchor_location(anchor),
+        outdated: false,
+        content: @html.div("Comment \{id}"),
+      }
+      let key = discussion_key(0, side, 1)
+      match discussions.index.get(key) {
+        Some(items) => items.push(item)
+        None => discussions.index[key] = [item]
+      }
+    }
+    for side in [@review.Left, Right] {
+      let anchor = ReviewAnchor::{
+        path: "a.txt",
+        side,
+        line: 1,
+        position: Some(if side is Left { 1 } else { 2 }),
+      }
+      let (session, _) = @comments.update(session, OpenInlineDraft(0, anchor))
+      let html = safe_review_diff(
+        file,
+        0,
+        projection_document_fixture(),
+        mode,
+        session,
+        emit,
+        discussions~,
+      )
+      let rendered = @rabbita.render_to_string(() => {
+        @rabbita.Val::constant(html)
+      })
+      let old_code = rendered.find("old</b>").unwrap()
+      let new_code = rendered.find("new</b>").unwrap()
+      let left = rendered.find("Comment 1").unwrap()
+      let right = rendered.find("Comment 2").unwrap()
+      let second = rendered.find("Comment 3").unwrap()
+      let editor = rendered.find("inline-comment-editor-row").unwrap()
+      assert_true(old_code < left)
+      assert_true(new_code < right && right < second)
+      assert_true(
+        if mode is Split || side is Right {
+          second < editor
+        } else {
+          left < editor && editor < new_code
+        },
+      )
+      assert_true(rendered.contains("inline-discussion inline-left"))
+      assert_true(rendered.contains("inline-discussion inline-right"))
+    }
+  }
+}

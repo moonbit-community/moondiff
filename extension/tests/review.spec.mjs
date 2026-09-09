@@ -1019,7 +1019,7 @@ test("loaded extension opens the current GitHub SPA route", async () => {
   }
 });
 
-test("inline cards anchor both sides once, keep replies, and place editors above the target", async ({ page }) => {
+test("inline cards anchor both sides once, keep replies, and place editors after discussions below the target", async ({ page }) => {
   await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.addInitScript(() => {
     const root = window.__fake.reviewComments[0];
@@ -1037,8 +1037,8 @@ test("inline cards anchor both sides once, keep replies, and place editors above
       await expect(card).toHaveCount(1);
       await expect(card.locator(".comment-location")).toContainText("src/main.mbt");
       expect(await card.evaluate(row => {
-        let target = row.nextElementSibling;
-        while (target?.classList.contains("inline-discussion-row")) target = target.nextElementSibling;
+        let target = row.previousElementSibling;
+        while (target?.classList.contains("inline-discussion-row")) target = target.previousElementSibling;
         return target?.classList.contains("comment-target");
       })).toBe(true);
     }
@@ -1046,7 +1046,12 @@ test("inline cards anchor both sides once, keep replies, and place editors above
   await openNewLineComment(page, 2);
   const editor = page.locator(".inline-comment-editor-row");
   await expect(editor.locator(".comment-location")).toContainText("New · 2");
-  expect(await editor.evaluate(row => row.nextElementSibling.classList.contains("comment-target"))).toBe(true);
+  expect(await editor.evaluate(row => {
+    let previous = row.previousElementSibling;
+    if (!previous?.classList.contains("inline-discussion-row")) return false;
+    while (previous?.classList.contains("inline-discussion-row")) previous = previous.previousElementSibling;
+    return previous?.classList.contains("comment-target");
+  })).toBe(true);
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   const own = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
   await expect(page.locator(".github-comment").filter({ hasText: "Existing reply" }).getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
@@ -1227,8 +1232,8 @@ test("declaration reordering preserves absolute comment lines across algorithms 
         const card = page.locator(".inline-discussion-row").filter({ hasText: body });
         await expect(card).toHaveCount(1);
         await expect.poll(() => card.evaluate(row => {
-          let target = row.nextElementSibling;
-          while (target?.classList.contains("inline-discussion-row")) target = target.nextElementSibling;
+          let target = row.previousElementSibling;
+          while (target?.classList.contains("inline-discussion-row")) target = target.previousElementSibling;
           return target.textContent;
         })).toContain(code);
       }
@@ -1517,8 +1522,10 @@ for (const kind of ["pull", "commit"]) {
         await expect(page.locator(".inline-comment-editor-row")).toHaveCount(1);
         expect(await textarea.evaluate(el => {
           const row = el.closest("tr");
-          return row.previousElementSibling?.classList.contains("inline-discussion-row") &&
-            row.nextElementSibling?.classList.contains("comment-target");
+          let previous = row.previousElementSibling;
+          if (!previous?.classList.contains("inline-discussion-row")) return false;
+          while (previous?.classList.contains("inline-discussion-row")) previous = previous.previousElementSibling;
+          return previous?.classList.contains("comment-target");
         })).toBe(true);
       });
     }

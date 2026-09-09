@@ -132,12 +132,13 @@ fn inline_editor_row(
     anchor is Some(anchor) {
     (
       draft.id.key(),
-      @html.tr(class="inline-comment-editor-row", [
-        @html.td(colspan=columns, [
-          @html.p(class="comment-location", anchor_location(anchor)),
-          comment_editor(draft, review, emit, unavailable=review.snapshot_stale),
-        ]),
-      ]),
+      inline_discussion_row(
+        "inline-comment-editor-row",
+        anchor,
+        columns,
+        anchor_location(anchor),
+        comment_editor(draft, review, emit, unavailable=review.snapshot_stale),
+      ),
     )
   } else {
     ("editor:none", @html.nothing)
@@ -222,14 +223,15 @@ fn split_review_line(
       ),
     ),
   ]
+  items.push_iter(cards.iter())
   if inline_draft_for_anchor(review, row.old_anchor) is Some(_) &&
     projected_editor(discussions, row.old_anchor, row.file_index, site) {
-    items.insert(0, inline_editor_row(review, row.old_anchor, 4, emit))
+    items.push(inline_editor_row(review, row.old_anchor, 4, emit))
   } else if inline_draft_for_anchor(review, row.new_anchor) is Some(_) &&
     projected_editor(discussions, row.new_anchor, row.file_index, site) {
-    items.insert(0, inline_editor_row(review, row.new_anchor, 4, emit))
+    items.push(inline_editor_row(review, row.new_anchor, 4, emit))
   }
-  cards + items
+  items
 }
 
 ///|
@@ -292,11 +294,12 @@ fn unified_source_line(
       ),
     ),
   ]
+  items.push_iter(cards.iter())
   if inline_draft_for_anchor(review, anchor) is Some(_) &&
     projected_editor(discussions, anchor, file_index, site) {
-    items.insert(0, inline_editor_row(review, anchor, 3, emit))
+    items.push(inline_editor_row(review, anchor, 3, emit))
   }
-  cards + items
+  items
 }
 
 ///|
@@ -500,7 +503,7 @@ fn safe_review_diff(
       }
     }
   }
-  @html.div(class="diff-scroll", [
+  @html.div(class="diff-scroll review-scroll", [
     @html.table(
       class=if mode is Split {
         "split review-diff"
