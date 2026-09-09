@@ -238,8 +238,29 @@ overall comments and replies to available roots remain supported. A successful
 line post shows a GitHub link while its inline placement awaits verification.
 
 Only one draft can be open, including an empty draft. Reopening its target
-preserves its body and error; choosing another target asks you to send or cancel
-the current draft. During posting, comment entry buttons are disabled, and
+preserves its identity, body and error; other entry points are disabled until
+the current draft is sent or cancelled. During posting, comment entry buttons are disabled, and
 responses are checked against the submission number and phase. Failed posts
 retain the draft for retry. **Load latest** is disabled while any draft, post,
 or deletion is pending; cancel or finish the draft to load the new snapshot.
+
+
+## Comment architecture
+
+See [comment invariants and extension points](internal/comments/README.md) before
+adding comment actions. `comments.Session` has a read-only interface; all changes
+enter through `comments.update(session, event)`, which returns a new session and
+pure effect descriptions. The application owns authentication and executes those
+effects through `internal/comment_requests`.
+
+Run **all** playground packages, including internal packages, from the module root:
+
+```sh
+cd playground
+moon check --target js --deny-warn
+moon test --target js
+npm run test:extension
+npm run test:e2e
+```
+
+CI uses this module-wide scope rather than testing only `playground/main`.
