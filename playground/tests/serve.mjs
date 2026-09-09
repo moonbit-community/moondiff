@@ -16,7 +16,7 @@ const playgroundRoot = resolve(testsDir, "..");
 const repositoryRoot = resolve(playgroundRoot, "..");
 const temporaryRoot = mkdtempSync(join(tmpdir(), "moondiff-playground-e2e-"));
 const targetDir = join(temporaryRoot, "moon-target");
-const publicRoot = join(playgroundRoot, "public");
+const publicRoot = join(playgroundRoot, "frontend/public");
 
 const build = spawnSync(
   "moon",
@@ -27,7 +27,7 @@ const build = spawnSync(
     "--release",
     "--target-dir",
     targetDir,
-    "playground/main",
+    "playground/frontend/main",
   ],
   { cwd: repositoryRoot, stdio: "inherit" },
 );

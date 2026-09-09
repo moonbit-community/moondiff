@@ -33,7 +33,7 @@ jobs:
       - name: moon check
         run: |
           moon check --target all
-          (cd playground && moon check --target js --deny-warn)
+          (cd playground/frontend && moon check --target js --deny-warn)
       
       - name: format diff
         run: |
@@ -48,7 +48,7 @@ jobs:
       - name: run test
         run: |
           moon test --target all
-          (cd playground && moon test --target js)
+          (cd playground/frontend && moon test --target js)
           bash scripts/cli_test.sh && git diff --exit-code cli_test
 
       - name: Set up Node.js

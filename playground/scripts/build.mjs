@@ -28,7 +28,7 @@ try {
       "--release",
       "--target-dir",
       targetRoot,
-      "playground/main",
+      "playground/frontend/main",
     ],
     { cwd: repositoryRoot, stdio: "inherit" },
   );
@@ -49,7 +49,7 @@ try {
   if (!existsSync(builtJavaScript)) {
     throw new Error(`MoonBit release artifact was not found at ${builtJavaScript}.`);
   }
-  cpSync(join(playgroundRoot, "public"), stagingRoot, { recursive: true });
+  cpSync(join(playgroundRoot, "frontend/public"), stagingRoot, { recursive: true });
   copyFileSync(builtJavaScript, join(stagingRoot, "index.js"));
   rmSync(outputRoot, { recursive: true, force: true });
   renameSync(stagingRoot, outputRoot);

@@ -1,4 +1,4 @@
-import { checkToolbar } from "../../playground/tests/toolbar.mjs";
+import { checkToolbar } from "../../playground/frontend/tests/toolbar.mjs";
 import { chromium, expect, test } from "../../playground/node_modules/@playwright/test/index.mjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

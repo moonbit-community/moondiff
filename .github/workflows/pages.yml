@@ -33,11 +33,11 @@ jobs:
 
       - name: Check playground
         run: |
-          moon check playground/main --target js --deny-warn
-          moon test playground/main --target js
+          moon check playground/frontend/main --target js --deny-warn
+          moon test playground/frontend/main --target js
 
       - name: Build static site
-        run: warren build playground/main --dist playground/dist
+        run: warren build playground/frontend/main --dist playground/dist
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
