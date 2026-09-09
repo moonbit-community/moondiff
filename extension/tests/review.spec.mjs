@@ -34,6 +34,11 @@ function reviewPath(target = pullTarget()) {
   return `${root}/pull/${target.number}/commits/${target.sha}`;
 }
 
+async function requestCommentDeletion(card) {
+  await card.getByRole("button", { name: "More options", exact: true }).click();
+  await card.getByRole("menuitem", { name: "Delete", exact: true }).click();
+}
+
 async function installHost(page, target = pullTarget(), options = {}) {
   await page.addInitScript(({ target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch }) => {
     let savedAuth = {};
@@ -1054,11 +1059,11 @@ test("inline cards anchor both sides once, keep replies, and place editors after
   })).toBe(true);
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   const own = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
-  await expect(page.locator(".github-comment").filter({ hasText: "Existing reply" }).getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
-  await own.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.locator(".github-comment").filter({ hasText: "Existing reply" }).locator(".comment-delete")).toHaveCount(0);
+  await requestCommentDeletion(own);
   await own.getByRole("button", { name: "Cancel deletion" }).click();
   await expect(own).toBeVisible();
-  await own.getByRole("button", { name: "Delete", exact: true }).click();
+  await requestCommentDeletion(own);
   await own.getByRole("button", { name: "Confirm delete" }).click();
   await expect(own).toHaveCount(0);
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing reply" })).toHaveCount(1);
@@ -1069,7 +1074,7 @@ test("delete failures can retry without duplicate requests or stale refresh resu
   await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.goto(reviewPath());
   const own = page.locator(".github-comment").filter({ hasText: "Existing overall comment" });
-  await own.getByRole("button", { name: "Delete", exact: true }).click();
+  await requestCommentDeletion(own);
   await page.evaluate(() => { window.__fake.deleteError = "Permission denied"; });
   await own.getByRole("button", { name: "Confirm delete" }).click();
   await expect(own.locator(".comment-error")).toContainText("GitHub denied this action");
@@ -1091,12 +1096,180 @@ test("delete failures can retry without duplicate requests or stale refresh resu
   expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.issue.comment.delete").length)).toBe(2);
 });
 
+test("comment menu supports keyboard navigation, dismissal and deletion confirmation", async ({ page }) => {
+  await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+  await page.goto(reviewPath());
+  const card = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
+  const more = card.getByRole("button", { name: "More options" });
+  const menu = card.getByRole("menu");
+  const link = menu.getByRole("menuitem", { name: /Open on GitHub/u });
+  const deletion = menu.getByRole("menuitem", { name: "Delete", exact: true });
+  await more.focus();
+  await more.press("Enter");
+  await expect(menu).toBeVisible();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await expect(link).toBeFocused();
+  await expect(link).toHaveAttribute("href", "https://github.com/upstream/project/pull/17#discussion_r20");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await page.keyboard.press("ArrowDown");
+  await expect(deletion).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(link).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(deletion).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(link).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(more).toBeFocused();
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await more.press("Space");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(menu).toBeHidden();
+  await expect(more).not.toBeFocused();
+  await more.press("ArrowUp");
+  await expect(deletion).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  await expect(card.getByText("Delete this comment?", { exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Cancel deletion" }).click();
+  await more.click();
+  await expect(menu).toBeVisible();
+  await more.click();
+  await expect(menu).toBeHidden();
+  await more.click();
+  await card.locator(".github-comment-body").click();
+  await expect(menu).toBeHidden();
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  const thread = page.locator(".review-thread").filter({ hasText: "Existing inline comment" });
+  await thread.getByRole("button", { name: "Reply", exact: true }).click();
+  await more.click();
+  await expect(deletion).toBeDisabled();
+  await expect(link).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(link).toBeFocused();
+  await page.keyboard.press("Escape");
+  await thread.getByRole("button", { name: "Cancel", exact: true }).click();
+});
+
+for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
+  test(`comment cards and editors fit ${width}px in ${colorScheme} mode`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.emulateMedia({ colorScheme });
+    await page.clock.setFixedTime("2026-08-18T10:01:00Z");
+    await page.route("https://github.com/*.png?size=64", route => route.abort());
+    await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
+    await page.addInitScript(() => {
+      const root = window.__fake.reviewComments[0];
+      window.__fake.reviewComments.push({ ...root, id: "40", side: "LEFT", position: 2, body: "Left thread\nhttps://example.com/" + "long".repeat(60) });
+      window.__fake.reviewComments.push({ ...root, id: "41", body: "Unknown author and time", created_at: "invalid", user: undefined });
+    });
+    await page.goto(reviewPath());
+    const right = page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" });
+    const left = page.locator(".inline-discussion-row").filter({ hasText: "Left thread" });
+    const unknown = page.locator(".github-comment").filter({ hasText: "Unknown author and time" });
+    await expect(right.locator("time").first()).toHaveText("2 hours ago");
+    await expect(right.locator("time").first()).toHaveAttribute("title", "Tue, 18 Aug 2026 08:01:00 GMT");
+    await expect(unknown.locator("time")).toHaveText("Unknown time");
+    await expect(unknown.locator("time")).toHaveAttribute("title", "Unknown time");
+    await expect(unknown.locator("strong")).toHaveText("ghost");
+    await expect(unknown.locator(".comment-avatar-image")).toHaveCount(0);
+    const avatar = right.locator(".comment-avatar").first();
+    await expect(avatar).toHaveCSS("border-radius", "50%");
+    await expect(avatar.locator(".comment-avatar-image")).toHaveCSS("background-image", 'url("https://github.com/reviewer.png?size=64")');
+    expect(await avatar.locator(".comment-avatar-placeholder").evaluate(el => getComputedStyle(el, "::before").width)).toBe("10px");
+    for (const layout of ["Split", "Unified"]) {
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      for (const [row, side] of [[left, "left"], [right, "right"]]) {
+        const placement = await row.locator(".inline-discussion").evaluate(el => {
+          const box = el.getBoundingClientRect();
+          const diff = el.closest(".diff-scroll").getBoundingClientRect();
+          return { x: box.x - diff.x, width: box.width, diff: diff.width };
+        });
+        const split = layout === "Split" && placement.diff >= 720;
+        expect(placement.width).toBeCloseTo(placement.diff / (split ? 2 : 1), 0);
+        expect(placement.x).toBeCloseTo(split && side === "right" ? placement.diff / 2 : 0, 0);
+      }
+      const thread = right.locator(".review-thread");
+      const boxes = await thread.locator(".github-comment").evaluateAll(els => els.map(el => {
+        const { x, width } = el.getBoundingClientRect();
+        return { x, width };
+      }));
+      expect(boxes[0]).toEqual(boxes[1]);
+      for (const body of await page.locator(".github-comment-body").all()) {
+        await expect(body).toHaveCSS("font-size", "14px");
+        await expect(body).toHaveCSS("line-height", "21px");
+        expect(await body.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      }
+      for (const side of ["old", "new"]) {
+        const gutter = page.locator(`.${side}-line-number`).filter({ has: page.locator(".line-number-value", { hasText: /^2$/u }) });
+        await gutter.hover();
+        await gutter.getByRole("button", { name: "Comment on line 2" }).click();
+        const editor = page.locator(".inline-comment-editor-row .inline-discussion");
+        await expect(editor.locator("textarea")).toBeFocused();
+        await expect(editor.locator("textarea")).toHaveCSS("font-size", "14px");
+        await expect(editor.getByRole("button", { name: "Post comment" })).toBeDisabled();
+        const box = await editor.evaluate(el => {
+          const rect = el.getBoundingClientRect(), diff = el.closest(".diff-scroll").getBoundingClientRect();
+          return { x: rect.x - diff.x, width: rect.width, diff: diff.width };
+        });
+        const split = layout === "Split" && box.diff >= 720;
+        expect(box.width).toBeCloseTo(box.diff / (split ? 2 : 1), 0);
+        expect(box.x).toBeCloseTo(split && side === "new" ? box.diff / 2 : 0, 0);
+        await editor.locator("textarea").fill("Ready to post");
+        await expect(editor.getByRole("button", { name: "Post comment" })).toBeEnabled();
+        await expect(editor.getByRole("button", { name: "Post comment" })).toHaveCSS("background-color", "rgb(31, 136, 61)");
+        await editor.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: testInfo.outputPath(`${layout}-${side}-editor.png`) });
+        await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+      }
+      await thread.getByRole("button", { name: "Reply", exact: true }).click();
+      await expect(thread.getByRole("button", { name: "Reply", exact: true })).toHaveCount(0);
+      await expect(thread.locator("textarea")).toBeFocused();
+      await thread.getByRole("button", { name: "Cancel", exact: true }).click();
+      await right.getByRole("button", { name: "More options" }).first().click();
+      const menu = right.getByRole("menu");
+      await expect(menu).toBeVisible();
+      const visible = await menu.evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight &&
+          el.contains(document.elementFromPoint(box.left + 10, box.top + 10));
+      });
+      expect(visible).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`${layout}-menu.png`) });
+      await page.keyboard.press("Escape");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+  });
+}
+
+test("split comment width changes at a 720px diff container without remounting the draft", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installHost(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await openNewLineComment(page, 2);
+  const editor = page.locator(".inline-comment-editor-row textarea");
+  await editor.fill("Keep the caret");
+  const original = await editor.elementHandle();
+  await editor.evaluate(el => el.setSelectionRange(2, 7, "backward"));
+  for (const width of [720, 719, 720]) {
+    await page.locator(".review-scroll").evaluate((el, width) => { el.style.width = `${width}px`; }, width);
+    for (const item of await page.locator(".inline-discussion").all()) {
+      expect((await item.boundingBox()).width).toBeCloseTo(width === 720 ? 360 : 719, 0);
+    }
+    expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
+    await expect(editor).toBeFocused();
+    expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([2, 7, "backward"]);
+  }
+});
+
 for (const [target, body, operation] of [[commitTarget(), "Existing commit comment", "github.commit.comment.delete"], [pullTarget(), "Existing reply", "github.review.comment.delete"]]) {
   test(`delete ${body}`, async ({ page }) => {
     await installHost(page, target, { authenticated: true, login: body === "Existing reply" ? "author" : "reviewer" });
     await page.goto(reviewPath(target));
     const card = page.locator(".github-comment").filter({ hasText: body });
-    await card.getByRole("button", { name: "Delete", exact: true }).click();
+    await requestCommentDeletion(card);
     await card.getByRole("button", { name: "Confirm delete" }).click();
     await expect(card).toHaveCount(0);
     expect(await page.evaluate(op => window.__fake.calls.filter(c => c.op === op).length, operation)).toBe(1);
@@ -1275,12 +1448,12 @@ test("expired credentials during deletion keep the card and offer sign-in", asyn
   await installHost(page, pullTarget(), { authenticated: true, login: "reviewer" });
   await page.goto(reviewPath());
   const card = page.locator(".github-comment").filter({ hasText: "Existing overall comment" });
-  await card.getByRole("button", { name: "Delete", exact: true }).click();
+  await requestCommentDeletion(card);
   await page.evaluate(() => window.__fake.authenticationFailureOps.push("github.issue.comment.delete"));
   await card.getByRole("button", { name: "Confirm delete" }).click();
   await expect(card.locator(".comment-error")).toContainText("Your GitHub session expired");
   await expect(page.getByRole("button", { name: "Try sign-in", exact: true })).toBeVisible();
-  await expect(card.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+  await expect(card.locator(".comment-delete")).toHaveCount(0);
   await expect(card).toBeVisible();
 });
 
@@ -1298,7 +1471,7 @@ for (const external of [false, true]) {
     await page.goto(reviewPath());
     const thread = page.locator(".review-thread").filter({ hasText: "Existing inline comment" });
     const own = thread.locator(".github-comment").filter({ hasText: "Existing inline comment" });
-    await own.getByRole("button", { name: "Delete", exact: true }).click();
+    await requestCommentDeletion(own);
     await thread.getByRole("button", { name: "Reply", exact: true }).click();
     await expect(own.getByRole("button", { name: "Confirm delete", exact: true })).toBeDisabled();
     await thread.locator("textarea").fill("Preserve this reply");
@@ -1361,7 +1534,11 @@ test("one draft survives repeated clicks and every entry switch while posting", 
   await expect(page.getByText("Do not lose this draft", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reply", exact: true }).first().click();
   await page.locator(".review-thread textarea").fill("Reply draft");
-  await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+  const activeThread = page.locator(".review-thread").filter({ has: page.locator("textarea") });
+  await expect(activeThread.getByRole("button", { name: "Reply", exact: true })).toHaveCount(0);
+  for (const entry of await page.getByRole("button", { name: "Reply", exact: true }).all()) {
+    await expect(entry).toBeDisabled();
+  }
   await expect(page.locator(".review-thread textarea")).toHaveValue("Reply draft");
 });
 
@@ -1453,7 +1630,7 @@ test("manual snapshot loading waits for root deletion across layout changes", as
   await expect(page.locator(".snapshot-stale")).toBeVisible();
   await page.evaluate(() => { window.__fake.deleteDelay = true; });
   const root = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
-  await root.getByRole("button", { name: "Delete", exact: true }).click();
+  await requestCommentDeletion(root);
   await root.getByRole("button", { name: "Confirm delete", exact: true }).click();
   await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDelete)).toBe("function");
   await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();

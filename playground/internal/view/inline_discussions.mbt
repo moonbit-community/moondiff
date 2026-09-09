@@ -298,68 +298,6 @@ fn fallback_discussions(
 }
 
 ///|
-fn comment_delete_controls(
-  id : @comments.CommentId,
-  review : Session,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  guard @comments.can_delete_comment(review, id) else {
-    if review.deletion is Some(DeleteFailed(selected, message)) &&
-      selected == id {
-      return @html.p(class="comment-error", message)
-    }
-    return @html.nothing
-  }
-  let selected = match review.deletion {
-    Some(ConfirmDelete(current))
-    | Some(Deleting(current))
-    | Some(DeleteFailed(current, _)) => current == id
-    _ => false
-  }
-  let conflict = @comments.draft_blocks_deletion(review, id)
-  let hint = if conflict {
-    "Send or cancel the reply draft before deleting this comment."
-  } else {
-    "Delete this comment"
-  }
-  let busy = review.deletion is Some(Deleting(_))
-  if !selected {
-    return @html.button(
-      type_="button",
-      class="comment-delete",
-      title=hint,
-      disabled=busy || conflict,
-      on_click=emit(Review(AskDelete(id))),
-      "Delete",
-    )
-  }
-  @html.div(class="comment-delete-actions", [
-    @html.span("Delete this comment?"),
-    @html.button(
-      type_="button",
-      disabled=busy,
-      on_click=emit(Review(CancelDelete)),
-      "Cancel deletion",
-    ),
-    @html.button(
-      type_="button",
-      disabled=busy || conflict,
-      title=hint,
-      on_click=emit(Review(ConfirmCommentDelete(id))),
-      if busy {
-        "Deleting…"
-      } else {
-        "Confirm delete"
-      },
-    ),
-    match review.deletion {
-      Some(DeleteFailed(_, error)) => @html.p(class="comment-error", error)
-      _ => @html.nothing
-    },
-  ])
-}
-
-///|
 fn discussion_key(
   file_index : Int,
   side : @review.ReviewSide,

@@ -75,53 +75,6 @@ fn review_gutter(
 }
 
 ///|
-fn comment_editor(
-  draft : CommentDraft,
-  review : Session,
-  emit : @rabbita.Emit[Msg],
-  unavailable? : Bool = false,
-) -> @rabbita.Html {
-  @html.div(class="comment-editor", [
-    @html.textarea(
-      class="comment-textarea",
-      value=draft.body,
-      rows=4,
-      maxlength=65_536,
-      placeholder="Leave a comment",
-      attrs=@html.Attrs::build().data_set("draft-id", draft.id.key()),
-      disabled=draft.submitting,
-      on_input=value => emit(Review(DraftBodyChanged(value))),
-      "",
-    ),
-    if draft.error is Some(message) {
-      @html.p(class="comment-error", message)
-    } else {
-      @html.nothing
-    },
-    @html.div(class="comment-editor-actions", [
-      @html.button(
-        type_="button",
-        class="secondary",
-        disabled=draft.submitting,
-        on_click=emit(Review(CancelDraft)),
-        "Cancel",
-      ),
-      @html.button(
-        type_="button",
-        class="comment-submit",
-        disabled=unavailable || !@comments.permission(review, Submit).allowed(),
-        on_click=emit(Review(SubmitDraft)),
-        if draft.submitting {
-          "Posting…"
-        } else {
-          "Post comment"
-        },
-      ),
-    ]),
-  ])
-}
-
-///|
 fn inline_editor_row(
   review : Session,
   anchor : ReviewAnchor?,
@@ -534,32 +487,6 @@ fn safe_review_diff(
 }
 
 ///|
-fn comment_body_view(
-  author : String,
-  created_at : String,
-  body : String,
-  html_url : String,
-  id : @comments.CommentId,
-  review : Session,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  @html.article(class="github-comment", [
-    @html.div(class="github-comment-meta", [
-      @html.strong(author),
-      @html.span(created_at),
-      @html.a(
-        href=html_url,
-        target=Blank,
-        rel="noopener noreferrer",
-        "Open on GitHub ↗",
-      ),
-    ]),
-    @html.p(class="github-comment-body", body),
-    comment_delete_controls(id, review, emit),
-  ])
-}
-
-///|
 fn review_thread_view(
   thread : ReviewThread,
   review : Session,
@@ -587,30 +514,37 @@ fn review_thread_view(
       emit,
     )
   }
-  if can_comment {
-    comments["reply-control"] = @html.button(
-      type_="button",
-      class="comment-reply-button",
-      disabled=!@comments.permission(
-        review,
-        OpenDraft(ReplyDraft(thread.root.id)),
-      ).allowed(),
-      title=if thread.root.in_reply_to_id is Some(_) {
-        "The root comment has been deleted."
-      } else if !@comments.valid_reply_target(review, thread.root.id) {
-        "The root comment is unavailable or being deleted."
-      } else {
-        "Reply to this thread"
-      },
-      on_click=emit(Review(OpenReplyDraft(thread.root.id))),
-      "Reply",
-    )
+  let reply_draft = review
+    .draft()
+    .filter(draft => {
+      draft.kind is ReplyDraft(id) &&
+      id == thread.root.id &&
+      @comments.valid_reply_target(review, id)
+    })
+  if can_comment && reply_draft is None {
+    comments["reply-control"] = @html.div(class="comment-reply-entry", [
+      comment_avatar(review.login),
+      @html.button(
+        type_="button",
+        class="comment-reply-button",
+        disabled=!@comments.permission(
+          review,
+          OpenDraft(ReplyDraft(thread.root.id)),
+        ).allowed(),
+        title=if thread.root.in_reply_to_id is Some(_) {
+          "The root comment has been deleted."
+        } else if !@comments.valid_reply_target(review, thread.root.id) {
+          "The root comment is unavailable or being deleted."
+        } else {
+          "Reply to this thread"
+        },
+        on_click=emit(Review(OpenReplyDraft(thread.root.id))),
+        attrs=@html.Attrs::build().aria_label("Reply"),
+        "Write a reply…",
+      ),
+    ])
   }
-  if can_comment &&
-    review.draft() is Some(draft) &&
-    draft.kind is ReplyDraft(id) &&
-    id == thread.root.id &&
-    @comments.valid_reply_target(review, id) {
+  if can_comment && reply_draft is Some(draft) {
     comments[draft.id.key()] = comment_editor(draft, review, emit)
   }
   @html.div(class="review-thread", comments)
