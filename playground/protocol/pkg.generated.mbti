@@ -1,0 +1,326 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-protocol"
+
+import {
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn[T : @json.FromJson + ToJson] decode(Json) -> T raise
+
+pub fn decode_request(Json) -> GitHubRequest raise
+
+pub fn valid_attempt_id(String) -> Bool
+
+pub fn valid_owner(String) -> Bool
+
+pub fn valid_path(String) -> Bool
+
+pub fn valid_repo(String) -> Bool
+
+pub fn valid_sha(String) -> Bool
+
+// Errors
+pub suberror ProtocolError {
+  ProtocolError(String, String)
+}
+
+// Types and methods
+pub(all) struct ApiAuthStatus {
+  authenticated : Bool
+  csrf_token : String
+  login : String?
+  user_id : String?
+  install_url : String?
+  device_flow : ApiDeviceFlow?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiCommentBundle {
+  issue_comments : Array[ApiIssueComment]
+  review_comments : Array[ApiReviewComment]
+  commit_comments : Array[ApiCommitComment]
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiCommentUser {
+  login : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiCommit {
+  sha : String
+  html_url : String
+  commit : ApiCommitInfo
+  parents : Array[ApiParent]
+  stats : ApiStats
+  files : Array[ApiFile]
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiCommitComment {
+  id : Int64
+  body : String
+  html_url : String
+  created_at : String
+  user : ApiCommentUser?
+  path : String?
+  position : Int?
+  line : Int?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiCommitInfo {
+  message : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiCompare {
+  merge_base_commit : ApiParent
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiDeviceFlow {
+  id : String
+  phase : DevicePhase
+  user_code : String
+  verification_uri : String
+  expires_at : Double
+  retry_after : Int
+  message : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiError {
+  status : Int
+  code : String
+  message : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiFile {
+  filename : String
+  previous_filename : String?
+  status : String
+  additions : Int
+  deletions : Int
+  changes : Int
+  patch : String?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiIssueComment {
+  id : Int64
+  body : String
+  html_url : String
+  created_at : String
+  user : ApiCommentUser?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiParent {
+  sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPull {
+  title : String
+  html_url : String
+  base : ApiPullBranch
+  head : ApiPullBranch
+  additions : Int
+  deletions : Int
+  changed_files : Int
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPullBranch {
+  sha : String
+  repo : ApiRepository?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiRepository {
+  full_name : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiReviewComment {
+  id : Int64
+  body : String
+  html_url : String
+  created_at : String
+  user : ApiCommentUser?
+  path : String
+  line : Int?
+  original_line : Int?
+  side : CommentSide?
+  position : Int?
+  commit_id : String
+  in_reply_to_id : Int64?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiSource {
+  base64 : String
+  size : Int
+  content_type : String
+} derive(Eq, ToJson, @json.FromJson)
+pub fn ApiSource::decode(Self) -> Bytes raise
+
+pub(all) struct ApiStats {
+  additions : Int
+  deletions : Int
+  total : Int
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct CommentDelete {
+  owner : String
+  repo : String
+  comment_id : Int64
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum CommentSide {
+  Left
+  Right
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum CommentTarget {
+  Commit(sha~ : String)
+  Pull(number~ : String)
+  PullCommit(number~ : String, sha~ : String)
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct CommentsList {
+  owner : String
+  repo : String
+  target : CommentTarget
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct CommitCommentCreate {
+  owner : String
+  repo : String
+  sha : String
+  path : String
+  position : Int
+  body : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct CommitGet {
+  owner : String
+  repo : String
+  sha : String
+  page : Int
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct CompareGet {
+  owner : String
+  repo : String
+  base : String
+  head : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ContentGet {
+  owner : String
+  repo : String
+  path : String
+  revision : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct DeleteResult {
+  deleted : Bool
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct DeviceAuthorization {
+  authorization_id : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum DevicePhase {
+  Starting
+  Pending
+  Verifying
+  Completed
+  Cancelled
+  Expired
+  Denied
+  Failed
+} derive(Eq, ToJson, @json.FromJson)
+pub fn DevicePhase::active(Self) -> Bool
+
+pub(all) struct DeviceResponse {
+  request_id : String
+  status : ApiAuthStatus
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct DeviceStart {
+  attempt_id : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum GitHubRequest {
+  CommitGet(CommitGet)
+  PullGet(PullGet)
+  CompareGet(CompareGet)
+  PullFiles(PullFiles)
+  ContentGet(ContentGet)
+  CommentsList(CommentsList)
+  IssueCommentCreate(IssueCommentCreate)
+  ReviewCommentCreate(ReviewCommentCreate)
+  CommitCommentCreate(CommitCommentCreate)
+  ReviewReplyCreate(ReviewReplyCreate)
+  IssueCommentDelete(CommentDelete)
+  ReviewCommentDelete(CommentDelete)
+  CommitCommentDelete(CommentDelete)
+} derive(Eq, ToJson, @json.FromJson)
+pub fn GitHubRequest::encode(Self) -> Json
+pub fn GitHubRequest::is_write(Self) -> Bool
+pub fn GitHubRequest::validate(Self) -> Unit raise
+
+pub(all) struct IssueCommentCreate {
+  owner : String
+  repo : String
+  number : String
+  body : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct PullFiles {
+  owner : String
+  repo : String
+  number : String
+  page : Int
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct PullGet {
+  owner : String
+  repo : String
+  number : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum Response[T] {
+  Success(value~ : T)
+  Failure(error~ : ApiError)
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ReviewCommentCreate {
+  owner : String
+  repo : String
+  number : String
+  commit_id : String
+  path : String
+  line : Int
+  side : CommentSide
+  body : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ReviewReplyCreate {
+  owner : String
+  repo : String
+  number : String
+  comment_id : Int64
+  body : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct RpcRequest {
+  v : Int
+  request : GitHubRequest
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum RpcValue {
+  Commit(ApiCommit)
+  Pull(ApiPull)
+  Compare(ApiCompare)
+  Files(Array[ApiFile])
+  Content(ApiSource)
+  Comments(ApiCommentBundle)
+  IssueComment(ApiIssueComment)
+  ReviewComment(ApiReviewComment)
+  CommitComment(ApiCommitComment)
+  Deleted(DeleteResult)
+} derive(Eq, ToJson, @json.FromJson)
+
+// Type aliases
+
+// Traits
