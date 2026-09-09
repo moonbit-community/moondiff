@@ -60,10 +60,22 @@ screens they show only their icons (**//**
 and **T**), without On/Off badges; their pressed states remain available to
 assistive technology.
 
-Published line comments and editors appear above their source line, with file,
-side and line labels. Hidden lines fall back to file discussions; outdated
-comments show their original line when available. Only your own comments offer
-deletion, with an inline confirmation and retryable errors.
+Published line discussions appear below their source line, followed by the new
+comment editor. In Split view, Old comments and editors stay on the left and New
+ones stay on the right. They use the full width when the diff area is narrower
+than 720px; Unified always uses the full width. File, side and line labels remain
+visible. Hidden lines fall back to file discussions, and outdated comments show
+their original line when available.
+
+Comments use circular GitHub avatars (with a placeholder if unavailable), plain
+text, and relative English timestamps; hover over a timestamp for the full UTC
+time. Replies are aligned within one thread. **Write a reply…** opens an editor
+with Cancel and a green Post comment button.
+
+The **More options** menu contains **Open on GitHub** and, for your own comments,
+**Delete**. Open it with Enter, Space or an arrow key; use the arrow keys or
+Home/End to move, Escape to close and return focus, and Tab to continue through
+the page. Deletion uses an inline confirmation with retryable errors.
 
 Existing GitHub App installations need an administrator to accept the updated
 **Contents: write** and **Pull requests: write** permissions for full comment
