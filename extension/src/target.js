@@ -13,7 +13,7 @@
     } catch {
       return null;
     }
-    if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com" || url.port) {
+    if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com" || url.port || url.username || url.password) {
       return null;
     }
     let parts;
@@ -46,7 +46,7 @@
     return null;
   }
 
-  function targetHash(target) {
+  function targetPath(target) {
     if (!target || typeof target !== "object" || Array.isArray(target)) return "";
     if (
       typeof target.owner !== "string" ||
@@ -54,9 +54,9 @@
       !OWNER.test(target.owner) ||
       !REPO.test(target.repo)
     ) return "";
-    const rootPath = `#/${target.owner}/${target.repo}`;
+    const rootPath = `/${target.owner.toLowerCase()}/${target.repo.toLowerCase()}`;
     if (target.kind === "commit" && typeof target.sha === "string" && SHA.test(target.sha)) {
-      return `${rootPath}/commit/${target.sha}`;
+      return `${rootPath}/commit/${target.sha.toLowerCase()}`;
     }
     if (target.kind === "pull" && typeof target.number === "string" && NUMBER.test(target.number)) {
       return `${rootPath}/pull/${target.number}`;
@@ -68,14 +68,14 @@
       NUMBER.test(target.number) &&
       SHA.test(target.sha)
     ) {
-      return `${rootPath}/pull/${target.number}/commits/${target.sha}`;
+      return `${rootPath}/pull/${target.number}/commits/${target.sha.toLowerCase()}`;
     }
     return "";
   }
 
-  function parseTargetHash(input) {
-    if (typeof input !== "string" || !input.startsWith("#/")) return null;
-    const parts = input.slice(2).split("/");
+  function parseTargetPath(input) {
+    if (typeof input !== "string" || !input.startsWith("/")) return null;
+    const parts = input.slice(1).split("/");
     const [owner, repo, kind] = parts;
     if (!OWNER.test(owner || "") || !REPO.test(repo || "")) return null;
     if (kind === "commit" && parts.length === 4 && SHA.test(parts[3])) {
@@ -92,15 +92,15 @@
   }
 
   function sameTarget(left, right) {
-    const leftHash = targetHash(left);
-    return Boolean(leftHash && leftHash === targetHash(right));
+    const leftHash = targetPath(left);
+    return Boolean(leftHash && leftHash === targetPath(right));
   }
 
   root.MoondiffTarget = Object.freeze({
     parseGitHubTarget,
-    parseTargetHash,
+    parseTargetPath,
     sameTarget,
-    targetHash,
+    targetPath,
     validators: Object.freeze({ OWNER, REPO, SHA, NUMBER }),
   });
 })(globalThis);
