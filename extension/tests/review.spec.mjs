@@ -445,7 +445,7 @@ test("shared file tree uses a wide sidebar and a narrow bottom drawer", async ({
   const sidebar = page.locator("#file-tree-sidebar");
   await expect(sidebar).toBeVisible();
   await expect(sidebar).toHaveAttribute("role", "complementary");
-  expect(await sidebar.evaluate(element => element.getBoundingClientRect().width)).toBe(320);
+  expect(await sidebar.evaluate(element => element.getBoundingClientRect().width)).toBe(240);
   await expect(page.getByRole("button", { name: "Open file tree" })).toBeHidden();
 
   for (const width of [800, 768]) {
