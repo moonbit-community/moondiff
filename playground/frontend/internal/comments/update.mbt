@@ -3,6 +3,7 @@ pub(all) enum Event {
   ContextChanged(Context)
   Reset(Bool, Bool)
   Identity(Bool, String?)
+  RecoverInterrupted
   RefreshComments
   BeginCommentsRefresh(Int, CommitRef)
   CommentsMetadataLoaded(Int, Int, Result[ApiPull, Failure])
@@ -29,6 +30,8 @@ pub(all) enum Event {
 fn update_review(model : Model, msg : Event) -> (Model, Effects) {
   match msg {
     ContextChanged(_) => (model, [])
+    RecoverInterrupted =>
+      (with_review(model, recover_interrupted(model.review)), [])
     Reset(enabled, preserve_draft) => {
       let initial = Session::new(enabled~)
       let review = {

@@ -2,8 +2,8 @@
 package "moonbit-community/moondiff-playground/internal/application"
 
 import {
+  "moonbit-community/moondiff-playground-protocol",
   "moonbit-community/moondiff-playground/internal/change",
-  "moonbit-community/moondiff-playground/internal/comment_requests",
   "moonbit-community/moondiff-playground/internal/comments",
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff-playground/internal/review",
@@ -17,9 +17,7 @@ pub fn app_init(@cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
 pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
 
-pub fn auth_status_from_api(@comment_requests.ApiAuthStatus) -> AuthStatus
-
-pub fn auth_status_from_api_preserving(@comment_requests.ApiAuthStatus, AuthStatus) -> AuthStatus
+pub fn auth_status_from_api(@moondiff-playground-protocol.ApiAuthStatus) -> AuthStatus
 
 pub fn file_dom_id(Int) -> String
 
@@ -29,45 +27,26 @@ pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
 // Types and methods
 pub(all) enum AuthMsg {
-  AuthStatusLoaded(Result[@comment_requests.ApiAuthStatus, Error])
-  ReactivationAuthStatusLoaded(Int, @github.CommitRef, Result[@comment_requests.ApiAuthStatus, Error])
-  StartDeviceAuthorization
-  DeviceAuthorizationStarted(Result[@comment_requests.ApiAuthStatus, Error])
-  PollDeviceAuthorization(String)
-  DeviceAuthorizationPolled(String, Result[@comment_requests.ApiAuthStatus, Error])
-  CancelDeviceAuthorization(String)
-  DeviceAuthorizationCancelled(String, Result[@comment_requests.ApiAuthStatus, Error])
+  AuthStatusLoaded(Int, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
+  ReactivationAuthStatusLoaded(Int, Int, @github.CommitRef?, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
+  StartSignIn
+  RestoreAuth
+  DeviceUpdated(Int, String, Bool, Result[@moondiff-playground-protocol.DeviceResponse, Error])
+  CancelSignIn
+  DeviceCancelFinished(Int, String, Result[@moondiff-playground-protocol.DeviceResponse, Error])
   CopyDeviceCode
-  DeviceCodeCopied(String)
-  DeviceCodeCopyFailed(String, String)
+  DeviceCodeCopied(Int, String, Bool)
   Logout
-  AuthLogoutFinished(Result[@comment_requests.ApiAuthStatus, Error])
+  AuthLogoutFinished(Int, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
 }
 
 pub(all) enum AuthStatus {
-  WebReadOnly
   AuthChecking
   Anonymous(String?)
-  DeviceAuthorizing(DeviceAuthorization)
-  DeviceCancelling(DeviceAuthorization)
-  SignedIn(login~ : String?, install_url~ : String?)
+  Authorizing(@moondiff-playground-protocol.ApiDeviceFlow, String)
+  DeviceCancelling(String, String)
+  SignedIn(login~ : String?, user_id~ : String?, install_url~ : String?)
   AuthFailed(String)
-} derive(Eq)
-
-pub(all) struct DeviceAuthorization {
-  flow_id : String
-  user_code : String
-  verification_uri : String
-  expires_in : Int
-  poll_after : Int
-  install_url : String?
-  copy_status : DeviceCodeCopyStatus
-} derive(Eq)
-
-pub(all) enum DeviceCodeCopyStatus {
-  DeviceCodeCopyReady
-  DeviceCodeCopyDone
-  DeviceCodeCopyError(String)
 } derive(Eq)
 
 pub(all) struct FileTreeState {
@@ -81,17 +60,17 @@ pub(all) struct FileTreeState {
 } derive(Eq)
 
 pub(all) enum LoadMsg {
-  CommitPageLoaded(Int, Int, Result[@github.ApiCommit, Error])
+  CommitPageLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommit, Error])
   ToggleFile(Int, Int)
   ToggleSection(Int, Int, String)
   OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, @change.SourceSide, Result[(String, Bytes), Error])
-  PullMetadataLoaded(Int, Int, Result[@github.ApiPull, Error])
-  PullCompareLoaded(Int, Int, Result[@github.ApiCompare, Error])
-  PullFilesPageLoaded(Int, Int, Int, Result[Array[@github.ApiFile], Error])
-  PullValidationLoaded(Int, Int, Result[@github.ApiPull, Error])
-  PullCommitMetadataLoaded(Int, Result[@github.ApiPull, Error])
+  PullMetadataLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
+  PullCompareLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCompare, Error])
+  PullFilesPageLoaded(Int, Int, Int, Result[Array[@moondiff-playground-protocol.ApiFile], Error])
+  PullValidationLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
+  PullCommitMetadataLoaded(Int, Result[@moondiff-playground-protocol.ApiPull, Error])
 }
 
 pub(all) struct Model {
@@ -105,7 +84,9 @@ pub(all) struct Model {
   route : @github.CommitRef?
   file_tree : FileTreeState
   auth : AuthStatus
-  last_authenticated_login : String?
+  auth_revision : Int
+  restore_pending : Bool
+  last_authenticated_user_id : String?
   review : @comments.Session
 } derive(Eq)
 
@@ -118,11 +99,11 @@ pub(all) enum Msg {
 
 pub(all) enum Phase {
   Idle
-  LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int, first~ : @github.ApiCommit?, files~ : Array[@github.ApiFile])
+  LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int, first~ : @moondiff-playground-protocol.ApiCommit?, files~ : Array[@moondiff-playground-protocol.ApiFile])
   LoadingPullMetadata(reference~ : @github.CommitRef, attempt~ : Int)
   LoadingPullCommitMetadata(reference~ : @github.CommitRef)
-  LoadingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @github.ApiPull, compare~ : @github.ApiCompare?, page~ : Int, files~ : Array[@github.ApiFile])
-  ValidatingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @github.ApiPull, compare~ : @github.ApiCompare, files~ : Array[@github.ApiFile])
+  LoadingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare?, page~ : Int, files~ : Array[@moondiff-playground-protocol.ApiFile])
+  ValidatingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare, files~ : Array[@moondiff-playground-protocol.ApiFile])
   LoadFailed(String)
   Showing(@change.ChangeView)
 } derive(Eq)
@@ -132,13 +113,13 @@ pub(all) enum ReviewMsg {
   RefreshComments
   LoadLatestSnapshot
   BeginCommentsRefresh(Int, @github.CommitRef)
-  CommentsMetadataLoaded(Int, Int, Result[@github.ApiPull, Error])
-  CommentsValidated(Int, Int, Result[@github.ApiPull, Error])
+  CommentsMetadataLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
+  CommentsValidated(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
   AskDelete(@comments.CommentId)
   CancelDelete
   ConfirmCommentDelete(@comments.CommentId)
-  CommentDeleted(Int, Int, @comments.CommentId, Result[@comments.DeleteResult, Error])
-  CommentsLoaded(Int, Int, Result[@comments.ApiCommentBundle, Error])
+  CommentDeleted(Int, Int, @comments.CommentId, Result[@moondiff-playground-protocol.DeleteResult, Error])
+  CommentsLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
   OpenInlineDraft(Int, @review.ReviewAnchor)
@@ -146,11 +127,11 @@ pub(all) enum ReviewMsg {
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, Int, @review.ReviewAnchor, Result[@github.ApiPull, Error])
-  IssueCommentCreated(Int, Int, Result[@comments.ApiIssueComment, Error])
-  ReviewCommentCreated(Int, Int, Result[@comments.ApiReviewComment, Error])
-  CommitCommentCreated(Int, Int, Result[@comments.ApiCommitComment, Error])
-  ReviewReplyCreated(Int, Int, Result[@comments.ApiReviewComment, Error])
+  CommentHeadChecked(Int, Int, @review.ReviewAnchor, Result[@moondiff-playground-protocol.ApiPull, Error])
+  IssueCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiIssueComment, Error])
+  ReviewCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
+  CommitCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiCommitComment, Error])
+  ReviewReplyCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
 }
 
 pub(all) enum UiMsg {

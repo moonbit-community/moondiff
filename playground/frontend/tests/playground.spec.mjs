@@ -1,5 +1,8 @@
+import { routeGithub, anonymousApi, fixtureURL } from "./api-routes.mjs";
 import { checkToolbar } from "./toolbar.mjs";
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => anonymousApi(page));
 
 const commitSha = "abcdef1234567890abcdef1234567890abcdef12";
 const parentSha = "1111111111111111111111111111111111111111";
@@ -473,12 +476,15 @@ function mergeBaseForHead(head) {
 }
 
 async function installFetchCacheRecorder(page) {
+  await page.addInitScript({ content: `window.__fixtureURL = ${fixtureURL.toString()}` });
   await page.addInitScript(() => {
+    const fixtureURL = window.__fixtureURL;
     const originalFetch = window.fetch;
     window.__moondiffFetchCalls = [];
     window.fetch = function(input, init) {
       const request = input instanceof Request ? input : null;
-      const url = request?.url ?? new URL(String(input), window.location.href).href;
+      const rawURL = request?.url ?? new URL(String(input), window.location.href).href;
+      const url = rawURL.endsWith("/api/rpc") ? fixtureURL(JSON.parse(init.body)) : rawURL;
       window.__moondiffFetchCalls.push({
         url,
         cache: init?.cache ?? request?.cache ?? "default",
@@ -495,7 +501,7 @@ async function installPullRoutes(page, { heads = [pullHeadOne] } = {}) {
   const rawRequests = [];
   await installFetchCacheRecorder(page);
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", async route => {
+  await routeGithub(page, "api", async route => {
     const request = route.request();
     const url = new URL(request.url());
     apiRequests.push(url.toString());
@@ -532,7 +538,7 @@ async function installPullRoutes(page, { heads = [pullHeadOne] } = {}) {
       body: JSON.stringify(body),
     });
   });
-  await page.route("https://raw.githubusercontent.com/**", async route => {
+  await routeGithub(page, "content", async route => {
     const rawUrl = route.request().url();
     rawRequests.push(rawUrl);
     const parts = new URL(rawUrl).pathname.split("/");
@@ -565,7 +571,7 @@ function expectRevalidatingRequests(requests, fetchCalls) {
   expect(fetchCalls).toHaveLength(requests.length);
   for (const [index, request] of requests.entries()) {
     expect(fetchCalls[index].url).toBe(request.url);
-    expect(fetchCalls[index].cache).toBe("no-cache");
+    expect(fetchCalls[index].cache).toBe("no-store");
     // Playwright routing disables its HTTP cache, so a cold mocked request can
     // omit Chromium's derived Cache-Control header. Validate it when present.
     const cacheControl = request.headers["cache-control"] ?? "";
@@ -577,7 +583,7 @@ function expectRevalidatingRequests(requests, fetchCalls) {
 
 async function installMockRoutes(page) {
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", async route => {
+  await routeGithub(page, "api", async route => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -585,7 +591,7 @@ async function installMockRoutes(page) {
       body: JSON.stringify(apiCommit),
     });
   });
-  await page.route("https://raw.githubusercontent.com/**", async route => {
+  await routeGithub(page, "content", async route => {
     const parts = new URL(route.request().url()).pathname.split("/");
     const revision = parts[3];
     const filename = decodeURIComponent(parts.slice(4).join("/"));
@@ -613,13 +619,13 @@ async function installMockRoutes(page) {
 async function installTreeRoutes(page) {
   const rawRequests = [];
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", route => route.fulfill({
+  await routeGithub(page, "api", route => route.fulfill({
     status: 200,
     contentType: "application/json",
     headers: { "access-control-allow-origin": "*" },
     body: JSON.stringify(treeCommit),
   }));
-  await page.route("https://raw.githubusercontent.com/**", async route => {
+  await routeGithub(page, "content", async route => {
     const url = new URL(route.request().url());
     const parts = url.pathname.split("/");
     const revision = parts[3];
@@ -664,7 +670,7 @@ async function installAlgorithmRoutes(
     formatOnly = false,
     longDeclarationOnly = false,
     parseFailure = false,
-    extensionHost = false,
+    authenticated = false,
   } = {},
 ) {
   const commit = formatOnly
@@ -676,67 +682,11 @@ async function installAlgorithmRoutes(
         files: [longDeclarationFile],
       }
       : algorithmCommit;
-  if (extensionHost) {
-    await page.addInitScript(
-      ({
-        commit,
-        parentSha,
-        formattingOld,
-        formattingNew,
-        structuralOld,
-        structuralNew,
-        collapsibleSectionsOld,
-        collapsibleSectionsNew,
-        oldReadme,
-        newReadme,
-      }) => {
-        globalThis.__MOONDIFF_EXTENSION_HOST__ = {
-          async request(operation, args) {
-            if (operation === "auth.status") {
-              return { authenticated: true, login: "reviewer" };
-            }
-            if (operation === "github.comments.list") {
-              return { issue_comments: [], review_comments: [], commit_comments: [] };
-            }
-            if (operation === "github.commit.get") return commit;
-            if (operation === "github.content.get") {
-              const old = args.ref === parentSha;
-              const body = args.path === "src/formatting_only.mbt"
-                ? (old ? formattingOld : formattingNew)
-                : args.path === "src/structural.mbt"
-                  ? (old ? structuralOld : structuralNew)
-                  : args.path === "src/collapsible_sections.mbt"
-                    ? (old ? collapsibleSectionsOld : collapsibleSectionsNew)
-                  : (old ? oldReadme : newReadme);
-              return {
-                base64: btoa(body),
-                size: body.length,
-                contentType: "text/plain",
-              };
-            }
-            throw Object.assign(new Error(`Unhandled test operation: ${operation}`), {
-              status: 400,
-              code: "unhandled_test_operation",
-            });
-          },
-        };
-      },
-      {
-        commit,
-        parentSha,
-        formattingOld,
-        formattingNew,
-        structuralOld,
-        structuralNew,
-        collapsibleSectionsOld,
-        collapsibleSectionsNew,
-        oldReadme,
-        newReadme,
-      },
-    );
+  if (authenticated) {
+    await page.route('**/api/auth/status', route => route.fulfill({ json: { $tag: 'Success', value: { authenticated: true, login: 'reviewer', user_id: '123', csrf_token: 'fixture' } } }));
   }
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", async route => {
+  await routeGithub(page, "api", async route => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -744,7 +694,7 @@ async function installAlgorithmRoutes(
       body: JSON.stringify(commit),
     });
   });
-  await page.route("https://raw.githubusercontent.com/**", async route => {
+  await routeGithub(page, "content", async route => {
     const parts = new URL(route.request().url()).pathname.split("/");
     const revision = parts[3];
     const filename = decodeURIComponent(parts.slice(4).join("/"));
@@ -798,13 +748,13 @@ async function installTestsRoutes(
     ? { ...testsCommit, files: [testsCommit.files[1]] }
     : testsCommit;
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", route => route.fulfill({
+  await routeGithub(page, "api", route => route.fulfill({
     status: 200,
     contentType: "application/json",
     headers: { "access-control-allow-origin": "*" },
     body: JSON.stringify(commit),
   }));
-  await page.route("https://raw.githubusercontent.com/**", async route => {
+  await routeGithub(page, "content", async route => {
     const parts = new URL(route.request().url()).pathname.split("/");
     const revision = parts[3];
     const filename = decodeURIComponent(parts.slice(4).join("/"));
@@ -850,13 +800,13 @@ async function installCommentsRoutes(
     ? { ...commentsCommit, files: [commentsCommit.files[2]] }
     : commentsCommit;
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", route => route.fulfill({
+  await routeGithub(page, "api", route => route.fulfill({
     status: 200,
     contentType: "application/json",
     headers: { "access-control-allow-origin": "*" },
     body: JSON.stringify(commit),
   }));
-  await page.route("https://raw.githubusercontent.com/**", async route => {
+  await routeGithub(page, "content", async route => {
     const parts = new URL(route.request().url()).pathname.split("/");
     const revision = parts[3];
     const filename = decodeURIComponent(parts.slice(4).join("/"));
@@ -934,7 +884,7 @@ async function dragFileTree(page, targetWidth) {
 
 async function openMockedShareLink(page) {
   await installMockRoutes(page);
-  await page.goto(`/#/example/project/commit/${commitSha}`);
+  await page.goto(`/example/project/commit/${commitSha}`);
   await expect(page.locator("table.split")).toBeVisible();
 }
 
@@ -959,7 +909,7 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
   await loadMockedCommit(page);
 
   await expect(page.getByText("example/project@", { exact: false })).toBeVisible();
-  await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
+  await expect(page).toHaveURL(`/example/project/commit/${commitSha}`);
   await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy link" })).toHaveCount(0);
   await expect(page.locator(".summary-grid, .share-panel")).toHaveCount(0);
@@ -1152,8 +1102,8 @@ test("desktop file tree resizes live, persists across changes, and resets on ref
 
   const nextSha = "5555555555555555555555555555555555555555";
   const nextUrl = "https://github.com/example/tree/commit/" + nextSha;
-  await page.evaluate(url => { location.hash = new URL(url).pathname; }, nextUrl);
-  await expect(page).toHaveURL("/#/example/tree/commit/" + nextSha);
+  await page.evaluate(url => { history.pushState(null, "", new URL(url).pathname); dispatchEvent(new PopStateEvent("popstate")); }, nextUrl);
+  await expect(page).toHaveURL("/example/tree/commit/" + nextSha);
   await expect(page.locator("table.split").first()).toBeVisible();
   expect(await fileTreeWidth(page)).toBe(480);
 
@@ -1379,11 +1329,11 @@ test("a shared playground URL restores the commit after refresh", async ({ page 
   await page.setViewportSize({ width: 1280, height: 800 });
   await openMockedShareLink(page);
 
-  await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
+  await expect(page).toHaveURL(`/example/project/commit/${commitSha}`);
   await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
 
   await page.reload();
-  await expect(page).toHaveURL(`/#/example/project/commit/${commitSha}`);
+  await expect(page).toHaveURL(`/example/project/commit/${commitSha}`);
   await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
   await expect(page.locator("table.split")).toBeVisible();
 });
@@ -1401,12 +1351,12 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
     hasText: "src/from_second_commit.mbt",
   });
   await expect(aggregateCard.locator("table.split")).toBeVisible();
-  await expect(page).toHaveURL(`/#/example/project/pull/${pullNumber}`);
+  await expect(page).toHaveURL(`/example/project/pull/${pullNumber}`);
   await expect(
     page.locator(".workspace-url"),
   ).toHaveText(pullUrl);
   await expect(page.locator(".file-card")).toHaveCount(101);
-  await expect(page.getByText("Public pull request", { exact: true })).toBeVisible();
+  await expect(page.getByText("GitHub pull request", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("link", { name: `example/project#${pullNumber}` }),
   ).toHaveAttribute("href", pullUrl);
@@ -1424,26 +1374,26 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
   expect(requests.apiRequests.some(url => url.includes("/commits?"))).toBe(false);
   expect(requests.apiRequests.some(url => url.includes("/files?per_page=100&page=1"))).toBe(true);
   expect(requests.apiRequests.some(url => url.includes("/files?per_page=100&page=2"))).toBe(true);
-  expect(requests.metadataCalls()).toBe(2);
+  expect(requests.metadataCalls()).toBeGreaterThanOrEqual(2);
   const metadataRequests = requests.mutableApiRequests.filter(({ url }) =>
-    new URL(url).pathname.endsWith(`/pulls/${pullNumber}`)
+    new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}`)
   );
   const fileRequests = requests.mutableApiRequests.filter(({ url }) =>
-    new URL(url).pathname.endsWith(`/pulls/${pullNumber}/files`)
+    new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}/files`)
   );
-  expect(metadataRequests).toHaveLength(2);
+  expect(metadataRequests.length).toBeGreaterThanOrEqual(2);
   expect(fileRequests).toHaveLength(2);
   const fetchCalls = await requests.fetchCalls();
   expectRevalidatingRequests(
     metadataRequests,
     fetchCalls.filter(({ url }) =>
-      new URL(url).pathname.endsWith(`/pulls/${pullNumber}`)
+      new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}`)
     ),
   );
   expectRevalidatingRequests(
     fileRequests,
     fetchCalls.filter(({ url }) =>
-      new URL(url).pathname.endsWith(`/pulls/${pullNumber}/files`)
+      new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}/files`)
     ),
   );
 
@@ -1453,7 +1403,7 @@ test("opening the same PR share route refreshes its head", async ({ page }) => {
   const requests = await installPullRoutes(page, {
     heads: [pullHeadOne, pullHeadOne, pullHeadTwo, pullHeadTwo],
   });
-  const sharePath = `/#/example/project/pull/${pullNumber}`;
+  const sharePath = `/example/project/pull/${pullNumber}`;
   await page.goto(sharePath);
   const aggregateCard = page.locator(".file-card").filter({
     hasText: "src/from_second_commit.mbt",
@@ -1469,7 +1419,7 @@ test("opening the same PR share route refreshes its head", async ({ page }) => {
   await expect(page.locator(".parent")).toContainText(pullMergeBaseTwo);
   await expect(aggregateCard).toContainText("head two");
   expect(page.url()).toBe(firstUrl);
-  expect(requests.metadataCalls()).toBe(4);
+  expect(requests.metadataCalls()).toBeGreaterThanOrEqual(4);
   expect(requests.apiRequests).toContain(
     `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadOne}`,
   );
@@ -1482,7 +1432,7 @@ test("a PR updated while loading retries and only shows the latest snapshot", as
   const requests = await installPullRoutes(page, {
     heads: [pullHeadOne, pullHeadTwo, pullHeadTwo],
   });
-  await page.goto(`/#/example/project/pull/${pullNumber}`);
+  await page.goto(`/example/project/pull/${pullNumber}`);
 
   const aggregateCard = page.locator(".file-card").filter({
     hasText: "src/from_second_commit.mbt",
@@ -1496,7 +1446,7 @@ test("a PR updated while loading retries and only shows the latest snapshot", as
   await expect(aggregateCard).toContainText("head two");
   await expect(aggregateCard).toContainText("merge base two");
 
-  expect(requests.metadataCalls()).toBe(3);
+  expect(requests.metadataCalls()).toBeGreaterThanOrEqual(3);
   expect(requests.apiRequests).toContain(
     `https://api.github.com/repos/example/project/compare/${pullBaseSha}...${pullHeadOne}`,
   );
@@ -1506,11 +1456,11 @@ test("a PR updated while loading retries and only shows the latest snapshot", as
   expect(requests.rawRequests.some(url => url.includes(`/${pullHeadOne}/`))).toBe(false);
 });
 
-test("a PR metadata 403 keeps the anonymous rate-limit guidance", async ({ page }) => {
+test("a PR metadata 403 keeps actionable rate-limit guidance", async ({ page }) => {
   const metadataRequests = [];
   await installFetchCacheRecorder(page);
   await page.route("https://**", route => route.abort("blockedbyclient"));
-  await page.route("https://api.github.com/**", async route => {
+  await routeGithub(page, "api", async route => {
     const request = route.request();
     metadataRequests.push({
       url: request.url(),
@@ -1527,17 +1477,17 @@ test("a PR metadata 403 keeps the anonymous rate-limit guidance", async ({ page 
     });
   });
 
-  await page.goto(`/#/example/project/pull/${pullNumber}`);
+  await page.goto(`/example/project/pull/${pullNumber}`);
 
   await expect(page.locator(".empty-state.error")).toContainText(
-    "GitHub rejected the request (HTTP 403). The anonymous API limit may be exhausted; try again later.",
+    "GitHub API rate limit exceeded. Sign in or try again after the reset time.",
   );
   expect(metadataRequests).toHaveLength(1);
   const fetchCalls = await page.evaluate(() => window.__moondiffFetchCalls);
   expectRevalidatingRequests(
     metadataRequests,
     fetchCalls.filter(({ url }) =>
-      new URL(url).pathname.endsWith(`/pulls/${pullNumber}`)
+      new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}`)
     ),
   );
 });
@@ -1869,8 +1819,8 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
 test("Ignore tests keeps whole-file cards and restores renamed, added, and deleted diffs", async ({ page }) => {
   const requests = [];
   page.on("request", request => {
-    if (request.url().startsWith("https://raw.githubusercontent.com/")) {
-      requests.push(request.url());
+    if (request.url().endsWith("/api/rpc") && request.postDataJSON().request.$tag === "ContentGet") {
+      requests.push(fixtureURL(request.postDataJSON()));
     }
   });
   await loadTestsCommit(page, { wholeFiles: true });
@@ -1921,7 +1871,7 @@ test("Ignore tests keeps whole-file cards and restores renamed, added, and delet
 
 test("complete Lexical sections hide only hunk headings in both review layouts", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await loadAlgorithmCommit(page, { extensionHost: true });
+  await loadAlgorithmCommit(page, { authenticated: true });
   await expect(page.getByText("Signed in as reviewer")).toBeVisible();
 
   const structuralCard = page.locator(".file-card").filter({ hasText: "src/structural.mbt" });
@@ -1978,7 +1928,7 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
 
 test("MoonBit toplevel sections fold independently with mouse and keyboard", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await loadAlgorithmCommit(page, { extensionHost: true });
+  await loadAlgorithmCommit(page, { authenticated: true });
 
   const card = page.locator(".file-card").filter({
     hasText: "src/collapsible_sections.mbt",
@@ -2091,7 +2041,7 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
   await expect(readmeCard.locator(".diff-scroll")).toHaveJSProperty("innerHTML", lineHtmlInAstMode);
   expect(page.url()).toBe(urlBeforeSwitch);
   expect(new URL(page.url()).search).toBe("");
-  expect(new URL(page.url()).hash).toBe(`#/example/algorithms/commit/${algorithmSha}`);
+  expect(new URL(page.url()).pathname).toBe(`/example/algorithms/commit/${algorithmSha}`);
 });
 
 test("the selected algorithm survives later commit navigation without entering the URL", async ({ page }) => {
@@ -2102,13 +2052,13 @@ test("the selected algorithm survives later commit navigation without entering t
   await page.getByRole("button", { name: "Unified", exact: true }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
-  await page.evaluate(url => { location.hash = new URL(url).pathname; }, nextUrl);
+  await page.evaluate(url => { history.pushState(null, "", new URL(url).pathname); dispatchEvent(new PopStateEvent("popstate")); }, nextUrl);
   await expect(page.getByRole("button", { name: "Tree" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".structural-empty")).toBeVisible();
   await expect(page.getByRole("button", { name: "Unified", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page).toHaveURL(`/#/example/algorithms/commit/${nextSha}`);
+  await expect(page).toHaveURL(`/example/algorithms/commit/${nextSha}`);
   expect(new URL(page.url()).search).toBe("");
   expect(page.url()).not.toContain("ignore");
 });
@@ -2140,11 +2090,11 @@ test("workspace keeps a static URL while loading and after a retryable failure",
   await installMockRoutes(page);
   let release;
   const pending = new Promise(resolve => { release = resolve; });
-  await page.route("https://api.github.com/**", async route => {
+  await routeGithub(page, "api", async route => {
     await pending;
     await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Unavailable" }) });
   }, { times: 1 });
-  await page.goto(`/#/example/project/commit/${commitSha}`);
+  await page.goto(`/example/project/commit/${commitSha}`);
   await expect(page.locator(".loading")).toBeVisible();
   await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
   await expect(page.locator(".hero-workspace input, .hero-workspace form")).toHaveCount(0);

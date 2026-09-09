@@ -1,29 +1,25 @@
 ///|
 pub fn app_init(emit : @rabbita.Emit[Msg]) -> (Model, @rabbita.Cmd) {
   let model = initial_model()
-  let (next, command) = match
-    reference_from_playground_url(browser_current_url()) {
-    Ok(Some(reference)) => begin_change_load(model, reference, emit)
-    Ok(None) => (model, @rabbita.none)
-    Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
+  let next = match reference_from_playground_url(browser_current_url()) {
+    Ok(Some(reference)) =>
+      {
+        ..model,
+        route: Some(reference),
+        input: canonical_github_url(reference),
+      }
+    Ok(None) => model
+    Err(message) => with_phase(model, LoadFailed(message))
   }
-  if extension_host_enabled() {
-    (next, @rabbita.batch([auth_status_request(emit), command]))
-  } else {
-    (next, command)
-  }
+  (next, auth_status_request(next.auth_revision, emit))
 }
 
 ///|
 pub fn app_subscriptions(model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
-  let base = if extension_host_enabled() {
-    @sub.batch([
-      @sub.on_url_changed(url => emit(Ui(RouteChanged(url)))),
-      page_reactivation_subscription(emit),
-    ])
-  } else {
-    @sub.on_url_changed(url => emit(Ui(RouteChanged(url))))
-  }
+  let base = @sub.batch([
+    @sub.on_url_changed(url => emit(Ui(RouteChanged(url)))),
+    page_reactivation_subscription(emit),
+  ])
   if model.file_tree.drawer_open {
     @sub.batch([
       base,

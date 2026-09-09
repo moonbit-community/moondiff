@@ -568,10 +568,9 @@ fn auth_controls(
   refresh? : @rabbita.Html = @html.nothing,
 ) -> @rabbita.Html {
   match auth {
-    WebReadOnly => @html.nothing
     AuthChecking =>
       @html.span(class="auth-status", "Checking GitHub session…")
-    SignedIn(login~, install_url~) =>
+    SignedIn(login~, install_url~, ..) =>
       @html.div(class="auth-controls", [
         @html.span("Signed in\{login.map(name => " as \{name}").unwrap_or("")}"),
         refresh,
@@ -587,6 +586,7 @@ fn auth_controls(
         },
         @html.button(
           type_="button",
+          disabled=false,
           class="secondary",
           on_click=emit(Auth(Logout)),
           "Sign out",
@@ -596,8 +596,9 @@ fn auth_controls(
       @html.div(class="auth-controls", [
         @html.button(
           type_="button",
+          disabled=false,
           class="comment-submit",
-          on_click=emit(Auth(StartDeviceAuthorization)),
+          on_click=emit(Auth(StartSignIn)),
           "Sign in with GitHub",
         ),
         if install_url is Some(url) {
@@ -611,80 +612,92 @@ fn auth_controls(
           @html.nothing
         },
       ])
-    DeviceAuthorizing(device) => {
-      let copy_label = match device.copy_status {
-        DeviceCodeCopyReady => "Copy code"
-        DeviceCodeCopyDone => "Copied"
-        DeviceCodeCopyError(_) => "Try copy again"
-      }
-      let minutes = (device.expires_in + 59) / 60
-      @html.div(class="device-authorization", [
-        @html.p("Enter this code on GitHub to finish signing in:"),
-        @html.div(class="device-code-row", [
-          @html.code(class="device-user-code", device.user_code),
-          @html.button(
-            type_="button",
-            class=if device.copy_status is DeviceCodeCopyDone {
-              "secondary device-code-copy copied"
-            } else {
-              "secondary device-code-copy"
-            },
-            title=match device.copy_status {
-              DeviceCodeCopyError(message) =>
-                "Clipboard access failed: \{message}"
-              _ => "Copy the GitHub device code"
-            },
-            on_click=emit(Auth(CopyDeviceCode)),
-            copy_label,
-          ),
-        ]),
-        @html.div(class="device-auth-actions", [
-          @html.a(
-            href=device.verification_uri,
-            target=Blank,
-            rel="noopener noreferrer",
-            "Open GitHub verification page ↗",
-          ),
-          if device.install_url is Some(url) {
+    Authorizing(flow, notice) =>
+      @html.div(class="auth-controls device-auth", [
+        @html.p(
+          class="device-prompt",
+          if flow.phase == @protocol.DevicePhase::Starting {
+            "Starting GitHub sign-in…"
+          } else if flow.phase == @protocol.DevicePhase::Verifying {
+            "Confirming your GitHub account…"
+          } else {
+            "Enter this code on GitHub to sign in:"
+          },
+        ),
+        if !flow.user_code.is_empty() {
+          @html.div(class="device-code-actions", [
+            @html.span(
+              class="device-code",
+              attrs=@html.Attrs::build().aria_label("GitHub verification code"),
+              flow.user_code,
+            ),
+            @html.button(
+              type_="button",
+              class="secondary",
+              on_click=emit(Auth(CopyDeviceCode)),
+              "Copy code",
+            ),
             @html.a(
-              href=url,
+              href=flow.verification_uri,
               target=Blank,
               rel="noopener noreferrer",
-              "Install GitHub App ↗",
-            )
+              class="secondary device-open",
+              attrs=@html.Attrs::build().role("button"),
+              "Open GitHub ↗",
+            ),
+          ])
+        } else {
+          @html.nothing
+        },
+        @html.p(
+          class="device-progress",
+          attrs=@html.Attrs::build().role("status"),
+          if !notice.is_empty() {
+            notice
+          } else if !flow.message.is_empty() {
+            flow.message
+          } else if flow.phase == @protocol.DevicePhase::Pending {
+            "Waiting for authorization. This page will update automatically."
           } else {
-            @html.nothing
+            "Keep this page open. Sign-in will continue automatically."
           },
+        ),
+        @html.button(
+          type_="button",
+          class="secondary",
+          on_click=emit(Auth(CancelSignIn)),
+          "Cancel sign-in",
+        ),
+      ])
+    DeviceCancelling(_, message) =>
+      @html.div(class="auth-controls device-auth", [
+        @html.span(
+          attrs=@html.Attrs::build().role("status"),
+          if message.is_empty() {
+            "Cancelling GitHub sign-in…"
+          } else {
+            message
+          },
+        ),
+        if !message.is_empty() {
           @html.button(
             type_="button",
             class="secondary",
-            on_click=emit(Auth(CancelDeviceAuthorization(device.flow_id))),
-            "Cancel",
-          ),
-        ]),
-        @html.p(
-          class="device-auth-hint",
-          "Waiting for GitHub authorization · expires in about \{minutes} min",
-        ),
-        match device.copy_status {
-          DeviceCodeCopyError(message) =>
-            @html.p(
-              class="comment-error",
-              "Could not copy the code: \{message}",
-            )
-          _ => @html.nothing
+            on_click=emit(Auth(CancelSignIn)),
+            "Retry cancellation",
+          )
+        } else {
+          @html.nothing
         },
       ])
-    }
-    DeviceCancelling(_) =>
-      @html.span(class="auth-status", "Cancelling GitHub sign-in…")
     AuthFailed(message) =>
       @html.div(class="auth-controls error", [
         @html.span(message),
         @html.button(
           type_="button",
+          disabled=false,
           class="secondary",
-          on_click=emit(Auth(StartDeviceAuthorization)),
+          on_click=emit(Auth(StartSignIn)),
           "Try sign-in",
         ),
       ])
@@ -698,9 +711,6 @@ fn comments_overview(
   auth : @application.AuthStatus,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  if auth is WebReadOnly {
-    return @html.nothing
-  }
   let refresh = @html.button(
     type_="button",
     class="secondary refresh-comments",

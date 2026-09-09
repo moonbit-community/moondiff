@@ -1,9 +1,5 @@
 ///|
 using @github {
-  type ApiCommit,
-  type ApiCompare,
-  type ApiFile,
-  type ApiPull,
   type CommitRef,
   type RepositoryRef,
   type SourceLocation,
@@ -40,16 +36,7 @@ using @change {
 }
 
 ///|
-using @github_client {extension_host_enabled, gateway_json_request}
-
-///|
-using @comments {
-  type ApiCommentBundle,
-  type ApiCommitComment,
-  type ApiIssueComment,
-  type ApiReviewComment,
-  type Session,
-}
+using @comments {type Session}
 
 ///|
 using @routing {
@@ -57,13 +44,25 @@ using @routing {
   canonical_github_url,
   playground_share_url,
   reference_from_playground_url,
-  reference_from_route,
 }
 
 ///|
 using @comment_requests {
   comment_failure,
-  type ApiAuthStatus,
   error_message,
   comment_failure_message,
+}
+
+///|
+using @protocol {
+  type ApiAuthStatus,
+  type ApiCommentBundle,
+  type ApiCommit,
+  type ApiCommitComment,
+  type ApiCompare,
+  type ApiDeviceFlow,
+  type ApiFile,
+  type ApiIssueComment,
+  type ApiPull,
+  type ApiReviewComment,
 }

@@ -2,34 +2,68 @@
 package "moonbit-community/moondiff-playground/internal/github_client"
 
 import {
+  "moonbit-community/moondiff-playground-protocol",
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/rabbita/cmd",
-  "moonbitlang/core/json",
 }
 
 // Values
-pub fn extension_error_code(Error) -> String?
+pub fn auth_device_request(DeviceAction, String, Int, @cmd.Emit[Result[@moondiff-playground-protocol.DeviceResponse, Error]]) -> @cmd.Cmd
 
-pub fn extension_host_enabled() -> Bool
+pub fn auth_logout_request(@cmd.Emit[Result[@moondiff-playground-protocol.ApiAuthStatus, Error]]) -> @cmd.Cmd
 
-pub fn[T : @json.FromJson] extension_rpc_json(String, String, Int, @cmd.Emit[Result[T, Error]]) -> @cmd.Cmd
+pub fn auth_status_request(@cmd.Emit[Result[@moondiff-playground-protocol.ApiAuthStatus, Error]]) -> @cmd.Cmd
 
-pub fn[A : ToJson, T : @json.FromJson] extension_rpc_request(String, A, Int, @cmd.Emit[Result[T, Error]]) -> @cmd.Cmd
+pub fn cancel_before(Int) -> @cmd.Cmd
 
-pub fn[T : @json.FromJson] gateway_json_request(String, @github.RepositoryRef, String, String, Int, Int, @cmd.Emit[Result[T, Error]]) -> @cmd.Cmd
+pub fn create_commit_comment(@moondiff-playground-protocol.CommitCommentCreate, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCommitComment, Error]]) -> @cmd.Cmd
+
+pub fn create_issue_comment(@moondiff-playground-protocol.IssueCommentCreate, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiIssueComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_comment(@moondiff-playground-protocol.ReviewCommentCreate, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_reply(@moondiff-playground-protocol.ReviewReplyCreate, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn delete_commit_comment(@moondiff-playground-protocol.CommentDelete, Int, @cmd.Emit[Result[@moondiff-playground-protocol.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn delete_issue_comment(@moondiff-playground-protocol.CommentDelete, Int, @cmd.Emit[Result[@moondiff-playground-protocol.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn delete_review_comment(@moondiff-playground-protocol.CommentDelete, Int, @cmd.Emit[Result[@moondiff-playground-protocol.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn dispose() -> Unit
+
+pub fn get_commit(@moondiff-playground-protocol.CommitGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCommit, Error]]) -> @cmd.Cmd
+
+pub fn get_compare(@moondiff-playground-protocol.CompareGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCompare, Error]]) -> @cmd.Cmd
+
+pub fn get_content(@moondiff-playground-protocol.ContentGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiSource, Error]]) -> @cmd.Cmd
+
+pub fn get_pull(@moondiff-playground-protocol.PullGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPull, Error]]) -> @cmd.Cmd
+
+pub fn get_pull_files(@moondiff-playground-protocol.PullFiles, Int, @cmd.Emit[Result[Array[@moondiff-playground-protocol.ApiFile], Error]]) -> @cmd.Cmd
+
+pub fn http_error_code(Error) -> String?
+
+pub fn list_comments(@moondiff-playground-protocol.CommentsList, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCommentBundle, Error]]) -> @cmd.Cmd
 
 pub fn source_request(@github.SourceLocation, Int, @cmd.Emit[Result[(String, Bytes), Error]]) -> @cmd.Cmd
 
 // Errors
-pub(all) suberror ExtensionRequestError {
-  ExtensionRequestError(status~ : Int, code~ : String, detail~ : String)
-}
-
 pub(all) suberror GitHubRequestError {
   GitHubRequestError(String)
 }
 
+pub(all) suberror HttpRequestError {
+  HttpRequestError(status~ : Int, code~ : String, detail~ : String)
+}
+
 // Types and methods
+pub(all) enum DeviceAction {
+  Start
+  Poll
+  Retry
+  Cancel
+}
 
 // Type aliases
 

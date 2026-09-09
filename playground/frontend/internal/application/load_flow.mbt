@@ -170,27 +170,28 @@ fn begin_change_load(
       ..model,
       input: canonical_github_url(reference),
       generation,
+      restore_pending: false,
       phase,
       route: Some(reference),
       file_tree: reset_file_tree_state(model.file_tree),
-      review: if extension_host_enabled() {
-        @comments.update(
-          comment_session_context(model.review, {
-            generation,
-            route: Some(reference),
-            snapshot: None,
-            enabled: true,
-          }),
-          Reset(true, preserve_draft),
-        ).0
-      } else {
-        model.review
-      },
+      review: @comments.update(
+        comment_session_context(model.review, {
+          generation,
+          route: Some(reference),
+          snapshot: None,
+          enabled: true,
+        }),
+        Reset(true, preserve_draft),
+      ).0,
     },
-    if extension_host_enabled() && !(reference.target is PullRequest(_)) {
-      @rabbita.batch([command, comments_request(reference, generation, emit)])
+    if !(reference.target is PullRequest(_)) {
+      @rabbita.batch([
+        @github_client.cancel_before(generation),
+        command,
+        comments_request(reference, generation, emit),
+      ])
     } else {
-      command
+      @rabbita.batch([@github_client.cancel_before(generation), command])
     },
   )
 }

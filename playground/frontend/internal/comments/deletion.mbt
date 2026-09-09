@@ -13,11 +13,6 @@ pub(all) enum CommentDeletion {
 } derive(Eq)
 
 ///|
-pub(all) struct DeleteResult {
-  deleted : Bool
-} derive(FromJson)
-
-///|
 pub fn without_deleted(
   bundle : ApiCommentBundle,
   deleted : Array[CommentId],

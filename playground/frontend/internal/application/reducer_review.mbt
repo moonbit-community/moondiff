@@ -13,7 +13,7 @@ pub(all) enum ReviewMsg {
     Int,
     Int,
     @comments.CommentId,
-    Result[@comments.DeleteResult, Error]
+    Result[@protocol.DeleteResult, Error]
   )
   CommentsLoaded(Int, Int, Result[ApiCommentBundle, Error])
   PageReactivated
@@ -63,12 +63,20 @@ fn update_review(
       return begin_change_load(model, reference, emit)
     }
     PageReactivated => {
-      guard extension_host_enabled() && model.route is Some(reference) else {
+      guard !(model.auth is DeviceCancelling(_, _)) &&
+        !(model.auth
+        is Authorizing({ phase: @protocol.DevicePhase::Starting, .. }, _)) &&
+        !(model.auth is AuthChecking) else {
         return (model, @rabbita.none)
       }
       return (
         model,
-        reactivation_auth_status_request(reference, model.generation, emit),
+        reactivation_auth_status_request(
+          model.route,
+          model.generation,
+          model.auth_revision,
+          emit,
+        ),
       )
     }
     RefreshComments => RefreshComments

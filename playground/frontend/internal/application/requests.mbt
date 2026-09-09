@@ -42,70 +42,38 @@ fn commands_for_change(
 }
 
 ///|
-fn auth_status_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
-  @comment_requests.auth_status_request(result => {
-    emit(Auth(AuthStatusLoaded(result)))
+fn auth_status_request(
+  revision : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  @github_client.auth_status_request(result => {
+    emit(Auth(AuthStatusLoaded(revision, result)))
   })
 }
 
 ///|
 fn reactivation_auth_status_request(
-  reference : CommitRef,
+  reference : CommitRef?,
   generation : Int,
+  revision : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  @comment_requests.auth_status_request(result => {
-    emit(Auth(ReactivationAuthStatusLoaded(generation, reference, result)))
+  @github_client.auth_status_request(result => {
+    emit(
+      Auth(
+        ReactivationAuthStatusLoaded(revision, generation, reference, result),
+      ),
+    )
   })
 }
 
 ///|
-fn auth_device_start_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
-  @comment_requests.auth_device_start_request(result => {
-    emit(Auth(DeviceAuthorizationStarted(result)))
-  })
-}
-
-///|
-fn auth_device_poll_request(
-  flow_id : String,
+fn auth_logout_request(
+  revision : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  @comment_requests.auth_device_poll_request(flow_id, result => {
-    emit(Auth(DeviceAuthorizationPolled(flow_id, result)))
-  })
-}
-
-///|
-fn auth_device_cancel_request(
-  flow_id : String,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Cmd {
-  @comment_requests.auth_device_cancel_request(flow_id, result => {
-    emit(Auth(DeviceAuthorizationCancelled(flow_id, result)))
-  })
-}
-
-///|
-fn schedule_device_poll(
-  flow_id : String,
-  poll_after : Int,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Cmd {
-  let seconds = if poll_after < 0 {
-    0
-  } else if poll_after > 3_600 {
-    3_600
-  } else {
-    poll_after
-  }
-  @cmd.delay(emit(Auth(PollDeviceAuthorization(flow_id))), seconds * 1_000)
-}
-
-///|
-fn auth_logout_request(emit : @rabbita.Emit[Msg]) -> @rabbita.Cmd {
-  @comment_requests.auth_logout_request(result => {
-    emit(Auth(AuthLogoutFinished(result)))
+  @github_client.auth_logout_request(result => {
+    emit(Auth(AuthLogoutFinished(revision, result)))
   })
 }
 
@@ -116,4 +84,45 @@ fn comments_request(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   emit(Review(BeginCommentsRefresh(generation, reference)))
+}
+
+///|
+fn device_request(
+  model : Model,
+  operation : @github_client.DeviceAction,
+  id : String,
+  delay : Int,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  @github_client.auth_device_request(operation, id, delay, result => {
+    emit(
+      Auth(
+        DeviceUpdated(
+          model.auth_revision,
+          id,
+          operation is (Start | Retry),
+          result,
+        ),
+      ),
+    )
+  })
+}
+
+///|
+fn device_poll_request(
+  model : Model,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  guard model.auth is Authorizing(flow, _) else { return @rabbita.none }
+  device_request(
+    model,
+    if flow.phase == @protocol.DevicePhase::Starting {
+      @github_client.Retry
+    } else {
+      @github_client.Poll
+    },
+    flow.id,
+    flow.retry_after,
+    emit,
+  )
 }

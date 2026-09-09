@@ -42,50 +42,48 @@ test "shared playground routes round-trip to canonical GitHub commit URLs" {
   let reference = commit_reference("moonbit-community", "moondiff", "aBcDeF1")
   assert_eq(
     playground_route(reference),
-    "#/moonbit-community/moondiff/commit/aBcDeF1",
+    "/moonbit-community/moondiff/commit/aBcDeF1",
   )
   assert_eq(
     canonical_github_url(reference),
     "https://github.com/moonbit-community/moondiff/commit/aBcDeF1",
   )
   guard reference_from_playground_url(
-      "https://example.github.io/moondiff/#/moonbit-community/moondiff/commit/aBcDeF1",
+      "https://example.test/moonbit-community/moondiff/commit/aBcDeF1",
     )
     is Ok(Some(parsed)) else {
     fail("expected the shared route to parse")
   }
   assert_true(parsed == reference)
   let pull = pull_reference("moonbitlang", "core", "4082")
-  assert_eq(playground_route(pull), "#/moonbitlang/core/pull/4082")
+  assert_eq(playground_route(pull), "/moonbitlang/core/pull/4082")
   assert_eq(
     canonical_github_url(pull),
     "https://github.com/moonbitlang/core/pull/4082",
   )
   guard reference_from_playground_url(
-      "https://example.github.io/moondiff/#/moonbitlang/core/pull/4082",
+      "https://example.test/moonbitlang/core/pull/4082",
     )
     is Ok(Some(parsed_pull)) else {
     fail("expected the shared pull request route to parse")
   }
   assert_true(parsed_pull == pull)
-  assert_true(
-    reference_from_playground_url("https://example.com/moondiff/") is Ok(None),
-  )
+  assert_true(reference_from_playground_url("https://example.com/") is Ok(None))
   assert_true(
     reference_from_playground_url(
-      "https://example.com/moondiff/#/moonbit-community/moondiff/pull/0",
+      "https://example.com/moonbit-community/moondiff/pull/0",
     )
     is Err(_),
   )
   assert_true(
     reference_from_playground_url(
-      "https://example.com/moondiff/#/moonbit-community/moondiff/pull/017",
+      "https://example.com/moonbit-community/moondiff/pull/017",
     )
     is Err(_),
   )
   assert_true(
     reference_from_playground_url(
-      "https://example.com/moondiff/#/bad owner/moondiff/commit/abcdef1",
+      "https://example.com/bad owner/moondiff/commit/abcdef1",
     )
     is Err(_),
   )
@@ -107,7 +105,7 @@ test "reject unsupported or malformed URLs" {
 }
 
 ///|
-test "PR commit URL and hash routes preserve pull context" {
+test "PR commit URL and ordinary routes preserve pull context" {
   for
     url in [
       "https://github.com/acme/widgets/pull/17/commits/abcdef1", "https://github.com/acme/widgets/pull/17/changes/abcdef1",
@@ -118,10 +116,10 @@ test "PR commit URL and hash routes preserve pull context" {
     assert_true(reference.target is PullCommit("17", "abcdef1"))
     assert_eq(
       playground_route(reference),
-      "#/acme/widgets/pull/17/commits/abcdef1",
+      "/acme/widgets/pull/17/commits/abcdef1",
     )
     guard reference_from_playground_url(
-        "https://example.test/\{playground_route(reference)}",
+        "https://example.test\{playground_route(reference)}",
       )
       is Ok(Some(roundtrip)) else {
       fail("expected PR commit route to round-trip")
@@ -138,4 +136,12 @@ test "PR commit URL and hash routes preserve pull context" {
     }
     assert_true(reference.target is PullRequest("17"))
   }
+}
+
+///|
+test "old hash links are invalid" {
+  assert_true(
+    reference_from_playground_url("https://example.com/#/a/b/pull/42") is Err(_),
+  )
+  assert_true(reference_from_route(Some("#/a/b/pull/42")) is Err(_))
 }

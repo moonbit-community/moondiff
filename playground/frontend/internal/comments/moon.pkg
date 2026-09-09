@@ -1,8 +1,8 @@
 import {
+  "moonbit-community/moondiff-playground-protocol" @protocol,
   "moonbit-community/moondiff-playground/internal/change",
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff-playground/internal/review",
-  "moonbitlang/core/json",
 }
 
 import {

@@ -2,6 +2,7 @@
 package "moonbit-community/moondiff-playground/internal/change"
 
 import {
+  "moonbit-community/moondiff-playground-protocol",
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff/model",
   "moonbitlang/core/immut/hashmap",
@@ -14,11 +15,11 @@ pub fn ensure_expanded_file_documents(ChangeView, DiffAlgorithm, ignore_comments
 
 pub fn ensure_file_document(FileState, DiffAlgorithm, ignore_comments? : Bool, ignore_tests? : Bool) -> FileState
 
-pub fn finish_change(@github.CommitRef, @github.Revision?, @github.Revision, String, String, @github.ApiStats, Array[@github.ApiFile]) -> ChangeView
+pub fn finish_change(@github.CommitRef, @github.Revision?, @github.Revision, String, String, @moondiff-playground-protocol.ApiStats, Array[@moondiff-playground-protocol.ApiFile]) -> ChangeView
 
-pub fn finish_commit(@github.CommitRef, @github.RepositoryRef, @github.ApiCommit, Array[@github.ApiFile]) -> ChangeView
+pub fn finish_commit(@github.CommitRef, @github.RepositoryRef, @moondiff-playground-protocol.ApiCommit, Array[@moondiff-playground-protocol.ApiFile]) -> ChangeView
 
-pub fn finish_pull(@github.CommitRef, @github.ApiPull, @github.ApiCompare, Array[@github.ApiFile]) -> Result[ChangeView, String]
+pub fn finish_pull(@github.CommitRef, @moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiCompare, Array[@moondiff-playground-protocol.ApiFile]) -> Result[ChangeView, String]
 
 pub fn ignored_change_subject(Bool, Bool) -> String
 
@@ -43,14 +44,14 @@ pub(all) enum CachedDiffResult {
 
 pub(all) struct ChangeView {
   reference : @github.CommitRef
-  pull_snapshot : @github.ApiPull?
+  pull_snapshot : @moondiff-playground-protocol.ApiPull?
   sha : String
   parent_sha : String?
   old_revision : @github.Revision?
   new_revision : @github.Revision
   message : String
   html_url : String
-  stats : @github.ApiStats
+  stats : @moondiff-playground-protocol.ApiStats
   total_files : Int
   files : Array[FileState]
 } derive(Eq)
@@ -68,7 +69,7 @@ pub fn DiffCache::get(Self, CacheKey) -> CachedDiffResult?
 pub fn DiffCache::put(Self, CacheKey, CachedDiffResult) -> Self
 
 pub(all) struct FileState {
-  file : @github.ApiFile
+  file : @moondiff-playground-protocol.ApiFile
   diff_mode : @github.FileDiffMode
   expanded : Bool
   collapsed_sections : Array[String]

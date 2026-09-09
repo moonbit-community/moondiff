@@ -1,24 +1,21 @@
 ///|
-using @github {type ApiPull, type CommitRef, reference_repository}
+using @github {type CommitRef, reference_repository}
 
 ///|
 using @review {type ReviewAnchor}
 
 ///|
-using @comments {
-  type ApiCommentBundle,
-  type ApiIssueComment,
-  type ApiReviewComment,
-  type ApiCommitComment,
-  type DeleteResult,
-  type CommentId,
-}
+using @comments {type CommentId}
 
 ///|
-using @github_client {
-  extension_error_code,
-  extension_host_enabled,
-  extension_rpc_json,
-  extension_rpc_request,
-  gateway_json_request,
+using @github_client {http_error_code}
+
+///|
+using @protocol {
+  type DeleteResult,
+  type ApiCommentBundle,
+  type ApiCommitComment,
+  type ApiIssueComment,
+  type ApiPull,
+  type ApiReviewComment,
 }

@@ -1,111 +1,12 @@
 ///|
-priv struct CommentListArgs {
-  owner : String
-  repo : String
-  kind : String
-  number : String?
-  sha : String?
-} derive(ToJson)
-
-///|
-priv struct IssueCommentArgs {
-  owner : String
-  repo : String
-  number : String
-  body : String
-} derive(ToJson)
-
-///|
-priv struct ReviewCommentArgs {
-  owner : String
-  repo : String
-  number : String
-  commit_id : String
-  path : String
-  line : Int
-  side : String
-  body : String
-} derive(ToJson)
-
-///|
-priv struct CommitCommentArgs {
-  owner : String
-  repo : String
-  sha : String
-  path : String
-  position : Int
-  body : String
-} derive(ToJson)
-
-///|
-priv struct ReviewReplyArgs {
-  owner : String
-  repo : String
-  number : String
-  comment_id : Int64
-  body : String
-} derive(ToJson)
-
-///|
-priv struct DeviceFlowArgs {
-  flow_id : String
-} derive(ToJson)
-
-///|
-pub fn auth_status_request(
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_json("auth.status", "{}", 0, emit)
-}
-
-///|
-pub fn auth_device_start_request(
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_json("auth.device.start", "{}", 0, emit)
-}
-
-///|
-pub fn auth_device_poll_request(
-  flow_id : String,
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "auth.device.poll",
-    DeviceFlowArgs::{ flow_id, },
-    0,
-    emit,
-  )
-}
-
-///|
-pub fn auth_device_cancel_request(
-  flow_id : String,
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "auth.device.cancel",
-    DeviceFlowArgs::{ flow_id, },
-    0,
-    emit,
-  )
-}
-
-///|
-pub fn auth_logout_request(
-  emit : @rabbita.Emit[Result[ApiAuthStatus, Error]],
-) -> @rabbita.Cmd {
-  extension_rpc_json("auth.logout", "{}", 0, emit)
-}
-
-///|
-fn comment_list_args(reference : CommitRef) -> CommentListArgs {
-  let (kind, number, sha) = match reference.target {
-    PullRequest(number) => ("pull", Some(number), None)
-    Commit(sha) => ("commit", None, Some(sha))
-    PullCommit(number, sha) => ("pull_commit", Some(number), Some(sha))
+fn comment_list_args(reference : CommitRef) -> @protocol.CommentsList {
+  let target = match reference.target {
+    PullRequest(number) => @protocol.CommentTarget::Pull(number~)
+    Commit(sha) => @protocol.CommentTarget::Commit(sha~)
+    PullCommit(number, sha) =>
+      @protocol.CommentTarget::PullCommit(number~, sha~)
   }
-  { owner: reference.owner, repo: reference.repo, kind, number, sha, }
+  { owner: reference.owner, repo: reference.repo, target, }
 }
 
 ///|
@@ -114,12 +15,7 @@ pub fn comments_request(
   generation : Int,
   emit : @rabbita.Emit[Result[ApiCommentBundle, Error]],
 ) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.comments.list",
-    comment_list_args(reference),
-    generation,
-    emit,
-  )
+  @github_client.list_comments(comment_list_args(reference), generation, emit)
 }
 
 ///|
@@ -129,12 +25,12 @@ pub fn comment_head_request(
   generation : Int,
   emit : @rabbita.Emit[Result[ApiPull, Error]],
 ) -> @rabbita.Cmd {
-  gateway_json_request(
-    "github.pull.get",
-    reference_repository(reference),
-    number,
-    "",
-    0,
+  @github_client.get_pull(
+    {
+      owner: reference_repository(reference).owner,
+      repo: reference_repository(reference).repo,
+      number,
+    },
     generation,
     emit,
   )
@@ -148,9 +44,8 @@ pub fn create_issue_comment_request(
   generation : Int,
   emit : @rabbita.Emit[Result[ApiIssueComment, Error]],
 ) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.issue.comment.create",
-    IssueCommentArgs::{
+  @github_client.create_issue_comment(
+    @protocol.IssueCommentCreate::{
       owner: reference.owner,
       repo: reference.repo,
       number,
@@ -171,9 +66,8 @@ pub fn create_review_comment_request(
   generation : Int,
   emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.review.comment.create",
-    ReviewCommentArgs::{
+  @github_client.create_review_comment(
+    @protocol.ReviewCommentCreate::{
       owner: reference.owner,
       repo: reference.repo,
       number,
@@ -181,9 +75,9 @@ pub fn create_review_comment_request(
       path: anchor.path,
       line: anchor.line,
       side: if anchor.side is Left {
-        "LEFT"
+        @protocol.CommentSide::Left
       } else {
-        "RIGHT"
+        @protocol.CommentSide::Right
       },
       body,
     },
@@ -202,9 +96,8 @@ pub fn create_commit_comment_request(
   emit : @rabbita.Emit[Result[ApiCommitComment, Error]],
 ) -> @rabbita.Cmd {
   guard anchor.position is Some(position) else { return @rabbita.none }
-  extension_rpc_request(
-    "github.commit.comment.create",
-    CommitCommentArgs::{
+  @github_client.create_commit_comment(
+    @protocol.CommitCommentCreate::{
       owner: reference.owner,
       repo: reference.repo,
       sha,
@@ -226,9 +119,8 @@ pub fn create_review_reply_request(
   generation : Int,
   emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
-  extension_rpc_request(
-    "github.review.reply.create",
-    ReviewReplyArgs::{
+  @github_client.create_review_reply(
+    @protocol.ReviewReplyCreate::{
       owner: reference.owner,
       repo: reference.repo,
       number,

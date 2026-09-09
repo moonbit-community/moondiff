@@ -29,7 +29,7 @@ fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
 fn review_comment_fixture(
   id : Int,
   line? : Int = 2,
-  side? : String = "RIGHT",
+  side? : @protocol.CommentSide = Right,
   position? : Int? = Some(3),
   commit_id? : String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   reply_to? : Int64? = None,

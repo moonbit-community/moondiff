@@ -24,15 +24,12 @@ using @comments {
 }
 
 ///|
-using @github {type ApiFile}
-
-///|
-using @github_client {extension_host_enabled}
-
-///|
 using @review {
   type ReviewAnchor,
   type ReviewRow,
   parse_canonical_patch,
   project_review_items,
 }
+
+///|
+using @protocol {type ApiFile}

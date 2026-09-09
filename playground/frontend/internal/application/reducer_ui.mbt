@@ -23,7 +23,48 @@ fn update_ui(
   msg : UiMsg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
-  match msg {
+  // Navigation may arrive while the initial session request is still pending.
+  // Keep generation zero so its response starts only the latest selected route.
+  if model.generation == 0 &&
+    model.auth is AuthChecking &&
+    msg is RouteChanged(url) {
+    return match reference_from_playground_url(url.to_string()) {
+      Ok(Some(reference)) =>
+        (
+          {
+            ..model,
+            route: Some(reference),
+            restore_pending: false,
+            input: canonical_github_url(reference),
+            phase: Idle,
+          },
+          @rabbita.none,
+        )
+      Ok(None) =>
+        (
+          {
+            ..model,
+            route: None,
+            restore_pending: false,
+            input: "",
+            phase: Idle,
+          },
+          @rabbita.none,
+        )
+      Err(message) =>
+        (
+          {
+            ..model,
+            route: None,
+            restore_pending: false,
+            input: "",
+            phase: LoadFailed(message),
+          },
+          @rabbita.none,
+        )
+    }
+  }
+  let (next, command) = match msg {
     InputChanged(value) => ({ ..model, input: value, }, @rabbita.none)
     SelectView(view_mode) => ({ ..model, view_mode, }, @rabbita.none)
     ToggleFileTreeDrawer => {
@@ -177,12 +218,24 @@ fn update_ui(
             {
               ..model,
               generation: model.generation + 1,
+              restore_pending: false,
               phase: LoadFailed(message),
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
           )
         Ok(reference) => {
+          if model.generation == 0 && model.auth is AuthChecking {
+            return (
+              {
+                ..model,
+                route: Some(reference),
+                restore_pending: false,
+                input: canonical_github_url(reference),
+              },
+              @nav.push_url(playground_share_url(reference)),
+            )
+          }
           let already_at_route = model.route == Some(reference)
           let (next, request) = begin_change_load(model, reference, emit)
           let navigation = if already_at_route {
@@ -194,18 +247,19 @@ fn update_ui(
         }
       }
     RouteChanged(url) =>
-      match reference_from_route(url.fragment) {
+      match reference_from_playground_url(url.to_string()) {
         Err(message) =>
           (
             {
               ..model,
               input: "",
               generation: model.generation + 1,
+              restore_pending: false,
               phase: LoadFailed(message),
               route: None,
               file_tree: reset_file_tree_state(model.file_tree),
             },
-            @rabbita.none,
+            @github_client.cancel_before(model.generation + 1),
           )
         Ok(None) =>
           (
@@ -213,11 +267,12 @@ fn update_ui(
               ..model,
               input: "",
               generation: model.generation + 1,
+              restore_pending: false,
               phase: Idle,
               route: None,
               file_tree: reset_file_tree_state(model.file_tree),
             },
-            @rabbita.none,
+            @github_client.cancel_before(model.generation + 1),
           )
         Ok(Some(reference)) =>
           if model.route == Some(reference) {
@@ -226,5 +281,15 @@ fn update_ui(
             begin_change_load(model, reference, emit)
           }
       }
+  }
+  if model.restore_pending && !next.restore_pending && next.auth is AuthChecking {
+    // Navigation invalidates the scoped restoration query. Resolve the session
+    // again so the new route cannot remain stuck in AuthChecking.
+    (
+      next,
+      @rabbita.batch([command, auth_status_request(next.auth_revision, emit)]),
+    )
+  } else {
+    (next, command)
   }
 }

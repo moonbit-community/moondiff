@@ -10,12 +10,8 @@ fn commit_request(
     Commit(sha) | PullCommit(_, sha) => sha
     PullRequest(_) => ""
   }
-  gateway_json_request(
-    "github.commit.get",
-    repository,
-    sha,
-    "",
-    page,
+  @github_client.get_commit(
+    { owner: repository.owner, repo: repository.repo, sha, page, },
     generation,
     result => emit(Load(CommitPageLoaded(generation, page, result))),
   )
@@ -31,12 +27,12 @@ fn pull_commit_metadata_request(
     PullCommit(number, _) => number
     _ => ""
   }
-  gateway_json_request(
-    "github.pull.get",
-    reference_repository(reference),
-    number,
-    "",
-    0,
+  @github_client.get_pull(
+    {
+      owner: reference_repository(reference).owner,
+      repo: reference_repository(reference).repo,
+      number,
+    },
     generation,
     result => emit(Load(PullCommitMetadataLoaded(generation, result))),
   )
@@ -53,12 +49,12 @@ fn pull_metadata_request(
     PullRequest(number) => number
     _ => ""
   }
-  gateway_json_request(
-    "github.pull.get",
-    reference_repository(reference),
-    number,
-    "",
-    0,
+  @github_client.get_pull(
+    {
+      owner: reference_repository(reference).owner,
+      repo: reference_repository(reference).repo,
+      number,
+    },
     generation,
     result => emit(Load(PullMetadataLoaded(generation, attempt, result))),
   )
@@ -73,12 +69,13 @@ fn pull_compare_request(
   attempt : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  gateway_json_request(
-    "github.compare.get",
-    reference_repository(reference),
-    base_sha,
-    head_sha,
-    0,
+  @github_client.get_compare(
+    {
+      owner: reference_repository(reference).owner,
+      repo: reference_repository(reference).repo,
+      base: base_sha,
+      head: head_sha,
+    },
     generation,
     result => emit(Load(PullCompareLoaded(generation, attempt, result))),
   )
@@ -96,12 +93,13 @@ fn pull_files_request(
     PullRequest(number) => number
     _ => ""
   }
-  gateway_json_request(
-    "github.pull.files",
-    reference_repository(reference),
-    number,
-    "",
-    page,
+  @github_client.get_pull_files(
+    {
+      owner: reference_repository(reference).owner,
+      repo: reference_repository(reference).repo,
+      number,
+      page,
+    },
     generation,
     result => emit(Load(PullFilesPageLoaded(generation, attempt, page, result))),
   )
@@ -118,12 +116,12 @@ fn pull_validation_request(
     PullRequest(number) => number
     _ => ""
   }
-  gateway_json_request(
-    "github.pull.get",
-    reference_repository(reference),
-    number,
-    "",
-    0,
+  @github_client.get_pull(
+    {
+      owner: reference_repository(reference).owner,
+      repo: reference_repository(reference).repo,
+      number,
+    },
     generation,
     result => emit(Load(PullValidationLoaded(generation, attempt, result))),
   )
