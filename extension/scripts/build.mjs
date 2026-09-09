@@ -1,14 +1,11 @@
-import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
-  existsSync,
   mkdirSync,
   mkdtempSync,
   renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { deflateSync } from "node:zlib";
@@ -20,51 +17,17 @@ export const extensionRoot = resolve(scriptsDirectory, "..");
 export const repositoryRoot = resolve(extensionRoot, "..");
 export const outputRoot = join(extensionRoot, "dist");
 
-const TEST_DEFAULTS = Object.freeze({
-  clientId: "Iv1.moondiff-test-client",
-  installUrl: "https://github.com/apps/moondiff-test/installations/new",
-});
-const TEST_INSTALL_URL = new URL(TEST_DEFAULTS.installUrl);
-
-function validateMode(mode) {
-  if (mode !== "development" && mode !== "webstore") {
-    throw new Error(`Unknown extension build mode: ${mode}.`);
-  }
-}
-
-function required(env, key, label, fallback) {
-  const value = String(env[key] || fallback || "").trim();
-  if (!value) throw new Error(`Missing ${key} (${label}).`);
-  return value;
-}
-
-function sameEndpoint(left, right) {
-  const leftPath = left.pathname.replace(/\/+$/u, "");
-  const rightPath = right.pathname.replace(/\/+$/u, "");
-  return left.origin === right.origin && leftPath === rightPath;
-}
-
 export function readBuildConfig(env = process.env, mode = "development") {
-  validateMode(mode);
-  const allowTest = env.MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG === "1";
-  if (mode === "webstore" && allowTest) {
-    throw new Error("MOONDIFF_EXTENSION_ALLOW_TEST_CONFIG is not allowed in webstore builds.");
+  if (!["development", "webstore"].includes(mode)) throw new Error(`Unknown build mode: ${mode}`);
+  const value = env.MOONDIFF_PLAYGROUND_URL;
+  if (!value) throw new Error("Missing MOONDIFF_PLAYGROUND_URL.");
+  const url = new URL(value);
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash ||
+      !(url.protocol === "https:" || mode === "development" && loopback && url.protocol === "http:")) {
+    throw new Error("MOONDIFF_PLAYGROUND_URL must be an HTTPS root URL; development also allows loopback HTTP.");
   }
-  const defaults = allowTest ? TEST_DEFAULTS : {};
-  const clientId = required(env, "MOONDIFF_GITHUB_CLIENT_ID", "GitHub App client ID", defaults.clientId);
-  const installUrl = required(env, "MOONDIFF_GITHUB_INSTALL_URL", "GitHub App installation URL", defaults.installUrl);
-  if (!/^[A-Za-z0-9._-]{6,200}$/u.test(clientId)) throw new Error("MOONDIFF_GITHUB_CLIENT_ID is invalid.");
-  const parsedInstall = new URL(installUrl);
-  if (parsedInstall.protocol !== "https:" || parsedInstall.hostname !== "github.com") {
-    throw new Error("MOONDIFF_GITHUB_INSTALL_URL must be an HTTPS github.com URL.");
-  }
-  if (mode === "webstore" && clientId === TEST_DEFAULTS.clientId) {
-    throw new Error("The built-in test GitHub App client ID is not allowed in webstore builds.");
-  }
-  if (mode === "webstore" && sameEndpoint(parsedInstall, TEST_INSTALL_URL)) {
-    throw new Error("The built-in test GitHub App installation URL is not allowed in webstore builds.");
-  }
-  return { clientId, installUrl: parsedInstall.toString() };
+  return { playgroundUrl: url.origin + "/" };
 }
 
 function crc32(buffer) {
@@ -149,7 +112,7 @@ function rasterIcon(size) {
   ]);
 }
 
-function manifest() {
+function manifest(config) {
   const icons = {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -159,15 +122,11 @@ function manifest() {
   return {
     manifest_version: 3,
     name: "Moondiff",
-    description: "Review and comment on GitHub pull requests and commits with MoonBit-aware diffs.",
+    description: "Automatically open GitHub changes in your Moondiff playground.",
     version: extensionVersion,
     minimum_chrome_version: "116",
     permissions: ["storage"],
-    host_permissions: [
-      "https://api.github.com/*",
-      "https://github.com/login/device/code",
-      "https://github.com/login/oauth/access_token",
-    ],
+    host_permissions: [new URL(config.playgroundUrl).origin + "/*"],
     background: { service_worker: "service-worker.js" },
     content_scripts: [{
       // GitHub can SPA-navigate into a PR or commit without creating a new document,
@@ -178,49 +137,32 @@ function manifest() {
     }],
     icons,
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'none'; connect-src 'self' https://api.github.com https://github.com",
+      extension_pages: "script-src 'self'; object-src 'none'; connect-src 'self'",
     },
   };
 }
 
 export function buildExtension({ env = process.env, log = process.stdout, mode = "development" } = {}) {
   const buildConfig = readBuildConfig(env, mode);
-  const targetRoot = mkdtempSync(join(tmpdir(), "moondiff-extension-build-"));
   const stagingRoot = mkdtempSync(join(extensionRoot, ".dist-"));
   try {
-    const build = spawnSync("moon", [
-      "build",
-      "--target", "js",
-      "--release",
-      "--target-dir", targetRoot,
-      "playground/main",
-    ], { cwd: repositoryRoot, stdio: "inherit" });
-    if (build.error) throw build.error;
-    if (build.status !== 0) throw new Error(`MoonBit extension build failed with exit code ${build.status}.`);
-    const builtJavaScript = join(targetRoot, "js", "release", "build", "moonbit-community", "moondiff-playground", "main", "main.js");
-    if (!existsSync(builtJavaScript)) throw new Error(`MoonBit extension artifact was not found at ${builtJavaScript}.`);
-
     mkdirSync(join(stagingRoot, "icons"), { recursive: true });
-    for (const file of ["target.js", "content-script.js", "service-worker.js", "review-bootstrap.js", "review.html"]) {
+    for (const file of ["target.js", "content-script.js", "service-worker.js"]) {
       copyFileSync(join(extensionRoot, "src", file), join(stagingRoot, file));
     }
-    copyFileSync(builtJavaScript, join(stagingRoot, "index.js"));
-    copyFileSync(join(repositoryRoot, "playground", "public", "styles.css"), join(stagingRoot, "styles.css"));
     copyFileSync(join(extensionRoot, "icons", "favicon.svg"), join(stagingRoot, "icons", "favicon.svg"));
     for (const size of [16, 32, 48, 128]) {
       writeFileSync(join(stagingRoot, "icons", `icon-${size}.png`), rasterIcon(size));
     }
-    writeFileSync(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest(), null, 2)}\n`);
+    writeFileSync(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest(buildConfig), null, 2)}\n`);
     writeFileSync(join(stagingRoot, "config.js"), `globalThis.MoondiffConfig = Object.freeze(${JSON.stringify({
-      clientId: buildConfig.clientId,
-      installUrl: buildConfig.installUrl,
+      playgroundUrl: buildConfig.playgroundUrl,
     })});\n`);
     rmSync(outputRoot, { recursive: true, force: true });
     renameSync(stagingRoot, outputRoot);
     log.write(`Built ${outputRoot}\n`);
     return { outputRoot };
   } finally {
-    rmSync(targetRoot, { recursive: true, force: true });
     rmSync(stagingRoot, { recursive: true, force: true });
   }
 }
