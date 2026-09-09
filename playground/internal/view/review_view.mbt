@@ -628,6 +628,7 @@ fn file_discussions_view(
 fn auth_controls(
   auth : @application.AuthStatus,
   emit : @rabbita.Emit[Msg],
+  refresh? : @rabbita.Html = @html.nothing,
 ) -> @rabbita.Html {
   match auth {
     WebReadOnly => @html.nothing
@@ -636,6 +637,7 @@ fn auth_controls(
     SignedIn(login~, install_url~) =>
       @html.div(class="auth-controls", [
         @html.span("Signed in\{login.map(name => " as \{name}").unwrap_or("")}"),
+        refresh,
         if install_url is Some(url) {
           @html.a(
             href=url,
@@ -762,6 +764,13 @@ fn comments_overview(
   if auth is WebReadOnly {
     return @html.nothing
   }
+  let refresh = @html.button(
+    type_="button",
+    class="secondary refresh-comments",
+    disabled=!(review.refresh() is RefreshIdle),
+    on_click=emit(Review(RefreshComments)),
+    "Refresh",
+  )
   let issue_views : Map[String, @rabbita.Html] = Map([])
   if review.comments() is CommentsReady(bundle) {
     for comment in bundle.issue_comments {
@@ -783,14 +792,12 @@ fn comments_overview(
         @html.h2("Comments"),
       ]),
       @html.div([
-        auth_controls(auth, emit),
-        @html.button(
-          type_="button",
-          class="secondary refresh-comments",
-          disabled=!(review.refresh() is RefreshIdle),
-          on_click=emit(Review(RefreshComments)),
-          "Refresh",
-        ),
+        auth_controls(auth, emit, refresh~),
+        if auth is SignedIn(_) {
+          @html.nothing
+        } else {
+          refresh
+        },
       ]),
     ]),
     if review.snapshot_stale {
