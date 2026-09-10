@@ -1,0 +1,16 @@
+services:
+  moondiff:
+    image: ghcr.io/moonbit-community/moondiff-playground:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4173:4173"
+    env_file:
+      - .env
+    environment:
+      MOONDIFF_LISTEN: "0.0.0.0:4173"
+      MOONDIFF_STATIC_DIR: /app/static
+      MOONDIFF_DATABASE: /var/lib/moondiff/moondiff.sqlite3
+    volumes:
+      - moondiff-data:/var/lib/moondiff
+volumes:
+  moondiff-data:
