@@ -367,20 +367,87 @@ function newLineCommentGutter(page, line) {
   const lineNumber = page.locator(".line-number-value", {
     hasText: new RegExp(`^${line}$`),
   });
-  return page.locator(".review-gutter.new-line-number", { has: lineNumber });
+  return page.locator("#moondiff-file-0 .review-gutter.new-line-number", { has: lineNumber });
 }
 
 function newLineCommentButton(page, line) {
   return newLineCommentGutter(page, line)
-    .getByRole("button", { name: `Comment on line ${line}` });
+    .getByRole("button", { name: `Comment on line ${line}`, exact: true });
+}
+
+async function clickLineCommentButton(button) {
+  await expect(async () => {
+    await button.scrollIntoViewIfNeeded({ timeout: 1_000 });
+    await button.locator("xpath=..").hover({ timeout: 1_000 });
+    await button.click({ timeout: 1_000 });
+  }).toPass({ timeout: 5_000, intervals: [100, 250, 500] });
 }
 
 async function openNewLineComment(page, line) {
-  await newLineCommentGutter(page, line).hover();
-  const button = newLineCommentButton(page, line);
-  await expect(button).toHaveCSS("opacity", "1");
-  await button.click();
+  await clickLineCommentButton(newLineCommentButton(page, line));
   await expect(page.locator(".inline-comment-editor-row textarea")).toBeVisible();
+}
+
+async function releaseListAfterLineCommentHover(page, button) {
+  const race = { interruptions: 0 };
+  const gutter = button.locator("xpath=..");
+  // Trigger only after hover, immediately before the click's actionability check.
+  await page.addLocatorHandler(button.and(page.locator(".review-gutter:hover > .line-comment-button")), async () => {
+    const before = await gutter.boundingBox();
+    await expect(button).toHaveCSS("opacity", "1");
+    await page.evaluate(() => window.__fake.releaseList());
+    await expect.poll(async () => Math.abs((await gutter.boundingBox()).y - before.y)).toBeGreaterThan(before.height);
+    // Re-hit-test the stationary pointer at the gutter's original coordinates.
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    await expect.poll(() => button.evaluate(el => el.parentElement.matches(":hover"))).toBe(false);
+    await expect(button).toHaveCSS("opacity", "0");
+    await expect(button).toHaveCSS("pointer-events", "none");
+    race.interruptions += 1;
+  }, { times: 1, noWaitAfter: true });
+  return race;
+}
+
+for (const phase of ["initial comment load", "background refresh"]) {
+  for (const layout of ["Split", "Unified"]) {
+    for (const side of ["old", "new"]) {
+      test(`line comment click recovers from ${phase} after hover: ${layout} ${side}`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 1200 });
+        await installApi(page, pullTarget(), { authenticated: true });
+        await page.addInitScript(phase => {
+          if (phase === "initial comment load") window.__fake.delayNextList = true;
+        }, phase);
+        await page.goto(reviewPath());
+        const file = page.locator("#moondiff-file-0");
+        await expect(file).toContainText("src/main.mbt");
+        await page.getByRole("button", { name: layout, exact: true }).click();
+        if (phase === "background refresh") {
+          await waitForSignedInComments(page);
+          await page.evaluate(() => {
+            const state = window.__fake;
+            state.reviewComments.push({ ...state.reviewComments[0], id: "99", line: 1, position: 1 });
+            state.delayNextList = true;
+          });
+          await reactivatePage(page);
+        }
+        await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+        const button = file.locator(`.${side}-line-number`)
+          .getByRole("button", { name: "Comment on line 2", exact: true });
+        const race = await releaseListAfterLineCommentHover(page, button);
+        await clickLineCommentButton(button);
+        expect(race.interruptions).toBe(1);
+        const row = file.locator(".inline-comment-editor-row");
+        const editor = row.locator("textarea");
+        await expect(page.locator(".comment-editor")).toHaveCount(1);
+        await expect(editor).toBeVisible();
+        await expect(editor).toBeFocused();
+        await expect(row.locator(".comment-location")).toHaveText(`src/main.mbt · ${side === "old" ? "Old" : "New"} · 2`);
+        await expectInlinePlacement(row.locator(".inline-discussion"), layout, side === "old" ? "left" : "right");
+        await page.keyboard.type("Draft after layout change");
+        await expect(editor).toHaveValue("Draft after layout change");
+        await expect(editor).toBeFocused();
+      });
+    }
+  }
 }
 
 test("anonymous public PR loads comments and a safe narrow diff without Analyze", async ({ page }) => {
@@ -956,9 +1023,8 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
         expect(await body.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
       }
       for (const side of ["old", "new"]) {
-        const gutter = page.locator(`.${side}-line-number`).filter({ has: page.locator(".line-number-value", { hasText: /^2$/u }) });
-        await gutter.hover();
-        await gutter.getByRole("button", { name: "Comment on line 2" }).click();
+        const gutter = page.locator(`#moondiff-file-0 .${side}-line-number`).filter({ has: page.locator(".line-number-value", { hasText: /^2$/u }) });
+        await clickLineCommentButton(gutter.getByRole("button", { name: "Comment on line 2", exact: true }));
         const editor = page.locator(".inline-comment-editor-row .inline-discussion");
         await expect(editor.locator("textarea")).toBeFocused();
         await expect(editor.locator("textarea")).toHaveCSS("font-size", "14px");
@@ -995,8 +1061,6 @@ test("split comment width changes at a 720px diff container without remounting t
   await page.setViewportSize({ width: 1440, height: 900 });
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
-  // Initial comments can move the gutter after hover and hide its action again.
-  await expect(page.getByText("Existing inline comment", { exact: true })).toBeVisible();
   await openNewLineComment(page, 2);
   const editor = page.locator(".inline-comment-editor-row textarea");
   await editor.fill("Keep the caret");
@@ -1261,15 +1325,32 @@ test("one draft survives repeated clicks and every entry switch while posting", 
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await page.getByRole("button", { name: "Add overall comment" }).click();
+  const overallEditor = page.locator(".overall-comments textarea");
+  await overallEditor.fill("Keep the overall draft");
+  const overallDraftId = await overallEditor.getAttribute("data-draft-id");
   await newLineCommentGutter(page, 2).hover();
   await expect(newLineCommentButton(page, 2)).toBeDisabled();
-  await expect(page.locator(".overall-comments textarea")).toHaveValue("");
+  await expect(clickLineCommentButton(newLineCommentButton(page, 2))).rejects.toThrow(/not enabled/);
+  await expect(page.locator(".comment-editor")).toHaveCount(1);
+  await expect(overallEditor).toHaveAttribute("data-draft-id", overallDraftId);
+  await expect(overallEditor).toHaveValue("Keep the overall draft");
   await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
-  await expect(page.locator(".overall-comments textarea")).toHaveValue("");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await openNewLineComment(page, 2);
   await page.locator(".comment-editor textarea").fill("Do not lose this draft");
+  const inlineDraftId = await page.locator(".comment-editor textarea").getAttribute("data-draft-id");
+  await page.evaluate(() => {
+    const state = window.__fake;
+    state.reviewComments.push({ ...state.reviewComments[0], id: "99", line: 1, position: 1 });
+    state.delayNextList = true;
+  });
+  await reactivatePage(page);
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+  const race = await releaseListAfterLineCommentHover(page, newLineCommentButton(page, 2));
   await openNewLineComment(page, 2);
+  expect(race.interruptions).toBe(1);
+  await expect(page.locator(".comment-editor")).toHaveCount(1);
+  await expect(page.locator(".comment-editor textarea")).toHaveAttribute("data-draft-id", inlineDraftId);
   await expect(page.locator(".comment-editor textarea")).toHaveValue("Do not lose this draft");
   await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
@@ -1568,8 +1649,7 @@ for (const change of ["modified", "inserted", "deleted"]) {
     // Original reproduction: start a draft in the second occurrence after closing the first.
     const side = change === "deleted" ? "old" : "new";
     const anchor = second.locator(`.${side}-line-number button[aria-label="Comment on line 1"]`);
-    await anchor.locator("xpath=..").hover();
-    await anchor.click();
+    await clickLineCommentButton(anchor);
     const editor = page.locator(".comment-editor textarea");
     await expect(editor).toHaveCount(1);
     await expect(second.locator("textarea")).toBeVisible();
