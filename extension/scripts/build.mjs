@@ -122,7 +122,7 @@ function manifest(config) {
   return {
     manifest_version: 3,
     name: "Moondiff",
-    description: "Automatically open GitHub changes in your Moondiff playground.",
+    description: "Open GitHub changes in your Moondiff playground with the Open in Moondiff button.",
     version: extensionVersion,
     minimum_chrome_version: "116",
     permissions: ["storage"],

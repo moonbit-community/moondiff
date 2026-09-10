@@ -1,7 +1,8 @@
 # Moondiff redirect extension
 
-The extension automatically opens GitHub commits and pull requests in your
-self-hosted [Moondiff playground](../playground/README.md). It contains no
+The extension adds a black **Open in Moondiff** button to the bottom-right corner
+of GitHub commit and pull-request pages. Click it to open the corresponding page
+in your self-hosted [Moondiff playground](../playground/README.md). It contains no
 review UI, GitHub API client, OAuth flow or credentials. Authentication and
 comments belong to the playground backend.
 
@@ -32,17 +33,22 @@ change it.
 
 ## Navigation and tab reuse
 
-GitHub first loads and SPA transitions are detected automatically. PR home,
+GitHub first loads and SPA transitions update the button without opening or
+activating playground tabs. The button is removed on unsupported pages and
+restored after page redraws. It supports mouse and keyboard activation, and is
+temporarily disabled while opening; after a failed request, click again to retry.
+
+Each click uses the current GitHub URL. PR home,
 Files changed and commit-list pages all map to `/owner/repo/pull/number`.
 `changes/sha` and `commits/sha` both map to
 `/owner/repo/pull/number/commits/sha`. Commit pages map to
 `/owner/repo/commit/sha`. Repository/SHA casing, query parameters and comment
-anchors do not create duplicate destinations. No page button is required.
+anchors do not create duplicate destinations.
 
 Mappings are keyed by source GitHub tab ID plus canonical change path and saved
-in `chrome.storage.session`, surviving service worker restarts. Concurrent events
+in `chrome.storage.session`, surviving service worker restarts. Concurrent requests
 share one open operation. Different changes open and activate separate tabs.
-Returning to the same change only activates its existing tab if it still has the
+Clicking the button for the same change activates its existing tab if it still has the
 matching origin and path. Closed or navigated-away destinations are forgotten;
 the extension never navigates an existing tab to replace its content or draft.
 Two source GitHub tabs have independent mappings.
@@ -66,6 +72,8 @@ npm run test:extension
 Unit tests cover aliases, permission/config validation, concurrent opens, worker
 restart, old credential cleanup and tab lifecycle. Chromium loads the real
 extension against local route fixtures for GitHub and the destination, covering
-initial loads, SPA navigation, safe reuse, closed/navigated tabs and distinct
-source tabs. The former review tests now live under `playground/frontend/tests/` and use
+button appearance, click-only opening, SPA navigation, page redraws, safe reuse,
+closed/navigated tabs and distinct source tabs. Content-script browser tests also
+cover trusted clicks, keyboard activation, pending requests and failure retries.
+The former review tests now live under `playground/frontend/tests/` and use
 same-origin HTTP fixtures.

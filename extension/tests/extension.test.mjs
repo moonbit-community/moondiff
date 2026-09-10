@@ -39,6 +39,7 @@ const pr = 'https://github.com/Acme/Widgets/pull/42';
 
 test('target aliases normalize commits, PR tabs, query strings, anchors and casing', () => {
   const { context: c } = harness();
+  assert.equal(c.MoondiffTarget.targetPath(c.MoondiffTarget.parseGitHubTarget('https://github.com/Acme/Widgets/commit/ABCDEF1?diff=split#comment')), '/acme/widgets/commit/abcdef1');
   for (const suffix of ['', '/files', '/commits', '/files?diff=split#discussion_r1']) assert.equal(c.MoondiffTarget.targetPath(c.MoondiffTarget.parseGitHubTarget(pr + suffix)), '/acme/widgets/pull/42');
   for (const suffix of ['/changes/ABCDEF1', '/commits/abcdef1']) assert.equal(c.MoondiffTarget.targetPath(c.MoondiffTarget.parseGitHubTarget(pr + suffix)), '/acme/widgets/pull/42/commits/abcdef1');
   for (const invalid of ['http://github.com/a/b/pull/1', 'https://evil/a/b/pull/1', 'https://github.com/a/b/pull/0', 'https://user@github.com/a/b/pull/1']) assert.equal(c.MoondiffTarget.parseGitHubTarget(invalid), null);
@@ -94,24 +95,6 @@ test('untrusted frames, mismatched targets, and old RPCs are rejected; upgrade d
   await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'github.commit.get', args: {} }, h.sender(pr)));
   await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/99' } }, h.sender(pr)));
   assert.equal(h.created.length, 0);
-});
-
-test('content script auto-opens only normalized target transitions across initial load and SPA', async () => {
-  const calls = []; const listeners = new Map(); let mutation;
-  const location = { href: pr };
-  const context = vm.createContext({ URL, location, queueMicrotask, setTimeout,
-    document: { documentElement: {} }, chrome: { runtime: { async sendMessage(message) { calls.push(message); return { ok: true }; } } },
-    addEventListener(name, fn) { listeners.set(name, fn); },
-    MutationObserver: class { constructor(fn) { mutation = fn; } observe() {} },
-  });
-  vm.runInContext(source('target.js'), context); vm.runInContext(source('content-script.js'), context);
-  assert.equal(calls.length, 1);
-  for (const suffix of ['/files', '/commits', '?diff=split#comment']) { location.href = pr + suffix; mutation(); await new Promise(queueMicrotask); }
-  assert.equal(calls.length, 1);
-  location.href = pr.replace('42', '43'); listeners.get('turbo:load')(); mutation(); await new Promise(queueMicrotask);
-  assert.equal(calls.length, 2);
-  location.href = 'https://github.com/acme/widgets'; mutation(); await new Promise(queueMicrotask);
-  location.href = pr; listeners.get('popstate')(); await new Promise(queueMicrotask); assert.equal(calls.length, 3);
 });
 
 test('build validates root deployment URL and emits only redirect assets and minimal permissions', () => {
