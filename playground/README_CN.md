@@ -29,7 +29,8 @@ npm ci
 # 也可以使用绝对路径。
 
 # 后端 HTTP 服务监听的 IP 地址和 TCP 端口，不包含 URL 协议前缀。
-# 127.0.0.1 仅接受本机回环连接。
+# 127.0.0.1 仅接受本机回环连接。Docker 中默认为 0.0.0.0:4173
+# （所有 IPv4 接口），以便通过发布的端口访问服务。
 MOONDIFF_LISTEN=127.0.0.1:4173
 
 # 浏览器访问服务时使用的源地址（协议、主机名和可选端口），用于校验登录、
@@ -43,12 +44,13 @@ MOONDIFF_LISTEN=127.0.0.1:4173
 MOONDIFF_PUBLIC_URL=http://localhost:4173
 
 # 后端提供的前端 HTML、JavaScript 等构建产物所在目录。
-# 由 npm run build 创建，启动前必须存在。
+# 由 npm run build 创建，启动前必须存在。Docker 中默认为 /app/static。
 MOONDIFF_STATIC_DIR=dist/static
 
 # SQLite 文件，保存会话、加密的 GitHub 凭据和待完成的设备登录状态。
 # 文件不存在时会自动创建；需提前创建父目录，并确保运行服务的用户有写入权限。
 # 使用持久存储保存该文件，每个数据库只能由一个服务进程使用。
+# Docker 中默认为 /var/lib/moondiff/moondiff.sqlite3。
 MOONDIFF_DATABASE=moondiff.sqlite3
 
 # 必填，本地开发也需要：对恰好 64 个随机字节进行 Base64 编码得到的密钥。
@@ -140,6 +142,51 @@ MOONDIFF_STATIC_DIR=/absolute/release/static moonrun ./moondiff-server.wasm
 后端监听器使用 HTTP，生产环境的 HTTPS 需由反向代理处理，可参考随附的
 [Nginx 示例](deploy/nginx.conf.example)。使用专用的操作系统账户和私有的持久数据目录，
 仅允许反向代理访问后端监听器。每个 SQLite 数据库只能由一个进程使用，升级期间也不例外。
+
+## Docker
+
+在仓库根目录构建，以便镜像能够访问所有 `moon.work` 成员：
+
+```sh
+docker build -f playground/Dockerfile -t moondiff-playground:local .
+```
+
+构建阶段会安装 Node.js 22 和最新的 MoonBit 工具链，与现有 CI 配置保持一致。
+如需指定 MoonBit 版本，传入 `--build-arg MOONBIT_VERSION=<version>`，
+版本值需使用 MoonBit 官方安装器支持的格式。运行时镜像包含 `moonrun`、受信任的 CA 证书、
+Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
+
+按照[运行时配置](#运行时配置)创建 `playground/.env`，填写 GitHub App 配置和持久保存的密钥，
+然后在仓库根目录执行：
+
+```sh
+docker run --detach --name moondiff-playground \
+  --restart unless-stopped \
+  --publish 127.0.0.1:4173:4173 \
+  --env-file playground/.env \
+  --env MOONDIFF_LISTEN=0.0.0.0:4173 \
+  --env MOONDIFF_STATIC_DIR=/app/static \
+  --env MOONDIFF_DATABASE=/var/lib/moondiff/moondiff.sqlite3 \
+  --mount type=volume,source=moondiff-data,target=/var/lib/moondiff \
+  moondiff-playground:local
+```
+
+命令中显式指定的路径和监听地址会覆盖 `.env` 中用于本地开发的值。
+Docker 会将该文件中的配置作为环境变量传入；该文件与本地数据库、依赖和构建产物一起被排除在构建上下文之外。
+打开 `http://localhost:4173`。生产环境中，将 `MOONDIFF_PUBLIC_URL` 设置为对外提供服务的 HTTPS 源地址，
+并按照[部署说明](#构建与部署)配置反向代理。
+
+命名卷会在替换容器时保留 SQLite 数据。每个数据库只能供一个容器使用，
+重启后也需保持 `MOONDIFF_TOKEN_KEY` 不变。如果改用绑定挂载，
+请确保 UID/GID 为 `10001:10001` 的用户对挂载目录有写入权限。
+镜像的健康检查会在配置的监听端口上请求 `/healthz`。
+
+`playground-image` GitHub Actions 工作流会在每次拉取请求和推送到 `main` 时
+构建 `linux/amd64` 镜像，并检查容器健康状态、静态资源、变更详情直达链接和认证状态接口。
+在 `main` 上通过这些检查后，工作流使用具有 `packages: write` 权限的 `GITHUB_TOKEN`，
+发布 `ghcr.io/<owner>/<repository>-playground:latest` 和 `:sha-<full-commit-sha>` 镜像。
+也可以手动运行工作流；只有在 `main` 上运行时才会发布镜像。
+如需使用已发布的镜像，将运行命令中的 `moondiff-playground:local` 替换为对应的 GHCR 镜像标签。
 
 ## 会话与备份
 

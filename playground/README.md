@@ -29,7 +29,8 @@ placeholder with a persistent key generated using the command below.
 # and npm run dev); absolute paths are also accepted.
 
 # HTTP listener IP and TCP port, without a URL scheme.
-# 127.0.0.1 accepts only loopback connections.
+# 127.0.0.1 accepts only loopback connections. Docker defaults to 0.0.0.0:4173
+# (all IPv4 interfaces) so published ports can reach the server.
 MOONDIFF_LISTEN=127.0.0.1:4173
 
 # Browser-facing root origin (scheme, hostname and optional port), used to
@@ -43,12 +44,13 @@ MOONDIFF_LISTEN=127.0.0.1:4173
 MOONDIFF_PUBLIC_URL=http://localhost:4173
 
 # Built frontend HTML, JavaScript and other assets served by the backend.
-# Created by npm run build; must exist before startup.
+# Created by npm run build; must exist before startup. Docker default: /app/static.
 MOONDIFF_STATIC_DIR=dist/static
 
 # SQLite file for sessions, encrypted GitHub credentials and pending device sign-ins.
 # Created if missing; create its parent directory first and make it writable by
 # the server user. Keep it on persistent storage; run one server per database.
+# Docker default: /var/lib/moondiff/moondiff.sqlite3.
 MOONDIFF_DATABASE=moondiff.sqlite3
 
 # Required, including locally: Base64 encoding of exactly 64 random bytes.
@@ -148,6 +150,57 @@ at a reverse proxy such as the supplied [Nginx example](deploy/nginx.conf.exampl
 Use a dedicated OS account and a private persistent data directory. Restrict the
 upstream listener to the proxy. Run exactly one process per SQLite database,
 including during upgrades.
+
+## Docker
+
+Build from the repository root so the image can access all `moon.work` members:
+
+```sh
+docker build -f playground/Dockerfile -t moondiff-playground:local .
+```
+
+The build stage installs Node.js 22 and the latest MoonBit toolchain, matching
+the existing CI setup. To select a specific MoonBit release, pass
+`--build-arg MOONBIT_VERSION=<version>` using a version accepted by the official
+MoonBit installer. The runtime image contains `moonrun`, trusted CA certificates,
+the Wasm backend and static assets, and runs as UID/GID `10001:10001`.
+
+Create `playground/.env` with the GitHub App settings and persistent token key
+from [Runtime configuration](#runtime-configuration), then run from the repository
+root:
+
+```sh
+docker run --detach --name moondiff-playground \
+  --restart unless-stopped \
+  --publish 127.0.0.1:4173:4173 \
+  --env-file playground/.env \
+  --env MOONDIFF_LISTEN=0.0.0.0:4173 \
+  --env MOONDIFF_STATIC_DIR=/app/static \
+  --env MOONDIFF_DATABASE=/var/lib/moondiff/moondiff.sqlite3 \
+  --mount type=volume,source=moondiff-data,target=/var/lib/moondiff \
+  moondiff-playground:local
+```
+
+The explicit path and listener settings override the local-development values in
+`.env`. Docker passes this file as environment variables; it is excluded from the
+build context along with local databases, dependencies and generated artifacts.
+Open `http://localhost:4173`. For production, set `MOONDIFF_PUBLIC_URL` to the
+external HTTPS origin and configure a reverse proxy as described in the
+[deployment instructions](#build-and-deploy).
+
+The named volume preserves SQLite data when replacing the container. Use only
+one container per database and keep the same `MOONDIFF_TOKEN_KEY` across restarts.
+If using a bind mount instead, make its directory writable by UID/GID
+`10001:10001`. The image health check probes `/healthz` on the configured listener
+port.
+
+The `playground-image` GitHub Actions workflow builds a `linux/amd64` image and
+checks container health, static resources, a direct change link and the auth
+status endpoint on every pull request and push to `main`. After these checks pass
+on `main`, it publishes `ghcr.io/<owner>/<repository>-playground:latest` and
+`:sha-<full-commit-sha>` using the workflow's `GITHUB_TOKEN` with `packages: write`.
+It can also be run manually; only runs on `main` publish images. To use a published
+image, replace `moondiff-playground:local` in the run command with its GHCR tag.
 
 ## Sessions and backup
 

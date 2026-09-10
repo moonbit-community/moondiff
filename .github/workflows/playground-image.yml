@@ -1,0 +1,101 @@
+name: playground-image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: playground-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Generate image tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}-playground
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long
+            type=ref,event=pr
+
+      - name: Build playground image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: playground/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: |
+            moondiff-playground:ci
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=playground-image
+          cache-to: type=gha,mode=max,scope=playground-image
+
+      - name: Smoke-test playground container
+        shell: bash
+        run: |
+          container_id=$(docker run --detach \
+            --publish 127.0.0.1:4173:4173 \
+            --health-interval=1s \
+            --env MOONDIFF_PUBLIC_URL=http://localhost:4173 \
+            --env MOONDIFF_TOKEN_KEY="$(openssl rand -base64 64 | tr -d '\n')" \
+            --env MOONDIFF_GITHUB_CLIENT_ID=smoke-test \
+            --env MOONDIFF_GITHUB_INSTALL_URL=https://github.com/apps/smoke-test/installations/new \
+            moondiff-playground:ci)
+          trap 'docker logs "$container_id"; docker rm --force --volumes "$container_id" >/dev/null' EXIT
+          for attempt in {1..30}; do
+            health=$(docker inspect --format '{{.State.Health.Status}}' "$container_id")
+            if [ "$health" = healthy ]; then
+              break
+            fi
+            if [ "$health" = unhealthy ]; then
+              exit 1
+            fi
+            echo "Waiting for container health ($attempt/30): $health"
+            sleep 1
+          done
+          test "$health" = healthy
+          for path in /healthz / /index.js /styles.css /alice/repo/pull/42 /api/auth/status; do
+            curl --fail --silent --show-error --max-time 10 --output /dev/null "http://127.0.0.1:4173$path"
+          done
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push tested image to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          while IFS= read -r image_tag; do
+            docker push "$image_tag"
+          done <<< "$IMAGE_TAGS"
