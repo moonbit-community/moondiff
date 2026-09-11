@@ -23,7 +23,8 @@ npm ci
 替换密钥占位值。
 
 ```sh
-# 启动前需将这些变量导出到环境中。服务端不会自动加载 .env。
+# npm run dev 会自动加载 .env。使用 npm start 或直接运行服务端前，
+# 需先将这些变量导出到环境中；服务端本身不会自动加载 .env。
 # 除标记为“必填”的变量外，下方给出的值均为默认值。
 # 相对路径以进程工作目录为基准（npm start 和 npm run dev 使用 playground/）；
 # 也可以使用绝对路径。
@@ -74,25 +75,25 @@ MOONDIFF_GITHUB_INSTALL_URL=https://github.com/apps/your-app/installations/new
 
 数据库备份与恢复方法见[会话与备份](#会话与备份)。
 
-导出环境变量并启动服务：
+构建并启动开发服务：
 
 ```sh
-# 开启自动导出，使后续新建或修改的 Shell 变量能被子进程继承。
-set -a
-
-# 在当前 Shell 中读取并执行 .env，将其中的配置导出为环境变量。
-. ./.env
-
-# 关闭自动导出；已导出的配置仍会传给随后启动的服务。
-set +a
-
-# 使用上述环境变量构建一次并启动服务，不监听文件变化。
 npm run dev
 ```
 
 打开 `http://localhost:4173`，或配置的 `MOONDIFF_PUBLIC_URL` 地址。该配置必须与浏览器的源地址一致。
-`npm run dev` 会构建一次并启动服务，不会监听文件变化。
+`npm run dev` 会加载 `playground/.env`，保留已导出的环境变量，构建一次并启动服务，
+不会监听文件变化。按 Ctrl+C 停止。也可以在仓库根目录执行
+`node playground/scripts/dev.mjs`。如果已导出所有必填配置，可以不创建 `.env`。
+
 使用 `npm run build` 重新构建，使用 `npm start` 运行已有构建产物。
+使用 `npm start` 或直接运行后端前，需先导出配置：
+
+```sh
+set -a
+. ./.env
+set +a
+```
 
 导出配置后，如需从源码运行后端，在仓库根目录执行
 `moon -C playground/backend run main`。如需使用 Native 目标，
