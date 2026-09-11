@@ -2372,3 +2372,54 @@ button.toolbar-button.ignore-tests-toggle.active {
 .device-code { font-family: ui-monospace, monospace; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.12em; user-select: all; }
 .device-open { display: inline-block; text-decoration: none; }
 .device-progress { font-size: 0.875rem; }
+
+.viewed-control, .viewed-label, .viewed-progress-content, .viewed-sign-in {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.viewed-control { flex-wrap: wrap; justify-content: flex-end; }
+.viewed-label {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.viewed-label:hover { background: var(--surface-subtle); }
+.viewed-label.is-viewed { background: color-mix(in srgb, #0969da 12%, var(--surface)); }
+.viewed-label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.viewed-label:has(input:disabled) { cursor: default; color: var(--muted); }
+.viewed-label input { width: 1rem; height: 1rem; margin: 0; accent-color: #0969da; }
+.viewed-spinner { width: 0.7rem; height: 0.7rem; }
+.viewed-dismissed, .viewed-refreshing { color: var(--muted); font-size: 0.7rem; }
+.viewed-retry { padding: 0.2rem 0.4rem; font-size: 0.7rem; }
+.viewed-progress { margin: 0.75rem 0; font-size: 0.8rem; }
+.viewed-progress-content, .viewed-sign-in { flex-wrap: wrap; }
+.viewed-progress-track { width: 8rem; height: 0.45rem; border-radius: 1rem; overflow: hidden; background: var(--border-soft); }
+.viewed-progress-fill { height: 100%; background: #0969da; transition: width 120ms ease; }
+.viewed-error { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; width: 100%; color: var(--muted-strong); }
+.tree-viewed { margin-left: auto; color: #0969da; font-weight: 700; }
+@media (max-width: 767px) {
+  .viewed-label { padding: 0.25rem; }
+  .viewed-dismissed { display: none; }
+  .file-actions:has(.viewed-control) { gap: 0.3rem; }
+}
+
+.viewed-file-error { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; color: var(--muted-strong); font-size: 0.8rem; }
+
+.viewed-confirming {
+  max-width: 12rem;
+  white-space: normal;
+  color: var(--muted-strong);
+  font-size: 0.7rem;
+}
+
+.viewed-confirmation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}

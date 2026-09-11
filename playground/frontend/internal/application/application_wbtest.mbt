@@ -22,6 +22,7 @@ fn fixture_file(
 ///|
 test "stale commit responses are discarded by generation" {
   let model = Model::{
+    viewed: empty_viewed_state(0),
     input: "https://github.com/a/b/commit/abcdef1",
     generation: 2,
     view_mode: Split,
@@ -50,6 +51,7 @@ fn pull_test_model(
   phase : Phase,
 ) -> Model {
   {
+    viewed: empty_viewed_state(0),
     input: canonical_github_url(reference),
     generation,
     view_mode: Split,
@@ -425,6 +427,7 @@ fn diff_test_view(files : Array[ApiFile]) -> ChangeView raise {
 ///|
 fn diff_test_model(view : ChangeView) -> Model {
   {
+    viewed: empty_viewed_state(0),
     input: "",
     generation: 9,
     view_mode: Split,
@@ -1263,6 +1266,7 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
     2,
   ).unwrap()
   let model = Model::{
+    viewed: empty_viewed_state(0),
     input: canonical_github_url(view.reference),
     generation: 5,
     view_mode: Split,
@@ -1419,6 +1423,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     error: None,
   }
   let model = Model::{
+    viewed: empty_viewed_state(0),
     input: canonical_github_url(view.reference),
     generation: 5,
     view_mode: Split,
@@ -1625,6 +1630,7 @@ fn auth_test_model(
   last_authenticated_user_id? : String? = None,
 ) -> Model {
   {
+    viewed: empty_viewed_state(0),
     input: "",
     generation: 5,
     view_mode: Split,

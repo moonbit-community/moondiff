@@ -264,6 +264,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
         return pullMetadata();
       }
       if (op === "github.compare.get") return { merge_base_commit: { sha: mergeBase } };
+      if (op === "github.pull.viewed.get") return { base_sha: state.currentBase, head_sha: state.currentHead, files: [{ path: file().filename, state: { $tag: "Unviewed" } }] };
       if (op === "github.pull.files") return [file()];
       if (op === "github.commit.get") return commit();
       if (op === "github.content.get") return content(args.ref);
