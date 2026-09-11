@@ -28,6 +28,7 @@
   --hunk: #f3f3f3;
   --empty-stripe: #e4e4e4;
   --toolbar-height: 3rem;
+  --file-heading-height: max(2.75rem, calc(2.7rem + 1px));
   --file-tree-preferred-width: 240px;
   --file-tree-resizer-width: 8px;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
@@ -1149,7 +1150,7 @@ button.file-tree-row.selected {
   position: sticky;
   z-index: 10;
   top: var(--toolbar-height);
-  min-height: 2.75rem;
+  min-height: var(--file-heading-height);
   padding: 0.35rem 0.75rem;
   border-bottom: 1px solid var(--border-soft);
   background: color-mix(in srgb, var(--surface) 97%, transparent);
@@ -1314,6 +1315,12 @@ button.file-tree-row.selected {
   cursor: pointer;
   user-select: none;
   transition: color 120ms ease, background 120ms ease;
+}
+
+.semantic-section[open] > .semantic-section-title {
+  position: sticky;
+  z-index: 9;
+  top: calc(var(--toolbar-height) + var(--file-heading-height));
 }
 
 .semantic-section > .semantic-section-title::-webkit-details-marker {
