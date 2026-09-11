@@ -240,24 +240,23 @@ fn ignore_comments_control(
   ignore_comments : Bool,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  @html.button(
-    type_="button",
+  @html.label(
     class=if ignore_comments {
-      "toolbar-button ignore-comments-toggle active"
+      "toolbar-filter ignore-comments-toggle active"
     } else {
-      "toolbar-button ignore-comments-toggle"
+      "toolbar-filter ignore-comments-toggle"
     },
     title=if ignore_comments {
       "Show comment and blank-line changes"
     } else {
       "Ignore MoonBit comment and blank-line changes"
     },
-    attrs=@html.Attrs::build()
-      .aria_label("Ignore comments")
-      .aria_pressed(if ignore_comments { "true" } else { "false" }),
-    on_click=emit(Ui(ToggleIgnoreComments)),
     [
-      @html.span(class="ignore-comments-icon", "//"),
+      @html.input(
+        input_type=Checkbox,
+        checked=ignore_comments,
+        attrs=@html.Attrs::build().on_click(_ => emit(Ui(ToggleIgnoreComments))),
+      ),
       @html.span(class="ignore-comments-label", "Ignore comments"),
     ],
   )
@@ -268,24 +267,23 @@ fn ignore_tests_control(
   ignore_tests : Bool,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  @html.button(
-    type_="button",
+  @html.label(
     class=if ignore_tests {
-      "toolbar-button ignore-tests-toggle active"
+      "toolbar-filter ignore-tests-toggle active"
     } else {
-      "toolbar-button ignore-tests-toggle"
+      "toolbar-filter ignore-tests-toggle"
     },
     title=if ignore_tests {
       "Show MoonBit test files and test blocks"
     } else {
       "Ignore *_test.mbt / *_wbtest.mbt file pairs and top-level MoonBit test and async test blocks"
     },
-    attrs=@html.Attrs::build()
-      .aria_label("Ignore tests")
-      .aria_pressed(if ignore_tests { "true" } else { "false" }),
-    on_click=emit(Ui(ToggleIgnoreTests)),
     [
-      @html.span(class="ignore-tests-icon", "{}"),
+      @html.input(
+        input_type=Checkbox,
+        checked=ignore_tests,
+        attrs=@html.Attrs::build().on_click(_ => emit(Ui(ToggleIgnoreTests))),
+      ),
       @html.span(class="ignore-tests-label", "Ignore tests"),
     ],
   )
@@ -336,8 +334,10 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
             algorithm_control(model.diff_algorithm, emit),
             layout_control(model.view_mode, emit),
           ]),
-          ignore_comments_control(model.ignore_comments, emit),
-          ignore_tests_control(model.ignore_tests, emit),
+          @html.div(class="filter-controls", [
+            ignore_comments_control(model.ignore_comments, emit),
+            ignore_tests_control(model.ignore_tests, emit),
+          ]),
         ],
       )
     _ => @html.nothing

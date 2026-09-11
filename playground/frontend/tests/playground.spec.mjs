@@ -785,8 +785,8 @@ async function loadTestsCommit(page, options) {
   await page.getByLabel("Public GitHub commit or pull request URL").fill(testsUrl);
   await page.getByRole("button", { name: "View diff" }).click();
   if (options?.wholeFiles) {
-    const toggle = page.getByRole("button", { name: "Ignore tests" });
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const toggle = page.getByRole("checkbox", { name: "Ignore tests" });
+    await expect(toggle).toBeChecked({ checked: true });
     await toggle.click();
   }
   await expect(page.locator("table.split").first()).toBeVisible();
@@ -1577,37 +1577,32 @@ test("long semantic section titles wrap without widening narrow pages", async ({
 });
 
 for (const width of [1280, 420]) for (const colorScheme of ["light", "dark"]) {
-  test(`Ignore comments and Ignore tests have compact OpenSeek-blue pressed states at ${width}px in ${colorScheme} mode`, async ({ page }) => {
+  test(`Ignore comments and Ignore tests have labeled checkboxes with OpenSeek-blue checked states at ${width}px in ${colorScheme} mode`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ colorScheme });
     await loadCommentsCommit(page);
-    for (const [name, icon, prefix] of [
-      ["Ignore comments", "//", "ignore-comments"],
-      ["Ignore tests", "{}", "ignore-tests"],
+    for (const [name, prefix] of [
+      ["Ignore comments", "ignore-comments"],
+      ["Ignore tests", "ignore-tests"],
     ]) {
-      const toggle = page.getByRole("button", { name, exact: true });
-      for (const pressed of [true, false, true]) {
-        await expect(toggle).toHaveAttribute("aria-pressed", String(pressed));
-        await expect(toggle).toHaveText(`${icon}${name}`);
-        await expect(toggle.locator(".filter-state")).toHaveCount(0);
-        await expect(toggle.locator(`.${prefix}-icon`)).toBeVisible();
-        if (width === 420) {
-          await expect(toggle.locator(`.${prefix}-label`)).toBeHidden();
-          await expect(toggle).toHaveCSS("width", "32px");
+      const toggle = page.getByRole("checkbox", { name, exact: true });
+      const control = toggle.locator("..");
+      for (const [index, checked] of [true, false, true].entries()) {
+        await expect(toggle).toBeChecked({ checked });
+        await expect(control).toHaveText(name);
+        await expect(toggle).toBeVisible();
+        await expect(control.locator(`.${prefix}-label`)).toBeVisible();
+        if (checked) {
+          await expect(control).toHaveCSS("background-color", "rgb(238, 242, 254)");
+          await expect(control).toHaveCSS("color", "rgb(42, 85, 204)");
         } else {
-          await expect(toggle.locator(`.${prefix}-label`)).toBeVisible();
-        }
-        if (pressed) {
-          await expect(toggle).toHaveCSS("background-color", "rgb(238, 242, 254)");
-          await expect(toggle).toHaveCSS("color", "rgb(42, 85, 204)");
-        } else {
-          await expect(toggle).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
+          await expect(control).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
         }
         await toggle.hover();
         for (const side of ["top", "right", "bottom", "left"]) {
-          await expect(toggle).toHaveCSS(`border-${side}-width`, "0px");
+          await expect(control).toHaveCSS(`border-${side}-width`, "0px");
         }
-        const contrast = await toggle.evaluate(button => {
+        const contrast = await control.evaluate(button => {
           const rgba = value => {
             const channels = value.match(/[\d.]+/g).map(Number);
             // color-mix() backgrounds serialize as normalized color(srgb ...).
@@ -1628,7 +1623,14 @@ for (const width of [1280, 420]) for (const colorScheme of ["light", "dark"]) {
           return ratio(rgba(style.color), background(button));
         });
         expect(contrast).toBeGreaterThanOrEqual(4.5);
-        await toggle.click();
+        if (index === 0) await toggle.click();
+        else if (index === 1) await control.locator(`.${prefix}-label`).click();
+        else {
+          await toggle.focus();
+          await toggle.press("Space");
+          await expect(toggle).toBeFocused();
+        }
+        await expect(toggle).toBeChecked({ checked: !checked });
       }
     }
   });
@@ -1638,18 +1640,18 @@ test("Ignore comments works across algorithms and layouts without changing plain
   await page.setViewportSize({ width: 1280, height: 900 });
   await loadCommentsCommit(page);
 
-  const toggle = page.getByRole("button", { name: "Ignore comments" });
+  const toggle = page.getByRole("checkbox", { name: "Ignore comments" });
   const mixedCard = page.locator(".file-card").filter({ hasText: "src/mixed.mbt" });
   const commentsOnlyCard = page.locator(".file-card").filter({ hasText: "src/comments_only.mbt" });
   const blankLinesOnlyCard = page.locator(".file-card").filter({ hasText: "src/blank_lines_only.mbt" });
   const plainCard = page.locator(".file-card").filter({ hasText: "notes.txt" });
   const plainBlankLinesCard = page.locator(".file-card").filter({ hasText: "blank_lines.txt" });
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await expect(toggle).toHaveText("//Ignore comments");
+  await expect(toggle).toBeChecked({ checked: true });
+  await expect(toggle.locator("..")).toHaveText("Ignore comments");
   await toggle.click();
-  await page.getByRole("button", { name: "Ignore tests" }).click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await expect(toggle).toHaveAttribute(
+  await page.getByRole("checkbox", { name: "Ignore tests" }).click();
+  await expect(toggle).toBeChecked({ checked: false });
+  await expect(toggle.locator("..")).toHaveAttribute(
     "title",
     "Ignore MoonBit comment and blank-line changes",
   );
@@ -1668,8 +1670,8 @@ test("Ignore comments works across algorithms and layouts without changing plain
   await expect(plainBlankSplitRow.locator("td").nth(3)).toHaveText("");
   const plainBlankSplitHtml = await plainBlankLinesCard.locator(".diff-scroll").innerHTML();
   await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await expect(toggle).toHaveAttribute(
+  await expect(toggle).toBeChecked({ checked: true });
+  await expect(toggle.locator("..")).toHaveAttribute(
     "title",
     "Show comment and blank-line changes",
   );
@@ -1723,12 +1725,12 @@ test("Ignore comments works across algorithms and layouts without changing plain
 
   await page.getByRole("button", { name: "Token" }).click();
   await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(toggle).toBeChecked({ checked: false });
   await expect(commentsOnlyCard.locator("table.unified")).toBeVisible();
   await expect(blankLinesOnlyCard.locator("table.unified")).toBeVisible();
 
   await page.setViewportSize({ width: 420, height: 900 });
-  const compactToggle = await toggle.evaluate(button => ({
+  const compactToggle = await toggle.locator("..").evaluate(button => ({
     left: button.getBoundingClientRect().left,
     right: button.getBoundingClientRect().right,
     width: button.getBoundingClientRect().width,
@@ -1738,9 +1740,9 @@ test("Ignore comments works across algorithms and layouts without changing plain
   }));
   expect(compactToggle.left).toBeGreaterThanOrEqual(0);
   expect(compactToggle.right).toBeLessThanOrEqual(420);
-  expect(compactToggle.width).toBe(32);
+  expect(compactToggle.width).toBeGreaterThan(32);
   await expect(toggle.locator(".filter-state")).toHaveCount(0);
-  expect(compactToggle.labelDisplay).toBe("none");
+  expect(compactToggle.labelDisplay).not.toBe("none");
   expect(compactToggle.pageWidth).toBeLessThanOrEqual(compactToggle.viewportWidth);
 });
 
@@ -1748,19 +1750,19 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   await page.setViewportSize({ width: 1280, height: 900 });
   await loadTestsCommit(page);
 
-  const testsToggle = page.getByRole("button", { name: "Ignore tests" });
-  const commentsToggle = page.getByRole("button", { name: "Ignore comments" });
+  const testsToggle = page.getByRole("checkbox", { name: "Ignore tests" });
+  const commentsToggle = page.getByRole("checkbox", { name: "Ignore comments" });
   const mixedCard = page.locator(".file-card").filter({ hasText: "src/mixed_tests.mbt" });
   const testsOnlyCard = page.locator(".file-card").filter({ hasText: "src/tests_only.mbt" });
   const combinedCard = page.locator(".file-card").filter({ hasText: "src/combined_only.mbt" });
   const plainCard = page.locator(".file-card").filter({ hasText: "tests.txt" });
   const urlBeforeFilters = page.url();
 
-  await expect(testsToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(testsToggle).toBeChecked({ checked: true });
   await testsToggle.click();
   await commentsToggle.click();
-  await expect(testsToggle).toHaveAttribute("aria-pressed", "false");
-  await expect(testsToggle).toHaveAttribute(
+  await expect(testsToggle).toBeChecked({ checked: false });
+  await expect(testsToggle.locator("..")).toHaveAttribute(
     "title",
     "Ignore *_test.mbt / *_wbtest.mbt file pairs and top-level MoonBit test and async test blocks",
   );
@@ -1768,8 +1770,8 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   const plainHtml = await plainCard.locator(".diff-scroll").innerHTML();
 
   await testsToggle.click();
-  await expect(testsToggle).toHaveAttribute("aria-pressed", "true");
-  await expect(testsToggle).toHaveAttribute("title", "Show MoonBit test files and test blocks");
+  await expect(testsToggle).toBeChecked({ checked: true });
+  await expect(testsToggle.locator("..")).toHaveAttribute("title", "Show MoonBit test files and test blocks");
   await expect(testsOnlyCard).toContainText(
     "No changes besides MoonBit test blocks found. Turn off Ignore tests",
   );
@@ -1800,7 +1802,7 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   expect(page.url()).not.toContain("ignore");
 
   await page.setViewportSize({ width: 420, height: 900 });
-  const compact = await testsToggle.evaluate(button => ({
+  const compact = await testsToggle.locator("..").evaluate(button => ({
     left: button.getBoundingClientRect().left,
     right: button.getBoundingClientRect().right,
     width: button.getBoundingClientRect().width,
@@ -1810,9 +1812,9 @@ test("Ignore tests works across algorithms, layouts, combined filters, and narro
   }));
   expect(compact.left).toBeGreaterThanOrEqual(0);
   expect(compact.right).toBeLessThanOrEqual(420);
-  expect(compact.width).toBe(32);
+  expect(compact.width).toBeGreaterThan(32);
   await expect(testsToggle.locator(".filter-state")).toHaveCount(0);
-  expect(compact.labelDisplay).toBe("none");
+  expect(compact.labelDisplay).not.toBe("none");
   expect(compact.pageWidth).toBeLessThanOrEqual(compact.viewportWidth);
 });
 
@@ -1825,8 +1827,8 @@ test("Ignore tests keeps whole-file cards and restores renamed, added, and delet
   });
   await loadTestsCommit(page, { wholeFiles: true });
   const cards = page.locator(".file-card");
-  const toggle = page.getByRole("button", { name: "Ignore tests" });
-  const commentsToggle = page.getByRole("button", { name: "Ignore comments" });
+  const toggle = page.getByRole("checkbox", { name: "Ignore tests" });
+  const commentsToggle = page.getByRole("checkbox", { name: "Ignore comments" });
   await expect(cards).toHaveCount(7);
   for (const card of await cards.all()) {
     await expect(card.locator("table.split")).toBeVisible();
@@ -2047,15 +2049,15 @@ test("AST mode keeps structural spans, empty states, line diffs, and layouts usa
 test("the selected algorithm survives later commit navigation without entering the URL", async ({ page }) => {
   await loadAlgorithmCommit(page);
   await page.getByRole("button", { name: "Tree" }).click();
-  await page.getByRole("button", { name: "Ignore comments" }).click();
-  await page.getByRole("button", { name: "Ignore tests" }).click();
+  await page.getByRole("checkbox", { name: "Ignore comments" }).click();
+  await page.getByRole("checkbox", { name: "Ignore tests" }).click();
   await page.getByRole("button", { name: "Unified", exact: true }).click();
   const nextSha = "3333333333333333333333333333333333333333";
   const nextUrl = `https://github.com/example/algorithms/commit/${nextSha}`;
   await page.evaluate(url => { history.pushState(null, "", new URL(url).pathname); dispatchEvent(new PopStateEvent("popstate")); }, nextUrl);
   await expect(page.getByRole("button", { name: "Tree" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Ignore comments" })).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByRole("button", { name: "Ignore tests" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("checkbox", { name: "Ignore comments" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Ignore tests" })).not.toBeChecked();
   await expect(page.locator(".structural-empty")).toBeVisible();
   await expect(page.getByRole("button", { name: "Unified", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page).toHaveURL(`/example/algorithms/commit/${nextSha}`);
