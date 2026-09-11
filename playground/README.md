@@ -23,7 +23,8 @@ Create `.env` with the following content. Fill in the
 placeholder with a persistent key generated using the command below.
 
 ```sh
-# Export these variables before starting. The server does not load .env.
+# npm run dev loads .env automatically. For npm start or running the server
+# directly, export these variables first; the server itself does not load .env.
 # Values shown below are defaults unless marked Required.
 # Relative paths use the process working directory (playground/ for npm start
 # and npm run dev); absolute paths are also accepted.
@@ -75,26 +76,27 @@ MOONDIFF_GITHUB_INSTALL_URL=https://github.com/apps/your-app/installations/new
 See [Sessions and backup](#sessions-and-backup) for database
 backup and restore instructions.
 
-Export the variables and start the server:
+Build and start the development server:
 
 ```sh
-# Automatically export subsequent new or modified shell variables to child processes.
-set -a
-
-# Read and execute .env in the current shell, exporting its configuration as environment variables.
-. ./.env
-
-# Disable automatic export; already exported variables remain available to the server.
-set +a
-
-# Build once and start the server using these environment variables, without watching for changes.
 npm run dev
 ```
 
 Open `http://localhost:4173`, or the configured `MOONDIFF_PUBLIC_URL`. This value
-must match the browser origin. `npm run dev` rebuilds once and starts the server;
-it does not watch for changes. Use `npm run build` to rebuild and `npm start` to
-run existing artifacts.
+must match the browser origin. `npm run dev` loads `playground/.env`, preserves
+already exported environment variables, rebuilds once and starts the server;
+it does not watch for changes. Press Ctrl+C to stop. You can also run
+`node playground/scripts/dev.mjs` from the repository root. The `.env` file is
+optional when all required settings are already exported.
+
+Use `npm run build` to rebuild and `npm start` to run existing artifacts.
+Before using `npm start` or running the backend directly, export the configuration:
+
+```sh
+set -a
+. ./.env
+set +a
+```
 
 To run the backend from source after exporting the configuration, use
 `moon -C playground/backend run main` from the repository root. To select Native,

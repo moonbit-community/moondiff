@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "npm run build && npm start",
+    "dev": "node scripts/dev.mjs",
     "start": "moonrun dist/moondiff-server.wasm",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
