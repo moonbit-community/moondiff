@@ -174,11 +174,10 @@ async fn App::refresh_once(self : App, original : Session) -> Session {
 
 ///|
 fn App::expire_auth(self : App, session : Session) -> Unit raise {
-  execute(
-    self.db,
-    "UPDATE sessions SET tokens='',epoch=epoch+1 WHERE id=? AND epoch=?",
-    [Text(session.id), Integer(session.epoch)],
-  )
+  execute(self.db, DB_EXPIRE_SESSION_AUTH, [
+    Text(session.id),
+    Integer(session.epoch),
+  ])
 }
 
 ///|

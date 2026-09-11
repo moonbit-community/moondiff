@@ -44,9 +44,7 @@ fn execute(
 ///|
 #cfg(target="native")
 fn database_settings() -> Array[String] {
-  [
-    "PRAGMA journal_mode=WAL", "PRAGMA foreign_keys=ON", "PRAGMA busy_timeout=5000",
-  ]
+  [DB_ENABLE_WAL, DB_ENABLE_FOREIGN_KEYS, DB_SET_BUSY_TIMEOUT]
 }
 
 ///|
@@ -66,20 +64,18 @@ fn App::open(config : Config) -> App raise {
   }
   for
     sql in [
-      "CREATE TABLE IF NOT EXISTS metadata (name TEXT PRIMARY KEY, value TEXT NOT NULL)",
-      "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL, epoch INTEGER NOT NULL DEFAULT 0, user_id TEXT NOT NULL DEFAULT '', login TEXT NOT NULL DEFAULT '', tokens TEXT NOT NULL DEFAULT '', access_expires INTEGER NOT NULL DEFAULT 0, refresh_expires INTEGER NOT NULL DEFAULT 0)",
-      "CREATE TABLE IF NOT EXISTS authorizations (session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, id TEXT NOT NULL, target_id TEXT NOT NULL, epoch INTEGER NOT NULL, phase TEXT NOT NULL, credentials TEXT NOT NULL DEFAULT '', user_code TEXT NOT NULL DEFAULT '', verification_uri TEXT NOT NULL DEFAULT '', expires INTEGER NOT NULL, next_poll INTEGER NOT NULL DEFAULT 0, interval INTEGER NOT NULL DEFAULT 5, backoff INTEGER NOT NULL DEFAULT 0, token_issued INTEGER NOT NULL DEFAULT 0, message TEXT NOT NULL DEFAULT '', PRIMARY KEY (session_id,id))",
-      "CREATE UNIQUE INDEX IF NOT EXISTS one_active_device ON authorizations(session_id) WHERE phase IN ('starting','pending','verifying')",
-      // Preserve the foreign-key contract even when the host does not let us
-      // enable foreign_keys. These also apply to databases created by Native.
-       "CREATE TRIGGER IF NOT EXISTS authorizations_require_session_insert BEFORE INSERT ON authorizations WHEN NOT EXISTS (SELECT 1 FROM sessions WHERE id=NEW.session_id) BEGIN SELECT RAISE(ABORT, 'authorization session is missing'); END",
-      "CREATE TRIGGER IF NOT EXISTS authorizations_require_session_update BEFORE UPDATE OF session_id ON authorizations WHEN NOT EXISTS (SELECT 1 FROM sessions WHERE id=NEW.session_id) BEGIN SELECT RAISE(ABORT, 'authorization session is missing'); END",
-      "CREATE TRIGGER IF NOT EXISTS sessions_preserve_authorization_parent BEFORE UPDATE OF id ON sessions WHEN NEW.id IS NOT OLD.id AND EXISTS (SELECT 1 FROM authorizations WHERE session_id=OLD.id) BEGIN SELECT RAISE(ABORT, 'session has a pending authorization'); END",
-      "CREATE TRIGGER IF NOT EXISTS sessions_delete_authorizations AFTER DELETE ON sessions BEGIN DELETE FROM authorizations WHERE session_id=OLD.id; END",
+      DB_CREATE_METADATA,
+      DB_CREATE_SESSIONS,
+      DB_CREATE_AUTHORIZATIONS,
+      DB_CREATE_ONE_ACTIVE_DEVICE_INDEX,
+      DB_CREATE_AUTHORIZATION_SESSION_INSERT_TRIGGER,
+      DB_CREATE_AUTHORIZATION_SESSION_UPDATE_TRIGGER,
+      DB_CREATE_SESSION_AUTHORIZATION_PARENT_TRIGGER,
+      DB_CREATE_SESSION_DELETE_AUTHORIZATIONS_TRIGGER,
     ] {
     execute(db, sql, [])
   }
-  let stmt = db.prepare("SELECT value FROM metadata WHERE name='key-check-v1'")
+  let stmt = db.prepare(QUERY_KEY_CHECK)
   defer stmt.finalize()
   if stmt.step() {
     let stored : String = stmt.column(index=0)
@@ -87,7 +83,7 @@ fn App::open(config : Config) -> App raise {
       fail("Database key check failed")
     }
   } else {
-    execute(db, "INSERT INTO metadata VALUES ('key-check-v1', ?)", [
+    execute(db, DB_INSERT_KEY_CHECK, [
       Text(seal(config.key, "database", "key-check", b"moondiff-v1")),
     ])
   }
@@ -96,9 +92,7 @@ fn App::open(config : Config) -> App raise {
 
 ///|
 fn App::session(self : App, id : String) -> Session? raise {
-  let stmt = self.db.prepare(
-    "SELECT csrf, expires, epoch, user_id, login, tokens, access_expires, refresh_expires FROM sessions WHERE id=? AND expires>?",
-  )
+  let stmt = self.db.prepare(QUERY_SESSION)
   defer stmt.finalize()
   stmt.bind(index=1, id)
   stmt.bind(index=2, now())
@@ -120,11 +114,9 @@ fn App::session(self : App, id : String) -> Session? raise {
 fn App::create_session(self : App) -> (String, Session) raise {
   let cookie = random_id()
   let id = digest(cookie)
-  execute(self.db, "DELETE FROM sessions WHERE expires<=?", [Integer(now())])
-  execute(self.db, "DELETE FROM authorizations WHERE expires<=?", [
-    Integer(now()),
-  ])
-  execute(self.db, "INSERT INTO sessions (id,csrf,expires) VALUES (?,?,?)", [
+  execute(self.db, DB_DELETE_EXPIRED_SESSIONS, [Integer(now())])
+  execute(self.db, DB_DELETE_EXPIRED_AUTHORIZATIONS, [Integer(now())])
+  execute(self.db, DB_INSERT_SESSION, [
     Text(id),
     Text(random_id()),
     Integer(now() + 30L * 86400),
@@ -140,7 +132,7 @@ fn App::still_current(self : App, session : Session) -> Bool raise {
 ///|
 fn App::logout(self : App, session : Session) -> Unit raise {
   // Cascading deletion also consumes every pending authorization. No async gap.
-  execute(self.db, "DELETE FROM sessions WHERE id=?", [Text(session.id)])
+  execute(self.db, DB_DELETE_SESSION, [Text(session.id)])
 }
 
 ///|
@@ -193,9 +185,9 @@ fn App::install_tokens(
     user,
     @utf8.encode(tokens.stringify()),
   )
-  execute(self.db, "BEGIN IMMEDIATE", [])
+  execute(self.db, DB_BEGIN_IMMEDIATE, [])
   {
-    errdefer execute(self.db, "ROLLBACK", [])
+    errdefer execute(self.db, DB_ROLLBACK, [])
     if !device_id.is_empty() {
       guard self.device_current(session.id, device_id) is Some(flow) &&
         flow.phase == "verifying" &&
@@ -205,34 +197,29 @@ fn App::install_tokens(
         )
       }
     }
-    execute(
-      self.db,
-      "UPDATE sessions SET user_id=?,login=?,tokens=?,access_expires=?,refresh_expires=?,epoch=epoch+? WHERE id=? AND epoch=? AND expires>?",
-      [
-        Text(user),
-        Text(login),
-        Text(encrypted),
-        Integer(access_expires),
-        Integer(refresh_expires),
-        Integer(if device_id.is_empty() { 0 } else { 1 }),
-        Text(session.id),
-        Integer(session.epoch),
-        Integer(now()),
-      ],
-    )
+    execute(self.db, DB_INSTALL_SESSION_TOKENS, [
+      Text(user),
+      Text(login),
+      Text(encrypted),
+      Integer(access_expires),
+      Integer(refresh_expires),
+      Integer(if device_id.is_empty() { 0 } else { 1 }),
+      Text(session.id),
+      Integer(session.epoch),
+      Integer(now()),
+    ])
     guard self.db.changes() == 1 else {
       raise RpcError(
         401, "authentication_required", "This session is no longer active.",
       )
     }
     if !device_id.is_empty() {
-      execute(
-        self.db,
-        "UPDATE authorizations SET phase='completed',credentials='',message='' WHERE session_id=? AND id=?",
-        [Text(session.id), Text(device_id)],
-      )
+      execute(self.db, DB_COMPLETE_AUTHORIZATION, [
+        Text(session.id),
+        Text(device_id),
+      ])
     }
-    execute(self.db, "COMMIT", [])
+    execute(self.db, DB_COMMIT, [])
   }
   self.session(session.id).unwrap()
 }
