@@ -124,83 +124,91 @@ GitHub, and authorize the device in the new window; the playground updates
 automatically. A page reload restores an unexpired code. Cancel sign-in before
 starting a new attempt.
 
-## Build and deploy
-
-Build a release from the repository root:
-
-```sh
-moon update
-npm --prefix playground ci
-npm run build
-```
-
-`playground/dist/` contains `moondiff-server.wasm` and `static/`. Copy both into
-the release directory and install a compatible `moonrun` with trusted CA
-certificates. Export the [runtime configuration](#runtime-configuration), then
-run from the release directory:
-
-```sh
-MOONDIFF_STATIC_DIR=/absolute/release/static moonrun ./moondiff-server.wasm
-```
-
-Use an independent domain or port at `/`; deployment under a subpath is not
-supported. `MOONDIFF_PUBLIC_URL` must equal the browser's origin and is not inferred
-from proxy headers. The backend listener speaks HTTP; terminate production HTTPS
-at a reverse proxy such as the supplied [Nginx example](deploy/nginx.conf.example).
-Use a dedicated OS account and a private persistent data directory. Restrict the
-upstream listener to the proxy. Run exactly one process per SQLite database,
-including during upgrades.
-
 ## Docker
 
-Build from the repository root so the image can access all `moon.work` members:
+Install Docker with the Compose v2 plugin. The supplied
+[compose.yaml](compose.yaml) runs
+`ghcr.io/moonbit-community/moondiff-playground:latest`; no local Node.js or MoonBit
+installation is needed to use this image.
+
+Create `playground/.env` with the GitHub App settings and persistent token key
+from [Runtime configuration](#runtime-configuration). For local access, keep
+`MOONDIFF_PUBLIC_URL=http://localhost:4173`. For production, set it to the external
+HTTPS origin and configure Nginx on the Docker host using the
+[Nginx example](deploy/nginx.conf.example).
+
+Run the following Compose commands from `playground/`:
+
+```sh
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+Compose loads `.env` through `env_file`; there is no need to export it in the
+shell. The `environment` entries in `compose.yaml` override any local-development
+values for `MOONDIFF_LISTEN`, `MOONDIFF_STATIC_DIR` and `MOONDIFF_DATABASE` with
+`0.0.0.0:4173`, `/app/static` and `/var/lib/moondiff/moondiff.sqlite3` respectively.
+
+The port mapping `127.0.0.1:4173:4173` publishes the service on the Docker host's
+loopback address. Nginx on that host forwards requests to
+`http://127.0.0.1:4173`. Inside the container, keep
+`MOONDIFF_LISTEN=0.0.0.0:4173` so Docker can forward connections to the container's
+network interface. Binding the backend to `127.0.0.1` inside the container would
+prevent these connections from reaching it. The container listener and the host
+port binding have separate scopes.
+
+Open `http://localhost:4173` on the Docker host for local access, or the configured
+HTTPS origin for production. The image health check probes `/healthz` on the
+configured listener port. To follow service logs:
+
+```sh
+docker compose logs --follow moondiff
+```
+
+To update the published image, run `docker compose pull` and `docker compose up -d`
+again. Compose replaces the container while preserving its named volume. The
+`unless-stopped` restart policy restarts the service after a Docker restart unless
+it was manually stopped. Use `docker compose down` to stop and remove the service;
+omit `--volumes` to retain the database.
+
+The `moondiff-data` volume is mounted at `/var/lib/moondiff`. Compose prefixes its
+actual name with the project name, normally `playground_moondiff-data`; keep the
+same project name when updating. Use only one container per database and keep the
+same `MOONDIFF_TOKEN_KEY` across restarts. See [Sessions and backup](#sessions-and-backup)
+for backup and restore instructions. If using a bind mount instead, make its
+directory writable by UID/GID `10001:10001`.
+
+To build an image locally, run from the repository root so the build can access
+all `moon.work` members:
 
 ```sh
 docker build -f playground/Dockerfile -t moondiff-playground:local .
+```
+
+Then change `services.moondiff.image` in `playground/compose.yaml` to
+`moondiff-playground:local` and run from the repository root:
+
+```sh
+docker compose -f playground/compose.yaml up -d --pull never
 ```
 
 The build stage installs Node.js 22 and the latest MoonBit toolchain, matching
 the existing CI setup. To select a specific MoonBit release, pass
 `--build-arg MOONBIT_VERSION=<version>` using a version accepted by the official
 MoonBit installer. The runtime image contains `moonrun`, trusted CA certificates,
-the Wasm backend and static assets, and runs as UID/GID `10001:10001`.
-
-Create `playground/.env` with the GitHub App settings and persistent token key
-from [Runtime configuration](#runtime-configuration), then run from the repository
-root:
-
-```sh
-docker run --detach --name moondiff-playground \
-  --restart unless-stopped \
-  --publish 127.0.0.1:4173:4173 \
-  --env-file playground/.env \
-  --env MOONDIFF_LISTEN=0.0.0.0:4173 \
-  --env MOONDIFF_STATIC_DIR=/app/static \
-  --env MOONDIFF_DATABASE=/var/lib/moondiff/moondiff.sqlite3 \
-  --mount type=volume,source=moondiff-data,target=/var/lib/moondiff \
-  moondiff-playground:local
-```
-
-The explicit path and listener settings override the local-development values in
-`.env`. Docker passes this file as environment variables; it is excluded from the
-build context along with local databases, dependencies and generated artifacts.
-Open `http://localhost:4173`. For production, set `MOONDIFF_PUBLIC_URL` to the
-external HTTPS origin and configure a reverse proxy as described in the
-[deployment instructions](#build-and-deploy).
-
-The named volume preserves SQLite data when replacing the container. Use only
-one container per database and keep the same `MOONDIFF_TOKEN_KEY` across restarts.
-If using a bind mount instead, make its directory writable by UID/GID
-`10001:10001`. The image health check probes `/healthz` on the configured listener
-port.
+the Wasm backend and static assets, and runs as UID/GID `10001:10001`. `.env`, local
+databases, dependencies and generated artifacts are excluded from the build
+context.
 
 The `playground-image` GitHub Actions workflow builds a `linux/amd64` image and
 checks container health, static resources, a direct change link and the auth
 status endpoint on every pull request and push to `main`. After these checks pass
 on `main`, it publishes `ghcr.io/<owner>/<repository>-playground:latest` and
 `:sha-<full-commit-sha>` using the workflow's `GITHUB_TOKEN` with `packages: write`.
-It can also be run manually; only runs on `main` publish images. To use a published
-image, replace `moondiff-playground:local` in the run command with its GHCR tag.
+It can also be run manually; only runs on `main` publish images. To pin a release
+or use an image from a fork, change `services.moondiff.image` in `compose.yaml` to
+the corresponding GHCR tag.
 
 ## Sessions and backup
 

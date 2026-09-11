@@ -119,74 +119,80 @@ App 权限发生变化后，已有安装需要接受新的权限。将 App 安�
 在新窗口中完成设备授权；playground 会自动更新登录状态。
 刷新页面后会恢复尚未过期的验证码。开始新一轮登录前，先取消当前登录。
 
-## 构建与部署
-
-在仓库根目录构建发布产物：
-
-```sh
-moon update
-npm --prefix playground ci
-npm run build
-```
-
-`playground/dist/` 包含 `moondiff-server.wasm` 和 `static/`。
-将两者复制到发布目录，并安装兼容的 `moonrun` 和受信任的 CA 证书。
-导出[运行时配置](#运行时配置)中的环境变量后，在发布目录执行：
-
-```sh
-MOONDIFF_STATIC_DIR=/absolute/release/static moonrun ./moondiff-server.wasm
-```
-
-使用独立的域名或端口，将应用部署在 `/`；不支持部署到子路径。
-`MOONDIFF_PUBLIC_URL` 必须与浏览器的源地址一致，后端不会从代理请求头推断该值。
-后端监听器使用 HTTP，生产环境的 HTTPS 需由反向代理处理，可参考随附的
-[Nginx 示例](deploy/nginx.conf.example)。使用专用的操作系统账户和私有的持久数据目录，
-仅允许反向代理访问后端监听器。每个 SQLite 数据库只能由一个进程使用，升级期间也不例外。
-
 ## Docker
 
-在仓库根目录构建，以便镜像能够访问所有 `moon.work` 成员：
+安装 Docker 和 Compose v2 插件。随附的 [compose.yaml](compose.yaml) 使用
+`ghcr.io/moonbit-community/moondiff-playground:latest` 镜像，
+使用该镜像无需在本机安装 Node.js 或 MoonBit。
+
+按照[运行时配置](#运行时配置)创建 `playground/.env`，填写 GitHub App 配置和持久保存的密钥。
+本地访问时保留 `MOONDIFF_PUBLIC_URL=http://localhost:4173`；生产环境中，
+将其设置为对外提供服务的 HTTPS 源地址，并参考 [Nginx 示例](deploy/nginx.conf.example)
+在 Docker 宿主机上配置 Nginx。
+
+以下 Compose 命令均在 `playground/` 目录中执行：
+
+```sh
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+Compose 通过 `env_file` 加载 `.env`，无需在 Shell 中导出变量。
+`compose.yaml` 的 `environment` 会将 `MOONDIFF_LISTEN`、`MOONDIFF_STATIC_DIR`
+和 `MOONDIFF_DATABASE` 分别覆盖为 `0.0.0.0:4173`、`/app/static`
+和 `/var/lib/moondiff/moondiff.sqlite3`，避免沿用 `.env` 中用于本地开发的值。
+
+端口映射 `127.0.0.1:4173:4173` 将服务发布到 Docker 宿主机的回环地址，
+宿主机上的 Nginx 将请求转发到 `http://127.0.0.1:4173`。
+容器内应保持 `MOONDIFF_LISTEN=0.0.0.0:4173`，让后端能够接收 Docker
+转发到容器网卡的连接。若在容器内改为监听 `127.0.0.1`，这些连接将无法到达后端。
+容器内的监听地址与宿主机的端口绑定地址作用于不同的网络环境。
+
+本地访问时，在 Docker 宿主机上打开 `http://localhost:4173`；
+生产环境中，访问配置的 HTTPS 源地址。镜像的健康检查会在配置的监听端口上请求 `/healthz`。
+查看服务日志：
+
+```sh
+docker compose logs --follow moondiff
+```
+
+更新已发布的镜像时，再次执行 `docker compose pull` 和 `docker compose up -d`。
+Compose 会替换容器并保留命名卷。`unless-stopped` 重启策略会在 Docker 重启后
+恢复服务，手动停止的服务除外。使用 `docker compose down` 停止并移除服务；
+保留数据库时不要添加 `--volumes`。
+
+`moondiff-data` 卷挂载到 `/var/lib/moondiff`。Compose 会给卷的实际名称添加项目名前缀，
+通常为 `playground_moondiff-data`；更新时需保持项目名不变。每个数据库只能供一个容器使用，
+重启后也需保持 `MOONDIFF_TOKEN_KEY` 不变。备份与恢复方法见[会话与备份](#会话与备份)。
+如果改用绑定挂载，请确保 UID/GID 为 `10001:10001` 的用户对挂载目录有写入权限。
+
+如需在本地构建镜像，在仓库根目录执行，以便构建过程能够访问所有 `moon.work` 成员：
 
 ```sh
 docker build -f playground/Dockerfile -t moondiff-playground:local .
+```
+
+然后将 `playground/compose.yaml` 中的 `services.moondiff.image` 改为
+`moondiff-playground:local`，并在仓库根目录执行：
+
+```sh
+docker compose -f playground/compose.yaml up -d --pull never
 ```
 
 构建阶段会安装 Node.js 22 和最新的 MoonBit 工具链，与现有 CI 配置保持一致。
 如需指定 MoonBit 版本，传入 `--build-arg MOONBIT_VERSION=<version>`，
 版本值需使用 MoonBit 官方安装器支持的格式。运行时镜像包含 `moonrun`、受信任的 CA 证书、
 Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
-
-按照[运行时配置](#运行时配置)创建 `playground/.env`，填写 GitHub App 配置和持久保存的密钥，
-然后在仓库根目录执行：
-
-```sh
-docker run --detach --name moondiff-playground \
-  --restart unless-stopped \
-  --publish 127.0.0.1:4173:4173 \
-  --env-file playground/.env \
-  --env MOONDIFF_LISTEN=0.0.0.0:4173 \
-  --env MOONDIFF_STATIC_DIR=/app/static \
-  --env MOONDIFF_DATABASE=/var/lib/moondiff/moondiff.sqlite3 \
-  --mount type=volume,source=moondiff-data,target=/var/lib/moondiff \
-  moondiff-playground:local
-```
-
-命令中显式指定的路径和监听地址会覆盖 `.env` 中用于本地开发的值。
-Docker 会将该文件中的配置作为环境变量传入；该文件与本地数据库、依赖和构建产物一起被排除在构建上下文之外。
-打开 `http://localhost:4173`。生产环境中，将 `MOONDIFF_PUBLIC_URL` 设置为对外提供服务的 HTTPS 源地址，
-并按照[部署说明](#构建与部署)配置反向代理。
-
-命名卷会在替换容器时保留 SQLite 数据。每个数据库只能供一个容器使用，
-重启后也需保持 `MOONDIFF_TOKEN_KEY` 不变。如果改用绑定挂载，
-请确保 UID/GID 为 `10001:10001` 的用户对挂载目录有写入权限。
-镜像的健康检查会在配置的监听端口上请求 `/healthz`。
+`.env`、本地数据库、依赖和构建产物均被排除在构建上下文之外。
 
 `playground-image` GitHub Actions 工作流会在每次拉取请求和推送到 `main` 时
 构建 `linux/amd64` 镜像，并检查容器健康状态、静态资源、变更详情直达链接和认证状态接口。
 在 `main` 上通过这些检查后，工作流使用具有 `packages: write` 权限的 `GITHUB_TOKEN`，
 发布 `ghcr.io/<owner>/<repository>-playground:latest` 和 `:sha-<full-commit-sha>` 镜像。
 也可以手动运行工作流；只有在 `main` 上运行时才会发布镜像。
-如需使用已发布的镜像，将运行命令中的 `moondiff-playground:local` 替换为对应的 GHCR 镜像标签。
+如需固定版本或使用 fork 发布的镜像，将 `compose.yaml` 中的 `services.moondiff.image`
+改为对应的 GHCR 镜像标签。
 
 ## 会话与备份
 
