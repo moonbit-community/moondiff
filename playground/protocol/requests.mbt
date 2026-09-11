@@ -107,6 +107,8 @@ pub(all) struct CommentDelete {
 pub(all) enum GitHubRequest {
   CommitGet(CommitGet)
   PullGet(PullGet)
+  PullViewedGet(PullViewedGet)
+  PullFileViewedSet(PullFileViewedSet)
   CompareGet(CompareGet)
   PullFiles(PullFiles)
   ContentGet(ContentGet)

@@ -4,6 +4,7 @@ import test, { before } from 'node:test';
 import { randomBytes } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { buildServer, startServer, browser } from './server-fixture.mjs';
+import { startViewedServer, repositoryPaths } from './viewed-fixture.mjs';
 
 before(buildServer);
 
@@ -473,4 +474,187 @@ test('a late refresh cannot overwrite a newly confirmed device identity', async 
   assert.equal((await old).ok, false);
   assert.equal((await user.status()).user_id, '2');
   assert((await user.rpc('github.commit.get', args)).ok); assert.equal(f.requests.at(-1).headers.authorization, 'Bearer access-bob');
+});
+
+const viewedArgs = { owner: 'alice', repo: 'repo', number: '42' };
+const viewedSnapshot = { id: 'PR_fixture', baseRefOid: '1'.repeat(40), headRefOid: 'a'.repeat(40) };
+const viewedWrite = { ...viewedArgs, path: 'new/目录 name.mbt', viewed: true, base_sha: viewedSnapshot.baseRefOid, head_sha: viewedSnapshot.headRefOid };
+function viewedPage(nodes, hasNextPage = false, endCursor = null, totalCount = nodes.length, snapshot = viewedSnapshot) {
+  return { data: { repository: { pullRequest: { ...snapshot, files: { totalCount, nodes, pageInfo: { hasNextPage, endCursor } } } } } };
+}
+
+test('Viewed paginates 100 files, preserves all three states, and verifies the snapshot', async t => {
+  const nodes = Array.from({ length: 103 }, (_, i) => ({ path: `src/${i}.mbt`, viewerViewedState: ['VIEWED', 'UNVIEWED', 'DISMISSED'][i % 3] }));
+  const f = await startServer((r, res) => {
+    if (r.path !== '/graphql') return;
+    assert.equal(r.method, 'POST'); assert.match(r.headers.authorization, /^Bearer access-/);
+    assert.deepEqual({ ...r.body.variables, cursor: undefined }, { ...viewedArgs, number: 42, cursor: undefined });
+    if (r.body.query.includes('ViewedFiles')) {
+      assert.match(r.body.query, /files\(first: 100, after: \$cursor\)/);
+      const next = r.body.variables.cursor === 'next';
+      res.end(JSON.stringify(viewedPage(next ? nodes.slice(100) : nodes.slice(0, 100), !next, next ? null : 'next', 103)));
+    } else res.end(JSON.stringify({ data: { repository: { pullRequest: viewedSnapshot } } }));
+    return true;
+  }); t.after(() => f.close());
+  const user = browser(f); await user.status();
+  assert.equal((await user.rpc('github.pull.viewed.get', viewedArgs)).error.code, 'authentication_required');
+  assert.equal(f.requests.filter(r => r.path === '/graphql').length, 0);
+  await user.login(); f.sql('UPDATE sessions SET access_expires=1');
+  const result = await user.rpc('github.pull.viewed.get', viewedArgs);
+  assert(result.ok, JSON.stringify(result));
+  assert.equal(result.value.files.length, 103);
+  assert.deepEqual(result.value.files.slice(0, 3).map(f => f.state.$tag), ['Viewed', 'Unviewed', 'Dismissed']);
+  assert.equal(result.value.base_sha, viewedSnapshot.baseRefOid);
+  assert.equal(result.value.head_sha, viewedSnapshot.headRefOid);
+  assert.equal(f.requests.filter(r => r.path === '/graphql').length, 3);
+  assert.equal(f.requests.filter(r => r.body?.grant_type === 'refresh_token').length, 1);
+});
+
+test('Viewed writes resolve node IDs, preserve renamed paths, check CSRF and stop on changed snapshots', async t => {
+  let snapshot = viewedSnapshot, changeDuringMutation = false;
+  const f = await startServer((r, res) => {
+    if (r.path !== '/graphql') return;
+    if (r.body.query.startsWith('mutation')) {
+      assert.deepEqual(r.body.variables, { id: 'PR_fixture', path: viewedWrite.path });
+      const op = r.body.query.includes('unmarkFileAsViewed') ? 'unmarkFileAsViewed' : 'markFileAsViewed';
+      if (changeDuringMutation) snapshot = { ...snapshot, headRefOid: 'b'.repeat(40) };
+      res.end(JSON.stringify({ data: { [op]: { pullRequest: snapshot } } }));
+    } else res.end(JSON.stringify({ data: { repository: { pullRequest: snapshot } } }));
+    return true;
+  }); t.after(() => f.close());
+  const user = browser(f); await user.status();
+  assert.equal((await user.rpc('github.pull.file.viewed.set', viewedWrite)).error.code, 'authentication_required');
+  await user.login();
+  for (const headers of [{ Origin: 'https://evil.example' }, { 'X-CSRF-Token': 'wrong' }]) {
+    assert.equal((await user.rpc('github.pull.file.viewed.set', viewedWrite, headers)).error.code, 'csrf_failed');
+  }
+  assert.equal(f.requests.filter(r => r.path === '/graphql').length, 0);
+  for (const viewed of [true, false]) {
+    const result = await user.rpc('github.pull.file.viewed.set', { ...viewedWrite, viewed });
+    assert(result.ok, JSON.stringify(result));
+    assert.deepEqual(result.value.file, { path: viewedWrite.path, state: { $tag: viewed ? 'Viewed' : 'Unviewed' } });
+  }
+  snapshot = { ...viewedSnapshot, baseRefOid: '2'.repeat(40) };
+  const mutations = () => f.requests.filter(r => r.body?.query?.startsWith('mutation')).length;
+  const before = mutations();
+  assert.equal((await user.rpc('github.pull.file.viewed.set', viewedWrite)).error.code, 'pull_snapshot_changed');
+  assert.equal(mutations(), before);
+  snapshot = viewedSnapshot; changeDuringMutation = true;
+  assert.equal((await user.rpc('github.pull.file.viewed.set', viewedWrite)).error.code, 'pull_snapshot_changed');
+});
+
+test('Viewed rejects partial GraphQL errors and malformed or changed pagination', async t => {
+  let response = {}, mode = '', pages = 0;
+  const f = await startServer((r, res) => {
+    if (r.path !== '/graphql') return;
+    pages++;
+    if (mode === 'repeat') response = viewedPage([{ path: `src/${pages}`, viewerViewedState: 'VIEWED' }], true, 'same', 3);
+    if (mode === 'changed') response = viewedPage([{ path: 'src/last', viewerViewedState: 'VIEWED' }], false, null, 1, pages > 1 ? { ...viewedSnapshot, headRefOid: 'b'.repeat(40) } : viewedSnapshot);
+    res.end(JSON.stringify(response)); return true;
+  }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  for (const [type, code] of [['FORBIDDEN', 'permission_denied'], ['RATE_LIMITED', 'rate_limit'], ['UNAUTHORIZED', 'authentication_required'], ['NOT_FOUND', 'not_found_or_not_installed'], ['OTHER', 'github_graphql_error']]) {
+    response = { ...viewedPage([]), errors: [{ type, message: 'upstream private details' }] };
+    assert.equal((await user.rpc('github.pull.viewed.get', viewedArgs)).error.code, code);
+  }
+  for (const value of [
+    viewedPage([{ path: 'a', viewerViewedState: 'UNKNOWN' }]),
+    viewedPage([{ path: 'a', viewerViewedState: 'VIEWED' }, { path: 'a', viewerViewedState: 'VIEWED' }]),
+    viewedPage([], true, 'cursor', 1), viewedPage([], false, null, 1),
+    viewedPage([{ path: '../bad', viewerViewedState: 'VIEWED' }]),
+    { data: { repository: { pullRequest: null } } },
+  ]) {
+    response = value;
+    assert.equal((await user.rpc('github.pull.viewed.get', viewedArgs)).error.code, 'invalid_github_response');
+  }
+  response = viewedPage([], false, null, 3001);
+  assert.equal((await user.rpc('github.pull.viewed.get', viewedArgs)).error.code, 'pagination_limit');
+  mode = 'repeat'; pages = 0;
+  assert.equal((await user.rpc('github.pull.viewed.get', viewedArgs)).error.code, 'invalid_github_response');
+  assert.equal(pages, 2);
+  mode = 'changed'; pages = 0;
+  assert.equal((await user.rpc('github.pull.viewed.get', viewedArgs)).error.code, 'pull_snapshot_changed');
+});
+
+for (const viewed of [true, false]) {
+  test(`Viewed confirmation waits for a disconnected ${viewed ? 'mark' : 'unmark'} across sessions`, async t => {
+    const f = await startViewedServer(); t.after(() => f.close());
+    const user = browser(f), restored = browser(f), bob = browser(f);
+    await user.login(); await restored.login(); await bob.login('bob');
+    const path = f.state.files[0];
+    f.state.forScope().set(path, viewed ? 'UNVIEWED' : 'VIEWED');
+    const hold = f.state.holdWrite(path);
+    const abort = new AbortController();
+    const writing = user.request('/api/rpc', {
+      method: 'POST', signal: abort.signal,
+      headers: { 'Content-Type': 'application/json', Origin: f.base, 'X-CSRF-Token': user.csrf },
+      body: JSON.stringify(rpcRequest('github.pull.file.viewed.set', { ...viewedWrite, path, viewed })),
+    });
+    await hold.entered.promise;
+    abort.abort(); await assert.rejects(writing, { name: 'AbortError' });
+    let settled = false;
+    const confirming = restored.rpc('github.pull.viewed.get', { ...viewedArgs, owner: 'ALICE', repo: 'Repo' }).then(result => { settled = true; return result; });
+    // Independent users, repositories and PRs remain usable while Alice waits.
+    for (const [reader, scope] of [
+      [bob, viewedArgs], [restored, { ...viewedArgs, repo: 'other' }], [restored, { ...viewedArgs, number: '43' }],
+    ]) assert((await reader.rpc('github.pull.viewed.get', scope)).ok);
+    await new Promise(r => setTimeout(r, 50));
+    assert.equal(settled, false);
+    assert.equal(f.state.reads.filter(r => r.who === 'alice' && r.repo.toLowerCase() === 'repo' && r.number === 42).length, 0);
+    hold.release.resolve();
+    const result = await confirming;
+    assert(result.ok, JSON.stringify(result));
+    assert.equal(result.value.files[0].state.$tag, viewed ? 'Viewed' : 'Unviewed');
+    assert.equal(f.state.mutations.length, 1);
+  });
+}
+
+test('Viewed serializes multiple files and continues after a failed mutation', async t => {
+  const f = await startViewedServer(); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const [first, second] = f.state.files;
+  const hold = f.state.holdWrite(first, { fail: true });
+  const one = user.rpc('github.pull.file.viewed.set', { ...viewedWrite, path: first });
+  await hold.entered.promise;
+  const two = user.rpc('github.pull.file.viewed.set', { ...viewedWrite, path: second });
+  // Ensure the second request has reached the backend before issuing the read.
+  await new Promise(r => setTimeout(r, 50));
+  const read = user.rpc('github.pull.viewed.get', viewedArgs);
+  await new Promise(r => setTimeout(r, 50));
+  assert.equal(f.state.mutations.length, 1);
+  assert.equal(f.state.reads.length, 0);
+  hold.release.resolve();
+  assert.equal((await one).ok, false);
+  assert.equal((await two).ok, true);
+  assert.deepEqual((await read).value.files.map(f => f.state.$tag), ['Viewed', 'Viewed']);
+  assert.deepEqual(f.state.mutations.map(m => m.path), [first, second]);
+});
+
+test('repository filenames survive source URL encoding, both comment APIs and Viewed', async t => {
+  const f = await startViewedServer({ state: { files: repositoryPaths } }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  for (const path of repositoryPaths) {
+    const source = await user.rpc('github.content.get', { owner: 'alice', repo: 'repo', path, ref: viewedSnapshot.headRefOid });
+    assert(source.ok, JSON.stringify(source));
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+    assert.equal(f.requests.at(-1).path, `/repos/alice/repo/contents/${encoded}?ref=${viewedSnapshot.headRefOid}`);
+    for (const [op, args] of [
+      ['github.review.comment.create', { ...viewedArgs, path, body: 'PR comment', commit_id: viewedSnapshot.headRefOid, line: 2, side: 'RIGHT' }],
+      ['github.commit.comment.create', { owner: 'alice', repo: 'repo', sha: viewedSnapshot.headRefOid, path, body: 'Commit comment', position: 3 }],
+    ]) {
+      const result = await user.rpc(op, args);
+      assert(result.ok, JSON.stringify(result));
+      assert.equal(f.requests.at(-1).body.path, path);
+      assert.equal(result.value.path, path);
+    }
+    for (const viewed of [true, false]) {
+      const result = await user.rpc('github.pull.file.viewed.set', { ...viewedWrite, path, viewed });
+      assert(result.ok, JSON.stringify(result));
+      assert.equal(f.requests.at(-1).body.variables.path, path);
+      const read = await user.rpc('github.pull.viewed.get', viewedArgs);
+      assert(read.ok, JSON.stringify(read));
+      assert.deepEqual(read.value.files.map(f => f.path), repositoryPaths);
+      assert.equal(read.value.files.find(f => f.path === path).state.$tag, viewed ? 'Viewed' : 'Unviewed');
+    }
+  }
 });
