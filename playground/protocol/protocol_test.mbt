@@ -311,7 +311,17 @@ test "strict requests reject unknown tags versions extra missing fractional and 
 test "semantic validation rejects unsafe repository paths revisions comments and line positions" {
   for
     path in [
-      "", "../file", "a//b", "/root", "a\\b", "a/./b", "a\u0000b", "a\u007fb", "a/../b",
+      "",
+      "../file",
+      "a//b",
+      "/root",
+      "a/./b",
+      "a\u0000b",
+      "a/../b",
+      "a/",
+      ".",
+      "..",
+      "a".repeat(4097),
     ] {
     reject(
       @protocol.GitHubRequest::ContentGet({
@@ -372,5 +382,62 @@ test "source decoding validates base64 and byte length" {
     } noraise {
       _ => fail("Accepted invalid source")
     }
+  }
+}
+
+///|
+test "Viewed requests validate and roundtrip three states with snapshots" {
+  let read : @protocol.GitHubRequest = PullViewedGet({
+    owner: "alice",
+    repo: "repo",
+    number: "42",
+  })
+  let args : @protocol.PullFileViewedSet = {
+    owner: "alice",
+    repo: "repo",
+    number: "42",
+    path: "new/目录.mbt",
+    viewed: true,
+    base_sha: "123abcd",
+    head_sha: "abcdef0",
+  }
+  let write : @protocol.GitHubRequest = PullFileViewedSet(args)
+  assert_true(@protocol.decode_request(read.encode()) == read)
+  assert_false(read.is_write())
+  assert_true(@protocol.decode_request(write.encode()) == write)
+  assert_true(write.is_write())
+  roundtrip(
+    @protocol.GitHubRequest::PullFileViewedSet({ ..args, viewed: false, }),
+  )
+  for state in [@protocol.FileViewedState::Viewed, Unviewed, Dismissed] {
+    roundtrip(
+      @protocol.RpcValue::PullViewed({
+        base_sha: args.base_sha,
+        head_sha: args.head_sha,
+        files: [{ path: args.path, state, }],
+      }),
+    )
+    roundtrip(
+      @protocol.RpcValue::FileViewed({
+        base_sha: args.base_sha,
+        head_sha: args.head_sha,
+        file: { path: args.path, state, },
+      }),
+    )
+  }
+  for
+    bad in [
+      @protocol.GitHubRequest::PullFileViewedSet({ ..args, path: "../bad", }),
+      PullFileViewedSet({ ..args, base_sha: "latest", }),
+      PullFileViewedSet({ ..args, head_sha: "HEAD", }),
+      PullViewedGet({ owner: "alice", repo: "repo", number: "2147483648", }),
+    ] {
+    let rejected = try {
+      bad.validate()
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(rejected)
   }
 }

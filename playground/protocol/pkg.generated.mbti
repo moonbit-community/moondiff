@@ -18,6 +18,8 @@ pub fn valid_path(String) -> Bool
 
 pub fn valid_repo(String) -> Bool
 
+pub fn valid_repository_path(String) -> Bool
+
 pub fn valid_sha(String) -> Bool
 
 // Errors
@@ -99,6 +101,17 @@ pub(all) struct ApiFile {
   patch : String?
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) struct ApiFileViewed {
+  path : String
+  state : FileViewedState
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiFileViewedResult {
+  base_sha : String
+  head_sha : String
+  file : ApiFileViewed
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) struct ApiIssueComment {
   id : Int64
   body : String
@@ -124,6 +137,12 @@ pub(all) struct ApiPull {
 pub(all) struct ApiPullBranch {
   sha : String
   repo : ApiRepository?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPullViewed {
+  base_sha : String
+  head_sha : String
+  files : Array[ApiFileViewed]
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiRepository {
@@ -240,9 +259,17 @@ pub(all) struct DeviceStart {
   attempt_id : String
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) enum FileViewedState {
+  Viewed
+  Unviewed
+  Dismissed
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) enum GitHubRequest {
   CommitGet(CommitGet)
   PullGet(PullGet)
+  PullViewedGet(PullViewedGet)
+  PullFileViewedSet(PullFileViewedSet)
   CompareGet(CompareGet)
   PullFiles(PullFiles)
   ContentGet(ContentGet)
@@ -266,6 +293,16 @@ pub(all) struct IssueCommentCreate {
   body : String
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) struct PullFileViewedSet {
+  owner : String
+  repo : String
+  number : String
+  path : String
+  viewed : Bool
+  base_sha : String
+  head_sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) struct PullFiles {
   owner : String
   repo : String
@@ -274,6 +311,12 @@ pub(all) struct PullFiles {
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct PullGet {
+  owner : String
+  repo : String
+  number : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct PullViewedGet {
   owner : String
   repo : String
   number : String
@@ -311,6 +354,8 @@ pub(all) struct RpcRequest {
 pub(all) enum RpcValue {
   Commit(ApiCommit)
   Pull(ApiPull)
+  PullViewed(ApiPullViewed)
+  FileViewed(ApiFileViewedResult)
   Compare(ApiCompare)
   Files(Array[ApiFile])
   Content(ApiSource)

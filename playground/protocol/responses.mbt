@@ -15,6 +15,8 @@ pub(all) enum Response[T] {
 pub(all) enum RpcValue {
   Commit(ApiCommit)
   Pull(ApiPull)
+  PullViewed(ApiPullViewed)
+  FileViewed(ApiFileViewedResult)
   Compare(ApiCompare)
   Files(Array[ApiFile])
   Content(ApiSource)

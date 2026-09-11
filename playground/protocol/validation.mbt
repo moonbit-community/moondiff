@@ -49,6 +49,17 @@ pub fn valid_path(path : String) -> Bool {
 }
 
 ///|
+/// Validate a Git repository path without normalizing its filename characters.
+/// Slashes delimit components; backslashes and control characters except NUL
+/// are literal filename characters. Local/static paths use `valid_path` instead.
+pub fn valid_repository_path(path : String) -> Bool {
+  !path.is_empty() &&
+  path.length() <= 4096 &&
+  !path.contains("\u0000") &&
+  path.split("/").all(p => p != "" && p != "." && p != "..")
+}
+
+///|
 pub suberror ProtocolError {
   ProtocolError(String, String)
 }
@@ -114,7 +125,11 @@ fn check_sha(sha : String) -> Unit raise {
 
 ///|
 fn check_path(path : String) -> Unit raise {
-  require(valid_path(path), "invalid_path", "Invalid repository path.")
+  require(
+    valid_repository_path(path),
+    "invalid_path",
+    "Invalid repository path.",
+  )
 }
 
 ///|
@@ -122,6 +137,8 @@ pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
   match self {
     CommitGet(_) => false
     PullGet(_) => false
+    PullViewedGet(_) => false
+    PullFileViewedSet(_) => true
     CompareGet(_) => false
     PullFiles(_) => false
     ContentGet(_) => false
@@ -141,6 +158,8 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
   let (owner, repo) = match self {
     CommitGet(p) => (p.owner, p.repo)
     PullGet(p) => (p.owner, p.repo)
+    PullViewedGet(p) => (p.owner, p.repo)
+    PullFileViewedSet(p) => (p.owner, p.repo)
     CompareGet(p) => (p.owner, p.repo)
     PullFiles(p) => (p.owner, p.repo)
     ContentGet(p) => (p.owner, p.repo)
@@ -168,6 +187,13 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
       )
     }
     PullGet(p) => check_number(p.number)
+    PullViewedGet(p) => check_pull_number(p.number)
+    PullFileViewedSet(p) => {
+      check_pull_number(p.number)
+      check_path(p.path)
+      check_sha(p.base_sha)
+      check_sha(p.head_sha)
+    }
     CompareGet(p) => {
       check_sha(p.base)
       check_sha(p.head)
@@ -238,4 +264,16 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
         "Invalid comment identifier.",
       )
   }
+}
+
+///|
+// GraphQL's Int is signed 32-bit, unlike REST identifiers.
+fn check_pull_number(number : String) -> Unit raise {
+  check_number(number)
+  let id : Int64 = @json.from_json(number.to_json())
+  require(
+    id <= 2147483647L,
+    "invalid_arguments",
+    "Pull request number out of range.",
+  )
 }

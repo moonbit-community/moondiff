@@ -23,6 +23,22 @@ async fn App::rpc(
           ),
         ),
       )
+    PullViewedGet(p) =>
+      self.with_viewed_scope(session, p, () => {
+        PullViewed(self.pull_viewed(session, p))
+      })
+    PullFileViewedSet(p) =>
+      self.with_viewed_scope(
+        session,
+        { owner: p.owner, repo: p.repo, number: p.number, },
+        () => {
+          // Keep the coordinator until preflight, mutation and validation finish,
+          // even if the browser disconnects. Upstream calls retain their timeout.
+          @async.protect_from_cancel(() => {
+            FileViewed(self.set_file_viewed(session, p))
+          })
+        },
+      )
     CompareGet(p) =>
       Compare(
         decode_github(

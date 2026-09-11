@@ -17,6 +17,7 @@ priv struct App {
   db : @sqlite3.Connection
   refreshes : Map[String, @async.Lazy[Session]]
   devices : Map[String, @async.Lazy[Unit]]
+  viewed_scopes : Map[String, ViewedCoordinator]
 }
 
 ///|
@@ -90,7 +91,7 @@ fn App::open(config : Config) -> App raise {
       Text(seal(config.key, "database", "key-check", b"moondiff-v1")),
     ])
   }
-  { config, db, refreshes: {}, devices: {}, }
+  { config, db, refreshes: {}, devices: {}, viewed_scopes: {}, }
 }
 
 ///|
