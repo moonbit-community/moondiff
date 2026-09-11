@@ -1904,3 +1904,58 @@ test('page restoration releases interrupted deletion and refreshes its uncertain
   await expect(own).toHaveCount(0);
   expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith('.comment.delete')).length)).toBe(1);
 });
+
+for (const algorithm of ["Token", "Tree"]) {
+  for (const layout of ["Split", "Unified"]) {
+    test(`${algorithm} ${layout}: navigating into a collapsed section preserves comment anchors and the draft`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 480 });
+      const before = "let first = 11; let second = 22";
+      const after = "let first = 33; let second = 44";
+      await installApi(page, pullTarget(), {
+        authenticated: true, oldSource: before, newSource: after,
+        patch: `@@ -1 +1 @@\n-${before}\n+${after}`,
+      });
+      await page.addInitScript(() => {
+        window.__fake.reviewComments = [{
+          ...window.__fake.reviewComments[0], line: 1, side: "RIGHT", position: 2,
+        }];
+      });
+      await page.goto(reviewPath());
+      await waitForSignedInComments(page);
+      await page.getByRole("button", { name: algorithm, exact: true }).click();
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      const sections = page.locator("details.semantic-section");
+      await expect(sections).toHaveCount(2);
+      const first = sections.nth(0), second = sections.nth(1);
+      await first.locator(".semantic-section-label").click();
+      const anchor = second.locator('.new-line-number button[aria-label="Comment on line 1"]');
+      await clickLineCommentButton(anchor);
+      const editor = page.locator(".inline-comment-editor-row textarea");
+      await editor.fill("Preserve this line-one draft");
+      const draftId = await editor.getAttribute("data-draft-id");
+      await editor.evaluate(element => element.setSelectionRange(2, 9, "backward"));
+      // File-level navigation follows the reading position, so place the second
+      // declaration beneath its sticky heading before returning to the first.
+      await second.evaluate(element => {
+        const summary = element.querySelector("summary");
+        const row = element.querySelector("[data-change-block-start]");
+        const inset = parseFloat(getComputedStyle(summary).top) + summary.getBoundingClientRect().height + 8;
+        window.scrollTo(0, window.scrollY + row.getBoundingClientRect().top - inset);
+      });
+      await page.locator("#moondiff-file-0 .file-heading").getByRole("button", { name: "Previous change", exact: true }).click();
+      await expect(first).toHaveJSProperty("open", true);
+      await expect(page.locator("#moondiff-file-0 .file-heading").getByRole("button", { name: "Previous change", exact: true })).toBeFocused();
+      await expect(first.locator(".review-thread")).toHaveCount(1);
+      await expect(page.locator(".review-thread")).toHaveCount(1);
+      await expect(first.locator("textarea")).toHaveCount(1);
+      await expect(editor).toHaveAttribute("data-draft-id", draftId);
+      await expect(editor).toHaveValue("Preserve this line-one draft");
+      expect(await editor.evaluate(element => [element.selectionStart, element.selectionEnd, element.selectionDirection])).toEqual([2, 9, "backward"]);
+      await page.getByRole("button", { name: layout === "Split" ? "Unified" : "Split", exact: true }).click();
+      await expect(first).toHaveJSProperty("open", true);
+      await expect(first.locator("textarea")).toHaveCount(1);
+      await expect(editor).toHaveAttribute("data-draft-id", draftId);
+      await expect(first.locator('.new-line-number button[aria-label="Comment on line 1"]')).toHaveCount(1);
+    });
+  }
+}

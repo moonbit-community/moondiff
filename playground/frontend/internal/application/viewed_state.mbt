@@ -287,6 +287,7 @@ fn reconcile_viewed(
     Load(ToggleFile(generation, index))
     | Load(OpenFile(generation, index))
     | Load(ToggleSection(generation, index, _))
+    | Load(NavigateChange(generation, index, _, _, _))
     | Load(RetryFile(generation, index)) if generation == model.generation =>
       record_viewed_interaction(model, index)
     Review(OpenInlineDraft(_, _) | OpenReplyDraft(_) | DraftBodyChanged(_))

@@ -294,6 +294,7 @@ test "Viewed tracks section toggles and retries before loading but ignores stale
     msg in [
       Load(OpenFile(initial.generation, 0)),
       Load(ToggleSection(initial.generation, 0, "section")),
+      Load(NavigateChange(initial.generation, 0, "section", 0, 1)),
       Load(RetryFile(initial.generation, 0)),
     ] {
     let changed = viewed_interaction_update(initial, msg)
@@ -311,6 +312,7 @@ test "Viewed tracks section toggles and retries before loading but ignores stale
         Load(ToggleFile(generation, index)),
         Load(OpenFile(generation, index)),
         Load(ToggleSection(generation, index, "section")),
+        Load(NavigateChange(generation, index, "section", 0, 1)),
         Load(RetryFile(generation, index)),
       ] {
       let ignored = viewed_interaction_update(initial, msg)
