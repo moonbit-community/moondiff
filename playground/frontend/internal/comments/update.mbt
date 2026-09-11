@@ -1,8 +1,10 @@
 ///|
 pub(all) enum Event {
+  SnapshotChanged
   ContextChanged(Context)
   Reset(Bool, Bool)
   Identity(Bool, String?)
+  IdentityChecking
   RecoverInterrupted
   RefreshComments
   BeginCommentsRefresh(Int, CommitRef)
@@ -29,6 +31,7 @@ pub(all) enum Event {
 ///|
 fn update_review(model : Model, msg : Event) -> (Model, Effects) {
   match msg {
+    SnapshotChanged => (mark_snapshot_stale(model), [])
     ContextChanged(_) => (model, [])
     RecoverInterrupted =>
       (with_review(model, recover_interrupted(model.review)), [])
@@ -38,6 +41,7 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
         ..initial,
         context: model.review.context,
         can_comment: model.review.can_comment,
+        identity_checking: model.review.identity_checking,
         login: model.review.login,
         editor: if preserve_draft {
           match model.review.editor {
@@ -50,11 +54,22 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
       }
       (with_review(model, review), [])
     }
+    IdentityChecking =>
+      (
+        with_review(model, {
+          ..model.review,
+          can_comment: false,
+          identity_checking: true,
+          authentication_error: None,
+        }),
+        [],
+      )
     Identity(can_comment, login) =>
       (
         with_review(model, {
           ..model.review,
           can_comment,
+          identity_checking: false,
           login,
           authentication_error: None,
         }),

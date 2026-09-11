@@ -65,7 +65,7 @@ fn prepare_discussions(
       }
       _ => None
     },
-    editor: if review.draft() is Some(draft) && review_can_comment(review) {
+    editor: if review.draft() is Some(draft) && review.draft_visible() {
       comment_editor(
         draft,
         review,

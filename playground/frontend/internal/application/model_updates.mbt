@@ -45,7 +45,11 @@ fn with_auth(model : Model, auth : AuthStatus) -> Model {
   }
   let (review, _) = @comments.update(
     comment_session_context(model.review, comment_context(model)),
-    Identity(auth is SignedIn(..), login),
+    if auth is AuthChecking {
+      IdentityChecking
+    } else {
+      Identity(auth is SignedIn(..), login)
+    },
   )
   { ..model, auth, last_authenticated_user_id: user_id, review, }
 }

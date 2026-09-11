@@ -114,9 +114,11 @@ pub(all) enum Effect {
 }
 
 pub(all) enum Event {
+  SnapshotChanged
   ContextChanged(Context)
   Reset(Bool, Bool)
   Identity(Bool, String?)
+  IdentityChecking
   RecoverInterrupted
   RefreshComments
   BeginCommentsRefresh(Int, @github.CommitRef)
@@ -178,6 +180,7 @@ pub fn Session::comment_key(Self, CommentId) -> String
 pub fn Session::comments(Self) -> CommentsStatus
 pub fn Session::deleted(Self) -> Array[CommentId]
 pub fn Session::draft(Self) -> CommentDraft?
+pub fn Session::draft_visible(Self) -> Bool
 pub fn Session::generation(Self) -> Int
 pub fn Session::new(enabled? : Bool) -> Self
 pub fn Session::refresh(Self) -> CommentRefresh

@@ -13,6 +13,7 @@ fn model_with_comment_auth_failure(model : Model, error : Failure) -> Model {
     with_review(model, {
       ..model.review,
       can_comment: false,
+      identity_checking: false,
       authentication_error: Some(error.message),
     })
   } else {
