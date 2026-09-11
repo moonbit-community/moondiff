@@ -15,6 +15,7 @@ pub(all) struct ReviewRow {
   old_segments : ArrayView[@model.DiffSegment]?
   new_segments : ArrayView[@model.DiffSegment]?
   kind : ReviewRowKind
+  change_block_start : Bool
   old_anchor : ReviewAnchor?
   new_anchor : ReviewAnchor?
 }
@@ -71,6 +72,7 @@ fn make_review_row(
   new_segments : ArrayView[@model.DiffSegment]?,
   kind : ReviewRowKind,
   context : Bool,
+  change_block_start? : Bool = false,
 ) -> ReviewRow {
   let old_anchor = match (context, old_line) {
     (false, Some(line)) => canonical_anchor(patch, Left, line)
@@ -90,6 +92,7 @@ fn make_review_row(
     old_segments,
     new_segments,
     kind,
+    change_block_start,
     old_anchor,
     new_anchor,
   }
@@ -132,7 +135,7 @@ pub fn project_review_rows(
           } else {
             ChangeRow
           }
-          for row in changes {
+          for index, row in changes {
             match row {
               Paired(old, new) =>
                 rows.push(
@@ -148,6 +151,7 @@ pub fn project_review_rows(
                     Some(new.segments),
                     kind,
                     false,
+                    change_block_start=kind is ChangeRow && index == 0,
                   ),
                 )
               OldOnly(old) =>
@@ -164,6 +168,7 @@ pub fn project_review_rows(
                     None,
                     kind,
                     false,
+                    change_block_start=kind is ChangeRow && index == 0,
                   ),
                 )
               NewOnly(new) =>
@@ -180,6 +185,7 @@ pub fn project_review_rows(
                     Some(new.segments),
                     kind,
                     false,
+                    change_block_start=kind is ChangeRow && index == 0,
                   ),
                 )
             }

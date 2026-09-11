@@ -46,6 +46,7 @@ pub(all) struct ReviewRow {
   old_segments : ArrayView[@model.DiffSegment]?
   new_segments : ArrayView[@model.DiffSegment]?
   kind : ReviewRowKind
+  change_block_start : Bool
   old_anchor : ReviewAnchor?
   new_anchor : ReviewAnchor?
 }
