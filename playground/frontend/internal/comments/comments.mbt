@@ -55,6 +55,7 @@ pub struct Session {
   notice : String?
   published_url : String?
   can_comment : Bool
+  priv identity_checking : Bool
   login : String?
   authentication_error : String?
   priv comments : CommentsStatus
@@ -80,6 +81,7 @@ pub fn Session::new(enabled? : Bool = false) -> Session {
     notice: None,
     published_url: None,
     can_comment: false,
+    identity_checking: false,
     login: None,
     authentication_error: None,
     deletion_id: 0,
@@ -239,4 +241,10 @@ pub(all) struct DraftId {
 ///|
 pub fn DraftId::key(self : DraftId) -> String {
   "draft:\{self.generation}:\{self.sequence}"
+}
+
+///|
+// An identity check disables writes, but should not unmount an existing editor.
+pub fn Session::draft_visible(self : Session) -> Bool {
+  self.can_comment || self.identity_checking
 }

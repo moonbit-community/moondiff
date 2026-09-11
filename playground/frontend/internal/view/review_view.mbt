@@ -30,7 +30,7 @@ fn inline_draft_for_anchor(
   review : Session,
   anchor : ReviewAnchor?,
 ) -> CommentDraft? {
-  guard review_can_comment(review) &&
+  guard review.draft_visible() &&
     anchor is Some(anchor) &&
     review.draft() is Some(draft) else {
     return None
@@ -544,7 +544,7 @@ fn review_thread_view(
       ),
     ])
   }
-  if can_comment && reply_draft is Some(draft) {
+  if review.draft_visible() && reply_draft is Some(draft) {
     comments[draft.id.key()] = comment_editor(draft, review, emit)
   }
   @html.div(class="review-thread", comments)
@@ -794,7 +794,7 @@ fn comments_overview(
       _ => @html.nothing
     },
     fallback_discussions(prepare_discussions(view, review, emit), None),
-    if review_can_comment(review) &&
+    if review.draft_visible() &&
       review.draft() is Some(draft) &&
       draft.kind is ReplyDraft(id) &&
       !@comments.valid_reply_target(review, id) {
@@ -810,10 +810,10 @@ fn comments_overview(
     if view.reference.target is PullRequest(_) {
       @html.div(class="overall-comments", [
         @html.div(issue_views),
-        if review_can_comment(review) {
+        if review.draft_visible() {
           if review.draft() is Some(draft) && draft.kind is OverallDraft {
             comment_editor(draft, review, emit)
-          } else {
+          } else if review_can_comment(review) {
             @html.button(
               type_="button",
               class="secondary add-overall-comment",
@@ -821,6 +821,8 @@ fn comments_overview(
               on_click=emit(Review(OpenOverallDraft)),
               "Add overall comment",
             )
+          } else {
+            @html.nothing
           }
         } else {
           @html.nothing

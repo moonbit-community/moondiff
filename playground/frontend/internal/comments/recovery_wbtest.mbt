@@ -113,3 +113,32 @@ test "interrupted deletion and list refresh reject late success without losing t
   assert_true(unchanged.deletion == confirming.deletion)
   assert_eq(unchanged.notice, confirming.notice)
 }
+
+///|
+test "identity checks keep local drafts visible without permitting a submission" {
+  let anchor : ReviewAnchor = {
+    path: "src/main.mbt",
+    line: 2,
+    side: Right,
+    position: Some(3),
+  }
+  let editing = update(
+      update(session_fixture(), OpenInlineDraft(0, anchor)).0,
+      DraftBodyChanged("keep this draft"),
+    ).0
+  let checking = update(editing, IdentityChecking).0
+  assert_true(checking.draft_visible())
+  assert_true(checking.draft() == editing.draft())
+  assert_false(permission(checking, Submit).allowed())
+  let (blocked, effects) = update(checking, SubmitDraft)
+  assert_true(blocked.submission() is None)
+  assert_true(effects.is_empty())
+  let edited = update(checking, DraftBodyChanged("continue locally")).0
+  assert_eq(edited.draft().unwrap().body, "continue locally")
+  let signed_in = update(edited, Identity(true, Some("alice"))).0
+  assert_true(signed_in.draft_visible())
+  assert_true(permission(signed_in, Submit).allowed())
+  let signed_out = update(edited, Identity(false, None)).0
+  assert_false(signed_out.draft_visible())
+  assert_false(permission(signed_out, Submit).allowed())
+}

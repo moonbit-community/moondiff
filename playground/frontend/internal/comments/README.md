@@ -75,7 +75,10 @@ restores selection after a remount, keyed by `DraftId`. It focuses only a new
 draft or an editor focused immediately before the update. Finished draft records
 are removed; nothing is persisted to browser storage. Ordinary refreshes must
 retain the actual node, including during composition, rather than relying on
-selection restoration to mask a replacement.
+selection restoration to mask a replacement. `IdentityChecking` keeps an existing
+editor visible during a temporary authentication check while `can_comment` stays
+false, so the check cannot remove its DOM, focus or selection. Posting remains
+disabled. A resolved identity or authentication failure ends that transient state.
 
 ## Regression checks
 
