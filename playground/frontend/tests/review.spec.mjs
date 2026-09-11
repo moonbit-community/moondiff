@@ -1102,13 +1102,13 @@ test("filtered comments fall back with location, and return inline after filters
   await page.goto(reviewPath());
   await expect(page.locator(".file-discussions").filter({ hasText: "Existing inline comment" })).toContainText("Not shown in current view");
   await expect(page.locator(".outdated-discussions .comment-location")).toContainText("17");
-  await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).click();
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
   await page.getByRole("button", { name: "Tree", exact: true }).click();
-  await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).click();
   await expect(page.locator(".file-discussions").filter({ hasText: "Existing inline comment" })).toContainText("Not shown in current view");
   await page.getByRole("button", { name: "Token", exact: true }).click();
-  await page.getByRole("button", { name: "Ignore comments", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).click();
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing inline comment" })).toHaveCount(1);
 });
 
@@ -1125,29 +1125,27 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme });
     await page.goto(reviewPath());
     for (const name of ["Ignore comments", "Ignore tests"]) {
-      const toggle = page.getByRole("button", { name, exact: true });
-      await expect(toggle).toHaveAttribute("aria-pressed", "true");
+      const toggle = page.getByRole("checkbox", { name, exact: true });
+      const control = toggle.locator("..");
+      await expect(toggle).toBeChecked();
       for (const state of ["on", "off"]) {
         {
           const prefix = name === "Ignore comments" ? "ignore-comments" : "ignore-tests";
-          const icon = name === "Ignore comments" ? "//" : "{}";
-          await expect(toggle).toHaveText(`${icon}${name}`);
-          await expect(toggle.locator(".filter-state")).toHaveCount(0);
-          await expect(toggle.locator(`.${prefix}-icon`)).toBeVisible();
-          if (width === 420) await expect(toggle.locator(`.${prefix}-label`)).toBeHidden();
-          else await expect(toggle.locator(`.${prefix}-label`)).toBeVisible();
+          await expect(control).toHaveText(name);
+          await expect(toggle).toBeVisible();
+          await expect(control.locator(`.${prefix}-label`)).toBeVisible();
           if (state === "on") {
-            await expect(toggle).toHaveCSS("background-color", "rgb(238, 242, 254)");
-            await expect(toggle).toHaveCSS("color", "rgb(42, 85, 204)");
+            await expect(control).toHaveCSS("background-color", "rgb(238, 242, 254)");
+            await expect(control).toHaveCSS("color", "rgb(42, 85, 204)");
           } else {
-            await expect(toggle).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
+            await expect(control).not.toHaveCSS("background-color", "rgb(238, 242, 254)");
           }
         }
         await toggle.hover();
         for (const side of ["top", "right", "bottom", "left"]) {
-          await expect(toggle).toHaveCSS(`border-${side}-width`, "0px");
+          await expect(control).toHaveCSS(`border-${side}-width`, "0px");
         }
-        const contrast = await toggle.evaluate(button => {
+        const contrast = await control.evaluate(button => {
           const rgba = value => {
             const channels = value.match(/[\d.]+/g).map(Number);
             // color-mix() backgrounds serialize as normalized color(srgb ...).
@@ -1169,7 +1167,7 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
         });
         expect(contrast).toBeGreaterThanOrEqual(4.5);
         await toggle.click();
-        await expect(toggle).toHaveAttribute("aria-pressed", state === "on" ? "false" : "true");
+        await expect(toggle).toBeChecked({ checked: state !== "on" });
       }
     }
     for (const layout of ["split", "unified"]) {
@@ -1251,12 +1249,12 @@ test("filter choices reset on reload and a collapsed file keeps its draft in dis
   await page.getByRole("button", { name: "Expand src/main.mbt", exact: true }).click();
   await expect(page.locator(".inline-comment-editor-row textarea")).toHaveValue("Preserved draft");
   for (const name of ["Ignore comments", "Ignore tests"]) {
-    await page.getByRole("button", { name, exact: true }).click();
-    await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("checkbox", { name, exact: true }).click();
+    await expect(page.getByRole("checkbox", { name, exact: true })).not.toBeChecked();
   }
   expect(page.url()).not.toContain("ignore");
   await page.reload();
-  for (const name of ["Ignore comments", "Ignore tests"]) await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true");
+  for (const name of ["Ignore comments", "Ignore tests"]) await expect(page.getByRole("checkbox", { name, exact: true })).toBeChecked();
 });
 
 test("expired credentials during deletion keep the card and offer sign-in", async ({ page }) => {
@@ -1730,7 +1728,7 @@ for (const change of ["modified", "inserted", "deleted"]) {
       }
     }
     for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
-      await page.getByRole("button", { name: filter, exact: true }).click();
+      await page.getByRole("checkbox", { name: filter, exact: true }).click();
       await expect(first).toHaveJSProperty("open", false);
       await expectPlacement(second);
     }

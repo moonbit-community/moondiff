@@ -454,6 +454,12 @@ button.toolbar-button:active {
   gap: 0.375rem;
 }
 
+.filter-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.12rem;
+}
+
 .segmented-control {
   display: inline-flex;
   align-items: center;
@@ -480,30 +486,28 @@ button.segmented-option:active {
   transform: none;
 }
 
-button.ignore-comments-toggle,
-button.ignore-tests-toggle {
-  width: auto;
+.toolbar-filter {
+  display: inline-flex;
+  height: 2rem;
+  align-items: center;
+  gap: 0.42rem;
+  border-radius: 0.38rem;
   padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 520;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
 }
 
-button.ignore-comments-toggle.active,
-button.ignore-tests-toggle.active {
-  color: var(--foreground);
-  background: var(--surface-subtle);
-}
-
-.ignore-comments-icon {
-  color: #8064c8;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.ignore-tests-icon {
-  color: #3d8f73;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  font-weight: 700;
+.toolbar-filter input {
+  flex: 0 0 auto;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
+  accent-color: #2a55cc;
+  cursor: pointer;
 }
 
 .public-note {
@@ -2122,16 +2126,15 @@ footer {
   .status-label {
     display: none;
   }
+}
 
-  .ignore-comments-label,
-  .ignore-tests-label {
-    display: none;
+@media (max-width: 540px) {
+  :root {
+    --toolbar-height: 7.375rem;
   }
 
-  button.ignore-comments-toggle,
-  button.ignore-tests-toggle {
-    width: 2rem;
-    padding: 0;
+  .filter-controls {
+    flex-basis: 100%;
   }
 }
 
@@ -2244,10 +2247,9 @@ footer {
   }
 }
 
-/* Algorithm and filter controls retain distinct pressed states in both themes. */
+/* Algorithm and filter controls retain distinct selected states in both themes. */
 button.segmented-option,
-button.toolbar-button.ignore-comments-toggle,
-button.toolbar-button.ignore-tests-toggle {
+.toolbar-filter {
   transition: transform 120ms ease;
   width: auto;
   padding: 0 0.5rem;
@@ -2256,15 +2258,9 @@ button.toolbar-button.ignore-tests-toggle {
   background: #fff;
 }
 
-button.toolbar-button.ignore-comments-toggle .ignore-comments-icon,
-button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
-  color: inherit;
-}
-
 @media (prefers-color-scheme: dark) {
   button.segmented-option,
-  button.toolbar-button.ignore-comments-toggle,
-  button.toolbar-button.ignore-tests-toggle {
+  .toolbar-filter {
     color: #eee;
     background: #242424;
   }
@@ -2272,19 +2268,10 @@ button.toolbar-button.ignore-tests-toggle .ignore-tests-icon {
 
 /* OpenSeek GUI soft and strong accents (desktop/styles/tokens.css). */
 button.segmented-option.active,
-button.toolbar-button.ignore-comments-toggle.active,
-button.toolbar-button.ignore-tests-toggle.active {
+.toolbar-filter.active {
   color: #2a55cc;
   background: #eef2fe;
   font-weight: 700;
-}
-
-@media (max-width: 680px) {
-  button.toolbar-button.ignore-comments-toggle,
-  button.toolbar-button.ignore-tests-toggle {
-    width: 2rem;
-    padding: 0;
-  }
 }
 
 @media (max-width: 360px) {
