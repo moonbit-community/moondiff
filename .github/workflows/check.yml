@@ -82,3 +82,14 @@ jobs:
       - name: Run Playwright integration tests
         working-directory: playground
         run: npm run test:e2e
+
+      - name: Upload browser test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-failures-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playground/test-results/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
