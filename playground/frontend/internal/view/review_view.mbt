@@ -126,6 +126,7 @@ fn split_review_line(
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
+  change_block? : Int,
 ) -> Array[(String, @rabbita.Html)] {
   let (old_class, new_class) = review_row_classes(row)
   let cards = inline_cards(
@@ -140,6 +141,7 @@ fn split_review_line(
     (
       source_row_key("split", row.file_index, row.old_line, row.new_line),
       @html.tr(
+        attrs=change_block_start_attrs(change_block),
         class=if cards.is_empty() &&
           inline_draft_for_anchor(review, row.old_anchor) is None &&
           inline_draft_for_anchor(review, row.new_anchor) is None {
@@ -202,12 +204,14 @@ fn unified_source_line(
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
+  change_block? : Int,
 ) -> Array[(String, @rabbita.Html)] {
   let cards = inline_cards(discussions, file_index, old_line, new_line, 3, site)
   let items : Array[(String, @rabbita.Html)] = [
     (
       source_row_key("unified", file_index, old_line, new_line),
       @html.tr(
+        attrs=change_block_start_attrs(change_block),
         class=if cards.is_empty() &&
           inline_draft_for_anchor(review, anchor) is None {
           ""
@@ -262,6 +266,7 @@ fn unified_review_line(
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
+  change_block? : Int,
 ) -> Array[(String, @rabbita.Html)] {
   match row.kind {
     ContextRow =>
@@ -279,6 +284,7 @@ fn unified_review_line(
         emit,
         discussions~,
         site~,
+        change_block?,
       )
     IgnoredRow =>
       if row.old_text == row.new_text {
@@ -296,6 +302,7 @@ fn unified_review_line(
           emit,
           discussions~,
           site~,
+          change_block?,
         )
       } else {
         let items = unified_source_line(
@@ -312,6 +319,11 @@ fn unified_review_line(
           emit,
           discussions~,
           site~,
+          change_block?=if row.old_line is Some(_) {
+            change_block
+          } else {
+            None
+          },
         )
         items.push_iter(
           unified_source_line(
@@ -328,6 +340,7 @@ fn unified_review_line(
             emit,
             discussions~,
             site~,
+            change_block?=if row.old_line is None { change_block } else { None },
           ).iter(),
         )
         items
@@ -350,6 +363,7 @@ fn unified_review_line(
             emit,
             discussions~,
             site~,
+            change_block?,
           ).iter(),
         )
       }
@@ -369,6 +383,7 @@ fn unified_review_line(
             emit,
             discussions~,
             site~,
+            change_block?=if row.old_line is None { change_block } else { None },
           ).iter(),
         )
       }
@@ -397,6 +412,7 @@ fn safe_review_diff(
   // Count each source identity independently; comments never shift these keys.
   let occurrences : Map[String, Int] = Map([])
   let mut line_index = 0
+  let mut block_index = -1
   for
     item in project_review_items(
       file_index,
@@ -425,6 +441,12 @@ fn safe_review_diff(
         // Keep the actual file index even though the gutter only needs the
         // canonical anchor. This makes the selected draft stable across views.
         let row = { ..row, file_index, }
+        let change_block = if row.change_block_start {
+          block_index += 1
+          Some(block_index)
+        } else {
+          None
+        }
         let rendered = match mode {
           Split =>
             split_review_line(
@@ -432,6 +454,7 @@ fn safe_review_diff(
               review,
               emit,
               discussions~,
+              change_block?,
               site=projection_site(
                 file_index, old_base, new_base, line_index, fragment,
               ),
@@ -442,6 +465,7 @@ fn safe_review_diff(
               review,
               emit,
               discussions~,
+              change_block?,
               site=projection_site(
                 file_index, old_base, new_base, line_index, fragment,
               ),
