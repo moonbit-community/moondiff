@@ -8,6 +8,7 @@ import {
   "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff-playground/internal/review",
   "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/dom",
   "moonbit-community/rabbita/sub",
   "moonbit-community/rabbita/url",
   "moonbitlang/core/json",
@@ -21,6 +22,8 @@ pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
 pub fn auth_status_from_api(@moondiff-playground-protocol.ApiAuthStatus) -> AuthStatus
 
 pub fn file_dom_id(Int) -> String
+
+pub fn navigate_section_change(@dom.MouseEvent, Int, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 
@@ -64,6 +67,7 @@ pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommit, Error])
   ToggleFile(Int, Int)
   ToggleSection(Int, Int, String)
+  NavigateChange(Int, Int, String, Int, Int)
   OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, @change.SourceSide, Result[(String, Bytes), Error])

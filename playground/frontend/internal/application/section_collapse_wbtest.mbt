@@ -177,3 +177,56 @@ test "section toggles preserve drafts and refresh retains choices until a new sn
   assert_true(stale == loaded)
   assert_eq(collapsed_sections(refreshed), [key])
 }
+
+///|
+test "change navigation expands idempotently and rejects stale or invalid targets" {
+  let model = diff_test_model(
+    diff_test_view([
+      fixture_file("first.mbt", "modified"),
+      fixture_file("second.mbt", "modified"),
+    ]),
+  )
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let (collapsed, _) = update_load(
+    model,
+    ToggleSection(model.generation, 0, "target"),
+    emit,
+  )
+  let (collapsed, _) = update_load(
+    collapsed,
+    ToggleSection(model.generation, 0, "other"),
+    emit,
+  )
+  let (opened, _) = update_load(
+    collapsed,
+    NavigateChange(model.generation, 0, "target", 0, 1),
+    emit,
+  )
+  assert_eq(collapsed_sections(collapsed), ["target", "other"])
+  assert_eq(collapsed_sections(opened), ["other"])
+  assert_eq(collapsed_sections(opened, index=1), [])
+  let (again, _) = update_load(
+    opened,
+    NavigateChange(model.generation, 0, "target", 1, -1),
+    emit,
+  )
+  assert_true(again == opened)
+  let (switched, _) = update_ui(opened, SelectView(Unified), emit)
+  assert_eq(collapsed_sections(switched), ["other"])
+  for
+    (generation, index, block, direction) in [
+      (model.generation - 1, 0, 0, 1),
+      (model.generation + 1, 0, 0, 1),
+      (model.generation, -1, 0, 1),
+      (model.generation, 2, 0, 1),
+      (model.generation, 0, -1, 1),
+      (model.generation, 0, 0, 0),
+    ] {
+    let (ignored, _) = update_load(
+      collapsed,
+      NavigateChange(generation, index, "target", block, direction),
+      emit,
+    )
+    assert_true(ignored == collapsed)
+  }
+}

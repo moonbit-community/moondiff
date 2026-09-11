@@ -563,6 +563,8 @@ fn semantic_fragment_view(
   emit : @rabbita.Emit[Msg],
   whole : Bool,
   expanded? : Bool = true,
+  generation? : Int = 0,
+  section_key? : String = "",
   on_toggle? : @rabbita.Cmd = @rabbita.none,
   show_hunk_headers? : Bool = true,
   discussions? : InlineDiscussions = empty_discussions(),
@@ -591,7 +593,7 @@ fn semantic_fragment_view(
           event.prevent_default()
           on_toggle
         }),
-        title,
+        [@html.span(class="semantic-section-label", title)],
       )
     } else {
       @html.nothing
@@ -619,7 +621,14 @@ fn semantic_fragment_view(
   if whole {
     @html.section(class="semantic-whole", content)
   } else {
-    @html.details(class="semantic-section", open=expanded, content)
+    @html.details(
+      class="semantic-section",
+      open=expanded,
+      attrs=@html.Attrs::build()
+        .data_set("section-key", section_key)
+        .data_set("navigation-generation", generation.to_string()),
+      content,
+    )
   }
 }
 
@@ -664,6 +673,8 @@ fn top_level_diff_view(
         review,
         emit,
         false,
+        generation~,
+        section_key=key,
         expanded=!file.collapsed_sections.contains(key),
         on_toggle=emit(Load(ToggleSection(generation, file_index, key))),
         show_hunk_headers~,
@@ -692,6 +703,8 @@ fn top_level_diff_view(
           review,
           emit,
           false,
+          generation~,
+          section_key=key,
           expanded=!file.collapsed_sections.contains(key),
           on_toggle=emit(Load(ToggleSection(generation, file_index, key))),
           show_hunk_headers~,
@@ -905,20 +918,25 @@ fn file_card(
     class=if file.expanded { "file-card expanded" } else { "file-card" },
     [
       @html.div(class="file-heading", [
-        @html.button(
-          type_="button",
-          class="file-toggle",
-          title="\{toggle_label} \{file_label(file.file)}",
-          attrs=@html.Attrs::build()
-            .aria_expanded(if file.expanded { "true" } else { "false" })
-            .aria_label("\{toggle_label} \{file_label(file.file)}"),
-          on_click=emit(Load(ToggleFile(generation, index))),
-          [
-            @html.span(class="disclosure-icon", ""),
-            @html.span(class=status_class(file.file.status), ""),
-            @html.code(class="file-path", file_label(file.file)),
-          ],
-        ),
+        @html.div(class="file-name-controls", [
+          @html.button(
+            type_="button",
+            class="file-toggle",
+            title="\{toggle_label} \{file_label(file.file)}",
+            attrs=@html.Attrs::build()
+              .aria_expanded(if file.expanded { "true" } else { "false" })
+              .aria_label("\{toggle_label} \{file_label(file.file)}"),
+            on_click=emit(Load(ToggleFile(generation, index))),
+            [
+              @html.span(class="disclosure-icon", ""),
+              @html.span(class=status_class(file.file.status), ""),
+              @html.code(class="file-path", file_label(file.file)),
+            ],
+          ),
+          file_change_controls(
+            file, generation, index, algorithm, ignore_comments, ignore_tests, emit,
+          ),
+        ]),
         @html.div(class="file-actions", [
           @html.span(class="status-label", status_label(file.file.status)),
           @html.span(class="file-stats", [

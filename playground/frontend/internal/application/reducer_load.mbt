@@ -3,6 +3,7 @@ pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[ApiCommit, Error])
   ToggleFile(Int, Int)
   ToggleSection(Int, Int, String)
+  NavigateChange(Int, Int, String, Int, Int)
   OpenFile(Int, Int)
   RetryFile(Int, Int)
   SourceLoaded(Int, Int, SourceSide, Result[(String, Bytes), Error])
@@ -274,6 +275,28 @@ fn update_load(
           Showing(set_file_state(view, index, { ..file, collapsed_sections, })),
         ),
         @rabbita.none,
+      )
+    }
+    NavigateChange(generation, index, key, block, direction) => {
+      if generation != model.generation ||
+        block < 0 ||
+        (direction != -1 && direction != 1) {
+        return (model, @rabbita.none)
+      }
+      guard model.phase is Showing(view) &&
+        view.files.get(index) is Some(file) &&
+        file.expanded else {
+        return (model, @rabbita.none)
+      }
+      let collapsed_sections = file.collapsed_sections.filter(section => {
+        section != key
+      })
+      (
+        with_phase(
+          model,
+          Showing(set_file_state(view, index, { ..file, collapsed_sections, })),
+        ),
+        navigate_change_after_render(generation, index, key, block, direction),
       )
     }
     OpenFile(generation, index) => {
