@@ -286,6 +286,7 @@ fn file_tree_row_view(
   state : FileTreeState,
   generation : Int,
   filtering : Bool,
+  viewed : @application.ViewedState,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   match row {
@@ -360,6 +361,16 @@ fn file_tree_row_view(
             file_tree_status_marker(status),
           ),
           @html.span(class="tree-row-name", name),
+          if viewed.files.get(index) is Some({ state: Some(Viewed), .. }) {
+            @html.span(
+              class="tree-viewed",
+              title="Viewed",
+              attrs=@html.Attrs::build().aria_label("Viewed"),
+              "✓",
+            )
+          } else {
+            @html.nothing
+          },
         ],
       )
     }
@@ -684,6 +695,7 @@ fn file_tree_view(
                   model.file_tree,
                   model.generation,
                   filtering,
+                  model.viewed,
                   emit,
                 )
               }),

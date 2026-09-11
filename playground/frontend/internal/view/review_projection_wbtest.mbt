@@ -84,6 +84,7 @@ test "same-line projection uses the first expanded matched inserted or deleted s
             files: [{ ..file, collapsed_sections: collapsed, }],
           }
           let model = Model::{
+            viewed: @application.ViewedState::new(),
             input: "",
             generation: 1,
             view_mode: mode,
@@ -276,6 +277,7 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
     }
     let view = { ..base_view, files: [file], }
     let model = Model::{
+      viewed: @application.ViewedState::new(),
       input: "",
       generation: 1,
       view_mode: Split,

@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/json",
   "moonbit-community/moondiff-playground-protocol" @protocol,
   "moonbit-community/moondiff-playground/internal/comment_requests",
   "moonbit-community/moondiff-playground/internal/change",

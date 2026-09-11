@@ -44,6 +44,7 @@ pub(all) struct Model {
   auth_revision : Int
   restore_pending : Bool
   last_authenticated_user_id : String?
+  viewed : ViewedState
   review : Session
 } derive(Eq)
 
@@ -63,6 +64,7 @@ fn initial_model() -> Model {
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: None,
+    viewed: empty_viewed_state(0),
     review: initial_review_state(),
   }
 }

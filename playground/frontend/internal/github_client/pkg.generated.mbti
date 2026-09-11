@@ -42,9 +42,13 @@ pub fn get_pull(@moondiff-playground-protocol.PullGet, Int, @cmd.Emit[Result[@mo
 
 pub fn get_pull_files(@moondiff-playground-protocol.PullFiles, Int, @cmd.Emit[Result[Array[@moondiff-playground-protocol.ApiFile], Error]]) -> @cmd.Cmd
 
+pub fn get_pull_viewed(@moondiff-playground-protocol.PullViewedGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullViewed, Error]]) -> @cmd.Cmd
+
 pub fn http_error_code(Error) -> String?
 
 pub fn list_comments(@moondiff-playground-protocol.CommentsList, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCommentBundle, Error]]) -> @cmd.Cmd
+
+pub fn set_file_viewed(@moondiff-playground-protocol.PullFileViewedSet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiFileViewedResult, Error]]) -> @cmd.Cmd
 
 pub fn source_request(@github.SourceLocation, Int, @cmd.Emit[Result[(String, Bytes), Error]]) -> @cmd.Cmd
 

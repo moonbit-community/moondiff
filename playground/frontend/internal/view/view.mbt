@@ -895,6 +895,8 @@ fn file_card(
   ignore_tests : Bool,
   review : Session,
   emit : @rabbita.Emit[Msg],
+  viewed? : @rabbita.Html = @html.nothing,
+  viewed_error? : @rabbita.Html = @html.nothing,
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let toggle_label = if file.expanded { "Collapse" } else { "Expand" }
@@ -923,8 +925,10 @@ fn file_card(
             @html.span(class="additions", "+\{file.file.additions}"),
             @html.span(class="deletions", "−\{file.file.deletions}"),
           ]),
+          viewed,
         ]),
       ]),
+      viewed_error,
       if file.expanded {
         file_diff_view(
           file,
@@ -975,6 +979,8 @@ fn file_list_view(
       model.ignore_tests,
       model.review,
       emit,
+      viewed=viewed_checkbox(commit, model, index, emit),
+      viewed_error=viewed_file_error(model, index, emit),
       discussions~,
     )
     file_views["discussions:\{model.generation}:\{file.file.filename}"] = file_discussions_view(
@@ -1055,6 +1061,7 @@ fn change_view(
                 @html.pre(class="commit-message", commit.message),
               ]),
             ]),
+            viewed_progress(commit, model, emit),
             comments_overview(commit, model.review, model.auth, emit),
             file_list_view(commit, model, emit),
           ],

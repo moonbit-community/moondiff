@@ -10,6 +10,7 @@ import {
   "moonbit-community/rabbita/cmd",
   "moonbit-community/rabbita/sub",
   "moonbit-community/rabbita/url",
+  "moonbitlang/core/json",
 }
 
 // Values
@@ -87,10 +88,12 @@ pub(all) struct Model {
   auth_revision : Int
   restore_pending : Bool
   last_authenticated_user_id : String?
+  viewed : ViewedState
   review : @comments.Session
 } derive(Eq)
 
 pub(all) enum Msg {
+  Viewed(ViewedMsg)
   Auth(AuthMsg)
   Review(ReviewMsg)
   Load(LoadMsg)
@@ -151,6 +154,63 @@ pub(all) enum UiMsg {
   ToggleIgnoreComments
   ToggleIgnoreTests
 }
+
+pub(all) struct ViewedFile {
+  state : @moondiff-playground-protocol.FileViewedState?
+  pending : ViewedPending?
+  error : String?
+  touched : Bool
+  expansion_revision : Int
+} derive(Eq)
+
+pub(all) enum ViewedMsg {
+  Toggle(Int, Int)
+  Refresh
+  Restored(Int, Int, Result[Array[ViewedRecord], String])
+  Stored(Int, Int, ViewedRecord, Bool)
+  StorageFailed(Int)
+  Check(Int, Int, Int)
+  Loaded(Int, Int, Result[@moondiff-playground-protocol.ApiPullViewed, Error])
+  Saved(Int, Int, String, Result[@moondiff-playground-protocol.ApiFileViewedResult, Error])
+}
+
+pub(all) struct ViewedPending {
+  record : ViewedRecord
+  stored : Bool
+  before : @moondiff-playground-protocol.FileViewedState
+  expanded : Bool
+  expansion_revision : Int
+  confirming : Bool
+} derive(Eq)
+
+pub(all) struct ViewedRecord {
+  id : String
+  user_id : String
+  owner : String
+  repo : String
+  number : String
+  path : String
+  viewed : Bool
+  base_sha : String
+  head_sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ViewedState {
+  user_id : String?
+  epoch : Int
+  serial : Int
+  read_serial : Int
+  files : Array[ViewedFile]
+  loading : Bool
+  ready : Bool
+  refresh_needed : Bool
+  error : String?
+  stale : Bool
+  storage_ready : Bool
+  retry : Int
+  poll_scheduled : Bool
+} derive(Eq)
+pub fn ViewedState::new() -> Self
 
 // Type aliases
 
