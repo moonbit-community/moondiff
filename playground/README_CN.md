@@ -86,19 +86,6 @@ npm run dev
 不会监听文件变化。按 Ctrl+C 停止。也可以在仓库根目录执行
 `node playground/scripts/dev.mjs`。如果已导出所有必填配置，可以不创建 `.env`。
 
-使用 `npm run build` 重新构建，使用 `npm start` 运行已有构建产物。
-使用 `npm start` 或直接运行后端前，需先导出配置：
-
-```sh
-set -a
-. ./.env
-set +a
-```
-
-导出配置后，如需从源码运行后端，在仓库根目录执行
-`moon -C playground/backend run main`。如需使用 Native 目标，
-添加 `--target native --release`。
-
 ## GitHub App 配置
 
 在 GitHub App 设置中启用 **Device Flow**（设备授权流程）。后端使用 Client ID

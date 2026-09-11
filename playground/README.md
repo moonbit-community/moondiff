@@ -89,19 +89,6 @@ it does not watch for changes. Press Ctrl+C to stop. You can also run
 `node playground/scripts/dev.mjs` from the repository root. The `.env` file is
 optional when all required settings are already exported.
 
-Use `npm run build` to rebuild and `npm start` to run existing artifacts.
-Before using `npm start` or running the backend directly, export the configuration:
-
-```sh
-set -a
-. ./.env
-set +a
-```
-
-To run the backend from source after exporting the configuration, use
-`moon -C playground/backend run main` from the repository root. To select Native,
-add `--target native --release`.
-
 ## GitHub App setup
 
 Enable **Device Flow** in the GitHub App settings. The backend obtains and
