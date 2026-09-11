@@ -64,9 +64,7 @@ fn App::device(
   session_id : String,
   id : String,
 ) -> DeviceFlow? raise {
-  let stmt = self.db.prepare(
-    "SELECT target_id,epoch,phase,credentials,user_code,verification_uri,expires,next_poll,interval,backoff,token_issued,message FROM authorizations WHERE session_id=? AND id=?",
-  )
+  let stmt = self.db.prepare(QUERY_AUTHORIZATION)
   defer stmt.finalize()
   stmt.bind(index=1, session_id)
   stmt.bind(index=2, id)
@@ -96,11 +94,12 @@ fn App::end_device(
   phase : String,
   message : String,
 ) -> Unit raise {
-  execute(
-    self.db,
-    "UPDATE authorizations SET phase=?,credentials='',message=? WHERE session_id=? AND id=? AND phase IN ('starting','pending','verifying')",
-    [Text(phase), Text(message), Text(flow.session_id), Text(flow.id)],
-  )
+  execute(self.db, DB_END_AUTHORIZATION, [
+    Text(phase),
+    Text(message),
+    Text(flow.session_id),
+    Text(flow.id),
+  ])
 }
 
 ///|
@@ -128,9 +127,7 @@ fn App::device_current(
 ///|
 fn App::visible_device(self : App, session : Session) -> DeviceFlow? raise {
   let id = {
-    let stmt = self.db.prepare(
-      "SELECT id FROM authorizations WHERE session_id=? AND phase != 'alias' ORDER BY (phase IN ('starting','pending','verifying')) DESC,epoch DESC,rowid DESC LIMIT 1",
-    )
+    let stmt = self.db.prepare(QUERY_VISIBLE_AUTHORIZATION)
     defer stmt.finalize()
     stmt.bind(index=1, session.id)
     guard stmt.step() else { return None }
@@ -163,37 +160,27 @@ fn App::begin_device(
     return previous.target_id
   }
   if self.visible_device(session) is Some(flow) && flow.active() {
-    execute(
-      self.db,
-      "INSERT INTO authorizations (session_id,id,target_id,epoch,phase,expires) VALUES (?,?,?,?,'alias',?)",
-      [
-        Text(session.id),
-        Text(attempt),
-        Text(flow.id),
-        Integer(flow.epoch),
-        Integer(flow.expires),
-      ],
-    )
+    execute(self.db, DB_INSERT_AUTHORIZATION_ALIAS, [
+      Text(session.id),
+      Text(attempt),
+      Text(flow.id),
+      Integer(flow.epoch),
+      Integer(flow.expires),
+    ])
     return flow.id
   }
-  execute(self.db, "BEGIN IMMEDIATE", [])
+  execute(self.db, DB_BEGIN_IMMEDIATE, [])
   {
-    errdefer execute(self.db, "ROLLBACK", [])
-    execute(self.db, "UPDATE sessions SET epoch=epoch+1 WHERE id=?", [
+    errdefer execute(self.db, DB_ROLLBACK, [])
+    execute(self.db, DB_INCREMENT_SESSION_EPOCH, [Text(session.id)])
+    execute(self.db, DB_INSERT_STARTING_AUTHORIZATION, [
       Text(session.id),
+      Text(attempt),
+      Text(attempt),
+      Integer(session.epoch + 1),
+      Integer(now() + 900),
     ])
-    execute(
-      self.db,
-      "INSERT INTO authorizations (session_id,id,target_id,epoch,phase,expires) VALUES (?,?,?,?,'starting',?)",
-      [
-        Text(session.id),
-        Text(attempt),
-        Text(attempt),
-        Integer(session.epoch + 1),
-        Integer(now() + 900),
-      ],
-    )
-    execute(self.db, "COMMIT", [])
+    execute(self.db, DB_COMMIT, [])
   }
   attempt
 }
@@ -211,29 +198,24 @@ fn App::cancel_device(
     )
   }
   guard self.device(session.id, id) is Some(attempt) else {
-    execute(
-      self.db,
-      "INSERT INTO authorizations (session_id,id,target_id,epoch,phase,expires) VALUES (?,?,?,?,'cancelled',?)",
-      [
-        Text(session.id),
-        Text(id),
-        Text(id),
-        Integer(current.epoch),
-        Integer(now() + 900),
-      ],
-    )
+    execute(self.db, DB_INSERT_CANCELLED_AUTHORIZATION, [
+      Text(session.id),
+      Text(id),
+      Text(id),
+      Integer(current.epoch),
+      Integer(now() + 900),
+    ])
     return id
   }
   if self.device_current(session.id, attempt.target_id) is Some(flow) {
-    execute(self.db, "BEGIN IMMEDIATE", [])
-    errdefer execute(self.db, "ROLLBACK", [])
+    execute(self.db, DB_BEGIN_IMMEDIATE, [])
+    errdefer execute(self.db, DB_ROLLBACK, [])
     self.end_device(flow, "cancelled", "This authorization was cancelled.")
-    execute(
-      self.db,
-      "UPDATE sessions SET epoch=epoch+1 WHERE id=? AND epoch=?",
-      [Text(session.id), Integer(flow.epoch)],
-    )
-    execute(self.db, "COMMIT", [])
+    execute(self.db, DB_INCREMENT_CURRENT_SESSION_EPOCH, [
+      Text(session.id),
+      Integer(flow.epoch),
+    ])
+    execute(self.db, DB_COMMIT, [])
   }
   attempt.target_id
 }
@@ -262,22 +244,18 @@ fn App::device_response(
 ///|
 fn App::save_device(self : App, flow : DeviceFlow) -> Unit raise {
   guard self.device_current(flow.session_id, flow.id) is Some(_) else { return }
-  execute(
-    self.db,
-    "UPDATE authorizations SET phase=?,credentials=?,user_code=?,verification_uri=?,expires=?,next_poll=?,interval=?,backoff=?,token_issued=?,message=? WHERE session_id=? AND id=?",
-    [
-      Text(flow.phase),
-      Text(flow.credentials),
-      Text(flow.user_code),
-      Text(flow.verification_uri),
-      Integer(flow.expires),
-      Integer(flow.next_poll),
-      Integer(flow.interval),
-      Integer(flow.backoff),
-      Integer(flow.token_issued),
-      Text(flow.message),
-      Text(flow.session_id),
-      Text(flow.id),
-    ],
-  )
+  execute(self.db, DB_SAVE_AUTHORIZATION, [
+    Text(flow.phase),
+    Text(flow.credentials),
+    Text(flow.user_code),
+    Text(flow.verification_uri),
+    Integer(flow.expires),
+    Integer(flow.next_poll),
+    Integer(flow.interval),
+    Integer(flow.backoff),
+    Integer(flow.token_issued),
+    Text(flow.message),
+    Text(flow.session_id),
+    Text(flow.id),
+  ])
 }
