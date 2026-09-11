@@ -314,6 +314,11 @@ button.compact {
   border-radius: 0.62rem 0.62rem 0 0;
 }
 
+.hero-landing .auth-controls {
+  justify-content: flex-start;
+  margin-top: 1rem;
+}
+
 .commit-form {
   min-width: 0;
 }
