@@ -116,25 +116,6 @@ test "pagination appends file metadata and stops at GitHub's 30-page cap" {
   assert_true(should_fetch_next_page(1, 100))
   assert_false(should_fetch_next_page(1, 99))
   assert_false(should_fetch_next_page(30, 100))
-  assert_true(
-    commit_api_url(commit_reference("a", "b", "abcdef1"), 30).has_suffix(
-      "?per_page=100&page=30",
-    ),
-  )
-  let pull = pull_reference("moonbitlang", "core", "4082")
-  assert_eq(
-    pull_api_url(pull),
-    "https://api.github.com/repos/moonbitlang/core/pulls/4082",
-  )
-  assert_eq(
-    compare_api_url(
-      pull, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cccccccccccccccccccccccccccccccccccccccc",
-    ),
-    "https://api.github.com/repos/moonbitlang/core/compare/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...cccccccccccccccccccccccccccccccccccccccc",
-  )
-  assert_true(
-    pull_files_api_url(pull, 2).has_suffix("/files?per_page=100&page=2"),
-  )
   assert_true(should_fetch_next_pull_page(1, 100, 100, Some(101)))
   assert_false(should_fetch_next_pull_page(1, 100, 100, Some(100)))
   assert_false(should_fetch_next_pull_page(1, 99, 99, Some(101)))

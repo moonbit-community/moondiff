@@ -153,39 +153,3 @@ pub fn parse_change_url(input : String) -> Result[CommitRef, String] {
   }
   Ok(reference)
 }
-
-///|
-#warnings("-unused_value")
-pub fn commit_api_url(reference : CommitRef, page : Int) -> String {
-  let sha = match reference.target {
-    Commit(sha) | PullCommit(_, sha) => sha
-    PullRequest(_) => return ""
-  }
-  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/commits/\{sha}?per_page=100&page=\{page}"
-}
-
-///|
-pub fn pull_api_url(reference : CommitRef) -> String {
-  let number = match reference.target {
-    PullRequest(number) | PullCommit(number, _) => number
-    Commit(_) => return ""
-  }
-  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/pulls/\{number}"
-}
-
-///|
-#warnings("-unused_value")
-pub fn compare_api_url(
-  reference : CommitRef,
-  base_sha : String,
-  head_sha : String,
-) -> String {
-  guard reference.target is PullRequest(_) else { return "" }
-  "https://api.github.com/repos/\{reference.owner}/\{reference.repo}/compare/\{base_sha}...\{head_sha}"
-}
-
-///|
-#warnings("-unused_value")
-pub fn pull_files_api_url(reference : CommitRef, page : Int) -> String {
-  "\{pull_api_url(reference)}/files?per_page=100&page=\{page}"
-}
