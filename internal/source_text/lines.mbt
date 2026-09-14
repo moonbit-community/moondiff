@@ -69,23 +69,3 @@ pub fn split_lines(source : String) -> Array[String] {
   }
   lines
 }
-
-///|
-/// Split source text using universal newline rules, returning `None` as soon
-/// as the result would exceed `max_lines`. Empty input still counts as one
-/// line, and a terminating newline retains the final empty line.
-pub fn split_lines_bounded(source : String, max_lines~ : Int) -> Array[String]? {
-  if max_lines < 1 {
-    return None
-  }
-  let scanner = LineRangeScanner::new(source)
-  let lines : Array[String] = []
-  while scanner.next() is Some(range) {
-    if lines.length() >= max_lines {
-      return None
-    }
-    let (start, end_) = range
-    lines.push(String::from_array(scanner.chars[start:end_].to_owned()))
-  }
-  Some(lines)
-}

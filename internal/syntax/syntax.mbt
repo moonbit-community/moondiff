@@ -227,42 +227,9 @@ pub fn Syntax::content_id(self : Self) -> UInt {
   self.info().content_id
 }
 
-///|UUID(dfdebc9c-a7ff-4a48-bfd6-36120e4820dc)
-pub fn Syntax::content_is_unique(self : Self) -> Bool {
-  self.info().content_is_unique
-}
-
 ///|UUID(bead19e5-664b-4f68-8928-0fe34ed94f36)
 pub fn Syntax::num_ancestors(self : Self) -> UInt {
   self.info().num_ancestors
-}
-
-///|UUID(689e4a0f-bb8d-4bad-bcb0-d0f7bcea711e)
-pub fn Syntax::comment_positions(
-  nodes : ArrayView[Syntax],
-) -> Array[SingleLineSpan] {
-  fn walk_comment_positions(
-    node : Syntax,
-    positions : Array[SingleLineSpan],
-  ) -> Unit {
-    match node {
-      Atom(position~, kind~, ..) =>
-        if kind is Comment {
-          positions.push_iter(position.iter())
-        }
-      List(children~, ..) =>
-        for child in children {
-          walk_comment_positions(child, positions)
-        }
-    }
-  }
-
-  let positions = Array(capacity=50)
-  for node in nodes {
-    walk_comment_positions(node, positions)
-  } nobreak {
-    positions
-  }
 }
 
 ///|UUID(9e566b27-2a0c-4777-8ae0-07fdf04f1cff)

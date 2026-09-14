@@ -15,8 +15,6 @@ pub fn mark_syntax_roots_with_budget(ArrayView[@syntax.Syntax], ArrayView[@synta
 
 pub fn shortest_path_with_budget(Vertex, Int, Int, @computation.ScopeBudget) -> GraphLimitResult[Array[(Edge, Vertex)]] raise @computation.ScopeLimitExceeded
 
-pub fn tree_count(@syntax.Syntax?) -> UInt
-
 // Errors
 
 // Types and methods

@@ -140,12 +140,6 @@ fn node_count(root : Syntax?) -> UInt {
   .fold(init=0U, (x, y) => x + y)
 }
 
-///|UUID(e496578b-e165-449e-9e33-d3cc82d8db71)
-/// How many top-level AST nodes do we have?
-pub fn tree_count(root : Syntax?) -> UInt {
-  root.succ(node => node.next_sibling()).count().reinterpret_as_uint()
-}
-
 ///|UUID(a24b0dfa-1df3-4fcb-b1c2-4355dd4083a5)
 fn mark_syntax_with_budget(
   lhs_syntax : Syntax?,

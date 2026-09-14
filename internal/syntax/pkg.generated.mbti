@@ -65,9 +65,7 @@ pub enum Syntax {
   List(info~ : SyntaxInfo, kind~ : ListKind?, open_position~ : Array[@span.SingleLineSpan], open_content~ : String, children~ : Array[Syntax], close_position~ : Array[@span.SingleLineSpan], close_content~ : String, num_descendants~ : UInt)
 }
 pub fn Syntax::atom(content~ : String, position~ : Array[@span.SingleLineSpan], kind~ : AtomKind) -> Self
-pub fn Syntax::comment_positions(ArrayView[Self]) -> Array[@span.SingleLineSpan]
 pub fn Syntax::content_id(Self) -> UInt
-pub fn Syntax::content_is_unique(Self) -> Bool
 pub fn Syntax::id(Self) -> UInt
 pub fn Syntax::info(Self) -> SyntaxInfo
 pub fn Syntax::list(open_content~ : String, open_position~ : Array[@span.SingleLineSpan], children~ : Array[Self], close_content~ : String, close_position~ : Array[@span.SingleLineSpan], kind? : ListKind) -> Self
