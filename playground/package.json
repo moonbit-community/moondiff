@@ -9,12 +9,18 @@
     "test:e2e-config": "node --test tests/e2e-config.test.mjs",
     "test:e2e": "npm run test:e2e-config && playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "build:extension": "node ../extension/chrome/scripts/build.mjs",
+    "build:extension": "npm run build:extension:chrome && npm run build:extension:firefox",
+    "build:extension:chrome": "node ../extension/chrome/scripts/build.mjs",
+    "build:extension:firefox": "node ../extension/firefox/scripts/build.mjs",
     "test:extension": "node --test ../extension/chrome/tests/*.test.mjs && ./node_modules/.bin/playwright test --config ../extension/chrome/playwright.config.mjs",
-    "package:extension": "node ../extension/chrome/scripts/package.mjs",
+    "lint:extension:firefox": "node ../extension/firefox/scripts/lint.mjs",
+    "package:extension": "npm run package:extension:chrome && npm run package:extension:firefox",
+    "package:extension:chrome": "node ../extension/chrome/scripts/package.mjs",
+    "package:extension:firefox": "node ../extension/firefox/scripts/package.mjs",
     "test:server": "moon test protocol --target all && moon test frontend/internal/github_client --target js && moon -C backend test && node --test backend/tests/server.test.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1"
+    "@playwright/test": "1.62.1",
+    "web-ext": "10.5.0"
   }
 }
