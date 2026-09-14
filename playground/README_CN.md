@@ -260,7 +260,7 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 1. 部署 Wasm 模块、兼容的 `moonrun`、静态目录、持久化数据库路径、密钥和 App 配置。
    验证 HTTPS、`/healthz` 和变更详情直达链接。
 2. 构建轻量的跳转扩展，将 `MOONDIFF_PLAYGROUND_URL` 设置为该服务的源地址；
-   详见[扩展说明](../extension/README.md)。
+   详见[扩展说明](../extension/chrome/README.md)。
 3. 扩展升级时会清除已有凭据。每个用户都需要重新登录，
    不会导入浏览器中的令牌或旧审阅页面状态。
 4. Pages 发布工作流已移除。切换部署时，在 Settings → Pages 中关闭仓库旧的 GitHub Pages 站点，
@@ -320,4 +320,4 @@ npm --prefix .. run test:artifacts
 
 - [前端包](frontend/)
 - [后端认证、加密、存储和请求处理实现](backend/INTERNAL_CN.md)
-- [跳转扩展开发](../extension/README.md)
+- [跳转扩展开发](../extension/chrome/README.md)

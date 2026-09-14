@@ -7,9 +7,9 @@ playground/dist/
 playground/node_modules/
 playground/playwright-report/
 playground/test-results/
-extension/dist/
-extension/artifacts/
-extension/.dist-*/
+extension/chrome/dist/
+extension/chrome/artifacts/
+extension/chrome/.dist-*/
 playwright-report/
 test-results/
 playground/.dist-*/

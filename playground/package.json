@@ -9,9 +9,9 @@
     "test:e2e-config": "node --test tests/e2e-config.test.mjs",
     "test:e2e": "npm run test:e2e-config && playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "build:extension": "node ../extension/scripts/build.mjs",
-    "test:extension": "node --test ../extension/tests/*.test.mjs && ./node_modules/.bin/playwright test --config ../extension/playwright.config.mjs",
-    "package:extension": "node ../extension/scripts/package.mjs",
+    "build:extension": "node ../extension/chrome/scripts/build.mjs",
+    "test:extension": "node --test ../extension/chrome/tests/*.test.mjs && ./node_modules/.bin/playwright test --config ../extension/chrome/playwright.config.mjs",
+    "package:extension": "node ../extension/chrome/scripts/package.mjs",
     "test:server": "moon test protocol --target all && moon test frontend/internal/github_client --target js && moon -C backend test && node --test backend/tests/server.test.mjs"
   },
   "devDependencies": {

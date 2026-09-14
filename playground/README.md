@@ -287,7 +287,7 @@ are 404. Old `/#/…` routes show an invalid-link error in the app, without conv
    database location, key and App settings. Verify HTTPS, `/healthz`, and direct
    change links.
 2. Build the small redirect extension with `MOONDIFF_PLAYGROUND_URL` set to this
-   origin; see [extension instructions](../extension/README.md).
+   origin; see [extension instructions](../extension/chrome/README.md).
 3. Existing extension credentials are removed on upgrade. Every user signs in
    again; no browser token or old review-page state is imported.
 4. The Pages publishing workflow has been removed. At release cutover, disable
@@ -352,4 +352,4 @@ cases.
 
 - [Frontend packages](frontend/)
 - [Backend authentication, encryption, storage and request handling internals](backend/INTERNAL.md)
-- [Redirect extension development](../extension/README.md)
+- [Redirect extension development](../extension/chrome/README.md)

@@ -1,4 +1,4 @@
-import { test, expect, chromium } from '../../playground/node_modules/@playwright/test/index.mjs';
+import { test, expect, chromium } from '../../../playground/node_modules/@playwright/test/index.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
