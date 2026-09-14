@@ -1,4 +1,5 @@
 import { routeGithub, anonymousApi, fixtureURL } from "./api-routes.mjs";
+import { e2eOrigin } from "../../tests/e2e-config.mjs";
 import { checkToolbar } from "./toolbar.mjs";
 import { expect, test } from "@playwright/test";
 
@@ -1376,10 +1377,10 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
   expect(requests.apiRequests.some(url => url.includes("/files?per_page=100&page=2"))).toBe(true);
   expect(requests.metadataCalls()).toBeGreaterThanOrEqual(2);
   const metadataRequests = requests.mutableApiRequests.filter(({ url }) =>
-    new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}`)
+    new URL(url, e2eOrigin).pathname.endsWith(`/pulls/${pullNumber}`)
   );
   const fileRequests = requests.mutableApiRequests.filter(({ url }) =>
-    new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}/files`)
+    new URL(url, e2eOrigin).pathname.endsWith(`/pulls/${pullNumber}/files`)
   );
   expect(metadataRequests.length).toBeGreaterThanOrEqual(2);
   expect(fileRequests).toHaveLength(2);
@@ -1387,13 +1388,13 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
   expectRevalidatingRequests(
     metadataRequests,
     fetchCalls.filter(({ url }) =>
-      new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}`)
+      new URL(url, e2eOrigin).pathname.endsWith(`/pulls/${pullNumber}`)
     ),
   );
   expectRevalidatingRequests(
     fileRequests,
     fetchCalls.filter(({ url }) =>
-      new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}/files`)
+      new URL(url, e2eOrigin).pathname.endsWith(`/pulls/${pullNumber}/files`)
     ),
   );
 
@@ -1487,7 +1488,7 @@ test("a PR metadata 403 keeps actionable rate-limit guidance", async ({ page }) 
   expectRevalidatingRequests(
     metadataRequests,
     fetchCalls.filter(({ url }) =>
-      new URL(url, "http://127.0.0.1:4173").pathname.endsWith(`/pulls/${pullNumber}`)
+      new URL(url, e2eOrigin).pathname.endsWith(`/pulls/${pullNumber}`)
     ),
   );
 });

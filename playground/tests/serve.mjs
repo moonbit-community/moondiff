@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildServer, startServer, repository } from '../backend/tests/server-fixture.mjs';
+import { e2ePort } from './e2e-config.mjs';
 const assets = mkdtempSync(join(tmpdir(), 'moondiff-e2e-assets-'));
 buildServer();
 const build = spawnSync('moon', ['build', 'playground/frontend/main', '--target', 'js', '--release'], { cwd: repository, stdio: 'inherit' });
@@ -20,7 +21,7 @@ const fixture = await startServer((request, response) => {
     }
     return true;
   }
-}, { staticDir: assets, port: Number(process.env.PORT || 4173) });
+}, { staticDir: assets, port: e2ePort });
 async function shutdown() { await fixture.close(); rmSync(assets, { recursive: true, force: true }); process.exit(0); }
 for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, shutdown);
 console.log(`Playground Wasm E2E server: ${fixture.base}`);

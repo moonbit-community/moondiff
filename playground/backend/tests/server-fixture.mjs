@@ -15,6 +15,7 @@ export function buildServer() {
 }
 export async function startServer(handler, options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'moondiff-server-'));
+  const host = '127.0.0.1';
   const staticDir = options.staticDir || join(root, 'static');
   if (!options.staticDir) mkdirSync(staticDir);
   if (!options.staticDir) writeFileSync(join(staticDir, 'index.html'), '<!doctype html><title>fixture</title>');
@@ -61,14 +62,14 @@ export async function startServer(handler, options = {}) {
   stub.listen(0, '127.0.0.1');
   await once(stub, 'listening');
   const placeholder = createServer();
-  placeholder.listen(0, '127.0.0.1');
+  placeholder.listen(0, host);
   await once(placeholder, 'listening');
   const port = options.port || placeholder.address().port;
   await new Promise(r => placeholder.close(r));
-  const base = `http://127.0.0.1:${port}`;
+  const base = new URL(`http://${host}:${port}`).origin;
   const stubURL = `http://127.0.0.1:${stub.address().port}`;
   const database = join(root, 'sessions.db');
-  const env = { ...process.env, MOONDIFF_LISTEN: `127.0.0.1:${port}`, MOONDIFF_PUBLIC_URL: base, MOONDIFF_STATIC_DIR: staticDir, MOONDIFF_DATABASE: database, MOONDIFF_TOKEN_KEY: randomBytes(64).toString('base64'), MOONDIFF_GITHUB_CLIENT_ID: 'test-client', MOONDIFF_GITHUB_INSTALL_URL: 'https://github.com/apps/test/installations/new', MOONDIFF_TEST_MODE: '1', MOONDIFF_TEST_GITHUB_URL: stubURL, MOONDIFF_TEST_OAUTH_URL: stubURL, ...options.env };
+  const env = { ...process.env, MOONDIFF_LISTEN: `${host}:${port}`, MOONDIFF_PUBLIC_URL: base, MOONDIFF_STATIC_DIR: staticDir, MOONDIFF_DATABASE: database, MOONDIFF_TOKEN_KEY: randomBytes(64).toString('base64'), MOONDIFF_GITHUB_CLIENT_ID: 'test-client', MOONDIFF_GITHUB_INSTALL_URL: 'https://github.com/apps/test/installations/new', MOONDIFF_TEST_MODE: '1', MOONDIFF_TEST_GITHUB_URL: stubURL, MOONDIFF_TEST_OAUTH_URL: stubURL, ...options.env };
   delete env.MOONDIFF_GITHUB_CLIENT_SECRET;
   let child;
   let output = '';
