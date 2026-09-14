@@ -178,7 +178,6 @@ pub struct Session {
 } derive(Eq)
 pub fn Session::comment_key(Self, CommentId) -> String
 pub fn Session::comments(Self) -> CommentsStatus
-pub fn Session::deleted(Self) -> Array[CommentId]
 pub fn Session::draft(Self) -> CommentDraft?
 pub fn Session::draft_visible(Self) -> Bool
 pub fn Session::generation(Self) -> Int

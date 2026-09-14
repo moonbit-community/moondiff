@@ -18,11 +18,7 @@ pub fn branch_repository(@moondiff-playground-protocol.ApiPullBranch, Repository
 
 pub fn check_source(Bytes) -> CheckedSource
 
-pub fn commit_api_url(CommitRef, Int) -> String
-
 pub fn commit_reference(String, String, String) -> CommitRef
-
-pub fn compare_api_url(CommitRef, String, String) -> String
 
 pub fn decode_commit(String) -> @moondiff-playground-protocol.ApiCommit raise
 
@@ -40,11 +36,7 @@ pub fn merge_file_pages(ArrayView[@moondiff-playground-protocol.ApiFile], ArrayV
 
 pub fn parse_change_url(String) -> Result[CommitRef, String]
 
-pub fn pull_api_url(CommitRef) -> String
-
 pub fn pull_commit_reference(String, String, String, String) -> CommitRef
-
-pub fn pull_files_api_url(CommitRef, Int) -> String
 
 pub fn pull_merge_base(@moondiff-playground-protocol.ApiCompare) -> String
 

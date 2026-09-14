@@ -16,11 +16,6 @@ pub fn Session::comments(self : Session) -> CommentsStatus {
 }
 
 ///|
-pub fn Session::deleted(self : Session) -> Array[CommentId] {
-  self.deleted.copy()
-}
-
-///|
 pub fn Session::refresh(self : Session) -> CommentRefresh {
   match self.refresh {
     RefreshValidation(pull, bundle) =>
