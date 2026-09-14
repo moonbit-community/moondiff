@@ -69,9 +69,9 @@ jobs:
         working-directory: playground
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright browsers
         working-directory: playground
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Run playground integration tests
         run: node --test playground/backend/tests/server.test.mjs
