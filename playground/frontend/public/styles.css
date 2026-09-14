@@ -1557,7 +1557,6 @@ button.file-tree-row.selected {
 
 .diff-scroll .ignored-context {
   color: var(--code-foreground);
-  background: var(--surface);
   font-weight: inherit;
 }
 
