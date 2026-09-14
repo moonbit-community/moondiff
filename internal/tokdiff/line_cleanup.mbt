@@ -175,8 +175,8 @@ fn cleaned_diff_lines(
     let (old_start, new_start, _, _) = edit_bounds(edits[first])
     let (_, _, old_end, new_end) = edit_bounds(edits[last])
     if alignment_tokens(
-        old.view(start=old_start, end=old_end),
-        new.view(start=new_start, end=new_end),
+        old.exact_view(start=old_start, end=old_end),
+        new.exact_view(start=new_start, end=new_end),
         line => line,
       )
       is Some(tokens) {

@@ -4,7 +4,6 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/async",
   "moonbitlang/async/fs",
-  "moonbitlang/async/io",
   "moonbitlang/async/stdio",
   "moonbit-community/moondiff/internal/cli_diff",
 }
