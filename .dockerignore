@@ -11,7 +11,7 @@
 **/.dist-*
 **/playwright-report
 **/test-results
-extension/chrome/artifacts
+extension/*/artifacts
 **/.env
 **/.env.*
 **/*.sqlite3

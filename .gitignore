@@ -10,6 +10,9 @@ playground/test-results/
 extension/chrome/dist/
 extension/chrome/artifacts/
 extension/chrome/.dist-*/
+extension/firefox/dist/
+extension/firefox/artifacts/
+extension/firefox/.dist-*/
 playwright-report/
 test-results/
 playground/.dist-*/
