@@ -9,8 +9,6 @@ import {
 }
 
 // Values
-pub fn ignore_comments(@model.HunkDocument, old~ : ArrayView[String], new~ : ArrayView[String]) -> @model.HunkDocument
-
 pub fn is_test_file(String) -> Bool
 
 pub fn lexer_complexity_within_limit(String) -> Bool
