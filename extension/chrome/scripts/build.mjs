@@ -14,7 +14,7 @@ import { extensionVersion } from "./version.mjs";
 
 const scriptsDirectory = dirname(fileURLToPath(import.meta.url));
 export const extensionRoot = resolve(scriptsDirectory, "..");
-export const repositoryRoot = resolve(extensionRoot, "..");
+export const repositoryRoot = resolve(extensionRoot, "../..");
 export const outputRoot = join(extensionRoot, "dist");
 
 export function readBuildConfig(env = process.env, mode = "development") {

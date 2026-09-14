@@ -2,7 +2,7 @@
 
 The extension adds a black **Open in Moondiff** button to the bottom-right corner
 of GitHub commit and pull-request pages. Click it to open the corresponding page
-in your self-hosted [Moondiff playground](../playground/README.md). It contains no
+in your self-hosted [Moondiff playground](../../playground/README.md). It contains no
 review UI, GitHub API client, OAuth flow or credentials. Authentication and
 comments belong to the playground backend.
 
@@ -14,7 +14,7 @@ Set the destination at build time, from the repository root:
 MOONDIFF_PLAYGROUND_URL=https://diff.example npm run build:extension
 ```
 
-Load `extension/dist/` using **Load unpacked** in Chrome's extension developer
+Load `extension/chrome/dist/` using **Load unpacked** in Chrome's extension developer
 mode. Development builds also accept a loopback URL such as
 `MOONDIFF_PLAYGROUND_URL=http://localhost:4173`. Subpaths, query strings,
 fragments, credentials and nonlocal HTTP are rejected. The build copies only
@@ -28,7 +28,7 @@ MOONDIFF_PLAYGROUND_URL=https://diff.example npm run package:extension
 ```
 
 Production packages require an HTTPS root URL. Update `scripts/version.mjs` for
-a new release. The ZIP is written to `extension/artifacts/`. The destination is fixed in the package; rebuild to
+a new release. The ZIP is written to `extension/chrome/artifacts/`. The destination is fixed in the package; rebuild to
 change it.
 
 ## Navigation and tab reuse
