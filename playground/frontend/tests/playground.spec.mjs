@@ -1746,6 +1746,24 @@ test("Ignore comments works across algorithms and layouts without changing plain
   expect(compactToggle.pageWidth).toBeLessThanOrEqual(compactToggle.viewportWidth);
 });
 
+test("ignored trailing comments inherit changed-line backgrounds", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await loadCommentsCommit(page);
+
+  const mixedCard = page.locator(".file-card").filter({ hasText: "src/mixed.mbt" });
+  const oldComment = mixedCard
+    .locator("td.del .ignored-context")
+    .filter({ hasText: "old trailing" });
+  const newComment = mixedCard
+    .locator("td.add .ignored-context")
+    .filter({ hasText: "new trailing" });
+
+  await expect(oldComment).toHaveCount(1);
+  await expect(newComment).toHaveCount(1);
+  await expect(oldComment).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(newComment).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+});
+
 test("Ignore tests works across algorithms, layouts, combined filters, and narrow screens", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await loadTestsCommit(page);
