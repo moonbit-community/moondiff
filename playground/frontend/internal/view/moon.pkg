@@ -3,7 +3,6 @@ import {
   "moonbit-community/moondiff-playground/internal/application",
   "moonbit-community/moondiff-playground/internal/change",
   "moonbit-community/moondiff-playground/internal/comments",
-  "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff-playground/internal/review",
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/mbtdiff",
@@ -11,5 +10,9 @@ import {
   "moonbit-community/rabbita/dom",
   "moonbit-community/rabbita/html",
 }
+
+import {
+  "moonbit-community/moondiff-playground/internal/github",
+} for "wbtest"
 
 supported_targets = "js"

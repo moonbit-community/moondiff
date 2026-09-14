@@ -17,7 +17,6 @@ import {
 }
 
 import {
-  "moonbit-community/moondiff/model",
   "moonbitlang/core/encoding/utf8",
 } for "wbtest"
 

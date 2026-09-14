@@ -108,8 +108,8 @@ fn plain_hunk(
         blocks.push(
           ChangeBlock(
             plain_change_rows(
-              old_view.view(start=old_start, end=old_end),
-              new_view.view(start=new_start, end=new_end),
+              old_view.exact_view(start=old_start, end=old_end),
+              new_view.exact_view(start=new_start, end=new_end),
               old_start,
               new_start,
               budget,
