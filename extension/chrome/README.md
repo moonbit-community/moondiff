@@ -11,7 +11,7 @@ comments belong to the playground backend.
 Set the destination at build time, from the repository root:
 
 ```sh
-MOONDIFF_PLAYGROUND_URL=https://diff.example npm run build:extension
+MOONDIFF_PLAYGROUND_URL=https://diff.example npm run build:extension:chrome
 ```
 
 Load `extension/chrome/dist/` using **Load unpacked** in Chrome's extension developer
@@ -24,7 +24,7 @@ built by this command.
 For a Chrome Web Store ZIP:
 
 ```sh
-MOONDIFF_PLAYGROUND_URL=https://diff.example npm run package:extension
+MOONDIFF_PLAYGROUND_URL=https://diff.example npm run package:extension:chrome
 ```
 
 Production packages require an HTTPS root URL. Update `scripts/version.mjs` for
@@ -66,7 +66,7 @@ and session storage. Users must sign in again on the playground.
 ```sh
 npm --prefix playground ci
 cd playground && npx playwright install chromium && cd ..
-npm run test:extension
+npm run test:extension:chrome
 ```
 
 Unit tests cover aliases, permission/config validation, concurrent opens, worker

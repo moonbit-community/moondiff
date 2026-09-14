@@ -287,7 +287,7 @@ are 404. Old `/#/…` routes show an invalid-link error in the app, without conv
    database location, key and App settings. Verify HTTPS, `/healthz`, and direct
    change links.
 2. Build the small redirect extension with `MOONDIFF_PLAYGROUND_URL` set to this
-   origin; see [extension instructions](../extension/chrome/README.md).
+   origin; see the [Chrome and Firefox extension instructions](../extension/README.md).
 3. Existing extension credentials are removed on upgrade. Every user signs in
    again; no browser token or old review-page state is imported.
 4. The Pages publishing workflow has been removed. At release cutover, disable
@@ -324,15 +324,17 @@ transport tests. After MoonBit changes, run `moon fmt` and
 For browser tests:
 
 ```sh
-npx playwright install chromium
+npx playwright install chromium firefox
 npm run test:e2e
 ```
 
-Use `npx playwright install --with-deps chromium` if system libraries are missing,
-and `npm run test:e2e:ui` for the interactive runner. Tests start their own Wasm
-server on port 4173, so stop the local development server first. They use temporary
-SQLite databases and a local GitHub/OAuth stub; no real GitHub credentials are
-required. Frontend regression tests mock the same-origin API.
+Use `npx playwright install --with-deps chromium firefox` if system libraries are
+missing, and `npm run test:e2e:ui` for the interactive runner. The playground
+suite uses Chromium; Firefox is used by the redirect-extension suite below.
+Tests start their own Wasm server on port 4173, so stop the local development
+server first. They use temporary SQLite databases and a local GitHub/OAuth stub;
+no real GitHub credentials are required. Frontend regression tests mock the
+same-origin API.
 
 To verify the redirect extension and release artifacts:
 
@@ -341,6 +343,13 @@ npm run test:extension
 npm run build
 npm --prefix .. run test:artifacts
 ```
+
+`test:extension` runs the Chrome unit and Chromium integration tests, followed
+by the Firefox unit and Firefox content-script tests. Browser-specific build,
+test, and package commands use the `:chrome` or `:firefox` suffix; Firefox also
+provides `lint:extension:firefox`. See the
+[extension entry point](../extension/README.md) for packaging and temporary-load
+instructions.
 
 These test suites and artifact checks can also be run from the repository root
 with `npm run test:server`, `npm run test:playground`, `npm run test:extension`,
@@ -352,4 +361,4 @@ cases.
 
 - [Frontend packages](frontend/)
 - [Backend authentication, encryption, storage and request handling internals](backend/INTERNAL.md)
-- [Redirect extension development](../extension/chrome/README.md)
+- [Chrome and Firefox redirect extension development](../extension/README.md)

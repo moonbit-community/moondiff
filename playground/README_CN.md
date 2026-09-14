@@ -260,7 +260,7 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 1. 部署 Wasm 模块、兼容的 `moonrun`、静态目录、持久化数据库路径、密钥和 App 配置。
    验证 HTTPS、`/healthz` 和变更详情直达链接。
 2. 构建轻量的跳转扩展，将 `MOONDIFF_PLAYGROUND_URL` 设置为该服务的源地址；
-   详见[扩展说明](../extension/chrome/README.md)。
+   详见 [Chrome 与 Firefox 扩展说明](../extension/README.md)。
 3. 扩展升级时会清除已有凭据。每个用户都需要重新登录，
    不会导入浏览器中的令牌或旧审阅页面状态。
 4. Pages 发布工作流已移除。切换部署时，在 Settings → Pages 中关闭仓库旧的 GitHub Pages 站点，
@@ -295,12 +295,13 @@ npm run test:server
 运行浏览器测试：
 
 ```sh
-npx playwright install chromium
+npx playwright install chromium firefox
 npm run test:e2e
 ```
 
-如果缺少系统库，使用 `npx playwright install --with-deps chromium` 安装；
-使用 `npm run test:e2e:ui` 启动交互式测试界面。测试会自行在 4173 端口启动 Wasm 服务，
+如果缺少系统库，使用 `npx playwright install --with-deps chromium firefox` 安装；
+使用 `npm run test:e2e:ui` 启动交互式测试界面。playground 测试使用 Chromium，
+下方的跳转扩展测试还会使用 Firefox。测试会自行在 4173 端口启动 Wasm 服务，
 因此请先停止本地开发服务。测试使用临时 SQLite 数据库和本地 GitHub/OAuth 模拟服务，
 无需真实的 GitHub 凭据。前端回归测试会模拟同源 API。
 
@@ -312,6 +313,11 @@ npm run build
 npm --prefix .. run test:artifacts
 ```
 
+`test:extension` 会先运行 Chrome 单元测试和 Chromium 集成测试，再运行 Firefox
+单元测试及 Firefox 内容脚本测试。浏览器专用的构建、测试和打包命令使用
+`:chrome` 或 `:firefox` 后缀；Firefox 还提供 `lint:extension:firefox`。
+打包及临时加载方法见[扩展入口说明](../extension/README.md)。
+
 也可以在仓库根目录依次运行 `npm run test:server`、`npm run test:playground`、
 `npm run test:extension` 和 `npm run build && npm run test:artifacts`，执行上述测试套件和产物检查。
 实现层面的测试用例见[回归测试覆盖范围](backend/INTERNAL_CN.md#回归测试)。
@@ -320,4 +326,4 @@ npm --prefix .. run test:artifacts
 
 - [前端包](frontend/)
 - [后端认证、加密、存储和请求处理实现](backend/INTERNAL_CN.md)
-- [跳转扩展开发](../extension/chrome/README.md)
+- [Chrome 与 Firefox 跳转扩展开发](../extension/README.md)
