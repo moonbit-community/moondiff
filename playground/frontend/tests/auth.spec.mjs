@@ -1,4 +1,5 @@
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
+import { e2eOrigin } from '../../tests/e2e-config.mjs';
 import { expect, test } from '@playwright/test';
 const sha = 'abcdef1234567890abcdef1234567890abcdef12';
 const route = `/fixture/repo/commit/${sha}`;
@@ -15,7 +16,7 @@ async function authorize(page, code) {
 
 test('real Wasm device login displays and copies the code, opens GitHub and completes automatically', async ({ page, context }) => {
   const external = [], responses = [];
-  page.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:4173/')) external.push(request.url()); });
+  page.on('request', request => { if (new URL(request.url()).origin !== e2eOrigin) external.push(request.url()); });
   page.on('response', async response => { if (response.url().includes('/api/auth/')) responses.push(await response.text().catch(() => '')); });
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(route);

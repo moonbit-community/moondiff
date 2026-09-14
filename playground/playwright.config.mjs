@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { e2eOrigin } from "./tests/e2e-config.mjs";
 
 export default defineConfig({
   testDir: "./frontend/tests",
@@ -10,14 +11,14 @@ export default defineConfig({
     timeout: 5_000,
   },
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: e2eOrigin,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "off",
   },
   webServer: {
     command: "node ./tests/serve.mjs",
-    url: "http://127.0.0.1:4173",
+    url: e2eOrigin,
     reuseExistingServer: false,
     timeout: 120_000,
   },
