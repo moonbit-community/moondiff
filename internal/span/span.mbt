@@ -100,17 +100,6 @@ test "line widths" {
   ])
 }
 
-///|UUID(bc4a523c-cabd-455a-af99-eea962898b64)
-pub fn LineWidths::text_of_loc(
-  self : Self,
-  start_pos : @basic.Position,
-  end_pos : @basic.Position,
-) -> Array[Char] {
-  let start = start_pos.cnum
-  let end = end_pos.cnum
-  self.contents[start:end].to_owned()
-}
-
 ///|UUID(b1be2268-a2f5-4aea-aacb-b462e246b523)
 pub fn LineWidths::loc_to_spans(
   self : Self,

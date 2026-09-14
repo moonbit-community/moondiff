@@ -11,8 +11,6 @@ pub fn elab_cst(String, @untyped_cst.CstNode) -> @syntax.Syntax
 
 pub fn elab_cst_node_groups(String, ArrayView[Array[@untyped_cst.CstNode]]) -> Array[@syntax.Syntax]
 
-pub fn elab_cst_nodes(String, ArrayView[@untyped_cst.CstNode]) -> @syntax.Syntax
-
 // Errors
 
 // Types and methods

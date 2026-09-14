@@ -401,17 +401,6 @@ pub fn elab_cst(source : String, node : @cst.CstNode) -> Syntax {
 }
 
 ///|
-/// Converts adjacent CST nodes into a single matching root while retaining
-/// each node as a sibling. This is used to attach leading comments to a
-/// top-level declaration without flattening its grammar shape.
-pub fn elab_cst_nodes(
-  source : String,
-  nodes : ArrayView[@cst.CstNode],
-) -> Syntax {
-  CstElabCtx::new(source).elab_nodes(nodes)
-}
-
-///|
 /// Converts several groups of adjacent CST nodes using one source index.
 /// Top-level alignment uses this entry point so elaborating many declarations
 /// scans the source once instead of once per declaration.
