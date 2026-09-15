@@ -1013,6 +1013,26 @@ fn file_list_view(
 }
 
 ///|
+fn commit_message_view(message : String) -> @rabbita.Html {
+  let (title, body) = match message.split_once("\n") {
+    Some((title, body)) =>
+      (
+        title.trim_end(chars="\r").to_owned(),
+        body.trim_start(chars="\r\n").to_owned(),
+      )
+    None => (message, "")
+  }
+  @html.div(class="commit-message", [
+    @html.h2(class="commit-message-title", title),
+    if body.is_empty() {
+      @html.nothing
+    } else {
+      @html.pre(class="commit-message-body", body)
+    },
+  ])
+}
+
+///|
 fn change_view(
   commit : ChangeView,
   model : Model,
@@ -1031,9 +1051,7 @@ fn change_view(
           class="change-main",
           attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
           [
-            @html.div(class="commit-card", [
-              @html.pre(class="commit-message", commit.message),
-            ]),
+            @html.div(class="commit-card", [commit_message_view(commit.message)]),
             viewed_progress(commit, model, emit),
             comments_overview(commit, model.review, model.auth, emit),
             file_list_view(commit, model, emit),
