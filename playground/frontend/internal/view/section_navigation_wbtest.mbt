@@ -89,7 +89,7 @@ test "section headings leave navigation in the file heading" {
       let rendered = @rabbita.render_to_string(() => {
         @rabbita.Val::constant(
           semantic_fragment_view(
-            fixture_file("target.mbt", "modified"),
+            ready_test_file(fixture_file("target.mbt", "modified"), [], []),
             0,
             Some(0),
             { document: { hunks, }, fallbacks: [], },

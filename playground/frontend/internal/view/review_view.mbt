@@ -4,23 +4,27 @@ fn review_segment_nodes(
   segments : ArrayView[@model.DiffSegment]?,
   changed_class : String,
   prefix : String,
+  highlights? : ArrayView[@highlight_moonbit.HighlightSpan] = [],
 ) -> Array[@rabbita.Html] {
   let nodes : Array[@rabbita.Html] = []
   if !prefix.is_empty() {
     nodes.push(@html.span(class="diff-prefix", prefix))
   }
   if segments is Some(segments) {
+    let mut offset = 0
     for segment in segments {
+      let content = syntax_nodes(segment.text, highlights, offset)
       nodes.push(
         match segment.kind {
-          Unchanged => @html.span(segment.text)
-          Changed => @html.b(class=changed_class, segment.text)
-          Ignored => @html.span(class="ignored-context", segment.text)
+          Unchanged => @html.span(content)
+          Changed => @html.b(class=changed_class, content)
+          Ignored => @html.span(class="ignored-context", content)
         },
       )
+      offset += segment.text.length()
     }
   } else {
-    nodes.push(@html.span(text.unwrap_or("")))
+    nodes.push(@html.span(syntax_nodes(text.unwrap_or(""), highlights, 0)))
   }
   nodes
 }
@@ -127,6 +131,7 @@ fn split_review_line(
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
+  highlights? : @highlight_moonbit.FileHighlights = @highlight_moonbit.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let (old_class, new_class) = review_row_classes(row)
   let cards = inline_cards(
@@ -160,7 +165,13 @@ fn split_review_line(
           ),
           @html.td(
             class=old_class,
-            review_segment_nodes(row.old_text, row.old_segments, "wd", ""),
+            review_segment_nodes(
+              row.old_text,
+              row.old_segments,
+              "wd",
+              "",
+              highlights=source_line_highlights(highlights.old, row.old_line),
+            ),
           ),
           review_gutter(
             row.file_index,
@@ -172,7 +183,13 @@ fn split_review_line(
           ),
           @html.td(
             class=new_class,
-            review_segment_nodes(row.new_text, row.new_segments, "wa", ""),
+            review_segment_nodes(
+              row.new_text,
+              row.new_segments,
+              "wa",
+              "",
+              highlights=source_line_highlights(highlights.new, row.new_line),
+            ),
           ),
         ],
       ),
@@ -205,6 +222,7 @@ fn unified_source_line(
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
+  syntax? : ArrayView[@highlight_moonbit.HighlightSpan] = [],
 ) -> Array[(String, @rabbita.Html)] {
   let cards = inline_cards(discussions, file_index, old_line, new_line, 3, site)
   let items : Array[(String, @rabbita.Html)] = [
@@ -245,7 +263,13 @@ fn unified_source_line(
           ),
           @html.td(
             class=class_name,
-            review_segment_nodes(text, segments, changed_class, prefix),
+            review_segment_nodes(
+              text,
+              segments,
+              changed_class,
+              prefix,
+              highlights=syntax,
+            ),
           ),
         ],
       ),
@@ -267,7 +291,10 @@ fn unified_review_line(
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
+  highlights? : @highlight_moonbit.FileHighlights = @highlight_moonbit.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
+  let old_syntax = source_line_highlights(highlights.old, row.old_line)
+  let new_syntax = source_line_highlights(highlights.new, row.new_line)
   match row.kind {
     ContextRow =>
       unified_source_line(
@@ -285,6 +312,7 @@ fn unified_review_line(
         discussions~,
         site~,
         change_block?,
+        syntax=new_syntax,
       )
     IgnoredRow =>
       if row.old_text == row.new_text {
@@ -303,6 +331,7 @@ fn unified_review_line(
           discussions~,
           site~,
           change_block?,
+          syntax=new_syntax,
         )
       } else {
         let items = unified_source_line(
@@ -319,6 +348,7 @@ fn unified_review_line(
           emit,
           discussions~,
           site~,
+          syntax=old_syntax,
           change_block?=if row.old_line is Some(_) {
             change_block
           } else {
@@ -340,6 +370,7 @@ fn unified_review_line(
             emit,
             discussions~,
             site~,
+            syntax=new_syntax,
             change_block?=if row.old_line is None { change_block } else { None },
           ).iter(),
         )
@@ -363,6 +394,7 @@ fn unified_review_line(
             emit,
             discussions~,
             site~,
+            syntax=old_syntax,
             change_block?,
           ).iter(),
         )
@@ -383,6 +415,7 @@ fn unified_review_line(
             emit,
             discussions~,
             site~,
+            syntax=new_syntax,
             change_block?=if row.old_line is None { change_block } else { None },
           ).iter(),
         )
@@ -406,6 +439,7 @@ fn safe_review_diff(
   hunk_context? : String = "",
   fragment? : String = "line",
   discussions? : InlineDiscussions = empty_discussions(),
+  highlights? : @highlight_moonbit.FileHighlights = @highlight_moonbit.FileHighlights::empty(),
 ) -> @rabbita.Html {
   let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Map[String, @rabbita.Html] = Map([])
@@ -455,6 +489,7 @@ fn safe_review_diff(
               emit,
               discussions~,
               change_block?,
+              highlights~,
               site=projection_site(
                 file_index, old_base, new_base, line_index, fragment,
               ),
@@ -466,6 +501,7 @@ fn safe_review_diff(
               emit,
               discussions~,
               change_block?,
+              highlights~,
               site=projection_site(
                 file_index, old_base, new_base, line_index, fragment,
               ),

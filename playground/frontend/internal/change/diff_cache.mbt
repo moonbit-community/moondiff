@@ -87,6 +87,26 @@ pub fn ensure_file_document(
   ignore_comments? : Bool = false,
   ignore_tests? : Bool = false,
 ) -> FileState {
+  let file = if file.diff_cache.highlights is None &&
+    file.old_side is Ready(old) &&
+    file.new_side is Ready(new) {
+    {
+      ..file,
+      diff_cache: {
+        ..file.diff_cache,
+        highlights: Some(
+          @highlight_moonbit.FileHighlights::new(
+            file.file.previous_filename.unwrap_or(file.file.filename),
+            file.file.filename,
+            old.join("\n"),
+            new.join("\n"),
+          ),
+        ),
+      },
+    }
+  } else {
+    file
+  }
   let key = diff_cache_key(
     file.diff_mode,
     algorithm,

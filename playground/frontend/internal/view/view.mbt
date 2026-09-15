@@ -550,7 +550,7 @@ fn semantic_document_has_fallback(document : @mbtdiff.DiffDocument) -> Bool {
 
 ///|
 fn semantic_fragment_view(
-  file : ApiFile,
+  file : FileState,
   file_index : Int,
   section_index : Int?,
   fragment : @mbtdiff.DiffFragment,
@@ -603,7 +603,7 @@ fn semantic_fragment_view(
       @html.nothing
     } else {
       safe_review_diff(
-        file,
+        file.file,
         file_index,
         fragment.document,
         mode,
@@ -615,6 +615,9 @@ fn semantic_fragment_view(
         hunk_context~,
         fragment=section_index.map(i => "section:\{i}").unwrap_or("whole"),
         discussions~,
+        highlights=file.diff_cache.highlights.unwrap_or(
+          @highlight_moonbit.FileHighlights::empty(),
+        ),
       )
     },
   ]
@@ -661,7 +664,7 @@ fn top_level_diff_view(
     if fragment_has_output(fragment) {
       let key = section_keys[section_index]
       sections[key] = semantic_fragment_view(
-        file.file,
+        file,
         file_index,
         Some(section_index),
         fragment,
@@ -691,7 +694,7 @@ fn top_level_diff_view(
       if fragment_has_output(fragment) {
         let key = section_keys[section_index]
         deleted[key] = semantic_fragment_view(
-          file.file,
+          file,
           file_index,
           Some(section_index),
           fragment,
@@ -737,7 +740,7 @@ fn semantic_document_view(
   match document {
     Whole(fragment) =>
       semantic_fragment_view(
-        file.file,
+        file,
         file_index,
         None,
         fragment,
@@ -821,6 +824,9 @@ fn file_diff_view(
             review,
             emit,
             discussions~,
+            highlights=file.diff_cache.highlights.unwrap_or(
+              @highlight_moonbit.FileHighlights::empty(),
+            ),
           )
         MoonBit(document~, status~, ignore_reason~) => {
           if status is IgnoredOnly {
