@@ -2292,6 +2292,10 @@ footer {
     color: #777777;
   }
 
+  .section-change-button {
+    color: #fff;
+  }
+
   .error {
     color: #ff8e96;
   }
