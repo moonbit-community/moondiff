@@ -1928,6 +1928,8 @@ for (const algorithm of ["Token", "Tree"]) {
       await expect(sections).toHaveCount(2);
       const first = sections.nth(0), second = sections.nth(1);
       await first.locator(".semantic-section-label").click();
+      await expect(second.locator('.review-diff .syntax-variable').filter({ hasText: /^second$/ }).first()).toHaveText("second");
+      await expect(second.locator('b.wa .syntax-number').filter({ hasText: /^44$/ })).toHaveCount(1);
       const anchor = second.locator('.new-line-number button[aria-label="Comment on line 1"]');
       await clickLineCommentButton(anchor);
       const editor = page.locator(".inline-comment-editor-row textarea");
@@ -1956,6 +1958,7 @@ for (const algorithm of ["Token", "Tree"]) {
       await expect(first.locator("textarea")).toHaveCount(1);
       await expect(editor).toHaveAttribute("data-draft-id", draftId);
       await expect(first.locator('.new-line-number button[aria-label="Comment on line 1"]')).toHaveCount(1);
+      await expect(first.locator('b.wa .syntax-number').filter({ hasText: /^33$/ })).toHaveCount(1);
     });
   }
 }
