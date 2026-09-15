@@ -6,6 +6,24 @@ extern "js" fn same_highlights(
   #| (a, b) => a === b
 
 ///|
+test "C headers and MoonBit apply line and source budgets independently per side" {
+  let source = "0,".repeat(1025) +
+    "\n" +
+    ("0,".repeat(1024) + "\n").repeat(16) +
+    "1"
+  for path in ["code.c", "code.h", "code.mbt"] {
+    let highlights = file_highlights(path, path, source, source)
+    for side in [highlights.old.unwrap(), highlights.new.unwrap()] {
+      assert_true(side.line(1).is_empty())
+      for line in 2..<=17 {
+        assert_eq(side.line(line).length(), 1024)
+      }
+      assert_true(side.line(18).is_empty())
+    }
+  }
+}
+
+///|
 test "source highlights are computed once across all diff options" {
   let initial = ready_test_file(
     fixture_file("src/code.mbt", "modified"),
@@ -71,5 +89,107 @@ test "highlights wait for source and remain available for fallback diffs" {
     let highlights = renamed.diff_cache.highlights.unwrap()
     assert_eq(highlights.old is Some(_), old.has_suffix(".mbt"))
     assert_eq(highlights.new is Some(_), new.has_suffix(".mbt"))
+  }
+}
+
+///|
+test "highlight routing is case sensitive and independent for every rename side" {
+  let cases = [
+    ("code.c", "int x = 1;", Some(@highlight.Type)),
+    ("code.h", "int x = 1;", Some(Type)),
+    ("code.mbt", "let x = 1", Some(Keyword)),
+    ("code.txt", "int x = 1;", None),
+    ("code.mbti", "pub fn x() -> Int", None),
+    ("code.C", "int x = 1;", None),
+    ("code.H", "int x = 1;", None),
+    ("code.MBT", "let x = 1", None),
+    ("code.cpp", "int x = 1;", None),
+    ("code.c.txt", "int x = 1;", None),
+  ]
+  for (old_path, old_source, old_kind) in cases {
+    for (new_path, new_source, new_kind) in cases {
+      let file = ensure_file_document(
+        ready_test_file(
+          fixture_file(new_path, "renamed", previous_filename=old_path),
+          [old_source],
+          [new_source],
+        ),
+        LexicalAlgorithm,
+      )
+      let highlights = file.diff_cache.highlights.unwrap()
+      assert_eq(highlights.old.map(h => h.line(1)[0].kind), old_kind)
+      assert_eq(highlights.new.map(h => h.line(1)[0].kind), new_kind)
+    }
+  }
+}
+
+///|
+test "C additions deletions and renames retain line diffs and reuse source highlights" {
+  for
+    file in [
+      fixture_file("code.c", "added"),
+      fixture_file("code.h", "added"),
+      fixture_file("code.c", "removed"),
+      fixture_file("code.h", "removed"),
+      fixture_file("code.h", "renamed", previous_filename="old.c"),
+    ] {
+    let old = if file.status == "added" { [] } else { ["int value = 1;"] }
+    let new = if file.status == "removed" { [] } else { ["int value = 2;"] }
+    let initial = ready_test_file(file, old, new)
+    assert_true(initial.diff_mode is LineDiff)
+    let mut cached = ensure_file_document(initial, LexicalAlgorithm)
+    let highlights = cached.diff_cache.highlights.unwrap()
+    assert_eq(
+      highlights.old.unwrap().line(1).is_empty(),
+      file.status == "added",
+    )
+    assert_eq(
+      highlights.new.unwrap().line(1).is_empty(),
+      file.status == "removed",
+    )
+    for algorithm in [LexicalAlgorithm, AstAlgorithm] {
+      for ignore_comments in [false, true] {
+        for ignore_tests in [false, true] {
+          cached = ensure_file_document(
+            cached,
+            algorithm,
+            ignore_comments~,
+            ignore_tests~,
+          )
+          assert_true(
+            same_highlights(highlights, cached.diff_cache.highlights.unwrap()),
+          )
+          assert_true(cached.diff_cache.get(Line) is Some(Line(_)))
+        }
+      }
+    }
+    assert_true(initial.diff_cache.highlights is None)
+  }
+}
+
+///|
+test "C highlights wait for both loaded source sides" {
+  let initial = ready_test_file(
+    fixture_file("code.c", "modified"),
+    ["int old;"],
+    ["int new;"],
+  )
+  for
+    pending in [
+      NotRequested,
+      Loading,
+      LoadFailed("retry"),
+      CannotRender("binary", false),
+    ] {
+    for
+      file in [
+        { ..initial, old_side: pending, },
+        { ..initial, new_side: pending, },
+      ] {
+      assert_true(
+        ensure_file_document(file, LexicalAlgorithm).diff_cache.highlights
+        is None,
+      )
+    }
   }
 }
