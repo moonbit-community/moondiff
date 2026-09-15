@@ -6,6 +6,7 @@ import {
   "moonbit-community/moondiff-playground-protocol@0.0.0",
   "moonbit-community/moondiff@0.0.6",
   "moonbit-community/rabbita@0.14.2",
+  "moonbitlang/lexer@0.3.16",
 }
 
 readme = "README.md"

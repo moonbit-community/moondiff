@@ -1,0 +1,6 @@
+import {
+  "moonbitlang/lexer",
+  "moonbitlang/lexer/tokens",
+}
+
+supported_targets = "js"
