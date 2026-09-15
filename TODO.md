@@ -46,3 +46,21 @@
   - Affected area: `scripts/pre-commit.sh`.
   - [ ] Detect partially staged files and refuse to continue, or format and update only the content already in the index.
   - [ ] Add a test that stages only part of a file and verifies that the remaining working-tree changes stay unstaged.
+
+## Deferred
+
+- [ ] Known issue: documentation-example syntax highlighting can overflow the lexer stack.
+  - **Status: Intentionally deferred; no current plan to fix.**
+  - Affected areas: `playground/frontend/internal/highlight/moonbit/docs.mbt`,
+    `playground/frontend/internal/highlight/moonbit/classify.mbt`, and
+    `playground/frontend/internal/change/diff_cache.mbt`.
+  - Reproduced with a MoonBit fenced code example inside `///` comments whose
+    string interpolation contains an array of about 4,000 string literals
+    (approximately 16 KB for the complete source file).
+  - Highlighting masks the comment prefixes and lexes the example as code.
+    The lexer's mutually recursive interpolation scanners can then throw
+    `RangeError: Maximum call stack size exceeded`; the highlighter's
+    `depth >= 32` guard does not bound recursion inside the lexer.
+  - The original Token and Tree diff calculations succeed on this input, but
+    the added highlighting step leaves the browser showing
+    `Loading file contents…` without a diff.
