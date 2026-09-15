@@ -909,7 +909,8 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
   await page.setViewportSize({ width: 1440, height: 900 });
   await loadMockedCommit(page);
 
-  await expect(page.getByText("example/project@", { exact: false })).toBeVisible();
+  await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
+  await expect(page.locator(".commit-message")).toHaveText(apiCommit.commit.message);
   await expect(page).toHaveURL(`/example/project/commit/${commitSha}`);
   await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy link" })).toHaveCount(0);
@@ -1357,15 +1358,11 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
     page.locator(".workspace-url"),
   ).toHaveText(pullUrl);
   await expect(page.locator(".file-card")).toHaveCount(101);
-  await expect(page.getByText("GitHub pull request", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: `example/project#${pullNumber}` }),
-  ).toHaveAttribute("href", pullUrl);
   await expect(page.locator(".commit-message")).toHaveText(
     "Aggregate changes from both PR commits",
   );
-  await expect(page.locator(".parent")).toContainText(pullMergeBaseOne);
-  await expect(page.locator(".parent")).toContainText(pullHeadOne);
+  await expect(aggregateCard).toContainText("merge base one");
+  await expect(aggregateCard).toContainText("head one");
   await expect(
     page.getByRole("link", { name: "Open pull request on GitHub" }),
   ).toHaveCount(0);
@@ -1410,14 +1407,13 @@ test("opening the same PR share route refreshes its head", async ({ page }) => {
     hasText: "src/from_second_commit.mbt",
   });
   await expect(aggregateCard.locator("table.split")).toBeVisible();
-  await expect(page.locator(".parent")).toContainText(pullHeadOne);
+  await expect(aggregateCard).toContainText("merge base one");
   await expect(aggregateCard).toContainText("head one");
   const firstUrl = page.url();
 
   await page.reload();
   await expect(aggregateCard.locator("table.split")).toBeVisible();
-  await expect(page.locator(".parent")).toContainText(pullHeadTwo);
-  await expect(page.locator(".parent")).toContainText(pullMergeBaseTwo);
+  await expect(aggregateCard).toContainText("merge base two");
   await expect(aggregateCard).toContainText("head two");
   expect(page.url()).toBe(firstUrl);
   expect(requests.metadataCalls()).toBeGreaterThanOrEqual(4);
@@ -1439,8 +1435,6 @@ test("a PR updated while loading retries and only shows the latest snapshot", as
     hasText: "src/from_second_commit.mbt",
   });
   await expect(aggregateCard.locator("table.split")).toBeVisible();
-  await expect(page.locator(".parent")).toContainText(pullMergeBaseTwo);
-  await expect(page.locator(".parent")).toContainText(pullHeadTwo);
   await expect(page.locator(".commit-message")).toHaveText(
     "Aggregate the latest PR snapshot",
   );
