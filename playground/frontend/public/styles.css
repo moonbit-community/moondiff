@@ -25,6 +25,20 @@
   --del: #fff0ef;
   --del-strong: #ffc9c5;
   --code-foreground: #54545a;
+  /* VSCode Light+ (including light_vs.json), with the MoonBit TextMate scopes.
+     https://github.com/microsoft/vscode/tree/main/extensions/theme-defaults/themes */
+  --syntax-keyword: #0000ff;
+  --syntax-control: #af00db;
+  --syntax-function: #795e26;
+  --syntax-type: #267f99;
+  --syntax-variable: #001080;
+  --syntax-number: #098658;
+  --syntax-string: #a31515;
+  --syntax-escape: #ee0000;
+  --syntax-comment: #008000;
+  --syntax-operator: #000000;
+  --syntax-interpolation: #000000;
+  --syntax-attribute-parameter: #800000;
   --hunk: #f3f3f3;
   --empty-stripe: #e4e4e4;
   --toolbar-height: 3rem;
@@ -1593,6 +1607,35 @@ button.file-tree-row.selected {
   font-weight: inherit;
 }
 
+.syntax-keyword,
+.syntax-modifier,
+.syntax-boolean {
+  color: var(--syntax-keyword);
+}
+
+.syntax-control,
+.syntax-async,
+.syntax-attribute {
+  color: var(--syntax-control);
+}
+
+/* The extension's keyword.control.moonbit.async TextMate customization. */
+.syntax-async {
+  font-style: italic;
+}
+
+.syntax-function { color: var(--syntax-function); }
+.syntax-type,
+.syntax-package { color: var(--syntax-type); }
+.syntax-variable { color: var(--syntax-variable); }
+.syntax-number { color: var(--syntax-number); }
+.syntax-string { color: var(--syntax-string); }
+.syntax-escape { color: var(--syntax-escape); }
+.syntax-comment { color: var(--syntax-comment); }
+.syntax-operator { color: var(--syntax-operator); }
+.syntax-interpolation { color: var(--syntax-interpolation); }
+.syntax-attribute-parameter { color: var(--syntax-attribute-parameter); }
+
 .review-gutter {
   position: relative;
 }
@@ -2228,6 +2271,19 @@ footer {
     --del: #321a1b;
     --del-strong: #6a2c2d;
     --code-foreground: #c7c7cb;
+    /* VSCode Dark+ (including dark_vs.json). */
+    --syntax-keyword: #569cd6;
+    --syntax-control: #c586c0;
+    --syntax-function: #dcdcaa;
+    --syntax-type: #4ec9b0;
+    --syntax-variable: #9cdcfe;
+    --syntax-number: #b5cea8;
+    --syntax-string: #ce9178;
+    --syntax-escape: #d7ba7d;
+    --syntax-comment: #6a9955;
+    --syntax-operator: #d4d4d4;
+    --syntax-interpolation: #569cd6;
+    --syntax-attribute-parameter: #569cd6;
     --hunk: #242424;
     --empty-stripe: #333333;
   }

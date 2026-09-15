@@ -44,11 +44,12 @@ pub(all) enum CacheKey {
 ///|
 pub(all) struct DiffCache {
   entries : @immut_hashmap.HashMap[CacheKey, CachedDiffResult]
+  highlights : @highlight_moonbit.FileHighlights?
 } derive(Eq)
 
 ///|
 pub fn DiffCache::empty() -> DiffCache {
-  { entries: @immut_hashmap.new(), }
+  { entries: @immut_hashmap.new(), highlights: None, }
 }
 
 ///|
@@ -62,7 +63,7 @@ pub fn DiffCache::put(
   key : CacheKey,
   value : CachedDiffResult,
 ) -> DiffCache {
-  { entries: self.entries.add(key, value), }
+  { ..self, entries: self.entries.add(key, value), }
 }
 
 ///|

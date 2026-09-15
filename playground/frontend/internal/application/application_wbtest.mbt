@@ -725,6 +725,12 @@ test "algorithm switching fills the second cache and reuses the first" {
     fail("expected commit to remain visible")
   }
   let changed = changed_view.files[0]
+  assert_true(
+    changed.diff_cache.highlights == lexical_file.diff_cache.highlights,
+  )
+  let (unified, _) = update_ui(switched, SelectView(Unified), emit)
+  guard unified.phase is Showing(unified_view) else { fail("expected change") }
+  assert_true(unified_view.files[0].diff_cache == changed.diff_cache)
   assert_true(changed.diff_cache.get(lexical_key) == Some(lexical))
   guard changed.diff_cache.get(ast_key) is Some(ast) else {
     fail("expected AST cache")
@@ -919,6 +925,11 @@ test "new source invalidates every MoonBit filter cache" {
     }
   }
   assert_true(updated_view.files[0].diff_cache.get(Line) is None)
+  let before = cached.diff_cache.highlights.unwrap()
+  let after = updated_view.files[0].diff_cache.highlights.unwrap()
+  assert_true(after.old == before.old)
+  assert_true(after.new != before.new)
+  assert_true(after.new.unwrap().line(1).length() > 0)
 }
 
 ///|
