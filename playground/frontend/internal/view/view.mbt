@@ -1018,39 +1018,6 @@ fn change_view(
   model : Model,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  let section_label = match commit.reference.target {
-    Commit(_) => "GitHub commit"
-    PullRequest(_) => "GitHub pull request"
-    PullCommit(_, _) => "GitHub pull request commit"
-  }
-  let identity = match commit.reference.target {
-    Commit(_) =>
-      "\{commit.reference.owner}/\{commit.reference.repo}@\{commit.sha}"
-    PullRequest(number) =>
-      "\{commit.reference.owner}/\{commit.reference.repo}#\{number}"
-    PullCommit(number, _) =>
-      "\{commit.reference.owner}/\{commit.reference.repo}#\{number}@\{commit.sha}"
-  }
-  let comparison = match commit.reference.target {
-    Commit(_) =>
-      if commit.parent_sha is Some(parent) {
-        "Compared with first parent \{parent}."
-      } else {
-        "Root commit; compared with an empty tree."
-      }
-    PullRequest(_) =>
-      if commit.parent_sha is Some(parent) {
-        "Compared merge base \{parent} with head \{commit.sha}."
-      } else {
-        "Compared the pull request base with head \{commit.sha}."
-      }
-    PullCommit(_, _) =>
-      if commit.parent_sha is Some(parent) {
-        "Compared PR commit \{commit.sha} with first parent \{parent}."
-      } else {
-        "PR root commit; compared with an empty tree."
-      }
-  }
   @html.section(class="results", [
     @html.div(
       class="change-layout",
@@ -1065,19 +1032,7 @@ fn change_view(
           attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
           [
             @html.div(class="commit-card", [
-              @html.div(class="commit-title", [
-                @html.div(class="commit-identity", [
-                  @html.p(class="section-label", section_label),
-                  @html.a(
-                    href=commit.html_url,
-                    target=Blank,
-                    rel="noopener noreferrer",
-                    identity,
-                  ),
-                  @html.p(class="parent", comparison),
-                ]),
-                @html.pre(class="commit-message", commit.message),
-              ]),
+              @html.pre(class="commit-message", commit.message),
             ]),
             viewed_progress(commit, model, emit),
             comments_overview(commit, model.review, model.auth, emit),
