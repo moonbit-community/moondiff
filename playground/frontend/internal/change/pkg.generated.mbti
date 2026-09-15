@@ -4,7 +4,7 @@ package "moonbit-community/moondiff-playground/internal/change"
 import {
   "moonbit-community/moondiff-playground-protocol",
   "moonbit-community/moondiff-playground/internal/github",
-  "moonbit-community/moondiff-playground/internal/highlight/moonbit",
+  "moonbit-community/moondiff-playground/internal/highlight",
   "moonbit-community/moondiff/model",
   "moonbitlang/core/immut/hashmap",
 }
@@ -64,7 +64,7 @@ pub(all) enum DiffAlgorithm {
 
 pub(all) struct DiffCache {
   entries : @hashmap.HashMap[CacheKey, CachedDiffResult]
-  highlights : @moonbit.FileHighlights?
+  highlights : @highlight.FileHighlights?
 } derive(Eq)
 pub fn DiffCache::empty() -> Self
 pub fn DiffCache::get(Self, CacheKey) -> CachedDiffResult?

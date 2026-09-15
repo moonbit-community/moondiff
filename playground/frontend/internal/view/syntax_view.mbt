@@ -1,5 +1,5 @@
 ///|
-fn syntax_class(kind : @highlight_moonbit.HighlightKind) -> String {
+fn syntax_class(kind : @highlight.HighlightKind) -> String {
   let suffix = match kind {
     Keyword => "keyword"
     Control => "control"
@@ -24,9 +24,9 @@ fn syntax_class(kind : @highlight_moonbit.HighlightKind) -> String {
 
 ///|
 fn source_line_highlights(
-  source : @highlight_moonbit.SourceHighlights?,
+  source : @highlight.SourceHighlights?,
   line : Int?,
-) -> ArrayView[@highlight_moonbit.HighlightSpan] {
+) -> ArrayView[@highlight.HighlightSpan] {
   match (source, line) {
     (Some(source), Some(line)) => source.line(line)
     _ => []
@@ -38,7 +38,7 @@ fn source_line_highlights(
 // the background; these inner nodes only supply foregrounds and font style.
 fn syntax_nodes(
   text : String,
-  highlights : ArrayView[@highlight_moonbit.HighlightSpan],
+  highlights : ArrayView[@highlight.HighlightSpan],
   offset : Int,
 ) -> Array[@rabbita.Html] {
   let nodes : Array[@rabbita.Html] = []

@@ -2,52 +2,15 @@
 package "moonbit-community/moondiff-playground/internal/highlight/moonbit"
 
 import {
-  "moonbitlang/core/debug",
+  "moonbit-community/moondiff-playground/internal/highlight",
 }
 
 // Values
+pub fn highlight(String) -> @highlight.SourceHighlights
 
 // Errors
 
 // Types and methods
-pub(all) struct FileHighlights {
-  old : SourceHighlights?
-  new : SourceHighlights?
-} derive(Eq)
-pub fn FileHighlights::empty() -> Self
-pub fn FileHighlights::new(String, String, String, String) -> Self
-
-pub(all) enum HighlightKind {
-  Keyword
-  Control
-  Async
-  Modifier
-  Function
-  Type
-  Package
-  Variable
-  Number
-  Boolean
-  StringLiteral
-  Escape
-  Interpolation
-  Comment
-  Operator
-  Attribute
-  AttributeParameter
-} derive(Eq, @debug.Debug)
-
-pub(all) struct HighlightSpan {
-  start : Int
-  end : Int
-  kind : HighlightKind
-} derive(Eq, @debug.Debug)
-
-pub struct SourceHighlights {
-  lines : Array[Array[HighlightSpan]]
-} derive(Eq)
-pub fn SourceHighlights::from_source(String) -> Self
-pub fn SourceHighlights::line(Self, Int) -> ArrayView[HighlightSpan]
 
 // Type aliases
 

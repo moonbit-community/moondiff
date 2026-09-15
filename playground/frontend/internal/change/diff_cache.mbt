@@ -95,7 +95,7 @@ pub fn ensure_file_document(
       diff_cache: {
         ..file.diff_cache,
         highlights: Some(
-          @highlight_moonbit.FileHighlights::new(
+          file_highlights(
             file.file.previous_filename.unwrap_or(file.file.filename),
             file.file.filename,
             old.join("\n"),

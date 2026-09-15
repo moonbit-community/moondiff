@@ -4,7 +4,7 @@ fn colored_line(
   line? : Int = 1,
 ) -> Array[(String, HighlightKind)] {
   let text = source.split("\n").to_array()[line - 1].to_owned()
-  SourceHighlights::from_source(source)
+  highlight(source)
   .line(line)
   .to_owned()
   .map(span => (slice(text, span.start, span.end), span.kind))
@@ -268,7 +268,7 @@ test "doc fences support tildes, empty languages, and unterminated blocks" {
 ///|
 test "UTF-16 ranges retain Chinese, emoji, tabs, CRLF, and blank lines" {
   let source = "\tlet x = \"中文😀<&>\"; let y = 12\r\n\r\n// 中文😀\rlet z = 3"
-  let highlights = SourceHighlights::from_source(source)
+  let highlights = highlight(source)
   let number = highlights.line(1).to_owned().filter(span => span.kind is Number)
   assert_eq(number, [{ start: 28, end: 30, kind: Number, }])
   assert_eq(slice(source, 28, 30), "12")
@@ -282,7 +282,7 @@ test "UTF-16 ranges retain Chinese, emoji, tabs, CRLF, and blank lines" {
   )
   assert_eq(highlights.line(0).length(), 0)
   assert_eq(highlights.line(99).length(), 0)
-  assert_eq(SourceHighlights::from_source("").line(1).length(), 0)
+  assert_eq(highlight("").line(1).length(), 0)
 }
 
 ///|
@@ -292,7 +292,7 @@ test "lexical errors keep valid tokens and never create overlapping or empty ran
       "let x = ` 1\nlet y = 2", "fn broken( {", "let s = \"unfinished😀", "\"hello \\{fn x() { 1 }",
       "😀\nlet x = 2", "\"\\{ }\"", "let x = 1\nlet y = 2\n",
     ] {
-    let highlights = SourceHighlights::from_source(source)
+    let highlights = highlight(source)
     for index, line in source.split("\n").to_array() {
       let mut previous = 0
       for span in highlights.line(index + 1) {
@@ -310,21 +310,6 @@ test "lexical errors keep valid tokens and never create overlapping or empty ran
     ("=", Operator),
     ("1", Number),
   ])
-}
-
-///|
-test "file eligibility follows each rename side and only the mbt extension" {
-  for
-    (old_path, new_path, old_enabled, new_enabled) in [
-      ("before.mbt", "after.txt", true, false),
-      ("before.txt", "after.mbt", false, true),
-      ("before.mbt", "after.mbt", true, true),
-      ("before.mbti", "after.md", false, false),
-    ] {
-    let file = FileHighlights::new(old_path, new_path, "let x = 1", "let x = 2")
-    assert_eq(file.old is Some(_), old_enabled)
-    assert_eq(file.new is Some(_), new_enabled)
-  }
 }
 
 ///|

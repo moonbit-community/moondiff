@@ -4,7 +4,7 @@ fn review_segment_nodes(
   segments : ArrayView[@model.DiffSegment]?,
   changed_class : String,
   prefix : String,
-  highlights? : ArrayView[@highlight_moonbit.HighlightSpan] = [],
+  highlights? : ArrayView[@highlight.HighlightSpan] = [],
 ) -> Array[@rabbita.Html] {
   let nodes : Array[@rabbita.Html] = []
   if !prefix.is_empty() {
@@ -131,7 +131,7 @@ fn split_review_line(
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
-  highlights? : @highlight_moonbit.FileHighlights = @highlight_moonbit.FileHighlights::empty(),
+  highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let (old_class, new_class) = review_row_classes(row)
   let cards = inline_cards(
@@ -222,7 +222,7 @@ fn unified_source_line(
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
-  syntax? : ArrayView[@highlight_moonbit.HighlightSpan] = [],
+  syntax? : ArrayView[@highlight.HighlightSpan] = [],
 ) -> Array[(String, @rabbita.Html)] {
   let cards = inline_cards(discussions, file_index, old_line, new_line, 3, site)
   let items : Array[(String, @rabbita.Html)] = [
@@ -291,7 +291,7 @@ fn unified_review_line(
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
-  highlights? : @highlight_moonbit.FileHighlights = @highlight_moonbit.FileHighlights::empty(),
+  highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let old_syntax = source_line_highlights(highlights.old, row.old_line)
   let new_syntax = source_line_highlights(highlights.new, row.new_line)
@@ -439,7 +439,7 @@ fn safe_review_diff(
   hunk_context? : String = "",
   fragment? : String = "line",
   discussions? : InlineDiscussions = empty_discussions(),
-  highlights? : @highlight_moonbit.FileHighlights = @highlight_moonbit.FileHighlights::empty(),
+  highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> @rabbita.Html {
   let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Map[String, @rabbita.Html] = Map([])
