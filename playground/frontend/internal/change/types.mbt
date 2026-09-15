@@ -44,7 +44,7 @@ pub(all) enum CacheKey {
 ///|
 pub(all) struct DiffCache {
   entries : @immut_hashmap.HashMap[CacheKey, CachedDiffResult]
-  highlights : @highlight_moonbit.FileHighlights?
+  highlights : @highlight.FileHighlights?
 } derive(Eq)
 
 ///|

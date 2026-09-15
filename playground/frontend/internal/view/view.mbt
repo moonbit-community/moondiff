@@ -616,7 +616,7 @@ fn semantic_fragment_view(
         fragment=section_index.map(i => "section:\{i}").unwrap_or("whole"),
         discussions~,
         highlights=file.diff_cache.highlights.unwrap_or(
-          @highlight_moonbit.FileHighlights::empty(),
+          @highlight.FileHighlights::empty(),
         ),
       )
     },
@@ -825,7 +825,7 @@ fn file_diff_view(
             emit,
             discussions~,
             highlights=file.diff_cache.highlights.unwrap_or(
-              @highlight_moonbit.FileHighlights::empty(),
+              @highlight.FileHighlights::empty(),
             ),
           )
         MoonBit(document~, status~, ignore_reason~) => {

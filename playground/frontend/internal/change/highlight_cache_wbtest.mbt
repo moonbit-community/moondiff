@@ -1,7 +1,7 @@
 ///|
 extern "js" fn same_highlights(
-  a : @highlight_moonbit.FileHighlights,
-  b : @highlight_moonbit.FileHighlights,
+  a : @highlight.FileHighlights,
+  b : @highlight.FileHighlights,
 ) -> Bool =
   #| (a, b) => a === b
 

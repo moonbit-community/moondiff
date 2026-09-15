@@ -4,7 +4,7 @@ import {
   "moonbit-community/moondiff-playground/internal/change",
   "moonbit-community/moondiff-playground/internal/comments",
   "moonbit-community/moondiff-playground/internal/review",
-  "moonbit-community/moondiff-playground/internal/highlight/moonbit" @highlight_moonbit,
+  "moonbit-community/moondiff-playground/internal/highlight",
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/mbtdiff",
   "moonbit-community/rabbita",

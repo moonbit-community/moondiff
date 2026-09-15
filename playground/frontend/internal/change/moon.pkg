@@ -1,7 +1,8 @@
 import {
+  "moonbit-community/moondiff-playground/internal/highlight/moonbit" @highlight_moonbit,
   "moonbit-community/moondiff-playground-protocol" @protocol,
   "moonbit-community/moondiff-playground/internal/github",
-  "moonbit-community/moondiff-playground/internal/highlight/moonbit" @highlight_moonbit,
+  "moonbit-community/moondiff-playground/internal/highlight",
   "moonbit-community/moondiff/mbtdiff",
   "moonbit-community/moondiff/linediff",
   "moonbitlang/core/immut/hashmap" @immut_hashmap,

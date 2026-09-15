@@ -201,7 +201,7 @@ fn collect_tokens(
             re"^[A-Za-z0-9_.]+$" => true
             _ => false
           })
-        let kind = if attribute_word {
+        let kind : HighlightKind? = if attribute_word {
           Some(AttributeParameter)
         } else if token is (LIDENT(_) | DOT_LIDENT(_)) &&
           is_function(tokens, index) &&

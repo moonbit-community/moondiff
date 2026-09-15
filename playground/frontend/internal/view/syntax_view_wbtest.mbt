@@ -7,7 +7,14 @@ fn render_syntax_nodes(nodes : Array[@rabbita.Html]) -> String {
 ///|
 test "syntax ranges intersect diff segments without changing text or markup" {
   let source = "let value = \"中😀<&>\\n\""
-  let highlights = @highlight_moonbit.SourceHighlights::from_source(source)
+  let highlights = @highlight.SourceHighlights::from_spans(source, [
+    { start: 0, end: 3, kind: Keyword, },
+    { start: 4, end: 9, kind: Variable, },
+    { start: 10, end: 11, kind: Operator, },
+    { start: 12, end: 19, kind: StringLiteral, },
+    { start: 19, end: 21, kind: Escape, },
+    { start: 21, end: 22, kind: StringLiteral, },
+  ])
   let rendered = render_syntax_nodes(
     review_segment_nodes(
       Some(source),
@@ -42,7 +49,7 @@ test "plain, empty, and out-of-range lines render without syntax assumptions" {
     content="<div><span>\t&lt;script&gt;&amp;\"中文😀\"  \r</span></div>",
   )
   assert_eq(render_syntax_nodes(syntax_nodes("", [], 0)), "<div></div>")
-  let highlights = @highlight_moonbit.SourceHighlights::from_source("let x = 1")
+  let highlights = @highlight.SourceHighlights::from_spans("let x = 1", [])
   assert_eq(source_line_highlights(Some(highlights), Some(99)).length(), 0)
   assert_eq(source_line_highlights(Some(highlights), None).length(), 0)
   assert_eq(source_line_highlights(None, Some(1)).length(), 0)
