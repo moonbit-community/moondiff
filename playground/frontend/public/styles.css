@@ -1027,23 +1027,12 @@ button.file-tree-row.selected {
   padding: 0.62rem 0.85rem;
 }
 
-.commit-title,
 .file-heading,
 .file-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-}
-
-.commit-title {
-  display: grid;
-  grid-template-columns: minmax(18rem, 0.8fr) minmax(18rem, 1.2fr);
-  gap: 2rem;
-}
-
-.commit-identity {
-  min-width: 0;
 }
 
 .section-label {
@@ -1055,38 +1044,16 @@ button.file-tree-row.selected {
   text-transform: uppercase;
 }
 
-.commit-title a {
-  display: block;
-  overflow: hidden;
-  color: var(--muted-strong);
-  font-family: var(--mono);
-  font-size: 0.76rem;
-  font-weight: 580;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.parent {
-  margin: 0.18rem 0 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.64rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .commit-message {
-  max-height: 2.55rem;
+  min-width: 0;
   margin: 0;
-  overflow: hidden;
-  border-left: 2px solid var(--border);
-  padding: 0.08rem 0 0.08rem 0.75rem;
+  padding: 0.08rem 0;
   color: var(--muted-strong);
   font-family: var(--mono);
   font-size: 0.72rem;
   line-height: 1.45;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .file-status {
@@ -2013,7 +1980,6 @@ button.comment-more[aria-expanded="true"] {
   }
 
   .hero-workspace,
-  .commit-title,
   .comments-toolbar {
     align-items: stretch;
   }
@@ -2042,18 +2008,6 @@ footer {
 
 .workspace footer {
   display: none;
-}
-
-@media (max-width: 900px) {
-  .commit-title {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: 1rem;
-  }
-
-  .commit-message {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
 }
 
 @media (max-width: 767px) {
@@ -2170,15 +2124,6 @@ footer {
     justify-content: flex-start;
   }
 
-  .commit-title {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.55rem;
-  }
-
-  .commit-message {
-    max-height: 2.15rem;
-  }
-
   .file-heading {
     top: var(--toolbar-height);
   }
@@ -2242,10 +2187,6 @@ footer {
 
   .commit-card {
     padding-inline: 0.65rem;
-  }
-
-  .parent {
-    display: none;
   }
 
   .file-heading {
