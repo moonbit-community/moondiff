@@ -8,6 +8,8 @@ fn source_highlights(
     path == "pkg.generated.mbti" ||
     path.has_suffix("/pkg.generated.mbti") {
     Some(@highlight_moonbit.highlight(source))
+  } else if path.has_suffix(".c") || path.has_suffix(".h") {
+    Some(@highlight_c.highlight(source))
   } else {
     None
   }

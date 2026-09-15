@@ -94,3 +94,50 @@ test "semantic sections use original lines for highlights after reorder and same
     }
   }
 }
+
+///|
+#warnings("-alert_unstable")
+test "C lexical fixes reach rendered diffs with original escaped source text" {
+  let old = [
+    "struct", "#define BAD [[note(", "\\u4e2d;", "<:[nodiscard]:> int run\\U0001F600(void) { return 1; } // 中文😀<&>",
+  ]
+  let new = old.map(line => line.replace(old="return 1", new="return 2"))
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for algorithm in [@change.LexicalAlgorithm, AstAlgorithm] {
+    let file = ensure_file_document(
+      ready_test_file(fixture_file("code.c", "modified"), old, new),
+      algorithm,
+    )
+    for mode in [@change.Split, Unified] {
+      let rendered = @rabbita.render_to_string(() => {
+        @rabbita.Val::constant(
+          file_diff_view(
+            file,
+            0,
+            0,
+            mode,
+            algorithm,
+            false,
+            false,
+            @comments.Session::new(),
+            emit,
+          ),
+        )
+      })
+      for
+        (kind, text) in [
+          ("type", "\\u4e2d"),
+          ("attribute", "&lt;:["),
+          ("attribute", "nodiscard"),
+          ("attribute", "]:&gt;"),
+          ("function", "run\\U0001F600"),
+          ("comment", "// 中文😀&lt;&amp;&gt;"),
+        ] {
+        assert_true(
+          rendered.contains("class=\"syntax-\{kind}\">\{text}</span>"),
+          msg=text,
+        )
+      }
+    }
+  }
+}
