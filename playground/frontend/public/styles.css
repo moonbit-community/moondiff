@@ -1024,7 +1024,7 @@ button.file-tree-row.selected {
   display: grid;
   min-width: 0;
   border-width: 0 0 1px;
-  padding: 0.62rem 0.85rem;
+  padding: 0.5rem 0.75rem;
 }
 
 .file-heading,
@@ -1045,15 +1045,31 @@ button.file-tree-row.selected {
 }
 
 .commit-message {
+  display: grid;
+  min-width: 0;
+  gap: 0.5rem;
+  color: var(--foreground);
+  font-family: var(--mono);
+}
+
+.commit-message-title,
+.commit-message-body {
   min-width: 0;
   margin: 0;
-  padding: 0.08rem 0;
-  color: var(--muted-strong);
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  line-height: 1.45;
+  font-family: inherit;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.commit-message-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.commit-message-body {
+  font-size: 0.75rem;
+  font-weight: 400;
 }
 
 .file-status {
@@ -2183,10 +2199,6 @@ footer {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
-  }
-
-  .commit-card {
-    padding-inline: 0.65rem;
   }
 
   .file-heading {
