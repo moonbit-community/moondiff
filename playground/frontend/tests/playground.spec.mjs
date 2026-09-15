@@ -582,14 +582,14 @@ function expectRevalidatingRequests(requests, fetchCalls) {
   }
 }
 
-async function installMockRoutes(page) {
+async function installMockRoutes(page, { message = apiCommit.commit.message } = {}) {
   await page.route("https://**", route => route.abort("blockedbyclient"));
   await routeGithub(page, "api", async route => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       headers: { "access-control-allow-origin": "*" },
-      body: JSON.stringify(apiCommit),
+      body: JSON.stringify({ ...apiCommit, commit: { ...apiCommit.commit, message } }),
     });
   });
   await routeGithub(page, "content", async route => {
@@ -840,8 +840,8 @@ async function loadCommentsCommit(page, options) {
   await expect(page.locator("table.split").first()).toBeVisible();
 }
 
-async function loadMockedCommit(page) {
-  await installMockRoutes(page);
+async function loadMockedCommit(page, options) {
+  await installMockRoutes(page, options);
   await page.goto("/");
   await page.getByLabel("Public GitHub commit or pull request URL").fill(commitUrl);
   await page.getByRole("button", { name: "View diff" }).click();
@@ -911,6 +911,7 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
 
   await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
   await expect(page.locator(".commit-message")).toHaveText(apiCommit.commit.message);
+  await expect(page.locator(".commit-message-body")).toHaveCount(0);
   await expect(page).toHaveURL(`/example/project/commit/${commitSha}`);
   await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy link" })).toHaveCount(0);
@@ -978,6 +979,91 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
   await page.getByRole("button", { name: "Split" }).click();
   await expect(page.locator("table.split")).toBeVisible();
 });
+
+for (const [name, newline] of [["LF", "\n"], ["CRLF", "\r\n"]]) {
+  test(`commit messages preserve paragraphs and indentation with ${name}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const title = "Fix commit message layout — 保留说明 🚀";
+    const lines = [
+      "  Keep the first paragraph indented.",
+      "",
+      "Explain the next change.",
+      "    preserve_code_indentation()",
+      "\tKeep the tab too.",
+      "",
+      "Final paragraph — 最后一段 🚀.",
+    ];
+    const body = lines.join(newline);
+    await loadMockedCommit(page, { message: `${title}${newline}${newline}${body}` });
+
+    // textContent preserves whitespace that toHaveText would normalize away.
+    await expect(page.locator(".commit-message-title")).toHaveJSProperty("textContent", title);
+    const bodyView = page.locator(".commit-message-body");
+    await expect(bodyView).toHaveJSProperty("textContent", body);
+    const layout = await bodyView.evaluate(element => {
+      const indent = document.createRange();
+      indent.setStart(element.firstChild, 0);
+      indent.setEnd(element.firstChild, 2);
+      return {
+        height: element.getBoundingClientRect().height,
+        lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+        indentWidth: indent.getBoundingClientRect().width,
+      };
+    });
+    expect(layout.height).toBeGreaterThanOrEqual(lines.length * layout.lineHeight - 1);
+    expect(layout.indentWidth).toBeGreaterThan(0);
+  });
+}
+
+for (const width of [1440, 768, 375]) {
+  test(`long commit messages wrap without clipping at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const title = `Fix ${"LongSubject".repeat(60)}`;
+    const body = [
+      "Keep the entire explanation visible.",
+      "",
+      "LongBodyWithoutBreaks".repeat(100),
+      "",
+      "End of the commit message.",
+    ].join("\n");
+    await loadMockedCommit(page, { message: `${title}\n\n${body}` });
+
+    await expect(page.locator(".commit-message-title")).toHaveJSProperty("textContent", title);
+    await expect(page.locator(".commit-message-body")).toHaveJSProperty("textContent", body);
+    const layout = await page.locator(".commit-card").evaluate(card => {
+      const message = card.querySelector(".commit-message");
+      const parts = [...message.querySelectorAll(".commit-message-title, .commit-message-body")];
+      return {
+        lineCounts: parts.map(element => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return new Set(
+            [...range.getClientRects()]
+              .filter(rect => rect.width > 0 && rect.height > 0)
+              .map(rect => Math.round(rect.top)),
+          ).size;
+        }),
+        boxes: [card, message, ...parts].map(element => ({
+          name: element.className,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+        })),
+        documentClientWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+    for (const lineCount of layout.lineCounts) {
+      expect(lineCount).toBeGreaterThan(1);
+    }
+    for (const box of layout.boxes) {
+      expect(box.scrollWidth, `${box.name} horizontal overflow`).toBeLessThanOrEqual(box.clientWidth + 1);
+      expect(box.scrollHeight, `${box.name} vertical clipping`).toBeLessThanOrEqual(box.clientHeight + 1);
+    }
+    expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth);
+  });
+}
 
 test("desktop file tree supports collapse search status filters and file navigation", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
