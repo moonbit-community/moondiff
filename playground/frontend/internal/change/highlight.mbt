@@ -19,6 +19,8 @@ fn source_highlights(
     Some(@highlight_moonbit.highlight(source))
   } else if path.has_suffix(".c") || path.has_suffix(".h") {
     Some(@highlight_c.highlight(source))
+  } else if path.has_suffix(".yaml") || path.has_suffix(".yml") {
+    Some(@highlight_yaml.highlight(source))
   } else {
     None
   }
