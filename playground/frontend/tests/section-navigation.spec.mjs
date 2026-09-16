@@ -468,7 +468,7 @@ test('route changes disconnect the old height observer and reset navigation', as
   await page.evaluate(() => window.scrollTo(0, 0));
   await button(page, 1).click();
   await expectLanding(page.locator('#moondiff-file-0 .semantic-section').first(), 0);
-  expect(await page.evaluate(() => window.resizeObservers.filter(observer => !observer.disconnected).length)).toBe(1);
+  expect(await page.evaluate(() => window.resizeObservers.filter(observer => !observer.disconnected).length)).toBe(await page.locator('.file-card').count() + 2);
 });
 
 test('a height-only viewport resize discards the clamped landing', async ({ page }) => {

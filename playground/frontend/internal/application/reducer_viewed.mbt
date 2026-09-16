@@ -182,13 +182,7 @@ fn update_viewed(
         },
       )
       let (next, expansion) = viewed_expansion(next, index, !desired, emit)
-      (
-        next,
-        @rabbita.batch([
-          expansion,
-          viewed_persist_request(next, index, record, emit),
-        ]),
-      )
+      (next, expansion)
     }
     Loaded(epoch, serial, result) => {
       guard epoch == model.viewed.epoch &&

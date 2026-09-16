@@ -1,4 +1,26 @@
 ///|
+fn build_file_tree(files : ArrayView[FileState]) -> Array[FileTreeRow] {
+  build_file_tree_metadata(
+    files.map(f => TreeMetadata::{
+      path: f.file.filename,
+      previous_filename: f.file.previous_filename,
+      status: f.file.status,
+    }),
+  )
+}
+
+///|
+fn file_tree_statuses(files : ArrayView[FileState]) -> Array[String] {
+  let statuses : Array[String] = []
+  for state in files {
+    if !statuses.contains(state.file.status) {
+      statuses.push(state.file.status)
+    }
+  }
+  statuses
+}
+
+///|
 fn fixture_file(
   filename : String,
   status : String,
@@ -366,7 +388,7 @@ test "test file notices follow diff results and preserve source load states" {
           AstAlgorithm,
           false,
           true,
-          @comments.Session::new(),
+          @comments.Session::new().read_view(),
           emit,
         ),
       )
@@ -451,7 +473,7 @@ test "AST structural-empty view preserves section fallback notices" {
         AstAlgorithm,
         false,
         false,
-        @comments.Session::new(),
+        @comments.Session::new().read_view(),
         emit,
       ),
     )
@@ -500,7 +522,7 @@ test "AST structural-empty view without fallback keeps its original DOM" {
         AstAlgorithm,
         false,
         false,
-        @comments.Session::new(),
+        @comments.Session::new().read_view(),
         emit,
       ),
     )
@@ -551,7 +573,7 @@ test "same-line declarations retain every modified inserted and deleted section"
               top,
               mode,
               false,
-              @comments.Session::new(),
+              @comments.Session::new().read_view(),
               emit,
             ),
           )

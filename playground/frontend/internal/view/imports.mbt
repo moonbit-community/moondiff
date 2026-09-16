@@ -3,7 +3,6 @@ using @application {type FileTreeState, type Model, type Msg, file_dom_id}
 
 ///|
 using @change {
-  type ChangeView,
   type DiffAlgorithm,
   type FileState,
   type SideLoad,
@@ -13,15 +12,7 @@ using @change {
 }
 
 ///|
-using @comments {
-  type CommentDraft,
-  type Session,
-  type ReviewThread,
-  author_label,
-  commit_discussions,
-  review_can_comment,
-  review_threads,
-}
+using @comments {type CommentDraft, type ReviewThread, author_label}
 
 ///|
 using @review {

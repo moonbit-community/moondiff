@@ -31,7 +31,7 @@ fn review_segment_nodes(
 
 ///|
 fn inline_draft_for_anchor(
-  review : Session,
+  review : @comments.ReadView,
   anchor : ReviewAnchor?,
 ) -> CommentDraft? {
   guard review.draft_visible() &&
@@ -51,7 +51,7 @@ fn review_gutter(
   number : Int?,
   anchor : ReviewAnchor?,
   class_name : String,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   @html.td(class="line-number review-gutter \{class_name}", [
@@ -59,14 +59,11 @@ fn review_gutter(
       class="line-number-value",
       number.map(value => value.to_string()).unwrap_or(""),
     ),
-    if review_can_comment(review) && anchor is Some(anchor) {
+    if review.permissions.can_comment && anchor is Some(anchor) {
       @html.button(
         type_="button",
         class="line-comment-button",
-        disabled=!@comments.permission(
-          review,
-          OpenDraft(InlineDraft(file_index, anchor)),
-        ).allowed(),
+        disabled=!review.allowed(OpenDraft(InlineDraft(file_index, anchor))),
         title="Comment on line \{anchor.line}",
         attrs=@html.Attrs::build().aria_label("Comment on line \{anchor.line}"),
         on_click=emit(Review(OpenInlineDraft(file_index, anchor))),
@@ -80,7 +77,7 @@ fn review_gutter(
 
 ///|
 fn inline_editor_row(
-  review : Session,
+  review : @comments.ReadView,
   anchor : ReviewAnchor?,
   columns : Int,
   emit : @rabbita.Emit[Msg],
@@ -126,7 +123,7 @@ fn review_row_classes(row : ReviewRow) -> (String, String) {
 ///|
 fn split_review_line(
   row : ReviewRow,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   single_side? : @review.ReviewSide,
   discussions? : InlineDiscussions = empty_discussions(),
@@ -231,7 +228,7 @@ fn unified_source_line(
   segments : ArrayView[@model.DiffSegment]?,
   changed_class : String,
   prefix : String,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
@@ -300,7 +297,7 @@ fn unified_source_line(
 ///|
 fn unified_review_line(
   row : ReviewRow,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
@@ -445,7 +442,7 @@ fn safe_review_diff(
   file_index : Int,
   document : @model.HunkDocument,
   mode : ViewMode,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   old_base? : Int = 0,
   new_base? : Int = 0,
@@ -467,25 +464,31 @@ fn safe_review_diff(
   } else {
     4
   }
-  let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Map[String, @rabbita.Html] = Map([])
   // Count each source identity independently; comments never shift these keys.
   let occurrences : Map[String, Int] = Map([])
   let mut line_index = 0
   let mut block_index = -1
   for
-    item in project_review_items(
+    item in review_items(
+      discussions.cache,
+      file,
       file_index,
-      file.filename,
       document,
-      patch,
-      old_base~,
-      new_base~,
-      show_hunk_headers~,
-      hunk_context~,
+      old_base,
+      new_base,
+      fragment,
     ) {
     match item {
       ReviewHunk(header) => {
+        if !show_hunk_headers {
+          continue
+        }
+        let header = if hunk_context.is_empty() {
+          header
+        } else {
+          "\{header} \{hunk_context}"
+        }
         let key = "hunk:\{file_index}:\{old_base}:\{new_base}:\{header}"
         let occurrence = occurrences.get(key).unwrap_or(0)
         occurrences[key] = occurrence + 1
@@ -576,10 +579,10 @@ fn safe_review_diff(
 ///|
 fn review_thread_view(
   thread : ReviewThread,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  let can_comment = review_can_comment(review)
+  let can_comment = review.permissions.can_comment
   let comments : Map[String, @rabbita.Html] = Map([])
   comments[review.comment_key(ReviewComment(thread.root.id))] = comment_body_view(
     author_label(thread.root.user),
@@ -606,7 +609,7 @@ fn review_thread_view(
     .filter(draft => {
       draft.kind is ReplyDraft(id) &&
       id == thread.root.id &&
-      @comments.valid_reply_target(review, id)
+      review.valid_reply_target(id)
     })
   if can_comment && reply_draft is None {
     comments["reply-control"] = @html.div(class="comment-reply-entry", [
@@ -614,13 +617,10 @@ fn review_thread_view(
       @html.button(
         type_="button",
         class="comment-reply-button",
-        disabled=!@comments.permission(
-          review,
-          OpenDraft(ReplyDraft(thread.root.id)),
-        ).allowed(),
+        disabled=!review.allowed(OpenDraft(ReplyDraft(thread.root.id))),
         title=if thread.root.in_reply_to_id is Some(_) {
           "The root comment has been deleted."
-        } else if !@comments.valid_reply_target(review, thread.root.id) {
+        } else if !review.valid_reply_target(thread.root.id) {
           "The root comment is unavailable or being deleted."
         } else {
           "Reply to this thread"
@@ -635,17 +635,6 @@ fn review_thread_view(
     comments[draft.id.key()] = comment_editor(draft, review, emit)
   }
   @html.div(class="review-thread", comments)
-}
-
-///|
-fn file_discussions_view(
-  _view : ChangeView,
-  file_index : Int,
-  _review : Session,
-  _emit : @rabbita.Emit[Msg],
-  discussions? : InlineDiscussions = empty_discussions(),
-) -> @rabbita.Html {
-  fallback_discussions(discussions, Some(file_index))
 }
 
 ///|
@@ -793,31 +782,29 @@ fn auth_controls(
 
 ///|
 fn comments_overview(
-  view : ChangeView,
-  review : Session,
+  is_pull : Bool,
+  review : @comments.ReadView,
   auth : @application.AuthStatus,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let refresh = @html.button(
     type_="button",
     class="secondary refresh-comments",
-    disabled=!(review.refresh() is RefreshIdle),
+    disabled=review.refresh_busy,
     on_click=emit(Review(RefreshComments)),
     "Refresh",
   )
   let issue_views : Map[String, @rabbita.Html] = Map([])
-  if review.comments() is CommentsReady(bundle) {
-    for comment in bundle.issue_comments {
-      issue_views[review.comment_key(IssueComment(comment.id))] = comment_body_view(
-        author_label(comment.user),
-        comment.created_at,
-        comment.body,
-        comment.html_url,
-        IssueComment(comment.id),
-        review,
-        emit,
-      )
-    }
+  for comment in review.group.issue_comments {
+    issue_views[review.comment_key(IssueComment(comment.id))] = comment_body_view(
+      author_label(comment.user),
+      comment.created_at,
+      comment.body,
+      comment.html_url,
+      IssueComment(comment.id),
+      review,
+      emit,
+    )
   }
   @html.section(class="comments-overview", [
     @html.div(class="comments-toolbar", [
@@ -840,7 +827,7 @@ fn comments_overview(
         @html.button(
           type_="button",
           class="secondary load-latest-snapshot",
-          disabled=!@comments.permission(review, LoadSnapshot).allowed(),
+          disabled=!review.allowed(LoadSnapshot),
           on_click=emit(Review(LoadLatestSnapshot)),
           "Load latest",
         ),
@@ -864,27 +851,26 @@ fn comments_overview(
     } else {
       @html.nothing
     },
-    if review.refresh_error is Some(message) &&
-      review.comments() is CommentsReady(_) {
+    if review.refresh_error is Some(message) && review.status is Ready {
       @html.p(class="comment-error", message)
     } else {
       @html.nothing
     },
-    match review.comments() {
-      CommentsLoading =>
+    match review.status {
+      Loading =>
         if review.snapshot_stale {
           @html.nothing
         } else {
           @html.p(class="comments-loading", "Loading comments…")
         }
-      CommentsFailed(message) => @html.p(class="comment-error", message)
+      Failed(message) => @html.p(class="comment-error", message)
       _ => @html.nothing
     },
-    fallback_discussions(prepare_discussions(view, review, emit), None),
+    fallback_discussions(prepare_discussions(None, None, review, emit), None),
     if review.draft_visible() &&
       review.draft() is Some(draft) &&
       draft.kind is ReplyDraft(id) &&
-      !@comments.valid_reply_target(review, id) {
+      !review.valid_reply_target(id) {
       @html.div(class="unavailable-reply-draft", [
         @html.p(
           "The root comment is unavailable. Your reply draft is preserved; copy its text or cancel it.",
@@ -894,17 +880,17 @@ fn comments_overview(
     } else {
       @html.nothing
     },
-    if view.reference.target is PullRequest(_) {
+    if is_pull {
       @html.div(class="overall-comments", [
         @html.div(issue_views),
         if review.draft_visible() {
           if review.draft() is Some(draft) && draft.kind is OverallDraft {
             comment_editor(draft, review, emit)
-          } else if review_can_comment(review) {
+          } else if review.permissions.can_comment {
             @html.button(
               type_="button",
               class="secondary add-overall-comment",
-              disabled=!@comments.permission(review, OpenDraft(OverallDraft)).allowed(),
+              disabled=!review.allowed(OpenDraft(OverallDraft)),
               on_click=emit(Review(OpenOverallDraft)),
               "Add overall comment",
             )

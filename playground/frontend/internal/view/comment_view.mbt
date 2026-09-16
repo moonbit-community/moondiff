@@ -51,7 +51,7 @@ fn comment_body_view(
   body : String,
   html_url : String,
   id : @comments.CommentId,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   @html.article(class="github-comment", [
@@ -75,7 +75,7 @@ fn comment_body_view(
 ///|
 fn comment_editor(
   draft : CommentDraft,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   unavailable? : Bool = false,
 ) -> @rabbita.Html {
@@ -121,8 +121,7 @@ fn comment_editor(
         @html.button(
           type_="button",
           class="comment-submit",
-          disabled=unavailable ||
-            !@comments.permission(review, Submit).allowed(),
+          disabled=unavailable || !review.allowed(Submit),
           on_click=emit(Review(SubmitDraft)),
           if draft.submitting {
             "Posting…"

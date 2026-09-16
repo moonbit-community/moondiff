@@ -1,14 +1,8 @@
 ///|
-fn change_controls(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
-  let mut enabled = false
-  if model.phase is Showing(view) {
-    for index, _ in view.files {
-      if @application.file_navigation_enabled(model, index) {
-        enabled = true
-        break
-      }
-    }
-  }
+fn change_controls(
+  input : NavigationInput,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
   @html.span(
     class="section-change-controls",
     [
@@ -21,14 +15,14 @@ fn change_controls(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
           type_="button",
           class="section-change-button",
           title=label,
-          disabled=!enabled,
+          disabled=!input.enabled,
           attrs=@html.Attrs::build()
             .aria_label(label)
             .data_set("change-direction", direction.to_string())
             .on_click(event => {
               @application.navigate_section_change(
                 event,
-                model.generation,
+                input.generation,
                 direction,
                 emit,
               )

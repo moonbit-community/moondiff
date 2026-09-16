@@ -1,0 +1,13 @@
+import {
+  "moonbit-community/moondiff-playground/internal/application",
+  "moonbit-community/moondiff-playground/internal/view",
+  "moonbit-community/moondiff-playground/internal/identity",
+  "moonbit-community/moondiff-playground/internal/metrics",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/sub",
+  "moonbit-community/rabbita/html",
+  "moonbitlang/core/immut/vector",
+}
+
+supported_targets = "js"

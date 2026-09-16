@@ -2,7 +2,7 @@
 fn comment_menu(
   id : @comments.CommentId,
   html_url : String,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let menu_id = "comment-menu:\{review.comment_key(id)}"
@@ -49,8 +49,8 @@ fn comment_menu(
           attrs=@html.Attrs::build().role("menuitem").tabindex(-1),
           "Open on GitHub ↗",
         ),
-        if @comments.can_delete_comment(review, id) {
-          let conflict = @comments.draft_blocks_deletion(review, id)
+        if review.can_delete(id) {
+          let conflict = review.draft_blocks_deletion(id)
           @html.button(
             type_="button",
             class="comment-delete",
@@ -59,7 +59,7 @@ fn comment_menu(
             } else {
               "Delete this comment"
             },
-            disabled=review.deletion is Some(Deleting(_)) || conflict,
+            disabled=review.permissions.deleting || conflict,
             attrs=@html.Attrs::build().role("menuitem").tabindex(-1),
             on_click=emit(Review(AskDelete(id))),
             "Delete",
@@ -75,10 +75,10 @@ fn comment_menu(
 ///|
 fn comment_delete_controls(
   id : @comments.CommentId,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  guard @comments.can_delete_comment(review, id) else {
+  guard review.can_delete(id) else {
     if review.deletion is Some(DeleteFailed(selected, message)) &&
       selected == id {
       return @html.p(class="comment-error", message)
@@ -91,7 +91,7 @@ fn comment_delete_controls(
     | Some(DeleteFailed(current, _)) => current == id
     _ => false
   }
-  let conflict = @comments.draft_blocks_deletion(review, id)
+  let conflict = review.draft_blocks_deletion(id)
   let hint = if conflict {
     "Send or cancel the reply draft before deleting this comment."
   } else {

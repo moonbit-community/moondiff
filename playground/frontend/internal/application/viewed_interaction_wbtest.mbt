@@ -20,7 +20,7 @@ fn viewed_interaction_model() -> Model {
 
 ///|
 fn viewed_interaction_update(model : Model, msg : Msg) -> Model {
-  let next = update(model, msg, _ => @rabbita.none).0
+  let next = update(model, msg, _ => @rabbita.none).model
   match msg {
     Viewed(Toggle(_, index)) => viewed_test_stored(next, index)
     _ => next

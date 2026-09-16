@@ -3,6 +3,8 @@ package "moonbit-community/moondiff-playground/internal/view"
 
 import {
   "moonbit-community/moondiff-playground/internal/application",
+  "moonbit-community/moondiff-playground/internal/change",
+  "moonbit-community/moondiff-playground/internal/comments",
   "moonbit-community/moondiff/model",
   "moonbit-community/rabbita/cmd",
   "moonbit-community/rabbita/html",
@@ -10,13 +12,17 @@ import {
 }
 
 // Values
-pub fn app_view(@application.Model, @cmd.Emit[@application.Msg]) -> @html.Html
-
 pub fn diff_notice(ArrayView[@model.FallbackReason], Bool) -> DiffNotice?
+
+pub fn region_view(RegionInput, @cmd.Emit[@application.Msg], FileDerivation) -> @html.Html
 
 pub fn semantic_section_fragment(@model.DiffSection) -> @model.DiffFragment
 
 pub fn semantic_section_title(Int, @model.DiffSection) -> String
+
+pub fn shell_input(@application.Model) -> ShellInput
+
+pub fn shell_view(ShellInput, Array[MountHost]) -> @html.Html
 
 // Errors
 
@@ -27,7 +33,137 @@ pub(all) struct DiffNotice {
   message : String
 }
 
+pub(all) struct DiscussionInput {
+  is_pull : Bool
+  review : @comments.ReadView
+  auth : @application.AuthStatus
+} derive(Eq)
+
+pub(all) struct DisplayOptions {
+  mode : @change.ViewMode
+  algorithm : @change.DiffAlgorithm
+  ignore_comments : Bool
+  ignore_tests : Bool
+} derive(Eq)
+
+pub struct FileDerivation {
+  // private fields
+}
+pub fn FileDerivation::new() -> Self
+
+pub(all) struct FileInput {
+  file : @change.FileState
+  generation : Int
+  index : Int
+  display : DisplayOptions
+  review : @comments.ReadView
+  viewed : ViewedControl
+  navigation_enabled : Bool
+}
+pub impl Eq for FileInput
+
 type FileTreeRow derive(Eq, @debug.Debug)
+
+pub(all) struct MountHost {
+  region : @application.Region
+  id : String
+} derive(Eq)
+
+pub(all) struct NavigationInput {
+  generation : Int
+  enabled : Bool
+} derive(Eq)
+
+pub(all) enum RegionInput {
+  Toolbar(ToolbarInput)
+  Status(StatusInput)
+  FileTree(TreeInput)
+  Navigation(NavigationInput)
+  ViewedSummary(ViewedSummaryInput)
+  Discussion(DiscussionInput)
+  File(FileInput)
+} derive(Eq)
+pub fn RegionInput::draft_id(Self) -> String
+
+pub struct RegionProjection {
+  // private fields
+}
+pub fn RegionProjection::inputs(Self, @application.Model) -> Array[(@application.Region, RegionInput)]
+pub fn RegionProjection::new() -> Self
+
+pub(all) struct ShellInput {
+  generation : Int
+  landing : Bool
+  showing : Bool
+  message : String
+  drawer_open : Bool
+  preferred_width : Int
+  display : DisplayOptions
+} derive(Eq)
+
+pub(all) enum StatusInput {
+  Empty
+  Loading(String)
+  Failed(String, @application.AuthStatus)
+} derive(Eq)
+
+pub(all) struct ToolbarInput {
+  input : String
+  landing : Bool
+  drawer_open : Bool
+  auth : @application.AuthStatus
+  file_count : Int?
+  diff_algorithm : @change.DiffAlgorithm
+  view_mode : @change.ViewMode
+  ignore_comments : Bool
+  ignore_tests : Bool
+} derive(Eq)
+
+pub struct TreeData {
+  // private fields
+}
+pub impl Eq for TreeData
+
+pub(all) struct TreeInput {
+  generation : Int
+  tree : TreeData
+  state : @application.FileTreeState
+  viewed : Array[Bool]
+} derive(Eq)
+
+pub(all) struct TreeMetadata {
+  path : String
+  previous_filename : String?
+  status : String
+} derive(Eq)
+
+pub(all) struct ViewedControl {
+  is_pull : Bool
+  generation : Int
+  index : Int
+  path : String
+  checked : Bool
+  syncing : Bool
+  confirming : Bool
+  dismissed : Bool
+  disabled : Bool
+  title : String
+  error : String?
+  retry_disabled : Bool
+} derive(Eq)
+
+pub(all) struct ViewedSummaryInput {
+  is_pull : Bool
+  total : Int
+  count : Int
+  pending : Bool
+  auth : @application.AuthStatus
+  ready : Bool
+  loading : Bool
+  error : String?
+  stale : Bool
+  poll_scheduled : Bool
+} derive(Eq)
 
 // Type aliases
 

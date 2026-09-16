@@ -76,12 +76,13 @@ fn append_file_tree_rows(
 }
 
 ///|
-fn build_file_tree(files : ArrayView[FileState]) -> Array[FileTreeRow] {
+fn build_file_tree_metadata(
+  files : ArrayView[TreeMetadata],
+) -> Array[FileTreeRow] {
   let children : Map[String, Array[FileTreeNode]] = Map([])
   let seen_directories : Map[String, Unit] = Map([])
-  for index, state in files {
-    let file = state.file
-    let parts = file_tree_path_parts(file.filename)
+  for index, file in files {
+    let parts = file_tree_path_parts(file.path)
     let mut parent_path = ""
     let mut directory_path = ""
     for part_index in 0..<(parts.length() - 1) {
@@ -99,11 +100,11 @@ fn build_file_tree(files : ArrayView[FileState]) -> Array[FileTreeRow] {
       }
       parent_path = directory_path
     }
-    let name = parts.last().unwrap_or(file.filename)
+    let name = parts.last().unwrap_or(file.path)
     file_tree_children_for(children, parent_path).push(
       TreeNodeFile(
         index~,
-        path=file.filename,
+        path=file.path,
         name~,
         status=file.status,
         previous_path=file.previous_filename,
@@ -113,17 +114,6 @@ fn build_file_tree(files : ArrayView[FileState]) -> Array[FileTreeRow] {
   let rows : Array[FileTreeRow] = []
   append_file_tree_rows("", 0, children, rows)
   rows
-}
-
-///|
-fn file_tree_statuses(files : ArrayView[FileState]) -> Array[String] {
-  let statuses : Array[String] = []
-  for state in files {
-    if !statuses.contains(state.file.status) {
-      statuses.push(state.file.status)
-    }
-  }
-  statuses
 }
 
 ///|
@@ -286,7 +276,7 @@ fn file_tree_row_view(
   state : FileTreeState,
   generation : Int,
   filtering : Bool,
-  viewed : @application.ViewedState,
+  viewed : Array[Bool],
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   match row {
@@ -361,7 +351,7 @@ fn file_tree_row_view(
             file_tree_status_marker(status),
           ),
           @html.span(class="tree-row-name", name),
-          if viewed.files.get(index) is Some({ state: Some(Viewed), .. }) {
+          if viewed.get(index) == Some(true) {
             @html.span(
               class="tree-viewed",
               title="Viewed",
@@ -572,31 +562,30 @@ fn file_tree_drawer_keydown(
 
 ///|
 fn file_tree_view(
-  commit : ChangeView,
-  model : Model,
+  input : TreeInput,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
-  let rows = build_file_tree(commit.files)
-  let projection = project_file_tree(rows, model.file_tree)
-  let filtering = file_tree_filters_active(model.file_tree)
-  let statuses = file_tree_statuses(commit.files)
+  let rows = input.tree.rows
+  let projection = project_file_tree(rows, input.state)
+  let filtering = file_tree_filters_active(input.state)
+  let statuses = input.tree.statuses
   @html.fragment([
     @html.button(
       type_="button",
       class="file-tree-backdrop",
-      hidden=!model.file_tree.drawer_open,
+      hidden=!input.state.drawer_open,
       attrs=@html.Attrs::build().aria_label("Close file tree").tabindex(-1),
       on_click=emit(Ui(CloseFileTreeDrawer)),
       "",
     ),
     @html.aside(
       id="file-tree-sidebar",
-      class=if model.file_tree.drawer_open {
+      class=if input.state.drawer_open {
         "file-tree-sidebar open"
       } else {
         "file-tree-sidebar"
       },
-      attrs=if model.file_tree.drawer_open {
+      attrs=if input.state.drawer_open {
         @html.Attrs::build()
         .role("dialog")
         .aria_modal("true")
@@ -612,35 +601,35 @@ fn file_tree_view(
             @html.span(
               class="file-tree-count",
               if filtering {
-                "\{projection.matching_count}/\{commit.files.length()}"
+                "\{projection.matching_count}/\{input.tree.metadata.length()}"
               } else {
-                commit.files.length().to_string()
+                input.tree.metadata.length().to_string()
               },
             ),
           ]),
           @html.div(class="file-tree-actions", [
             @html.button(
               type_="button",
-              class=if model.file_tree.search_open {
+              class=if input.state.search_open {
                 "file-tree-action search-toggle active"
               } else {
                 "file-tree-action search-toggle"
               },
-              title=if model.file_tree.search_open {
+              title=if input.state.search_open {
                 "Close search"
               } else {
                 "Search files"
               },
               attrs=@html.Attrs::build()
                 .aria_label(
-                  if model.file_tree.search_open {
+                  if input.state.search_open {
                     "Close file search"
                   } else {
                     "Search files"
                   },
                 )
                 .aria_expanded(
-                  if model.file_tree.search_open {
+                  if input.state.search_open {
                     "true"
                   } else {
                     "false"
@@ -659,7 +648,7 @@ fn file_tree_view(
             ),
           ]),
         ]),
-        if model.file_tree.search_open {
+        if input.state.search_open {
           @html.div(class="file-tree-search", [
             @html.label(
               for_="file-tree-search",
@@ -669,7 +658,7 @@ fn file_tree_view(
             @html.input(
               id="file-tree-search",
               input_type=Search,
-              value=model.file_tree.search_query,
+              value=input.state.search_query,
               placeholder="Search paths",
               autofocus=true,
               attrs=@html.Attrs::build().aria_label("Search changed files"),
@@ -679,7 +668,7 @@ fn file_tree_view(
         } else {
           @html.nothing
         },
-        file_tree_status_filters(statuses, model.file_tree, emit),
+        file_tree_status_filters(statuses, input.state, emit),
         @html.div(
           class="file-tree-scroll",
           attrs=@html.Attrs::build()
@@ -692,10 +681,10 @@ fn file_tree_view(
               projection.visible_rows.map(row => {
                 file_tree_row_view(
                   row,
-                  model.file_tree,
-                  model.generation,
+                  input.state,
+                  input.generation,
                   filtering,
-                  model.viewed,
+                  input.viewed,
                   emit,
                 )
               }),

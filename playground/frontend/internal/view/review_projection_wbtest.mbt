@@ -1,4 +1,22 @@
 ///|
+// Pure compatibility helper for white-box projection tests.
+fn review_projection(view : ChangeView, model : Model) -> ReviewProjection {
+  let projection : ReviewProjection = { lines: Map([]), editors: Map([]), }
+  for index, file in view.files {
+    append_file_projection(
+      projection,
+      file,
+      index,
+      model.view_mode,
+      model.diff_algorithm,
+      model.ignore_comments,
+      model.ignore_tests,
+    )
+  }
+  projection
+}
+
+///|
 fn projection_document_fixture() -> @model.HunkDocument {
   {
     hunks: [
@@ -225,7 +243,7 @@ test "projection source identity does not depend on hunk headings" {
       0,
       document,
       Split,
-      session,
+      session.read_view(path="a.txt"),
       emit,
       show_hunk_headers=headers,
       discussions~,
@@ -297,7 +315,20 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
     assert_eq(!projection.lines.is_empty(), visible)
     let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
     let html = @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(file_list_view(view, model, emit))
+      @rabbita.Val::constant(
+        @html.div(
+          class="file-list",
+          RegionProjection::new()
+          .inputs(model)
+          .filter_map(entry => {
+            let (_, input) = entry
+            match input {
+              File(_) => Some(region_view(input, emit, FileDerivation::new()))
+              _ => None
+            }
+          }),
+        ),
+      )
     })
     assert_eq(html.contains("<table"), visible)
   }
@@ -368,7 +399,7 @@ test "source rows precede both sides of discussion and the selected editor" {
         0,
         projection_document_fixture(),
         mode,
-        session,
+        session.read_view(path="a.txt"),
         emit,
         discussions~,
       )

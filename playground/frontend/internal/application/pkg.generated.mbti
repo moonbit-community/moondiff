@@ -27,11 +27,18 @@ pub fn file_navigation_enabled(Model, Int) -> Bool
 
 pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
 
-pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
+pub fn update(Model, Msg, @cmd.Emit[Msg]) -> Transition
 
 // Errors
 
 // Types and methods
+pub(all) struct AfterCommit {
+  target : Region
+  scope : CommitScope
+  command : @cmd.Cmd
+  navigation : NavigationPolicy
+}
+
 pub(all) enum AuthMsg {
   AuthStatusLoaded(Int, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
   ReactivationAuthStatusLoaded(Int, Int, @github.CommitRef?, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
@@ -53,6 +60,11 @@ pub(all) enum AuthStatus {
   DeviceCancelling(String, String)
   SignedIn(login~ : String?, user_id~ : String?, install_url~ : String?)
   AuthFailed(String)
+} derive(Eq)
+
+pub(all) enum CommitScope {
+  Region
+  PageLayout
 } derive(Eq)
 
 pub(all) struct FileTreeState {
@@ -106,6 +118,11 @@ pub(all) enum Msg {
   Ui(UiMsg)
 }
 
+pub(all) enum NavigationPolicy {
+  Cancel
+  Continue
+} derive(Eq)
+
 pub(all) enum Phase {
   Idle
   LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int, first~ : @moondiff-playground-protocol.ApiCommit?, files~ : Array[@moondiff-playground-protocol.ApiFile])
@@ -116,6 +133,18 @@ pub(all) enum Phase {
   LoadFailed(String)
   Showing(@change.ChangeView)
 } derive(Eq)
+
+pub(all) enum Region {
+  Shell
+  Toolbar
+  Status
+  FileTree
+  Navigation
+  ViewedSummary
+  Discussion
+  File(String)
+} derive(Eq, Hash)
+pub fn Region::key(Self) -> String
 
 pub(all) enum ReviewMsg {
   Domain(@comments.Event)
@@ -141,6 +170,12 @@ pub(all) enum ReviewMsg {
   ReviewCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
   CommitCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiCommitComment, Error])
   ReviewReplyCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
+}
+
+pub(all) struct Transition {
+  model : Model
+  command : @cmd.Cmd
+  after_commit : Array[AfterCommit]
 }
 
 pub(all) enum UiMsg {

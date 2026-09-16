@@ -26,17 +26,12 @@ fn project_document(
   old_base : Int,
   new_base : Int,
   fragment? : String = "line",
+  cache? : FileDerivation,
 ) -> Unit {
-  let patch = parse_canonical_patch(file.filename, file.patch)
   let mut line_index = 0
   for
-    item in project_review_items(
-      index,
-      file.filename,
-      document,
-      patch,
-      old_base~,
-      new_base~,
+    item in review_items(
+      cache, file, index, document, old_base, new_base, fragment,
     ) {
     guard item is ReviewLine(row) else { continue }
     let site = projection_site(index, old_base, new_base, line_index, fragment)
@@ -83,6 +78,7 @@ fn project_fragment(
   old_range : @mbtdiff.LineRange?,
   new_range : @mbtdiff.LineRange?,
   section? : Int,
+  cache? : FileDerivation,
 ) -> Unit {
   project_document(
     projection,
@@ -93,90 +89,141 @@ fn project_fragment(
     old_range.map(r => r.start).unwrap_or(0),
     new_range.map(r => r.start).unwrap_or(0),
     fragment=section.map(i => "section:\{i}").unwrap_or("whole"),
+    cache?,
   )
 }
 
 ///|
-fn review_projection(view : ChangeView, model : Model) -> ReviewProjection {
-  let projection = ReviewProjection::{ lines: Map([]), editors: Map([]), }
-  for index, file in view.files {
-    guard file.expanded &&
-      file.old_side is Ready(_) &&
-      file.new_side is Ready(_) else {
-      continue
-    }
-    guard cached_file_document(
-        file,
-        model.diff_algorithm,
-        ignore_comments=model.ignore_comments,
-        ignore_tests=model.ignore_tests,
+fn append_file_projection(
+  projection : ReviewProjection,
+  file : FileState,
+  index : Int,
+  mode : ViewMode,
+  algorithm : DiffAlgorithm,
+  ignore_comments : Bool,
+  ignore_tests : Bool,
+  cache? : FileDerivation,
+) -> Unit {
+  guard file.expanded && file.old_side is Ready(_) && file.new_side is Ready(_) else {
+    return
+  }
+  guard cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
+    is Some(result) else {
+    return
+  }
+  match result {
+    Line(document) =>
+      project_document(
+        projection,
+        file.file,
+        index,
+        document,
+        mode,
+        0,
+        0,
+        cache?,
       )
-      is Some(result) else {
-      continue
-    }
-    match result {
-      Line(document) =>
-        project_document(
-          projection,
-          file.file,
-          index,
-          document,
-          model.view_mode,
-          0,
-          0,
-        )
-      MoonBit(document~, status~, ..) if !semantic_document_visible(
-          document,
-          status,
-          model.diff_algorithm,
-        ) => ()
-      MoonBit(document~, ..) =>
-        match document {
-          Whole(fragment) =>
-            project_fragment(
-              projection,
-              file.file,
-              index,
-              fragment,
-              model.view_mode,
-              None,
-              None,
-            )
-          TopLevel(top) => {
-            let section_keys = semantic_section_keys(top.sections)
-            for deleted in [false, true] {
-              for
-                section_index in (if deleted {
-                  top.old_order
-                } else {
-                  top.new_order
-                }) {
-                guard top.sections.get(section_index) is Some(section) else {
-                  continue
-                }
-                if (section is Deleted(..)) != deleted ||
-                  file.collapsed_sections.contains(section_keys[section_index]) {
-                  continue
-                }
-                let fragment = semantic_section_fragment(section)
-                if fragment_has_output(fragment) {
-                  project_fragment(
-                    projection,
-                    file.file,
-                    index,
-                    fragment,
-                    model.view_mode,
-                    semantic_section_old_range(section),
-                    semantic_section_new_range(section),
-                    section=section_index,
-                  )
-                }
+    MoonBit(document~, status~, ..) if !semantic_document_visible(
+        document, status, algorithm,
+      ) => ()
+    MoonBit(document~, ..) =>
+      match document {
+        Whole(fragment) =>
+          project_fragment(
+            projection,
+            file.file,
+            index,
+            fragment,
+            mode,
+            None,
+            None,
+            cache?,
+          )
+        TopLevel(top) => {
+          let section_keys = semantic_section_keys(top.sections)
+          for deleted in [false, true] {
+            for
+              section_index in (if deleted {
+                top.old_order
+              } else {
+                top.new_order
+              }) {
+              guard top.sections.get(section_index) is Some(section) else {
+                continue
+              }
+              if (section is Deleted(..)) != deleted ||
+                file.collapsed_sections.contains(section_keys[section_index]) {
+                continue
+              }
+              let fragment = semantic_section_fragment(section)
+              if fragment_has_output(fragment) {
+                project_fragment(
+                  projection,
+                  file.file,
+                  index,
+                  fragment,
+                  mode,
+                  semantic_section_old_range(section),
+                  semantic_section_new_range(section),
+                  section=section_index,
+                  cache?,
+                )
               }
             }
           }
         }
+      }
+  }
+}
+
+///|
+fn file_projection(
+  file : FileState,
+  index : Int,
+  mode : ViewMode,
+  algorithm : DiffAlgorithm,
+  ignore_comments : Bool,
+  ignore_tests : Bool,
+  cache : FileDerivation,
+) -> ReviewProjection {
+  if cache.visibility
+    is Some((old, old_mode, old_algorithm, old_comments, old_tests)) {
+    let same_document = @identity.same_option(
+      cached_file_document(
+        old,
+        old_algorithm,
+        ignore_comments=old_comments,
+        ignore_tests=old_tests,
+      ),
+      cached_file_document(file, algorithm, ignore_comments~, ignore_tests~),
+    )
+    if same_document &&
+      @identity.same(old.file, file.file) &&
+      old.expanded == file.expanded &&
+      @identity.same(old.collapsed_sections, file.collapsed_sections) &&
+      mode == old_mode {
+      return cache.projection
+    }
+    if !same_document {
+      cache.rows.clear()
     }
   }
+  cache.visibility = Some(
+    (file, mode, algorithm, ignore_comments, ignore_tests),
+  )
+  @metrics.count(file.file.filename, "projection")
+  let projection : ReviewProjection = { lines: Map([]), editors: Map([]), }
+  append_file_projection(
+    projection,
+    file,
+    index,
+    mode,
+    algorithm,
+    ignore_comments,
+    ignore_tests,
+    cache~,
+  )
+  cache.projection = projection
   projection
 }
 

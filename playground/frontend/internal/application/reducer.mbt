@@ -12,8 +12,7 @@ pub fn update(
   model : Model,
   msg : Msg,
   emit : @rabbita.Emit[Msg],
-) -> (Model, @rabbita.Cmd) {
-  capture_editor()
+) -> Transition {
   let (next, command) = match msg {
     Viewed(msg) => update_viewed(model, msg, emit)
     Auth(msg) => update_auth(model, msg, emit)
@@ -22,13 +21,9 @@ pub fn update(
     Ui(msg) => update_ui(model, msg, emit)
   }
   let (next, viewed_command) = reconcile_viewed(model, next, msg, emit)
-  (
-    next,
-    @rabbita.batch([
-      sticky_layout_after_update(next.generation),
-      command,
-      viewed_command,
-      editor_after_update(next),
-    ]),
-  )
+  {
+    model: next,
+    command: @rabbita.batch([command, viewed_command]),
+    after_commit: ui_after_commit(model, next, msg, emit),
+  }
 }

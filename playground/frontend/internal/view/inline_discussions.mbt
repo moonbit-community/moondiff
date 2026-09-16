@@ -12,6 +12,7 @@ priv struct InlineDiscussion {
 // Render-local data: one absolute-line index and a precomputed placement map,
 // shared across the file fragments.
 priv struct InlineDiscussions {
+  cache : FileDerivation?
   generation : Int
   items : Array[InlineDiscussion]
   projection : ReviewProjection
@@ -24,6 +25,7 @@ priv struct InlineDiscussions {
 ///|
 fn empty_discussions() -> InlineDiscussions {
   {
+    cache: None,
     generation: 0,
     items: [],
     projection: { lines: Map([]), editors: Map([]), },
@@ -42,29 +44,20 @@ fn anchor_location(anchor : ReviewAnchor) -> String {
 
 ///|
 fn prepare_discussions(
-  view : ChangeView,
-  review : Session,
+  file : ApiFile?,
+  file_index : Int?,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
+  cache? : FileDerivation,
   projection? : ReviewProjection = { lines: Map([]), editors: Map([]), },
 ) -> InlineDiscussions {
   let result = {
     ..empty_discussions(),
-    generation: review.generation(),
+    generation: review.generation,
     projection,
     draft: review.draft(),
-    draft_file_index: match review.draft() {
-      Some({ kind: InlineDraft(_, anchor), .. }) => {
-        let mut found = None
-        for index, file in view.files {
-          if file.file.filename == anchor.path {
-            found = Some(index)
-            break
-          }
-        }
-        found
-      }
-      _ => None
-    },
+    cache,
+    draft_file_index: file_index,
     editor: if review.draft() is Some(draft) && review.draft_visible() {
       comment_editor(
         draft,
@@ -76,8 +69,10 @@ fn prepare_discussions(
       @html.nothing
     },
   }
-  guard review.comments() is CommentsReady(bundle) else { return result }
-  for thread in review_threads(view, bundle.review_comments) {
+  let patch = file
+    .map(file => canonical_patch(cache, file))
+    .unwrap_or(@review.NotCommentable)
+  for thread in @comments.file_threads(review.group, file_index, patch) {
     let root = thread.root
     let side : @review.ReviewSide = if root.side == Some(@protocol.Left) {
       Left
@@ -91,12 +86,8 @@ fn prepare_discussions(
     }
     let anchor = if !thread.outdated &&
       root.line is Some(line) &&
-      thread.file_index is Some(index) {
-      @review.canonical_anchor(
-        parse_canonical_patch(root.path, view.files[index].file.patch),
-        side,
-        line,
-      )
+      thread.file_index is Some(_) {
+      @review.canonical_anchor(patch, side, line)
     } else {
       None
     }
@@ -114,15 +105,16 @@ fn prepare_discussions(
       content: review_thread_view(thread, review, emit),
     })
   }
-  for discussion in commit_discussions(view, bundle.commit_comments) {
+  for
+    discussion in @comments.file_commit_discussions(
+      review.group,
+      file_index,
+      patch,
+    ) {
     let comment = discussion.comment
-    let anchor = if discussion.file_index is Some(index) &&
+    let anchor = if discussion.file_index is Some(_) &&
       comment.position is Some(position) &&
-      parse_canonical_patch(
-        view.files[index].file.filename,
-        view.files[index].file.patch,
-      )
-      is Commentable(anchors) {
+      patch is Commentable(anchors) {
       anchors.iter().find_first(a => a.position == Some(position))
     } else {
       None
