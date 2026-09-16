@@ -34,8 +34,6 @@ export async function checkToolbar(page) {
           toolbarOverflow: el.scrollWidth > el.clientWidth,
           adjacent: groups[0].y === groups[1].y && groups[0].right < groups[1].left,
           buttons,
-          height: el.getBoundingClientRect().height,
-          offset: parseFloat(getComputedStyle(document.querySelector(".file-heading")).top),
           selectable: getComputedStyle(el.querySelector(".workspace-url")).userSelect,
         };
       });
@@ -43,7 +41,16 @@ export async function checkToolbar(page) {
       expect(metrics.toolbarOverflow, `${colorScheme} ${width}px toolbar`).toBe(false);
       expect(metrics.adjacent).toBe(true);
       expect(metrics.buttons.every(value => JSON.stringify(value) === JSON.stringify(metrics.buttons[0]))).toBe(true);
-      expect(Math.abs(metrics.height - metrics.offset), `${colorScheme} ${width}px sticky offset`).toBeLessThanOrEqual(2);
+      await expect.poll(() => hero.evaluate(el => {
+        const title = document.querySelector(".change-titlebar");
+        const toolbarHeight = el.getBoundingClientRect().height;
+        const titleHeight = title.getBoundingClientRect().height;
+        const fileTop = parseFloat(getComputedStyle(document.querySelector(".file-heading")).top);
+        return Math.max(
+          Math.abs(toolbarHeight - parseFloat(getComputedStyle(title).top)),
+          Math.abs(toolbarHeight + titleHeight - fileTop),
+        );
+      }), `${colorScheme} ${width}px sticky offsets`).toBeLessThanOrEqual(1);
       expect(metrics.selectable).toBe("text");
     }
   }

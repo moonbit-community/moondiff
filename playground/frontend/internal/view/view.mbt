@@ -914,6 +914,7 @@ fn file_card(
   ignore_tests : Bool,
   review : Session,
   emit : @rabbita.Emit[Msg],
+  navigation_enabled~ : Bool,
   viewed? : @rabbita.Html = @html.nothing,
   viewed_error? : @rabbita.Html = @html.nothing,
   discussions? : InlineDiscussions = empty_discussions(),
@@ -922,6 +923,10 @@ fn file_card(
   @html.article(
     id=file_dom_id(index),
     class=if file.expanded { "file-card expanded" } else { "file-card" },
+    attrs=@html.Attrs::build()
+      .data_set("file-index", index.to_string())
+      .data_set("navigation-generation", generation.to_string())
+      .data_set("navigation-enabled", navigation_enabled.to_string()),
     [
       @html.div(class="file-heading", [
         @html.div(class="file-name-controls", [
@@ -938,9 +943,6 @@ fn file_card(
               @html.span(class=status_class(file.file.status), ""),
               @html.code(class="file-path", file_label(file.file)),
             ],
-          ),
-          file_change_controls(
-            file, generation, index, algorithm, ignore_comments, ignore_tests, emit,
           ),
         ]),
         @html.div(class="file-actions", [
@@ -1003,6 +1005,7 @@ fn file_list_view(
       model.ignore_tests,
       model.review,
       emit,
+      navigation_enabled=@application.file_navigation_enabled(model, index),
       viewed=viewed_checkbox(commit, model, index, emit),
       viewed_error=viewed_file_error(model, index, emit),
       discussions~,
@@ -1019,7 +1022,10 @@ fn file_list_view(
 }
 
 ///|
-fn commit_message_view(message : String) -> @rabbita.Html {
+fn commit_message_view(
+  message : String,
+  controls : @rabbita.Html,
+) -> @rabbita.Html {
   let (title, body) = match message.split_once("\n") {
     Some((title, body)) =>
       (
@@ -1028,12 +1034,17 @@ fn commit_message_view(message : String) -> @rabbita.Html {
       )
     None => (message, "")
   }
-  @html.div(class="commit-message", [
-    @html.h2(class="commit-message-title", title),
+  @html.fragment([
+    @html.div(class="change-titlebar", [
+      @html.h2(class="commit-message-title", title),
+      controls,
+    ]),
     if body.is_empty() {
       @html.nothing
     } else {
-      @html.pre(class="commit-message-body", body)
+      @html.div(class="commit-card", [
+        @html.pre(class="commit-message-body", body),
+      ])
     },
   ])
 }
@@ -1055,9 +1066,15 @@ fn change_view(
         file_tree_resizer_view(model.file_tree, emit),
         @html.div(
           class="change-main",
-          attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
+          attrs=@html.Attrs::build()
+            .inert(model.file_tree.drawer_open)
+            .data_set("navigation-generation", model.generation.to_string())
+            .data_set(
+              "navigation-layout",
+              "\{model.view_mode is Split}:\{model.diff_algorithm is AstAlgorithm}:\{model.ignore_comments}:\{model.ignore_tests}",
+            ),
           [
-            @html.div(class="commit-card", [commit_message_view(commit.message)]),
+            commit_message_view(commit.message, change_controls(model, emit)),
             viewed_progress(commit, model, emit),
             comments_overview(commit, model.review, model.auth, emit),
             file_list_view(commit, model, emit),

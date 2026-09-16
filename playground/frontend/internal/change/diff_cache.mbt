@@ -46,6 +46,29 @@ pub fn cached_file_document(
 }
 
 ///|
+pub fn has_navigable_changes(
+  file : FileState,
+  algorithm : DiffAlgorithm,
+  ignore_comments~ : Bool,
+  ignore_tests~ : Bool,
+) -> Bool {
+  guard (file.old_side, file.new_side) is (Ready(_), Ready(_)) &&
+    cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
+    is Some(MoonBit(document=TopLevel(top), status~, ..)) &&
+    !(status is IgnoredOnly) else {
+    return false
+  }
+  top.sections.any(section => {
+    let fragment = match section {
+      Matched(diff~, ..) | Deleted(diff~, ..) | Inserted(diff~, ..) => diff
+    }
+    fragment.document.hunks.any(hunk => {
+      hunk.blocks.any(block => block is ChangeBlock(rows) && !rows.is_empty())
+    })
+  })
+}
+
+///|
 fn calculate_file_document(
   file : FileState,
   key : CacheKey,

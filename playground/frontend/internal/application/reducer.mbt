@@ -22,5 +22,13 @@ pub fn update(
     Ui(msg) => update_ui(model, msg, emit)
   }
   let (next, viewed_command) = reconcile_viewed(model, next, msg, emit)
-  (next, @rabbita.batch([command, viewed_command, editor_after_update(next)]))
+  (
+    next,
+    @rabbita.batch([
+      sticky_layout_after_update(next.generation),
+      command,
+      viewed_command,
+      editor_after_update(next),
+    ]),
+  )
 }

@@ -1936,7 +1936,7 @@ for (const algorithm of ["Token", "Tree"]) {
       await editor.fill("Preserve this line-one draft");
       const draftId = await editor.getAttribute("data-draft-id");
       await editor.evaluate(element => element.setSelectionRange(2, 9, "backward"));
-      // File-level navigation follows the reading position, so place the second
+      // Global navigation follows the reading position, so place the second
       // declaration beneath its sticky heading before returning to the first.
       await second.evaluate(element => {
         const summary = element.querySelector("summary");
@@ -1944,9 +1944,9 @@ for (const algorithm of ["Token", "Tree"]) {
         const inset = parseFloat(getComputedStyle(summary).top) + summary.getBoundingClientRect().height + 8;
         window.scrollTo(0, window.scrollY + row.getBoundingClientRect().top - inset);
       });
-      await page.locator("#moondiff-file-0 .file-heading").getByRole("button", { name: "Previous change", exact: true }).click();
+      await page.locator(".change-titlebar").getByRole("button", { name: "Previous change", exact: true }).click();
       await expect(first).toHaveJSProperty("open", true);
-      await expect(page.locator("#moondiff-file-0 .file-heading").getByRole("button", { name: "Previous change", exact: true })).toBeFocused();
+      await expect(page.locator(".change-titlebar").getByRole("button", { name: "Previous change", exact: true })).toBeFocused();
       await expect(first.locator(".review-thread")).toHaveCount(1);
       await expect(page.locator(".review-thread")).toHaveCount(1);
       await expect(first.locator("textarea")).toHaveCount(1);
