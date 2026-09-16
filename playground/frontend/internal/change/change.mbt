@@ -46,9 +46,8 @@ pub fn finish_change(
   let mut auto_load_count = 0
   for file in all_files {
     let diff_mode = file_diff_mode(file)
-    let auto_load = diff_mode is MoonBitDiff ||
-      is_moonbit_manifest(file.filename) ||
-      file.previous_filename.map(is_moonbit_manifest).unwrap_or(false)
+    let auto_load = is_moonbit_file(file.filename) ||
+      file.previous_filename.map(is_moonbit_file).unwrap_or(false)
     let expanded = auto_load && auto_load_count < 20
     if auto_load {
       auto_load_count += 1

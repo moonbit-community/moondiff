@@ -20,12 +20,30 @@ fn fixture_file(
 }
 
 ///|
-test "all files remain listed but only the first twenty MoonBit sources and manifests auto-load" {
+test "all files remain listed but only the first twenty MoonBit files auto-load" {
   let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
   let files : Array[ApiFile] = []
   files.push(fixture_file("README.md", "added"))
   files.push(fixture_file("moon.mod", "added"))
   files.push(fixture_file("src/moon.pkg", "added"))
+  files.push(fixture_file("pkg.generated.mbti", "added"))
+  files.push(fixture_file("src/pkg.generated.mbti", "added"))
+  files.push(fixture_file("build.mbtx", "added"))
+  files.push(fixture_file("scripts/build.mbtx", "added"))
+  files.push(
+    fixture_file(
+      "src/interface.txt",
+      "renamed",
+      previous_filename="src/pkg.generated.mbti",
+    ),
+  )
+  files.push(
+    fixture_file(
+      "scripts/build.txt",
+      "renamed",
+      previous_filename="scripts/build.mbtx",
+    ),
+  )
   for index in 0..<21 {
     if index == 5 {
       files.push(
@@ -56,14 +74,14 @@ test "all files remain listed but only the first twenty MoonBit sources and mani
   )
   assert_false(view.files[0].expanded)
   assert_true(view.files[0].new_side is NotRequested)
-  for state in view.files[1:3] {
+  for state in view.files[1:9] {
     assert_true(state.diff_mode is LineDiff)
     assert_true(state.expanded)
     assert_true(state.old_side is Ready([]))
     assert_true(state.new_side is Loading)
   }
-  let mut auto_load_index = 2
-  for state in view.files[3:] {
+  let mut auto_load_index = 8
+  for state in view.files[9:] {
     match state.diff_mode {
       MoonBitDiff => {
         if auto_load_index < 20 {
@@ -82,7 +100,7 @@ test "all files remain listed but only the first twenty MoonBit sources and mani
       }
     }
   }
-  assert_eq(auto_load_index, 23)
+  assert_eq(auto_load_index, 29)
 }
 
 ///|
