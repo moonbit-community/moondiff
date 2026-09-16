@@ -336,6 +336,12 @@ server first. They use temporary SQLite databases and a local GitHub/OAuth stub;
 no real GitHub credentials are required. Frontend regression tests mock the
 same-origin API.
 
+Rendering stress tests run separately with `npm run test:e2e:stress` (or
+`npm run test:playground:stress` from the repository root). This runs the six
+fixture/CPU cases with one worker and retains their performance attachments.
+`npm run test:e2e` and its UI runner select only `*.spec.mjs`; stress tests use
+`*.stress.mjs` and their own Playwright configuration.
+
 To verify the redirect extension and release artifacts:
 
 ```sh

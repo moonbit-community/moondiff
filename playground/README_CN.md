@@ -305,6 +305,11 @@ npm run test:e2e
 因此请先停止本地开发服务。测试使用临时 SQLite 数据库和本地 GitHub/OAuth 模拟服务，
 无需真实的 GitHub 凭据。前端回归测试会模拟同源 API。
 
+渲染压力测试单独使用 `npm run test:e2e:stress` 运行；在仓库根目录则使用
+`npm run test:playground:stress`。该命令以单 worker 运行 6 项夹具/CPU 组合，
+并保留性能数据附件。`npm run test:e2e` 及交互式测试界面只选择 `*.spec.mjs`；
+压力测试使用 `*.stress.mjs` 和独立的 Playwright 配置。
+
 验证跳转扩展和发布产物：
 
 ```sh
