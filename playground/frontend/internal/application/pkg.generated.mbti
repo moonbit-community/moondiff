@@ -23,7 +23,9 @@ pub fn auth_status_from_api(@moondiff-playground-protocol.ApiAuthStatus) -> Auth
 
 pub fn file_dom_id(Int) -> String
 
-pub fn navigate_section_change(@dom.MouseEvent, Int, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
+pub fn file_navigation_enabled(Model, Int) -> Bool
+
+pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> (Model, @cmd.Cmd)
 

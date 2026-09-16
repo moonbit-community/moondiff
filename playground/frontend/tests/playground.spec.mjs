@@ -910,7 +910,7 @@ test("desktop keeps split columns balanced and switches views", async ({ page })
   await loadMockedCommit(page);
 
   await expect(page.locator(".workspace-url")).toHaveText(commitUrl);
-  await expect(page.locator(".commit-message")).toHaveText(apiCommit.commit.message);
+  await expect(page.locator(".commit-message-title")).toHaveText(apiCommit.commit.message);
   await expect(page.locator(".commit-message-body")).toHaveCount(0);
   await expect(page).toHaveURL(`/example/project/commit/${commitSha}`);
   await expect(page.getByRole("link", { name: "Open commit on GitHub" })).toHaveCount(0);
@@ -1030,9 +1030,9 @@ for (const width of [1440, 768, 375]) {
 
     await expect(page.locator(".commit-message-title")).toHaveJSProperty("textContent", title);
     await expect(page.locator(".commit-message-body")).toHaveJSProperty("textContent", body);
-    const layout = await page.locator(".commit-card").evaluate(card => {
-      const message = card.querySelector(".commit-message");
-      const parts = [...message.querySelectorAll(".commit-message-title, .commit-message-body")];
+    const layout = await page.locator(".change-main").evaluate(card => {
+      const message = card.querySelector(".change-titlebar");
+      const parts = [...card.querySelectorAll(".commit-message-title, .commit-message-body")];
       return {
         lineCounts: parts.map(element => {
           const range = document.createRange();
@@ -1444,7 +1444,7 @@ test("a PR URL loads every paginated file and preserves the PR share route", asy
     page.locator(".workspace-url"),
   ).toHaveText(pullUrl);
   await expect(page.locator(".file-card")).toHaveCount(101);
-  await expect(page.locator(".commit-message")).toHaveText(
+  await expect(page.locator(".commit-message-title")).toHaveText(
     "Aggregate changes from both PR commits",
   );
   await expect(aggregateCard).toContainText("merge base one");
@@ -1521,7 +1521,7 @@ test("a PR updated while loading retries and only shows the latest snapshot", as
     hasText: "src/from_second_commit.mbt",
   });
   await expect(aggregateCard.locator("table.split")).toBeVisible();
-  await expect(page.locator(".commit-message")).toHaveText(
+  await expect(page.locator(".commit-message-title")).toHaveText(
     "Aggregate the latest PR snapshot",
   );
   await expect(aggregateCard).toContainText("head two");

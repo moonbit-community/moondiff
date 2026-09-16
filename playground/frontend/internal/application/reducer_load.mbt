@@ -285,7 +285,7 @@ fn update_load(
       }
       guard model.phase is Showing(view) &&
         view.files.get(index) is Some(file) &&
-        file.expanded else {
+        file_navigation_enabled(model, index) else {
         return (model, @rabbita.none)
       }
       let collapsed_sections = file.collapsed_sections.filter(section => {

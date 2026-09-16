@@ -5,7 +5,7 @@ const sha = "3333333333333333333333333333333333333333";
 const parent = "1111111111111111111111111111111111111111";
 const longName = `navigate_${"long_declaration_".repeat(12)}`;
 const marker = "[data-change-block-start]";
-const button = (page, direction) => page.locator("#moondiff-file-0 .file-heading").getByRole("button", {
+const button = (page, direction) => page.locator(".change-titlebar").getByRole("button", {
   name: direction > 0 ? "Next change" : "Previous change", exact: true,
 });
 
@@ -63,6 +63,7 @@ async function loadNavigation(page, { layout = "Split", algorithm = "Tree", widt
   for (const [index, count] of blockCounts.entries()) {
     await expect(sections.nth(index).locator(marker)).toHaveCount(count);
   }
+  if (trailingFile) await expect(page.locator("#moondiff-file-1").locator(marker)).toHaveCount(3);
   await page.evaluate(() => window.scrollTo(0, 0));
   return sections;
 }
@@ -80,13 +81,21 @@ async function readChange(section, index, extra = 0) {
 async function expectLanding(section, index) {
   await expect(section).toHaveAttribute("open", "");
   await expect.poll(() => section.evaluate((element, index) => {
-    const summary = element.querySelector("summary").getBoundingClientRect();
-    return Math.abs(element.querySelectorAll("[data-change-block-start]")[index].getBoundingClientRect().top - summary.bottom - 8);
+    const height = selector => document.querySelector(selector).getBoundingClientRect().height;
+    const inset = height(".hero-workspace") + height(".change-titlebar") +
+      element.closest(".file-card").querySelector(".file-heading").getBoundingClientRect().height +
+      element.querySelector("summary").getBoundingClientRect().height + 8;
+    const top = scrollY + element.querySelectorAll("[data-change-block-start]")[index].getBoundingClientRect().top - inset;
+    return Math.abs(scrollY - Math.max(0, Math.min(top, document.documentElement.scrollHeight - innerHeight)));
   }, index)).toBeLessThanOrEqual(1);
-  expect(await section.evaluate(element => {
+  expect(await section.evaluate((element, index) => {
+    const title = document.querySelector(".change-titlebar").getBoundingClientRect();
+    const heading = element.closest(".file-card").querySelector(".file-heading").getBoundingClientRect();
     const summary = element.querySelector("summary").getBoundingClientRect();
-    return summary.top >= element.closest(".file-card").querySelector(".file-heading").getBoundingClientRect().bottom - 1;
-  })).toBe(true);
+    const row = element.querySelectorAll("[data-change-block-start]")[index].getBoundingClientRect();
+    return title.top >= document.querySelector(".hero-workspace").getBoundingClientRect().bottom - 1 &&
+      heading.top >= title.bottom - 1 && summary.top >= heading.bottom - 1 && row.top >= summary.bottom - 1;
+  }, index)).toBe(true);
 }
 
 async function expectNoMovement(page, action) {
@@ -124,7 +133,8 @@ for (const algorithm of ["Token", "Tree"]) {
     test(`${algorithm} ${layout}: first change, manual scroll, both directions across sections and file boundaries`, async ({ page }) => {
       const sections = await loadNavigation(page, { algorithm, layout });
       const first = sections.nth(0);
-      await expect(page.locator("#moondiff-file-0 .file-heading .section-change-button")).toHaveCount(2);
+      await expect(page.locator(".change-titlebar .section-change-button")).toHaveCount(2);
+      await expect(page.locator(".file-heading .section-change-button")).toHaveCount(0);
       await expect(sections.locator(".section-change-controls")).toHaveCount(0);
       await expect(button(page, 1)).toHaveText("↓ next");
       await expect(button(page, -1)).toHaveText("↑ prev");
@@ -132,9 +142,10 @@ for (const algorithm of ["Token", "Tree"]) {
       await expect(button(page, -1)).toHaveAttribute("title", "Previous change");
       expect(await first.locator(marker).evaluateAll(rows => rows.every(row => row.querySelector(".line-number") && !row.querySelector(".hunk-header")))).toBe(true);
       expect(await first.locator(".hunk-header").count()).toBeLessThan(3);
-      // No first-block default: the first Next must actually land on block zero.
+      const other = page.locator("#moondiff-file-1 .semantic-section");
+      // First Previous wraps to the final block, then Next wraps back to the first.
       await button(page, -1).click();
-      await expectNoMovement(page, () => button(page, -1).click());
+      await expectLanding(other, 2);
       await button(page, 1).click();
       await expectLanding(first, 0);
       await button(page, 1).click();
@@ -154,16 +165,18 @@ for (const algorithm of ["Token", "Tree"]) {
       await readChange(first, 1, 90);
       await button(page, -1).click();
       await expectLanding(first, 0);
-      await expectNoMovement(page, () => button(page, -1).click());
+      await button(page, -1).click();
+      await expectLanding(other, 2);
 
       // The final deleted declaration is part of this file's navigation order.
       await readChange(sections.nth(2), 0);
       await button(page, 1).click();
       await expectLanding(sections.nth(3), 0);
-      await expectNoMovement(page, () => button(page, 1).click());
+      await button(page, 1).click();
+      await expectLanding(other, 0);
       await expect(button(page, 1)).toBeFocused();
       await button(page, -1).click();
-      await expectLanding(sections.nth(2), 0);
+      await expectLanding(sections.nth(3), 0);
     });
 
     test(`${algorithm} ${layout}: collapsed targets expand and continuous keyboard navigation follows focus`, async ({ page }) => {
@@ -210,8 +223,8 @@ for (const algorithm of ["Token", "Tree"]) {
       }
     });
 
-    test(`${algorithm} ${layout}: a file with one change can locate it`, async ({ page }) => {
-      const sections = await loadNavigation(page, { algorithm, layout, single: true });
+    test(`${algorithm} ${layout}: a single global target stays navigable`, async ({ page }) => {
+      const sections = await loadNavigation(page, { algorithm, layout, single: true, trailingFile: false });
       const section = sections.first();
       await expect(button(page, -1)).toBeEnabled();
       await expect(button(page, 1)).toBeEnabled();
@@ -225,7 +238,7 @@ for (const algorithm of ["Token", "Tree"]) {
     });
 
     test(`${algorithm} ${layout}: narrow long titles and arrow hover keep stable dimensions`, async ({ page }) => {
-      const sections = await loadNavigation(page, { algorithm, layout, width: 420 });
+      const sections = await loadNavigation(page, { algorithm, layout, width: 420, trailingFile: false });
       const first = sections.nth(0);
       await readChange(first, 0);
       const previous = button(page, -1);
@@ -236,7 +249,7 @@ for (const algorithm of ["Token", "Tree"]) {
         right: element.getBoundingClientRect().right,
       }));
       expect(metrics.height).toBeGreaterThan(metrics.lineHeight * 2);
-      const filename = await page.locator("#moondiff-file-0 .file-path").boundingBox();
+      const filename = await page.locator(".commit-message-title").boundingBox();
       const previousRect = await previous.boundingBox();
       expect(filename.x + filename.width).toBeLessThan(previousRect.x);
       expect(previousRect.x - filename.x - filename.width).toBeLessThan(24);
@@ -252,8 +265,8 @@ for (const algorithm of ["Token", "Tree"]) {
       await expect(next).toHaveCSS("font-weight", "700");
       expect((await next.boundingBox()).width).toBe(size.width);
       expect((await next.boundingBox()).height).toBe(size.height);
-      await page.locator("#moondiff-file-0 .file-toggle").focus();
-      await page.keyboard.press("Tab");
+      await next.focus();
+      await page.keyboard.press("Shift+Tab");
       await expect(previous).toBeFocused();
       await expect(previous).toHaveCSS("outline-style", "solid");
       await page.keyboard.press("Tab");
@@ -285,8 +298,12 @@ test("navigation clamps the final change to the page bottom", async ({ page }) =
   await button(page, 1).click();
   await expect(button(page, 1)).toBeFocused();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight - scrollY)).toBeLessThanOrEqual(1);
-  await expectNoMovement(page, () => page.keyboard.press("Enter"));
   expect(await sections.nth(3).locator(marker).evaluate(element => element.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
   await button(page, -1).click();
   await expectLanding(previous, 0);
+  await button(page, 1).click();
+  await page.keyboard.press("Enter");
+  await expectLanding(sections.nth(0), 0);
+  await button(page, -1).click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight - scrollY)).toBeLessThanOrEqual(1);
 });

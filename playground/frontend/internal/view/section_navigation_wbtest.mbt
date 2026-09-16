@@ -81,7 +81,7 @@ test "only nonempty change blocks mark their first actual source row in either l
 
 ///|
 #warnings("-alert_unstable")
-test "section headings leave navigation in the file heading" {
+test "section headings leave navigation in the change title bar" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let hunk = projection_document_fixture().hunks[0]
   for hunks in [[], [hunk], [hunk, hunk]] {

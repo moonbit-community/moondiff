@@ -22,6 +22,8 @@ pub fn finish_commit(@github.CommitRef, @github.RepositoryRef, @moondiff-playgro
 
 pub fn finish_pull(@github.CommitRef, @moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiCompare, Array[@moondiff-playground-protocol.ApiFile]) -> Result[ChangeView, String]
 
+pub fn has_navigable_changes(FileState, DiffAlgorithm, ignore_comments~ : Bool, ignore_tests~ : Bool) -> Bool
+
 pub fn ignored_change_subject(Bool, Bool) -> String
 
 pub fn initial_side(String?, Bool) -> SideLoad

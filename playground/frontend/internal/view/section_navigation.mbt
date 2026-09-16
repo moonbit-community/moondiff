@@ -1,23 +1,14 @@
 ///|
-fn file_change_controls(
-  file : FileState,
-  generation : Int,
-  file_index : Int,
-  algorithm : DiffAlgorithm,
-  ignore_comments : Bool,
-  ignore_tests : Bool,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  guard cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
-    is Some(MoonBit(document=TopLevel(top), ..)) else {
-    return @html.nothing
+fn change_controls(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
+  let mut enabled = false
+  if model.phase is Showing(view) {
+    for index, _ in view.files {
+      if @application.file_navigation_enabled(model, index) {
+        enabled = true
+        break
+      }
+    }
   }
-  let enabled = file.expanded &&
-    top.sections.any(section => {
-      semantic_section_fragment(section).document.hunks.any(hunk => {
-        hunk.blocks.any(block => block is ChangeBlock(rows) && !rows.is_empty())
-      })
-    })
   @html.span(
     class="section-change-controls",
     [
@@ -36,7 +27,10 @@ fn file_change_controls(
             .data_set("change-direction", direction.to_string())
             .on_click(event => {
               @application.navigate_section_change(
-                event, generation, file_index, direction, emit,
+                event,
+                model.generation,
+                direction,
+                emit,
               )
             }),
           text,

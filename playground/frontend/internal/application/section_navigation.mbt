@@ -1,16 +1,35 @@
 ///|
+pub fn file_navigation_enabled(model : Model, index : Int) -> Bool {
+  guard model.phase is Showing(view) &&
+    view.files.get(index) is Some(file) &&
+    file.expanded else {
+    return false
+  }
+  if view.reference.target is PullRequest(_) &&
+    model.viewed.files.get(index) is Some({ state: Some(Viewed), .. }) {
+    return false
+  }
+  @change.has_navigable_changes(
+    file,
+    model.diff_algorithm,
+    ignore_comments=model.ignore_comments,
+    ignore_tests=model.ignore_tests,
+  )
+}
+
+///|
 pub fn navigate_section_change(
   event : @dom.MouseEvent,
   generation : Int,
-  file_index : Int,
   direction : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   find_section_change(
     event,
+    generation,
     direction,
     section_change_inset,
-    (key, block) => {
+    (file_index, key, block) => {
       emit(Load(NavigateChange(generation, file_index, key, block, direction)))
     },
     @rabbita.none,
@@ -18,78 +37,73 @@ pub fn navigate_section_change(
 }
 
 ///|
-// Share the measured sticky inset between selection and landing. Long titles
-// and responsive toolbars can be taller than the CSS minimums.
+// The same measured stack determines selection and landing, even when the
+// target section is still collapsed or has not reached its sticky position.
 extern "js" fn section_change_inset(section : @dom.Element) -> Double =
   #| section => {
   #|   const summary = section.querySelector('.semantic-section-title');
   #|   const heading = section.closest('.file-card').querySelector('.file-heading');
   #|   const toolbar = document.querySelector('.hero-workspace');
-  #|   const stickyTop = Math.max(
-  #|     parseFloat(getComputedStyle(summary).top) || 0,
-  #|     (toolbar?.getBoundingClientRect().height || 0) + heading.getBoundingClientRect().height
-  #|   );
-  #|   return stickyTop + summary.getBoundingClientRect().height + 8;
+  #|   const title = section.closest('.change-main').querySelector('.change-titlebar');
+  #|   return toolbar.getBoundingClientRect().height + title.getBoundingClientRect().height +
+  #|     heading.getBoundingClientRect().height + summary.getBoundingClientRect().height + 8;
   #| }
 
 ///|
-// Re-read geometry on every activation, including after manual scrolling or a
-// layout switch. Collapsed details still contain their source row markers.
+// Flatten DOM order, including the trailing group of deleted declarations.
+// Eligibility and geometry are re-read on every activation; hidden rows in a
+// collapsed section are targets, but cannot supply a reading position.
 extern "js" fn find_section_change(
   event : @dom.MouseEvent,
+  generation : Int,
   direction : Int,
   inset : (@dom.Element) -> Double,
-  navigate : (String, Int) -> @rabbita.Cmd,
+  navigate : (Int, String, Int) -> @rabbita.Cmd,
   none : @rabbita.Cmd,
 ) -> @rabbita.Cmd =
-  #| (event, direction, inset, navigate, none) => {
+  #| (event, generation, direction, inset, navigate, none) => {
   #|   event.preventDefault();
   #|   event.stopPropagation();
-  #|   const file = event.currentTarget.closest('.file-card');
-  #|   if (!file?.classList.contains('expanded')) return none;
-  #|   const sections = Array.from(file.querySelectorAll('.semantic-section'));
-  #|   if (!sections.length) return none;
-  #|   const heading = file.querySelector('.file-heading');
-  #|   const stickyTop = Math.max(
-  #|     parseFloat(getComputedStyle(heading).top) || 0,
-  #|     document.querySelector('.hero-workspace')?.getBoundingClientRect().height || 0
-  #|   ) + heading.getBoundingClientRect().height;
-  #|   let section = sections[0];
-  #|   for (const candidate of sections) {
-  #|     if (candidate.getBoundingClientRect().top > stickyTop + 1) break;
-  #|     section = candidate;
+  #|   const main = event.currentTarget.closest('.change-main');
+  #|   if (main?.dataset.navigationGeneration !== String(generation)) return none;
+  #|   const targets = [];
+  #|   let current = -1;
+  #|   let boundary = 0;
+  #|   for (const file of main.querySelectorAll('.file-card.expanded[data-navigation-enabled="true"]')) {
+  #|     if (file.dataset.navigationGeneration !== String(generation)) continue;
+  #|     for (const section of file.querySelectorAll('.semantic-section')) {
+  #|       if (section.dataset.navigationGeneration !== String(generation)) continue;
+  #|       const rows = Array.from(section.querySelectorAll('[data-change-block-start]'));
+  #|       const edge = inset(section) + 1;
+  #|       const headingEdge = edge - section.querySelector('summary').getBoundingClientRect().height - 8;
+  #|       const rect = section.getBoundingClientRect();
+  #|       const start = targets.length;
+  #|       for (const row of rows) targets.push({ file, section, row });
+  #|       if (rect.bottom <= headingEdge) {
+  #|         boundary = targets.length;
+  #|       } else if (rect.top <= headingEdge) {
+  #|         // Before a section's first change, or inside a collapsed section,
+  #|         // Previous selects the preceding block rather than skipping it.
+  #|         boundary = start;
+  #|         for (let i = 0; section.open && i < rows.length; i++) {
+  #|           if (rows[i].getBoundingClientRect().top > edge) break;
+  #|           current = start + i;
+  #|         }
+  #|       }
+  #|     }
   #|   }
-  #|   // A clamped landing cannot reach the reading edge. Keep that target
-  #|   // until scrolling or layout changes invalidate its measured position.
-  #|   const landing = file.__moondiffChangeLanding;
-  #|   const atLanding = landing?.target.isConnected &&
-  #|     landing.target.closest('.semantic-section')?.open &&
+  #|   if (!targets.length) return none;
+  #|   const landing = main.__moondiffChangeLanding;
+  #|   const landed = landing ? targets.findIndex(target => target.row === landing.target) : -1;
+  #|   const atLanding = landed >= 0 && targets[landed].section.open &&
   #|     Math.abs(window.scrollY - landing.scrollY) <= 1 &&
   #|     document.documentElement.scrollHeight === landing.scrollHeight &&
   #|     Math.abs(landing.target.getBoundingClientRect().top - landing.top) <= 1;
-  #|   if (atLanding) section = landing.target.closest('.semantic-section');
-  #|   const blocks = Array.from(section.querySelectorAll('[data-change-block-start]'));
-  #|   // Use the landing edge even before the section title becomes sticky.
-  #|   const readingEdge = inset(section) + 1;
-  #|   let current = -1;
-  #|   for (let i = 0; section.open && i < blocks.length; i++) {
-  #|     if (blocks[i].getBoundingClientRect().top > readingEdge) break;
-  #|     current = i;
-  #|   }
-  #|   if (atLanding) current = blocks.indexOf(landing.target);
-  #|   const next = current + direction;
-  #|   if (next >= 0 && next < blocks.length) {
-  #|     return navigate(section.dataset.sectionKey, Number(blocks[next].dataset.changeBlockStart));
-  #|   }
-  #|   // DOM order includes the trailing group of deleted declarations and
-  #|   // confines traversal to this file, skipping sections without changes.
-  #|   for (let i = sections.indexOf(section) + direction; i >= 0 && i < sections.length; i += direction) {
-  #|     const targets = sections[i].querySelectorAll('[data-change-block-start]');
-  #|     if (!targets.length) continue;
-  #|     const target = targets[direction > 0 ? 0 : targets.length - 1];
-  #|     return navigate(sections[i].dataset.sectionKey, Number(target.dataset.changeBlockStart));
-  #|   }
-  #|   return none;
+  #|   if (atLanding) current = landed;
+  #|   else if (window.scrollY <= 1) { current = -1; boundary = 0; }
+  #|   const next = (current < 0 ? boundary + (direction > 0 ? 0 : -1) : current + direction);
+  #|   const { file, section, row } = targets[(next + targets.length) % targets.length];
+  #|   return navigate(Number(file.dataset.fileIndex), section.dataset.sectionKey, Number(row.dataset.changeBlockStart));
   #| }
 
 ///|
@@ -123,7 +137,11 @@ extern "js" fn scroll_to_section_change(
 ) -> Unit =
   #| (generation, fileId, sectionKey, block, direction, inset) => {
   #|   const file = document.getElementById(fileId);
-  #|   const section = Array.from(file?.querySelectorAll('.semantic-section') || []).find(
+  #|   if (!file?.matches('.expanded[data-navigation-enabled="true"]') ||
+  #|       file.dataset.navigationGeneration !== String(generation)) return;
+  #|   const main = file.closest('.change-main');
+  #|   if (main?.dataset.navigationGeneration !== String(generation)) return;
+  #|   const section = Array.from(file.querySelectorAll('.semantic-section')).find(
   #|     element => element.dataset.sectionKey === sectionKey && element.dataset.navigationGeneration === String(generation)
   #|   );
   #|   if (!section?.open) return;
@@ -132,11 +150,11 @@ extern "js" fn scroll_to_section_change(
   #|   const top = window.scrollY + target.getBoundingClientRect().top - inset(section);
   #|   const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
   #|   window.scrollTo({ top: Math.max(0, Math.min(top, max)), behavior: 'instant' });
-  #|   file.__moondiffChangeLanding = top > max || top < 0 ? {
+  #|   main.__moondiffChangeLanding = top > max || top < 0 ? {
   #|     target,
   #|     scrollY: window.scrollY,
   #|     scrollHeight: document.documentElement.scrollHeight,
   #|     top: target.getBoundingClientRect().top,
   #|   } : null;
-  #|   file.querySelector(`.file-heading [data-change-direction="${direction}"]`)?.focus({ preventScroll: true });
+  #|   main.querySelector(`.change-titlebar [data-change-direction="${direction}"]`)?.focus({ preventScroll: true });
   #| }

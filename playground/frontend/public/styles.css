@@ -42,6 +42,9 @@
   --hunk: #f3f3f3;
   --empty-stripe: #e4e4e4;
   --toolbar-height: 3rem;
+  --toolbar-inset: var(--toolbar-height);
+  --change-title-height: 0px;
+  --file-heading-inset: var(--file-heading-height);
   --file-heading-height: max(2.75rem, calc(2.7rem + 1px));
   --file-tree-preferred-width: 240px;
   --file-tree-resizer-width: 8px;
@@ -637,10 +640,10 @@ button.segmented-option:active {
   display: flex;
   position: sticky;
   z-index: 20;
-  top: var(--toolbar-height);
+  top: var(--toolbar-inset);
   width: var(--file-tree-width);
   min-width: 0;
-  height: calc(100svh - var(--toolbar-height));
+  height: calc(100svh - var(--toolbar-inset));
   align-self: start;
   overflow: hidden;
   border-right: 1px solid var(--border);
@@ -651,9 +654,9 @@ button.segmented-option:active {
 .file-tree-resizer {
   position: sticky;
   z-index: 21;
-  top: var(--toolbar-height);
+  top: var(--toolbar-inset);
   width: var(--file-tree-resizer-width);
-  height: calc(100svh - var(--toolbar-height));
+  height: calc(100svh - var(--toolbar-inset));
   align-self: start;
   background: var(--workspace);
   cursor: col-resize;
@@ -1058,19 +1061,25 @@ button.file-tree-row.selected {
   text-transform: uppercase;
 }
 
-.commit-message {
-  display: grid;
+.change-titlebar {
+  display: flex;
+  position: sticky;
+  z-index: 25;
+  top: var(--toolbar-inset);
   min-width: 0;
+  align-items: center;
   gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
   color: var(--foreground);
-  font-family: var(--mono);
+  background: var(--surface);
 }
 
 .commit-message-title,
 .commit-message-body {
   min-width: 0;
   margin: 0;
-  font-family: inherit;
+  font-family: var(--mono);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1136,7 +1145,7 @@ button.file-tree-row.selected {
   min-width: 0;
   overflow: visible;
   border-width: 1px 0;
-  scroll-margin-top: calc(var(--toolbar-height) + 0.5rem);
+  scroll-margin-top: calc(var(--toolbar-inset) + var(--change-title-height) + 0.5rem);
 }
 
 .file-card.expanded {
@@ -1146,7 +1155,7 @@ button.file-tree-row.selected {
 .file-heading {
   position: sticky;
   z-index: 10;
-  top: var(--toolbar-height);
+  top: calc(var(--toolbar-inset) + var(--change-title-height));
   min-height: var(--file-heading-height);
   padding: 0.35rem 0.75rem;
   border-bottom: 1px solid var(--border-soft);
@@ -1375,7 +1384,7 @@ button.file-tree-row.selected {
 .semantic-section[open] > .semantic-section-title {
   position: sticky;
   z-index: 9;
-  top: calc(var(--toolbar-height) + var(--file-heading-height));
+  top: calc(var(--toolbar-inset) + var(--change-title-height) + var(--file-heading-inset));
 }
 
 .semantic-section > .semantic-section-title::-webkit-details-marker {
@@ -2151,10 +2160,6 @@ footer {
   button.file-tree-row {
     min-height: 2.05rem;
   }
-
-  .file-card {
-    scroll-margin-top: calc(var(--toolbar-height) + 0.5rem);
-  }
 }
 
 @media (max-width: 680px) {
@@ -2188,10 +2193,6 @@ footer {
     grid-area: actions;
     flex-wrap: wrap;
     justify-content: flex-start;
-  }
-
-  .file-heading {
-    top: var(--toolbar-height);
   }
 
   .file-toggle {

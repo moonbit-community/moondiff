@@ -180,11 +180,17 @@ test "section toggles preserve drafts and refresh retains choices until a new sn
 
 ///|
 test "change navigation expands idempotently and rejects stale or invalid targets" {
+  let api = fixture_file("first.mbt", "modified")
+  let file = ensure_file_document(
+    ready_test_file(api, ["fn first() { 1 }"], ["fn first() { 2 }"]),
+    LexicalAlgorithm,
+  )
   let model = diff_test_model(
-    diff_test_view([
-      fixture_file("first.mbt", "modified"),
-      fixture_file("second.mbt", "modified"),
-    ]),
+    set_file_state(
+      diff_test_view([api, fixture_file("second.mbt", "modified")]),
+      0,
+      file,
+    ),
   )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (collapsed, _) = update_load(
