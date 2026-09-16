@@ -45,6 +45,43 @@ const cBefore = [
 ].join("\r\n");
 const cAfter = cBefore.replace("+ 1)", "+ 2)").replace("label, 11", "label, 22");
 
+const yamlBefore = [
+  "%YAML 1.2",
+  "---",
+  "defaults: &defaults",
+  "  retries: 11",
+  "  enabled: true",
+  "  empty: null",
+  '  message: "中文😀<tag>&\\n"',
+  "  'quoted key': !!str 123abc",
+  "  mode: on # string",
+  "  url: https://host:8080/path#fragment",
+  "items: [*defaults, {name: worker, ports: [80, 443]}]",
+  "script: |2- # block",
+  "  # literal: true",
+  "  echo 中文😀<tag>&",
+  "folded: >+",
+  "  first line",
+  "  second line",
+  "...",
+].join("\r\n");
+const yamlAfter = yamlBefore.replace("11", "22").replace("123abc", "456abc")
+  .replace("443", "8443").replace("echo", "printf").replace("second", "final");
+
+const yamlFiles = [
+  { filename: "src/config.yaml", old: yamlBefore, new: yamlAfter, kinds: ["variable", "variable"] },
+  { filename: "src/config.yml", old: "enabled: true\rvalue: 1", new: "enabled: false\rvalue: 2", kinds: ["boolean", "boolean"] },
+  { filename: "src/added.yaml", status: "added", old: "", new: "value: 2", kinds: [null, "variable"] },
+  { filename: "src/deleted.yml", status: "removed", old: "value: 1", new: "", kinds: ["variable", null] },
+  { filename: "src/renamed.yaml", previous_filename: "src/renamed.yml", old: "value: 1", new: "value: 2", kinds: ["variable", "variable"] },
+  { filename: "src/from_yaml.txt", previous_filename: "src/from_yaml.yaml", old: "value: 1", new: "value: 2", kinds: ["variable", null] },
+  { filename: "src/from_text.yml", previous_filename: "src/was_yaml.txt", old: "value: 1", new: "value: 2", kinds: [null, "variable"] },
+  { filename: "src/from_c.yaml", previous_filename: "src/was_yaml.c", old: "int value = 1;", new: "value: 2", kinds: ["type", "variable"] },
+  { filename: "src/from_yaml.mbt", previous_filename: "src/was_mbt.yaml", old: "value: 1", new: "let value = 2", kinds: ["variable", "keyword"] },
+  { filename: "src/upper.YAML", old: "value: 1", new: "value: 2", kinds: [null, null] },
+  { filename: "src/upper.YML", old: "value: 1", new: "value: 2", kinds: [null, null] },
+];
+
 const cRegressions = [
   {
     name: "numeric separators",
@@ -457,4 +494,105 @@ for (const layout of ["Split", "Unified"]) {
       await expectOriginalLines(file, fixture.old, fixture.new);
     });
   }
+}
+
+for (const layout of ["Split", "Unified"]) {
+  for (const theme of ["light", "dark"]) {
+    test(`${layout} ${theme}: YAML scopes preserve original text and diff backgrounds`, async ({ page }, info) => {
+      const errors = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.emulateMedia({ colorScheme: theme });
+      const requests = await installSources(page, [yamlFiles[0]]);
+      await page.goto(path);
+      const file = page.locator("#moondiff-file-0");
+      await expect(file.locator(".review-diff")).toHaveCount(0);
+      expect(requests).toHaveLength(0);
+      await file.getByRole("button", { name: "Expand src/config.yaml", exact: true }).click();
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      await expect(file.locator(".syntax-variable").first()).toBeVisible();
+      await expect(file.locator("table")).toHaveClass(new RegExp(`\\b${layout.toLowerCase()}\\b`));
+      await expect(file.locator(".diff-notice")).toHaveCount(0);
+      const palette = colors[theme];
+      for (const kind of ["keyword", "control", "type", "variable", "number", "string", "escape", "comment", "operator"]) {
+        await expect(file.locator(`.syntax-${kind}`).first()).toHaveCSS("color", palette[kind]);
+      }
+      await expect(file.locator(".syntax-attribute").first()).toHaveCSS("color", palette.control);
+      await expect(file.locator(".syntax-boolean").first()).toHaveCSS("color", palette.keyword);
+      for (const kind of ["wa", "wd"]) {
+        const change = file.locator(`b.${kind}`).filter({ has: page.locator(".syntax-number") }).first();
+        await expect(change).toHaveCSS("background-color", palette[kind]);
+        await expect(change.locator(".syntax-number").first()).toHaveCSS("color", palette.number);
+      }
+      for (const side of ["add", "del"]) {
+        await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", palette[side]);
+      }
+      await expect(file.locator(".syntax-string").filter({ hasText: /^  # literal: true$/ }).first()).toHaveCSS("color", palette.string);
+      await expect(file.locator(".syntax-string").filter({ hasText: /^https:\/\/host:8080\/path#fragment$/ }).first()).toHaveCSS("color", palette.string);
+      await expect(file.locator(".syntax-string").filter({ hasText: /^on$/ }).first()).toHaveCSS("color", palette.string);
+      await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix, .syntax-comment [class^=syntax-]")).toHaveCount(0);
+      await expectOriginalLines(file, yamlBefore, yamlAfter);
+      await file.screenshot({ path: info.outputPath("yaml-highlighting.png") });
+      expect(requests).toHaveLength(2);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test("YAML extensions additions deletions and renames reuse loaded sources across controls", async ({ page }) => {
+  const requests = await installSources(page, yamlFiles);
+  await page.goto(path);
+  for (let index = 0; index < yamlFiles.length; index++) {
+    const file = page.locator(`#moondiff-file-${index}`);
+    const expand = file.getByRole("button", { name: /^Expand / });
+    if (await expand.count()) await expand.click();
+    await expect(file.locator(".review-diff")).toBeVisible();
+  }
+  const count = requests.length;
+  expect(count).toBe(yamlFiles.length * 2 - 2);
+  for (const algorithm of ["Token", "Tree"]) {
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const layout of ["Split", "Unified"]) {
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      for (const [index, source] of yamlFiles.entries()) {
+        const file = page.locator(`#moondiff-file-${index}`);
+        for (const [side, kind] of [["del", source.kinds[0]], ["add", source.kinds[1]]]) {
+          if (kind) await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toBeVisible();
+          else await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
+        }
+        await expectOriginalLines(file, source.old, source.new);
+      }
+    }
+  }
+  for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
+    await page.getByRole("checkbox", { name: filter, exact: true }).click();
+    await expectOriginalLines(page.locator("#moondiff-file-0"), yamlBefore, yamlAfter);
+  }
+  expect(requests.length).toBe(count);
+  expect(requests).not.toContain("true:src/added.yaml");
+  expect(requests).not.toContain("false:src/deleted.yml");
+});
+
+for (const layout of ["Split", "Unified"]) {
+  test(`${layout}: YAML budget fallback retains multiline state and source`, async ({ page }) => {
+    const old = ['values: [' + '0,'.repeat(2_000) + '"open', '# still string", {flag: true}]', 'tail: 1'].join("\r\n");
+    const current = old.replace('"open', '"start').replace("tail: 1", "tail: 2");
+    const source = { filename: "src/crowded.yaml", old, new: current };
+    await installSources(page, [source]);
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(path);
+    await page.getByRole("button", { name: "Expand src/crowded.yaml", exact: true }).click();
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    const file = page.locator("#moondiff-file-0");
+    for (const side of ["del", "add"]) {
+      const cell = file.locator(`td.${side}`).filter({ hasText: "values: [" });
+      await expect(cell).toHaveCount(1);
+      await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
+      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+    }
+    await expect(file.locator('.syntax-string').filter({ hasText: /^# still string"$/ }).first()).toHaveCSS("color", colors.light.string);
+    await expect(file.locator(".syntax-comment")).toHaveCount(0);
+    await expect(file.locator(".syntax-boolean").first()).toBeVisible();
+    await expectOriginalLines(file, old, current);
+  });
 }
