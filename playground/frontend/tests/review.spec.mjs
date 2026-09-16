@@ -30,8 +30,25 @@ function reviewPath(target = pullTarget()) {
 }
 
 async function requestCommentDeletion(card) {
-  await card.getByRole("button", { name: "More options", exact: true }).click();
-  await card.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  const confirmation = card.getByRole("button", { name: "Confirm delete", exact: true });
+  // A preceding Cancel click can return before its regional DOM commit.
+  await expect(card.locator(".comment-delete-actions")).toHaveCount(0);
+  // Source loading can remount a fallback comment inline and discard its menu.
+  // Retry only the confirmation request; the caller performs the actual deletion.
+  await expect(async () => {
+    if (await confirmation.isVisible()) return;
+    const menu = card.getByRole("menu");
+    if (!await menu.isVisible()) {
+      await card.getByRole("button", { name: "More options", exact: true }).click({ timeout: 1_000 });
+    }
+    await menu.getByRole("menuitem", { name: "Delete", exact: true }).click({ timeout: 1_000 });
+    await expect(confirmation).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 5_000, intervals: [100, 250, 500] });
+}
+
+async function cancelCommentDeletion(card) {
+  await card.getByRole("button", { name: "Cancel deletion", exact: true }).click();
+  await expect(card.locator(".comment-delete-actions")).toHaveCount(0);
 }
 
 async function installApi(page, target = pullTarget(), options = {}) {
@@ -877,12 +894,13 @@ test("inline cards anchor both sides once, keep replies, and place editors after
   const own = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
   await expect(page.locator(".github-comment").filter({ hasText: "Existing reply" }).locator(".comment-delete")).toHaveCount(0);
   await requestCommentDeletion(own);
-  await own.getByRole("button", { name: "Cancel deletion" }).click();
+  await cancelCommentDeletion(own);
   await expect(own).toBeVisible();
   await requestCommentDeletion(own);
   await own.getByRole("button", { name: "Confirm delete" }).click();
   await expect(own).toHaveCount(0);
   await expect(page.locator(".inline-discussion-row").filter({ hasText: "Existing reply" })).toHaveCount(1);
+  expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.review.comment.delete").length)).toBe(1);
 });
 
 test("delete failures can retry without duplicate requests or stale refresh resurrection", async ({ page }) => {
@@ -948,7 +966,7 @@ test("comment menu supports keyboard navigation, dismissal and deletion confirma
   await page.keyboard.press("Enter");
   await expect(menu).toBeHidden();
   await expect(card.getByText("Delete this comment?", { exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Cancel deletion" }).click();
+  await cancelCommentDeletion(card);
   await more.click();
   await expect(menu).toBeVisible();
   await more.click();

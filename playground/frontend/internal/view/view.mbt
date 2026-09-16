@@ -50,7 +50,10 @@ fn brand_view() -> @rabbita.Html {
 }
 
 ///|
-fn commit_form(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
+fn commit_form(
+  model : ToolbarInput,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
   @html.form(on_submit=emit(Ui(Submit)), class="commit-form", [
     @html.label(
       for_="commit-url",
@@ -122,7 +125,7 @@ fn landing_details() -> @rabbita.Html {
 
 ///|
 fn hero_view(
-  model : Model,
+  model : ToolbarInput,
   landing : Bool,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
@@ -145,7 +148,7 @@ fn hero_view(
   } else {
     @html.header(
       class="hero hero-workspace",
-      attrs=@html.Attrs::build().inert(model.file_tree.drawer_open),
+      attrs=@html.Attrs::build().inert(model.drawer_open),
       [
         @html.div(class="hero-copy", brand_view()),
         @html.div(class="hero-controls", [
@@ -290,9 +293,12 @@ fn ignore_tests_control(
 }
 
 ///|
-fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
-  match model.phase {
-    Showing(commit) =>
+fn workspace_actions(
+  model : ToolbarInput,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  match model.file_count {
+    Some(file_count) =>
       @html.nav(
         class="workspace-actions",
         attrs=@html.Attrs::build().aria_label("Diff actions"),
@@ -300,33 +306,23 @@ fn workspace_actions(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html 
           @html.button(
             type_="button",
             class="toolbar-button file-tree-trigger",
-            title=if model.file_tree.drawer_open {
-              "Close files"
-            } else {
-              "Browse files"
-            },
+            title=if model.drawer_open { "Close files" } else { "Browse files" },
             attrs=@html.Attrs::build()
               .aria_label(
-                if model.file_tree.drawer_open {
+                if model.drawer_open {
                   "Close file tree"
                 } else {
                   "Open file tree"
                 },
               )
-              .aria_expanded(
-                if model.file_tree.drawer_open {
-                  "true"
-                } else {
-                  "false"
-                },
-              )
+              .aria_expanded(if model.drawer_open { "true" } else { "false" })
               .aria_controls("file-tree-sidebar"),
             on_click=emit(Ui(ToggleFileTreeDrawer)),
             [
               @html.span(class="file-tree-trigger-icon", ""),
               @html.span(
                 class="file-tree-trigger-count",
-                commit.files.length().to_string(),
+                file_count.to_string(),
               ),
             ],
           ),
@@ -559,7 +555,7 @@ fn semantic_fragment_view(
   old_context : String?,
   new_context : String?,
   mode : ViewMode,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   whole : Bool,
   expanded? : Bool = true,
@@ -643,7 +639,7 @@ fn top_level_diff_view(
   top : @mbtdiff.TopLevelDiff,
   mode : ViewMode,
   show_hunk_headers : Bool,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -733,7 +729,7 @@ fn semantic_document_view(
   document : @mbtdiff.DiffDocument,
   mode : ViewMode,
   show_hunk_headers : Bool,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -778,7 +774,7 @@ fn file_diff_view(
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
   ignore_tests : Bool,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   discussions? : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
@@ -912,7 +908,7 @@ fn file_card(
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
   ignore_tests : Bool,
-  review : Session,
+  review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   navigation_enabled~ : Bool,
   viewed? : @rabbita.Html = @html.nothing,
@@ -924,6 +920,7 @@ fn file_card(
     id=file_dom_id(index),
     class=if file.expanded { "file-card expanded" } else { "file-card" },
     attrs=@html.Attrs::build()
+      .data_set("file-path", file.file.filename)
       .data_set("file-index", index.to_string())
       .data_set("navigation-generation", generation.to_string())
       .data_set("navigation-enabled", navigation_enabled.to_string()),
@@ -976,52 +973,6 @@ fn file_card(
 }
 
 ///|
-fn file_list_view(
-  commit : ChangeView,
-  model : Model,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  if commit.files.length() == 0 {
-    return @html.div(
-      class="empty-state",
-      "No changed files were returned for this change.",
-    )
-  }
-  let file_views : Map[String, @rabbita.Html] = Map([])
-  let discussions = prepare_discussions(
-    commit,
-    model.review,
-    emit,
-    projection=review_projection(commit, model),
-  )
-  for index, file in commit.files {
-    file_views["file:\{model.generation}:\{file.file.filename}"] = file_card(
-      file,
-      model.generation,
-      index,
-      model.view_mode,
-      model.diff_algorithm,
-      model.ignore_comments,
-      model.ignore_tests,
-      model.review,
-      emit,
-      navigation_enabled=@application.file_navigation_enabled(model, index),
-      viewed=viewed_checkbox(commit, model, index, emit),
-      viewed_error=viewed_file_error(model, index, emit),
-      discussions~,
-    )
-    file_views["discussions:\{model.generation}:\{file.file.filename}"] = file_discussions_view(
-      commit,
-      index,
-      model.review,
-      emit,
-      discussions~,
-    )
-  }
-  @html.div(class="file-list", file_views)
-}
-
-///|
 fn commit_message_view(
   message : String,
   controls : @rabbita.Html,
@@ -1050,118 +1001,12 @@ fn commit_message_view(
 }
 
 ///|
-fn change_view(
-  commit : ChangeView,
-  model : Model,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Html {
-  @html.section(class="results", [
-    @html.div(
-      class="change-layout",
-      style=[
-        "--file-tree-preferred-width: \{model.file_tree.preferred_width}px",
-      ],
-      [
-        file_tree_view(commit, model, emit),
-        file_tree_resizer_view(model.file_tree, emit),
-        @html.div(
-          class="change-main",
-          attrs=@html.Attrs::build()
-            .inert(model.file_tree.drawer_open)
-            .data_set("navigation-generation", model.generation.to_string())
-            .data_set(
-              "navigation-layout",
-              "\{model.view_mode is Split}:\{model.diff_algorithm is AstAlgorithm}:\{model.ignore_comments}:\{model.ignore_tests}",
-            ),
-          [
-            commit_message_view(commit.message, change_controls(model, emit)),
-            viewed_progress(commit, model, emit),
-            comments_overview(commit, model.review, model.auth, emit),
-            file_list_view(commit, model, emit),
-          ],
-        ),
-      ],
-    ),
-  ])
-}
-
-///|
-fn phase_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
-  match model.phase {
-    Idle => @html.nothing
-    LoadingCommit(page~, ..) =>
-      @html.div(class="empty-state loading", [
-        @html.span(class="spinner", ""),
-        @html.span(
-          "Loading commit metadata (page \{page}, up to 100 files per page)…",
-        ),
-      ])
-    LoadingPullMetadata(..) =>
-      @html.div(class="empty-state loading", [
-        @html.span(class="spinner", ""),
-        @html.span("Loading pull request metadata…"),
-      ])
-    LoadingPullCommitMetadata(..) =>
-      @html.div(class="empty-state loading", [
-        @html.span(class="spinner", ""),
-        @html.span("Loading pull request commit metadata…"),
-      ])
-    LoadingPullSnapshot(page~, ..) =>
-      @html.div(class="empty-state loading", [
-        @html.span(class="spinner", ""),
-        @html.span(
-          if page > 0 {
-            "Loading pinned comparison and changed files (page \{page})…"
-          } else {
-            "Finishing the pinned comparison…"
-          },
-        ),
-      ])
-    ValidatingPullSnapshot(..) =>
-      @html.div(class="empty-state loading", [
-        @html.span(class="spinner", ""),
-        @html.span("Checking that the pull request stayed unchanged…"),
-      ])
-    LoadFailed(message) =>
-      @html.div(class="empty-state error", [
-        @html.p(message),
-        auth_controls(model.auth, emit),
-        @html.button(
-          type_="button",
-          class="secondary",
-          on_click=emit(Ui(Submit)),
-          "Try again",
-        ),
-      ])
-    Showing(commit) => change_view(commit, model, emit)
-  }
-}
-
-///|
 fn landing_mode(model : Model) -> Bool {
   match model.phase {
     Idle => true
     LoadFailed(_) => model.route is None
     _ => false
   }
-}
-
-///|
-pub fn app_view(model : Model, emit : @rabbita.Emit[Msg]) -> @rabbita.Html {
-  let landing = landing_mode(model)
-  @html.main_(class=if landing { "shell landing" } else { "shell workspace" }, [
-    hero_view(model, landing, emit),
-    phase_view(model, emit),
-    @html.footer([
-      @html.span("Built with Moondiff · "),
-      @html.a(
-        href="https://github.com/moonbit-community/moondiff",
-        target=Blank,
-        rel="noopener noreferrer",
-        "Source on GitHub",
-      ),
-    ]),
-  ])
 }
 
 ///|

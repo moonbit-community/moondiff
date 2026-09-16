@@ -139,60 +139,109 @@ test('a page restored during startup resumes the server code after unloading its
   await authorize(page, code); await expect(page.getByText('Signed in as alice')).toBeVisible();
 });
 
+// Install and pause before navigation: real response/actionability waits must
+// never consume the application's retry budget. The install time precedes the
+// fixed pause time so pauseAt cannot race a moving wall clock.
+async function installAuthClock(page) {
+  await page.clock.install({ time: new Date('2026-08-18T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-08-18T01:00:00Z'));
+  await page.addInitScript(() => {
+    const randomUUID = crypto.randomUUID.bind(crypto);
+    window.__attempts = [];
+    crypto.randomUUID = () => { const id = randomUUID(); window.__attempts.push(id); return id; };
+    const timeout = window.setTimeout.bind(window);
+    window.__authTimers = [];
+    window.setTimeout = (callback, ms, ...args) => {
+      if ([5_000, 10_000, 20_000].includes(ms)) window.__authTimers.push({ ms, at: Date.now() });
+      return timeout(callback, ms, ...args);
+    };
+  });
+}
+
+function authResponse(page, endpoint) {
+  return page.waitForResponse(response => new URL(response.url()).pathname === `/api/auth/${endpoint}`);
+}
+
+async function renderAuthResponse(page, pending, locator, timerCount) {
+  const response = await pending;
+  expect(await response.finished(), `response body for ${response.url()}`).toBeNull();
+  // Body completion precedes the central and regional paints. Advance only a
+  // small bounded budget, well below the shortest (5 second) auth timer.
+  for (let frames = 0; frames < 60; frames++) {
+    await page.clock.runFor(16);
+    if (await locator.isVisible() && await page.evaluate(count => window.__authTimers.length === count, timerCount)) return;
+  }
+  const diagnostic = await page.evaluate(() => ({ now: Date.now(), timers: window.__authTimers, text: document.body.innerText.slice(0, 2_000) }));
+  throw new Error(`Auth did not render ${locator} after ${response.url()} within 60 frames (960ms): ${JSON.stringify(diagnostic)}`);
+}
+
+async function beforeAuthDeadline(page, index, ms) {
+  const { timer, now } = await page.evaluate(index => ({ timer: window.__authTimers[index], now: Date.now() }), index);
+  expect(timer, `auth timer ${index}`).toMatchObject({ ms });
+  // Account for every frame already consumed while waiting for the UI.
+  const remaining = timer.at + ms - now;
+  expect(remaining, `time left before ${ms}ms auth deadline`).toBeGreaterThan(1);
+  await page.clock.runFor(remaining - 1);
+  expect(await page.evaluate(() => Date.now())).toBe(timer.at + ms - 1);
+}
+
 test('proxy failures during session start and polling back off and recover on one login attempt', async ({ page }) => {
   let sessions = 0;
   const starts = [], polls = [];
   const canonical = 'canonical-proxy-recovery-0001';
   const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
-  await page.addInitScript(() => {
-    const randomUUID = crypto.randomUUID.bind(crypto);
-    window.__attempts = [];
-    crypto.randomUUID = () => { const id = randomUUID(); window.__attempts.push(id); return id; };
-  });
+  await installAuthClock(page);
   await page.route('**/api/auth/status', handler => {
     sessions += 1;
-    if (sessions === 2) return handler.fulfill({ status: 503, contentType: 'text/html', body: '<html><body>Proxy unavailable</body></html>' });
-    return handler.fulfill({ json: successFixture('auth.status', {
-      authenticated: false,
-      csrf_token: `session-csrf-${sessions}`,
-      ...(sessions >= 4 ? { device_flow: device } : {}),
-    }) });
+    const response = sessions === 2
+      ? { status: 503, contentType: 'text/html', body: '<html><body>Proxy unavailable</body></html>' }
+      : { json: successFixture('auth.status', {
+        authenticated: false,
+        csrf_token: `session-csrf-${sessions}`,
+        ...(sessions >= 4 ? { device_flow: device } : {}),
+      }) };
+    return handler.fulfill(response);
   });
   await page.route('**/api/auth/device/start', handler => {
     const { attempt_id } = handler.request().postDataJSON();
     starts.push({ attempt_id, csrf: handler.request().headers()['x-csrf-token'] });
-    if (starts.length === 1) return handler.fulfill({ status: 502, body: '' });
-    return handler.fulfill({ json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'poll-csrf', attempt_id, device_flow: device }) });
+    return handler.fulfill(starts.length === 1
+      ? { status: 502, body: '' }
+      : { json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'poll-csrf', attempt_id, device_flow: device }) });
   });
   await page.route('**/api/auth/device/poll', handler => {
     const { authorization_id } = handler.request().postDataJSON();
     polls.push({ authorization_id, csrf: handler.request().headers()['x-csrf-token'] });
-    if (polls.length === 1) return handler.fulfill({ status: 504, contentType: 'application/json', body: '{invalid json' });
-    return handler.fulfill({ json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'signed-in-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) });
+    return handler.fulfill(polls.length === 1
+      ? { status: 504, contentType: 'application/json', body: '{invalid json' }
+      : { json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'signed-in-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) });
   });
-  await page.clock.install();
+  let response = authResponse(page, 'status');
   await page.goto(route);
-  await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
+  const signIn = page.getByRole('button', { name: 'Sign in with GitHub' });
+  await renderAuthResponse(page, response, signIn, 0);
+  response = authResponse(page, 'status');
+  await signIn.click();
   const retryMessage = page.getByText('Connection interrupted. Sign-in will retry automatically.');
-  await expect(retryMessage).toBeVisible();
+  await renderAuthResponse(page, response, retryMessage, 1);
   expect(sessions).toBe(2);
   expect(starts).toEqual([]);
   await expect(page.getByText('Proxy unavailable')).toHaveCount(0);
 
-  await page.clock.pauseAt(new Date());
-  await page.clock.fastForward(9_000);
+  await beforeAuthDeadline(page, 0, 10_000);
   expect(sessions).toBe(2);
-  await page.clock.fastForward(1_000);
-  await expect.poll(() => starts.length).toBe(1);
-  await page.clock.runFor(50);
-  await expect(retryMessage).toBeVisible();
-  expect(sessions).toBe(3);
-  await page.clock.fastForward(19_000);
+  expect(starts).toEqual([]);
+  response = authResponse(page, 'device/start');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, retryMessage, 2);
   expect(sessions).toBe(3);
   expect(starts).toHaveLength(1);
-  await page.clock.fastForward(1_000);
-  await expect.poll(() => starts.length).toBe(2);
-  await page.clock.runFor(50);
+  await beforeAuthDeadline(page, 1, 20_000);
+  expect(sessions).toBe(3);
+  expect(starts).toHaveLength(1);
+  response = authResponse(page, 'device/start');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, page.locator('.device-code'), 3);
   await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
   expect(sessions).toBe(4);
   const attempts = await page.evaluate(() => window.__attempts);
@@ -203,18 +252,17 @@ test('proxy failures during session start and polling back off and recover on on
   ]);
   expect(attempts[0]).not.toBe(canonical);
 
-  await page.clock.fastForward(4_000);
+  await beforeAuthDeadline(page, 2, 5_000);
   expect(polls).toEqual([]);
-  await page.clock.fastForward(1_000);
-  await expect.poll(() => polls.length).toBe(1);
-  await page.clock.runFor(50);
-  await expect(retryMessage).toBeVisible();
-  await page.clock.fastForward(9_000);
+  response = authResponse(page, 'device/poll');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, retryMessage, 4);
   expect(polls).toHaveLength(1);
-  await page.clock.fastForward(1_000);
-  await expect.poll(() => polls.length).toBe(2);
-  await page.clock.runFor(50);
-  await expect(page.getByText('Signed in as alice')).toBeVisible();
+  await beforeAuthDeadline(page, 3, 10_000);
+  expect(polls).toHaveLength(1);
+  response = authResponse(page, 'device/poll');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 4);
   expect(polls).toEqual([
     { authorization_id: canonical, csrf: 'poll-csrf' },
     { authorization_id: canonical, csrf: 'poll-csrf' },
@@ -229,11 +277,7 @@ test('session failures back off on one login attempt and recover with fresh CSRF
   const starts = [], polls = [];
   const canonical = 'canonical-authorization-0001';
   const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
-  await page.addInitScript(() => {
-    const randomUUID = crypto.randomUUID.bind(crypto);
-    window.__attempts = [];
-    crypto.randomUUID = () => { const id = randomUUID(); window.__attempts.push(id); return id; };
-  });
+  await installAuthClock(page);
   await page.route('**/api/auth/status', handler => {
     sessions += 1;
     return handler.fulfill({ status: sessions <= 3 ? 503 : 200, json: sessions <= 3
@@ -246,33 +290,46 @@ test('session failures back off on one login attempt and recover with fresh CSRF
     return handler.fulfill({ json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'fresh-retry-csrf', attempt_id, device_flow: device }) });
   });
   await page.route('**/api/auth/device/poll', handler => {
-    const { authorization_id } = handler.request().postDataJSON(); polls.push(authorization_id);
+    const { authorization_id } = handler.request().postDataJSON();
+    polls.push({ authorization_id, csrf: handler.request().headers()['x-csrf-token'] });
     return handler.fulfill({ json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'fresh-retry-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) });
   });
-  await page.clock.install();
+  let response = authResponse(page, 'status');
   await page.goto(route);
-  await page.getByRole('button', { name: 'Try sign-in' }).click();
-  await expect(page.getByText('Connection interrupted. Sign-in will retry automatically.')).toBeVisible();
+  const signIn = page.getByRole('button', { name: 'Try sign-in' });
+  await renderAuthResponse(page, response, signIn, 0);
+  response = authResponse(page, 'status');
+  await signIn.click();
+  const retryMessage = page.getByText('Connection interrupted. Sign-in will retry automatically.');
+  await renderAuthResponse(page, response, retryMessage, 1);
   expect(sessions).toBe(2);
-  await page.clock.pauseAt(new Date());
-  await page.clock.fastForward(9_000);
+  expect(starts).toEqual([]);
+  await beforeAuthDeadline(page, 0, 10_000);
   expect(sessions).toBe(2);
-  await page.clock.fastForward(1_000);
-  await expect.poll(() => sessions).toBe(3);
-  await page.clock.runFor(50);
-  await page.clock.fastForward(19_000);
+  response = authResponse(page, 'status');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, retryMessage, 2);
   expect(sessions).toBe(3);
-  await page.clock.fastForward(1_000);
-  await expect.poll(() => starts.length).toBe(1);
-  await page.clock.runFor(50);
+  expect(starts).toEqual([]);
+  await beforeAuthDeadline(page, 1, 20_000);
+  expect(sessions).toBe(3);
+  expect(starts).toEqual([]);
+  response = authResponse(page, 'device/start');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, page.locator('.device-code'), 3);
   await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
   expect(sessions).toBe(4);
   const attempts = await page.evaluate(() => window.__attempts);
   expect(attempts).toHaveLength(1);
+  expect(attempts[0]).not.toBe(canonical);
   expect(starts).toEqual([{ attempt_id: attempts[0], csrf: 'fresh-retry-csrf' }]);
-  await page.clock.fastForward(5_000);
-  await expect.poll(() => polls.length).toBe(1);
-  await page.clock.runFor(50);
-  await expect(page.getByText('Signed in as alice')).toBeVisible();
-  expect(polls).toEqual([canonical]);
+  await beforeAuthDeadline(page, 2, 5_000);
+  expect(polls).toEqual([]);
+  response = authResponse(page, 'device/poll');
+  await page.clock.runFor(1);
+  await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 3);
+  expect(polls).toEqual([{ authorization_id: canonical, csrf: 'fresh-retry-csrf' }]);
+  expect(sessions).toBe(4);
+  expect(starts).toHaveLength(1);
+  expect(await page.evaluate(() => window.__attempts)).toEqual(attempts);
 });

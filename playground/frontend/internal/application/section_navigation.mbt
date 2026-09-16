@@ -107,14 +107,14 @@ extern "js" fn find_section_change(
   #| }
 
 ///|
-fn navigate_change_after_render(
+fn navigate_change_after_commit(
   generation : Int,
   file_index : Int,
   section_key : String,
   block : Int,
   direction : Int,
 ) -> @rabbita.Cmd {
-  @cmd.custom_cmd(kind=@cmd.after_render, _ => {
+  @cmd.custom_cmd(_ => {
     scroll_to_section_change(
       generation,
       file_dom_id(file_index),

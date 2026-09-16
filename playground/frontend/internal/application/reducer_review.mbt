@@ -38,7 +38,7 @@ fn domain_review(
 ) -> (Model, @rabbita.Cmd) {
   let contextual = comment_session_context(model.review, comment_context(model))
   let (review, effects) = @comments.update(contextual, event)
-  if review == contextual && effects.is_empty() {
+  if @identity.same(review, contextual) && effects.is_empty() {
     return (model, @rabbita.none)
   }
   (

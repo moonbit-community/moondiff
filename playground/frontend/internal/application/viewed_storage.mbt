@@ -137,12 +137,13 @@ fn viewed_persist_request(
 ) -> @rabbita.Cmd {
   // Commit the optimistic checkbox before an immediate storage failure can
   // roll it back, otherwise the browser's native toggle outlives the VDOM diff.
-  @cmd.custom_cmd(kind=@cmd.after_render, scheduler => {
+  let epoch = model.viewed.epoch
+  @cmd.custom_cmd(scheduler => {
     let ok = viewed_storage_put(
       record.key(),
       ToJson::to_json(record).stringify(),
     )
-    scheduler.add(emit(Viewed(Stored(model.viewed.epoch, index, record, ok))))
+    scheduler.add(emit(Viewed(Stored(epoch, index, record, ok))))
   })
 }
 

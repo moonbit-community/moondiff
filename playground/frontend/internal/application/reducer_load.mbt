@@ -288,6 +288,9 @@ fn update_load(
         file_navigation_enabled(model, index) else {
         return (model, @rabbita.none)
       }
+      if !file.collapsed_sections.contains(key) {
+        return (model, @rabbita.none)
+      }
       let collapsed_sections = file.collapsed_sections.filter(section => {
         section != key
       })
@@ -296,7 +299,7 @@ fn update_load(
           model,
           Showing(set_file_state(view, index, { ..file, collapsed_sections, })),
         ),
-        navigate_change_after_render(generation, index, key, block, direction),
+        @rabbita.none,
       )
     }
     OpenFile(generation, index) => {
@@ -306,26 +309,13 @@ fn update_load(
       guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
         return (model, @rabbita.none)
       }
-      let drawer_was_open = model.file_tree.drawer_open
       let selected = select_file(model, index)
       let (opened, load_command) = if file.expanded {
         (selected, @rabbita.none)
       } else {
         expand_file(selected, view, generation, index, file, emit)
       }
-      let focus_command = if drawer_was_open {
-        focus_selector_after_render("#\{file_dom_id(index)} .file-toggle")
-      } else {
-        @rabbita.none
-      }
-      (
-        opened,
-        @rabbita.batch([
-          load_command,
-          @nav.scroll_to(file_dom_id(index)),
-          focus_command,
-        ]),
-      )
+      (opened, load_command)
     }
     RetryFile(generation, index) => {
       if generation != model.generation {

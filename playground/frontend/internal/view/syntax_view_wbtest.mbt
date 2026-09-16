@@ -77,7 +77,7 @@ test "semantic sections use original lines for highlights after reorder and same
             algorithm,
             false,
             false,
-            @comments.Session::new(),
+            @comments.Session::new().read_view(),
             emit,
           ),
         )
@@ -119,7 +119,7 @@ test "C lexical fixes reach rendered diffs with original escaped source text" {
             algorithm,
             false,
             false,
-            @comments.Session::new(),
+            @comments.Session::new().read_view(),
             emit,
           ),
         )

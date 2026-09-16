@@ -67,7 +67,7 @@ test "Viewed restores tri-state independently from expansion and cache" {
   assert_false(viewed_test_expanded(loaded))
   let opened = update(loaded, Load(OpenFile(loaded.generation, 0)), _ => {
       @rabbita.none
-    }).0
+    }).model
   assert_true(viewed_test_expanded(opened))
   assert_true(opened.viewed.files[0].state == Some(Viewed))
   let refresh = begin_viewed_refresh(opened, _ => @rabbita.none).0
@@ -78,7 +78,7 @@ test "Viewed restores tri-state independently from expansion and cache" {
   assert_true(viewed_test_expanded(dismissed))
   let touched = update(initial, Load(OpenFile(initial.generation, 0)), _ => {
       @rabbita.none
-    }).0
+    }).model
   assert_true(viewed_test_expanded(viewed_test_loaded(touched, Viewed)))
 }
 
@@ -123,12 +123,12 @@ test "unmark expands and failure preserves subsequent manual expansion choices" 
       unmarked,
       Load(ToggleFile(unmarked.generation, 0)),
       _ => @rabbita.none,
-    ).0
+    ).model
   let manually_opened = update(
       manually_collapsed,
       Load(OpenFile(unmarked.generation, 0)),
       _ => @rabbita.none,
-    ).0
+    ).model
   let failed = viewed_test_saved(
     manually_opened,
     Err(
@@ -290,7 +290,7 @@ test "page restoration rechecks Viewed without collapsing manually opened files"
   let loaded = viewed_test_loaded(viewed_test_model(), Viewed)
   let opened = update(loaded, Load(OpenFile(loaded.generation, 0)), _ => {
       @rabbita.none
-    }).0
+    }).model
   let checking = {
     ..opened,
     auth: AuthChecking,

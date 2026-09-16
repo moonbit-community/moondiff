@@ -69,32 +69,21 @@ fn update_ui(
     SelectView(view_mode) => ({ ..model, view_mode, }, @rabbita.none)
     ToggleFileTreeDrawer => {
       let drawer_open = !model.file_tree.drawer_open
-      let focus_command = if drawer_open {
-        focus_selector_after_render("#file-tree-sidebar .drawer-close")
-      } else {
-        focus_selector_after_render(".file-tree-trigger")
-      }
       (
         { ..model, file_tree: { ..model.file_tree, drawer_open, }, },
-        focus_command,
+        @rabbita.none,
       )
     }
-    CloseFileTreeDrawer => {
-      let focus_command = if model.file_tree.drawer_open {
-        focus_selector_after_render(".file-tree-trigger")
-      } else {
-        @rabbita.none
-      }
+    CloseFileTreeDrawer =>
       (
         { ..model, file_tree: { ..model.file_tree, drawer_open: false, }, },
-        focus_command,
+        @rabbita.none,
       )
-    }
     FileTreeViewportChanged(width) =>
       if model.file_tree.drawer_open && width >= 768 {
         (
           { ..model, file_tree: { ..model.file_tree, drawer_open: false, }, },
-          focus_selector_after_render("#file-tree-sidebar .search-toggle"),
+          @rabbita.none,
         )
       } else {
         (model, @rabbita.none)

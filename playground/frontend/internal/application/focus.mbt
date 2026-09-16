@@ -1,6 +1,6 @@
 ///|
-fn focus_selector_after_render(selector : String) -> @rabbita.Cmd {
-  @cmd.custom_cmd(kind=@cmd.after_render, _ => {
+fn focus_selector(selector : String) -> @rabbita.Cmd {
+  @cmd.custom_cmd(_ => {
     match @dom.document().query_selector(selector).to_option() {
       None => ()
       Some(element) =>

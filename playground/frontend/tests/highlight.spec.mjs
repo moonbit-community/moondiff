@@ -199,22 +199,61 @@ async function installSources(page, sources = files) {
   return requests;
 }
 
-async function expectOriginalLines(container, old, current) {
-  const rows = await container.locator(".review-diff tr").evaluateAll(rows => rows.flatMap(row => {
-    return ["old", "new"].flatMap(side => {
-      const gutter = row.querySelector(`.${side}-line-number`);
-      const number = Number(gutter?.querySelector(".line-number-value")?.textContent);
-      if (!number) return [];
-      const cell = row.closest("table").classList.contains("split")
-        ? gutter.nextElementSibling : row.querySelector("td:last-child");
-      const clone = cell.cloneNode(true);
-      clone.querySelector(".diff-prefix")?.remove();
-      return [{ side, number, text: clone.textContent }];
-    });
-  }));
-  expect(rows.length).toBeGreaterThan(0);
+async function expectOriginalLines(container, layout, old, current) {
+  expect(["Split", "Unified"], "an explicit target layout is required").toContain(layout);
   const sources = { old: old.split(/\r\n|\r|\n/), new: current.split(/\r\n|\r|\n/) };
-  for (const row of rows) expect(row.text, `${row.side} line ${row.number}`).toBe(sources[row.side][row.number - 1]);
+  let rows;
+  await expect(async () => {
+    // Resolve the container again on every attempt. No row handles survive a
+    // regional commit, and layout and text come from the same synchronous read.
+    const snapshot = await container.evaluate(container => {
+      const tables = [...container.querySelectorAll("table.review-diff")];
+      const snapshot = { connected: container.isConnected, layouts: [], rows: [], errors: [] };
+      for (const table of tables) {
+        snapshot.layouts.push([...table.classList].filter(name => ["split", "unified"].includes(name)).join(" "));
+        for (const row of table.querySelectorAll("tr")) {
+          const gutters = row.querySelectorAll(":scope > .review-gutter");
+          const hasContent = row.querySelector(":scope > td.ctx, :scope > td.add, :scope > td.del, :scope > td.empty");
+          if (hasContent && gutters.length !== (table.classList.contains("single-sided") ? 1 : 2)) {
+            snapshot.errors.push(`Missing source gutter: ${row.textContent}`);
+          }
+          for (const side of ["old", "new"]) {
+            const gutter = row.querySelector(`.${side}-line-number`);
+            // Added/deleted split tables omit the absent side's gutter entirely.
+            if (!gutter) continue;
+            const value = gutter.querySelector(".line-number-value");
+            if (!value) {
+              snapshot.errors.push(`Missing ${side} line number: ${row.textContent}`);
+              continue;
+            }
+            if (value.textContent === "") continue;
+            const number = Number(value.textContent);
+            const cell = table.classList.contains("split")
+              ? gutter.nextElementSibling : row.querySelector("td:last-child");
+            if (!cell || cell.tagName !== "TD" || cell.classList.contains("line-number")) {
+              snapshot.errors.push(`Missing ${side} content cell at line ${value.textContent}`);
+              continue;
+            }
+            const clone = cell.cloneNode(true);
+            clone.querySelector(".diff-prefix")?.remove();
+            snapshot.rows.push({ side, number, text: clone.textContent });
+          }
+        }
+      }
+      return snapshot;
+    }, undefined, { timeout: 1_000 });
+    expect(snapshot.connected, "file container was detached").toBe(true);
+    expect(snapshot.layouts, "missing diff tables").not.toEqual([]);
+    expect(snapshot.layouts, `waiting for ${layout} regional commit`).toEqual(snapshot.layouts.map(() => layout.toLowerCase()));
+    expect(snapshot.errors, "incomplete line snapshot").toEqual([]);
+    expect(snapshot.rows.length, "diff tables contain no source lines").toBeGreaterThan(0);
+    for (const row of snapshot.rows) {
+      const label = `${layout} ${row.side} line ${row.number}`;
+      expect(Number.isInteger(row.number) && row.number > 0 && row.number <= sources[row.side].length, label).toBe(true);
+      expect(row.text, label).toBe(sources[row.side][row.number - 1]);
+    }
+    rows = snapshot.rows;
+  }).toPass({ timeout: 5_000, intervals: [50, 100, 250] });
   return rows;
 }
 
@@ -268,7 +307,7 @@ for (const layout of ["Split", "Unified"]) {
     await expect(file.locator("td.ctx .syntax-type").first()).toHaveCSS("color", colors.light.type);
     expect(syntaxNodes).toBeGreaterThan(0);
     expect(syntaxNodes).toBeLessThan(32);
-    const rows = await expectOriginalLines(file, old, current);
+    const rows = await expectOriginalLines(file, layout, old, current);
     for (const side of ["old", "new"]) {
       expect(rows.filter(row => row.side === side).map(row => row.number)).toEqual([1, 2, 3]);
     }
@@ -309,11 +348,11 @@ for (const algorithm of ["Token", "Tree"]) {
         await expect(file.locator("td.del").first()).toHaveCSS("background-color", palette.del);
         await expect(file.locator("td.ctx .syntax-keyword").first()).toHaveCSS("color", palette.keyword);
         await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix")).toHaveCount(0);
-        await expectOriginalLines(file, before, after);
+        await expectOriginalLines(file, layout, before, after);
         const broken = page.locator("#moondiff-file-1");
         await expect(broken.locator(".diff-notice").first()).toBeVisible();
         await expect(broken.locator(".syntax-keyword").first()).toHaveCSS("color", palette.keyword);
-        await expectOriginalLines(broken, files[1].old, files[1].new);
+        await expectOriginalLines(broken, layout, files[1].old, files[1].new);
         // Keep one representative screenshot for every algorithm/layout/theme.
         await file.screenshot({ path: info.outputPath("moonbit-highlighting.png") });
       });
@@ -368,7 +407,7 @@ test("MoonBit manifests auto-expand with highlighted line diffs, including renam
         if (source.highlightedSides.length === 2) {
           await expect(file.locator(".syntax-keyword").first()).toHaveCSS("color", colors.light.keyword);
         }
-        await expectOriginalLines(file, source.old, source.new);
+        await expectOriginalLines(file, layout, source.old, source.new);
       }
     }
   }
@@ -391,7 +430,7 @@ test("renames highlight each source side independently; filters and layouts reus
         const file = page.locator(`#moondiff-file-${index}`);
         await expect(file.locator(`td.${highlightedSide} .syntax-keyword`)).toHaveCount(1);
         await expect(file.locator(`td.${highlightedSide === "del" ? "add" : "del"} [class^=syntax-]`)).toHaveCount(0);
-        await expectOriginalLines(file, files[index].old, files[index].new);
+        await expectOriginalLines(file, layout, files[index].old, files[index].new);
       }
     }
   }
@@ -433,7 +472,7 @@ for (const layout of ["Split", "Unified"]) {
       await expect(file.locator("td.del").first()).toHaveCSS("background-color", palette.del);
       await expect(file.locator("td.ctx .syntax-type").first()).toHaveCSS("color", palette.type);
       await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix, .syntax-comment [class^=syntax-]")).toHaveCount(0);
-      await expectOriginalLines(file, cBefore, cAfter);
+      await expectOriginalLines(file, layout, cBefore, cAfter);
       await file.screenshot({ path: info.outputPath("c-highlighting.png") });
     });
   }
@@ -465,13 +504,13 @@ test("C headers additions deletions and language renames reuse highlights across
           if (kind) await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toBeVisible();
           else await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
         }
-        await expectOriginalLines(file, files[index].old, files[index].new);
+        await expectOriginalLines(file, layout, files[index].old, files[index].new);
       }
     }
   }
   for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
     await page.getByRole("checkbox", { name: filter, exact: true }).click();
-    await expectOriginalLines(page.locator("#moondiff-file-6"), cBefore, cAfter);
+    await expectOriginalLines(page.locator("#moondiff-file-6"), "Unified", cBefore, cAfter);
   }
   expect(requests.length).toBe(count);
   expect(requests).not.toContain("true:src/added.h");
@@ -491,7 +530,7 @@ for (const layout of ["Split", "Unified"]) {
         span.className.slice("syntax-".length), span.textContent,
       ]));
       for (const token of fixture.tokens) expect(tokens).toContainEqual(token);
-      await expectOriginalLines(file, fixture.old, fixture.new);
+      await expectOriginalLines(file, layout, fixture.old, fixture.new);
     });
   }
 }
@@ -531,7 +570,7 @@ for (const layout of ["Split", "Unified"]) {
       await expect(file.locator(".syntax-string").filter({ hasText: /^https:\/\/host:8080\/path#fragment$/ }).first()).toHaveCSS("color", palette.string);
       await expect(file.locator(".syntax-string").filter({ hasText: /^on$/ }).first()).toHaveCSS("color", palette.string);
       await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix, .syntax-comment [class^=syntax-]")).toHaveCount(0);
-      await expectOriginalLines(file, yamlBefore, yamlAfter);
+      await expectOriginalLines(file, layout, yamlBefore, yamlAfter);
       await file.screenshot({ path: info.outputPath("yaml-highlighting.png") });
       expect(requests).toHaveLength(2);
       expect(errors).toEqual([]);
@@ -560,13 +599,13 @@ test("YAML extensions additions deletions and renames reuse loaded sources acros
           if (kind) await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toBeVisible();
           else await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
         }
-        await expectOriginalLines(file, source.old, source.new);
+        await expectOriginalLines(file, layout, source.old, source.new);
       }
     }
   }
   for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
     await page.getByRole("checkbox", { name: filter, exact: true }).click();
-    await expectOriginalLines(page.locator("#moondiff-file-0"), yamlBefore, yamlAfter);
+    await expectOriginalLines(page.locator("#moondiff-file-0"), "Unified", yamlBefore, yamlAfter);
   }
   expect(requests.length).toBe(count);
   expect(requests).not.toContain("true:src/added.yaml");
@@ -593,6 +632,6 @@ for (const layout of ["Split", "Unified"]) {
     await expect(file.locator('.syntax-string').filter({ hasText: /^# still string"$/ }).first()).toHaveCSS("color", colors.light.string);
     await expect(file.locator(".syntax-comment")).toHaveCount(0);
     await expect(file.locator(".syntax-boolean").first()).toBeVisible();
-    await expectOriginalLines(file, old, current);
+    await expectOriginalLines(file, layout, old, current);
   });
 }

@@ -2495,3 +2495,8 @@ button.segmented-option.active,
   gap: 0.5rem;
   font-size: 0.75rem;
 }
+
+/* Regions are independent roots without introducing layout boxes. */
+.render-region { display: contents; }
+/* Rabbita mount inserts an empty placeholder before the rendered root. */
+.render-region > div:not([class]):empty { display: none; }
