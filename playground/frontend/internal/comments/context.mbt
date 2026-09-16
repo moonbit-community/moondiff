@@ -66,5 +66,5 @@ pub fn update(session : Session, event : Event) -> (Session, Array[Effect]) {
     enabled: context.enabled,
   }
   let (next, effects) = update_review(model, event)
-  (next.review, effects)
+  (index_comments(session, next.review), effects)
 }

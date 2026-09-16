@@ -17,6 +17,10 @@ pub fn commit_discussions(@change.ChangeView, ArrayView[@moondiff-playground-pro
 
 pub fn draft_blocks_deletion(Session, CommentId) -> Bool
 
+pub fn file_commit_discussions(CommentGroup, Int?, @review.CanonicalPatch) -> Array[CommitDiscussion]
+
+pub fn file_threads(CommentGroup, Int?, @review.CanonicalPatch) -> Array[ReviewThread]
+
 pub fn permission(Session, Action) -> Permission
 
 pub fn review_can_comment(Session) -> Bool
@@ -55,6 +59,13 @@ pub(all) struct CommentDraft {
   submitting : Bool
   error : String?
 } derive(Eq)
+
+pub struct CommentGroup {
+  issue_comments : ReadOnlyArray[@moondiff-playground-protocol.ApiIssueComment]
+  review_comments : ReadOnlyArray[@moondiff-playground-protocol.ApiReviewComment]
+  commit_comments : ReadOnlyArray[@moondiff-playground-protocol.ApiCommitComment]
+}
+pub impl Eq for CommentGroup
 
 pub(all) enum CommentId {
   IssueComment(Int64)
@@ -153,6 +164,47 @@ pub(all) enum Permission {
 } derive(Eq)
 pub fn Permission::allowed(Self) -> Bool
 
+pub struct PermissionSummary {
+  can_comment : Bool
+  visible : Bool
+  login : String?
+  stale : Bool
+  target : DraftKind?
+  posting : Bool
+  deleting : Bool
+  has_snapshot : Bool
+  is_pull : Bool
+} derive(Eq)
+
+pub(all) enum ReadStatus {
+  Disabled
+  Loading
+  Ready
+  Failed(String)
+} derive(Eq)
+
+pub struct ReadView {
+  permissions : PermissionSummary
+  group : CommentGroup
+  generation : Int
+  snapshot_stale : Bool
+  login : String?
+  deletion : CommentDeletion?
+  status : ReadStatus
+  refresh_busy : Bool
+  refresh_error : String?
+  notice : String?
+  published_url : String?
+  // private fields
+} derive(Eq)
+pub fn ReadView::allowed(Self, Action) -> Bool
+pub fn ReadView::can_delete(Self, CommentId) -> Bool
+pub fn ReadView::comment_key(Self, CommentId) -> String
+pub fn ReadView::draft(Self) -> CommentDraft?
+pub fn ReadView::draft_blocks_deletion(Self, CommentId) -> Bool
+pub fn ReadView::draft_visible(Self) -> Bool
+pub fn ReadView::valid_reply_target(Self, Int64) -> Bool
+
 pub(all) struct ReviewThread {
   id : CommentId
   root : @moondiff-playground-protocol.ApiReviewComment
@@ -177,11 +229,17 @@ pub struct Session {
   // private fields
 } derive(Eq)
 pub fn Session::comment_key(Self, CommentId) -> String
+pub fn Session::comment_version(Self) -> Int
 pub fn Session::comments(Self) -> CommentsStatus
 pub fn Session::draft(Self) -> CommentDraft?
+pub fn Session::draft_path(Self) -> String?
 pub fn Session::draft_visible(Self) -> Bool
+pub fn Session::file_comments(Self, String) -> CommentGroup
 pub fn Session::generation(Self) -> Int
 pub fn Session::new(enabled? : Bool) -> Self
+pub fn Session::overall_comments(Self, ArrayView[String]) -> CommentGroup
+pub fn Session::permission_summary(Self) -> PermissionSummary
+pub fn Session::read_view(Self, path? : String, paths? : ArrayView[String], group? : CommentGroup) -> ReadView
 pub fn Session::refresh(Self) -> CommentRefresh
 pub fn Session::submission(Self) -> SubmissionPhase?
 
