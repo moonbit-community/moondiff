@@ -66,6 +66,7 @@ pub(all) enum DiffAlgorithm {
 
 pub(all) struct DiffCache {
   entries : @hashmap.HashMap[CacheKey, CachedDiffResult]
+  navigable : @hashmap.HashMap[CacheKey, Bool]
   highlights : @highlight.FileHighlights?
 } derive(Eq)
 pub fn DiffCache::empty() -> Self

@@ -44,12 +44,17 @@ pub(all) enum CacheKey {
 ///|
 pub(all) struct DiffCache {
   entries : @immut_hashmap.HashMap[CacheKey, CachedDiffResult]
+  navigable : @immut_hashmap.HashMap[CacheKey, Bool]
   highlights : @highlight.FileHighlights?
 } derive(Eq)
 
 ///|
 pub fn DiffCache::empty() -> DiffCache {
-  { entries: @immut_hashmap.new(), highlights: None, }
+  {
+    entries: @immut_hashmap.new(),
+    navigable: @immut_hashmap.new(),
+    highlights: None,
+  }
 }
 
 ///|
@@ -63,7 +68,11 @@ pub fn DiffCache::put(
   key : CacheKey,
   value : CachedDiffResult,
 ) -> DiffCache {
-  { ..self, entries: self.entries.add(key, value), }
+  {
+    ..self,
+    entries: self.entries.add(key, value),
+    navigable: self.navigable.add(key, result_has_navigable_changes(value)),
+  }
 }
 
 ///|
