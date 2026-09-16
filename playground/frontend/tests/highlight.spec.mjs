@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
+import { expectPending, holdRegionFrames } from "./dom-timing.mjs";
+import { settleRegions } from "../../tests/render-probe.mjs";
 
 const sha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const parent = "1111111111111111111111111111111111111111";
@@ -273,6 +275,48 @@ const colors = {
     add: "rgb(16, 41, 31)", del: "rgb(50, 26, 27)", wa: "rgb(25, 95, 69)", wd: "rgb(106, 44, 45)",
   },
 };
+
+for (const rate of [1, 6]) for (const algorithm of ["Token", "Tree"]) {
+  test(`line snapshots wait for regional layout commits: ${algorithm}, ${rate}x CPU`, async ({ page }) => {
+    // Cover all three languages and added, deleted and renamed files with a
+    // small fixture so CPU throttling stresses scheduling, not fixture size.
+    const sources = [files[4], files[7], yamlFiles[3]];
+    await installSources(page, sources);
+    await page.goto(path);
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const [index, source] of sources.entries()) {
+      const file = page.locator(`#moondiff-file-${index}`);
+      const expand = file.getByRole("button", { name: /^Expand / });
+      if (await expand.count()) await expand.click();
+      await expectOriginalLines(file, "Split", source.old, source.new);
+    }
+    await settleRegions(page);
+    const session = await page.context().newCDPSession(page);
+    await session.send("Emulation.setCPUThrottlingRate", { rate });
+    for (const layout of ["Unified", "Split"]) {
+      const barrier = await holdRegionFrames(page, sources.map(source => `file:${source.filename}`));
+      let reads;
+      try {
+        const toggle = page.getByRole("button", { name: layout, exact: true });
+        await toggle.click();
+        await barrier.blocked();
+        await expect(toggle).toHaveAttribute("aria-pressed", "true");
+        for (const index of sources.keys()) {
+          await expect(page.locator(`#moondiff-file-${index} table.review-diff`).first()).toHaveClass(new RegExp(`\\b${layout === "Split" ? "unified" : "split"}\\b`));
+        }
+        reads = sources.map((source, index) => expectOriginalLines(
+          page.locator(`#moondiff-file-${index}`), layout, source.old, source.new,
+        ));
+        await Promise.all(reads.map((read, index) => expectPending(read, `${sources[index].filename} must wait for ${layout}`)));
+      } finally {
+        await barrier.release();
+        if (reads) await Promise.all(reads);
+      }
+      await settleRegions(page);
+    }
+    await session.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  });
+}
 
 for (const layout of ["Split", "Unified"]) {
   test(`${layout}: C long generated lines fall back without losing text or diff backgrounds`, async ({ page }, info) => {

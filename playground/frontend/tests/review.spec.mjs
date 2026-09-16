@@ -1,5 +1,7 @@
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
 import { checkToolbar } from "./toolbar.mjs";
+import { expectPending, holdRegionFrames } from "./dom-timing.mjs";
+import { settleRegions } from "../../tests/render-probe.mjs";
 import { expect, test } from "@playwright/test";
 
 const head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -209,6 +211,10 @@ async function installApi(page, target = pullTarget(), options = {}) {
         return { ...authStatus(), attempt_id: args.attempt_id };
       }
       if (op === "auth.device.poll") {
+        if (state.delayNextDevicePoll) {
+          state.delayNextDevicePoll = false;
+          await new Promise(resolve => { state.releaseDevicePoll = resolve; });
+        }
         state.authenticated = true;
         const device_flow = { ...state.device, phase: 'completed' };
         state.device = null;
@@ -676,6 +682,59 @@ test("expired credentials during comment refresh offer sign-in and hide authorin
   await expect(page.locator(".line-comment-button").first()).toBeAttached();
 });
 
+for (const kind of ["overall", "inline"]) {
+  test(`${kind} draft survives re-login without taking file search focus`, async ({ page }) => {
+    await installApi(page, pullTarget(), { authenticated: true });
+    await page.goto(reviewPath());
+    await waitForSignedInComments(page);
+    if (kind === "overall") {
+      await page.getByRole("button", { name: "Add overall comment" }).click();
+    } else {
+      await openNewLineComment(page, 2);
+    }
+    const editor = page.locator(".comment-editor textarea");
+    await expect(editor).toBeFocused();
+    const body = "Keep this draft through re-login\n" + "Keep the scroll position\n".repeat(30);
+    await editor.fill(body);
+    const draftId = await editor.getAttribute("data-draft-id");
+    const interaction = el => [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
+    const saved = await editor.evaluate(el => {
+      el.setSelectionRange(3, 12, "backward");
+      el.scrollTop = 48;
+      return [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
+    });
+    expect(saved[3]).toBeGreaterThan(0);
+
+    // A background refresh expires the session while the draft still has focus.
+    await page.evaluate(() => {
+      window.__fake.authenticationFailureOps.push("github.comments.list");
+      window.__fake.delayNextDevicePoll = true;
+    });
+    await reactivatePage(page);
+    await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
+    await expect(editor).toHaveCount(0);
+    await page.getByRole("button", { name: "Try sign-in" }).click();
+    await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDevicePoll)).toBe("function");
+
+    // Keep login pending until the user is typing in a different control.
+    await page.getByRole("button", { name: "Search files", exact: true }).click();
+    const search = page.getByRole("searchbox", { name: "Search changed files" });
+    await search.fill("main");
+    await expect(search).toBeFocused();
+    await expect(editor).toHaveCount(0);
+    await page.evaluate(() => window.__fake.releaseDevicePoll());
+    await waitForSignedInComments(page);
+    await expect(editor).toBeVisible();
+    await expect(search).toBeFocused();
+    await page.keyboard.type(".mbt");
+    await expect(search).toHaveValue("main.mbt");
+    await expect(search).toBeFocused();
+    await expect(editor).toHaveAttribute("data-draft-id", draftId);
+    await expect(editor).toHaveValue(body);
+    await expect.poll(() => editor.evaluate(interaction)).toEqual(saved);
+  });
+}
+
 test("expired credentials during comment submission preserve the draft for retry", async ({ page }) => {
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
@@ -1106,6 +1165,79 @@ for (const [target, body, operation] of [[commitTarget(), "Existing commit comme
     await card.getByRole("button", { name: "Confirm delete" }).click();
     await expect(card).toHaveCount(0);
     expect(await page.evaluate(op => window.__fake.calls.filter(c => c.op === op).length, operation)).toBe(1);
+  });
+}
+
+for (const rate of [1, 6]) for (const layout of ["Split", "Unified"]) {
+  test(`comment deletion waits for cancellation commit: ${layout}, ${rate}x CPU`, async ({ page }) => {
+    await installApi(page, pullTarget(), { authenticated: true, login: "reviewer" });
+    await page.goto(reviewPath());
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    const card = page.locator(".github-comment").filter({ hasText: "Existing inline comment" });
+    await expect(page.locator(".inline-discussion-row").filter({ has: card })).toBeVisible();
+    await requestCommentDeletion(card);
+    await settleRegions(page);
+    const session = await page.context().newCDPSession(page);
+    await session.send("Emulation.setCPUThrottlingRate", { rate });
+    // Exercise both the cancel helper and a caller that only awaited the click.
+    for (const useHelper of [true, false]) {
+      const barrier = await holdRegionFrames(page, ["file:src/main.mbt"]);
+      let cancellation, reopening;
+      try {
+        if (useHelper) cancellation = cancelCommentDeletion(card);
+        else await card.getByRole("button", { name: "Cancel deletion", exact: true }).click();
+        await barrier.blocked();
+        await expect(card.getByRole("button", { name: "Confirm delete", exact: true })).toBeVisible();
+        if (cancellation) await expectPending(cancellation, "cancellation must wait for its DOM commit");
+        else {
+          reopening = requestCommentDeletion(card);
+          await expectPending(reopening, "the old confirmation cannot satisfy a new deletion request");
+          await expect(card.getByRole("menu")).toBeHidden();
+        }
+        expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith(".comment.delete")).length)).toBe(0);
+      } finally {
+        await barrier.release();
+        if (cancellation) await cancellation;
+        if (reopening) await reopening;
+      }
+      if (useHelper) {
+        await expect(card.locator(".comment-delete-actions")).toHaveCount(0);
+        await requestCommentDeletion(card);
+      }
+      await settleRegions(page);
+    }
+    await card.getByRole("button", { name: "Confirm delete", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.review.comment.delete").length)).toBe(1);
+    await session.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  });
+}
+
+for (const layout of ["Split", "Unified"]) {
+  test(`comment deletion recovers when source loading moves an open menu inline: ${layout}`, async ({ page }) => {
+    const target = commitTarget();
+    await installApi(page, target, { authenticated: true, login: "reviewer" });
+    const source = await holdNextResponse(page, message => message.op === "github.content.get" && message.args.ref === commitSha);
+    await page.goto(reviewPath(target));
+    await source.started;
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    const card = page.locator(".github-comment").filter({ hasText: "Existing commit comment" });
+    await expect(page.locator(".file-discussions").filter({ has: card })).toBeVisible();
+    let interruptions = 0;
+    // Complete loading between opening the fallback menu and clicking Delete.
+    await page.addLocatorHandler(card.getByRole("menu"), async () => {
+      source.release();
+      await source.completed;
+      await expect(page.locator(".inline-discussion-row").filter({ has: card })).toBeVisible();
+      await expect(card.getByRole("menu")).toBeHidden();
+      interruptions += 1;
+    }, { times: 1 });
+    await requestCommentDeletion(card);
+    expect(interruptions).toBe(1);
+    expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.commit.comment.delete").length)).toBe(0);
+    await card.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(card).toHaveCount(0);
+    expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.commit.comment.delete").length)).toBe(1);
   });
 }
 
