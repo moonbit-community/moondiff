@@ -52,9 +52,18 @@ pub fn has_navigable_changes(
   ignore_comments~ : Bool,
   ignore_tests~ : Bool,
 ) -> Bool {
-  guard (file.old_side, file.new_side) is (Ready(_), Ready(_)) &&
-    cached_file_document(file, algorithm, ignore_comments~, ignore_tests~)
-    is Some(MoonBit(document=TopLevel(top), status~, ..)) &&
+  file.old_side is Ready(_) &&
+  file.new_side is Ready(_) &&
+  file.diff_cache.navigable
+  .get(
+    diff_cache_key(file.diff_mode, algorithm, ignore_comments~, ignore_tests~),
+  )
+  .unwrap_or(false)
+}
+
+///|
+fn result_has_navigable_changes(result : CachedDiffResult) -> Bool {
+  guard result is MoonBit(document=TopLevel(top), status~, ..) &&
     !(status is IgnoredOnly) else {
     return false
   }
@@ -76,6 +85,7 @@ fn calculate_file_document(
   guard (file.old_side, file.new_side) is (Ready(old), Ready(new)) else {
     return None
   }
+  @metrics.count(file.file.filename, "diff")
   match key {
     Line => Some(Line(@linediff.line_diff(old~, new~, context=3)))
     MoonBit(algorithm, ignore_comments, ignore_tests) => {
@@ -113,6 +123,7 @@ pub fn ensure_file_document(
   let file = if file.diff_cache.highlights is None &&
     file.old_side is Ready(old) &&
     file.new_side is Ready(new) {
+    @metrics.count(file.file.filename, "highlight")
     {
       ..file,
       diff_cache: {
