@@ -1,15 +1,16 @@
-import { cpSync, copyFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildServer, startServer, repository } from '../backend/tests/server-fixture.mjs';
+import { instrumentRenderProbe } from './render-probe.mjs';
 import { e2ePort } from './e2e-config.mjs';
 const assets = mkdtempSync(join(tmpdir(), 'moondiff-e2e-assets-'));
 buildServer();
 const build = spawnSync('moon', ['build', 'playground/frontend/main', '--target', 'js', '--release'], { cwd: repository, stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status || 1);
 cpSync(join(repository, 'playground/frontend/public'), assets, { recursive: true });
-copyFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), join(assets, 'index.js'));
+writeFileSync(join(assets, 'index.js'), instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), 'utf8')));
 const fixture = await startServer((request, response) => {
   if (request.path.startsWith('/repos/fixture/repo/')) {
     const path = new URL(request.path, 'http://localhost').pathname;

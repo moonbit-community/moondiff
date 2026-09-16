@@ -5,6 +5,7 @@
   "scripts": {
     "build": "npm --prefix playground run build",
     "test:playground": "npm --prefix playground run test:e2e",
+    "test:playground:stress": "npm --prefix playground run test:e2e:stress --",
     "build:extension": "npm run build:extension:chrome && npm run build:extension:firefox",
     "build:extension:chrome": "node extension/chrome/scripts/build.mjs",
     "build:extension:firefox": "node extension/firefox/scripts/build.mjs",

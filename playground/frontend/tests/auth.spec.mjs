@@ -1,6 +1,7 @@
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { e2eOrigin } from '../../tests/e2e-config.mjs';
 import { expect, test } from '@playwright/test';
+import { setTimeout as delay } from 'node:timers/promises';
 const sha = 'abcdef1234567890abcdef1234567890abcdef12';
 const route = `/fixture/repo/commit/${sha}`;
 
@@ -158,6 +159,15 @@ async function installAuthClock(page) {
   });
 }
 
+async function fulfillAuth(page, handler, response, responseDelay) {
+  if (responseDelay) {
+    const before = await page.evaluate(() => Date.now());
+    await delay(responseDelay);
+    expect(await page.evaluate(() => Date.now()), 'real response latency must not advance virtual time').toBe(before);
+  }
+  await handler.fulfill(response);
+}
+
 function authResponse(page, endpoint) {
   return page.waitForResponse(response => new URL(response.url()).pathname === `/api/auth/${endpoint}`);
 }
@@ -185,151 +195,155 @@ async function beforeAuthDeadline(page, index, ms) {
   expect(await page.evaluate(() => Date.now())).toBe(timer.at + ms - 1);
 }
 
-test('proxy failures during session start and polling back off and recover on one login attempt', async ({ page }) => {
-  let sessions = 0;
-  const starts = [], polls = [];
-  const canonical = 'canonical-proxy-recovery-0001';
-  const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
-  await installAuthClock(page);
-  await page.route('**/api/auth/status', handler => {
-    sessions += 1;
-    const response = sessions === 2
-      ? { status: 503, contentType: 'text/html', body: '<html><body>Proxy unavailable</body></html>' }
-      : { json: successFixture('auth.status', {
-        authenticated: false,
-        csrf_token: `session-csrf-${sessions}`,
-        ...(sessions >= 4 ? { device_flow: device } : {}),
-      }) };
-    return handler.fulfill(response);
-  });
-  await page.route('**/api/auth/device/start', handler => {
-    const { attempt_id } = handler.request().postDataJSON();
-    starts.push({ attempt_id, csrf: handler.request().headers()['x-csrf-token'] });
-    return handler.fulfill(starts.length === 1
-      ? { status: 502, body: '' }
-      : { json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'poll-csrf', attempt_id, device_flow: device }) });
-  });
-  await page.route('**/api/auth/device/poll', handler => {
-    const { authorization_id } = handler.request().postDataJSON();
-    polls.push({ authorization_id, csrf: handler.request().headers()['x-csrf-token'] });
-    return handler.fulfill(polls.length === 1
-      ? { status: 504, contentType: 'application/json', body: '{invalid json' }
-      : { json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'signed-in-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) });
-  });
-  let response = authResponse(page, 'status');
-  await page.goto(route);
-  const signIn = page.getByRole('button', { name: 'Sign in with GitHub' });
-  await renderAuthResponse(page, response, signIn, 0);
-  response = authResponse(page, 'status');
-  await signIn.click();
-  const retryMessage = page.getByText('Connection interrupted. Sign-in will retry automatically.');
-  await renderAuthResponse(page, response, retryMessage, 1);
-  expect(sessions).toBe(2);
-  expect(starts).toEqual([]);
-  await expect(page.getByText('Proxy unavailable')).toHaveCount(0);
+for (const responseDelay of [0, 250]) {
+  const latency = responseDelay ? ` (${responseDelay}ms responses)` : '';
 
-  await beforeAuthDeadline(page, 0, 10_000);
-  expect(sessions).toBe(2);
-  expect(starts).toEqual([]);
-  response = authResponse(page, 'device/start');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, retryMessage, 2);
-  expect(sessions).toBe(3);
-  expect(starts).toHaveLength(1);
-  await beforeAuthDeadline(page, 1, 20_000);
-  expect(sessions).toBe(3);
-  expect(starts).toHaveLength(1);
-  response = authResponse(page, 'device/start');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, page.locator('.device-code'), 3);
-  await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
-  expect(sessions).toBe(4);
-  const attempts = await page.evaluate(() => window.__attempts);
-  expect(attempts).toHaveLength(1);
-  expect(starts).toEqual([
-    { attempt_id: attempts[0], csrf: 'session-csrf-3' },
-    { attempt_id: attempts[0], csrf: 'session-csrf-4' },
-  ]);
-  expect(attempts[0]).not.toBe(canonical);
+  test(`proxy failures during session start and polling back off and recover on one login attempt${latency}`, async ({ page }) => {
+    let sessions = 0;
+    const starts = [], polls = [];
+    const canonical = 'canonical-proxy-recovery-0001';
+    const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
+    await installAuthClock(page);
+    await page.route('**/api/auth/status', handler => {
+      sessions += 1;
+      const response = sessions === 2
+        ? { status: 503, contentType: 'text/html', body: '<html><body>Proxy unavailable</body></html>' }
+        : { json: successFixture('auth.status', {
+          authenticated: false,
+          csrf_token: `session-csrf-${sessions}`,
+          ...(sessions >= 4 ? { device_flow: device } : {}),
+        }) };
+      return fulfillAuth(page, handler, response, responseDelay);
+    });
+    await page.route('**/api/auth/device/start', handler => {
+      const { attempt_id } = handler.request().postDataJSON();
+      starts.push({ attempt_id, csrf: handler.request().headers()['x-csrf-token'] });
+      return fulfillAuth(page, handler, starts.length === 1
+        ? { status: 502, body: '' }
+        : { json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'poll-csrf', attempt_id, device_flow: device }) }, responseDelay);
+    });
+    await page.route('**/api/auth/device/poll', handler => {
+      const { authorization_id } = handler.request().postDataJSON();
+      polls.push({ authorization_id, csrf: handler.request().headers()['x-csrf-token'] });
+      return fulfillAuth(page, handler, polls.length === 1
+        ? { status: 504, contentType: 'application/json', body: '{invalid json' }
+        : { json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'signed-in-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) }, responseDelay);
+    });
+    let response = authResponse(page, 'status');
+    await page.goto(route);
+    const signIn = page.getByRole('button', { name: 'Sign in with GitHub' });
+    await renderAuthResponse(page, response, signIn, 0);
+    response = authResponse(page, 'status');
+    await signIn.click();
+    const retryMessage = page.getByText('Connection interrupted. Sign-in will retry automatically.');
+    await renderAuthResponse(page, response, retryMessage, 1);
+    expect(sessions).toBe(2);
+    expect(starts).toEqual([]);
+    await expect(page.getByText('Proxy unavailable')).toHaveCount(0);
 
-  await beforeAuthDeadline(page, 2, 5_000);
-  expect(polls).toEqual([]);
-  response = authResponse(page, 'device/poll');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, retryMessage, 4);
-  expect(polls).toHaveLength(1);
-  await beforeAuthDeadline(page, 3, 10_000);
-  expect(polls).toHaveLength(1);
-  response = authResponse(page, 'device/poll');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 4);
-  expect(polls).toEqual([
-    { authorization_id: canonical, csrf: 'poll-csrf' },
-    { authorization_id: canonical, csrf: 'poll-csrf' },
-  ]);
-  expect(sessions).toBe(4);
-  expect(starts).toHaveLength(2);
-  expect(await page.evaluate(() => window.__attempts)).toEqual(attempts);
-});
+    await beforeAuthDeadline(page, 0, 10_000);
+    expect(sessions).toBe(2);
+    expect(starts).toEqual([]);
+    response = authResponse(page, 'device/start');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, retryMessage, 2);
+    expect(sessions).toBe(3);
+    expect(starts).toHaveLength(1);
+    await beforeAuthDeadline(page, 1, 20_000);
+    expect(sessions).toBe(3);
+    expect(starts).toHaveLength(1);
+    response = authResponse(page, 'device/start');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, page.locator('.device-code'), 3);
+    await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
+    expect(sessions).toBe(4);
+    const attempts = await page.evaluate(() => window.__attempts);
+    expect(attempts).toHaveLength(1);
+    expect(starts).toEqual([
+      { attempt_id: attempts[0], csrf: 'session-csrf-3' },
+      { attempt_id: attempts[0], csrf: 'session-csrf-4' },
+    ]);
+    expect(attempts[0]).not.toBe(canonical);
 
-test('session failures back off on one login attempt and recover with fresh CSRF and canonical polling', async ({ page }) => {
-  let sessions = 0;
-  const starts = [], polls = [];
-  const canonical = 'canonical-authorization-0001';
-  const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
-  await installAuthClock(page);
-  await page.route('**/api/auth/status', handler => {
-    sessions += 1;
-    return handler.fulfill({ status: sessions <= 3 ? 503 : 200, json: sessions <= 3
-      ? { $tag: 'Failure', error: { status: 503, code: 'unavailable', message: 'Session temporarily unavailable' } }
-      : successFixture('auth.status', { authenticated: false, csrf_token: 'fresh-retry-csrf' }) });
+    await beforeAuthDeadline(page, 2, 5_000);
+    expect(polls).toEqual([]);
+    response = authResponse(page, 'device/poll');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, retryMessage, 4);
+    expect(polls).toHaveLength(1);
+    await beforeAuthDeadline(page, 3, 10_000);
+    expect(polls).toHaveLength(1);
+    response = authResponse(page, 'device/poll');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 4);
+    expect(polls).toEqual([
+      { authorization_id: canonical, csrf: 'poll-csrf' },
+      { authorization_id: canonical, csrf: 'poll-csrf' },
+    ]);
+    expect(sessions).toBe(4);
+    expect(starts).toHaveLength(2);
+    expect(await page.evaluate(() => window.__attempts)).toEqual(attempts);
   });
-  await page.route('**/api/auth/device/start', handler => {
-    const { attempt_id } = handler.request().postDataJSON();
-    starts.push({ attempt_id, csrf: handler.request().headers()['x-csrf-token'] });
-    return handler.fulfill({ json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'fresh-retry-csrf', attempt_id, device_flow: device }) });
+
+  test(`session failures back off on one login attempt and recover with fresh CSRF and canonical polling${latency}`, async ({ page }) => {
+    let sessions = 0;
+    const starts = [], polls = [];
+    const canonical = 'canonical-authorization-0001';
+    const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
+    await installAuthClock(page);
+    await page.route('**/api/auth/status', handler => {
+      sessions += 1;
+      return fulfillAuth(page, handler, { status: sessions <= 3 ? 503 : 200, json: sessions <= 3
+        ? { $tag: 'Failure', error: { status: 503, code: 'unavailable', message: 'Session temporarily unavailable' } }
+        : successFixture('auth.status', { authenticated: false, csrf_token: 'fresh-retry-csrf' }) }, responseDelay);
+    });
+    await page.route('**/api/auth/device/start', handler => {
+      const { attempt_id } = handler.request().postDataJSON();
+      starts.push({ attempt_id, csrf: handler.request().headers()['x-csrf-token'] });
+      return fulfillAuth(page, handler, { json: successFixture('auth.device.start', { authenticated: false, csrf_token: 'fresh-retry-csrf', attempt_id, device_flow: device }) }, responseDelay);
+    });
+    await page.route('**/api/auth/device/poll', handler => {
+      const { authorization_id } = handler.request().postDataJSON();
+      polls.push({ authorization_id, csrf: handler.request().headers()['x-csrf-token'] });
+      return fulfillAuth(page, handler, { json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'fresh-retry-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) }, responseDelay);
+    });
+    let response = authResponse(page, 'status');
+    await page.goto(route);
+    const signIn = page.getByRole('button', { name: 'Try sign-in' });
+    await renderAuthResponse(page, response, signIn, 0);
+    response = authResponse(page, 'status');
+    await signIn.click();
+    const retryMessage = page.getByText('Connection interrupted. Sign-in will retry automatically.');
+    await renderAuthResponse(page, response, retryMessage, 1);
+    expect(sessions).toBe(2);
+    expect(starts).toEqual([]);
+    await beforeAuthDeadline(page, 0, 10_000);
+    expect(sessions).toBe(2);
+    response = authResponse(page, 'status');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, retryMessage, 2);
+    expect(sessions).toBe(3);
+    expect(starts).toEqual([]);
+    await beforeAuthDeadline(page, 1, 20_000);
+    expect(sessions).toBe(3);
+    expect(starts).toEqual([]);
+    response = authResponse(page, 'device/start');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, page.locator('.device-code'), 3);
+    await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
+    expect(sessions).toBe(4);
+    const attempts = await page.evaluate(() => window.__attempts);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).not.toBe(canonical);
+    expect(starts).toEqual([{ attempt_id: attempts[0], csrf: 'fresh-retry-csrf' }]);
+    await beforeAuthDeadline(page, 2, 5_000);
+    expect(polls).toEqual([]);
+    response = authResponse(page, 'device/poll');
+    await page.clock.runFor(1);
+    await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 3);
+    expect(polls).toEqual([{ authorization_id: canonical, csrf: 'fresh-retry-csrf' }]);
+    expect(sessions).toBe(4);
+    expect(starts).toHaveLength(1);
+    expect(await page.evaluate(() => window.__attempts)).toEqual(attempts);
   });
-  await page.route('**/api/auth/device/poll', handler => {
-    const { authorization_id } = handler.request().postDataJSON();
-    polls.push({ authorization_id, csrf: handler.request().headers()['x-csrf-token'] });
-    return handler.fulfill({ json: successFixture('auth.device.poll', { authenticated: true, csrf_token: 'fresh-retry-csrf', user_id: 'alice', login: 'alice', authorization_id, device_flow: { ...device, phase: 'completed' } }) });
-  });
-  let response = authResponse(page, 'status');
-  await page.goto(route);
-  const signIn = page.getByRole('button', { name: 'Try sign-in' });
-  await renderAuthResponse(page, response, signIn, 0);
-  response = authResponse(page, 'status');
-  await signIn.click();
-  const retryMessage = page.getByText('Connection interrupted. Sign-in will retry automatically.');
-  await renderAuthResponse(page, response, retryMessage, 1);
-  expect(sessions).toBe(2);
-  expect(starts).toEqual([]);
-  await beforeAuthDeadline(page, 0, 10_000);
-  expect(sessions).toBe(2);
-  response = authResponse(page, 'status');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, retryMessage, 2);
-  expect(sessions).toBe(3);
-  expect(starts).toEqual([]);
-  await beforeAuthDeadline(page, 1, 20_000);
-  expect(sessions).toBe(3);
-  expect(starts).toEqual([]);
-  response = authResponse(page, 'device/start');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, page.locator('.device-code'), 3);
-  await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
-  expect(sessions).toBe(4);
-  const attempts = await page.evaluate(() => window.__attempts);
-  expect(attempts).toHaveLength(1);
-  expect(attempts[0]).not.toBe(canonical);
-  expect(starts).toEqual([{ attempt_id: attempts[0], csrf: 'fresh-retry-csrf' }]);
-  await beforeAuthDeadline(page, 2, 5_000);
-  expect(polls).toEqual([]);
-  response = authResponse(page, 'device/poll');
-  await page.clock.runFor(1);
-  await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 3);
-  expect(polls).toEqual([{ authorization_id: canonical, csrf: 'fresh-retry-csrf' }]);
-  expect(sessions).toBe(4);
-  expect(starts).toHaveLength(1);
-  expect(await page.evaluate(() => window.__attempts)).toEqual(attempts);
-});
+}
