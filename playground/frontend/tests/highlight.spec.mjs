@@ -284,6 +284,60 @@ for (const algorithm of ["Token", "Tree"]) {
   }
 }
 
+test("MoonBit manifests auto-expand with highlighted line diffs, including renames", async ({ page }) => {
+  const moduleBefore = 'name = "example/demo"\nversion = "0.1.0"\nimport {\n  "moonbitlang/lexer@0.3.16",\n}';
+  const packageBefore = 'import {\n  "moonbitlang/core/json",\n}\noptions("is-main": false)';
+  const sources = [
+    ...["moon.mod", "nested/moon.mod"].map(filename => ({
+      filename, old: moduleBefore, new: moduleBefore.replace("0.1.0", "0.2.0"),
+      highlightedSides: ["del", "add"],
+    })),
+    ...["moon.pkg", "nested/moon.pkg"].map(filename => ({
+      filename, old: packageBefore, new: packageBefore.replace("false", "true"),
+      highlightedSides: ["del", "add"],
+    })),
+    {
+      filename: "legacy/moon.mod.txt", previous_filename: "legacy/moon.mod",
+      old: moduleBefore, new: moduleBefore.replace("0.1.0", "0.2.0"),
+      highlightedSides: ["del"],
+    },
+    {
+      filename: "migrated/moon.pkg", previous_filename: "migrated/moon.pkg.txt",
+      old: packageBefore, new: packageBefore.replace("false", "true"),
+      highlightedSides: ["add"],
+    },
+  ];
+  const requests = await installSources(page, sources);
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto(path);
+  for (const algorithm of ["Token", "Tree"]) {
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const layout of ["Split", "Unified"]) {
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      for (const [index, source] of sources.entries()) {
+        const file = page.locator(`#moondiff-file-${index}`);
+        await expect(file.locator(".file-toggle")).toHaveAttribute("aria-expanded", "true");
+        await expect(file.locator(".review-diff")).toBeVisible();
+        await expect(file.locator("table")).toHaveClass(new RegExp(`\\b${layout.toLowerCase()}\\b`));
+        await expect(file.locator(".diff-notice")).toHaveCount(0);
+        for (const side of ["del", "add"]) {
+          if (source.highlightedSides.includes(side)) {
+            await expect(file.locator(`td.${side} .syntax-string`).first()).toHaveCSS("color", colors.light.string);
+          } else {
+            await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
+          }
+          await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", colors.light[side]);
+        }
+        if (source.highlightedSides.length === 2) {
+          await expect(file.locator(".syntax-keyword").first()).toHaveCSS("color", colors.light.keyword);
+        }
+        await expectOriginalLines(file, source.old, source.new);
+      }
+    }
+  }
+  expect(requests).toHaveLength(sources.length * 2);
+});
+
 test("renames highlight each source side independently; filters and layouts reuse loaded sources", async ({ page }) => {
   const requests = await installSources(page);
   await page.goto(path);

@@ -43,12 +43,15 @@ pub fn finish_change(
   all_files : Array[ApiFile],
 ) -> ChangeView {
   let states : Array[FileState] = []
-  let mut moonbit_file_count = 0
+  let mut auto_load_count = 0
   for file in all_files {
     let diff_mode = file_diff_mode(file)
-    let expanded = diff_mode is MoonBitDiff && moonbit_file_count < 20
-    if diff_mode is MoonBitDiff {
-      moonbit_file_count += 1
+    let auto_load = diff_mode is MoonBitDiff ||
+      is_moonbit_manifest(file.filename) ||
+      file.previous_filename.map(is_moonbit_manifest).unwrap_or(false)
+    let expanded = auto_load && auto_load_count < 20
+    if auto_load {
+      auto_load_count += 1
     }
     let pair = source_pair_for_revisions(old_revision, new_revision, file)
     states.push({
