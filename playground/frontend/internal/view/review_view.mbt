@@ -128,20 +128,71 @@ fn split_review_line(
   row : ReviewRow,
   review : Session,
   emit : @rabbita.Emit[Msg],
+  single_side? : @review.ReviewSide,
   discussions? : InlineDiscussions = empty_discussions(),
   site? : String = "",
   change_block? : Int,
   highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let (old_class, new_class) = review_row_classes(row)
+  let columns = if single_side is Some(_) { 2 } else { 4 }
   let cards = inline_cards(
     discussions,
     row.file_index,
     row.old_line,
     row.new_line,
-    4,
+    columns,
     site,
   )
+  let cells : Array[@rabbita.Html] = []
+  if single_side != Some(Right) {
+    cells.push(
+      review_gutter(
+        row.file_index,
+        row.old_line,
+        row.old_anchor,
+        "old-line-number",
+        review,
+        emit,
+      ),
+    )
+    cells.push(
+      @html.td(
+        class=old_class,
+        review_segment_nodes(
+          row.old_text,
+          row.old_segments,
+          "wd",
+          "",
+          highlights=source_line_highlights(highlights.old, row.old_line),
+        ),
+      ),
+    )
+  }
+  if single_side != Some(Left) {
+    cells.push(
+      review_gutter(
+        row.file_index,
+        row.new_line,
+        row.new_anchor,
+        "new-line-number",
+        review,
+        emit,
+      ),
+    )
+    cells.push(
+      @html.td(
+        class=new_class,
+        review_segment_nodes(
+          row.new_text,
+          row.new_segments,
+          "wa",
+          "",
+          highlights=source_line_highlights(highlights.new, row.new_line),
+        ),
+      ),
+    )
+  }
   let items : Array[(String, @rabbita.Html)] = [
     (
       source_row_key("split", row.file_index, row.old_line, row.new_line),
@@ -154,54 +205,17 @@ fn split_review_line(
         } else {
           "comment-target"
         },
-        [
-          review_gutter(
-            row.file_index,
-            row.old_line,
-            row.old_anchor,
-            "old-line-number",
-            review,
-            emit,
-          ),
-          @html.td(
-            class=old_class,
-            review_segment_nodes(
-              row.old_text,
-              row.old_segments,
-              "wd",
-              "",
-              highlights=source_line_highlights(highlights.old, row.old_line),
-            ),
-          ),
-          review_gutter(
-            row.file_index,
-            row.new_line,
-            row.new_anchor,
-            "new-line-number",
-            review,
-            emit,
-          ),
-          @html.td(
-            class=new_class,
-            review_segment_nodes(
-              row.new_text,
-              row.new_segments,
-              "wa",
-              "",
-              highlights=source_line_highlights(highlights.new, row.new_line),
-            ),
-          ),
-        ],
+        cells,
       ),
     ),
   ]
   items.push_iter(cards.iter())
   if inline_draft_for_anchor(review, row.old_anchor) is Some(_) &&
     projected_editor(discussions, row.old_anchor, row.file_index, site) {
-    items.push(inline_editor_row(review, row.old_anchor, 4, emit))
+    items.push(inline_editor_row(review, row.old_anchor, columns, emit))
   } else if inline_draft_for_anchor(review, row.new_anchor) is Some(_) &&
     projected_editor(discussions, row.new_anchor, row.file_index, site) {
-    items.push(inline_editor_row(review, row.new_anchor, 4, emit))
+    items.push(inline_editor_row(review, row.new_anchor, columns, emit))
   }
   items
 }
@@ -441,6 +455,18 @@ fn safe_review_diff(
   discussions? : InlineDiscussions = empty_discussions(),
   highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> @rabbita.Html {
+  let single_side : @review.ReviewSide? = match (mode, file.status) {
+    (Split, "added") => Some(Right)
+    (Split, "removed") => Some(Left)
+    _ => None
+  }
+  let columns = if mode is Unified {
+    3
+  } else if single_side is Some(_) {
+    2
+  } else {
+    4
+  }
   let patch = parse_canonical_patch(file.filename, file.patch)
   let rows : Map[String, @rabbita.Html] = Map([])
   // Count each source identity independently; comments never shift these keys.
@@ -464,11 +490,7 @@ fn safe_review_diff(
         let occurrence = occurrences.get(key).unwrap_or(0)
         occurrences[key] = occurrence + 1
         rows["\{key}:\{occurrence}"] = @html.tr([
-          @html.td(
-            class="hunk-header",
-            colspan=if mode is Split { 4 } else { 3 },
-            header,
-          ),
+          @html.td(class="hunk-header", colspan=columns, header),
         ])
       }
       ReviewLine(row) => {
@@ -487,6 +509,7 @@ fn safe_review_diff(
               row,
               review,
               emit,
+              single_side?,
               discussions~,
               change_block?,
               highlights~,
@@ -518,14 +541,18 @@ fn safe_review_diff(
   }
   @html.div(class="diff-scroll review-scroll", [
     @html.table(
-      class=if mode is Split {
+      class=if single_side is Some(_) {
+        "split single-sided review-diff"
+      } else if mode is Split {
         "split review-diff"
       } else {
         "unified numbered review-diff"
       },
       [
         @html.colgroup(
-          if mode is Split {
+          if single_side is Some(_) {
+            [@html.col(class="gutter-column"), @html.col()]
+          } else if mode is Split {
             [
               @html.col(class="gutter-column"),
               @html.col(),

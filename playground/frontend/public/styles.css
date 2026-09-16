@@ -1487,6 +1487,13 @@ button.file-tree-row.selected {
   padding: 0 0.72rem;
 }
 
+.diff-scroll table.split.single-sided td.ctx,
+.diff-scroll table.split.single-sided td.del,
+.diff-scroll table.split.single-sided td.add,
+.diff-scroll table.split.single-sided td.empty {
+  width: calc(100% - 3rem);
+}
+
 .diff-scroll table.unified td.ctx,
 .diff-scroll table.unified td.del,
 .diff-scroll table.unified td.add,
@@ -1506,7 +1513,7 @@ button.file-tree-row.selected {
   user-select: none;
 }
 
-.diff-scroll table.split td.new-line-number {
+.diff-scroll table.split:not(.single-sided) td.new-line-number {
   border-left: 1px solid var(--border-soft);
 }
 
@@ -2382,11 +2389,11 @@ button.segmented-option.active,
 }
 
 @container review (min-width: 720px) {
-  .split .inline-discussion {
+  .split:not(.single-sided) .inline-discussion {
     width: 50%;
   }
 
-  .split .inline-right {
+  .split:not(.single-sided) .inline-right {
     margin-left: auto;
   }
 }
