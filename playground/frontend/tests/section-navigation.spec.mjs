@@ -21,7 +21,7 @@ function declaration(name, version, groups = 3) {
   return [...lines, "}"].join("\n");
 }
 
-async function loadNavigation(page, { layout = "Split", algorithm = "Tree", width = 1440, single = false, trailingFile = true, leadingAddition = false } = {}) {
+async function loadNavigation(page, { layout = "Split", algorithm = "Tree", width = 1440, single = false, trailingFile = true, leadingAddition = false, message = "Navigate individual changes across declarations", extraFiles = [] } = {}) {
   await page.setViewportSize({ width, height: 720 });
   await anonymousApi(page);
   const source = version => single
@@ -35,11 +35,12 @@ async function loadNavigation(page, { layout = "Split", algorithm = "Tree", widt
     ].join("\n\n");
   const files = [{ filename: "navigation.mbt", status: "modified", additions: 84, deletions: 98, changes: 182 }];
   if (trailingFile) files.push({ filename: "other.mbt", status: "modified", additions: 36, deletions: 36, changes: 72 });
+  files.push(...extraFiles.map(file => ({ status: "modified", additions: 1, deletions: 1, changes: 2, ...file })));
   await routeGithub(page, "api", route => route.fulfill({
     body: JSON.stringify({
       sha,
       html_url: `https://github.com/example/navigation/commit/${sha}`,
-      commit: { message: "Navigate individual changes across declarations" },
+      commit: { message },
       parents: [{ sha: parent }],
       stats: { additions: 120, deletions: 134, total: 254 },
       files,
@@ -50,7 +51,7 @@ async function loadNavigation(page, { layout = "Split", algorithm = "Tree", widt
     const version = url.includes(parent) ? "old" : "new";
     return route.fulfill({
       contentType: "text/plain",
-      body: url.includes("other.mbt") ? declaration("other_file", version) : source(version),
+      body: extraFiles.find(file => url.includes(file.filename))?.[version] ?? (url.includes("other.mbt") ? declaration("other_file", version) : source(version)),
     });
   });
   await page.goto(`/example/navigation/commit/${sha}`);
@@ -306,4 +307,180 @@ test("navigation clamps the final change to the page bottom", async ({ page }) =
   await expectLanding(sections.nth(0), 0);
   await button(page, -1).click();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight - scrollY)).toBeLessThanOrEqual(1);
+});
+
+for (const algorithm of ["Token", "Tree"]) {
+  for (const layout of ["Split", "Unified"]) {
+    test(`${algorithm} ${layout}: every block participates in the global cycle in DOM order`, async ({ page }) => {
+      await loadNavigation(page, { algorithm, layout });
+      const sections = page.locator('.file-card .semantic-section');
+      const targets = [];
+      for (let i = 0; i < await sections.count(); i++) {
+        for (let block = 0; block < await sections.nth(i).locator(marker).count(); block++) {
+          targets.push([sections.nth(i), block]);
+        }
+      }
+      await expect(sections.nth(3)).toContainText('deleted_section');
+      await button(page, 1).focus();
+      let activation = 0;
+      for (const [section, block] of [...targets, targets[0]]) {
+        await page.keyboard.press(activation++ % 2 ? 'Space' : 'Enter');
+        await expectLanding(section, block);
+        await expect(button(page, 1)).toBeFocused();
+      }
+      await button(page, -1).focus();
+      for (const [section, block] of [...targets].reverse()) {
+        await page.keyboard.press(activation++ % 2 ? 'Space' : 'Enter');
+        await expectLanding(section, block);
+      }
+      await expect(button(page, -1)).toBeFocused();
+    });
+  }
+}
+
+test('global controls skip closed files, unchanged files, line diffs, fallback and filtered changes', async ({ page }) => {
+  await loadNavigation(page, {
+    extraFiles: [
+      { filename: 'unchanged.mbt', old: 'fn unchanged() { 1 }', new: 'fn unchanged() { 1 }' },
+      { filename: 'plain.txt', old: 'old', new: 'new' },
+      { filename: 'broken.mbt', old: 'fn broken( {', new: 'fn broken( }' },
+      { filename: 'comments.mbt', old: '// old\nfn same() { 1 }', new: '// new\nfn same() { 1 }' },
+      { filename: 'ignored_test.mbt', old: 'fn ignored() { 1 }', new: 'fn ignored() { 2 }' },
+    ],
+  });
+  const first = page.locator('#moondiff-file-0');
+  const other = page.locator('#moondiff-file-1 .semantic-section');
+  await page.getByRole('checkbox', { name: 'Ignore comments', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Ignore tests', exact: true }).check();
+  await page.locator('#moondiff-file-3 .file-toggle').click();
+  await expect(page.locator('#moondiff-file-3 table')).toBeVisible();
+  await expect(page.locator('.file-card[data-navigation-enabled="true"]')).toHaveCount(2);
+  await first.locator('.file-toggle').click();
+  await expect(first).not.toHaveClass(/expanded/);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await button(page, 1).click();
+  await expectLanding(other, 0);
+  await button(page, -1).click();
+  await expectLanding(other, 2);
+  await button(page, 1).click();
+  await expectLanding(other, 0);
+  await page.locator('#moondiff-file-1 .file-toggle').click();
+  await expect(button(page, 1)).toBeDisabled();
+  await expect(button(page, -1)).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Ignore tests', exact: true }).uncheck();
+  await expect(button(page, 1)).toBeEnabled();
+  await button(page, 1).click();
+  await expectLanding(page.locator('#moondiff-file-6 .semantic-section'), 0);
+});
+
+test('clamped global landing is invalidated by manual scroll, layout and eligibility changes', async ({ page }) => {
+  await loadNavigation(page);
+  const first = page.locator('#moondiff-file-0 .semantic-section').first();
+  const other = page.locator('#moondiff-file-1 .semantic-section');
+  await button(page, -1).click();
+  await expectLanding(other, 2);
+  await readChange(first, 1, 40);
+  await button(page, 1).click();
+  await expectLanding(first, 2);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await button(page, -1).click();
+  await expectLanding(other, 2);
+  await page.getByRole('button', { name: 'Unified', exact: true }).click();
+  await readChange(other, 0);
+  await button(page, 1).click();
+  await expectLanding(other, 1);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await button(page, -1).click();
+  await page.locator('#moondiff-file-1 .file-toggle').click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await button(page, -1).click();
+  await expectLanding(page.locator('#moondiff-file-0 .semantic-section').last(), 0);
+  await button(page, 1).click();
+  await expectLanding(first, 0);
+});
+
+for (const width of [1440, 420]) {
+  test(`wrapped commit title stays sticky beyond its body at ${width}px and remeasures on resize`, async ({ page }) => {
+    const title = 'Keep the complete commit title visible while reviewing changes across several files and declarations';
+    const body = '  Indented explanation\n\n' + 'The body should scroll normally.\n'.repeat(12);
+    const sections = await loadNavigation(page, { width, message: `${title}\n\n${body}` });
+    const titlebar = page.locator('.change-titlebar');
+    await expect(page.locator('.commit-message-body')).toHaveJSProperty('textContent', body);
+    await button(page, 1).click();
+    await expectLanding(sections.first(), 0);
+    await expect.poll(() => page.locator('.commit-card').evaluate(el => el.getBoundingClientRect().bottom)).toBeLessThan(0);
+    await button(page, -1).click();
+    await expectLanding(page.locator('#moondiff-file-1 .semantic-section'), 2);
+    const initialHeight = (await titlebar.boundingBox()).height;
+    const opposite = width === 1440 ? 420 : 1440;
+    await page.setViewportSize({ width: opposite, height: 720 });
+    await expect.poll(() => titlebar.evaluate(el => el.getBoundingClientRect().height)).not.toBe(initialHeight);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await button(page, 1).click();
+    await expectLanding(sections.first(), 0);
+    await page.getByRole('button', { name: 'Unified', exact: true }).click();
+    await readChange(sections.nth(1), 0);
+    await button(page, 1).click();
+    await expectLanding(sections.nth(1), 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(opposite);
+  });
+}
+
+test('sidebar resizing remeasures wrapped titles and file-tree landing clears the title', async ({ page }) => {
+  const title = 'Review the entire commit and keep its full subject visible. '.repeat(4);
+  const sections = await loadNavigation(page, { message: title });
+  const titlebar = page.locator('.change-titlebar');
+  const initial = (await titlebar.boundingBox()).height;
+  const divider = page.getByRole('separator', { name: 'Resize file tree' });
+  const box = await divider.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(640, box.y + 80, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => titlebar.evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(initial);
+  await button(page, 1).click();
+  await expectLanding(sections.first(), 0);
+  await page.getByRole('treeitem', { name: 'Open other.mbt', exact: true }).click();
+  await expect.poll(() => page.locator('#moondiff-file-1').evaluate(el => el.getBoundingClientRect().top - document.querySelector('.change-titlebar').getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(7);
+  await button(page, -1).click();
+  await expectLanding(sections.last(), 0);
+  await page.getByRole('treeitem', { name: 'Open other.mbt', exact: true }).click();
+  await button(page, 1).click();
+  await expectLanding(page.locator('#moondiff-file-1 .semantic-section'), 0);
+});
+
+test('route changes disconnect the old height observer and reset navigation', async ({ page }) => {
+  await page.addInitScript(() => {
+    const Native = window.ResizeObserver;
+    window.resizeObservers = [];
+    window.ResizeObserver = class extends Native {
+      constructor(callback) { super(callback); window.resizeObservers.push(this); }
+      disconnect() { this.disconnected = true; super.disconnect(); }
+    };
+  });
+  await loadNavigation(page);
+  await button(page, -1).click();
+  await page.evaluate(() => { history.pushState(null, '', '/'); dispatchEvent(new PopStateEvent('popstate')); });
+  await expect(page.locator('.hero-landing')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.resizeObservers.every(observer => observer.disconnected))).toBe(true);
+  await page.evaluate(sha => { history.pushState(null, '', `/example/navigation/commit/${sha}`); dispatchEvent(new PopStateEvent('popstate')); }, sha);
+  await expect(page.locator('#moondiff-file-1 .semantic-section')).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await button(page, 1).click();
+  await expectLanding(page.locator('#moondiff-file-0 .semantic-section').first(), 0);
+  expect(await page.evaluate(() => window.resizeObservers.filter(observer => !observer.disconnected).length)).toBe(1);
+});
+
+test('a height-only viewport resize discards the clamped landing', async ({ page }) => {
+  await loadNavigation(page);
+  const other = page.locator('#moondiff-file-1 .semantic-section');
+  await button(page, -1).click();
+  await expectLanding(other, 2);
+  // The final target was below the reading edge. A shorter viewport makes a
+  // new physical landing possible and Next must re-read that position.
+  await page.setViewportSize({ width: 1440, height: 480 });
+  await button(page, 1).click();
+  await expectLanding(other, 2);
+  await button(page, 1).click();
+  await expectLanding(page.locator('#moondiff-file-0 .semantic-section').first(), 0);
 });
