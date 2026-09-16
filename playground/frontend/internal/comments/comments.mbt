@@ -43,6 +43,7 @@ pub(all) enum SubmissionPhase {
 
 ///|
 pub struct Session {
+  priv index : CommentIndex
   priv draft_sequence : Int
   priv receipts : ApiCommentBundle
   priv context : Context
@@ -69,6 +70,7 @@ pub struct Session {
 ///|
 pub fn Session::new(enabled? : Bool = false) -> Session {
   {
+    index: CommentIndex::new(),
     draft_sequence: 0,
     receipts: { issue_comments: [], review_comments: [], commit_comments: [], },
     context: { generation: 0, route: None, snapshot: None, enabled, },
