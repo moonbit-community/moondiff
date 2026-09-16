@@ -37,7 +37,7 @@ async function install(page, options = {}) {
     const { op, args } = fixtureRequest(request.postDataJSON());
     state.calls.push({ op, args });
     let value, failure;
-    if (op === 'github.pull.get') value = { title: 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length };
+    if (op === 'github.pull.get') value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length };
     else if (op === 'github.compare.get') value = { merge_base_commit: { sha: merge } };
     else if (op === 'github.pull.files') value = state.files;
     else if (op === 'github.commit.get') value = { sha: args.sha, html_url: `https://github.com/alice/repo/commit/${args.sha}`, commit: { message: 'Commit fixture' }, parents: [{ sha: base }], stats: { additions: 3, deletions: 3, total: 6 }, files };
@@ -762,5 +762,82 @@ for (const kind of ['inline', 'reply', 'overall']) {
     expect(await original.evaluate(el => el.isConnected && el === document.activeElement)).toBe(true);
     expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([2, 8, 'backward']);
     expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
+  });
+}
+
+for (const width of [1440, 390]) {
+  test(`PR title and global navigation skip Viewed files after expansion and sync at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    const title = 'Review the complete pull request title while navigating changes across multiple files';
+    const navigationFiles = ['first.mbt', 'viewed.mbt', 'last.mbt'].map(filename => ({
+      ...mbtFiles[0], filename,
+    }));
+    const source = ref => ['fn navigate() {', ...Array.from({ length: 45 }, (_, i) => `  ${ref === head ? 'new' : 'old'}_call_${i}()`), '}'].join('\n');
+    const state = await install(page, {
+      files: navigationFiles, source, title,
+      states: { alice: { 'viewed.mbt': 'Viewed' } },
+    });
+    await page.goto(path);
+    const checkbox = index => page.getByRole('checkbox', { name: `Viewed ${navigationFiles[index].filename}`, exact: true });
+    const next = page.locator('.change-titlebar').getByRole('button', { name: 'Next change', exact: true });
+    const prev = page.locator('.change-titlebar').getByRole('button', { name: 'Previous change', exact: true });
+    const landed = async index => {
+      await expect.poll(() => card(page, index).evaluate(el => {
+        const title = document.querySelector('.change-titlebar').getBoundingClientRect();
+        const toolbar = document.querySelector('.hero-workspace').getBoundingClientRect();
+        const heading = el.querySelector('.file-heading').getBoundingClientRect();
+        const summary = el.querySelector('.semantic-section-title').getBoundingClientRect();
+        const row = el.querySelector('[data-change-block-start]').getBoundingClientRect();
+        return Math.abs(title.top - toolbar.bottom) <= 1 && Math.abs(heading.top - title.bottom) <= 1 &&
+          Math.abs(summary.top - heading.bottom) <= 1 && Math.abs(row.top - summary.bottom - 8) <= 1;
+      })).toBe(true);
+    };
+    await expect(checkbox(1)).toBeChecked();
+    await expect(checkbox(0)).toBeEnabled();
+    await expect(page.locator('.commit-message-title')).toHaveText(title);
+    await card(page, 1).locator('.file-toggle').click();
+    await expect(card(page, 1)).toHaveClass(/expanded/);
+    await expect(card(page, 1).locator('[data-change-block-start]')).toHaveCount(1);
+    // Manual reading inside an excluded file has no current change: Previous
+    // and Next should select the nearest eligible blocks on either side.
+    await card(page, 1).evaluate(el => el.scrollIntoView());
+    await prev.click(); await landed(0);
+    await card(page, 1).evaluate(el => el.scrollIntoView());
+    await next.click(); await landed(2);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await next.click(); await landed(0);
+    await next.click(); await landed(2);
+    await next.click(); await landed(0);
+    await prev.click(); await landed(2);
+    await prev.click(); await landed(0);
+
+    // Remote updates keep manually expanded files open, but change eligibility.
+    state.states.alice['first.mbt'] = 'Viewed';
+    state.states.alice['viewed.mbt'] = 'Unviewed';
+    const reads = calls(state, 'github.pull.viewed.get').length;
+    await refresh(page);
+    await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBeGreaterThan(reads);
+    await expect(checkbox(0)).toBeChecked();
+    await expect(checkbox(1)).not.toBeChecked();
+    await expect(card(page, 0)).toHaveClass(/expanded/);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await next.click(); await landed(1);
+    await next.click(); await landed(2);
+    await prev.click(); await landed(1);
+
+    await expectViewedWrite(state, 'viewed.mbt', true, () => checkbox(1).check());
+    await expect(checkbox(1)).toBeEnabled();
+    await card(page, 1).locator('.file-toggle').click();
+    await expect(card(page, 1)).toHaveClass(/expanded/);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await next.click(); await landed(2);
+    await next.click(); await landed(2);
+    await prev.click(); await landed(2);
+    await card(page, 2).locator('.file-toggle').click();
+    await expect(next).toBeDisabled(); await expect(prev).toBeDisabled();
+    await expectViewedWrite(state, 'viewed.mbt', false, () => checkbox(1).uncheck());
+    await expect(next).toBeEnabled();
+    await next.click(); await landed(1);
+    await expect(next).toBeFocused();
   });
 }
