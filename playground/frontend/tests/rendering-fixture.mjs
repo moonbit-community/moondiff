@@ -31,6 +31,7 @@ export async function installRenderingFixture(page, fixture, options = {}) {
     const f = state.fixture;
     let value;
     switch (op) {
+      case 'github.viewer.pulls.get': value = { items: [], total_count: 0 }; break;
       case 'github.commit.get': value = { sha: args.sha, html_url: `https://github.com/example/regions/commit/${args.sha}`, commit: { message: f.message }, parents: [{ sha: f.base }], stats: { additions: 1, deletions: 1, total: 2 }, files: f.files }; break;
       case 'github.pull.get': value = { title: f.message, html_url: 'https://github.com/example/regions/pull/1', base: { sha: f.base, repo: { full_name: 'example/regions' } }, head: { sha: f.sha, repo: { full_name: 'example/regions' } }, additions: 1, deletions: 1, changed_files: f.files.length }; break;
       case 'github.compare.get': value = { merge_base_commit: { sha: f.base } }; break;

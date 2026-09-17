@@ -47,6 +47,7 @@ fn region_model() -> Model {
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: None,
+    home: @application.HomeState::new(),
     viewed: @application.ViewedState::new(),
     review,
   }

@@ -45,6 +45,7 @@ pub(all) struct Model {
   restore_pending : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState
+  home : HomeState
   review : Session
 } derive(Eq)
 
@@ -65,6 +66,7 @@ fn initial_model() -> Model {
     restore_pending: false,
     last_authenticated_user_id: None,
     viewed: empty_viewed_state(0),
+    home: empty_home_state(0),
     review: initial_review_state(),
   }
 }

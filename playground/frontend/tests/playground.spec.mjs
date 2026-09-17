@@ -724,9 +724,13 @@ async function installAlgorithmRoutes(
 
 async function loadAlgorithmCommit(page, options) {
   await installAlgorithmRoutes(page, options);
-  await page.goto("/");
-  await page.getByLabel("Public GitHub commit or pull request URL").fill(algorithmUrl);
-  await page.getByRole("button", { name: "View diff" }).click();
+  if (options?.authenticated) {
+    await page.goto(new URL(algorithmUrl).pathname);
+  } else {
+    await page.goto("/");
+    await page.getByLabel("Public GitHub commit or pull request URL").fill(algorithmUrl);
+    await page.getByRole("button", { name: "View diff" }).click();
+  }
   await expect(page.locator("table.split").first()).toBeVisible();
 }
 

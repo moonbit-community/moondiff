@@ -25,6 +25,8 @@ pub fn file_dom_id(Int) -> String
 
 pub fn file_navigation_enabled(Model, Int) -> Bool
 
+pub fn home_pull_key(@moondiff-playground-protocol.ApiPullSummary) -> String
+
 pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> Transition
@@ -77,6 +79,61 @@ pub(all) struct FileTreeState {
   preferred_width : Int
 } derive(Eq)
 
+pub(all) struct HomeCommits {
+  pull : @moondiff-playground-protocol.ApiPullSummary
+  expanded : Bool
+  page : HomePage[@moondiff-playground-protocol.ApiCommitSummary]
+  snapshot : (String, String)?
+  restarts : Int
+} derive(Eq)
+
+pub(all) enum HomeLoad {
+  Unloaded
+  Loading
+  Paused
+  Ready
+  Failed(String)
+} derive(Eq)
+
+pub(all) enum HomeMsg {
+  Refresh
+  SelectTab(@moondiff-playground-protocol.ViewerPullKind)
+  LoadPulls(@moondiff-playground-protocol.ViewerPullKind)
+  ToggleCommits(@moondiff-playground-protocol.ApiPullSummary)
+  LoadCommits(String)
+  Open(String)
+  PullsLoaded(Int, Int, Int, @moondiff-playground-protocol.ViewerPullKind, Result[@moondiff-playground-protocol.ApiViewerPulls, Error])
+  CommitsLoaded(Int, Int, Int, String, Result[@moondiff-playground-protocol.ApiPullCommits, Error])
+}
+
+pub(all) struct HomePage[T] {
+  items : Array[T]
+  total : Int?
+  cursor : String?
+  load : HomeLoad
+  refresh : HomeRefresh[T]?
+  updated_at : String?
+} derive(Eq)
+
+pub(all) struct HomeRefresh[T] {
+  items : Array[T]
+  total : Int?
+  cursor : String?
+  target : Int
+  cursor_restarts : Int
+} derive(Eq)
+
+pub(all) struct HomeState {
+  user : String?
+  epoch : Int
+  tab : @moondiff-playground-protocol.ViewerPullKind
+  reviews : HomePage[@moondiff-playground-protocol.ApiPullSummary]
+  authored : HomePage[@moondiff-playground-protocol.ApiPullSummary]
+  commits : Map[String, HomeCommits]
+} derive(Eq)
+pub fn HomeState::busy(Self) -> Bool
+pub fn HomeState::new() -> Self
+
 pub(all) enum LoadMsg {
   CommitPageLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommit, Error])
   ToggleFile(Int, Int)
@@ -107,10 +164,12 @@ pub(all) struct Model {
   restore_pending : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState
+  home : HomeState
   review : @comments.Session
 } derive(Eq)
 
 pub(all) enum Msg {
+  Home(HomeMsg)
   Viewed(ViewedMsg)
   Auth(AuthMsg)
   Review(ReviewMsg)
