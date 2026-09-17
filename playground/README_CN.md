@@ -309,6 +309,8 @@ npm run test:e2e
 `npm run test:playground:stress`。该命令以单 worker 运行 6 项夹具/CPU 组合，
 并保留性能数据附件。`npm run test:e2e` 及交互式测试界面只选择 `*.spec.mjs`；
 压力测试使用 `*.stress.mjs` 和独立的 Playwright 配置。
+`check` 工作流通过独立 job 运行压力测试并上传结果（包括性能附件）；主 job
+会构建发布产物并运行 `test:artifacts`，同时保留常规测试套件。
 
 验证跳转扩展和发布产物：
 

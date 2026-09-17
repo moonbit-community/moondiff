@@ -134,4 +134,6 @@ npm --prefix playground run test:e2e:stress -- --grep 'synthetic-large, 6x CPU'
 
 After separation, CLI discovery selected 317 regular tests and six stress tests
 with no overlap. All eight regular rendering tests and all six stress tests
-passed through their respective npm commands.
+passed through their respective npm commands. The `check` workflow runs stress
+tests in their own job and uploads their performance attachments and failure
+artifacts.
