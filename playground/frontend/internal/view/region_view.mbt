@@ -5,6 +5,7 @@ pub fn region_view(
   cache : FileDerivation,
 ) -> @rabbita.Html {
   match input {
+    Home(auth, home) => home_view(auth, home, emit)
     Toolbar(input) => hero_view(input, input.landing, emit)
     Status(input) =>
       match input {
@@ -106,6 +107,9 @@ pub fn shell_view(
     .find_first(h => h.region == region)
     .map(region_host)
     .unwrap_or(@html.nothing)
+  }
+  if input.home {
+    return @html.main_(class="shell dashboard", host(Home))
   }
   let files : Map[String, @rabbita.Html] = Map([])
   for h in hosts {

@@ -140,6 +140,7 @@ pub(all) enum StatusInput {
 
 ///|
 pub(all) enum RegionInput {
+  Home(@application.AuthStatus, @application.HomeState)
   Toolbar(ToolbarInput)
   Status(StatusInput)
   FileTree(TreeInput)
@@ -151,6 +152,7 @@ pub(all) enum RegionInput {
 
 ///|
 pub(all) struct ShellInput {
+  home : Bool
   generation : Int
   landing : Bool
   showing : Bool
@@ -163,6 +165,7 @@ pub(all) struct ShellInput {
 ///|
 pub fn shell_input(model : Model) -> ShellInput {
   {
+    home: home_shell(model),
     generation: model.generation,
     landing: landing_mode(model),
     showing: model.phase is Showing(_),
@@ -192,6 +195,11 @@ pub fn RegionProjection::inputs(
   self : RegionProjection,
   model : Model,
 ) -> Array[(@application.Region, RegionInput)] {
+  if home_shell(model) {
+    self.tree = None
+    self.overall = None
+    return [(@application.Home, Home(model.auth, model.home))]
+  }
   let inputs : Array[(@application.Region, RegionInput)] = [
     (@application.Toolbar, Toolbar(toolbar_input(model))),
   ]
@@ -301,6 +309,13 @@ pub fn RegionProjection::inputs(
     ),
   )
   inputs
+}
+
+///|
+fn home_shell(model : Model) -> Bool {
+  model.route is None &&
+  model.phase is Idle &&
+  model.auth is (AuthChecking | SignedIn(..))
 }
 
 ///|

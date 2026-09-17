@@ -130,8 +130,8 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
       await expect(editor).toHaveCount(0);
       if (action === 'route') {
         await navigate(page, '/');
-        await expect(page.locator('.hero-landing')).toBeVisible();
-        await page.locator('.hero-landing input').first().focus();
+        await expect(page.locator('.pr-dashboard')).toBeVisible();
+        await page.getByRole('button', { name: /^Account:/ }).focus();
       }
       // This unrelated response must arrive after detachment and before the
       // destination commit; capturing it used to erase the saved focus intent.
@@ -150,7 +150,7 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
       expect(await page.evaluate(() => __moondiffEditorInteraction.records.size)).toBe(0);
       expect(await page.evaluate(() => __moondiffEditorInteraction.active)).toBe('');
       expect(await page.evaluate(() => __moondiffEditorInteraction.stopListening)).toBeNull();
-      if (action === 'route') await expect(page.locator('.hero-landing input').first()).toBeFocused();
+      if (action === 'route') await expect(page.getByRole('button', { name: /^Account:/ })).toBeFocused();
     } else {
       await expect(page.locator('.unavailable-reply-draft textarea')).toHaveCount(1);
       await expect(editor).toHaveAttribute('data-draft-id', draftId);
@@ -233,7 +233,7 @@ test('navigation in the same frame cancels UI waits and completes Viewed storage
     document.querySelector('[data-region="tree"] [aria-label="Open src/unrelated-2.mbt"]').click();
     history.pushState(null, '', '/'); dispatchEvent(new PopStateEvent('popstate'));
   });
-  await expect(page.locator('.hero-landing')).toBeVisible(); await settleRegions(page);
+  await expect(page.locator('.pr-dashboard')).toBeVisible(); await settleRegions(page);
   expect(state.calls.filter(c => c.op === 'github.pull.file.viewed.set')).toHaveLength(0);
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter(k => k.startsWith('moondiff.viewed.pending.v1:')))).toEqual([]);
   expect((await renderCounts(page)).errors).toEqual([]);

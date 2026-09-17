@@ -101,7 +101,6 @@ pub(all) enum HomeMsg {
   LoadPulls(@moondiff-playground-protocol.ViewerPullKind)
   ToggleCommits(@moondiff-playground-protocol.ApiPullSummary)
   LoadCommits(String)
-  Open(String)
   PullsLoaded(Int, Int, Int, @moondiff-playground-protocol.ViewerPullKind, Result[@moondiff-playground-protocol.ApiViewerPulls, Error])
   CommitsLoaded(Int, Int, Int, String, Result[@moondiff-playground-protocol.ApiPullCommits, Error])
 }
@@ -194,6 +193,7 @@ pub(all) enum Phase {
 } derive(Eq)
 
 pub(all) enum Region {
+  Home
   Shell
   Toolbar
   Status
