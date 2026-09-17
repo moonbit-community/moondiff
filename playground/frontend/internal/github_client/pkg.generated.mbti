@@ -44,6 +44,8 @@ pub fn get_pull_files(@moondiff-playground-protocol.PullFiles, Int, @cmd.Emit[Re
 
 pub fn get_pull_viewed(@moondiff-playground-protocol.PullViewedGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullViewed, Error]]) -> @cmd.Cmd
 
+pub fn get_viewer_pulls(@moondiff-playground-protocol.ViewerPullsGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiViewerPulls, Error]]) -> @cmd.Cmd
+
 pub fn http_error_code(Error) -> String?
 
 pub fn list_comments(@moondiff-playground-protocol.CommentsList, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCommentBundle, Error]]) -> @cmd.Cmd

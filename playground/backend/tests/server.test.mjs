@@ -660,6 +660,186 @@ test('repository filenames survive source URL encoding, both comment APIs and Vi
   }
 });
 
+const viewerPullsOp = 'github.viewer.pulls.get';
+const authoredPulls = { kind: { $tag: 'Authored' } };
+const reviewPulls = { kind: { $tag: 'ReviewRequested' } };
+function searchPull(number, overrides = {}) {
+  return { number, title: `PR ${number}`, repository_url: `https://api.github.com/repos/org/repo${number % 3}`,
+    state: 'open', draft: number % 2 === 0, pull_request: {}, user: { login: 'alice' },
+    updated_at: new Date(Date.UTC(2026, 8, 1) - Math.floor(number / 3) * 1000).toISOString().replace('.000Z', 'Z'),
+    requested: ['alice'], ...overrides };
+}
+function searchPage(request, rows, incomplete = false) {
+  const url = new URL(request.path, 'http://stub');
+  assert.equal(url.searchParams.get('per_page'), '50');
+  assert.equal(url.searchParams.get('sort'), 'updated');
+  assert.equal(url.searchParams.get('order'), 'desc');
+  const match = /^is:pr is:open (author:@me|user-review-requested:@me) updated:(\S+)\.\.(\S+)$/.exec(url.searchParams.get('q'));
+  assert(match, `unexpected query ${url.searchParams.get('q')}`);
+  const who = request.headers.authorization.replace('Bearer access-', '');
+  const lower = Date.parse(match[2]), upper = Date.parse(match[3]);
+  assert(Number.isFinite(lower) && Number.isFinite(upper));
+  const selected = rows.filter(p => p.state === 'open' && p.pull_request && (match[1] === 'author:@me' ? p.user?.login === who : p.requested?.includes(who)) && Date.parse(p.updated_at) >= lower && Date.parse(p.updated_at) <= upper).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const page = Number(url.searchParams.get('page'));
+  assert(page <= 20, 'must split before the Search 1,000-result limit');
+  return { total_count: selected.length, incomplete_results: incomplete, items: selected.slice((page - 1) * 50, page * 50) };
+}
+
+test('homepage searches all accessible repositories with direct review and author filters, drafts and paging', async t => {
+  const rows = Array.from({ length: 63 }, (_, i) => searchPull(i + 1));
+  rows.push(searchPull(100, { state: 'closed' }), searchPull(101, { state: 'closed', pull_request: { merged_at: 'today' } }), searchPull(102, { pull_request: undefined }));
+  rows.push(searchPull(200, { user: { login: 'bob' }, requested: [], team_requested: ['alice-team'] }));
+  rows.push(searchPull(201, { user: { login: 'bob' }, requested: ['alice'] }));
+  const f = await startServer((r, res) => {
+    if (!r.path.startsWith('/search/issues?')) return;
+    res.end(JSON.stringify(searchPage(r, rows))); return true;
+  }); t.after(() => f.close());
+  const alice = browser(f), bob = browser(f);
+  await alice.status();
+  assert.equal((await alice.rpc(viewerPullsOp, authoredPulls)).error.code, 'authentication_required');
+  assert.equal(f.requests.filter(r => r.path.startsWith('/search')).length, 0);
+  await alice.login(); await bob.login('bob');
+  const first = await alice.rpc(viewerPullsOp, authoredPulls);
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(first.value.total_count, 63); assert.equal(first.value.items.length, 50);
+  assert.equal(new Set(first.value.items.map(p => p.repo)).size, 3);
+  assert(first.value.items.some(p => p.draft)); assert(!first.value.incomplete);
+  const cursor = first.value.next_cursor;
+  const second = await alice.rpc(viewerPullsOp, { ...authoredPulls, cursor });
+  assert.equal(second.value.items.length, 13); assert(!second.value.next_cursor);
+  const review = await alice.rpc(viewerPullsOp, reviewPulls);
+  assert.equal(review.value.total_count, 64);
+  assert.equal((await bob.rpc(viewerPullsOp, { ...authoredPulls, cursor })).error.code, 'invalid_cursor');
+  assert.equal((await alice.rpc(viewerPullsOp, { ...reviewPulls, cursor })).error.code, 'invalid_cursor');
+  assert.equal((await alice.rpc(viewerPullsOp, { ...authoredPulls, cursor: cursor + 'x' })).error.code, 'invalid_cursor');
+  for (const extra of [{ username: 'bob' }, { query: 'is:closed' }]) assert.equal((await alice.rpc(viewerPullsOp, { ...authoredPulls, ...extra })).error.code, 'invalid_arguments');
+});
+
+for (const args of [authoredPulls, reviewPulls]) test(`${args.kind.$tag} confirms the total before splitting 1,000-result windows without losing timestamp ties`, async t => {
+  const rows = Array.from({ length: 1107 }, (_, i) => searchPull(i + 1));
+  let incomplete = true;
+  const f = await startServer((r, res) => {
+    if (!r.path.startsWith('/search/issues?')) return;
+    const result = searchPage(r, rows, incomplete);
+    if (incomplete) result.total_count = 0;
+    incomplete = false;
+    res.end(JSON.stringify(result)); return true;
+  }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const partial = await user.rpc(viewerPullsOp, args);
+  assert.equal(partial.ok, true, JSON.stringify(partial));
+  assert.equal(partial.value.total_count, 0);
+  assert.match(partial.value.incomplete, /incomplete/);
+  assert.deepEqual(partial.value.items, []);
+  assert(partial.value.next_cursor);
+  let cursor = partial.value.next_cursor; const items = [];
+  for (let page = 0; page < 40; page++) {
+    const result = await user.rpc(viewerPullsOp, { ...args, cursor });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.total_count, 1107);
+    assert(!result.value.incomplete, result.value.incomplete);
+    assert.equal(result.value.items.length, result.value.next_cursor ? 50 : 7);
+    items.push(...result.value.items); cursor = result.value.next_cursor;
+    if (!cursor) break;
+  }
+  assert(!cursor); assert.equal(items.length, 1107);
+  assert.equal(new Set(items.map(p => `${p.repo}/${p.number}`)).size, 1107);
+  assert.deepEqual(items.map(p => p.updated_at), items.map(p => p.updated_at).sort().reverse());
+  assert(new Set(f.requests.filter(r => r.path.startsWith('/search')).map(r => new URL(r.path, 'http://stub').searchParams.get('q'))).size > 1);
+});
+
+for (const args of [authoredPulls, reviewPulls]) {
+  for (const [counts, total] of [[[0], 1], [[0, 7, 2], 1], [[4, 2], 0]]) {
+    test(`${args.kind.$tag} replaces provisional totals ${counts.join(', ')} with the first complete total ${total}`, async t => {
+      let attempt = 0;
+      const rows = Array.from({ length: total }, (_, i) => searchPull(i + 1));
+      const paths = [];
+      const f = await startServer((r, res) => {
+        if (!r.path.startsWith('/search/issues?')) return;
+        paths.push(r.path);
+        const result = searchPage(r, rows, attempt < counts.length);
+        if (attempt < counts.length) result.total_count = counts[attempt];
+        attempt++;
+        res.end(JSON.stringify(result)); return true;
+      }); t.after(() => f.close());
+      const user = browser(f); await user.login();
+      let cursor;
+      for (const count of counts) {
+        const partial = await user.rpc(viewerPullsOp, { ...args, ...(cursor ? { cursor } : {}) });
+        assert.equal(partial.ok, true, JSON.stringify(partial));
+        assert.equal(partial.value.total_count, count);
+        assert.deepEqual(partial.value.items, []);
+        assert.match(partial.value.incomplete, /incomplete/);
+        cursor = partial.value.next_cursor; assert(cursor);
+      }
+      const complete = await user.rpc(viewerPullsOp, { ...args, cursor });
+      assert.equal(complete.ok, true, JSON.stringify(complete));
+      assert.equal(complete.value.total_count, total);
+      assert.deepEqual(complete.value.items.map(p => p.number), rows.map(p => String(p.number)));
+      assert(!complete.value.next_cursor); assert(!complete.value.incomplete);
+      assert.equal(paths.length, counts.length + 1);
+      assert.equal(new Set(paths).size, 1, 'retries must use the original search window and page');
+    });
+  }
+
+  test(`${args.kind.$tag} keeps the confirmed total through incomplete and changed later pages`, async t => {
+    let rows = Array.from({ length: 51 }, (_, i) => searchPull(i + 1));
+    let provisional;
+    const paths = [];
+    const f = await startServer((r, res) => {
+      if (!r.path.startsWith('/search/issues?')) return;
+      paths.push(r.path);
+      const result = searchPage(r, rows, provisional !== undefined);
+      if (provisional !== undefined) result.total_count = provisional;
+      res.end(JSON.stringify(result)); return true;
+    }); t.after(() => f.close());
+    const user = browser(f); await user.login();
+    const first = await user.rpc(viewerPullsOp, args);
+    assert.equal(first.ok, true, JSON.stringify(first));
+    assert.equal(first.value.total_count, 51); assert.equal(first.value.items.length, 50);
+    let cursor = first.value.next_cursor; assert(cursor);
+    for (const count of [0, 99]) {
+      provisional = count;
+      const partial = await user.rpc(viewerPullsOp, { ...args, cursor });
+      assert.equal(partial.ok, true, JSON.stringify(partial));
+      assert.equal(partial.value.total_count, 51);
+      assert.deepEqual(partial.value.items, []);
+      assert.match(partial.value.incomplete, /incomplete/);
+      cursor = partial.value.next_cursor; assert(cursor);
+    }
+    provisional = undefined; rows.push(searchPull(52));
+    const complete = await user.rpc(viewerPullsOp, { ...args, cursor });
+    assert.equal(complete.ok, true, JSON.stringify(complete));
+    assert.equal(complete.value.total_count, 51);
+    assert.deepEqual(complete.value.items.map(p => p.number), ['51', '52']);
+    assert(!complete.value.next_cursor); assert(!complete.value.incomplete);
+    assert.equal(new Set(paths.slice(1)).size, 1, 'later-page retries must not advance');
+    assert.equal(new URL(paths[1], 'http://stub').searchParams.get('page'), '2');
+    const refreshed = await user.rpc(viewerPullsOp, args);
+    assert.equal(refreshed.value.total_count, 52);
+  });
+}
+
+test('incomplete and unsplittable search windows retain retry cursors', async t => {
+  let incomplete = true;
+  let rows = [searchPull(1)];
+  const f = await startServer((r, res) => {
+    if (!r.path.startsWith('/search/issues?')) return;
+    res.end(JSON.stringify(searchPage(r, rows, incomplete))); return true;
+  }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const partial = await user.rpc(viewerPullsOp, authoredPulls);
+  assert.match(partial.value.incomplete, /incomplete/);
+  assert.equal(partial.value.items.length, 0); assert(partial.value.next_cursor);
+  incomplete = false;
+  const retry = await user.rpc(viewerPullsOp, { ...authoredPulls, cursor: partial.value.next_cursor });
+  assert.equal(retry.value.items.length, 1); assert(!retry.value.incomplete);
+  rows = Array.from({ length: 1001 }, (_, i) => searchPull(i + 1, { updated_at: '2026-09-01T00:00:00Z' }));
+  const tied = await user.rpc(viewerPullsOp, authoredPulls);
+  assert.equal(tied.ok, true, JSON.stringify(tied));
+  assert.match(tied.value.incomplete, /same update time/); assert(tied.value.next_cursor);
+});
+
 test('closing a tab during a response aborts its connection without stopping the server', async t => {
   const f = await startServer(); t.after(() => f.close());
   writeFileSync(`${f.root}/static/large.js`, Buffer.alloc(8 * 1024 * 1024, 32));
