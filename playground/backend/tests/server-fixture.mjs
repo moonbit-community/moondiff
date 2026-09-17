@@ -86,6 +86,7 @@ export async function startServer(handler, options = {}) {
     output = '';
     child.stdout.on('data', b => { output += b; });
     child.stderr.on('data', b => { output += b; });
+    child.on('exit', (code, signal) => options.onExit?.(code, signal, output));
     for (let i = 0; i < 200; i++) {
       if (spawnError) throw new Error(`Could not start ${runtime}: ${spawnError.message}`);
       if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Wasm server exited: ${output}`);

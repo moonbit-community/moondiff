@@ -1,6 +1,12 @@
 ///|
+priv struct ResponseWriter {
+  connection : @http.ServerConnection
+  mut started : Bool
+}
+
+///|
 async fn respond(
-  conn : @http.ServerConnection,
+  conn : ResponseWriter,
   status : Int,
   body : Bytes,
   content_type? : String = "application/json; charset=utf-8",
@@ -14,7 +20,8 @@ async fn respond(
   headers["X-Content-Type-Options"] = "nosniff"
   headers["Referrer-Policy"] = "no-referrer"
   headers["X-Frame-Options"] = "DENY"
-  conn.send_response(
+  conn.started = true
+  conn.connection.send_response(
     status,
     if status < 400 {
       "OK"
@@ -25,14 +32,14 @@ async fn respond(
     cookies~,
   )
   if !head {
-    conn.write(body)
+    conn.connection.write(body)
   }
-  conn.end_response()
+  conn.connection.end_response()
 }
 
 ///|
 async fn[T : ToJson] respond_json(
-  conn : @http.ServerConnection,
+  conn : ResponseWriter,
   value : T,
   cookies? : Array[@http.Cookie] = [],
 ) -> Unit {
@@ -44,7 +51,7 @@ async fn[T : ToJson] respond_json(
 async fn App::static_file(
   self : App,
   request : @http.Request,
-  conn : @http.ServerConnection,
+  conn : ResponseWriter,
   raw_path : String,
 ) -> Unit {
   let path = decode_component(raw_path)
@@ -71,7 +78,8 @@ async fn App::static_file(
     [.., .. ".wasm"] => "application/wasm"
     _ => "application/octet-stream"
   }
-  conn.send_response(200, "OK", extra_headers={
+  conn.started = true
+  conn.connection.send_response(200, "OK", extra_headers={
     "Content-Type": content_type,
     "Content-Length": file.size().to_string(),
     "Cache-Control": "no-cache",
@@ -80,9 +88,9 @@ async fn App::static_file(
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   })
   if request.meth != Head {
-    conn.write_reader(file)
+    conn.connection.write_reader(file)
   }
-  conn.end_response()
+  conn.connection.end_response()
 }
 
 ///|
@@ -90,7 +98,7 @@ async fn App::handle(
   self : App,
   request : @http.Request,
   reader : &@io.Reader,
-  conn : @http.ServerConnection,
+  conn : ResponseWriter,
 ) -> Unit {
   let path = request.path.split("?").next().unwrap_or("").to_owned()
   if request.meth == Get && path == "/healthz" {
@@ -253,9 +261,13 @@ pub async fn run() -> Unit {
     reader,
     conn,
   ) => {
+    let conn = ResponseWriter::{ connection: conn, started: false, }
     @async.with_timeout(60000, () => app.handle(request, reader, conn)) catch {
       error => {
-        if @async.is_being_cancelled() {
+        // A tab can close while headers/body are being written. Sending an
+        // error response on that same connection would start a second response
+        // and violate the HTTP sender's state machine. Abort only this request.
+        if conn.started || @async.is_being_cancelled() {
           raise error
         }
         let (status, body) = rpc_error(error)
