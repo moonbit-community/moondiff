@@ -69,6 +69,12 @@ jobs:
         working-directory: playground
         run: npm ci
 
+      - name: Build release artifacts
+        run: npm run build
+
+      - name: Run release artifact tests
+        run: npm run test:artifacts
+
       - name: Install Playwright browsers
         working-directory: playground
         run: npx playwright install --with-deps chromium firefox
@@ -91,5 +97,47 @@ jobs:
           path: |
             playground/test-results/
             test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  rendering-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s pre-release
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: Update MoonBit dependencies
+        run: moon update
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: playground/package-lock.json
+
+      - name: Install playground dependencies
+        working-directory: playground
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: playground
+        run: npx playwright install --with-deps chromium
+
+      - name: Run rendering stress tests
+        run: npm run test:playground:stress
+
+      - name: Upload rendering stress test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rendering-stress-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: playground/test-results/
           retention-days: 7
           if-no-files-found: ignore

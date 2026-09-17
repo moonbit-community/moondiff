@@ -341,6 +341,9 @@ Rendering stress tests run separately with `npm run test:e2e:stress` (or
 fixture/CPU cases with one worker and retains their performance attachments.
 `npm run test:e2e` and its UI runner select only `*.spec.mjs`; stress tests use
 `*.stress.mjs` and their own Playwright configuration.
+The `check` workflow runs stress tests in an independent job and uploads their
+results, including performance attachments. Its main job builds the release and
+runs `test:artifacts` as well as the regular test suites.
 
 To verify the redirect extension and release artifacts:
 
