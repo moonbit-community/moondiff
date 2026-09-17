@@ -12,6 +12,10 @@ if (build.status !== 0) process.exit(build.status || 1);
 cpSync(join(repository, 'playground/frontend/public'), assets, { recursive: true });
 writeFileSync(join(assets, 'index.js'), instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), 'utf8')));
 const fixture = await startServer((request, response) => {
+  if (request.path.startsWith('/search/issues?')) {
+    response.end(JSON.stringify({ items: [], total_count: 0, incomplete_results: false }));
+    return true;
+  }
   if (request.path.startsWith('/repos/fixture/repo/')) {
     const path = new URL(request.path, 'http://localhost').pathname;
     if (path.endsWith('/comments')) response.end('[]');
