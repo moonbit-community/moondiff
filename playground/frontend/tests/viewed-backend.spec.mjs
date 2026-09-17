@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { browser, repository } from '../../backend/tests/server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from '../../backend/tests/viewed-fixture.mjs';
 import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
+import { clickLineCommentButton } from './comment-actions.mjs';
 
 const test = baseTest.extend({
   backend: async ({ page }, use) => {
@@ -50,8 +51,7 @@ const restore = page => page.evaluate(() => {
 const open = (page, backend, target = '/alice/repo/pull/42') => page.goto(backend.base + target);
 async function openInline(page, index = 0) {
   const gutter = card(page, index).locator('.review-gutter.new-line-number').filter({ has: page.locator('.line-number-value', { hasText: /^2$/ }) });
-  await gutter.hover();
-  await gutter.getByRole('button', { name: 'Comment on line 2', exact: true }).click();
+  await clickLineCommentButton(gutter.getByRole('button', { name: 'Comment on line 2', exact: true }));
   return card(page, index).locator('textarea');
 }
 

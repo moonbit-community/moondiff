@@ -303,6 +303,7 @@ test("navigation clamps the final change to the page bottom", async ({ page }) =
   await button(page, -1).click();
   await expectLanding(previous, 0);
   await button(page, 1).click();
+  await expectLanding(sections.nth(3), 0);
   await page.keyboard.press("Enter");
   await expectLanding(sections.nth(0), 0);
   await button(page, -1).click();
