@@ -40,6 +40,8 @@ pub fn get_content(@moondiff-playground-protocol.ContentGet, Int, @cmd.Emit[Resu
 
 pub fn get_pull(@moondiff-playground-protocol.PullGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPull, Error]]) -> @cmd.Cmd
 
+pub fn get_pull_commits(@moondiff-playground-protocol.PullCommitsGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullCommits, Error]]) -> @cmd.Cmd
+
 pub fn get_pull_files(@moondiff-playground-protocol.PullFiles, Int, @cmd.Emit[Result[Array[@moondiff-playground-protocol.ApiFile], Error]]) -> @cmd.Cmd
 
 pub fn get_pull_viewed(@moondiff-playground-protocol.PullViewedGet, Int, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullViewed, Error]]) -> @cmd.Cmd

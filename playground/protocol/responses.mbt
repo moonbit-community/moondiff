@@ -14,6 +14,7 @@ pub(all) enum Response[T] {
 ///|
 pub(all) enum RpcValue {
   ViewerPulls(ApiViewerPulls)
+  PullCommits(ApiPullCommits)
   Commit(ApiCommit)
   Pull(ApiPull)
   PullViewed(ApiPullViewed)

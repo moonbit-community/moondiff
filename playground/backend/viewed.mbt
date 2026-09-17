@@ -64,7 +64,7 @@ fn graphql_data(value : Json) -> Json raise {
       }
       if types.contains("FORBIDDEN") || types.contains("INSUFFICIENT_SCOPES") {
         raise RpcError(
-          403, "permission_denied", "GitHub denied access to Viewed state. Check your repository and App access.",
+          403, "permission_denied", "GitHub denied access. Check your repository and App access.",
         )
       }
       if types.contains("UNAUTHORIZED") {
@@ -78,7 +78,7 @@ fn graphql_data(value : Json) -> Json raise {
         )
       }
       raise RpcError(
-        502, "github_graphql_error", "GitHub could not complete the Viewed request.",
+        502, "github_graphql_error", "GitHub could not complete the request.",
       )
     }
     _ => raise invalid_viewed_response()
@@ -97,7 +97,7 @@ async fn App::graphql(
 ) -> Json {
   guard session is Some(s) && !s.tokens.is_empty() else {
     raise RpcError(
-      401, "authentication_required", "Sign in to sync Viewed files with GitHub.",
+      401, "authentication_required", "Sign in to access this GitHub data.",
     )
   }
   graphql_data(

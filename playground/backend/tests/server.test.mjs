@@ -6,6 +6,7 @@ import { request as httpRequest } from 'node:http';
 import { writeFileSync } from 'node:fs';
 import { buildServer, startServer, browser } from './server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from './viewed-fixture.mjs';
+import { startHomeServer, searchPull, searchPage, commitSha, sealHomeCursor, legacyPullCursor } from './home-fixture.mjs';
 
 before(buildServer);
 
@@ -661,30 +662,9 @@ test('repository filenames survive source URL encoding, both comment APIs and Vi
 });
 
 const viewerPullsOp = 'github.viewer.pulls.get';
+const pullCommitsOp = 'github.pull.commits.get';
 const authoredPulls = { kind: { $tag: 'Authored' } };
 const reviewPulls = { kind: { $tag: 'ReviewRequested' } };
-function searchPull(number, overrides = {}) {
-  return { number, title: `PR ${number}`, repository_url: `https://api.github.com/repos/org/repo${number % 3}`,
-    state: 'open', draft: number % 2 === 0, pull_request: {}, user: { login: 'alice' },
-    updated_at: new Date(Date.UTC(2026, 8, 1) - Math.floor(number / 3) * 1000).toISOString().replace('.000Z', 'Z'),
-    requested: ['alice'], ...overrides };
-}
-function searchPage(request, rows, incomplete = false) {
-  const url = new URL(request.path, 'http://stub');
-  assert.equal(url.searchParams.get('per_page'), '50');
-  assert.equal(url.searchParams.get('sort'), 'updated');
-  assert.equal(url.searchParams.get('order'), 'desc');
-  const match = /^is:pr is:open (author:@me|user-review-requested:@me) updated:(\S+)\.\.(\S+)$/.exec(url.searchParams.get('q'));
-  assert(match, `unexpected query ${url.searchParams.get('q')}`);
-  const who = request.headers.authorization.replace('Bearer access-', '');
-  const lower = Date.parse(match[2]), upper = Date.parse(match[3]);
-  assert(Number.isFinite(lower) && Number.isFinite(upper));
-  const selected = rows.filter(p => p.state === 'open' && p.pull_request && (match[1] === 'author:@me' ? p.user?.login === who : p.requested?.includes(who)) && Date.parse(p.updated_at) >= lower && Date.parse(p.updated_at) <= upper).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  const page = Number(url.searchParams.get('page'));
-  assert(page <= 20, 'must split before the Search 1,000-result limit');
-  return { total_count: selected.length, incomplete_results: incomplete, items: selected.slice((page - 1) * 50, page * 50) };
-}
-
 test('homepage searches all accessible repositories with direct review and author filters, drafts and paging', async t => {
   const rows = Array.from({ length: 63 }, (_, i) => searchPull(i + 1));
   rows.push(searchPull(100, { state: 'closed' }), searchPull(101, { state: 'closed', pull_request: { merged_at: 'today' } }), searchPull(102, { pull_request: undefined }));
@@ -818,6 +798,26 @@ for (const args of [authoredPulls, reviewPulls]) {
     const refreshed = await user.rpc(viewerPullsOp, args);
     assert.equal(refreshed.value.total_count, 52);
   });
+
+  test(`${args.kind.$tag} rejects pre-confirmation cursors before calling GitHub and accepts a fresh traversal`, async t => {
+    const f = await startHomeServer(); t.after(() => f.close());
+    f.state.rows = Array.from({ length: 51 }, (_, i) => searchPull(i + 1));
+    const user = browser(f); await user.login();
+    const cursor = legacyPullCursor(f, args.kind.$tag, 51);
+    const requests = f.requests.length;
+    const expired = await user.rpc(viewerPullsOp, { ...args, cursor });
+    assert.equal(expired.error?.status, 400);
+    assert.equal(expired.error?.code, 'invalid_cursor');
+    assert.equal(f.requests.length, requests, 'old cursors must not call GitHub');
+    const first = await user.rpc(viewerPullsOp, args);
+    assert.equal(first.ok, true, JSON.stringify(first));
+    assert.equal(first.value.total_count, 51); assert.equal(first.value.items.length, 50);
+    assert(first.value.next_cursor);
+    const last = await user.rpc(viewerPullsOp, { ...args, cursor: first.value.next_cursor });
+    assert.equal(last.ok, true, JSON.stringify(last));
+    assert.equal(last.value.total_count, 51); assert.equal(last.value.items.length, 1);
+    assert(!last.value.next_cursor);
+  });
 }
 
 test('incomplete and unsplittable search windows retain retry cursors', async t => {
@@ -838,6 +838,153 @@ test('incomplete and unsplittable search windows retain retry cursors', async t 
   const tied = await user.rpc(viewerPullsOp, authoredPulls);
   assert.equal(tied.ok, true, JSON.stringify(tied));
   assert.match(tied.value.incomplete, /same update time/); assert(tied.value.next_cursor);
+});
+
+const commitArgs = { owner: 'upstream', repo: 'repo', number: '42' };
+for (const total of [0, 250, 251, 301]) test(`homepage loads all ${total} commits in order using one source, including fork commits`, async t => {
+  const f = await startHomeServer({ total }); t.after(() => f.close());
+  const user = browser(f);
+  await user.status();
+  assert.equal((await user.rpc(pullCommitsOp, commitArgs)).error.code, 'authentication_required');
+  assert.equal(f.requests.filter(r => r.path === '/graphql').length, 0);
+  await user.login();
+  const items = []; let cursor;
+  for (let i = 0; i < 5; i++) {
+    const page = await user.rpc(pullCommitsOp, { ...commitArgs, ...(cursor ? { cursor } : {}) });
+    assert(page.ok, JSON.stringify(page));
+    assert.equal(page.value.total_count, total);
+    assert.equal(page.value.base_sha, f.state.base); assert.equal(page.value.head_sha, f.state.head);
+    assert.equal(page.value.items.length, Math.min(100, total - items.length));
+    items.push(...page.value.items); cursor = page.value.next_cursor;
+    if (!cursor) break;
+  }
+  assert(!cursor); assert.equal(items.length, total);
+  assert.deepEqual(items.map(c => c.sha), Array.from({ length: total }, (_, i) => commitSha(i + 1)));
+  assert.equal(new Set(items.map(c => c.sha)).size, total);
+  if (total) {
+    assert.equal(items[0].author, 'Unlinked Author'); assert.equal(items[1].author, 'fork-author');
+    for (const [index, item] of items.entries()) {
+      assert.equal(item.message, `${total > 250 ? 'Commit' : 'GraphQL commit'} ${index + 1}`);
+      assert.equal(item.committed_at, '2026-09-01T00:00:00Z');
+      assert.deepEqual(Object.keys(item).sort(), ['author', 'committed_at', 'message', 'sha']);
+    }
+  }
+  const graphqlPages = f.requests.filter(r => r.body?.query?.includes('query PullCommits('));
+  const comparePages = f.requests.filter(r => r.path.includes('/compare/'));
+  assert.equal(graphqlPages.length, total > 250 ? 1 : Math.max(1, Math.ceil(total / 100)));
+  assert.deepEqual(comparePages.map(r => new URL(r.path, 'http://stub').searchParams.get('page')),
+    total > 250 ? Array.from({ length: Math.ceil(total / 100) }, (_, i) => String(i + 1)) : []);
+});
+
+for (const total of [250, 301]) test(`commit snapshot checks reject base, head and count changes before and during ${total}-commit pages`, async t => {
+  const f = await startHomeServer({ total }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const original = { base: f.state.base, head: f.state.head, total };
+  const first = await user.rpc(pullCommitsOp, commitArgs);
+  assert(first.ok, JSON.stringify(first));
+  for (const field of ['base', 'head', 'total']) {
+    const mutate = () => { f.state[field] = field === 'total' ? total + 1 : 'c'.repeat(40); };
+    for (const timing of ['before', 'during']) {
+      Object.assign(f.state, original, { afterPage: null });
+      if (timing === 'before') mutate();
+      else f.state.afterPage = mutate;
+      const result = await user.rpc(pullCommitsOp, { ...commitArgs, cursor: first.value.next_cursor });
+      assert.equal(result.error?.code, 'pull_commits_changed', `${field} ${timing}: ${JSON.stringify(result)}`);
+    }
+    // A first-page race must also fail without publishing a partial snapshot.
+    Object.assign(f.state, original, { afterPage: mutate });
+    assert.equal((await user.rpc(pullCommitsOp, commitArgs)).error?.code, 'pull_commits_changed');
+  }
+});
+
+test('compare rejects inconsistent totals, short, empty, oversized and duplicate pages', async t => {
+  const f = await startHomeServer(); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const first = await user.rpc(pullCommitsOp, commitArgs);
+  const second = await user.rpc(pullCommitsOp, { ...commitArgs, cursor: first.value.next_cursor });
+  const third = await user.rpc(pullCommitsOp, { ...commitArgs, cursor: second.value.next_cursor });
+  for (const transform of [
+    data => { data.total_commits--; },
+    data => { data.total_commits = 301.5; },
+    data => { delete data.total_commits; },
+    data => { data.commits.pop(); },
+    data => { data.commits = []; },
+    data => { data.commits.push(data.commits[0]); },
+    data => { data.commits[1] = data.commits[0]; },
+    data => { data.commits[0].sha = 'bad'; },
+    data => { delete data.commits[0].commit.committer; },
+  ]) {
+    f.state.transformCompare = transform;
+    for (const cursor of [undefined, first.value.next_cursor]) {
+      const result = await user.rpc(pullCommitsOp, { ...commitArgs, ...(cursor ? { cursor } : {}) });
+      assert.equal(result.error?.code, 'invalid_github_response', JSON.stringify(result));
+    }
+  }
+  // The terminal page must account for exactly the remaining single commit.
+  for (const length of [0, 2, 100]) {
+    f.state.transformCompare = data => { data.commits = Array.from({ length }, () => data.commits[0]); };
+    assert.equal((await user.rpc(pullCommitsOp, { ...commitArgs, cursor: third.value.next_cursor })).error?.code, 'invalid_github_response');
+  }
+});
+
+test('GraphQL commit pages reject premature completion and non-progressing cursors', async t => {
+  const f = await startHomeServer({ total: 250 }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const first = await user.rpc(pullCommitsOp, commitArgs);
+  for (const transform of [
+    data => { data.pageInfo.hasNextPage = false; },
+    data => { data.pageInfo.endCursor = '100'; },
+    data => { data.pageInfo.endCursor = ''; },
+    data => { data.nodes = []; },
+    data => { data.nodes.push(data.nodes[0]); },
+    data => { data.nodes[1] = data.nodes[0]; },
+  ]) {
+    f.state.transformConnection = transform;
+    const result = await user.rpc(pullCommitsOp, { ...commitArgs, cursor: first.value.next_cursor });
+    assert.equal(result.error?.code, 'invalid_github_response', JSON.stringify(result));
+  }
+});
+
+// Reproduce a valid pre-upgrade encrypted cursor, with the real test server key.
+function legacyCommitCursor(f) {
+  return sealHomeCursor(f, 'commits:upstream/repo/42', {
+    after: '100', base: f.state.base, head: f.state.head, loaded: 100, total: f.state.total,
+  });
+}
+
+for (const total of [250, 301]) test(`commit cursors bind session, repository, PR and source for ${total} commits; old formats fail`, async t => {
+  const f = await startHomeServer({ total }); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const first = await user.rpc(pullCommitsOp, commitArgs), cursor = first.value.next_cursor;
+  const legacy = legacyCommitCursor(f);
+  const count = f.requests.length;
+  for (const args of [
+    { ...commitArgs, cursor: legacy }, { ...commitArgs, cursor: cursor + 'x' },
+    { ...commitArgs, number: '43', cursor }, { ...commitArgs, owner: 'fork', cursor },
+    { ...commitArgs, repo: 'another', cursor },
+  ]) assert.equal((await user.rpc(pullCommitsOp, args)).error?.code, 'invalid_cursor');
+  assert.equal(f.requests.length, count, 'invalid cursors must not call GitHub');
+  const other = browser(f); await other.login();
+  assert.equal((await other.rpc(pullCommitsOp, { ...commitArgs, cursor })).error?.code, 'invalid_cursor');
+  await user.logout(); await user.status(); await user.login();
+  assert.equal((await user.rpc(pullCommitsOp, { ...commitArgs, cursor })).error?.code, 'invalid_cursor');
+  assert.equal((await user.rpc(pullCommitsOp, commitArgs)).ok, true);
+});
+
+test('commit pagination preserves GraphQL partial-error and REST permission, rate-limit and session handling', async t => {
+  const f = await startHomeServer(); t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const first = await user.rpc(pullCommitsOp, commitArgs);
+  for (const [type, code] of [['FORBIDDEN', 'permission_denied'], ['RATE_LIMITED', 'rate_limit'], ['UNAUTHORIZED', 'authentication_required'], ['NOT_FOUND', 'not_found_or_not_installed']]) {
+    f.state.graphqlErrors = [{ type }];
+    assert.equal((await user.rpc(pullCommitsOp, commitArgs)).error?.code, code);
+  }
+  f.state.graphqlErrors = null;
+  for (const [status, code] of [[403, 'permission_denied'], [404, 'not_found_or_not_installed'], [429, 'rate_limit'], [401, 'authentication_required']]) {
+    f.state.restFailure = { status };
+    const result = await user.rpc(pullCommitsOp, { ...commitArgs, cursor: first.value.next_cursor });
+    assert.equal(result.error?.code, code, JSON.stringify(result));
+  }
 });
 
 test('closing a tab during a response aborts its connection without stopping the server', async t => {

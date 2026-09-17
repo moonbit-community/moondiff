@@ -3,6 +3,18 @@ test "homepage read requests and lightweight pages roundtrip" {
   let requests : Array[@protocol.GitHubRequest] = [
     ViewerPullsGet({ kind: ReviewRequested, cursor: None, }),
     ViewerPullsGet({ kind: Authored, cursor: Some("opaque"), }),
+    PullCommitsGet({
+      owner: "upstream",
+      repo: "repo",
+      number: "42",
+      cursor: None,
+    }),
+    PullCommitsGet({
+      owner: "upstream",
+      repo: "repo",
+      number: "42",
+      cursor: Some("opaque"),
+    }),
   ]
   for request in requests {
     assert_false(request.is_write())
@@ -24,6 +36,20 @@ test "homepage read requests and lightweight pages roundtrip" {
       total_count: 1001,
       next_cursor: Some("next"),
       incomplete: Some("Retry search"),
+    }),
+    PullCommits({
+      items: [
+        {
+          sha: "abcdef1",
+          message: "Summary",
+          author: "Author",
+          committed_at: "2026-09-17T00:00:00Z",
+        },
+      ],
+      total_count: 301,
+      next_cursor: Some("next"),
+      base_sha: "abcdef1",
+      head_sha: "abcdef2",
     }),
   ]
   for value in results {
@@ -58,6 +84,12 @@ test "homepage requests reject arbitrary searches and invalid pagination" {
     @protocol.GitHubRequest::ViewerPullsGet({
       kind: Authored,
       cursor: Some(""),
+    }).encode(),
+    @protocol.GitHubRequest::PullCommitsGet({
+      owner: "upstream",
+      repo: "repo",
+      number: "2147483648",
+      cursor: None,
     }).encode(),
   ]
   for value in bad {

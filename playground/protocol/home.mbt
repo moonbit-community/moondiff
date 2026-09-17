@@ -11,6 +11,14 @@ pub(all) struct ViewerPullsGet {
 } derive(Eq, FromJson, ToJson)
 
 ///|
+pub(all) struct PullCommitsGet {
+  owner : String
+  repo : String
+  number : String
+  cursor : String?
+} derive(Eq, FromJson, ToJson)
+
+///|
 pub(all) struct ApiPullSummary {
   owner : String
   repo : String
@@ -28,6 +36,23 @@ pub(all) struct ApiViewerPulls {
   next_cursor : String?
   // A retryable search window remains; the result must not look complete.
   incomplete : String?
+} derive(Eq, FromJson, ToJson)
+
+///|
+pub(all) struct ApiCommitSummary {
+  sha : String
+  message : String
+  author : String
+  committed_at : String
+} derive(Eq, FromJson, ToJson)
+
+///|
+pub(all) struct ApiPullCommits {
+  items : Array[ApiCommitSummary]
+  total_count : Int
+  next_cursor : String?
+  base_sha : String
+  head_sha : String
 } derive(Eq, FromJson, ToJson)
 
 ///|
