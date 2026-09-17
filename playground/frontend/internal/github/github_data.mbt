@@ -1,23 +1,19 @@
 ///|
-#warnings("-unused_value")
 pub fn decode_commit(body : String) -> ApiCommit raise {
   @json.from_json(@json.parse(body))
 }
 
 ///|
-#warnings("-unused_value")
 pub fn decode_pull(body : String) -> ApiPull raise {
   @json.from_json(@json.parse(body))
 }
 
 ///|
-#warnings("-unused_value")
 pub fn decode_compare(body : String) -> ApiCompare raise {
   @json.from_json(@json.parse(body))
 }
 
 ///|
-#warnings("-unused_value")
 pub fn decode_pull_files(body : String) -> Array[ApiFile] raise {
   @json.from_json(@json.parse(body))
 }
@@ -233,7 +229,6 @@ fn raw_url_for_repository(
 }
 
 ///|
-#warnings("-unused_value")
 pub fn raw_url(
   reference : CommitRef,
   revision : String,
@@ -304,7 +299,6 @@ pub fn source_pair_for_revisions(
 }
 
 ///|
-#warnings("-unused_value")
 pub fn source_pair(
   reference : CommitRef,
   commit_sha : String,
