@@ -5,7 +5,6 @@ pub(all) enum HomeMsg {
   LoadPulls(@protocol.ViewerPullKind)
   ToggleCommits(@protocol.ApiPullSummary)
   LoadCommits(String)
-  Open(String)
   PullsLoaded(
     Int,
     Int,
@@ -172,7 +171,6 @@ fn update_home(
     }
     SelectTab(tab) =>
       ({ ..model, home: { ..model.home, tab, }, }, @rabbita.none)
-    Open(path) => (model, @nav.push_url(path))
     LoadPulls(kind) => {
       let page = home_list(model.home, kind)
       if page.refresh is None && page.load is Ready && page.cursor is None {

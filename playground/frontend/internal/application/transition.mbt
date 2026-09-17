@@ -1,5 +1,6 @@
 ///|
 pub(all) enum Region {
+  Home
   Shell
   Toolbar
   Status
@@ -13,6 +14,7 @@ pub(all) enum Region {
 ///|
 pub fn Region::key(self : Region) -> String {
   match self {
+    Home => "home"
     Shell => "shell"
     Toolbar => "toolbar"
     Status => "status"

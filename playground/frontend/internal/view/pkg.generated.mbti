@@ -75,6 +75,7 @@ pub(all) struct NavigationInput {
 } derive(Eq)
 
 pub(all) enum RegionInput {
+  Home(@application.AuthStatus, @application.HomeState)
   Toolbar(ToolbarInput)
   Status(StatusInput)
   FileTree(TreeInput)
@@ -92,6 +93,7 @@ pub fn RegionProjection::inputs(Self, @application.Model) -> Array[(@application
 pub fn RegionProjection::new() -> Self
 
 pub(all) struct ShellInput {
+  home : Bool
   generation : Int
   landing : Bool
   showing : Bool
