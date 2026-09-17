@@ -1,5 +1,6 @@
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
 import { checkToolbar } from "./toolbar.mjs";
+import { clickLineCommentButton } from "./comment-actions.mjs";
 import { expectPending, holdRegionFrames } from "./dom-timing.mjs";
 import { settleRegions } from "../../tests/render-probe.mjs";
 import { expect, test } from "@playwright/test";
@@ -397,14 +398,6 @@ function newLineCommentGutter(page, line) {
 function newLineCommentButton(page, line) {
   return newLineCommentGutter(page, line)
     .getByRole("button", { name: `Comment on line ${line}`, exact: true });
-}
-
-async function clickLineCommentButton(button) {
-  await expect(async () => {
-    await button.scrollIntoViewIfNeeded({ timeout: 1_000 });
-    await button.locator("xpath=..").hover({ timeout: 1_000 });
-    await button.click({ timeout: 1_000 });
-  }).toPass({ timeout: 5_000, intervals: [100, 250, 500] });
 }
 
 async function openNewLineComment(page, line) {

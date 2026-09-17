@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { clickLineCommentButton } from './comment-actions.mjs';
 
 const base = '1'.repeat(40), head = 'a'.repeat(40), merge = '2'.repeat(40);
 const path = '/alice/repo/pull/42';
@@ -248,8 +249,7 @@ test('manual refresh and page restoration retain an expanded viewed file and its
   await page.goto(path); await expect(box(page)).toBeChecked();
   await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
   const gutter = card(page).locator('.review-gutter.new-line-number').filter({ has: page.locator('.line-number-value', { hasText: /^2$/ }) });
-  await gutter.hover();
-  await gutter.getByRole('button', { name: 'Comment on line 2', exact: true }).click();
+  await clickLineCommentButton(gutter.getByRole('button', { name: 'Comment on line 2', exact: true }));
   await page.locator('textarea').fill('Inline Viewed draft');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(2);
@@ -294,8 +294,7 @@ async function openMbtDraft(page, kind) {
     await card(page).getByRole('button', { name: 'Reply', exact: true }).click();
   } else {
     const gutter = card(page).locator('.review-gutter.new-line-number').filter({ has: page.locator('.line-number-value', { hasText: /^2$/ }) });
-    await gutter.hover();
-    await gutter.getByRole('button', { name: 'Comment on line 2', exact: true }).click();
+    await clickLineCommentButton(gutter.getByRole('button', { name: 'Comment on line 2', exact: true }));
   }
   return card(page).locator('textarea');
 }
