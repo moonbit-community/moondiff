@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import { randomBytes } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
+import { writeFileSync } from 'node:fs';
 import { buildServer, startServer, browser } from './server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from './viewed-fixture.mjs';
 
@@ -656,5 +657,20 @@ test('repository filenames survive source URL encoding, both comment APIs and Vi
       assert.deepEqual(read.value.files.map(f => f.path), repositoryPaths);
       assert.equal(read.value.files.find(f => f.path === path).state.$tag, viewed ? 'Viewed' : 'Unviewed');
     }
+  }
+});
+
+test('closing a tab during a response aborts its connection without stopping the server', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  writeFileSync(`${f.root}/static/large.js`, Buffer.alloc(8 * 1024 * 1024, 32));
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await new Promise((resolve, reject) => {
+      const request = httpRequest(`${f.base}/large.js`, response => {
+        response.once('data', () => { response.destroy(); resolve(); });
+        response.on('error', () => {});
+      });
+      request.on('error', reject); request.end();
+    });
+    assert.equal(await (await fetch(`${f.base}/healthz`)).text(), 'ok\n', f.output);
   }
 });
