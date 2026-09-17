@@ -5,7 +5,6 @@ pub(all) enum ReviewSide {
 } derive(Debug, Eq)
 
 ///|
-#warnings("-unused_value")
 pub(all) struct ReviewAnchor {
   path : String
   line : Int
@@ -218,7 +217,6 @@ pub fn canonical_anchor(
 }
 
 ///|
-#warnings("-unused_value")
 pub fn patch_is_commentable(patch : CanonicalPatch) -> Bool {
   patch is Commentable(_)
 }
