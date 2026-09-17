@@ -6,11 +6,13 @@ import {
   "moonbitlang/async/fs",
   "moonbitlang/async/socket",
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/encoding/base64",
   "moonbitlang/core/buffer",
   "moonbitlang/core/env",
   "moonbitlang/x/crypto",
+  "moonbitlang/x/time",
   "moonbit-community/sqlite3",
 }
 

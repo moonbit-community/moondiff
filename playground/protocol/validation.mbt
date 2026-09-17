@@ -135,6 +135,7 @@ fn check_path(path : String) -> Unit raise {
 ///|
 pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
   match self {
+    ViewerPullsGet(_) => false
     CommitGet(_) => false
     PullGet(_) => false
     PullViewedGet(_) => false
@@ -156,6 +157,10 @@ pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
 ///|
 pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
   let (owner, repo) = match self {
+    ViewerPullsGet(p) => {
+      check_cursor(p.cursor)
+      return
+    }
     CommitGet(p) => (p.owner, p.repo)
     PullGet(p) => (p.owner, p.repo)
     PullViewedGet(p) => (p.owner, p.repo)
@@ -178,6 +183,7 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
     "Invalid repository owner or name.",
   )
   match self {
+    ViewerPullsGet(_) => ()
     CommitGet(p) => {
       check_sha(p.sha)
       require(

@@ -105,6 +105,7 @@ pub(all) struct CommentDelete {
 
 ///|
 pub(all) enum GitHubRequest {
+  ViewerPullsGet(ViewerPullsGet)
   CommitGet(CommitGet)
   PullGet(PullGet)
   PullViewedGet(PullViewedGet)
