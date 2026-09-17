@@ -6,6 +6,7 @@ async fn App::rpc(
 ) -> @protocol.RpcValue {
   match request {
     ViewerPullsGet(p) => ViewerPulls(self.viewer_pulls(session, p))
+    PullCommitsGet(p) => PullCommits(self.pull_commits(session, p))
     CommitGet(p) =>
       Commit(
         decode_github(

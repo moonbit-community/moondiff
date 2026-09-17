@@ -71,6 +71,13 @@ pub(all) struct ApiCommitInfo {
   message : String
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) struct ApiCommitSummary {
+  sha : String
+  message : String
+  author : String
+  committed_at : String
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) struct ApiCompare {
   merge_base_commit : ApiParent
 } derive(Eq, ToJson, @json.FromJson)
@@ -137,6 +144,14 @@ pub(all) struct ApiPull {
 pub(all) struct ApiPullBranch {
   sha : String
   repo : ApiRepository?
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPullCommits {
+  items : Array[ApiCommitSummary]
+  total_count : Int
+  next_cursor : String?
+  base_sha : String
+  head_sha : String
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiPullSummary {
@@ -284,6 +299,7 @@ pub(all) enum FileViewedState {
 
 pub(all) enum GitHubRequest {
   ViewerPullsGet(ViewerPullsGet)
+  PullCommitsGet(PullCommitsGet)
   CommitGet(CommitGet)
   PullGet(PullGet)
   PullViewedGet(PullViewedGet)
@@ -309,6 +325,13 @@ pub(all) struct IssueCommentCreate {
   repo : String
   number : String
   body : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct PullCommitsGet {
+  owner : String
+  repo : String
+  number : String
+  cursor : String?
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct PullFileViewedSet {
@@ -371,6 +394,7 @@ pub(all) struct RpcRequest {
 
 pub(all) enum RpcValue {
   ViewerPulls(ApiViewerPulls)
+  PullCommits(ApiPullCommits)
   Commit(ApiCommit)
   Pull(ApiPull)
   PullViewed(ApiPullViewed)

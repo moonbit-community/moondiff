@@ -135,7 +135,7 @@ fn check_path(path : String) -> Unit raise {
 ///|
 pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
   match self {
-    ViewerPullsGet(_) => false
+    ViewerPullsGet(_) | PullCommitsGet(_) => false
     CommitGet(_) => false
     PullGet(_) => false
     PullViewedGet(_) => false
@@ -161,6 +161,7 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
       check_cursor(p.cursor)
       return
     }
+    PullCommitsGet(p) => (p.owner, p.repo)
     CommitGet(p) => (p.owner, p.repo)
     PullGet(p) => (p.owner, p.repo)
     PullViewedGet(p) => (p.owner, p.repo)
@@ -184,6 +185,10 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
   )
   match self {
     ViewerPullsGet(_) => ()
+    PullCommitsGet(p) => {
+      check_pull_number(p.number)
+      check_cursor(p.cursor)
+    }
     CommitGet(p) => {
       check_sha(p.sha)
       require(
