@@ -36,6 +36,8 @@ RPC 请求使用 `{"v":2,"request":GitHubRequest}` 格式。例如：
 | --- | --- | --- |
 | `CommitGet` | `sha`、`page` | `Commit(ApiCommit)` |
 | `PullGet` | `number` | `Pull(ApiPull)` |
+| `ViewerPullsGet` | `kind`、可选 `cursor`；无需 `owner`、`repo` | `ViewerPulls(ApiViewerPulls)` |
+| `PullCommitsGet` | `number`、可选 `cursor` | `PullCommits(ApiPullCommits)` |
 | `PullViewedGet` | `number` | `PullViewed(ApiPullViewed)` |
 | `PullFileViewedSet` | `number`, `path`, `viewed`, `base_sha`, `head_sha` | `FileViewed(ApiFileViewedResult)` |
 | `CompareGet` | `base`、`head` | `Compare(ApiCompare)` |
@@ -54,6 +56,51 @@ RPC 请求使用 `{"v":2,"request":GitHubRequest}` 格式。例如：
 评论侧别为 `Left` 或 `Right`，分别编码为 `{"$tag":"Left"}` 或 `{"$tag":"Right"}`。
 `ApiSource` 包含 `base64`、`size` 和 `content_type`；
 `ApiSource::decode` 校验 Base64 编码，并检查解码后的字节长度。
+
+## 登录后首页
+
+`ViewerPullsGet` 接收 `kind: {"$tag":"ReviewRequested"}` 或
+`kind: {"$tag":"Authored"}`，以及可选 `cursor`，不接收仓库、用户名或搜索表达式。
+后端使用当前会话，固定搜索 `is:pr is:open`，分别附加
+`user-review-requested:@me` 或 `author:@me`，按更新时间倒序，每页最多 50 条。
+范围为 GitHub App 授权可读取的仓库；仅团队请求 Review 不包含在内，本人草稿包含在内。
+
+`ApiViewerPulls` 包含 `items`、`total_count`、可选 `next_cursor` 和 `incomplete`。
+PR 摘要为 `owner`、`repo`、`number`、`title`、`author`、`updated_at`、`draft`。
+原始搜索窗口首次返回完整响应（`incomplete_results=false`）前，总数为暂定值，
+重试该窗口时可以更新。首次完整响应确认本次遍历的初始总数，后续页和拆分后的子窗口
+均沿用该总数，即使分页期间 GitHub 搜索索引发生变化。超过 1,000 条时拆分互不重叠的
+更新时间窗口，保留边界秒内的全部结果。同一秒超过限制、上游返回不完整结果，或当前请求
+达到窗口探索次数上限时，以 `incomplete` 明确提示，并提供继续或重试该窗口的游标。
+游标经过认证并绑定会话、认证代次与操作；刷新从头查询，已加载行在分页失败时保留。
+缺少总数确认标志的旧 PR 搜索游标返回 `invalid_cursor`（400），触发下文的列表恢复逻辑。
+
+`PullCommitsGet(owner, repo, number, cursor?)` 在提交数不超过 250 条时使用 PR 的
+GraphQL `commits` connection；超过时从第一页开始使用分页的
+[REST compare](https://docs.github.com/en/rest/commits/commits#compare-two-commits)，
+在 PR 所属的 base 仓库中按快照的完整 base/head SHA 查询，支持 fork PR。
+整个分页过程使用同一种数据源，每页 100 条，保持该来源的 GitHub 顺序。
+`ApiPullCommits` 包含 `items`、
+`total_count`、可选 `next_cursor`、`base_sha`、`head_sha`；commit 摘要仅包含
+`sha`、`message`（消息首行）、`author`（登录名或姓名）、`committed_at`（提交者时间），
+不含文件 diff。游标绑定仓库、PR、快照、数据源和分页位置；旧提交游标格式返回
+`invalid_cursor`（400）。每页读取前后核对 base/head 和提交总数；compare 总数、页长度或
+累计数量不一致时拒绝响应，沿用现有上游超时和响应大小限制。base/head 或总数
+变化返回 `pull_commits_changed`（409），前端从第一页重新获取该提交列表；刷新期间
+保留旧提交，直到替换内容准备就绪。反复变化时保留手动重试。GraphQL 部分成功响应也
+视为失败。两个新操作均要求登录且为只读。
+
+任一 PR 列表或提交列表的带游标请求收到 `invalid_cursor` 时，从第一页重新获取该列表。
+刷新期间只重置暂存页，旧条目和总数继续显示；普通分页则清空受影响列表的条目、总数和
+游标。提交列表同时清除旧快照和重启计数，保留展开状态；折叠中的
+列表等待再次展开后加载。其他列表与缓存保持可用。第一页本身仍返回 `invalid_cursor` 时，
+显示错误和 **Retry**，不自动循环；Retry 从第一页开始。这也适用于在另一标签页退出并
+重登同一账号后失效的游标。身份、导航和请求代次校验继续丢弃迟到响应。
+
+首页各组和各 PR 的加载、错误状态独立。内存缓存支持历史导航和页面恢复。刷新时两组
+从第一页分别重新获取，达到原先已展示的深度后才替换旧条目；展开的提交列表也会重新校验。
+刷新失败时保留可用内容并允许重试。退出、切换账号或会话过期时立即清空缓存。无数据库迁移，
+使用现有合并构建同步部署前后端。
 
 ## Viewed 同步
 

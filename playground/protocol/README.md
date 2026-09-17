@@ -39,6 +39,8 @@ A successful response to that request has a typed `RpcValue` payload:
 | --- | --- | --- |
 | `CommitGet` | `sha`, `page` | `Commit(ApiCommit)` |
 | `PullGet` | `number` | `Pull(ApiPull)` |
+| `ViewerPullsGet` | `kind`, optional `cursor`; no `owner` or `repo` | `ViewerPulls(ApiViewerPulls)` |
+| `PullCommitsGet` | `number`, optional `cursor` | `PullCommits(ApiPullCommits)` |
 | `PullViewedGet` | `number` | `PullViewed(ApiPullViewed)` |
 | `PullFileViewedSet` | `number`, `path`, `viewed`, `base_sha`, `head_sha` | `FileViewed(ApiFileViewedResult)` |
 | `CompareGet` | `base`, `head` | `Compare(ApiCompare)` |
@@ -58,6 +60,72 @@ Comment targets are `Commit(sha~)`, `Pull(number~)` or
 `{"$tag":"Left"}` or `{"$tag":"Right"}`. `ApiSource` contains
 `base64`, `size` and `content_type`; `ApiSource::decode` validates the Base64 and
 checks its decoded byte length.
+
+## Signed-in homepage
+
+`ViewerPullsGet` accepts `kind: {"$tag":"ReviewRequested"}` or
+`kind: {"$tag":"Authored"}`. Both operations require the current session.
+The server fixes the search to `is:pr is:open` with `user-review-requested:@me`
+or `author:@me`, ordered by update time descending, 50 PRs per GitHub page.
+This covers repositories readable through the user's GitHub App authorization;
+team-only review requests are excluded and authored drafts are included.
+The browser cannot submit a username or search expression.
+
+`ApiViewerPulls` contains `items`, `total_count`, optional `next_cursor` and
+optional `incomplete`. Each summary contains `owner`, `repo`, `number`, `title`,
+`author`, `updated_at` and `draft`. `total_count` is provisional until the first
+complete response (`incomplete_results=false`) for the original search window;
+retries of that window may revise it. That response confirms the initial count
+for the traversal, which stays fixed across later pages and split windows even
+if GitHub's search index changes during pagination. Searches over 1,000 results
+split into disjoint update-time windows, preserving boundary seconds. If a
+single second exceeds the limit, GitHub reports incomplete results, or a request
+exhausts its bounded window-discovery work, `incomplete` explains the unfinished
+state and `next_cursor` retries/continues that window. Previously loaded rows
+remain visible. Cursors are authenticated and bound to the session epoch and
+operation; refreshing starts a new search. Older PR search cursors without the
+total-confirmation flag return `invalid_cursor` (400), triggering the list
+recovery described below.
+
+`PullCommitsGet` uses the PR's GraphQL `commits` connection for up to 250
+commits. Larger PRs use paginated
+[REST compare](https://docs.github.com/en/rest/commits/commits#compare-two-commits)
+from page one, with the snapshot's full base/head SHAs in the PR's base
+repository, including for fork PRs. Each traversal uses a single source,
+100 commits per page, preserving its GitHub order. `ApiPullCommits` contains
+`items`, `total_count`, optional
+`next_cursor`, `base_sha` and `head_sha`; commit summaries contain `sha`,
+`message` (first line), `author` (login or name) and `committed_at` (committer
+timestamp), without diff data. Cursors also bind the repository, PR, snapshot,
+source and pagination position; the previous commit cursor format returns
+`invalid_cursor` (400). Base/head and commit count are checked before and after
+each page. Inconsistent compare totals, page lengths or accumulated counts are
+rejected, using the existing upstream timeouts and response size limits.
+A changed base/head or count returns
+`pull_commits_changed` (409); the frontend restarts that commit traversal from
+page one. During refresh, the previous commits remain visible until their
+replacement is ready. Repeated changes leave an explicit retry. Partial GraphQL
+responses are rejected.
+
+For either PR list or a commit list, `invalid_cursor` on a request with a
+cursor restarts that traversal from page one. During refresh, only the staged
+pages are reset; the previous rows and count remain visible. Outside refresh,
+the affected list's rows, count and cursor are cleared. Commit recovery also
+clears the old snapshot and restart count, preserving expansion; a collapsed
+list waits until it is expanded.
+Other lists and caches remain usable. If page one itself returns
+`invalid_cursor`, the list shows an error and **Retry** without automatically
+looping; Retry starts at page one. This also recovers cursors invalidated by
+signing out and back into the same account in another tab. Identity,
+navigation and request-generation checks still reject stale responses.
+
+The homepage has separate list and commit loading/error state. In-memory caches
+survive history navigation and page restoration. Refresh independently rebuilds
+each list from page one to its previous visible depth, retaining old rows until
+the replacement is ready; expanded commits are revalidated. Failed refreshes
+keep usable content and a retry path. Logout, account changes and expired
+sessions clear the caches. No database migration is required. Deploy the updated
+frontend and backend together using the existing combined build.
 
 ## Viewed synchronization
 
