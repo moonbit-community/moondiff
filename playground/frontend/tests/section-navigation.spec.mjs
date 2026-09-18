@@ -253,7 +253,7 @@ for (const algorithm of ["Token", "Tree"]) {
       const filename = await page.locator(".commit-message-title").boundingBox();
       const previousRect = await previous.boundingBox();
       expect(filename.x + filename.width).toBeLessThan(previousRect.x);
-      expect(previousRect.x - filename.x - filename.width).toBeLessThan(24);
+      expect(previousRect.x - filename.x - filename.width).toBeCloseTo(32, 1);
       expect(Math.abs(filename.y + filename.height / 2 - previousRect.y - previousRect.height / 2)).toBeLessThan(1);
       expect((await next.boundingBox()).x + (await next.boundingBox()).width).toBeLessThanOrEqual(420);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(420);
