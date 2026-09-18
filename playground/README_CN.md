@@ -54,6 +54,10 @@ MOONDIFF_STATIC_DIR=dist/static
 # Docker 中默认为 /var/lib/moondiff/moondiff.sqlite3。
 MOONDIFF_DATABASE=moondiff.sqlite3
 
+# 未过期且尚未登录 GitHub 的会话数量上限。达到上限时创建会话返回 JSON 429。
+# 默认 512，可设为 1–100000。
+MOONDIFF_ANONYMOUS_SESSION_LIMIT=512
+
 # 必填，本地开发也需要：对恰好 64 个随机字节进行 Base64 编码得到的密钥。
 # 用于加密已保存的 GitHub 令牌和设备凭据，并校验其完整性。
 # 只需生成一次：openssl rand -base64 64 | tr -d '\n'
@@ -101,7 +105,11 @@ App 权限发生变化后，已有安装需要接受新的权限。将 App 安�
 访问私有仓库和执行写操作还需要登录用户自身具有相应权限。
 此流程不使用 App 私钥或安装访问令牌。
 
-公开仓库支持匿名读取，但仍受 GitHub 请求频率限制。
+公开仓库支持匿名读取。浏览器直接向 `api.github.com` 读取提交、PR、比较、
+文件列表、指定版本的源码和评论，不发送 Cookie 或令牌。这些请求使用访客 IP 的
+[GitHub 匿名限额，每小时 60 次](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)。
+登录后的读取仍由后端完成，以支持私有仓库。浏览器遇到 CORS、网络或限额错误时
+会显示错误，不会改走后端匿名代理。
 
 登录时，playground 页面会显示验证码。复制验证码并打开 GitHub，
 在新窗口中完成设备授权；playground 会自动更新登录状态。
@@ -184,8 +192,12 @@ Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
 
 ## 会话与备份
 
-会话在 30 天后过期。退出登录会结束当前 playground 会话，
-不会卸载 GitHub App，也不会撤销其他 GitHub 会话。
+仅在开始登录时创建未登录会话，有效期 20 分钟。发起新的设备授权时，会话期限会
+延长至该授权固定的 15 分钟期限再加 5 分钟宽限期。复用活动授权时，只会将较短的
+会话补足至同一个固定期限；重复的 start 请求不会持续向后滑动期限。成功登录会在
+同一数据库事务中将有效期延长至 30 天。升级后首次启动时，旧版闲置匿名会话会被
+删除，仍在授权的旧会话有效期会收紧至 20 分钟。退出登录会结束当前 playground
+会话，不会卸载 GitHub App，也不会撤销其他 GitHub 会话。
 
 备份时需**同时保存数据库和原始加密密钥**，并将密钥单独存放在受保护的密钥存储中。
 仅复制运行中的主数据库文件并不安全，尤其是已有的 WAL 数据库。
@@ -207,13 +219,20 @@ sqlite3 /var/lib/moondiff/moondiff.sqlite3 '.backup /secure-backups/moondiff.sql
 
 | 方法 / 路径 | 响应 / 用途 |
 | --- | --- |
-| `GET /api/auth/status` | `{$tag:"Success",value:{authenticated,user_id?,login?,install_url?,csrf_token,device_flow?}}`；建立匿名会话并恢复待完成的登录 |
+| `GET /api/auth/status` | `{$tag:"Success",value:{authenticated,user_id?,login?,install_url?,csrf_token?,device_flow?}}`；恢复有效会话，无会话时只返回匿名状态，不写数据库或设置 Cookie |
+| `POST /api/auth/session` | 空 JSON 对象 `{}`；复用有效会话或创建 20 分钟登录会话，返回状态与 CSRF 令牌，新建时另设置 Cookie |
 | `POST /api/auth/device/start` | `{attempt_id}` 创建或复用会话中正在进行的授权；返回 `{request_id,status}` |
 | `POST /api/auth/device/poll` | `{authorization_id}` 在到达轮询时间后推进授权；返回 `{request_id,status}` |
 | `POST /api/auth/device/cancel` | `{authorization_id}` 取消授权并返回当前会话状态；返回 `{request_id,status}` |
 | `POST /api/auth/logout` | 使会话失效并返回 `Success(value=null)`；要求提供 Origin 和 X-CSRF-Token |
-| `POST /api/rpc` | `{v:2,request:GitHubRequest}` → `{$tag:"Success",value:RpcValue}` 或 `{$tag:"Failure",error:{status,code,message}}` |
+| `POST /api/rpc` | 所有操作均要求已登录会话；`{v:2,request:GitHubRequest}` → `{$tag:"Success",value:RpcValue}` 或 `{$tag:"Failure",error:{status,code,message}}` |
 | `GET /healthz` | 服务就绪时返回 `ok` |
+
+`POST /api/auth/session` 要求精确匹配配置的 Origin 和
+`Content-Type: application/json`；无效请求不会创建会话。创建前在 SQLite 事务中
+清理过期记录并检查 `MOONDIFF_ANONYMOUS_SESSION_LIMIT`，满额时返回错误码
+`session_limit` 的 JSON 429。生产 [Nginx 示例](deploy/nginx.conf) 另按连接 IP
+对会话创建与设备授权开始限速，每分钟 2 次、突发 10 次。
 
 三个设备授权 POST 接口都要求会话 Cookie、与配置一致的 Origin、
 `X-CSRF-Token` 和 `Content-Type: application/json`；请求包含额外字段时会被拒绝。
@@ -243,6 +262,13 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 请求先解码，再与重新编码的 JSON 比较，拒绝额外字段、小数截断和越界值，随后检查参数约束。
 后端只发送已建模字段；无效上游数据返回 `invalid_github_response`，客户端收到错误结果种类时返回 `invalid_server_response`。
 前后端须同步升级至 v2；不提供 v1 兼容层，SQLite 数据格式保持不变。
+
+浏览器公开读取与后端共用 REST 路径构造和响应校验。公开请求不发送
+`X-GitHub-Api-Version`，使用 GitHub 的
+[默认 API 版本](https://docs.github.com/en/rest/about-the-rest-api/api-versions)。
+仅完整 SHA 指向的不变数据进入有界内存缓存；相同并发请求共用一次读取。
+[契约检查](../.github/workflows/public-github-contract.yml) 在提交推送到 `main` 时运行，
+在未指定 API 版本的情况下检查公开响应结构和 CORS；遇到 GitHub 限流时报告“无法判定”。
 
 源码响应每侧最多 1 MiB，上游 JSON 响应最多 8 MiB，RPC 请求体最多 128 KiB，
 评论最多读取 100 页，每页 100 条。

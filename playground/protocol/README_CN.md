@@ -149,7 +149,10 @@ GitHub 用户 ID、仓库、PR 编号、原始当前路径、目标状态及 bas
 ## 认证接口
 
 `GET /api/auth/status` 返回 `Response[ApiAuthStatus]`。状态包含
-`authenticated`、`csrf_token`，以及可选的 `login`、`user_id`、`install_url` 和 `device_flow`。
+`authenticated`，以及可选的 `csrf_token`、`login`、`user_id`、`install_url` 和 `device_flow`。
+无有效会话时只返回匿名状态，不包含 `csrf_token`，也不创建会话或设置 Cookie。
+开始登录时，浏览器以空 JSON 对象 `{}` 和与配置精确匹配的 Origin 请求
+`POST /api/auth/session`。该接口创建或复用登录会话，并返回状态和 CSRF 令牌。
 设备授权流程包含 `id`、`phase`、`user_code`、`verification_uri`、
 `expires_at`（以秒为单位的 Unix 时间戳）、`retry_after`（秒）和 `message`。
 阶段为 `Starting`、`Pending`、`Verifying`、`Completed`、`Cancelled`、`Expired`、
@@ -163,7 +166,7 @@ poll 和 cancel 接口接收 `DeviceAuthorization`（`{authorization_id}`）。
 poll 响应中的这两个标识符都必须与请求匹配。
 
 `POST /api/auth/logout` 返回 `Response[Unit]`，其中 `value:null`。
-客户端随后重新查询状态，以建立匿名会话并获取新的 CSRF 令牌。
+客户端随后重新查询状态以确认匿名状态；该读取不会创建会话或 CSRF 令牌。
 
 ## 校验与调度
 
