@@ -162,7 +162,7 @@ test('restoring another account discards the old pending write and draft', async
   await expectViewedWrite(backend, backend.state.files[0], true, () => box(page).check()); await hold.entered.promise;
   await backend.user.login('bob');
   await restore(page);
-  await expect(page.getByText('Signed in as bob', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: bob', exact: true })).toBeVisible();
   await expect(box(page)).toBeEnabled(); await expect(box(page)).not.toBeChecked();
   await expect(page.locator('textarea')).toHaveCount(0);
   hold.release.resolve();

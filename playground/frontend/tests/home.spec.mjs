@@ -21,7 +21,7 @@ test('signed-in root replaces the entire landing DOM before and after refresh an
 test('signed-in invalid routes keep the input visible while typing a valid GitHub URL', async ({ page }) => {
   const state = await setup(page);
   await page.goto('/#/invalid');
-  await expect(page.getByText('Signed in as alice').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: alice', exact: true }).first()).toBeVisible();
   const input = page.locator('#commit-url');
   await expect(input).toBeVisible();
   await expect(page.locator('.empty-state.error')).toBeVisible();
@@ -76,12 +76,14 @@ test('commit expansion is lazy and cached while PR and fork commit links open in
   const pr = await prReady;
   await expect(pr).toHaveURL(/\/upstream\/repo\/pull\/1$/);
   await expect(pr.getByText('Loaded PR', { exact: true })).toBeVisible();
+  await expect(pr.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   expect(await pr.evaluate(() => window.opener)).toBeNull();
   await pr.close();
   const commitReady = page.waitForEvent('popup'); await link.click();
   const commit = await commitReady;
   await expect(commit).toHaveURL(/\/upstream\/repo\/pull\/1\/commits\/0+1$/);
   await expect(commit.getByText('Loaded commit', { exact: true })).toBeVisible();
+  await expect(commit.locator('.hero-workspace').getByRole('button', { name: 'Account: alice' })).toBeVisible();
   expect(await commit.evaluate(() => window.opener)).toBeNull();
   expect(state.calls.some(c => c.kind === 'CommitGet' && c.args.owner === 'fork')).toBe(true);
   await commit.close();

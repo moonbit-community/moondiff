@@ -641,33 +641,11 @@ fn review_thread_view(
 fn auth_controls(
   auth : @application.AuthStatus,
   emit : @rabbita.Emit[Msg],
-  refresh? : @rabbita.Html = @html.nothing,
 ) -> @rabbita.Html {
   match auth {
     AuthChecking =>
       @html.span(class="auth-status", "Checking GitHub session…")
-    SignedIn(login~, install_url~, ..) =>
-      @html.div(class="auth-controls", [
-        @html.span("Signed in\{login.map(name => " as \{name}").unwrap_or("")}"),
-        refresh,
-        if install_url is Some(url) {
-          @html.a(
-            href=url,
-            target=Blank,
-            rel="noopener noreferrer",
-            "Install GitHub App ↗",
-          )
-        } else {
-          @html.nothing
-        },
-        @html.button(
-          type_="button",
-          disabled=false,
-          class="secondary",
-          on_click=emit(Auth(Logout)),
-          "Sign out",
-        ),
-      ])
+    SignedIn(..) => @html.nothing
     Anonymous(install_url) =>
       @html.div(class="auth-controls", [
         @html.button(
@@ -812,14 +790,7 @@ fn comments_overview(
         @html.p(class="section-label", "GitHub discussion"),
         @html.h2("Comments"),
       ]),
-      @html.div([
-        auth_controls(auth, emit, refresh~),
-        if auth is SignedIn(_) {
-          @html.nothing
-        } else {
-          refresh
-        },
-      ]),
+      @html.div([auth_controls(auth, emit), refresh]),
     ]),
     if review.snapshot_stale {
       @html.div(class="snapshot-stale", [
