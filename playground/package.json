@@ -20,7 +20,8 @@
     "package:extension": "npm run package:extension:chrome && npm run package:extension:firefox",
     "package:extension:chrome": "node ../extension/chrome/scripts/package.mjs",
     "package:extension:firefox": "node ../extension/firefox/scripts/package.mjs",
-    "test:server": "moon test protocol --target all && moon test frontend/internal/github_client --target js && moon -C backend test && node --test backend/tests/server.test.mjs"
+    "test:server": "moon test protocol --target all && moon test frontend/internal/github_client --target js && moon -C backend test && node --test backend/tests/server.test.mjs",
+    "check:github-api-contract": "node scripts/check-github-api-contract.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
