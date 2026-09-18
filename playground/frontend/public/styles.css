@@ -1463,7 +1463,7 @@ button.file-tree-row.selected {
   top: var(--toolbar-inset);
   min-width: 0;
   align-items: center;
-  gap: 0.5rem;
+  gap: 2rem;
   border-bottom: 1px solid var(--border);
   padding: 0.5rem 0.75rem;
   color: var(--foreground);
@@ -1737,7 +1737,7 @@ button.file-tree-row.selected {
 
 .section-change-button {
   width: auto;
-  min-width: 3.75rem;
+  min-width: 4rem;
   height: 1.65rem;
   padding: 0 0.4rem;
   white-space: nowrap;
@@ -1746,7 +1746,7 @@ button.file-tree-row.selected {
   background: transparent;
   border: 1px solid transparent;
   box-shadow: none;
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1;
 }
 
