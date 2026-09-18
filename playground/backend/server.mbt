@@ -85,7 +85,7 @@ async fn App::static_file(
     "Cache-Control": "no-cache",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   })
   if request.meth != Head {
     conn.connection.write_reader(file)
@@ -106,33 +106,54 @@ async fn App::handle(
     return
   }
   if request.meth == Get && path == "/api/auth/status" {
-    let (cookies, session) = match self.request_session(request) {
-      Some(s) => ([], s)
-      None => {
-        let (cookie, s) = self.create_session()
-        ([self.cookie(cookie)], s)
-      }
-    }
-    let current = if !session.tokens.is_empty() {
-      self.authenticated(session) catch {
-        error => {
-          guard error is RpcError(401, _, _) || error is InvalidCiphertext else {
-            raise error
+    let session = self.request_session(request)
+    let current = if session is Some(session) && !session.tokens.is_empty() {
+      Some(
+        self.authenticated(session) catch {
+          error => {
+            guard error is RpcError(401, _, _) || error is InvalidCiphertext else {
+              raise error
+            }
+            self.expire_auth(session)
+            guard self.session(session.id) is Some(current) else {
+              raise RpcError(401, "authentication_required", "Session ended.")
+            }
+            current
           }
-          self.expire_auth(session)
-          guard self.session(session.id) is Some(current) else {
-            raise RpcError(401, "authentication_required", "Session ended.")
-          }
-          current
-        }
-      }
+        },
+      )
     } else {
       session
     }
-    respond_json(conn, self.status(current), cookies~)
+    respond_json(conn, self.status(current))
     return
   }
   let session = self.request_session(request)
+  if request.meth == Post && path == "/api/auth/session" {
+    guard request.headers.get("Origin") == Some(self.config.public_url) else {
+      raise RpcError(403, "csrf_failed", "The request origin is invalid.")
+    }
+    guard request.headers.get("Content-Type") == Some("application/json") else {
+      raise RpcError(415, "invalid_arguments", "Expected application/json.")
+    }
+    let bytes = read_bounded(reader, 1024)
+    let value = @json.parse(@utf8.decode(bytes)) catch {
+      _ => raise RpcError(400, "invalid_arguments", "Invalid JSON request.")
+    }
+    guard value == Json::object({}) else {
+      raise RpcError(400, "invalid_arguments", "Expected an empty JSON object.")
+    }
+    match session {
+      Some(session) => respond_json(conn, self.status(Some(session)))
+      None => {
+        let (cookie, created) = self.create_session()
+        respond_json(conn, self.status(Some(created)), cookies=[
+          self.cookie(cookie),
+        ])
+      }
+    }
+    return
+  }
   if path == "/auth/login" || path == "/auth/callback" {
     raise RpcError(404, "not_found", "Page not found.")
   }
@@ -188,12 +209,16 @@ async fn App::handle(
   if request.meth == Post && path == "/api/auth/logout" {
     let session = self.csrf_check(request, session)
     self.logout(session)
-    // Do not issue another cookie here: a late logout response cannot replace a
-    // newer session. The next explicit status request creates the anonymous one.
+    // A late logout response must not replace a newer session cookie.
     respond_json(conn, ())
     return
   }
   if request.meth == Post && path == "/api/rpc" {
+    guard session is Some(active) && !active.tokens.is_empty() else {
+      raise RpcError(
+        401, "authentication_required", "Sign in to GitHub to continue.",
+      )
+    }
     guard request.headers
       .get("Content-Type")
       .unwrap_or("")

@@ -10,6 +10,7 @@ priv struct Config {
   api_url : String
   oauth_url : String
   secure : Bool
+  anonymous_session_limit : Int
 }
 
 ///|
@@ -112,6 +113,19 @@ fn Config::load() -> Config raise {
   if test_mode {
     ignore(root_url(public_url, local_only=true))
   }
+  let anonymous_session_limit = setting(
+    "MOONDIFF_ANONYMOUS_SESSION_LIMIT", "512",
+  )
+  guard decimal(anonymous_session_limit) &&
+    anonymous_session_limit.length() <= 6 else {
+    fail("MOONDIFF_ANONYMOUS_SESSION_LIMIT must be between 1 and 100000")
+  }
+  let anonymous_session_limit : Int = @json.from_json(
+    @json.parse(anonymous_session_limit),
+  )
+  guard anonymous_session_limit >= 1 && anonymous_session_limit <= 100000 else {
+    fail("MOONDIFF_ANONYMOUS_SESSION_LIMIT must be between 1 and 100000")
+  }
   {
     listen: setting("MOONDIFF_LISTEN", "127.0.0.1:4173"),
     public_url,
@@ -123,5 +137,6 @@ fn Config::load() -> Config raise {
     api_url,
     oauth_url,
     secure: public_url.has_prefix("https://"),
+    anonymous_session_limit,
   }
 }

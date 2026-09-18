@@ -10,6 +10,76 @@ import { startHomeServer, searchPull, searchPage, commitSha, sealHomeCursor, leg
 
 before(buildServer);
 
+test('anonymous status is read only and session creation validates origin and JSON', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  const user = browser(f);
+  for (let i = 0; i < 4; i++) {
+    const response = await user.request('/api/auth/status');
+    assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal((await response.json()).value.authenticated, false);
+  }
+  assert.deepEqual(f.sql('SELECT count(*) FROM sessions'), [[0]]);
+  const create = (headers, body = '{}') => user.request('/api/auth/session', { method: 'POST', headers, body });
+  for (const [headers, body, status] of [
+    [{ 'Content-Type': 'application/json' }, '{}', 403],
+    [{ Origin: 'https://evil.example', 'Content-Type': 'application/json' }, '{}', 403],
+    [{ Origin: f.base, 'Content-Type': 'text/plain' }, '{}', 415],
+    [{ Origin: f.base, 'Content-Type': 'application/json' }, '{', 400],
+    [{ Origin: f.base, 'Content-Type': 'application/json' }, '{"extra":true}', 400],
+  ]) {
+    const response = await create(headers, body);
+    assert.equal(response.status, status);
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
+  assert.deepEqual(f.sql('SELECT count(*) FROM sessions'), [[0]]);
+  const first = await user.session();
+  assert.equal(first.authenticated, false);
+  assert.equal(typeof user.csrf, 'string');
+  const cookie = user.cookie;
+  await user.session();
+  assert.equal(user.cookie, cookie);
+  assert.deepEqual(f.sql('SELECT count(*) FROM sessions'), [[1]]);
+});
+
+test('anonymous session cap cleans expired rows and login extends the session', async t => {
+  const f = await startServer(undefined, { env: { MOONDIFF_ANONYMOUS_SESSION_LIMIT: '2' } }); t.after(() => f.close());
+  const first = browser(f), second = browser(f), third = browser(f);
+  await first.session(); await second.session();
+  const full = await third.request('/api/auth/session', { method: 'POST', headers: { Origin: f.base, 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(full.status, 429);
+  assert.equal((await full.json()).error.code, 'session_limit');
+  assert.equal(full.headers.get('set-cookie'), null);
+  assert.deepEqual(f.sql('SELECT count(*) FROM sessions'), [[2]]);
+  f.sql('UPDATE sessions SET expires=1 WHERE csrf=?', [second.csrf]);
+  await third.session();
+  assert.deepEqual(f.sql('SELECT count(*) FROM sessions'), [[2]]);
+  await first.login();
+  const [[expires]] = f.sql('SELECT expires FROM sessions WHERE csrf=?', [first.csrf]);
+  assert(Math.abs(expires - Date.now() / 1000 - 30 * 86400) < 5);
+  await browser(f).session();
+  assert.deepEqual(f.sql("SELECT count(*) FROM sessions WHERE tokens=''"), [[2]]);
+});
+
+test('startup migration deletes idle legacy anonymous sessions and tightens active ones', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  const idle = browser(f), pending = browser(f), loggedIn = browser(f);
+  await idle.session();
+  const flow = await pending.begin();
+  await loggedIn.login();
+  const [[loggedInExpiry]] = f.sql("SELECT expires FROM sessions WHERE tokens!=''");
+  await f.stop();
+  f.sql('DELETE FROM metadata WHERE name=?', ['anonymous-session-lifetime-v1']);
+  f.sql("UPDATE sessions SET expires=? WHERE tokens=''", [Math.floor(Date.now() / 1000) + 30 * 86400]);
+  await f.start();
+  assert.deepEqual(f.sql("SELECT count(*) FROM sessions WHERE tokens=''"), [[1]]);
+  const [[pendingExpiry]] = f.sql("SELECT expires FROM sessions WHERE tokens='' ");
+  assert(pendingExpiry <= Date.now() / 1000 + 20 * 60);
+  assert.deepEqual(f.sql("SELECT expires FROM sessions WHERE tokens!=''"), [[loggedInExpiry]]);
+  assert.equal((await pending.status()).device_flow.id, flow.id);
+  assert.equal((await idle.status()).authenticated, false);
+  assert.deepEqual(f.sql("SELECT count(*) FROM sessions WHERE tokens=''"), [[1]]);
+});
+
 test('authorization relationships and cascade cleanup work without foreign_keys PRAGMA', async t => {
   const f = await startServer(); t.after(() => f.close());
   const user = browser(f);
@@ -66,7 +136,7 @@ test('device login without a client secret, user isolation, encrypted persistenc
   assert.equal(f.env.MOONDIFF_GITHUB_CLIENT_SECRET, undefined);
   const alice = browser(f), bob = browser(f);
   const flow = await alice.begin();
-  await bob.status();
+  await bob.session();
   assert.equal((await bob.poll(flow)).error.code, 'authorization_not_found');
   assert.equal((await bob.cancel(flow)).value.authenticated, false);
   const [[encrypted]] = f.sql('SELECT credentials FROM authorizations WHERE phase=\'pending\'');
@@ -128,10 +198,12 @@ test('logout invalidates pending and in-flight device authorizations', async t =
   assert.equal((await user.status()).authenticated, false);
 });
 
-test('CSRF, operation validation, anonymous reads and authenticated writes', async t => {
+test('CSRF, operation validation, anonymous RPC denial and authenticated writes', async t => {
   const f = await startServer(); t.after(() => f.close());
   const user = browser(f); await user.status();
-  assert((await user.rpc('github.commit.get', args)).ok);
+  const calls = f.requests.length;
+  assert.equal((await user.rpc('github.commit.get', args)).error.code, 'authentication_required');
+  assert.equal(f.requests.length, calls);
   assert.equal((await user.rpc('github.issue.comment.create', { owner: 'alice', repo: 'repo', number: '1', body: 'hello' })).error.code, 'authentication_required');
   await user.login();
   assert.equal((await user.logout({ Origin: 'https://evil.example' })).status, 403);
@@ -221,6 +293,8 @@ test('expired refresh and pending states retain identity for recovery but never 
   assert.equal((await user.status()).user_id, '2');
   f.sql('UPDATE sessions SET expires=1');
   assert.equal((await user.status()).authenticated, false);
+  assert.equal(f.sql('SELECT count(*) FROM sessions')[0][0], 1);
+  await user.session();
   assert.equal(f.sql('SELECT count(*) FROM authorizations')[0][0], 0);
 });
 
@@ -251,14 +325,54 @@ test('pagination is complete or fails explicitly; private credentials and error 
   assert.equal((await user.rpc('github.issue.comment.create', write, { 'X-CSRF-Token': '' })).error.code, 'csrf_failed');
 });
 
-test('production status issues a Secure HttpOnly host cookie and a 30-day opaque session', async t => {
+test('session creation issues a Secure HttpOnly host cookie and a 20-minute opaque session', async t => {
   const f = await startServer(undefined, { env: { MOONDIFF_PUBLIC_URL: 'https://localhost' } }); t.after(() => f.close());
-  const res = await fetch(f.base + '/api/auth/status');
+  const anonymous = await fetch(f.base + '/api/auth/status');
+  assert.equal(anonymous.headers.get('set-cookie'), null);
+  assert.equal((await anonymous.json()).value.csrf_token, undefined);
+  const res = await fetch(f.base + '/api/auth/session', { method: 'POST', headers: { Origin: 'https://localhost', 'Content-Type': 'application/json' }, body: '{}' });
   assert.match(res.headers.get('set-cookie'), /^__Host-moondiff=/);
   for (const flag of ['Secure', 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=2592000']) assert(res.headers.get('set-cookie').includes(flag));
   const [[expires]] = f.sql('SELECT expires FROM sessions');
-  assert(Math.abs(expires - Date.now() / 1000 - 30 * 86400) < 5);
+  assert(Math.abs(expires - Date.now() / 1000 - 20 * 60) < 5);
   assert.equal((await res.json()).value.authenticated, false);
+});
+
+test('device start preserves a full authorization window and login extends the session', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  const user = browser(f); await user.session();
+  f.sql('UPDATE sessions SET expires=? WHERE csrf=?', [Math.floor(Date.now() / 1000) + 30, user.csrf]);
+  const started = Math.floor(Date.now() / 1000);
+  const flow = await user.begin('short-session-attempt-000');
+  const [[sessionExpires, authorizationExpires]] = f.sql(
+    'SELECT sessions.expires,authorizations.expires FROM sessions JOIN authorizations ON authorizations.session_id=sessions.id WHERE authorizations.id=?',
+    [flow.id],
+  );
+  assert(authorizationExpires >= started + 15 * 60);
+  assert(authorizationExpires <= Math.floor(Date.now() / 1000) + 15 * 60);
+  assert.equal(sessionExpires, authorizationExpires + 5 * 60);
+  f.approve(flow.user_code);
+  assert.equal((await user.poll(flow, true)).value.authenticated, true);
+  const [[loggedInExpires]] = f.sql('SELECT expires FROM sessions WHERE csrf=?', [user.csrf]);
+  assert(Math.abs(loggedInExpires - Date.now() / 1000 - 30 * 86400) < 5);
+});
+
+test('reused device authorization repairs fixed session grace without sliding', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  const user = browser(f); await user.session();
+  const attempt = 'legacy-active-attempt-000';
+  const flow = await user.begin(attempt);
+  const authorizationExpires = Math.floor(Date.now() / 1000) + 10 * 60;
+  f.sql('UPDATE authorizations SET expires=?,next_poll=? WHERE id=?', [authorizationExpires, 9999999999999, flow.id]);
+  f.sql('UPDATE sessions SET expires=? WHERE csrf=?', [Math.floor(Date.now() / 1000) + 30, user.csrf]);
+  assert.equal((await user.begin(attempt)).id, flow.id);
+  const expectedSessionExpires = authorizationExpires + 5 * 60;
+  assert.deepEqual(f.sql('SELECT expires FROM sessions WHERE csrf=?', [user.csrf]), [[expectedSessionExpires]]);
+  for (const id of ['overlap-attempt-000001', 'overlap-attempt-000002', attempt]) {
+    assert.equal((await user.begin(id)).id, flow.id);
+    assert.deepEqual(f.sql('SELECT expires FROM sessions WHERE csrf=?', [user.csrf]), [[expectedSessionExpires]]);
+  }
+  assert.deepEqual(f.sql("SELECT COUNT(*) FROM authorizations WHERE phase IN ('starting','pending','verifying')"), [[1]]);
 });
 
 test('temporary OAuth outages and malformed upstream JSON keep recovery credentials intact', async t => {
@@ -277,7 +391,7 @@ test('temporary OAuth outages and malformed upstream JSON keep recovery credenti
 
 test('all device endpoints validate cookies, Origin, CSRF, JSON and arguments', async t => {
   const f = await startServer(); t.after(() => f.close());
-  const user = browser(f); await user.status();
+  const user = browser(f); await user.session();
   for (const action of ['start', 'poll', 'cancel']) {
     const body = action === 'start' ? { attempt_id: 'valid-attempt-000000' } : { authorization_id: 'valid-attempt-000000' };
     for (const headers of [{ Origin: 'https://evil.example' }, { 'X-CSRF-Token': '' }, { Cookie: '' }]) {
@@ -335,7 +449,7 @@ test('cancellation tombstones defeat reordered starts and late device responses'
   const f = await startServer(async r => {
     if (r.path === '/login/device/code' && delay) { entered.resolve(); await released.promise; }
   }); t.after(() => { released.resolve(); return f.close(); });
-  const user = browser(f); await user.status();
+  const user = browser(f); await user.session();
   const id = 'cancel-before-start-0000';
   await user.cancel({ id });
   assert.equal((await user.begin(id)).phase, 'cancelled');
@@ -374,7 +488,7 @@ test('logout during device start cannot recreate the session or authorization', 
   const entered = gate(), released = gate();
   const f = await startServer(async r => { if (r.path === '/login/device/code') { entered.resolve(); await released.promise; } });
   t.after(() => { released.resolve(); return f.close(); });
-  const user = browser(f); await user.status();
+  const user = browser(f); await user.session();
   const result = user.device('start', { attempt_id: 'logout-during-start-000' }); await entered.promise;
   await user.logout(); released.resolve(); assert.equal((await result).ok, false);
   assert.deepEqual(f.sql('SELECT count(*) FROM authorizations'), [[0]]);

@@ -352,6 +352,63 @@ async function installApi(page, target = pullTarget(), options = {}) {
     }
     window.__dispatch = dispatch;
   }, { target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch });
+  await page.route('https://api.github.com/repos/**', async route => {
+    const url = new URL(route.request().url());
+    const [, , owner, repo, ...resource] = url.pathname.split('/');
+    if (!((owner === 'upstream' && repo === 'project') ||
+      (owner === 'contributor' && repo === 'project-fork'))) {
+      throw new Error(`Unexpected review fixture GitHub repository ${owner}/${repo}`);
+    }
+    const path = resource.join('/');
+    const common = { owner, repo };
+    let message, commentKind, source = false;
+    if (path.startsWith('contents/')) {
+      source = true;
+      message = { op: 'github.content.get', args: { ...common,
+        path: path.slice('contents/'.length).split('/').map(decodeURIComponent).join('/'), ref: url.searchParams.get('ref') } };
+    } else if (/^issues\/\d+\/comments$/.test(path)) {
+      commentKind = 'issue_comments'; message = { op: 'github.comments.list', args: target };
+    } else if (/^pulls\/\d+\/comments$/.test(path)) {
+      commentKind = 'review_comments'; message = { op: 'github.comments.list', args: target };
+    } else if (/^commits\/[^/]+\/comments$/.test(path)) {
+      commentKind = 'commit_comments'; message = { op: 'github.comments.list', args: target };
+    } else if (/^pulls\/\d+\/files$/.test(path)) {
+      message = { op: 'github.pull.files', args: { ...common, number: path.split('/')[1], page: Number(url.searchParams.get('page') || 1) } };
+    } else if (/^pulls\/\d+$/.test(path)) {
+      message = { op: 'github.pull.get', args: { ...common, number: path.split('/')[1] } };
+    } else if (/^commits\/[^/]+$/.test(path)) {
+      message = { op: 'github.commit.get', args: { ...common, sha: path.split('/')[1], page: Number(url.searchParams.get('page') || 1) } };
+    } else if (path.startsWith('compare/')) {
+      const [compareBase, compareHead] = path.slice('compare/'.length).split('...');
+      message = { op: 'github.compare.get', args: { ...common, base: compareBase, head: compareHead } };
+    } else {
+      throw new Error(`Unhandled review fixture GitHub URL ${url}`);
+    }
+    const payload = await page.evaluate(async ({ message, commentKind }) => {
+      try {
+        const state = window.__fake;
+        let value;
+        if (commentKind === 'review_comments' && state.publicCommentBundle) {
+          value = state.publicCommentBundle;
+          state.publicCommentBundle = null;
+        } else {
+          value = await window.__dispatch(message);
+          if (commentKind === 'issue_comments') state.publicCommentBundle = value;
+        }
+        return { ok: true, value: commentKind ? value[commentKind] : value };
+      } catch (error) {
+        return { ok: false, error: { status: error.status || 500, message: error.message } };
+      }
+    }, { message, commentKind });
+    const headers = { 'Access-Control-Allow-Origin': '*' };
+    if (!payload.ok) {
+      await route.fulfill({ status: payload.error.status, json: { message: payload.error.message }, headers }).catch(() => {});
+    } else if (source) {
+      await route.fulfill({ body: Buffer.from(payload.value.base64, 'base64'), contentType: 'text/plain', headers }).catch(() => {});
+    } else {
+      await route.fulfill({ json: payload.value, headers }).catch(() => {});
+    }
+  });
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
     const message = path.startsWith('/api/auth/device/') ? { op: 'auth.device.' + path.split('/').at(-1), args: route.request().postDataJSON() } : path === '/api/auth/status' ? { op: 'auth.status' } : path === '/api/auth/logout' ? { op: 'auth.logout' } : fixtureRequest(route.request().postDataJSON());
@@ -567,6 +624,7 @@ test("AST highlights inserted internal whitespace continuously in split and unif
 
 test("HTTP validation failures use a neutral Moondiff error message", async ({ page }) => {
   await installApi(page, pullTarget(), {
+    authenticated: true,
     commentListError: {
       status: 400,
       code: "invalid_arguments",

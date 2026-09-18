@@ -155,97 +155,32 @@ fn decode_component(text : String) -> String raise {
 
 ///|
 fn normalize(value : Json) -> Json {
-  match value {
-    Object(fields) => {
-      let result : Map[String, Json] = Map([])
-      for key, child in fields {
-        if child != Json::null() {
-          result[key] = normalize(child)
-        }
-      }
-      Json::object(result)
-    }
-    Array(values) => Json::array(values.map(normalize))
-    _ => value
-  }
+  @protocol.normalize_github(value)
 }
 
 ///|
 fn github_id(value : Json) -> String raise {
-  match value {
-    String(text) if decimal(text) => text
-    Number(_, repr=Some(text)) if decimal(text) => text
-    Number(number, ..) if number >= 1 &&
-      number <= 9007199254740991.0 &&
-      number == number.to_int64().to_double() => number.to_int64().to_string()
-    _ =>
-      raise RpcError(
-        502, "invalid_github_response", "GitHub returned an invalid identifier.",
-      )
+  @protocol.github_id(value) catch {
+    @protocol.ProtocolError(_, message) =>
+      raise RpcError(502, "invalid_github_response", message)
+    error => raise error
   }
 }
 
 ///|
 fn comment_for_protocol(value : Json) -> Json raise {
-  guard normalize(value) is Object(result) else {
-    raise RpcError(
-      502, "invalid_github_response", "GitHub returned an invalid comment.",
-    )
+  @protocol.comment_for_protocol(value) catch {
+    @protocol.ProtocolError(_, message) =>
+      raise RpcError(502, "invalid_github_response", message)
+    error => raise error
   }
-  result["id"] = Json::string(github_id(field(value, "id")))
-  if result.get("in_reply_to_id") is Some(id) {
-    result["in_reply_to_id"] = Json::string(github_id(id))
-  }
-  if result.get("side") is Some(side) {
-    result["side"] = match side {
-      String("LEFT") => @protocol.CommentSide::Left.to_json()
-      String("RIGHT") => @protocol.CommentSide::Right.to_json()
-      _ =>
-        raise RpcError(
-          502, "invalid_github_response", "GitHub returned an invalid side.",
-        )
-    }
-  }
-  Json::object(result)
 }
 
 ///|
 fn[T : FromJson + ToJson] decode_github(value : Json) -> T raise {
-  let decoded : T = @json.from_json(value) catch {
-    _ =>
-      raise RpcError(
-        502, "invalid_github_response", "GitHub returned invalid data.",
-      )
-  }
-  guard modeled_fields_equal(ToJson::to_json(decoded), value) else {
-    raise RpcError(
-      502, "invalid_github_response", "GitHub returned invalid field values.",
-    )
-  }
-  decoded
-}
-
-///|
-fn modeled_fields_equal(modeled : Json, raw : Json) -> Bool {
-  match (modeled, raw) {
-    (Object(a), Object(b)) =>
-      a
-      .iter()
-      .all(pair => {
-        let (key, value) = pair
-        b.get(key).map(raw => modeled_fields_equal(value, raw)).unwrap_or(false)
-      })
-    (Array(a), Array(b)) => {
-      if a.length() != b.length() {
-        return false
-      }
-      for i, value in a {
-        if !modeled_fields_equal(value, b[i]) {
-          return false
-        }
-      }
-      true
-    }
-    _ => modeled == raw
+  @protocol.decode_github(value) catch {
+    @protocol.ProtocolError(_, message) =>
+      raise RpcError(502, "invalid_github_response", message)
+    error => raise error
   }
 }

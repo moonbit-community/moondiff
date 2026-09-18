@@ -76,23 +76,50 @@ fn Client::start(
       }
       match result {
         Err(error) => completed(Err(error))
-        Ok(_) =>
-          self.send_device(
-            Start,
-            id,
-            result => {
-              if revision != self.auth_revision ||
-                self.pending_start_id != Some(id) {
-                completed(Err(Cancelled))
-                return
-              }
-              if result is Ok(_) {
-                self.pending_start_id = None
-              }
-              completed(result)
-            },
-            poll~,
-          )
+        Ok(_) => {
+          let begin = () => {
+            self.send_device(
+              Start,
+              id,
+              result => {
+                if revision != self.auth_revision ||
+                  self.pending_start_id != Some(id) {
+                  completed(Err(Cancelled))
+                  return
+                }
+                if result is Ok(_) {
+                  self.pending_start_id = None
+                }
+                completed(result)
+              },
+              poll~,
+            )
+          }
+          if self.csrf.is_empty() {
+            self.send(
+              "/api/auth/session",
+              "{}",
+              (result : Result[@protocol.ApiAuthStatus, Error]) => {
+                if revision != self.auth_revision ||
+                  self.pending_start_id != Some(id) {
+                  completed(Err(Cancelled))
+                  return
+                }
+                match result {
+                  Ok(status) => {
+                    self.adopt_status(status, poll)
+                    begin()
+                  }
+                  Err(error) => completed(Err(error))
+                }
+              },
+              auth=true,
+              poll~,
+            )
+          } else {
+            begin()
+          }
+        }
       }
     },
     poll~,
@@ -168,6 +195,23 @@ fn Client::device(
     Cancel => {
       self.invalidate_auth(false)
       let revision = self.auth_revision
+      let cancel = () => {
+        self.send_device(Cancel, id, result => {
+          if result is Err(HttpRequestError(status=403, code="csrf_failed", ..)) {
+            self.status(status => {
+              if revision != self.auth_revision {
+                completed(Err(Cancelled))
+              } else if status is Ok(status) && self.csrf.is_empty() {
+                completed(Ok({ request_id: id, status, }))
+              } else {
+                completed(result)
+              }
+            })
+          } else {
+            completed(result)
+          }
+        })
+      }
       if self.csrf.is_empty() {
         self.status(result => {
           if revision != self.auth_revision {
@@ -175,12 +219,17 @@ fn Client::device(
             return
           }
           match result {
-            Ok(_) => self.send_device(Cancel, id, completed)
+            Ok(status) =>
+              if self.csrf.is_empty() {
+                completed(Ok({ request_id: id, status, }))
+              } else {
+                cancel()
+              }
             Err(error) => completed(Err(error))
           }
         })
       } else {
-        self.send_device(Cancel, id, completed)
+        cancel()
       }
     }
   }
@@ -204,9 +253,20 @@ fn Client::logout(
           return
         }
         match result {
+          Err(HttpRequestError(status=403, code="csrf_failed", ..) as error) =>
+            self.status(status => {
+              if revision != self.auth_revision {
+                completed(Err(Cancelled))
+              } else if status is Ok(status) && self.csrf.is_empty() {
+                completed(Ok(status))
+              } else {
+                completed(Err(error))
+              }
+            })
           Err(error) => completed(Err(error))
           Ok(_) => {
             self.csrf = ""
+            self.authenticated = false
             self.status(completed)
           }
         }
@@ -222,7 +282,12 @@ fn Client::logout(
       }
       match result {
         Err(error) => completed(Err(error))
-        Ok(_) => send_logout()
+        Ok(status) =>
+          if self.csrf.is_empty() {
+            completed(Ok(status))
+          } else {
+            send_logout()
+          }
       }
     })
   } else {

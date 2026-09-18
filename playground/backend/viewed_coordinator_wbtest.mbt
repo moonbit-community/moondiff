@@ -4,6 +4,7 @@ async test "Viewed FIFO survives holder cancellation and failed waits and cleans
   defer db.close()
   let app : App = {
     config: {
+      anonymous_session_limit: 512,
       listen: "",
       public_url: "",
       static_dir: "",

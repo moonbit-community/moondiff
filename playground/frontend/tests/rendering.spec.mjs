@@ -187,6 +187,13 @@ test('source arrival and stale callbacks stay with their mount, repeated navigat
     expect(counts.errors).toEqual([]);
     expect(await page.evaluate(() => __moondiffRegionLayout.records.size)).toBe(2);
     expect(await page.evaluate(() => __moondiffEditorInteraction.records.size)).toBe(0);
+    // Each immutable SHA is cached by the public reader; use a new revision to
+    // exercise a pending source response on every navigation.
+    const nextSha = (i + 1).toString(16).repeat(40);
+    for (const file of fixture.files) {
+      fixture.sources[`${nextSha}:${file.filename}`] = fixture.sources[`${fixture.sha}:${file.filename}`];
+    }
+    fixture.sha = nextSha;
     const pending = gate();
     state.contentGate = { path: fixture.files[1].filename, ...pending };
     await navigate(page, route(fixture));

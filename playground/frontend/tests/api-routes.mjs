@@ -19,6 +19,23 @@ function normalize(value) {
 }
 export async function routeGithub(page, kind, handler, options) {
   let remaining = options?.times ?? Infinity;
+  await page.route('https://api.github.com/**', async route => {
+    const url = new URL(route.request().url());
+    const content = url.pathname.includes('/contents/');
+    if ((kind === 'content') !== content || remaining-- <= 0) return route.fallback();
+    let displayURL = route.request().url();
+    if (content) {
+      const match = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/);
+      if (match) displayURL = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${url.searchParams.get('ref')}/${match[3]}`;
+    }
+    await handler({
+      request: () => ({ url: () => displayURL, allHeaders: () => route.request().allHeaders() }),
+      abort: (...args) => route.abort(...args),
+      fulfill({ status = 200, contentType, body }) {
+        return route.fulfill({ status, body, contentType, headers: { 'Access-Control-Allow-Origin': '*' } });
+      },
+    });
+  });
   await page.route('**/api/rpc', async route => {
     const message = fixtureRequest(route.request().postDataJSON());
     const url = fixtureURL(route.request().postDataJSON());
@@ -43,7 +60,13 @@ export async function routeGithub(page, kind, handler, options) {
   });
 }
 export async function anonymousApi(page) {
-  await page.route('**/api/auth/status', route => route.fulfill({ json: { $tag: 'Success', value: { authenticated: false, csrf_token: 'fixture', install_url: 'https://github.com/apps/test/installations/new' } } }));
+  await page.route('**/api/auth/status', route => route.fulfill({ json: { $tag: 'Success', value: { authenticated: false, install_url: 'https://github.com/apps/test/installations/new' } } }));
+  await page.route('https://api.github.com/**', route => {
+    if (/\/(issues|pulls|commits)\/[^/]+\/comments$/.test(new URL(route.request().url()).pathname)) {
+      return route.fulfill({ json: [], headers: { 'Access-Control-Allow-Origin': '*' } });
+    }
+    return route.fallback();
+  });
   await page.route('**/api/rpc', route => {
     const { op } = fixtureRequest(route.request().postDataJSON());
     if (op === 'github.comments.list') return route.fulfill({ json: successFixture(op, { issue_comments: [], review_comments: [], commit_comments: [] }) });

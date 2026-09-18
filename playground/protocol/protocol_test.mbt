@@ -185,7 +185,7 @@ test "authentication phases and device responses roundtrip" {
     ] {
     let status : @protocol.ApiAuthStatus = {
       authenticated: false,
-      csrf_token: "csrf",
+      csrf_token: Some("csrf"),
       login: None,
       user_id: None,
       install_url: Some("url"),
