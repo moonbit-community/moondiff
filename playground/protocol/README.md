@@ -192,8 +192,13 @@ current state satisfies the request, not that operations across clients are orde
 ## Authentication endpoints
 
 `GET /api/auth/status` returns `Response[ApiAuthStatus]`. The status contains
-`authenticated`, `csrf_token`, and optional `login`, `user_id`, `install_url`,
-`device_flow`. A flow contains `id`, `phase`, `user_code`, `verification_uri`,
+`authenticated` and optional `csrf_token`, `login`, `user_id`, `install_url`,
+`device_flow`. With no valid session, the read returns anonymous status without
+`csrf_token`; it does not create a session or set a cookie. To begin sign-in,
+the browser sends `POST /api/auth/session` with the empty JSON object `{}` and
+an Origin that exactly matches the configured origin. That endpoint creates or
+reuses a sign-in session and returns its status and CSRF token.
+A flow contains `id`, `phase`, `user_code`, `verification_uri`,
 `expires_at` (Unix seconds), `retry_after` (seconds) and `message`. Its phase is
 one of `Starting`, `Pending`, `Verifying`, `Completed`, `Cancelled`, `Expired`,
 `Denied` and `Failed`, using the same tagged enum format.
@@ -206,7 +211,8 @@ canonical authorization ID, which can differ after a start reuses an existing
 attempt. Poll responses must match both identifiers.
 
 `POST /api/auth/logout` returns `Response[Unit]` with `value:null`. The client then
-queries status to establish the anonymous session and obtain a fresh CSRF token.
+queries status to confirm the anonymous state; no session or CSRF token is
+created by that read.
 
 ## Validation and scheduling
 

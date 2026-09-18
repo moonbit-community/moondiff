@@ -54,6 +54,10 @@ MOONDIFF_STATIC_DIR=dist/static
 # Docker default: /var/lib/moondiff/moondiff.sqlite3.
 MOONDIFF_DATABASE=moondiff.sqlite3
 
+# Maximum number of unexpired sessions without GitHub credentials. Session
+# creation returns JSON HTTP 429 when full. Default: 512; valid range: 1–100000.
+MOONDIFF_ANONYMOUS_SESSION_LIMIT=512
+
 # Required, including locally: Base64 encoding of exactly 64 random bytes.
 # Encrypts and authenticates stored GitHub tokens and device credentials.
 # Generate once with: openssl rand -base64 64 | tr -d '\n'
@@ -106,7 +110,13 @@ on repositories that users need to review. Private access and writing also
 require the signed-in user's own permissions. An App private key or installation
 access token is not used.
 
-Public repositories can be read anonymously. GitHub rate limits still apply.
+Public repositories can be read anonymously. The browser reads commits, pull
+requests, comparisons, file lists, source at a revision and comments directly
+from `api.github.com`, without a cookie or token. These requests use the visitor's
+[unauthenticated GitHub limit of 60 per hour per IP](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
+Signed-in reads use the backend so private repositories remain available. A
+browser CORS, network or rate-limit failure is shown as an error; it is not
+retried through the backend.
 
 Sign-in displays a verification code on the playground page. Copy it, open
 GitHub, and authorize the device in the new window; the playground updates
@@ -201,7 +211,15 @@ the corresponding GHCR tag.
 
 ## Sessions and backup
 
-Sessions expire after 30 days. Logout ends the current playground session without
+An unsigned-in session is created only when sign-in starts and expires after 20
+minutes. Starting a new device authorization extends the session through the
+authorization's fixed 15-minute deadline plus a 5-minute grace period. Reusing
+an active authorization repairs a shorter session to that same fixed deadline;
+repeated start requests do not keep sliding it forward. Successful sign-in
+extends the session to 30 days in the same database transaction. On first
+startup after this upgrade, idle legacy anonymous sessions are deleted and
+active legacy sign-ins are limited to 20 minutes.
+Logout ends the current playground session without
 uninstalling the GitHub App or revoking other GitHub sessions.
 
 Back up **both the database and the original encryption key**, with the key in a
@@ -226,13 +244,22 @@ in-place key rotation command.
 
 | Method / path | Response / purpose |
 | --- | --- |
-| `GET /api/auth/status` | `{$tag:"Success",value:{authenticated,user_id?,login?,install_url?,csrf_token,device_flow?}}`; establishes an anonymous session and restores pending login |
+| `GET /api/auth/status` | `{$tag:"Success",value:{authenticated,user_id?,login?,install_url?,csrf_token?,device_flow?}}`; restores a valid session, otherwise returns anonymous status without a database write or cookie |
+| `POST /api/auth/session` | Empty JSON object `{}`; reuses a valid session or creates a 20-minute sign-in session, returning status and CSRF token, plus a cookie when newly created |
 | `POST /api/auth/device/start` | `{attempt_id}` creates or reuses the session's active authorization; returns `{request_id,status}` |
 | `POST /api/auth/device/poll` | `{authorization_id}` advances that authorization when due; returns `{request_id,status}` |
 | `POST /api/auth/device/cancel` | `{authorization_id}` cancels that authorization and returns current session status; returns `{request_id,status}` |
 | `POST /api/auth/logout` | Invalidates the session and returns `Success(value=null)`; requires Origin and X-CSRF-Token |
-| `POST /api/rpc` | `{v:2,request:GitHubRequest}` → `{$tag:"Success",value:RpcValue}` or `{$tag:"Failure",error:{status,code,message}}` |
+| `POST /api/rpc` | Authenticated session required for every operation; `{v:2,request:GitHubRequest}` → `{$tag:"Success",value:RpcValue}` or `{$tag:"Failure",error:{status,code,message}}` |
 | `GET /healthz` | `ok` when the service is ready |
+
+`POST /api/auth/session` requires the exact configured Origin and
+`Content-Type: application/json`; invalid bodies or origins create no session.
+Session creation deletes expired records and enforces
+`MOONDIFF_ANONYMOUS_SESSION_LIMIT` inside a SQLite transaction. A full limit
+returns JSON 429 with code `session_limit`. The production
+[Nginx example](deploy/nginx.conf) also limits session creation and device starts
+by connection IP to 2 requests per minute with a burst of 10.
 
 All three device POSTs require the session cookie, configured Origin,
 `X-CSRF-Token` and `Content-Type: application/json`; extra fields are rejected.
@@ -268,6 +295,15 @@ integer values and overflow. The backend sends only modeled fields and reports
 invalid upstream data as `invalid_github_response`; unexpected client result
 kinds produce `invalid_server_response`. Upgrade both applications together:
 there is no v1 compatibility layer, and the SQLite data format is unchanged.
+
+The browser's public reads and backend share REST path construction and response
+validation. Public requests omit `X-GitHub-Api-Version` and follow GitHub's
+[default API version](https://docs.github.com/en/rest/about-the-rest-api/api-versions).
+Only data addressed by a full immutable SHA is kept in a bounded memory cache;
+concurrent identical requests share one fetch. The
+[contract check](../.github/workflows/public-github-contract.yml) runs on pushes
+to `main`. It checks public response shapes and CORS without an API version
+header, and reports GitHub rate limits as indeterminate.
 
 Source responses are bounded to 1 MiB per side, upstream JSON responses to 8 MiB,
 RPC bodies to 128 KiB and comments to 100 pages of 100.

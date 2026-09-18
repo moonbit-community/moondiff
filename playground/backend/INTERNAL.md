@@ -55,7 +55,18 @@ reactivation restore the server session, including an unexpired pending code.
 
 The account ID is retained when credentials fail or expire, so signing back into
 the same account preserves drafts. Switching accounts clears the previous account's
-data and draft. Sessions expire after 30 days. The only browser credential is a
+data and draft. `GET /api/auth/status` reads a valid session but never creates one.
+The browser calls `POST /api/auth/session` with an exact Origin and empty JSON
+body when sign-in begins. New unsigned-in sessions expire after 20 minutes;
+reserving a new device authorization atomically advances the session state and
+extends expiry through its fixed 15-minute deadline plus a 5-minute grace
+period. Reusing an active authorization repairs a shorter session against that
+authorization's existing deadline without sliding it on repeated starts. Token
+installation extends expiry to 30 days in the same transaction. A one-time
+startup migration deletes idle legacy anonymous sessions and tightens active
+ones to 20 minutes. Creation removes expired records and checks the configurable
+unsigned-in session cap under a SQLite write transaction.
+The only browser credential is a
 random HttpOnly, SameSite=Lax cookie; HTTPS uses a Secure cookie restricted to the
 current host. SQLite stores its SHA-256 digest, the GitHub user ID, CSRF token and
 encrypted GitHub token pair. Writes require the request origin to match the
@@ -100,7 +111,14 @@ requirements and backup procedures are in
 ## GitHub requests and static assets
 
 The backend restricts GitHub operations and arguments. Unknown operations and
-extra arguments are rejected; deletion checks the comment author's GitHub user
+extra arguments are rejected. The RPC entry and GitHub request function both
+require an authenticated session. Anonymous public reads go from the browser
+to `api.github.com`; commit, pull, compare, file, source and comment paths and
+data checks live in the shared protocol package. Identical in-flight browser
+reads are coalesced; the browser caches only full-SHA immutable results within
+an explicit memory bound. Browser reads omit cookies, tokens and a GitHub API
+version header, and never fall back to an anonymous backend request.
+Deletion checks the comment author's GitHub user
 ID. The server does not accept arbitrary upstream URLs or follow redirects when
 sending requests. Response, request and pagination limits are listed in the
 [HTTP contract](../README.md#http-contract).
