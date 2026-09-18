@@ -39,7 +39,7 @@ test('tabs support keyboard selection, cache both groups and retain the selected
   await noLanding(page);
 });
 
-for (const path of ['/']) test(`account popover supports authorization, keyboard and focus return on ${path}`, async ({ page }) => {
+for (const path of ['/', '/upstream/repo/pull/1', `/fork/repo/commit/${'b'.repeat(40)}`]) test(`account popover supports authorization, keyboard and focus return on ${path}`, async ({ page }) => {
   const state = await setup(page); state.installUrl = 'https://github.com/apps/moondiff/installations/new';
   await page.goto(path);
   const trigger = page.getByRole('button', { name: 'Account: alice' });

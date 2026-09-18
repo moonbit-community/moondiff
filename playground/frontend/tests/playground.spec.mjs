@@ -1977,7 +1977,7 @@ test("Ignore tests keeps whole-file cards and restores renamed, added, and delet
 test("complete Lexical sections hide only hunk headings in both review layouts", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await loadAlgorithmCommit(page, { authenticated: true });
-  await expect(page.getByText("Signed in as reviewer")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: reviewer', exact: true })).toBeVisible();
 
   const structuralCard = page.locator(".file-card").filter({ hasText: "src/structural.mbt" });
   const section = structuralCard.locator(".semantic-section");

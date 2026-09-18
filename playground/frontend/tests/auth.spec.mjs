@@ -31,12 +31,13 @@ test('real Wasm device login displays and copies the code, opens GitHub and comp
   await expect(page.getByRole('status')).toContainText('Code copied.');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
   await authorize(page, code);
-  await expect(page.getByText('Signed in as alice')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   expect((await context.cookies()).find(c => c.name === 'moondiff')).toMatchObject({ httpOnly: true, sameSite: 'Lax', path: '/' });
   expect(await page.evaluate(() => document.cookie)).not.toContain('moondiff=');
   expect(await page.evaluate(() => ({ ...localStorage }))).toEqual({});
-  await page.reload(); await expect(page.getByText('Signed in as alice')).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.reload(); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Account: alice' }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
   expect(external).toEqual([]);
   expect(responses.join('')).not.toMatch(/device_code|access_token|refresh_token|client_secret/);
@@ -57,7 +58,7 @@ test('reload and navigation retain a pending code; cancellation allows a fresh a
   await expect(page.locator('.device-code')).toBeVisible();
   await expect(page.locator('.device-code')).not.toHaveText(code);
   await authorize(page, await page.locator('.device-code').textContent());
-  await expect(page.getByText('Signed in as alice')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(next);
 });
 
@@ -78,7 +79,7 @@ test('cancel during startup ignores its delayed response after a new attempt beg
   await expect(page.locator('.device-code')).toBeVisible();
   const code = await page.locator('.device-code').textContent(); release();
   await expect(page.locator('.device-code')).toHaveText(code);
-  await authorize(page, code); await expect(page.getByText('Signed in as alice')).toBeVisible();
+  await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
 
 test('a delayed successful poll cannot replace a newer sign-in after cancellation', async ({ page }) => {
@@ -94,8 +95,8 @@ test('a delayed successful poll cannot replace a newer sign-in after cancellatio
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
   await expect(page.locator('.device-code')).toBeVisible(); const code = await page.locator('.device-code').textContent();
   release(); await expect(page.locator('.device-code')).toHaveText(code);
-  await expect(page.getByText('Signed in as stale-user')).toHaveCount(0);
-  await authorize(page, code); await expect(page.getByText('Signed in as alice')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: stale-user', exact: true })).toHaveCount(0);
+  await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
 
 test('initial session resolution precedes change loading even when navigating during startup', async ({ page }) => {
@@ -137,7 +138,7 @@ test('a page restored during startup resumes the server code after unloading its
   });
   await expect(page.locator('.device-code')).toBeVisible(); release();
   const code = await page.locator('.device-code').textContent();
-  await authorize(page, code); await expect(page.getByText('Signed in as alice')).toBeVisible();
+  await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
 
 // Install and pause before navigation: real response/actionability waits must
@@ -275,7 +276,7 @@ for (const responseDelay of [0, 250]) {
     expect(polls).toHaveLength(1);
     response = authResponse(page, 'device/poll');
     await page.clock.runFor(1);
-    await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 4);
+    await renderAuthResponse(page, response, page.getByRole('button', { name: 'Account: alice', exact: true }), 4);
     expect(polls).toEqual([
       { authorization_id: canonical, csrf: 'poll-csrf' },
       { authorization_id: canonical, csrf: 'poll-csrf' },
@@ -340,7 +341,7 @@ for (const responseDelay of [0, 250]) {
     expect(polls).toEqual([]);
     response = authResponse(page, 'device/poll');
     await page.clock.runFor(1);
-    await renderAuthResponse(page, response, page.getByText('Signed in as alice'), 3);
+    await renderAuthResponse(page, response, page.getByRole('button', { name: 'Account: alice', exact: true }), 3);
     expect(polls).toEqual([{ authorization_id: canonical, csrf: 'fresh-retry-csrf' }]);
     expect(sessions).toBe(4);
     expect(starts).toHaveLength(1);

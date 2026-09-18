@@ -366,7 +366,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
 }
 
 async function waitForSignedInComments(page) {
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
 }
 
@@ -663,7 +663,7 @@ test("expired credentials during comment refresh offer sign-in and hide authorin
 
   await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
   await expect(page.getByRole("button", { name: "Try sign-in" })).toBeVisible();
-  await expect(page.getByText("Signed in as tester")).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-button")).toHaveCount(0);
@@ -761,8 +761,9 @@ test("private PR prompts for GitHub App access and retries after login", async (
   await expect(page.getByRole("link", { name: /Install GitHub App/u })).toBeVisible();
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await expect(page.getByText("Fork PR")).toBeVisible();
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
-  const installLink = page.getByRole("link", { name: /Install GitHub App/u });
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Account: tester' }).click();
+  const installLink = page.getByRole('menuitem', { name: 'Install Moondiff Github App ↗' });
   await expect(installLink).toBeVisible();
   await expect(installLink).toHaveAttribute(
     "href",
@@ -779,13 +780,13 @@ test("reactivation synchronizes cross-tab login and logout", async ({ page }) =>
 
   await page.evaluate(() => { window.__fake.authenticated = true; });
   await reactivatePage(page);
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add overall comment" })).toBeVisible();
 
   await page.evaluate(() => { window.__fake.authenticated = false; });
   await reactivatePage(page);
   await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
-  await expect(page.getByText("Signed in as tester")).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
 });
 
@@ -797,7 +798,7 @@ test("cross-tab account switch clears the old draft and diff before reloading", 
     delayAccountSwitchPull: true,
   });
   await page.goto(reviewPath());
-  await expect(page.getByText("Signed in as alice")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   await expect(page.getByText("Fork PR for alice")).toBeVisible();
   await expect(page.getByText("new value for alice", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Add overall comment" }).click();
@@ -818,7 +819,7 @@ test("cross-tab account switch clears the old draft and diff before reloading", 
 
   await page.evaluate(() => window.__fake.releaseAccountSwitchPull());
   await expect.poll(() => page.evaluate(() => window.__fake.accountSwitchPullReleased)).toBe(true);
-  await expect(page.getByText("Signed in as bob")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: bob', exact: true })).toBeVisible();
   await expect(page.getByText("Fork PR for bob")).toBeVisible();
   await expect(page.getByText("new value for bob", { exact: false })).toBeVisible();
 });
@@ -832,7 +833,7 @@ test("cross-tab login on reactivation reloads a private repository", async ({ pa
   await page.evaluate(() => { window.__fake.authenticated = true; });
   await reactivatePage(page);
   await expect(page.getByText("Fork PR")).toBeVisible();
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__fake.calls
     .filter(call => call.op === "github.pull.get").length)).toBeGreaterThan(before);
 });
@@ -848,7 +849,7 @@ test("cross-tab login supersedes a pending anonymous private-repository failure"
   await page.evaluate(() => { window.__fake.authenticated = true; });
   await reactivatePage(page);
   await expect(page.getByText("Fork PR")).toBeVisible();
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__fake.calls
     .filter(call => call.op === "github.pull.get").length)).toBeGreaterThanOrEqual(2);
 
@@ -858,7 +859,7 @@ test("cross-tab login supersedes a pending anonymous private-repository failure"
   });
   await expect.poll(() => page.evaluate(() => window.__fake.anonymousPullReleased)).toBe(true);
   await expect(page.getByText("Fork PR")).toBeVisible();
-  await expect(page.getByText("Signed in as tester")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   await expect(page.getByText(/private repositories/u)).toHaveCount(0);
 });
 
@@ -1987,12 +1988,12 @@ for (const boundary of ['navigation', 'account']) {
     await restorePage(page); await session.started;
     if (boundary === 'navigation') {
       await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); }, reviewPath(pullCommitTarget()));
-      await expect(page.getByText('Signed in as tester')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
       await expect(page.locator('table.split.review-diff')).toContainText('new value for tester');
     }
     session.release(); await session.completed;
     if (boundary === 'account') {
-      await expect(page.getByText('Signed in as bob')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Account: bob', exact: true })).toBeVisible();
       await expect(page.locator('table.split.review-diff')).toContainText('new value for bob');
     }
     source.release(); await source.completed;

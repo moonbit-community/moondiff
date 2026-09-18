@@ -550,7 +550,8 @@ button.compact {
   z-index: 30;
   top: 0;
   min-height: var(--toolbar-height);
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "brand form actions account";
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.7rem;
   border-bottom: 1px solid var(--border);
@@ -562,6 +563,36 @@ button.compact {
 .hero-copy,
 .hero-controls {
   min-width: 0;
+}
+
+.hero-workspace .hero-copy {
+  grid-area: brand;
+}
+
+.hero-workspace .hero-controls {
+  grid-area: form;
+}
+
+.hero-workspace .workspace-actions {
+  grid-area: actions;
+}
+
+.hero-workspace .account-control {
+  grid-area: account;
+  justify-self: end;
+  align-self: center;
+  margin-inline-start: .5rem;
+  max-width: min(12rem, 25vw);
+}
+
+.hero-workspace .account-button {
+  min-height: 2rem;
+  padding: .38rem .6rem;
+  font-size: .875rem;
+}
+
+.hero-landing .account-control {
+  margin-top: 1rem;
 }
 
 .brand {
@@ -2526,6 +2557,24 @@ footer {
   }
 }
 
+@media (max-width: 980px) {
+  .hero-workspace {
+    grid-template-areas:
+      "brand form account"
+      "actions actions actions";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: .3rem .65rem;
+  }
+
+  .hero-workspace .account-control {
+    margin-inline-start: 0;
+  }
+
+  :root {
+    --toolbar-height: 5.25rem;
+  }
+}
+
 @media (max-width: 680px) {
   .landing {
     min-height: 100svh;
@@ -2533,24 +2582,7 @@ footer {
   }
 
   .hero-workspace {
-    grid-template-areas:
-      "brand form"
-      "actions actions";
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.3rem 0.65rem;
     padding: 0.38rem 0.55rem;
-  }
-
-  .hero-workspace .hero-copy {
-    grid-area: brand;
-  }
-
-  .hero-workspace .hero-controls {
-    grid-area: form;
-  }
-
-  :root {
-    --toolbar-height: 5.25rem;
   }
 
   .workspace-actions {

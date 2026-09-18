@@ -756,7 +756,7 @@ for (const kind of ['inline', 'reply', 'overall']) {
     await expect(page.getByRole('button', { name: 'Post comment', exact: true })).toBeDisabled();
     expect(await original.evaluate(el => el.isConnected && el === document.activeElement)).toBe(true);
     authGate.resolve();
-    await expect(page.getByText('Signed in as alice', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
     await waitingForConfirmation(page); await readFinished(page);
     expect(await original.evaluate(el => el.isConnected && el === document.activeElement)).toBe(true);
     expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([2, 8, 'backward']);

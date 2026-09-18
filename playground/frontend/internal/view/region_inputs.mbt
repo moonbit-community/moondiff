@@ -75,11 +75,7 @@ fn toolbar_input(model : Model) -> ToolbarInput {
     input: model.input,
     landing: landing_mode(model),
     drawer_open: model.file_tree.drawer_open,
-    auth: if landing_mode(model) {
-      model.auth
-    } else {
-      @application.AuthChecking
-    },
+    auth: model.auth,
     file_count: match model.phase {
       Showing(view) => Some(view.files.length())
       _ => None

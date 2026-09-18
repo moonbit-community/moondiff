@@ -143,6 +143,7 @@ fn hero_view(
         @html.div(class="input-panel", commit_form(model, emit)),
         landing_details(),
         auth_controls(model.auth, emit),
+        account_menu(model.auth, emit),
       ]),
     ])
   } else {
@@ -155,6 +156,7 @@ fn hero_view(
           @html.span(class="workspace-url", title=model.input, model.input),
         ]),
         workspace_actions(model, emit),
+        account_menu(model.auth, emit),
       ],
     )
   }
