@@ -143,6 +143,26 @@ fn App::visible_device(self : App, session : Session) -> DeviceFlow? raise {
 }
 
 ///|
+fn App::extend_device_session(
+  self : App,
+  session_id : String,
+  epoch : Int64,
+  authorization_expires : Int64,
+) -> Unit raise {
+  execute(self.db, DB_EXTEND_CURRENT_SESSION_AUTHORIZATION, [
+    Integer(authorization_expires + DEVICE_AUTHORIZATION_GRACE),
+    Text(session_id),
+    Integer(epoch),
+    Integer(now()),
+  ])
+  guard self.db.changes() == 1 else {
+    raise RpcError(
+      401, "authentication_required", "Session ended. Reload this page.",
+    )
+  }
+}
+
+///|
 // Each attempt gets a row, including attempts cancelled before start arrives.
 // Aliases bind overlapping starts to the single active authorization so either
 // request can cancel it even before its start response supplies the canonical ID.
@@ -151,34 +171,55 @@ fn App::begin_device(
   session : Session,
   attempt : String,
 ) -> String raise {
-  guard self.session(session.id) is Some(session) else {
+  guard self.session(session.id) is Some(current) else {
     raise RpcError(
       401, "authentication_required", "Session ended. Reload this page.",
     )
   }
   if self.device(session.id, attempt) is Some(previous) {
+    if self.device_current(session.id, previous.target_id) is Some(flow) {
+      self.extend_device_session(session.id, flow.epoch, flow.expires)
+    }
     return previous.target_id
   }
-  if self.visible_device(session) is Some(flow) && flow.active() {
-    execute(self.db, DB_INSERT_AUTHORIZATION_ALIAS, [
-      Text(session.id),
-      Text(attempt),
-      Text(flow.id),
-      Integer(flow.epoch),
-      Integer(flow.expires),
-    ])
+  if self.visible_device(current) is Some(flow) && flow.active() {
+    execute(self.db, DB_BEGIN_IMMEDIATE, [])
+    {
+      errdefer execute(self.db, DB_ROLLBACK, [])
+      self.extend_device_session(session.id, flow.epoch, flow.expires)
+      execute(self.db, DB_INSERT_AUTHORIZATION_ALIAS, [
+        Text(session.id),
+        Text(attempt),
+        Text(flow.id),
+        Integer(flow.epoch),
+        Integer(flow.expires),
+      ])
+      execute(self.db, DB_COMMIT, [])
+    }
     return flow.id
   }
   execute(self.db, DB_BEGIN_IMMEDIATE, [])
   {
     errdefer execute(self.db, DB_ROLLBACK, [])
-    execute(self.db, DB_INCREMENT_SESSION_EPOCH, [Text(session.id)])
+    let timestamp = now()
+    let authorization_expires = timestamp + DEVICE_AUTHORIZATION_LIFETIME
+    execute(self.db, DB_START_CURRENT_SESSION_AUTHORIZATION, [
+      Integer(authorization_expires + DEVICE_AUTHORIZATION_GRACE),
+      Text(session.id),
+      Integer(current.epoch),
+      Integer(timestamp),
+    ])
+    guard self.db.changes() == 1 else {
+      raise RpcError(
+        401, "authentication_required", "Session ended. Reload this page.",
+      )
+    }
     execute(self.db, DB_INSERT_STARTING_AUTHORIZATION, [
       Text(session.id),
       Text(attempt),
       Text(attempt),
-      Integer(session.epoch + 1),
-      Integer(now() + 900),
+      Integer(current.epoch + 1),
+      Integer(authorization_expires),
     ])
     execute(self.db, DB_COMMIT, [])
   }
@@ -203,7 +244,7 @@ fn App::cancel_device(
       Text(id),
       Text(id),
       Integer(current.epoch),
-      Integer(now() + 900),
+      Integer(now() + DEVICE_AUTHORIZATION_LIFETIME),
     ])
     return id
   }
@@ -232,7 +273,7 @@ fn App::device_response(
       401, "authentication_required", "Session ended. Reload this page.",
     )
   }
-  let status = self.status(session)
+  let status = self.status(Some(session))
   let status = if self.device(session_id, id) is Some(flow) {
     { ..status, device_flow: Some(flow.public_status()), }
   } else {

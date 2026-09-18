@@ -125,12 +125,22 @@ export function browser(fixture) {
       csrf = result.value.csrf_token;
       return readStatus(result.value);
     },
+    async session() {
+      const res = await this.request('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: fixture.base }, body: '{}' });
+      const result = await res.json();
+      if (result.$tag !== 'Success') throw new Error(JSON.stringify(result));
+      csrf = result.value.csrf_token;
+      return readStatus(result.value);
+    },
     async device(action, body, headers = {}) {
       const res = await this.request(`/api/auth/device/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: fixture.base, 'X-CSRF-Token': csrf, ...headers }, body: JSON.stringify(body) });
       return readResponse(await res.json(), true);
     },
     async begin(attempt = randomBytes(24).toString('base64url')) {
-      if (!csrf) await this.status();
+      if (!csrf) {
+        await this.status();
+        if (!csrf) await this.session();
+      }
       const result = await this.device('start', { attempt_id: attempt });
       if (!result.ok) throw new Error(JSON.stringify(result));
       return result.value.device_flow;

@@ -4,6 +4,7 @@ import {
   "moonbit-community/rabbita",
   "moonbit-community/rabbita/cmd",
   "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
 }
 
 supported_targets = "js"

@@ -1,9 +1,42 @@
-import { successFixture } from '../../tests/protocol-fixtures.mjs';
+import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
 import { e2eOrigin } from '../../tests/e2e-config.mjs';
 import { expect, test } from '@playwright/test';
 import { setTimeout as delay } from 'node:timers/promises';
 const sha = 'abcdef1234567890abcdef1234567890abcdef12';
 const route = `/fixture/repo/commit/${sha}`;
+
+test.beforeEach(async ({ page }) => {
+  await page.route('https://api.github.com/repos/fixture/repo/**', route => {
+    const url = new URL(route.request().url());
+    const headers = { 'Access-Control-Allow-Origin': '*' };
+    if (url.pathname.endsWith('/comments')) return route.fulfill({ json: [], headers });
+    if (url.pathname.includes('/contents/')) {
+      return route.fulfill({ body: 'pub fn hello() { 42 }\n', contentType: 'text/plain', headers });
+    }
+    const revision = url.pathname.split('/').at(-1);
+    return route.fulfill({ json: {
+      sha: revision, html_url: `https://github.com/fixture/repo/commit/${revision}`,
+      commit: { message: 'Fixture root commit' }, parents: [],
+      stats: { additions: 1, deletions: 0, total: 1 },
+      files: [{ filename: 'hello.mbt', status: 'added', additions: 1, deletions: 0,
+        changes: 1, patch: '@@ -0,0 +1 @@\n+pub fn hello() { 42 }' }],
+    }, headers });
+  });
+});
+
+async function fixtureCommentRefresh(page) {
+  let refreshed;
+  const refresh = new Promise(resolve => { refreshed = resolve; });
+  await page.route('**/api/rpc', async handler => {
+    const { op } = fixtureRequest(handler.request().postDataJSON());
+    if (op !== 'github.comments.list') return handler.fallback();
+    await handler.fulfill({ json: successFixture(op, {
+      issue_comments: [], review_comments: [], commit_comments: [],
+    }) });
+    refreshed();
+  });
+  return { refresh };
+}
 
 async function authorize(page, code) {
   const opened = page.waitForEvent('popup');
@@ -16,13 +49,25 @@ async function authorize(page, code) {
 }
 
 test('real Wasm device login displays and copies the code, opens GitHub and completes automatically', async ({ page, context }) => {
-  const external = [], responses = [];
-  page.on('request', request => { if (new URL(request.url()).origin !== e2eOrigin) external.push(request.url()); });
+  const external = [], publicRequests = [], backendReads = [], responses = [];
+  const sessions = [];
+  page.on('request', request => {
+    if (new URL(request.url()).origin !== e2eOrigin) {
+      external.push(request.url());
+      publicRequests.push(request);
+    }
+  });
   page.on('response', async response => { if (response.url().includes('/api/auth/')) responses.push(await response.text().catch(() => '')); });
+  page.on('request', request => { if (request.url().endsWith('/api/auth/session')) sessions.push(request); });
+  page.on('request', request => {
+    if (request.url().endsWith('/api/rpc') && request.postDataJSON()?.request?.$tag === 'CommitGet') backendReads.push(request);
+  });
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(route);
   await expect(page.getByText('Fixture root commit', { exact: true }).first()).toBeVisible();
   await expect(page.locator('table').first()).toContainText('hello');
+  expect(sessions).toHaveLength(0);
+  expect((await context.cookies()).some(c => c.name === 'moondiff')).toBe(false);
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
   await expect(page.locator('.device-code')).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
   expect(context.pages()).toHaveLength(1);
@@ -33,15 +78,72 @@ test('real Wasm device login displays and copies the code, opens GitHub and comp
   await authorize(page, code);
   await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   expect((await context.cookies()).find(c => c.name === 'moondiff')).toMatchObject({ httpOnly: true, sameSite: 'Lax', path: '/' });
+  expect(sessions).toHaveLength(1);
   expect(await page.evaluate(() => document.cookie)).not.toContain('moondiff=');
   expect(await page.evaluate(() => ({ ...localStorage }))).toEqual({});
   await page.reload(); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
+  await expect.poll(() => backendReads.length).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Account: alice' }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
-  expect(external).toEqual([]);
+  const directBeforeLogoutReload = publicRequests.length;
+  await page.reload();
+  await expect(page.getByText('Fixture root commit', { exact: true }).first()).toBeVisible();
+  await expect.poll(() => publicRequests.length).toBeGreaterThan(directBeforeLogoutReload);
+  expect(external.length).toBeGreaterThan(0);
+  expect(external.every(url => url.startsWith('https://api.github.com/repos/fixture/repo/'))).toBe(true);
+  for (const request of publicRequests) {
+    const headers = await request.allHeaders();
+    expect(headers).not.toHaveProperty('cookie');
+    expect(headers).not.toHaveProperty('authorization');
+    expect(headers).not.toHaveProperty('x-github-api-version');
+  }
   expect(responses.join('')).not.toMatch(/device_code|access_token|refresh_token|client_secret/);
 });
+
+for (const outcome of ['failure', 'cancel', 'success']) {
+  test(`an in-flight public source finishes after sign-in ${outcome}`, async ({ page }) => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    let started;
+    const requested = new Promise(resolve => { started = resolve; });
+    let sourceReads = 0;
+    await page.route('https://api.github.com/repos/fixture/repo/contents/**', async handler => {
+      sourceReads++;
+      started();
+      await gate;
+      await handler.fulfill({ body: 'pub fn hello() { 42 }\n', contentType: 'text/plain',
+        headers: { 'Access-Control-Allow-Origin': '*' } }).catch(() => {});
+    });
+    if (outcome === 'failure') {
+      await page.route('**/api/auth/device/start', handler => handler.fulfill({ status: 403,
+        json: { $tag: 'Failure', error: { status: 403, code: 'sign_in_denied', message: 'Sign-in denied.' } } }), { times: 1 });
+    }
+    try {
+      await page.goto(route);
+      await requested;
+      await expect(page.locator('.file-card').first()).toContainText('Loading file contents');
+      await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
+      if (outcome === 'failure') {
+        await expect(page.getByRole('button', { name: 'Try sign-in' })).toBeVisible();
+      } else {
+        await expect(page.locator('.device-code')).toBeVisible();
+        if (outcome === 'cancel') {
+          await page.getByRole('button', { name: 'Cancel sign-in' }).click();
+          await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
+        } else {
+          await authorize(page, await page.locator('.device-code').textContent());
+          await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
+        }
+      }
+    } finally {
+      release();
+    }
+    await expect(page.locator('.file-card table').first()).toContainText('pub fn hello');
+    await expect(page.locator('.file-card').first()).not.toContainText('Loading file contents');
+    expect(sourceReads).toBe(1);
+  });
+}
 
 test('reload and navigation retain a pending code; cancellation allows a fresh attempt', async ({ page }) => {
   await page.goto(route);
@@ -103,7 +205,10 @@ test('initial session resolution precedes change loading even when navigating du
   let release; const gate = new Promise(r => { release = r; });
   const calls = [];
   await page.route('**/api/auth/status', async handler => { await gate; await handler.continue(); });
-  page.on('request', request => { if (request.url().endsWith('/api/rpc')) calls.push(request.postDataJSON()); });
+  page.on('request', request => {
+    const url = request.url();
+    if (url.startsWith('https://api.github.com/repos/fixture/repo/commits/') && !url.includes('/comments')) calls.push(new URL(url).pathname.split('/').at(-1));
+  });
   await page.goto(route);
   await page.waitForFunction(() => document.querySelector('input'));
   const nextSha = '1111111111111111111111111111111111111111';
@@ -111,12 +216,12 @@ test('initial session resolution precedes change loading even when navigating du
   await page.waitForTimeout(100); expect(calls).toEqual([]); release();
   await expect(page.getByText('Fixture root commit', { exact: true }).first()).toBeVisible();
   expect(calls.length).toBeGreaterThan(0);
-  expect(calls.every(c => !c.request['0'].sha || c.request['0'].sha === nextSha)).toBe(true);
+  expect(calls.every(sha => sha === nextSha)).toBe(true);
 });
 
 test('legacy hash links display an invalid-link error without loading a change', async ({ page }) => {
   const calls = [];
-  page.on('request', request => { if (request.url().endsWith('/api/rpc')) calls.push(request.postDataJSON()); });
+  page.on('request', request => { if (request.url().startsWith('https://api.github.com/')) calls.push(request.url()); });
   await page.goto('/#' + route);
   await expect(page.locator('.error')).toBeVisible();
   expect(calls).toEqual([]); expect(new URL(page.url()).hash).toBe('#' + route);
@@ -205,6 +310,7 @@ for (const responseDelay of [0, 250]) {
     const canonical = 'canonical-proxy-recovery-0001';
     const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
     await installAuthClock(page);
+    const { refresh: commentsRefreshed } = await fixtureCommentRefresh(page);
     await page.route('**/api/auth/status', handler => {
       sessions += 1;
       const response = sessions === 2
@@ -276,7 +382,10 @@ for (const responseDelay of [0, 250]) {
     expect(polls).toHaveLength(1);
     response = authResponse(page, 'device/poll');
     await page.clock.runFor(1);
-    await renderAuthResponse(page, response, page.getByRole('button', { name: 'Account: alice', exact: true }), 4);
+    const account = page.getByRole('button', { name: 'Account: alice', exact: true });
+    await renderAuthResponse(page, response, account, 4);
+    await commentsRefreshed;
+    await expect(account).toBeVisible();
     expect(polls).toEqual([
       { authorization_id: canonical, csrf: 'poll-csrf' },
       { authorization_id: canonical, csrf: 'poll-csrf' },
@@ -292,6 +401,7 @@ for (const responseDelay of [0, 250]) {
     const canonical = 'canonical-authorization-0001';
     const device = { id: canonical, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: 2000000000, retry_after: 5, message: '' };
     await installAuthClock(page);
+    const { refresh: commentsRefreshed } = await fixtureCommentRefresh(page);
     await page.route('**/api/auth/status', handler => {
       sessions += 1;
       return fulfillAuth(page, handler, { status: sessions <= 3 ? 503 : 200, json: sessions <= 3
@@ -341,7 +451,10 @@ for (const responseDelay of [0, 250]) {
     expect(polls).toEqual([]);
     response = authResponse(page, 'device/poll');
     await page.clock.runFor(1);
-    await renderAuthResponse(page, response, page.getByRole('button', { name: 'Account: alice', exact: true }), 3);
+    const account = page.getByRole('button', { name: 'Account: alice', exact: true });
+    await renderAuthResponse(page, response, account, 3);
+    await commentsRefreshed;
+    await expect(account).toBeVisible();
     expect(polls).toEqual([{ authorization_id: canonical, csrf: 'fresh-retry-csrf' }]);
     expect(sessions).toBe(4);
     expect(starts).toHaveLength(1);

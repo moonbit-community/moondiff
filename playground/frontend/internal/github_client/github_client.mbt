@@ -12,6 +12,22 @@ fn[T] Client::rpc(
       return
     }
   }
+  if !self.authenticated &&
+    (request.public_path() is Some(_) || request is CommentsList(_)) {
+    self.public_rpc(request, generation, result => {
+      done(
+        match result {
+          Err(error) => Err(error)
+          Ok(value) =>
+            Ok(select(value)) catch {
+              _ =>
+                Err(invalid_response("Unexpected public GitHub result kind."))
+            }
+        },
+      )
+    })
+    return
+  }
   self.send(
     "/api/rpc",
     request.encode().stringify(),

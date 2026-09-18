@@ -31,9 +31,30 @@ priv struct PollTask {
 }
 
 ///|
+priv struct PublicWaiter {
+  generation : Int
+  done : (Result[@protocol.RpcValue, Error]) -> Unit
+}
+
+///|
+priv struct PublicPending {
+  mut waiters : Array[PublicWaiter]
+  mut abort : () -> Unit
+  mut active : Bool
+}
+
+///|
+priv struct PublicCacheEntry {
+  key : String
+  value : @protocol.RpcValue
+  bytes : Int
+}
+
+///|
 priv struct Client {
   transport : Transport
   mut csrf : String
+  mut authenticated : Bool
   mut auth_revision : Int
   mut status_sequence : Int
   mut generation : Int
@@ -42,6 +63,9 @@ priv struct Client {
   mut poll_task : PollTask?
   mut sequence : Int
   pending : Map[Int, Pending]
+  public_pending : Map[String, PublicPending]
+  mut public_cache : Array[PublicCacheEntry]
+  mut public_cache_bytes : Int
 }
 
 ///|
@@ -49,6 +73,7 @@ fn Client::new(transport : Transport) -> Client {
   {
     transport,
     csrf: "",
+    authenticated: false,
     auth_revision: 0,
     status_sequence: 0,
     generation: 0,
@@ -57,6 +82,9 @@ fn Client::new(transport : Transport) -> Client {
     poll_task: None,
     sequence: 0,
     pending: {},
+    public_pending: {},
+    public_cache: [],
+    public_cache_bytes: 0,
   }
 }
 
@@ -77,6 +105,7 @@ fn Client::cancel_pending(self : Client, predicate : (Pending) -> Bool) -> Unit 
 fn Client::cancel_before(self : Client, generation : Int) -> Unit {
   self.generation = Int::max(self.generation, generation)
   self.cancel_pending(p => p.generation > 0 && p.generation < self.generation)
+  self.cancel_public(false)
 }
 
 ///|
@@ -94,6 +123,9 @@ fn Client::stop_poll(self : Client) -> Unit {
 ///|
 fn Client::invalidate_auth(self : Client, all : Bool) -> Unit {
   self.auth_revision += 1
+  if all {
+    self.cancel_public(true)
+  }
   self.pending_start_id = None
   self.stop_poll()
   self.cancel_pending(p => all || p.auth)
@@ -111,7 +143,8 @@ fn Client::adopt_status(
   status : @protocol.ApiAuthStatus,
   from_poll : Bool,
 ) -> Unit {
-  self.csrf = status.csrf_token
+  self.csrf = status.csrf_token.unwrap_or("")
+  self.authenticated = status.authenticated
   let next = match status.device_flow {
     Some(flow) if flow.phase.active() => Some(flow.id)
     _ => None

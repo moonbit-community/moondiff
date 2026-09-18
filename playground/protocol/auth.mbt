@@ -18,7 +18,7 @@ pub fn DevicePhase::active(self : DevicePhase) -> Bool {
 ///|
 pub(all) struct ApiAuthStatus {
   authenticated : Bool
-  csrf_token : String
+  csrf_token : String?
   login : String?
   user_id : String?
   install_url : String?

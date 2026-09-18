@@ -110,6 +110,28 @@ const QUERY_KEY_CHECK : String = "SELECT value FROM metadata WHERE name='key-che
 const DB_INSERT_KEY_CHECK : String = "INSERT INTO metadata VALUES ('key-check-v1', ?)"
 
 ///|
+const QUERY_ANONYMOUS_MIGRATION : String = "SELECT 1 FROM metadata WHERE name='anonymous-session-lifetime-v1'"
+
+///|
+const DB_MARK_ANONYMOUS_MIGRATION : String = "INSERT INTO metadata VALUES ('anonymous-session-lifetime-v1', 'done')"
+
+///|
+const DB_DELETE_LEGACY_IDLE_SESSIONS : String =
+  #|DELETE FROM sessions WHERE tokens=''
+  #|AND NOT EXISTS (
+  #|  SELECT 1 FROM authorizations a WHERE a.session_id=sessions.id
+  #|  AND a.phase IN ('starting','pending','verifying') AND a.expires>?
+  #|)
+
+///|
+const DB_TIGHTEN_LEGACY_ACTIVE_SESSIONS : String =
+  #|UPDATE sessions SET expires=MIN(expires, ?)
+  #|WHERE tokens=''
+
+///|
+const QUERY_ANONYMOUS_SESSION_COUNT : String = "SELECT COUNT(*) FROM sessions WHERE tokens='' AND expires>?"
+
+///|
 const QUERY_SESSION : String =
   #|SELECT csrf, expires, epoch, user_id, login, tokens, access_expires, refresh_expires
   #|FROM sessions
@@ -130,16 +152,23 @@ const DB_DELETE_SESSION : String = "DELETE FROM sessions WHERE id=?"
 ///|
 const DB_INSTALL_SESSION_TOKENS : String =
   #|UPDATE sessions
-  #|SET user_id=?, login=?, tokens=?, access_expires=?, refresh_expires=?, epoch=epoch+?
+  #|SET user_id=?, login=?, tokens=?, access_expires=?, refresh_expires=?, epoch=epoch+?, expires=?
   #|WHERE id=? AND epoch=? AND expires>?
 
 ///|
 const DB_EXPIRE_SESSION_AUTH : String =
-  #|UPDATE sessions SET tokens='', epoch=epoch+1
+  #|UPDATE sessions SET tokens='', epoch=epoch+1, expires=MIN(expires, ?)
   #|WHERE id=? AND epoch=?
 
 ///|
-const DB_INCREMENT_SESSION_EPOCH : String = "UPDATE sessions SET epoch=epoch+1 WHERE id=?"
+const DB_START_CURRENT_SESSION_AUTHORIZATION : String =
+  #|UPDATE sessions SET expires=MAX(expires, ?), epoch=epoch+1
+  #|WHERE id=? AND epoch=? AND expires>?
+
+///|
+const DB_EXTEND_CURRENT_SESSION_AUTHORIZATION : String =
+  #|UPDATE sessions SET expires=MAX(expires, ?)
+  #|WHERE id=? AND epoch=? AND expires>?
 
 ///|
 const DB_INCREMENT_CURRENT_SESSION_EPOCH : String =

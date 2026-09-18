@@ -2,7 +2,7 @@
 test "web session maps immutable identity and expired session preserves recovery" {
   let status : ApiAuthStatus = {
     device_flow: None,
-    csrf_token: "csrf-test",
+    csrf_token: Some("csrf-test"),
     authenticated: true,
     login: Some("alice"),
     user_id: Some("123"),
@@ -26,7 +26,7 @@ test "same user id survives a login rename but switching accounts clears the dra
     before,
     {
       device_flow: None,
-      csrf_token: "csrf-test",
+      csrf_token: Some("csrf-test"),
       authenticated: true,
       login: Some("renamed"),
       user_id: Some("123"),
@@ -40,7 +40,7 @@ test "same user id survives a login rename but switching accounts clears the dra
     before,
     {
       device_flow: None,
-      csrf_token: "csrf-test",
+      csrf_token: Some("csrf-test"),
       authenticated: true,
       login: Some("alice"),
       user_id: Some("456"),

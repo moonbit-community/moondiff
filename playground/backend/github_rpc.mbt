@@ -7,23 +7,13 @@ async fn App::rpc(
   match request {
     ViewerPullsGet(p) => ViewerPulls(self.viewer_pulls(session, p))
     PullCommitsGet(p) => PullCommits(self.pull_commits(session, p))
-    CommitGet(p) =>
+    CommitGet(_) =>
       Commit(
-        decode_github(
-          self.github_json(
-            session,
-            "/repos/\{p.owner}/\{p.repo}/commits/\{p.sha}?per_page=100&page=\{p.page}",
-          ),
-        ),
+        decode_github(self.github_json(session, request.public_path().unwrap())),
       )
-    PullGet(p) =>
+    PullGet(_) =>
       Pull(
-        decode_github(
-          self.github_json(
-            session,
-            "/repos/\{p.owner}/\{p.repo}/pulls/\{p.number}",
-          ),
-        ),
+        decode_github(self.github_json(session, request.public_path().unwrap())),
       )
     PullViewedGet(p) =>
       self.with_viewed_scope(session, p, () => {
@@ -41,32 +31,18 @@ async fn App::rpc(
           })
         },
       )
-    CompareGet(p) =>
+    CompareGet(_) =>
       Compare(
-        decode_github(
-          self.github_json(
-            session,
-            "/repos/\{p.owner}/\{p.repo}/compare/\{p.base}...\{p.head}",
-          ),
-        ),
+        decode_github(self.github_json(session, request.public_path().unwrap())),
       )
-    PullFiles(p) =>
+    PullFiles(_) =>
       Files(
-        decode_github(
-          self.github_json(
-            session,
-            "/repos/\{p.owner}/\{p.repo}/pulls/\{p.number}/files?per_page=100&page=\{p.page}",
-          ),
-        ),
+        decode_github(self.github_json(session, request.public_path().unwrap())),
       )
-    ContentGet(p) => {
-      let path = p.path
-        .split("/")
-        .map(p => encode_component(p.to_owned()))
-        .join("/")
+    ContentGet(_) => {
       let (response, bytes) = self.github(
         session,
-        "/repos/\{p.owner}/\{p.repo}/contents/\{path}?ref=\{p.revision}",
+        request.public_path().unwrap(),
         source=true,
       )
       Content({
@@ -78,25 +54,19 @@ async fn App::rpc(
       })
     }
     CommentsList(p) => {
-      let base = "/repos/\{p.owner}/\{p.repo}"
+      let paths = p.public_paths()
       match p.target {
-        Pull(number~) =>
+        Pull(_) =>
           Comments({
-            issue_comments: decode_github(
-              self.comments(session, "\{base}/issues/\{number}/comments"),
-            ),
-            review_comments: decode_github(
-              self.comments(session, "\{base}/pulls/\{number}/comments"),
-            ),
+            issue_comments: decode_github(self.comments(session, paths[0])),
+            review_comments: decode_github(self.comments(session, paths[1])),
             commit_comments: [],
           })
-        Commit(sha~) | PullCommit(sha~, ..) =>
+        Commit(_) | PullCommit(..) =>
           Comments({
             issue_comments: [],
             review_comments: [],
-            commit_comments: decode_github(
-              self.comments(session, "\{base}/commits/\{sha}/comments"),
-            ),
+            commit_comments: decode_github(self.comments(session, paths[0])),
           })
       }
     }

@@ -27,6 +27,42 @@ async function install(page, options = {}) {
       active = true; document.dispatchEvent(new Event('visibilitychange')); dispatchEvent(new Event('focus'));
     };
   });
+  await page.route('https://api.github.com/repos/alice/repo/**', async route => {
+    const url = new URL(route.request().url());
+    const resource = url.pathname.replace('/repos/alice/repo/', '');
+    let op, args, value, source = false;
+    if (resource.startsWith('contents/')) {
+      source = true; op = 'github.content.get';
+      args = { path: resource.slice('contents/'.length).split('/').map(decodeURIComponent).join('/'), ref: url.searchParams.get('ref') };
+      const text = state.source ? state.source(args.ref) : `context\n${args.ref === head ? 'new' : 'old'}\ntail`;
+      value = Buffer.from(text);
+    } else if (/^pulls\/\d+\/files$/.test(resource)) {
+      op = 'github.pull.files'; args = { number: '42', page: Number(url.searchParams.get('page') || 1) }; value = state.files;
+    } else if (/^pulls\/\d+\/comments$/.test(resource)) {
+      op = 'github.comments.list'; args = { number: '42' }; value = state.reviewComments;
+    } else if (/^issues\/\d+\/comments$/.test(resource) || /^commits\/[^/]+\/comments$/.test(resource)) {
+      op = 'github.comments.list'; args = {}; value = [];
+    } else if (/^pulls\/\d+$/.test(resource)) {
+      op = 'github.pull.get'; args = { number: '42' };
+      value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42',
+        base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } },
+        additions: state.files.length, deletions: state.files.length, changed_files: state.files.length };
+    } else if (/^commits\/[^/]+$/.test(resource)) {
+      op = 'github.commit.get'; args = { sha: resource.split('/')[1] };
+      value = { sha: args.sha, html_url: `https://github.com/alice/repo/commit/${args.sha}`,
+        commit: { message: 'Commit fixture' }, parents: [{ sha: base }],
+        stats: { additions: 3, deletions: 3, total: 6 }, files: state.files };
+    } else if (resource.startsWith('compare/')) {
+      op = 'github.compare.get'; args = {}; value = { merge_base_commit: { sha: merge } };
+    } else {
+      throw new Error(`Unhandled Viewed fixture GitHub URL ${url}`);
+    }
+    state.calls.push({ op, args });
+    const headers = { 'Access-Control-Allow-Origin': '*' };
+    await route.fulfill(source
+      ? { body: value, contentType: 'text/plain', headers }
+      : { json: value, headers }).catch(() => {});
+  });
   await page.route('**/api/**', async route => {
     const request = route.request();
     if (new URL(request.url()).pathname === '/api/auth/status') {

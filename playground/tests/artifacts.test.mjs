@@ -16,10 +16,11 @@ test('release contains a Wasm module and self-contained root assets runnable wit
   assert(!existsSync(join(repository, 'playground/server.mjs')));
   assert(!existsSync(join(repository, '.github/workflows/pages.yml')));
   const client = readFileSync(join(staticDir, 'index.js'), 'utf8');
-  assert(!client.includes('chrome.runtime') && !client.includes('__moondiffExtensionHost') && !client.includes('https://api.github.com/'));
+  assert(!client.includes('chrome.runtime') && !client.includes('__moondiffExtensionHost'));
+  assert(client.includes('https://api.github.com'));
   assert(!existsSync(join(staticDir, 'http-client.js')));
   assert(!client.includes('MoondiffHttp') && !client.includes('client_secret'));
-  assert(client.includes('/api/rpc') && client.includes('/api/auth/device/poll'));
+  assert(client.includes('/api/rpc') && client.includes('/api/auth/session') && client.includes('/api/auth/device/poll'));
   const f = await startServer(undefined, { wasmPath, staticDir }); t.after(() => f.close());
   for (const path of ['/healthz', '/', '/alice/repo/pull/42', '/alice/repo/pull/42/commits/123abcd', '/index.js']) assert.equal((await fetch(f.base + path)).status, 200, path);
   for (const path of ['/unknown', '/auth/login', '/auth/callback']) assert.equal((await fetch(f.base + path)).status, 404);

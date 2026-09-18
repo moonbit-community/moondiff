@@ -1606,7 +1606,7 @@ test "comment creation authentication failures sign out and retain the draft" {
 fn signed_in_api_status(login : String) -> ApiAuthStatus {
   {
     device_flow: None,
-    csrf_token: "csrf-test",
+    csrf_token: Some("csrf-test"),
     authenticated: true,
     login: Some(login),
     install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
@@ -1618,7 +1618,7 @@ fn signed_in_api_status(login : String) -> ApiAuthStatus {
 fn anonymous_api_status() -> ApiAuthStatus {
   {
     device_flow: None,
-    csrf_token: "csrf-test",
+    csrf_token: Some("csrf-test"),
     authenticated: false,
     login: None,
     install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
@@ -1630,7 +1630,7 @@ fn anonymous_api_status() -> ApiAuthStatus {
 fn signed_in_api_status_without_login() -> ApiAuthStatus {
   {
     device_flow: None,
-    csrf_token: "csrf-test",
+    csrf_token: Some("csrf-test"),
     authenticated: true,
     login: None,
     install_url: Some("https://github.com/apps/moondiff-test/installations/new"),
@@ -1783,7 +1783,7 @@ test "installation URL changes do not cross the signed-in account boundary" {
       Some(view.reference),
       Ok({
         device_flow: None,
-        csrf_token: "csrf-test",
+        csrf_token: Some("csrf-test"),
         authenticated: true,
         login: Some("alice"),
         install_url: Some(

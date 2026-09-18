@@ -6,9 +6,17 @@ import {
 }
 
 // Values
+pub fn comment_for_protocol(Json) -> Json raise
+
 pub fn[T : @json.FromJson + ToJson] decode(Json) -> T raise
 
+pub fn[T : @json.FromJson + ToJson] decode_github(Json) -> T raise
+
 pub fn decode_request(Json) -> GitHubRequest raise
+
+pub fn github_id(Json) -> String raise
+
+pub fn normalize_github(Json) -> Json
 
 pub fn valid_attempt_id(String) -> Bool
 
@@ -30,7 +38,7 @@ pub suberror ProtocolError {
 // Types and methods
 pub(all) struct ApiAuthStatus {
   authenticated : Bool
-  csrf_token : String
+  csrf_token : String?
   login : String?
   user_id : String?
   install_url : String?
@@ -231,6 +239,7 @@ pub(all) struct CommentsList {
   repo : String
   target : CommentTarget
 } derive(Eq, ToJson, @json.FromJson)
+pub fn CommentsList::public_paths(Self) -> Array[String]
 
 pub(all) struct CommitCommentCreate {
   owner : String
@@ -318,6 +327,7 @@ pub(all) enum GitHubRequest {
 } derive(Eq, ToJson, @json.FromJson)
 pub fn GitHubRequest::encode(Self) -> Json
 pub fn GitHubRequest::is_write(Self) -> Bool
+pub fn GitHubRequest::public_path(Self) -> String?
 pub fn GitHubRequest::validate(Self) -> Unit raise
 
 pub(all) struct IssueCommentCreate {

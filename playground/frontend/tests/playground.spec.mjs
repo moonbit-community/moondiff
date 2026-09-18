@@ -1926,6 +1926,8 @@ test("Ignore tests keeps whole-file cards and restores renamed, added, and delet
   page.on("request", request => {
     if (request.url().endsWith("/api/rpc") && request.postDataJSON().request.$tag === "ContentGet") {
       requests.push(fixtureURL(request.postDataJSON()));
+    } else if (request.url().startsWith("https://api.github.com/") && request.url().includes("/contents/")) {
+      requests.push(new URL(request.url()).pathname);
     }
   });
   await loadTestsCommit(page, { wholeFiles: true });

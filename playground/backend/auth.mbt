@@ -13,7 +13,7 @@ fn App::cookie(self : App, value : String) -> @http.Cookie {
     self.cookie_name(),
     value,
     path="/",
-    max_age=2592000,
+    max_age=AUTHENTICATED_SESSION_LIFETIME,
     secure=self.config.secure,
     http_only=true,
     extensions=["SameSite=Lax"],
@@ -56,21 +56,35 @@ fn App::csrf_check(
 }
 
 ///|
-fn App::status(self : App, session : Session) -> @protocol.ApiAuthStatus raise {
-  {
-    authenticated: !session.tokens.is_empty(),
-    install_url: Some(self.config.install_url),
-    csrf_token: session.csrf,
-    login: if session.user.is_empty() {
-      None
-    } else {
-      Some(session.login)
-    },
-    user_id: if session.user.is_empty() {
-      None
-    } else {
-      Some(session.user)
-    },
-    device_flow: self.visible_device(session).map(flow => flow.public_status()),
+fn App::status(self : App, session : Session?) -> @protocol.ApiAuthStatus raise {
+  match session {
+    None =>
+      {
+        authenticated: false,
+        install_url: Some(self.config.install_url),
+        csrf_token: None,
+        login: None,
+        user_id: None,
+        device_flow: None,
+      }
+    Some(session) =>
+      {
+        authenticated: !session.tokens.is_empty(),
+        install_url: Some(self.config.install_url),
+        csrf_token: Some(session.csrf),
+        login: if session.user.is_empty() {
+          None
+        } else {
+          Some(session.login)
+        },
+        user_id: if session.user.is_empty() {
+          None
+        } else {
+          Some(session.user)
+        },
+        device_flow: self
+        .visible_device(session)
+        .map(flow => flow.public_status()),
+      }
   }
 }

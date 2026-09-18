@@ -175,6 +175,7 @@ async fn App::refresh_once(self : App, original : Session) -> Session {
 ///|
 fn App::expire_auth(self : App, session : Session) -> Unit raise {
   execute(self.db, DB_EXPIRE_SESSION_AUTH, [
+    Integer(now() + ANONYMOUS_SESSION_LIFETIME),
     Text(session.id),
     Integer(session.epoch),
   ])
@@ -223,20 +224,13 @@ async fn App::github(
   body? : Json,
   source? : Bool = false,
 ) -> (@http.Response, Bytes) {
-  let current = match session {
-    Some(session) if !session.tokens.is_empty() =>
-      Some(self.authenticated(session))
-    _ => None
-  }
-  guard meth == Get || current is Some(_) else {
+  guard session is Some(session) && !session.tokens.is_empty() else {
     raise RpcError(
-      401, "authentication_required", "Sign in to GitHub to comment.",
+      401, "authentication_required", "Sign in to GitHub to continue.",
     )
   }
-  let token = match current {
-    Some(s) => string(self.token_payload(s), "access_token")
-    None => ""
-  }
+  let current = self.authenticated(session)
+  let token = string(self.token_payload(current), "access_token")
   let (response, bytes) = upstream(
     self.config.api_url,
     path,
@@ -245,36 +239,34 @@ async fn App::github(
     body,
     source~,
   )
-  if current is Some(s) {
-    guard self.still_current(s) else {
+  guard self.still_current(current) else {
+    raise RpcError(
+      401, "authentication_required", "This session is no longer active.",
+    )
+  }
+  if response.code == 401 {
+    let refreshed = self.authenticated(current, rejected_token=token)
+    let token = string(self.token_payload(refreshed), "access_token")
+    let (response, bytes) = upstream(
+      self.config.api_url,
+      path,
+      meth,
+      token,
+      body,
+      source~,
+    )
+    guard self.still_current(refreshed) else {
       raise RpcError(
         401, "authentication_required", "This session is no longer active.",
       )
     }
     if response.code == 401 {
-      let refreshed = self.authenticated(s, rejected_token=token)
-      let token = string(self.token_payload(refreshed), "access_token")
-      let (response, bytes) = upstream(
-        self.config.api_url,
-        path,
-        meth,
-        token,
-        body,
-        source~,
-      )
-      guard self.still_current(refreshed) else {
-        raise RpcError(
-          401, "authentication_required", "This session is no longer active.",
-        )
-      }
-      if response.code == 401 {
-        self.expire_auth(refreshed)
-      }
-      guard response.code >= 200 && response.code < 300 else {
-        raise github_error(response, bytes)
-      }
-      return (response, bytes)
+      self.expire_auth(refreshed)
     }
+    guard response.code >= 200 && response.code < 300 else {
+      raise github_error(response, bytes)
+    }
+    return (response, bytes)
   }
   guard response.code >= 200 && response.code < 300 else {
     raise github_error(response, bytes)

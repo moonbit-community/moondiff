@@ -75,7 +75,7 @@ fn status_fixture(
 ) -> @protocol.ApiAuthStatus {
   {
     authenticated: phase is Completed,
-    csrf_token: csrf,
+    csrf_token: Some(csrf),
     login: None,
     user_id: if phase is Completed {
       Some("1")
@@ -92,6 +92,153 @@ fn status_fixture(
       retry_after: 5,
       message: "",
     }),
+  }
+}
+
+///|
+fn anonymous_status_fixture() -> @protocol.ApiAuthStatus {
+  { ..status_fixture(), csrf_token: None, }
+}
+
+///|
+test "anonymous sign-in creates a session only after a read-only status" {
+  let (client, n) = harness()
+  let id = "attempt-0000000000"
+  let results : Array[Result[@protocol.DeviceResponse, Error]] = []
+  client.device(Start, id, 0, r => results.push(r))
+  assert_eq(n.last().path, "/api/auth/status")
+  n.last().reply(anonymous_status_fixture())
+  assert_eq(n.last().path, "/api/auth/session")
+  assert_eq(n.last().body, "{}")
+  n.last().reply(status_fixture())
+  assert_eq(n.last().path, "/api/auth/device/start")
+  assert_eq(n.last().csrf, "csrf-123")
+  n.last().reply(device_fixture(id, id~))
+  assert_true(results[0] is Ok(_))
+}
+
+///|
+test "cancel and logout restore anonymous status when no session remains" {
+  let id = "attempt-0000000000"
+  let (cancel_client, cancel_network) = harness()
+  let cancelled : Array[Result[@protocol.DeviceResponse, Error]] = []
+  cancel_client.device(Cancel, id, 0, r => cancelled.push(r))
+  assert_eq(cancel_network.last().path, "/api/auth/status")
+  cancel_network.last().reply(anonymous_status_fixture())
+  assert_true(cancelled[0] is Ok({ status: { csrf_token: None, .. }, .. }))
+  assert_eq(cancel_network.calls.length(), 1)
+
+  let (logout_client, logout_network) = harness()
+  let logged_out : Array[Result[@protocol.ApiAuthStatus, Error]] = []
+  logout_client.logout(r => logged_out.push(r))
+  assert_eq(logout_network.last().path, "/api/auth/status")
+  logout_network.last().reply(anonymous_status_fixture())
+  assert_true(logged_out[0] is Ok({ csrf_token: None, .. }))
+  assert_eq(logout_network.calls.length(), 1)
+}
+
+///|
+test "login start, cancel, and authentication changes preserve public reads" {
+  let (client, network) = harness()
+  let id = "attempt-0000000000"
+  let request : @protocol.GitHubRequest = CommitGet({
+    owner: "alice",
+    repo: "repo",
+    sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    page: 1,
+  })
+  let key = request.encode().stringify()
+  let results : Array[Result[@protocol.RpcValue, Error]] = []
+  let mut aborted = false
+  let pending : PublicPending = {
+    waiters: [{ generation: 1, done: r => results.push(r), }],
+    abort: () => aborted = true,
+    active: true,
+  }
+  client.public_pending[key] = pending
+  client.device(Start, id, 0, _ => ())
+  assert_false(aborted)
+  network.last().reply(anonymous_status_fixture())
+  network.last().reply(status_fixture())
+  network.last().reply(device_fixture(id, id~))
+  assert_true(pending.active)
+
+  client.device(Cancel, id, 0, _ => ())
+  assert_false(aborted)
+  network.last().reply(device_fixture(id, phase=Cancelled))
+  assert_true(pending.active)
+
+  client.adopt_status(status_fixture(phase=Completed), false)
+  assert_true(pending.active)
+  let value : @protocol.RpcValue = Commit({
+    sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    html_url: "https://github.com/alice/repo/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    commit: { message: "public result", },
+    parents: [],
+    stats: { additions: 0, deletions: 0, total: 0, },
+    files: [],
+  })
+  client.finish_public(key, request, pending, Ok(value))
+  assert_false(aborted)
+  assert_false(pending.active)
+  assert_eq(results.length(), 1)
+  match results[0] {
+    Ok(Commit(commit)) => assert_eq(commit.commit.message, "public result")
+    _ => fail("Expected the public result after sign-in")
+  }
+  assert_eq(client.public_pending.length(), 0)
+  assert_eq(client.public_cache.length(), 1)
+}
+
+///|
+test "navigation cancels only old public generations" {
+  let (client, _) = harness()
+  let older : Array[Result[@protocol.RpcValue, Error]] = []
+  let current : Array[Result[@protocol.RpcValue, Error]] = []
+  let mut aborted = false
+  let pending : PublicPending = {
+    waiters: [
+      { generation: 1, done: r => older.push(r), },
+      { generation: 2, done: r => current.push(r), },
+    ],
+    abort: () => aborted = true,
+    active: true,
+  }
+  client.public_pending["public-read"] = pending
+  client.cancel_before(2)
+  assert_true(older[0] is Err(Cancelled))
+  assert_eq(current.length(), 0)
+  assert_true(pending.active)
+  assert_false(aborted)
+  client.cancel_before(3)
+  assert_true(current[0] is Err(Cancelled))
+  assert_false(pending.active)
+  assert_true(aborted)
+  assert_eq(client.public_pending.length(), 0)
+}
+
+///|
+test "logout and disposal cancel all public reads" {
+  for action in ["logout", "dispose"] {
+    let (client, _) = harness()
+    let results : Array[Result[@protocol.RpcValue, Error]] = []
+    let mut aborted = false
+    let pending : PublicPending = {
+      waiters: [{ generation: 1, done: r => results.push(r), }],
+      abort: () => aborted = true,
+      active: true,
+    }
+    client.public_pending["public-read"] = pending
+    if action == "logout" {
+      client.logout(_ => ())
+    } else {
+      client.dispose()
+    }
+    assert_true(aborted)
+    assert_false(pending.active)
+    assert_eq(results.length(), 1)
+    assert_true(results[0] is Err(Cancelled))
+    assert_eq(client.public_pending.length(), 0)
   }
 }
 
@@ -502,6 +649,7 @@ test "cancel logout and page departure discard late start success and failure at
 ///|
 test "RPC response kind mismatch is invalid_server_response and invalid requests do not reach transport" {
   let (client, n) = harness()
+  client.authenticated = true
   let results : Array[Result[@protocol.ApiCompare, Error]] = []
   let request : @protocol.GitHubRequest = CompareGet({
     owner: "alice",

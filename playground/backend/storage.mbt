@@ -87,6 +87,25 @@ fn App::open(config : Config) -> App raise {
       Text(seal(config.key, "database", "key-check", b"moondiff-v1")),
     ])
   }
+  // Run once for databases created before anonymous sessions became short lived.
+  execute(db, DB_BEGIN_IMMEDIATE, [])
+  {
+    errdefer execute(db, DB_ROLLBACK, [])
+    let migration = db.prepare(QUERY_ANONYMOUS_MIGRATION)
+    let already_migrated = migration.step()
+    migration.finalize()
+    if !already_migrated {
+      let timestamp = now()
+      execute(db, DB_DELETE_EXPIRED_SESSIONS, [Integer(timestamp)])
+      execute(db, DB_DELETE_EXPIRED_AUTHORIZATIONS, [Integer(timestamp)])
+      execute(db, DB_DELETE_LEGACY_IDLE_SESSIONS, [Integer(timestamp)])
+      execute(db, DB_TIGHTEN_LEGACY_ACTIVE_SESSIONS, [
+        Integer(timestamp + ANONYMOUS_SESSION_LIFETIME),
+      ])
+      execute(db, DB_MARK_ANONYMOUS_MIGRATION, [])
+    }
+    execute(db, DB_COMMIT, [])
+  }
   { config, db, refreshes: {}, devices: {}, viewed_scopes: {}, }
 }
 
@@ -114,13 +133,29 @@ fn App::session(self : App, id : String) -> Session? raise {
 fn App::create_session(self : App) -> (String, Session) raise {
   let cookie = random_id()
   let id = digest(cookie)
-  execute(self.db, DB_DELETE_EXPIRED_SESSIONS, [Integer(now())])
-  execute(self.db, DB_DELETE_EXPIRED_AUTHORIZATIONS, [Integer(now())])
-  execute(self.db, DB_INSERT_SESSION, [
-    Text(id),
-    Text(random_id()),
-    Integer(now() + 30L * 86400),
-  ])
+  execute(self.db, DB_BEGIN_IMMEDIATE, [])
+  {
+    errdefer execute(self.db, DB_ROLLBACK, [])
+    let timestamp = now()
+    execute(self.db, DB_DELETE_EXPIRED_SESSIONS, [Integer(timestamp)])
+    execute(self.db, DB_DELETE_EXPIRED_AUTHORIZATIONS, [Integer(timestamp)])
+    let stmt = self.db.prepare(QUERY_ANONYMOUS_SESSION_COUNT)
+    stmt.bind(index=1, timestamp)
+    ignore(stmt.step())
+    let count : Int64 = stmt.column(index=0)
+    stmt.finalize()
+    guard count < self.config.anonymous_session_limit.to_int64() else {
+      raise RpcError(
+        429, "session_limit", "Too many sign-in sessions are active. Try again later.",
+      )
+    }
+    execute(self.db, DB_INSERT_SESSION, [
+      Text(id),
+      Text(random_id()),
+      Integer(timestamp + ANONYMOUS_SESSION_LIFETIME),
+    ])
+    execute(self.db, DB_COMMIT, [])
+  }
   (cookie, self.session(id).unwrap())
 }
 
@@ -165,7 +200,7 @@ fn App::install_tokens(
     n <= 31536000 {
     issued_at + n.to_int64()
   } else {
-    session.expires
+    Int64::max(session.expires, issued_at + AUTHENTICATED_SESSION_LIFETIME)
   }
   let refresh_expires = if field(payload, "refresh_token_expires_in")
     is Number(n, ..) &&
@@ -204,6 +239,7 @@ fn App::install_tokens(
       Integer(access_expires),
       Integer(refresh_expires),
       Integer(if device_id.is_empty() { 0 } else { 1 }),
+      Integer(now() + AUTHENTICATED_SESSION_LIFETIME),
       Text(session.id),
       Integer(session.epoch),
       Integer(now()),
