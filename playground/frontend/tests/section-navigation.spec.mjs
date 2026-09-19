@@ -9,6 +9,11 @@ const button = (page, direction) => page.locator(".change-titlebar").getByRole("
   name: direction > 0 ? "Next change" : "Previous change", exact: true,
 });
 
+async function waitForUnifiedLayout(page) {
+  await expect(page.locator("table.unified").first()).toBeVisible();
+  await expect(page.locator("table.split")).toHaveCount(0);
+}
+
 function declaration(name, version, groups = 3) {
   const lines = [`fn ${name}() {`];
   for (let group = 0; group < groups; group++) {
@@ -57,7 +62,10 @@ async function loadNavigation(page, { layout = "Split", algorithm = "Tree", widt
   await page.goto(`/example/navigation/commit/${sha}`);
   await expect(page.locator("table.split").first()).toBeVisible();
   await page.getByRole("button", { name: algorithm, exact: true }).click();
-  if (layout === "Unified") await page.getByRole("button", { name: layout, exact: true }).click();
+  if (layout === "Unified") {
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    await waitForUnifiedLayout(page);
+  }
   const sections = page.locator("#moondiff-file-0 details.semantic-section");
   const blockCounts = single ? [1] : [...(leadingAddition ? [1] : []), 3, 3, 1, 1];
   await expect(sections).toHaveCount(blockCounts.length);
@@ -215,6 +223,7 @@ for (const algorithm of ["Token", "Tree"]) {
       await expectLanding(first, 2);
       for (const nextLayout of [layout === "Split" ? "Unified" : "Split", layout]) {
         await page.getByRole("button", { name: nextLayout, exact: true }).click();
+        if (nextLayout === "Unified") await waitForUnifiedLayout(page);
         await expect(first).toHaveAttribute("open", "");
         await expect(second).toHaveAttribute("open", "");
         await expect(second).toHaveAttribute("data-section-key", secondKey);
@@ -387,6 +396,7 @@ test('clamped global landing is invalidated by manual scroll, layout and eligibi
   await button(page, -1).click();
   await expectLanding(other, 2);
   await page.getByRole('button', { name: 'Unified', exact: true }).click();
+  await waitForUnifiedLayout(page);
   await readChange(other, 0);
   await button(page, 1).click();
   await expectLanding(other, 1);
@@ -420,6 +430,7 @@ for (const width of [1440, 420]) {
     await button(page, 1).click();
     await expectLanding(sections.first(), 0);
     await page.getByRole('button', { name: 'Unified', exact: true }).click();
+    await waitForUnifiedLayout(page);
     await readChange(sections.nth(1), 0);
     await button(page, 1).click();
     await expectLanding(sections.nth(1), 1);
