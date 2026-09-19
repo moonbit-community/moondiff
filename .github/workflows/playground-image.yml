@@ -49,7 +49,7 @@ jobs:
           load: true
           push: false
           build-args: |
-            MOONBIT_VERSION=pre-release
+            MOONBIT_VERSION=latest
           tags: |
             moondiff-playground:ci
             ${{ steps.meta.outputs.tags }}
