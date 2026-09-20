@@ -85,10 +85,13 @@ export async function startViewedServer(options = {}) {
     }
     if (r.path.includes('/compare/')) return send({ merge_base_commit: { sha: state.base } });
     if (r.path.includes('/files?')) return send(files);
+    if (r.path.includes('/check-runs?')) return send({ total_count: 0, check_runs: [] });
+    if (r.path.includes('/status?')) return send({ total_count: 0, statuses: [] });
     if (r.path.includes('/pulls/')) return send({
       title: 'Viewed integration fixture', html_url: 'https://github.com/alice/repo/pull/42',
       base: { sha: state.base, repo: { full_name: 'alice/repo' } },
       head: { sha: state.head, repo: { full_name: 'alice/repo' } },
+      state: 'open', draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean',
       additions: files.length, deletions: files.length, changed_files: files.length,
     });
     if (r.path.includes('/commits/')) return send({

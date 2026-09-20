@@ -46,6 +46,7 @@ pub(all) struct Model {
   last_authenticated_user_id : String?
   viewed : ViewedState
   home : HomeState
+  pull_merge : PullMergeState
   review : Session
 } derive(Eq)
 
@@ -67,6 +68,7 @@ fn initial_model() -> Model {
     last_authenticated_user_id: None,
     viewed: empty_viewed_state(0),
     home: empty_home_state(0),
+    pull_merge: empty_pull_merge_state(0),
     review: initial_review_state(),
   }
 }

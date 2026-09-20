@@ -24,6 +24,7 @@ test "stale commit responses are discarded by generation" {
   let model = Model::{
     viewed: empty_viewed_state(0),
     home: HomeState::new(),
+    pull_merge: empty_pull_merge_state(0),
     input: "https://github.com/a/b/commit/abcdef1",
     generation: 2,
     view_mode: Split,
@@ -54,6 +55,7 @@ fn pull_test_model(
   {
     viewed: empty_viewed_state(0),
     home: HomeState::new(),
+    pull_merge: empty_pull_merge_state(0),
     input: canonical_github_url(reference),
     generation,
     view_mode: Split,
@@ -431,6 +433,7 @@ fn diff_test_model(view : ChangeView) -> Model {
   {
     viewed: empty_viewed_state(0),
     home: HomeState::new(),
+    pull_merge: empty_pull_merge_state(0),
     input: "",
     generation: 9,
     view_mode: Split,
@@ -1282,6 +1285,7 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
   let model = Model::{
     viewed: empty_viewed_state(0),
     home: HomeState::new(),
+    pull_merge: empty_pull_merge_state(0),
     input: canonical_github_url(view.reference),
     generation: 5,
     view_mode: Split,
@@ -1440,6 +1444,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
   let model = Model::{
     viewed: empty_viewed_state(0),
     home: HomeState::new(),
+    pull_merge: empty_pull_merge_state(0),
     input: canonical_github_url(view.reference),
     generation: 5,
     view_mode: Split,
@@ -1648,6 +1653,7 @@ fn auth_test_model(
   {
     viewed: empty_viewed_state(0),
     home: HomeState::new(),
+    pull_merge: empty_pull_merge_state(0),
     input: "",
     generation: 5,
     view_mode: Split,

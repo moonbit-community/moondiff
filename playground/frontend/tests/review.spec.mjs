@@ -288,6 +288,8 @@ async function installApi(page, target = pullTarget(), options = {}) {
         return pullMetadata();
       }
       if (op === "github.compare.get") return { merge_base_commit: { sha: mergeBase } };
+      if (op === "github.pull.merge.status") return { base_sha: state.currentBase, head_sha: state.currentHead, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: "clean", ci_checks: [], ci_warnings: [] };
+      if (op === "github.pull.rebase.merge") return { merged: true, sha: "d".repeat(40), message: "Pull request successfully merged" };
       if (op === "github.pull.viewed.get") return { base_sha: state.currentBase, head_sha: state.currentHead, files: [{ path: file().filename, state: { $tag: "Unviewed" } }] };
       if (op === "github.pull.files") return [file()];
       if (op === "github.commit.get") return commit();

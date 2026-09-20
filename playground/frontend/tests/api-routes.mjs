@@ -68,8 +68,20 @@ export async function anonymousApi(page) {
     return route.fallback();
   });
   await page.route('**/api/rpc', route => {
-    const { op } = fixtureRequest(route.request().postDataJSON());
+    const { op, args } = fixtureRequest(route.request().postDataJSON());
     if (op === 'github.comments.list') return route.fulfill({ json: successFixture(op, { issue_comments: [], review_comments: [], commit_comments: [] }) });
+    if (op === 'github.pull.merge.status') return route.fulfill({ json: successFixture(op, {
+      base_sha: args.expected_base_sha,
+      head_sha: args.expected_head_sha,
+      open: true,
+      draft: false,
+      merged: false,
+      mergeable: true,
+      rebaseable: true,
+      mergeable_state: 'clean',
+      ci_checks: [],
+      ci_warnings: [],
+    }) });
     return route.fallback();
   });
 }

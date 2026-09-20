@@ -8,6 +8,7 @@ pub(all) enum Region {
   Navigation
   ViewedSummary
   Discussion
+  PullMergeStatus
   File(String)
 } derive(Eq, Hash)
 
@@ -22,6 +23,7 @@ pub fn Region::key(self : Region) -> String {
     Navigation => "navigation"
     ViewedSummary => "viewed"
     Discussion => "discussion"
+    PullMergeStatus => "pull-merge-status"
     File(path) => "file:\{path}"
   }
 }

@@ -35,6 +35,7 @@ async function setup(page, handler) {
       case 'PullFiles': value = successFixture('github.pull.files', []); break;
       case 'CommentsList': value = successFixture('github.comments.list', { issue_comments: [], review_comments: [], commit_comments: [] }); break;
       case 'PullViewedGet': value = successFixture('github.pull.viewed.get', { base_sha: base, head_sha: head, files: [] }); break;
+      case 'PullMergeStatusGet': value = successFixture('github.pull.merge.status', { base_sha: args.expected_base_sha, head_sha: args.expected_head_sha, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_checks: [], ci_warnings: [] }); break;
       case 'CommitGet': value = successFixture('github.commit.get', { sha: args.sha, html_url: `https://github.com/fork/repo/commit/${args.sha}`, commit: { message: 'Loaded commit' }, parents: [], stats: { additions: 0, deletions: 0, total: 0 }, files: [] }); break;
       default: throw new Error(`Unexpected request ${kind}`);
     }

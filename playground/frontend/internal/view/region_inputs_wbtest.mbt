@@ -49,6 +49,7 @@ fn region_model() -> Model {
     last_authenticated_user_id: None,
     home: @application.HomeState::new(),
     viewed: @application.ViewedState::new(),
+    pull_merge: @application.PullMergeState::new(),
     review,
   }
 }
@@ -57,6 +58,29 @@ fn region_model() -> Model {
 fn test_file_input(model : Model, index : Int) -> FileInput {
   guard model.phase is Showing(view) else { panic() }
   file_input(false, model, index, view.files[index])
+}
+
+///|
+fn pull_region_model() -> Model {
+  let model = region_model()
+  guard model.phase is Showing(view) else { panic() }
+  let reference = @github.pull_reference("owner", "repo", "17")
+  let base = "1111111111111111111111111111111111111111"
+  let head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  let pull : @protocol.ApiPull = {
+    title: "Pull request",
+    html_url: "https://github.com/owner/repo/pull/17",
+    base: { sha: base, repo: Some({ full_name: "owner/repo", }), },
+    head: { sha: head, repo: Some({ full_name: "owner/repo", }), },
+    additions: 2,
+    deletions: 2,
+    changed_files: 2,
+  }
+  {
+    ..model,
+    route: Some(reference),
+    phase: Showing({ ..view, reference, pull_snapshot: Some(pull), sha: head, }),
+  }
 }
 
 ///|
@@ -95,6 +119,47 @@ test "file inputs ignore another file, tree controls and draft text outside thei
   assert_false(test_file_input(opened, 0) == test_file_input(typed, 0))
   let layout = @application.update(initial, Ui(SelectView(Unified)), emit).model
   assert_false(other == test_file_input(layout, 1))
+}
+
+///|
+test "merge status changes invalidate only the independent merge region" {
+  assert_false(
+    RegionProjection::new()
+    .inputs(region_model())
+    .any(entry => entry.0 is @application.PullMergeStatus),
+  )
+  let model = pull_region_model()
+  let projection = RegionProjection::new()
+  let before = projection.inputs(model)
+  let status : @protocol.ApiPullMergeStatus = {
+    base_sha: "1111111111111111111111111111111111111111",
+    head_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    open: true,
+    draft: false,
+    merged: false,
+    mergeable: Some(true),
+    rebaseable: Some(true),
+    mergeable_state: "clean",
+    ci_summary: Some(Success),
+    ci_checks: [],
+    ci_warnings: [],
+  }
+  let changed = {
+    ..model,
+    pull_merge: { ..model.pull_merge, status: Some(status), },
+  }
+  let after = projection.inputs(changed)
+  assert_eq(before.length(), after.length())
+  for index in 0..<before.length() {
+    let (before_region, before_input) = before[index]
+    let (after_region, after_input) = after[index]
+    assert_true(before_region == after_region)
+    if before_region is @application.PullMergeStatus {
+      assert_false(before_input == after_input)
+    } else {
+      assert_true(before_input == after_input)
+    }
+  }
 }
 
 ///|

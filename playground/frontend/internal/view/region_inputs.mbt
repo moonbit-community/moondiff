@@ -128,6 +128,13 @@ pub(all) struct DiscussionInput {
 } derive(Eq)
 
 ///|
+pub(all) struct PullMergeInput {
+  state : @application.PullMergeState
+  auth : @application.AuthStatus
+  snapshot_stale : Bool
+} derive(Eq)
+
+///|
 pub(all) enum StatusInput {
   Empty
   Loading(String)
@@ -143,6 +150,7 @@ pub(all) enum RegionInput {
   Navigation(NavigationInput)
   ViewedSummary(ViewedSummaryInput)
   Discussion(DiscussionInput)
+  PullMergeStatus(PullMergeInput)
   File(FileInput)
 } derive(Eq)
 
@@ -304,6 +312,18 @@ pub fn RegionProjection::inputs(
       }),
     ),
   )
+  if is_pull {
+    inputs.push(
+      (
+        @application.PullMergeStatus,
+        PullMergeStatus({
+          state: model.pull_merge,
+          auth: model.auth,
+          snapshot_stale: model.review.snapshot_stale,
+        }),
+      ),
+    )
+  }
   inputs
 }
 

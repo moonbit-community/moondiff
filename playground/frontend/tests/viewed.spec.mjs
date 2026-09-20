@@ -84,6 +84,7 @@ async function install(page, options = {}) {
       failure = state.contentFailure; state.contentFailure = null;
     }
     else if (op === 'github.comments.list') value = { issue_comments: [], review_comments: state.reviewComments, commit_comments: [] };
+    else if (op === 'github.pull.merge.status') value = { base_sha: state.base, head_sha: state.head, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_checks: [], ci_warnings: [] };
     else if (op === 'github.review.comment.create' || op === 'github.review.reply.create') {
       value = {
         id: '22', body: args.body, html_url: 'https://github.com/comment/22', created_at: '2026-09-11T09:00:00Z',
