@@ -17,6 +17,8 @@ pub(all) enum RpcValue {
   PullCommits(ApiPullCommits)
   Commit(ApiCommit)
   Pull(ApiPull)
+  PullMergeStatus(ApiPullMergeStatus)
+  PullMergeResult(ApiPullMergeResult)
   PullViewed(ApiPullViewed)
   FileViewed(ApiFileViewedResult)
   Compare(ApiCompare)

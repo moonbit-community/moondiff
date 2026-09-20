@@ -45,6 +45,26 @@ pub(all) struct ApiAuthStatus {
   device_flow : ApiDeviceFlow?
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) struct ApiCiCheck {
+  name : String
+  state : ApiCiState
+  description : String
+  details_url : String?
+  source : ApiCiSource
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum ApiCiSource {
+  CheckRun
+  CommitStatus
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum ApiCiState {
+  Success
+  Pending
+  Failure
+  Neutral
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) struct ApiCommentBundle {
   issue_comments : Array[ApiIssueComment]
   review_comments : Array[ApiReviewComment]
@@ -160,6 +180,26 @@ pub(all) struct ApiPullCommits {
   next_cursor : String?
   base_sha : String
   head_sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPullMergeResult {
+  merged : Bool
+  sha : String?
+  message : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPullMergeStatus {
+  base_sha : String
+  head_sha : String
+  open : Bool
+  draft : Bool
+  merged : Bool
+  mergeable : Bool?
+  rebaseable : Bool?
+  mergeable_state : String
+  ci_summary : ApiCiState?
+  ci_checks : Array[ApiCiCheck]
+  ci_warnings : Array[String]
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiPullSummary {
@@ -311,6 +351,8 @@ pub(all) enum GitHubRequest {
   PullCommitsGet(PullCommitsGet)
   CommitGet(CommitGet)
   PullGet(PullGet)
+  PullMergeStatusGet(PullMergeStatusGet)
+  PullRebaseMerge(PullRebaseMerge)
   PullViewedGet(PullViewedGet)
   PullFileViewedSet(PullFileViewedSet)
   CompareGet(CompareGet)
@@ -367,6 +409,22 @@ pub(all) struct PullGet {
   number : String
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) struct PullMergeStatusGet {
+  owner : String
+  repo : String
+  number : String
+  expected_base_sha : String
+  expected_head_sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct PullRebaseMerge {
+  owner : String
+  repo : String
+  number : String
+  expected_base_sha : String
+  expected_head_sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) struct PullViewedGet {
   owner : String
   repo : String
@@ -407,6 +465,8 @@ pub(all) enum RpcValue {
   PullCommits(ApiPullCommits)
   Commit(ApiCommit)
   Pull(ApiPull)
+  PullMergeStatus(ApiPullMergeStatus)
+  PullMergeResult(ApiPullMergeResult)
   PullViewed(ApiPullViewed)
   FileViewed(ApiFileViewedResult)
   Compare(ApiCompare)

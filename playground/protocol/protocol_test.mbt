@@ -6,10 +6,24 @@ fn[T : FromJson + ToJson] roundtrip(value : T) -> Unit raise {
 }
 
 ///|
-test "all thirteen requests roundtrip and classify writes" {
+test "all fifteen requests roundtrip and classify writes" {
   let requests : Array[@protocol.GitHubRequest] = [
     CommitGet({ owner: "alice", repo: "repo", sha: "123abcd", page: 1, }),
     PullGet({ owner: "alice", repo: "repo", number: "42", }),
+    PullMergeStatusGet({
+      owner: "alice",
+      repo: "repo",
+      number: "42",
+      expected_base_sha: "123abcd",
+      expected_head_sha: "abcdef0",
+    }),
+    PullRebaseMerge({
+      owner: "alice",
+      repo: "repo",
+      number: "42",
+      expected_base_sha: "123abcd",
+      expected_head_sha: "abcdef0",
+    }),
     CompareGet({
       owner: "alice",
       repo: "repo",
@@ -63,9 +77,21 @@ test "all thirteen requests roundtrip and classify writes" {
     ReviewCommentDelete({ owner: "alice", repo: "repo", comment_id: 1, }),
     CommitCommentDelete({ owner: "alice", repo: "repo", comment_id: 1, }),
   ]
-  for i, request in requests {
+  for request in requests {
     assert_true(@protocol.decode_request(request.encode()) == request)
-    assert_eq(request.is_write(), i >= 6)
+    assert_eq(
+      request.is_write(),
+      request
+      is (PullRebaseMerge(_)
+      | IssueCommentCreate(_)
+      | ReviewCommentCreate(_)
+      | CommitCommentCreate(_)
+      | ReviewReplyCreate(_)
+      | IssueCommentDelete(_)
+      | ReviewCommentDelete(_)
+      | CommitCommentDelete(_)
+      | PullFileViewedSet(_)),
+    )
   }
   for
     target in [
@@ -141,6 +167,32 @@ test "every RPC result and response envelope roundtrips including int64 ids" {
       additions: 1,
       deletions: 0,
       changed_files: 1,
+    }),
+    PullMergeStatus({
+      base_sha: "123abcd",
+      head_sha: "abcdef0",
+      open: true,
+      draft: false,
+      merged: false,
+      mergeable: Some(true),
+      rebaseable: None,
+      mergeable_state: "clean",
+      ci_summary: Some(Pending),
+      ci_checks: [
+        {
+          name: "build",
+          state: Pending,
+          description: "Build is running",
+          details_url: Some("https://github.com/check/1"),
+          source: CheckRun,
+        },
+      ],
+      ci_warnings: ["Commit statuses could not be read."],
+    }),
+    PullMergeResult({
+      merged: true,
+      sha: Some("fedcba0"),
+      message: "Pull Request successfully merged",
     }),
     Compare({ merge_base_commit: { sha: "123abcd", }, }),
     Files([file]),
@@ -439,5 +491,57 @@ test "Viewed requests validate and roundtrip three states with snapshots" {
       _ => true
     }
     assert_true(rejected)
+  }
+}
+
+///|
+test "merge requests validate snapshots and preserve read/write classification" {
+  let status : @protocol.GitHubRequest = PullMergeStatusGet({
+    owner: "alice",
+    repo: "repo",
+    number: "42",
+    expected_base_sha: "123abcd",
+    expected_head_sha: "abcdef0",
+  })
+  let merge : @protocol.GitHubRequest = PullRebaseMerge({
+    owner: "alice",
+    repo: "repo",
+    number: "42",
+    expected_base_sha: "123abcd",
+    expected_head_sha: "abcdef0",
+  })
+  assert_false(status.is_write())
+  assert_true(merge.is_write())
+  assert_true(@protocol.decode_request(status.encode()) == status)
+  assert_true(@protocol.decode_request(merge.encode()) == merge)
+  let bad_requests : Array[@protocol.GitHubRequest] = [
+    @protocol.GitHubRequest::PullMergeStatusGet({
+      owner: "alice",
+      repo: "repo",
+      number: "0",
+      expected_base_sha: "123abcd",
+      expected_head_sha: "abcdef0",
+    }),
+    PullMergeStatusGet({
+      owner: "alice",
+      repo: "repo",
+      number: "42",
+      expected_base_sha: "main",
+      expected_head_sha: "abcdef0",
+    }),
+    PullRebaseMerge({
+      owner: "alice",
+      repo: "repo",
+      number: "42",
+      expected_base_sha: "123abcd",
+      expected_head_sha: "HEAD",
+    }),
+  ]
+  for bad in bad_requests {
+    try bad.validate() catch {
+      _ => ()
+    } noraise {
+      _ => fail("Accepted an invalid merge request")
+    }
   }
 }

@@ -138,6 +138,8 @@ pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
     ViewerPullsGet(_) | PullCommitsGet(_) => false
     CommitGet(_) => false
     PullGet(_) => false
+    PullMergeStatusGet(_) => false
+    PullRebaseMerge(_) => true
     PullViewedGet(_) => false
     PullFileViewedSet(_) => true
     CompareGet(_) => false
@@ -164,6 +166,8 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
     PullCommitsGet(p) => (p.owner, p.repo)
     CommitGet(p) => (p.owner, p.repo)
     PullGet(p) => (p.owner, p.repo)
+    PullMergeStatusGet(p) => (p.owner, p.repo)
+    PullRebaseMerge(p) => (p.owner, p.repo)
     PullViewedGet(p) => (p.owner, p.repo)
     PullFileViewedSet(p) => (p.owner, p.repo)
     CompareGet(p) => (p.owner, p.repo)
@@ -198,6 +202,16 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
       )
     }
     PullGet(p) => check_number(p.number)
+    PullMergeStatusGet(p) => {
+      check_pull_number(p.number)
+      check_sha(p.expected_base_sha)
+      check_sha(p.expected_head_sha)
+    }
+    PullRebaseMerge(p) => {
+      check_pull_number(p.number)
+      check_sha(p.expected_base_sha)
+      check_sha(p.expected_head_sha)
+    }
     PullViewedGet(p) => check_pull_number(p.number)
     PullFileViewedSet(p) => {
       check_pull_number(p.number)

@@ -213,6 +213,134 @@ test('CSRF, operation validation, anonymous RPC denial and authenticated writes'
   assert.equal((await user.rpc('github.commit.get', { ...args, url: 'http://evil' })).error.code, 'invalid_arguments');
 });
 
+const mergeBase = '1'.repeat(40), mergeHead = 'a'.repeat(40);
+const mergeArgs = { owner: 'alice', repo: 'repo', number: '42', expected_base_sha: mergeBase, expected_head_sha: mergeHead };
+const mergeSnapshot = (overrides = {}) => ({
+  base: { sha: mergeBase }, head: { sha: mergeHead }, state: 'open', draft: false,
+  merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean', ...overrides,
+});
+
+test('merge status aggregates paginated checks and statuses, tolerates partial CI access, and pins the snapshot', async t => {
+  const f = await startServer((r, res) => {
+    const send = value => { res.end(JSON.stringify(value)); return true; };
+    const url = new URL(r.path, 'http://stub');
+    const repo = url.pathname.split('/')[3];
+    if (url.pathname.endsWith('/pulls/42')) {
+      return send(mergeSnapshot(repo === 'changed' ? { head: { sha: 'b'.repeat(40) } } : {}));
+    }
+    if (url.pathname.endsWith('/check-runs')) {
+      if (repo === 'partial') { res.statusCode = 403; return send({ message: 'Checks permission missing' }); }
+      const page = Number(url.searchParams.get('page'));
+      const start = page === 1 ? 0 : 100;
+      const length = page === 1 ? 100 : 1;
+      return send({ total_count: 101, check_runs: Array.from({ length }, (_, i) => ({
+        name: `check-${start + i}`, status: 'completed', conclusion: 'success',
+        details_url: start + i === 0 ? 'javascript:alert(1)' : `https://example.com/check/${start + i}`,
+        html_url: null, output: { title: 'Passed' },
+      })) });
+    }
+    if (url.pathname.endsWith('/status')) return send({ total_count: 1, statuses: [{
+      context: 'deploy', state: repo === 'partial' ? 'success' : 'failure',
+      description: 'Deployment status', target_url: 'https://example.com/deploy',
+    }] });
+  });
+  t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const aggregate = await user.rpc('github.pull.merge.status', { ...mergeArgs, repo: 'aggregate' });
+  assert.equal(aggregate.ok, true);
+  assert.equal(aggregate.value.ci_summary.$tag, 'Failure');
+  assert.equal(aggregate.value.ci_checks.length, 102);
+  assert.equal(aggregate.value.ci_checks[0].details_url, undefined);
+  assert.equal(aggregate.value.ci_checks.at(-1).source.$tag, 'CommitStatus');
+  assert.equal(f.requests.filter(r => r.path.includes('/aggregate/') && r.path.includes('/check-runs')).length, 2);
+
+  const partial = await user.rpc('github.pull.merge.status', { ...mergeArgs, repo: 'partial' });
+  assert.equal(partial.ok, true);
+  assert.equal(partial.value.ci_summary.$tag, 'Success');
+  assert.deepEqual(partial.value.ci_warnings, ['Check runs could not be read; CI results are incomplete.']);
+  assert.equal(partial.value.ci_checks.length, 1);
+
+  const changed = await user.rpc('github.pull.merge.status', { ...mergeArgs, repo: 'changed' });
+  assert.equal(changed.ok, false);
+  assert.equal(changed.error.code, 'pull_snapshot_changed');
+  assert.equal(f.requests.filter(r => r.path.includes('/changed/') && (r.path.includes('/check-runs') || r.path.includes('/status?'))).length, 0);
+});
+
+test('rebase merge requires CSRF and authentication, revalidates SHAs, and sends the pinned head', async t => {
+  const f = await startServer((r, res) => {
+    const send = value => { res.end(JSON.stringify(value)); return true; };
+    if (r.path.endsWith('/pulls/42') && r.method === 'GET') return send(mergeSnapshot());
+    if (r.path.endsWith('/pulls/42/merge') && r.method === 'PUT') {
+      return send({ merged: true, sha: 'c'.repeat(40), message: 'Pull Request successfully merged' });
+    }
+  });
+  t.after(() => f.close());
+  const user = browser(f); await user.status();
+  assert.equal((await user.rpc('github.pull.rebase.merge', mergeArgs)).error.code, 'authentication_required');
+  await user.login();
+  assert.equal((await user.rpc('github.pull.rebase.merge', mergeArgs, { Origin: 'https://evil.example' })).error.code, 'csrf_failed');
+  assert.equal((await user.rpc('github.pull.rebase.merge', mergeArgs, { 'X-CSRF-Token': '' })).error.code, 'csrf_failed');
+  assert.equal(f.requests.filter(r => r.method === 'PUT').length, 0);
+  const merged = await user.rpc('github.pull.rebase.merge', mergeArgs);
+  assert.equal(merged.ok, true);
+  assert.equal(merged.value.merged, true);
+  assert.equal(merged.value.sha, 'c'.repeat(40));
+  const put = f.requests.find(r => r.method === 'PUT' && r.path.endsWith('/pulls/42/merge'));
+  assert.deepEqual(put.body, { sha: mergeHead, merge_method: 'rebase' });
+  assert.equal(put.headers.authorization, 'Bearer access-alice');
+});
+
+test('rebase merge exposes stable preflight and GitHub error categories', async t => {
+  const errors = {
+    denied: [403, 'merge_permission_denied'], limited: [403, 'rate_limit'],
+    blocked: [405, 'merge_blocked'], putstale: [409, 'pull_snapshot_changed'],
+    rejected: [422, 'merge_rejected'], outage: [503, 'merge_upstream_failure'],
+    expired: [401, 'authentication_required'],
+  };
+  const f = await startServer((r, res) => {
+    const send = value => { res.end(JSON.stringify(value)); return true; };
+    const url = new URL(r.path, 'http://stub');
+    const repo = url.pathname.split('/')[3];
+    if (url.pathname.endsWith('/pulls/42') && r.method === 'GET') {
+      if (repo === 'predenied') { res.statusCode = 403; return send({ message: 'Forbidden' }); }
+      if (repo === 'stale') return send(mergeSnapshot({ head: { sha: 'b'.repeat(40) } }));
+      if (repo === 'draft') return send(mergeSnapshot({ draft: true }));
+      if (repo === 'unknown') return send(mergeSnapshot({ mergeable: null, rebaseable: null, mergeable_state: 'unknown' }));
+      if (repo === 'preconflict') return send(mergeSnapshot({ mergeable: false, rebaseable: false, mergeable_state: 'dirty' }));
+      if (repo === 'preblocked') return send(mergeSnapshot({ mergeable_state: 'blocked' }));
+      return send(mergeSnapshot());
+    }
+    if (url.pathname.endsWith('/pulls/42/merge') && r.method === 'PUT') {
+      if (repo === 'refused') return send({ merged: false, sha: null, message: 'GitHub did not merge this pull request' });
+      if (repo === 'invalidresult') return send({ merged: true, sha: null, message: 'Merged without a SHA' });
+      const [status] = errors[repo]; res.statusCode = status;
+      if (repo === 'limited') res.setHeader('x-ratelimit-remaining', '0');
+      return send({ message: 'GitHub rejected merge' });
+    }
+  });
+  t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const refused = await user.rpc('github.pull.rebase.merge', { ...mergeArgs, repo: 'refused' });
+  assert.equal(refused.ok, true);
+  assert.equal(refused.value.merged, false);
+  assert.equal(refused.value.message, 'GitHub did not merge this pull request');
+  assert.equal((await user.rpc('github.pull.rebase.merge', { ...mergeArgs, repo: 'invalidresult' })).error.code, 'invalid_github_response');
+  for (const [repo, code] of [['predenied', 'merge_permission_denied'], ['stale', 'pull_snapshot_changed'], ['draft', 'pull_is_draft'], ['unknown', 'mergeability_unknown'], ['preconflict', 'merge_conflict'], ['preblocked', 'merge_blocked']]) {
+    const result = await user.rpc('github.pull.rebase.merge', { ...mergeArgs, repo });
+    assert.equal(result.error.code, code, repo);
+  }
+  assert.equal(f.requests.filter(r => r.method === 'PUT' && r.path.includes('/stale/')).length, 0);
+  assert.equal(f.requests.filter(r => r.method === 'PUT' && r.path.includes('/draft/')).length, 0);
+  assert.equal(f.requests.filter(r => r.method === 'PUT' && r.path.includes('/unknown/')).length, 0);
+  assert.equal(f.requests.filter(r => r.method === 'PUT' && r.path.includes('/preconflict/')).length, 0);
+  assert.equal(f.requests.filter(r => r.method === 'PUT' && r.path.includes('/preblocked/')).length, 0);
+  for (const [repo, [, code]] of Object.entries(errors)) {
+    const result = await user.rpc('github.pull.rebase.merge', { ...mergeArgs, repo });
+    assert.equal(result.error.code, code, repo);
+  }
+  assert.equal(f.requests.filter(r => r.method === 'PUT' && r.path.includes('/putstale/')).length, 1);
+});
+
 test('wrong key refuses startup and tampered identity/ciphertext cannot authenticate', async t => {
   const f = await startServer(); t.after(() => f.close());
   const user = browser(f); await user.login(); await f.stop();
