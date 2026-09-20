@@ -22,7 +22,7 @@ export function gate() {
 async function fixtureValue(state, op, args) {
   state.calls.push({ op, args });
   const f = state.fixture;
-  let value;
+  let value, failure;
   switch (op) {
     case 'github.viewer.pulls.get': value = { items: [], total_count: 0 }; break;
     case 'github.commit.get': value = { sha: args.sha, html_url: `https://github.com/example/regions/commit/${args.sha}`, commit: { message: f.message }, parents: [{ sha: f.base }], stats: { additions: 1, deletions: 1, total: 2 }, files: f.files }; break;
@@ -41,6 +41,14 @@ async function fixtureValue(state, op, args) {
       break;
     }
     case 'github.comments.list': value = { issue_comments: [], review_comments: state.comments ?? [], commit_comments: [] }; break;
+    case 'github.pull.merge.status': value = typeof state.mergeStatus === 'function' ? state.mergeStatus(args, state) : state.mergeStatus ?? { base_sha: f.base, head_sha: f.sha, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_checks: [], ci_warnings: [] }; break;
+    case 'github.pull.rebase.merge': {
+      const pending = state.mergeGate; state.mergeGate = null;
+      if (pending) await pending.promise;
+      failure = state.mergeFailure; state.mergeFailure = null;
+      value = state.mergeResult ?? { merged: true, sha: 'c'.repeat(40), message: 'Pull Request successfully merged' };
+      break;
+    }
     case 'github.pull.viewed.get': value = { base_sha: f.base, head_sha: f.sha, files: f.files.map(file => ({ path: file.filename, state: { $tag: state.viewed[file.filename] ? 'Viewed' : 'Unviewed' } })) }; break;
     case 'github.pull.file.viewed.set': {
       const pending = state.writeGate; state.writeGate = null;
@@ -51,7 +59,7 @@ async function fixtureValue(state, op, args) {
     }
     default: throw new Error(`Unhandled rendering fixture RPC ${op}`);
   }
-  return value;
+  return { value, failure };
 }
 
 export async function installRenderingFixture(page, fixture, options = {}) {
@@ -80,7 +88,7 @@ export async function installRenderingFixture(page, fixture, options = {}) {
     } else {
       throw new Error(`Unhandled rendering fixture GitHub URL ${url}`);
     }
-    const value = await fixtureValue(state, op, args);
+    const { value } = await fixtureValue(state, op, args);
     const headers = { 'Access-Control-Allow-Origin': '*' };
     if (op === 'github.content.get') {
       await route.fulfill({ body: Buffer.from(value.base64, 'base64'), contentType: 'text/plain', headers }).catch(() => {});
@@ -94,8 +102,11 @@ export async function installRenderingFixture(page, fixture, options = {}) {
         ...(state.authenticated ? { login: 'reviewer', user_id: '1' } : {}) }) });
     }
     const { op, args } = fixtureRequest(route.request().postDataJSON());
-    const value = await fixtureValue(state, op, args);
-    await route.fulfill({ json: successFixture(op, value) }).catch(() => {});
+    const { value, failure } = await fixtureValue(state, op, args);
+    await route.fulfill({
+      status: failure?.status || 200,
+      json: failure ? { $tag: 'Failure', error: failure } : successFixture(op, value),
+    }).catch(() => {});
   });
   return state;
 }

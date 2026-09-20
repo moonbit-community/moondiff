@@ -164,12 +164,14 @@ pub(all) struct Model {
   last_authenticated_user_id : String?
   viewed : ViewedState
   home : HomeState
+  pull_merge : PullMergeState
   review : @comments.Session
 } derive(Eq)
 
 pub(all) enum Msg {
   Home(HomeMsg)
   Viewed(ViewedMsg)
+  PullMerge(PullMergeMsg)
   Auth(AuthMsg)
   Review(ReviewMsg)
   Load(LoadMsg)
@@ -192,6 +194,27 @@ pub(all) enum Phase {
   Showing(@change.ChangeView)
 } derive(Eq)
 
+pub(all) enum PullMergeMsg {
+  Refresh
+  Poll(Int, Int, Int)
+  StatusLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPullMergeStatus, Error])
+  Submit
+  MergeFinished(Int, Int, Result[@moondiff-playground-protocol.ApiPullMergeResult, Error])
+}
+
+pub(all) struct PullMergeState {
+  epoch : Int
+  serial : Int
+  status : @moondiff-playground-protocol.ApiPullMergeStatus?
+  loading : Bool
+  submitting : Bool
+  error : String?
+  retry : Int
+  poll_scheduled : Bool
+  stale : Bool
+} derive(Eq)
+pub fn PullMergeState::new() -> Self
+
 pub(all) enum Region {
   Home
   Shell
@@ -201,6 +224,7 @@ pub(all) enum Region {
   Navigation
   ViewedSummary
   Discussion
+  PullMergeStatus
   File(String)
 } derive(Eq, Hash)
 pub fn Region::key(Self) -> String

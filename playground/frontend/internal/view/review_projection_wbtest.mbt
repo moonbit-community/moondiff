@@ -117,6 +117,7 @@ test "same-line projection uses the first expanded matched inserted or deleted s
             auth_revision: 0,
             restore_pending: false,
             last_authenticated_user_id: None,
+            pull_merge: @application.PullMergeState::new(),
             review: @comments.Session::new(),
           }
           let projection = review_projection(view, model)
@@ -311,6 +312,7 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
       auth_revision: 0,
       restore_pending: false,
       last_authenticated_user_id: None,
+      pull_merge: @application.PullMergeState::new(),
       review: @comments.Session::new(),
     }
     let projection = review_projection(view, model)

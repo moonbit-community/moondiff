@@ -36,6 +36,7 @@ pub fn region_view(
     ViewedSummary(input) => viewed_progress_input(input, emit)
     Discussion(input) =>
       comments_overview(input.is_pull, input.review, input.auth, emit)
+    PullMergeStatus(input) => pull_merge_status_view(input, emit)
     File(input) => {
       let file = input.file
       let options = input.display
@@ -144,6 +145,7 @@ pub fn shell_view(
                   commit_message_view(input.message, host(Navigation)),
                   host(ViewedSummary),
                   host(Discussion),
+                  host(PullMergeStatus),
                   if files.is_empty() {
                     @html.div(
                       class="file-list",

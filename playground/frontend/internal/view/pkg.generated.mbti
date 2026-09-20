@@ -74,6 +74,12 @@ pub(all) struct NavigationInput {
   enabled : Bool
 } derive(Eq)
 
+pub(all) struct PullMergeInput {
+  state : @application.PullMergeState
+  auth : @application.AuthStatus
+  snapshot_stale : Bool
+} derive(Eq)
+
 pub(all) enum RegionInput {
   Home(@application.AuthStatus, @application.HomeState)
   Toolbar(ToolbarInput)
@@ -82,6 +88,7 @@ pub(all) enum RegionInput {
   Navigation(NavigationInput)
   ViewedSummary(ViewedSummaryInput)
   Discussion(DiscussionInput)
+  PullMergeStatus(PullMergeInput)
   File(FileInput)
 } derive(Eq)
 pub fn RegionInput::draft_id(Self) -> String
