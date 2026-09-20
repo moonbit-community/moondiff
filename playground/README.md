@@ -100,12 +100,16 @@ refreshes user access tokens using the client ID, without a client secret or web
 authorization callback. See GitHub's [Device Flow protocol](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token-for-a-github-app)
 and [refresh protocol](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens#refreshing-a-user-access-token-with-a-refresh-token).
 
-Configure repository permissions: Contents read/write and Pull requests
-read/write, plus GitHub's required Metadata permission. Contents write is needed
-for [commit comment deletion](https://docs.github.com/en/rest/commits/comments#delete-a-commit-comment);
-Pull requests write also covers
+Configure repository permissions: Contents read/write, Pull requests read/write,
+Checks read-only and Commit statuses read-only, plus GitHub's required Metadata
+permission. Contents write is needed for
+[commit comment deletion](https://docs.github.com/en/rest/commits/comments#delete-a-commit-comment)
+and rebase merging; Pull requests write also covers
 [PR discussion comments](https://docs.github.com/en/rest/issues/comments#create-an-issue-comment).
-Existing installations must accept any changed App permissions. Install the app
+Checks and Commit statuses let the merge card report CI from
+both GitHub APIs; if either read fails, the card marks its results incomplete.
+Existing installations must reauthorize and accept these added permissions in
+GitHub after the App configuration changes. Install the app
 on repositories that users need to review. Private access and writing also
 require the signed-in user's own permissions. An App private key or installation
 access token is not used.

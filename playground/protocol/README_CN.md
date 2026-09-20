@@ -40,6 +40,8 @@ RPC 请求使用 `{"v":2,"request":GitHubRequest}` 格式。例如：
 | `PullCommitsGet` | `number`、可选 `cursor` | `PullCommits(ApiPullCommits)` |
 | `PullViewedGet` | `number` | `PullViewed(ApiPullViewed)` |
 | `PullFileViewedSet` | `number`, `path`, `viewed`, `base_sha`, `head_sha` | `FileViewed(ApiFileViewedResult)` |
+| `PullMergeStatusGet` | `number`、`expected_base_sha`、`expected_head_sha` | `PullMergeStatus(ApiPullMergeStatus)` |
+| `PullRebaseMerge` | `number`、`expected_base_sha`、`expected_head_sha` | `PullMergeResult(ApiPullMergeResult)` |
 | `CompareGet` | `base`、`head` | `Compare(ApiCompare)` |
 | `PullFiles` | `number`、`page` | `Files(Array[ApiFile])` |
 | `ContentGet` | `path`、`revision` | `Content(ApiSource)` |
@@ -101,6 +103,25 @@ GraphQL `commits` connection；超过时从第一页开始使用分页的
 从第一页分别重新获取，达到原先已展示的深度后才替换旧条目；展开的提交列表也会重新校验。
 刷新失败时保留可用内容并允许重试。退出、切换账号或会话过期时立即清空缓存。无数据库迁移，
 使用现有合并构建同步部署前后端。
+## 合并状态与 rebase 合并
+
+`PullMergeStatusGet` 要求当前会话已登录，读取 PR 当前状态，并要求 base/head SHA 与页面展示的快照一致。
+返回值包含 open、draft、merged、GitHub 的可选 `mergeable` 与 `rebaseable`、
+`mergeable_state`，以及固定 head commit 的 CI 详情。快照不一致时返回
+`pull_snapshot_changed`（409）。
+
+CI 会聚合分页的 Check Runs 与 combined Commit Statuses。每项包含名称、归一化状态
+（`Success`、`Pending`、`Failure` 或 `Neutral`）、描述、可选的 HTTP(S) 详情链接和来源。
+汇总优先级依次为 Failure、Pending、Success、Neutral；没有检查时不返回汇总状态。
+两个来源独立容错：一个来源读取失败时仍返回另一来源的数据，并在 `ci_warnings` 中明确提示。
+每个来源最多读取 100 页，每页 100 项。
+
+`PullRebaseMerge` 是要求登录的写操作，复用其他 mutation 的 Origin/CSRF 校验。
+后端重新读取 PR，拒绝快照变化、已关闭、已合并、草稿，以及未知或为假的可合并状态；
+随后以预期 head SHA 和 `merge_method: "rebase"` 调用 GitHub 合并接口。
+类型化结果包含 `merged`、可选合并 commit `sha` 和 `message`。稳定错误码会区分
+身份过期、权限不足、仓库规则阻止、冲突、快照变化、合并被拒、限流及上游故障。
+前端绝不会自动提交合并；仅在状态未定时按 2、4、8、16、30、30 秒轮询，并在页面恢复时刷新。
 
 ## Viewed 同步
 
