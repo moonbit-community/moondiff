@@ -5,6 +5,8 @@ const operations = {
   'github.commit.get': ['CommitGet', 'Commit'],
   'github.pull.viewed.get': ['PullViewedGet', 'PullViewed'],
   'github.pull.file.viewed.set': ['PullFileViewedSet', 'FileViewed'],
+  'github.pull.merge.status': ['PullMergeStatusGet', 'PullMergeStatus'],
+  'github.pull.rebase.merge': ['PullRebaseMerge', 'PullMergeResult'],
   'github.pull.get': ['PullGet', 'Pull'],
   'github.compare.get': ['CompareGet', 'Compare'],
   'github.pull.files': ['PullFiles', 'Files'],
@@ -63,7 +65,7 @@ export function modeledValue(kind, value) {
     case 'Content': return { base64: value.base64, size: value.size, content_type: value.content_type || value.contentType || 'application/octet-stream' };
     case 'Comments': return { issue_comments: value.issue_comments.map(v => comment(v, 'IssueComment')), review_comments: value.review_comments.map(v => comment(v, 'ReviewComment')), commit_comments: value.commit_comments.map(v => comment(v, 'CommitComment')) };
     case 'IssueComment': case 'ReviewComment': case 'CommitComment': return comment(value, kind);
-    case 'PullViewed': case 'FileViewed': case 'ViewerPulls': case 'PullCommits': return value;
+    case 'PullViewed': case 'FileViewed': case 'ViewerPulls': case 'PullCommits': case 'PullMergeStatus': case 'PullMergeResult': return value;
     case 'Deleted': return pick(value, 'deleted');
     default: throw new Error(`Unknown result ${kind}`);
   }

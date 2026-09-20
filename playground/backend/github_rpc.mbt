@@ -15,6 +15,8 @@ async fn App::rpc(
       Pull(
         decode_github(self.github_json(session, request.public_path().unwrap())),
       )
+    PullMergeStatusGet(p) => PullMergeStatus(self.pull_merge_status(session, p))
+    PullRebaseMerge(p) => PullMergeResult(self.pull_rebase_merge(session, p))
     PullViewedGet(p) =>
       self.with_viewed_scope(session, p, () => {
         PullViewed(self.pull_viewed(session, p))
