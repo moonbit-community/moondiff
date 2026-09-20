@@ -43,6 +43,8 @@ A successful response to that request has a typed `RpcValue` payload:
 | `PullCommitsGet` | `number`, optional `cursor` | `PullCommits(ApiPullCommits)` |
 | `PullViewedGet` | `number` | `PullViewed(ApiPullViewed)` |
 | `PullFileViewedSet` | `number`, `path`, `viewed`, `base_sha`, `head_sha` | `FileViewed(ApiFileViewedResult)` |
+| `PullMergeStatusGet` | `number`, `expected_base_sha`, `expected_head_sha` | `PullMergeStatus(ApiPullMergeStatus)` |
+| `PullRebaseMerge` | `number`, `expected_base_sha`, `expected_head_sha` | `PullMergeResult(ApiPullMergeResult)` |
 | `CompareGet` | `base`, `head` | `Compare(ApiCompare)` |
 | `PullFiles` | `number`, `page` | `Files(Array[ApiFile])` |
 | `ContentGet` | `path`, `revision` | `Content(ApiSource)` |
@@ -126,6 +128,30 @@ the replacement is ready; expanded commits are revalidated. Failed refreshes
 keep usable content and a retry path. Logout, account changes and expired
 sessions clear the caches. No database migration is required. Deploy the updated
 frontend and backend together using the existing combined build.
+## Merge status and rebase merge
+
+`PullMergeStatusGet` requires the current authenticated session, reads the current
+PR state and requires its base/head SHAs to match the displayed snapshot. It returns open, draft and merged flags, GitHub's
+optional `mergeable` and `rebaseable` values, `mergeable_state`, and CI details
+for the pinned head commit. A mismatch returns `pull_snapshot_changed` (409).
+
+CI combines paginated Check Runs and combined Commit Statuses. Each entry records
+its name, normalized state (`Success`, `Pending`, `Failure` or `Neutral`),
+description, optional HTTP(S) details URL and source. The aggregate priority is
+Failure, Pending, Success, then Neutral; no reported checks produce no summary.
+The two sources fail independently, so available data is still returned with an
+explicit `ci_warnings` entry when one cannot be read. Each source is capped at
+100 pages of 100 entries.
+
+`PullRebaseMerge` is an authenticated write and uses the same Origin/CSRF checks
+as other mutations. The backend re-reads the PR, rejects changed snapshots,
+closed, merged or draft PRs, and unknown or false mergeability, then calls
+GitHub's merge endpoint with the expected head SHA and `merge_method: "rebase"`.
+The typed result contains `merged`, optional merge commit `sha`, and `message`.
+Stable errors distinguish expired authentication, permission denial, repository
+rules, conflicts, changed snapshots, rejected merges, rate limits and upstream
+failures. The frontend never auto-submits a merge; it only polls pending status
+after 2, 4, 8, 16, 30 and 30 seconds and refreshes on page reactivation.
 
 ## Viewed synchronization
 

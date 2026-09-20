@@ -97,11 +97,14 @@ npm run dev
 [设备授权协议](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token-for-a-github-app)
 和[令牌刷新协议](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens#refreshing-a-user-access-token-with-a-refresh-token)。
 
-配置仓库权限：Contents 读写、Pull requests 读写，以及 GitHub 要求的 Metadata 权限。
-Contents 写权限用于[删除提交评论](https://docs.github.com/en/rest/commits/comments#delete-a-commit-comment)；
+配置仓库权限：Contents 读写、Pull requests 读写、Checks 只读、Commit statuses 只读，
+以及 GitHub 要求的 Metadata 权限。
+Contents 写权限用于[删除提交评论](https://docs.github.com/en/rest/commits/comments#delete-a-commit-comment)和 rebase 合并；
 Pull requests 写权限也用于
 [PR 讨论区评论](https://docs.github.com/en/rest/issues/comments#create-an-issue-comment)。
-App 权限发生变化后，已有安装需要接受新的权限。将 App 安装到用户需要审阅的仓库。
+Checks 与 Commit statuses 让合并卡片同时展示两类 GitHub CI 结果；任一读取失败时，
+卡片会明确提示结果不完整。App 配置增加权限后，已有安装必须在 GitHub 中重新授权并接受新权限。
+将 App 安装到用户需要审阅的仓库。
 访问私有仓库和执行写操作还需要登录用户自身具有相应权限。
 此流程不使用 App 私钥或安装访问令牌。
 
