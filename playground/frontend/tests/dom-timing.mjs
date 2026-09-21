@@ -1,5 +1,4 @@
 import { expect } from '@playwright/test';
-import { setTimeout as delay } from 'node:timers/promises';
 
 // Hold selected regional paints without freezing Playwright's actionability
 // frames. The corresponding hook exists only in serve.mjs's temporary bundle.
@@ -40,11 +39,28 @@ export async function holdRegionFrames(page, regions) {
   };
 }
 
-export async function expectPending(operation, label) {
-  // This real-time window deliberately outlasts the helper's first retry. A
-  // resolved/rejected operation must fail while the old DOM is held in place.
-  expect(await Promise.race([
-    operation.then(() => 'completed'),
-    delay(500, 'pending'),
-  ]), label).toBe('pending');
+export function operationCheckpoint(label) {
+  let reached;
+  const checkpoint = new Promise(resolve => { reached = resolve; });
+  let tracked = false;
+  let settled = false;
+  let settledAtCheckpoint;
+  return {
+    track(operation) {
+      if (tracked) throw new Error(`Operation checkpoint is already tracking: ${label}`);
+      tracked = true;
+      operation.then(() => { settled = true; }, () => { settled = true; });
+      return operation;
+    },
+    reach() {
+      if (settledAtCheckpoint !== undefined) return;
+      settledAtCheckpoint = settled;
+      reached();
+    },
+    async expectPending() {
+      if (!tracked) throw new Error(`Operation checkpoint is not tracking: ${label}`);
+      await checkpoint;
+      expect(settledAtCheckpoint, label).toBe(false);
+    },
+  };
 }

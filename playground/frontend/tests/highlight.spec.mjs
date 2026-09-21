@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
-import { expectPending, holdRegionFrames } from "./dom-timing.mjs";
+import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
+import { ensureFileExpanded } from "./file-actions.mjs";
 import { settleRegions } from "../../tests/render-probe.mjs";
 
 const sha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -201,7 +202,7 @@ async function installSources(page, sources = files) {
   return requests;
 }
 
-async function expectOriginalLines(container, layout, old, current) {
+async function expectOriginalLines(container, layout, old, current, checkpoint) {
   expect(["Split", "Unified"], "an explicit target layout is required").toContain(layout);
   const sources = { old: old.split(/\r\n|\r|\n/), new: current.split(/\r\n|\r|\n/) };
   let rows;
@@ -244,6 +245,7 @@ async function expectOriginalLines(container, layout, old, current) {
       }
       return snapshot;
     }, undefined, { timeout: 1_000 });
+    checkpoint?.reach();
     expect(snapshot.connected, "file container was detached").toBe(true);
     expect(snapshot.layouts, "missing diff tables").not.toEqual([]);
     expect(snapshot.layouts, `waiting for ${layout} regional commit`).toEqual(snapshot.layouts.map(() => layout.toLowerCase()));
@@ -286,8 +288,7 @@ for (const rate of [1, 6]) for (const algorithm of ["Token", "Tree"]) {
     await page.getByRole("button", { name: algorithm, exact: true }).click();
     for (const [index, source] of sources.entries()) {
       const file = page.locator(`#moondiff-file-${index}`);
-      const expand = file.getByRole("button", { name: /^Expand / });
-      if (await expand.count()) await expand.click();
+      await ensureFileExpanded(file);
       await expectOriginalLines(file, "Split", source.old, source.new);
     }
     await settleRegions(page);
@@ -304,10 +305,11 @@ for (const rate of [1, 6]) for (const algorithm of ["Token", "Tree"]) {
         for (const index of sources.keys()) {
           await expect(page.locator(`#moondiff-file-${index} table.review-diff`).first()).toHaveClass(new RegExp(`\\b${layout === "Split" ? "unified" : "split"}\\b`));
         }
-        reads = sources.map((source, index) => expectOriginalLines(
-          page.locator(`#moondiff-file-${index}`), layout, source.old, source.new,
-        ));
-        await Promise.all(reads.map((read, index) => expectPending(read, `${sources[index].filename} must wait for ${layout}`)));
+        const checkpoints = sources.map(source => operationCheckpoint(`${source.filename} must wait for ${layout}`));
+        reads = sources.map((source, index) => checkpoints[index].track(expectOriginalLines(
+          page.locator(`#moondiff-file-${index}`), layout, source.old, source.new, checkpoints[index],
+        )));
+        await Promise.all(checkpoints.map(checkpoint => checkpoint.expectPending()));
       } finally {
         await barrier.release();
         if (reads) await Promise.all(reads);
@@ -528,9 +530,7 @@ test("C headers additions deletions and language renames reuse highlights across
   for (let index = 6; index < files.length; index++) {
     const file = page.locator(`#moondiff-file-${index}`);
     await expect(file).toBeVisible();
-    const expand = file.getByRole("button", { name: /^Expand / });
-    if (await expand.count()) await expand.click();
-    await expect(file.locator(".review-diff")).toBeVisible();
+    await ensureFileExpanded(file);
   }
   const count = requests.length;
   const expected = [
@@ -627,9 +627,7 @@ test("YAML extensions additions deletions and renames reuse loaded sources acros
   await page.goto(path);
   for (let index = 0; index < yamlFiles.length; index++) {
     const file = page.locator(`#moondiff-file-${index}`);
-    const expand = file.getByRole("button", { name: /^Expand / });
-    if (await expand.count()) await expand.click();
-    await expect(file.locator(".review-diff")).toBeVisible();
+    await ensureFileExpanded(file);
   }
   const count = requests.length;
   expect(count).toBe(yamlFiles.length * 2 - 2);

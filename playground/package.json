@@ -6,7 +6,7 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "start": "moonrun dist/moondiff-server.wasm",
-    "test:e2e-config": "node --test tests/e2e-config.test.mjs",
+    "test:e2e-config": "node --test tests/e2e-config.test.mjs tests/comment-bundle-pairing.test.mjs",
     "test:e2e": "npm run test:e2e-config && playwright test",
     "test:e2e:stress": "npm run test:e2e-config && playwright test --config playwright.stress.config.mjs",
     "test:e2e:ui": "playwright test --ui",

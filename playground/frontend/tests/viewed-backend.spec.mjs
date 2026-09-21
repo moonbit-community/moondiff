@@ -6,6 +6,7 @@ import { browser, repository } from '../../backend/tests/server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from '../../backend/tests/viewed-fixture.mjs';
 import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
+import { ensureFileExpanded } from './file-actions.mjs';
 
 const test = baseTest.extend({
   backend: async ({ page }, use) => {
@@ -194,9 +195,7 @@ test('special and ordinary filenames support source, inline comments and Viewed 
     await open(page, backend, target);
     for (const [i, path] of repositoryPaths.entries()) {
       const file = card(page, i);
-      const expand = file.getByRole('button', { name: /^Expand / });
-      if (await expand.count()) await expand.click();
-      await expect(file.locator('table')).toBeVisible();
+      await ensureFileExpanded(file);
       const editor = await openInline(page, i);
       await editor.fill(`Comment for file ${i}`);
       await file.getByRole('button', { name: 'Post comment', exact: true }).click();

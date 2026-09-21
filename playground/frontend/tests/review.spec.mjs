@@ -1,7 +1,8 @@
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs';
 import { checkToolbar } from "./toolbar.mjs";
 import { clickLineCommentButton } from "./comment-actions.mjs";
-import { expectPending, holdRegionFrames } from "./dom-timing.mjs";
+import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
 import { settleRegions } from "../../tests/render-probe.mjs";
 import { expect, test } from "@playwright/test";
 
@@ -32,10 +33,15 @@ function reviewPath(target = pullTarget()) {
   return `${root}/pull/${target.number}/commits/${target.sha}`;
 }
 
-async function requestCommentDeletion(card) {
+async function requestCommentDeletion(card, checkpoint) {
   const confirmation = card.getByRole("button", { name: "Confirm delete", exact: true });
+  const actions = card.locator(".comment-delete-actions");
   // A preceding Cancel click can return before its regional DOM commit.
-  await expect(card.locator(".comment-delete-actions")).toHaveCount(0);
+  if (checkpoint) {
+    await expect(actions).toHaveCount(1);
+    checkpoint.reach();
+  }
+  await expect(actions).toHaveCount(0);
   // Source loading can remount a fallback comment inline and discard its menu.
   // Retry only the confirmation request; the caller performs the actual deletion.
   await expect(async () => {
@@ -49,12 +55,18 @@ async function requestCommentDeletion(card) {
   }).toPass({ timeout: 5_000, intervals: [100, 250, 500] });
 }
 
-async function cancelCommentDeletion(card) {
+async function cancelCommentDeletion(card, checkpoint) {
   await card.getByRole("button", { name: "Cancel deletion", exact: true }).click();
-  await expect(card.locator(".comment-delete-actions")).toHaveCount(0);
+  const actions = card.locator(".comment-delete-actions");
+  if (checkpoint) {
+    await expect(actions).toHaveCount(1);
+    checkpoint.reach();
+  }
+  await expect(actions).toHaveCount(0);
 }
 
 async function installApi(page, target = pullTarget(), options = {}) {
+  const commentPairs = createCommentBundlePairs();
   await page.addInitScript(({ target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch }) => {
     let savedAuth = {};
     try {
@@ -363,15 +375,20 @@ async function installApi(page, target = pullTarget(), options = {}) {
     }
     const path = resource.join('/');
     const common = { owner, repo };
-    let message, commentKind, source = false;
+    let message, commentKind, commentTarget, issueGeneration, source = false;
     if (path.startsWith('contents/')) {
       source = true;
       message = { op: 'github.content.get', args: { ...common,
         path: path.slice('contents/'.length).split('/').map(decodeURIComponent).join('/'), ref: url.searchParams.get('ref') } };
     } else if (/^issues\/\d+\/comments$/.test(path)) {
-      commentKind = 'issue_comments'; message = { op: 'github.comments.list', args: target };
+      commentKind = 'issue_comments';
+      commentTarget = { owner, repo, number: path.split('/')[1] };
+      message = { op: 'github.comments.list', args: { ...commentTarget, kind: 'pull' } };
+      issueGeneration = commentPairs.begin(commentTarget);
     } else if (/^pulls\/\d+\/comments$/.test(path)) {
-      commentKind = 'review_comments'; message = { op: 'github.comments.list', args: target };
+      commentKind = 'review_comments';
+      commentTarget = { owner, repo, number: path.split('/')[1] };
+      message = { op: 'github.comments.list', args: { ...commentTarget, kind: 'pull' } };
     } else if (/^commits\/[^/]+\/comments$/.test(path)) {
       commentKind = 'commit_comments'; message = { op: 'github.comments.list', args: target };
     } else if (/^pulls\/\d+\/files$/.test(path)) {
@@ -386,29 +403,32 @@ async function installApi(page, target = pullTarget(), options = {}) {
     } else {
       throw new Error(`Unhandled review fixture GitHub URL ${url}`);
     }
-    const payload = await page.evaluate(async ({ message, commentKind }) => {
-      try {
-        const state = window.__fake;
-        let value;
-        if (commentKind === 'review_comments' && state.publicCommentBundle) {
-          value = state.publicCommentBundle;
-          state.publicCommentBundle = null;
-        } else {
-          value = await window.__dispatch(message);
-          if (commentKind === 'issue_comments') state.publicCommentBundle = value;
+    let payload;
+    try {
+      if (commentKind === 'review_comments') {
+        const value = await commentPairs.consume(commentTarget);
+        payload = { ok: true, value };
+      } else {
+        payload = await page.evaluate(async message => {
+          try { return { ok: true, value: await window.__dispatch(message) }; }
+          catch (error) { return { ok: false, error: { status: error.status || 500, message: error.message } }; }
+        }, message);
+        if (commentKind === 'issue_comments') {
+          if (payload.ok) commentPairs.publish(issueGeneration, payload.value);
+          else commentPairs.cancel(issueGeneration, new Error(payload.error.message));
         }
-        return { ok: true, value: commentKind ? value[commentKind] : value };
-      } catch (error) {
-        return { ok: false, error: { status: error.status || 500, message: error.message } };
       }
-    }, { message, commentKind });
+    } catch (error) {
+      if (issueGeneration) commentPairs.cancel(issueGeneration, error);
+      payload = { ok: false, error: { status: 500, message: `Review fixture comment pairing failed: ${error.message}` } };
+    }
     const headers = { 'Access-Control-Allow-Origin': '*' };
     if (!payload.ok) {
       await route.fulfill({ status: payload.error.status, json: { message: payload.error.message }, headers }).catch(() => {});
     } else if (source) {
       await route.fulfill({ body: Buffer.from(payload.value.base64, 'base64'), contentType: 'text/plain', headers }).catch(() => {});
     } else {
-      await route.fulfill({ json: payload.value, headers }).catch(() => {});
+      await route.fulfill({ json: commentKind ? payload.value[commentKind] : payload.value, headers }).catch(() => {});
     }
   });
   await page.route('**/api/**', async route => {
@@ -465,20 +485,33 @@ async function openNewLineComment(page, line) {
 }
 
 async function releaseListAfterLineCommentHover(page, button) {
-  const race = { interruptions: 0 };
+  let complete;
+  let fail;
+  const completed = new Promise((resolve, reject) => {
+    complete = resolve;
+    fail = reject;
+  });
+  completed.catch(() => {});
+  const race = { interruptions: 0, completed };
   const gutter = button.locator("xpath=..");
   // Trigger only after hover, immediately before the click's actionability check.
   await page.addLocatorHandler(button.and(page.locator(".review-gutter:hover > .line-comment-button")), async () => {
-    const before = await gutter.boundingBox();
-    await expect(button).toHaveCSS("opacity", "1");
-    await page.evaluate(() => window.__fake.releaseList());
-    await expect.poll(async () => Math.abs((await gutter.boundingBox()).y - before.y)).toBeGreaterThan(before.height);
-    // Re-hit-test the stationary pointer at the gutter's original coordinates.
-    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
-    await expect.poll(() => button.evaluate(el => el.parentElement.matches(":hover"))).toBe(false);
-    await expect(button).toHaveCSS("opacity", "0");
-    await expect(button).toHaveCSS("pointer-events", "none");
-    race.interruptions += 1;
+    try {
+      const before = await gutter.boundingBox();
+      await expect(button).toHaveCSS("opacity", "1");
+      await page.evaluate(() => window.__fake.releaseList());
+      await expect.poll(async () => Math.abs((await gutter.boundingBox()).y - before.y)).toBeGreaterThan(before.height);
+      // Re-hit-test the stationary pointer at the gutter's original coordinates.
+      await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+      await expect.poll(() => button.evaluate(el => el.parentElement.matches(":hover"))).toBe(false);
+      await expect(button).toHaveCSS("opacity", "0");
+      await expect(button).toHaveCSS("pointer-events", "none");
+      race.interruptions += 1;
+      complete();
+    } catch (error) {
+      fail(error);
+      throw error;
+    }
   }, { times: 1, noWaitAfter: true });
   return race;
 }
@@ -510,6 +543,7 @@ for (const phase of ["initial comment load", "background refresh"]) {
           .getByRole("button", { name: "Comment on line 2", exact: true });
         const race = await releaseListAfterLineCommentHover(page, button);
         await clickLineCommentButton(button);
+        await race.completed;
         expect(race.interruptions).toBe(1);
         const row = file.locator(".inline-comment-editor-row");
         const editor = row.locator("textarea");
@@ -697,15 +731,11 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
     document.dispatchEvent(new Event("visibilitychange"));
     dispatchEvent(new Event("focus"));
   });
-  await page.waitForTimeout(50);
-  expect(await page.evaluate(() => ({
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect.poll(() => page.evaluate(() => ({
     auth: window.__fake.calls.filter(call => call.op === "auth.status").length,
     comments: window.__fake.commentListCalls,
-  }))).toEqual({ auth: before.auth + 1, comments: before.comments + 1 });
-
-  const beforeManual = await page.evaluate(() => window.__fake.commentListCalls);
-  await page.getByRole("button", { name: "Refresh" }).click();
-  await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(beforeManual);
+  }))).toEqual({ auth: before.auth + 1, comments: before.comments + 2 });
 
   await page.getByRole("button", { name: "Unified" }).click();
   await expect(page.locator("table.unified.review-diff")).toBeVisible();
@@ -1236,16 +1266,20 @@ for (const rate of [1, 6]) for (const layout of ["Split", "Unified"]) {
     // Exercise both the cancel helper and a caller that only awaited the click.
     for (const useHelper of [true, false]) {
       const barrier = await holdRegionFrames(page, ["file:src/main.mbt"]);
-      let cancellation, reopening;
+      let cancellation, reopening, checkpoint;
       try {
-        if (useHelper) cancellation = cancelCommentDeletion(card);
+        if (useHelper) {
+          checkpoint = operationCheckpoint("cancellation must wait for its DOM commit");
+          cancellation = checkpoint.track(cancelCommentDeletion(card, checkpoint));
+        }
         else await card.getByRole("button", { name: "Cancel deletion", exact: true }).click();
         await barrier.blocked();
         await expect(card.getByRole("button", { name: "Confirm delete", exact: true })).toBeVisible();
-        if (cancellation) await expectPending(cancellation, "cancellation must wait for its DOM commit");
+        if (cancellation) await checkpoint.expectPending();
         else {
-          reopening = requestCommentDeletion(card);
-          await expectPending(reopening, "the old confirmation cannot satisfy a new deletion request");
+          checkpoint = operationCheckpoint("the old confirmation cannot satisfy a new deletion request");
+          reopening = checkpoint.track(requestCommentDeletion(card, checkpoint));
+          await checkpoint.expectPending();
           await expect(card.getByRole("menu")).toBeHidden();
         }
         expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith(".comment.delete")).length)).toBe(0);
@@ -1551,6 +1585,7 @@ test("one draft survives repeated clicks and every entry switch while posting", 
   await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
   const race = await releaseListAfterLineCommentHover(page, newLineCommentButton(page, 2));
   await openNewLineComment(page, 2);
+  await race.completed;
   expect(race.interruptions).toBe(1);
   await expect(page.locator(".comment-editor")).toHaveCount(1);
   await expect(page.locator(".comment-editor textarea")).toHaveAttribute("data-draft-id", inlineDraftId);
