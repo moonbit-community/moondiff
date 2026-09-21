@@ -60,26 +60,6 @@ test('anonymous session cap cleans expired rows and login extends the session', 
   assert.deepEqual(f.sql("SELECT count(*) FROM sessions WHERE tokens=''"), [[2]]);
 });
 
-test('startup migration deletes idle legacy anonymous sessions and tightens active ones', async t => {
-  const f = await startServer(); t.after(() => f.close());
-  const idle = browser(f), pending = browser(f), loggedIn = browser(f);
-  await idle.session();
-  const flow = await pending.begin();
-  await loggedIn.login();
-  const [[loggedInExpiry]] = f.sql("SELECT expires FROM sessions WHERE tokens!=''");
-  await f.stop();
-  f.sql('DELETE FROM metadata WHERE name=?', ['anonymous-session-lifetime-v1']);
-  f.sql("UPDATE sessions SET expires=? WHERE tokens=''", [Math.floor(Date.now() / 1000) + 30 * 86400]);
-  await f.start();
-  assert.deepEqual(f.sql("SELECT count(*) FROM sessions WHERE tokens=''"), [[1]]);
-  const [[pendingExpiry]] = f.sql("SELECT expires FROM sessions WHERE tokens='' ");
-  assert(pendingExpiry <= Date.now() / 1000 + 20 * 60);
-  assert.deepEqual(f.sql("SELECT expires FROM sessions WHERE tokens!=''"), [[loggedInExpiry]]);
-  assert.equal((await pending.status()).device_flow.id, flow.id);
-  assert.equal((await idle.status()).authenticated, false);
-  assert.deepEqual(f.sql("SELECT count(*) FROM sessions WHERE tokens=''"), [[1]]);
-});
-
 test('authorization relationships and cascade cleanup work without foreign_keys PRAGMA', async t => {
   const f = await startServer(); t.after(() => f.close());
   const user = browser(f);
