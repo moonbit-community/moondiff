@@ -641,6 +641,7 @@ fn review_thread_view(
 fn auth_controls(
   auth : @application.AuthStatus,
   emit : @rabbita.Emit[Msg],
+  show_install? : Bool = true,
 ) -> @rabbita.Html {
   match auth {
     AuthChecking =>
@@ -655,7 +656,7 @@ fn auth_controls(
           on_click=emit(Auth(StartSignIn)),
           "Sign in with GitHub",
         ),
-        if install_url is Some(url) {
+        if show_install && install_url is Some(url) {
           @html.a(
             href=url,
             target=Blank,

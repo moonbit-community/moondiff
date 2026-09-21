@@ -142,7 +142,7 @@ fn hero_view(
       @html.div(class="hero-controls", [
         @html.div(class="input-panel", commit_form(model, emit)),
         landing_details(),
-        auth_controls(model.auth, emit),
+        auth_controls(model.auth, emit, show_install=false),
         account_menu(model.auth, emit),
       ]),
     ])

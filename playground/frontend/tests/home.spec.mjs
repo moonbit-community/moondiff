@@ -210,6 +210,7 @@ test('mobile dashboard wraps long titles and repositories with working keyboard 
 for (const invalidInput of [false, true]) test(`finishing real device sign-in on the anonymous homepage immediately shows the dashboard${invalidInput ? ' after an invalid landing URL' : ''}`, async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#commit-url')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Install GitHub App/u })).toHaveCount(0);
   if (invalidInput) {
     await page.locator('#commit-url').fill('https://example.com/not-github');
     await page.getByRole('button', { name: 'View diff' }).click();
