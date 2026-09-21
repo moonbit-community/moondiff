@@ -116,10 +116,10 @@ fn device_poll_request(
   guard model.auth is Authorizing(flow, _) else { return @rabbita.none }
   device_request(
     model,
-    if flow.phase == @protocol.DevicePhase::Starting {
-      @github_client.Retry
+    if flow.phase == Starting {
+      Retry
     } else {
-      @github_client.Poll
+      Poll
     },
     flow.id,
     flow.retry_after,

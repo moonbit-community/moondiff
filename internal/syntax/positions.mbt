@@ -105,7 +105,7 @@ fn split_word_parts(content : String) -> Array[WordPart] {
     kind = word_part_kind(chars[i])
     i += 1
   }
-  parts.push(WordPart::{
+  parts.push({
     text: string_slice(chars, start, chars.length()),
     start,
     end_: chars.length(),
@@ -167,18 +167,8 @@ fn first_line_padding_for_content(
   }
   let extra = token_display_width(positions) - content.length()
   match node {
-    Syntax::Atom(kind=AtomKind::String(StringKind::StringLiteral), ..) =>
-      if extra >= 2 {
-        1
-      } else {
-        0
-      }
-    Syntax::Atom(kind=AtomKind::Comment, ..) =>
-      if extra > 0 {
-        extra
-      } else {
-        0
-      }
+    Atom(kind=String(StringLiteral), ..) => if extra >= 2 { 1 } else { 0 }
+    Atom(kind=Comment, ..) => if extra > 0 { extra } else { 0 }
     _ => 0
   }
 }
@@ -314,19 +304,17 @@ fn split_replaced_atom_positions(
   budget : @computation.ScopeBudget,
 ) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
   let (self_node, opposite_node) = match change {
-    ChangeKind::ReplacedComment(lhs~, rhs~) => (lhs, rhs)
-    ChangeKind::ReplacedString(lhs~, rhs~) => (lhs, rhs)
+    ReplacedComment(lhs~, rhs~) => (lhs, rhs)
+    ReplacedString(lhs~, rhs~) => (lhs, rhs)
     _ => panic()
   }
 
   let (self_content, self_pos) = match self_node {
-    Syntax::Atom(content~, position~, ..) =>
-      (content, filter_empty_ends(position))
+    Atom(content~, position~, ..) => (content, filter_empty_ends(position))
     _ => return whole_novel_positions(positions)
   }
   let (opposite_content, opposite_pos) = match opposite_node {
-    Syntax::Atom(content~, position~, ..) =>
-      (content, filter_empty_ends(position))
+    Atom(content~, position~, ..) => (content, filter_empty_ends(position))
     _ => return whole_novel_positions(positions)
   }
   if self_pos.length() == 0 || opposite_pos.length() == 0 {
@@ -422,10 +410,10 @@ fn opposite_positions_for(
   is_close_delim : Bool,
 ) -> Array[@span.SingleLineSpan] {
   match change {
-    ChangeKind::Unchanged(opposite) =>
+    Unchanged(opposite) =>
       match opposite {
-        Syntax::Atom(position~, ..) => filter_empty_ends(position)
-        Syntax::List(open_position~, close_position~, ..) =>
+        Atom(position~, ..) => filter_empty_ends(position)
+        List(open_position~, close_position~, ..) =>
           if is_close_delim {
             filter_empty_ends(close_position)
           } else {
@@ -445,10 +433,10 @@ fn matched_positions_for(
 ) -> Array[MatchedPos] raise @computation.ScopeLimitExceeded {
   let positions = filter_empty_ends(positions)
   match change {
-    ChangeKind::Novel => whole_novel_positions(positions)
-    ChangeKind::ReplacedComment(..) | ChangeKind::ReplacedString(..) =>
+    Novel => whole_novel_positions(positions)
+    ReplacedComment(..) | ReplacedString(..) =>
       split_replaced_atom_positions(change, positions, budget)
-    ChangeKind::Unchanged(_) => {
+    Unchanged(_) => {
       let opposite_pos = opposite_positions_for(change, is_close_delim)
       unchanged_positions(positions, opposite_pos)
     }
@@ -465,11 +453,11 @@ fn change_positions_impl(
   fn walk(node : Syntax) -> Unit raise @computation.ScopeLimitExceeded {
     let change = change_map.get(node).unwrap_or_else(() => panic())
     match node {
-      Syntax::Atom(position~, ..) =>
+      Atom(position~, ..) =>
         positions.push_iter(
           matched_positions_for(change, position, false, budget).iter(),
         )
-      Syntax::List(open_position~, children~, close_position~, ..) => {
+      List(open_position~, children~, close_position~, ..) => {
         positions.push_iter(
           matched_positions_for(change, open_position, false, budget).iter(),
         )

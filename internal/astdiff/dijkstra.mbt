@@ -22,7 +22,7 @@ fn shortest_vertex_path(
   // PriorityQueue is a max-heap. Ensure nodes are wrapped with
   // @cmp.Reverse to flip comparisons.
   let heap = PriorityQueue([])
-  heap.push(WeightedVertex::{ vertex: start, distance: @cmp.Reverse(0), })
+  heap.push(WeightedVertex::{ vertex: start, distance: Reverse(0), })
   let seen = HashMap([], capacity=size_hint)
   let end : Vertex = for top = heap.pop() {
     match top {
@@ -43,10 +43,7 @@ fn shortest_vertex_path(
           }
           if found_shorter_route {
             next.predecessor.update(_ => Some((distance_to_next, current)))
-            heap.push(WeightedVertex::{
-              vertex: next,
-              distance: @cmp.Reverse(distance_to_next),
-            })
+            heap.push({ vertex: next, distance: Reverse(distance_to_next), })
           }
         }
         continue heap.pop()

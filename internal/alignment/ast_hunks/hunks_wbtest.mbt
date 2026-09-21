@@ -2,7 +2,7 @@
 
 ///|UUID(d7228f90-8748-409c-85dc-e7e69ec96c77)
 fn whole_line_span(line : Int, text : String) -> @span.SingleLineSpan {
-  @span.SingleLineSpan::{ line, start_col: 1, end_col: text.length() + 1, }
+  { line, start_col: 1, end_col: text.length() + 1, }
 }
 
 ///|UUID(18960ac7-e004-469c-be30-f51141e1a28f)
@@ -12,20 +12,15 @@ fn unchanged_line(
   opposite_line : Int,
   opposite_text : String,
 ) -> @syntax.MatchedPos {
-  @syntax.MatchedPos::{
-    kind: @syntax.MatchKind::Unchanged(opposite_pos=[
-      whole_line_span(opposite_line, opposite_text),
-    ]),
+  {
+    kind: Unchanged(opposite_pos=[whole_line_span(opposite_line, opposite_text)]),
     pos: whole_line_span(line, text),
   }
 }
 
 ///|UUID(44fd5ac8-40bb-4819-93a8-73cb1f179e1f)
 fn novel_span(line : Int, start_col : Int, end_col : Int) -> @syntax.MatchedPos {
-  @syntax.MatchedPos::{
-    kind: @syntax.MatchKind::Novel,
-    pos: @span.SingleLineSpan::{ line, start_col, end_col, },
-  }
+  { kind: Novel, pos: { line, start_col, end_col, }, }
 }
 
 ///|UUID(afd77686-8cd9-4975-809d-0c95062a6301)

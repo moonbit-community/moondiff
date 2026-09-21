@@ -92,7 +92,7 @@ test "default and explicit AST modes are identical" {
   let explicit_result = @mbtdiff.diff(
     old_source,
     new_source,
-    options=DiffOptions(mode=@mbtdiff.DiffMode::Ast),
+    options=DiffOptions(mode=Ast),
   )
   assert_true(default_result.status() == explicit_result.status())
   assert_true(default_result.document() == explicit_result.document())
@@ -215,7 +215,7 @@ test "lexical mode keeps fragment-local text changes" {
   let lexical = @mbtdiff.diff(
     old_source,
     new_source,
-    options=DiffOptions(graph_limit=0, mode=@mbtdiff.DiffMode::Lexical),
+    options=DiffOptions(graph_limit=0, mode=Lexical),
   )
   assert_true(lexical.status() is Changed)
   assert_false(public_document_is_empty(lexical.document()))
@@ -224,7 +224,7 @@ test "lexical mode keeps fragment-local text changes" {
   let reordered = @mbtdiff.diff(
     "fn first() {}\nfn second() {}",
     "fn second() {}\nfn first() {}",
-    options=DiffOptions(mode=@mbtdiff.DiffMode::Lexical),
+    options=DiffOptions(mode=Lexical),
   )
   assert_true(reordered.status() is Reordered)
   guard reordered.document() is TopLevel(top) else {
@@ -273,7 +273,7 @@ test "sectioned lexical mode ignores context_lines and returns full declarations
     let result = @mbtdiff.diff(
       old_source,
       new_source,
-      options=DiffOptions(context_lines~, mode=@mbtdiff.DiffMode::Lexical),
+      options=DiffOptions(context_lines~, mode=Lexical),
     )
     guard result.document()
       is TopLevel({ sections: [Matched(old~, new~, diff~, ..)], .. }) else {
@@ -291,7 +291,7 @@ test "sectioned lexical mode ignores context_lines and returns full declarations
 
 ///|
 test "comment and test filters classify IgnoredOnly" {
-  for mode in [@mbtdiff.DiffMode::Ast, @mbtdiff.DiffMode::Lexical] {
+  for mode in [@mbtdiff.DiffMode::Ast, Lexical] {
     let comments = @mbtdiff.diff(
       "fn f() { 1 // old\n}",
       "fn f() { 1 // new\n}",

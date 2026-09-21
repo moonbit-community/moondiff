@@ -9,7 +9,7 @@ fn App::cookie_name(self : App) -> String {
 
 ///|
 fn App::cookie(self : App, value : String) -> @http.Cookie {
-  @http.Cookie(
+  Cookie(
     self.cookie_name(),
     value,
     path="/",

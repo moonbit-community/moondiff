@@ -3,7 +3,7 @@ using @syntax {type ChangeMap, type Syntax}
 
 ///|UUID(07773283-18ef-444e-8074-3b5ae7c18565)
 fn pos(line : Int) -> Array[@span.SingleLineSpan] {
-  [@span.SingleLineSpan::{ line, start_col: 0, end_col: 1, }]
+  [{ line, start_col: 0, end_col: 1, }]
 }
 
 ///|
@@ -12,7 +12,7 @@ fn test_budget() -> @computation.ScopeBudget {
 }
 
 ///|
-fn[T] expect_within_limit(result : GraphLimitResult[T]) -> T {
+fn[T] expect_within_limit(result : @astdiff.GraphLimitResult[T]) -> T {
   match result {
     WithinLimit(value) => value
     GraphLimitExceeded => panic()
@@ -24,9 +24,9 @@ test "identical atoms" {
   let lhs = Syntax::atom(content="foo", position=pos(0), kind=Normal)
   let rhs = Syntax::atom(content="foo", position=pos(0), kind=Normal)
   @syntax.init_all_info([lhs], [rhs])
-  let start = Vertex::new(lhs=Some(lhs), rhs=Some(rhs))
+  let start = @astdiff.Vertex::new(lhs=Some(lhs), rhs=Some(rhs))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
@@ -55,9 +55,9 @@ test "extra atom lhs" {
     ),
   ]
   @syntax.init_all_info(lhs, rhs)
-  let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
+  let start = @astdiff.Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
@@ -89,9 +89,9 @@ test "repeated atoms" {
     ),
   ]
   @syntax.init_all_info(lhs, rhs)
-  let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
+  let start = @astdiff.Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
@@ -139,9 +139,9 @@ test "atom after empty list" {
     ),
   ]
   @syntax.init_all_info(lhs, rhs)
-  let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
+  let start = @astdiff.Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(
@@ -164,9 +164,9 @@ test "replace similar comment" {
     Syntax::atom(content="the quick brown cat", position=pos(1), kind=Comment),
   ]
   @syntax.init_all_info(lhs, rhs)
-  let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
+  let start = @astdiff.Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(actions is [ReplacedComment(levenshtein_pct=84)])
@@ -179,9 +179,9 @@ test "replace very different comment" {
   ]
   let rhs = [Syntax::atom(content="foo bar", position=pos(1), kind=Comment)]
   @syntax.init_all_info(lhs, rhs)
-  let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
+  let start = @astdiff.Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(actions is [ReplacedComment(levenshtein_pct=11)])
@@ -197,9 +197,9 @@ test "replace comment prefer most similar" {
     Syntax::atom(content="the quick brown fox.", position=pos(1), kind=Comment),
   ]
   @syntax.init_all_info(lhs, rhs)
-  let start = Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
+  let start = @astdiff.Vertex::new(lhs=lhs.get(0), rhs=rhs.get(0))
   let route = expect_within_limit(
-    shortest_path_with_budget(start, 0, 3000000, test_budget()),
+    @astdiff.shortest_path_with_budget(start, 0, 3000000, test_budget()),
   )
   let actions = route.iter().map(pair => pair.0).collect()
   assert_true(actions is [ReplacedComment(levenshtein_pct=95), NovelAtomLHS])
@@ -212,7 +212,7 @@ test "mark syntax equal atoms" {
   @syntax.init_all_info([lhs], [rhs])
   let change_map = ChangeMap::new()
   expect_within_limit(
-    mark_syntax_roots_with_budget(
+    @astdiff.mark_syntax_roots_with_budget(
       [lhs],
       [rhs],
       change_map,
@@ -231,7 +231,7 @@ test "mark syntax different atoms" {
   @syntax.init_all_info([lhs], [rhs])
   let change_map = ChangeMap::new()
   expect_within_limit(
-    mark_syntax_roots_with_budget(
+    @astdiff.mark_syntax_roots_with_budget(
       [lhs],
       [rhs],
       change_map,
@@ -259,7 +259,13 @@ test "mark syntax roots handles multiple changed roots around an unchanged ancho
   let change_map = ChangeMap::new()
 
   expect_within_limit(
-    mark_syntax_roots_with_budget(lhs, rhs, change_map, 3000000, test_budget()),
+    @astdiff.mark_syntax_roots_with_budget(
+      lhs,
+      rhs,
+      change_map,
+      3000000,
+      test_budget(),
+    ),
   )
 
   assert_true(change_map.get(lhs[1]) is Some(Unchanged(_)))
@@ -277,7 +283,7 @@ test "mark syntax reports graph limit explicitly" {
   @syntax.init_all_info([lhs], [rhs])
   let change_map = ChangeMap::new()
 
-  let result = mark_syntax_roots_with_budget(
+  let result = @astdiff.mark_syntax_roots_with_budget(
     [lhs],
     [rhs],
     change_map,

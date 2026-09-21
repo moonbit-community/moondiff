@@ -444,9 +444,9 @@ fn impl_tail_delegate(
     }
     expression.bind(fn(expression) {
       if direct_function_delegate(source, expression) is Some(target) {
-        Some(ImplTailDelegate::{ target, through_self: false, })
+        Some({ target, through_self: false, })
       } else if direct_self_delegate(source, expression) is Some(target) {
-        Some(ImplTailDelegate::{ target, through_self: true, })
+        Some({ target, through_self: true, })
       } else {
         None
       }

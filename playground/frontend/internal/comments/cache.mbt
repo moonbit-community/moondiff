@@ -11,12 +11,7 @@ priv enum CacheChange {
 fn merge_cache(session : Session, change : CacheChange) -> Session {
   let current = match session.comments {
     CommentsReady(bundle) => copy_bundle(bundle)
-    _ =>
-      ApiCommentBundle::{
-        issue_comments: [],
-        review_comments: [],
-        commit_comments: [],
-      }
+    _ => { issue_comments: [], review_comments: [], commit_comments: [], }
   }
   match change {
     Received(bundle, snapshot) => {

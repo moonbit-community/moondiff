@@ -71,10 +71,10 @@ fn prepare_discussions(
   }
   let patch = file
     .map(file => canonical_patch(cache, file))
-    .unwrap_or(@review.NotCommentable)
+    .unwrap_or(NotCommentable)
   for thread in @comments.file_threads(review.group, file_index, patch) {
     let root = thread.root
-    let side : @review.ReviewSide = if root.side == Some(@protocol.Left) {
+    let side : @review.ReviewSide = if root.side == Some(Left) {
       Left
     } else {
       Right

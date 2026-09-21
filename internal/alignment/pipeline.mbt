@@ -105,28 +105,22 @@ fn whole_document(
   document : @model.HunkDocument,
   fallback? : FallbackReason,
 ) -> DiffDocument {
-  @model.DiffDocument::Whole(diff_fragment(document, fallback))
+  Whole(diff_fragment(document, fallback))
 }
 
 ///|
 fn section_from_edit(edit : ImplEdit, diff : DiffFragment) -> DiffSection {
   match edit {
     Replace(old~, new~) =>
-      @model.DiffSection::Matched(
+      Matched(
         old=old.range,
         new=new.range,
         old_context=old.context,
         new_context=new.context,
         diff~,
       )
-    Delete(old) =>
-      @model.DiffSection::Deleted(old=old.range, old_context=old.context, diff~)
-    Insert(new) =>
-      @model.DiffSection::Inserted(
-        new=new.range,
-        new_context=new.context,
-        diff~,
-      )
+    Delete(old) => Deleted(old=old.range, old_context=old.context, diff~)
+    Insert(new) => Inserted(new=new.range, new_context=new.context, diff~)
   }
 }
 
@@ -149,7 +143,7 @@ fn top_level_result(
     NoStructuralChanges
   }
   {
-    document: @model.DiffDocument::TopLevel({
+    document: TopLevel({
       sections: sections[:],
       old_order: plan.old_order[:],
       new_order: plan.new_order[:],
@@ -269,7 +263,7 @@ fn calculate_diff_document_with_scope_limit(
     pipeline.budget,
     ignore_uuid=ignore_comments,
   ) catch {
-    @computation.ScopeLimitExceeded(stage~, limit~) =>
+    ScopeLimitExceeded(stage~, limit~) =>
       return whole_file_fallback(
         pipeline,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),

@@ -187,7 +187,7 @@ fn region_component(
         "region-lifetime",
         Local,
         Lifetime(coordinator, mount),
-        @sub.SubLoader(lifetime_loader),
+        SubLoader(lifetime_loader),
       )
     },
   )
@@ -229,7 +229,7 @@ fn region_component(
         }),
       ),
     )
-    @view.MountHost::{ region, id: mount.host, }
+    { region, id: mount.host, }
   })
 }
 

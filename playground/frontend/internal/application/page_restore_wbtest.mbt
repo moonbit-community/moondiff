@@ -40,7 +40,7 @@ test "page restoration keeps loaded content collapse choices and current account
       ..view.files[0],
       expanded: false,
       old_side: side,
-      new_side: @change.Loading,
+      new_side: Loading,
       collapsed_sections: ["section"],
     }
     let before = with_phase(base, Showing(set_file_state(view, 0, file)))
@@ -96,7 +96,7 @@ test "failed restoration retains its marker until a later status or login succee
             ..status,
             device_flow: pending_api_status("attempt").device_flow.map(flow => {
               ..flow,
-              phase: @protocol.DevicePhase::Completed,
+              phase: Completed,
             }),
           },
         }),
@@ -219,7 +219,7 @@ test "device start failures back off without replacing the attempt or auth revis
       ).0
     guard next.auth is Authorizing(flow, _) else { fail("retrying") }
     assert_eq(flow.id, "attempt")
-    assert_true(flow.phase is @protocol.Starting)
+    assert_true(flow.phase is Starting)
     assert_eq(flow.retry_after, delay)
     assert_eq(next.auth_revision, initial.auth_revision)
     continue next

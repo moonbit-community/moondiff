@@ -49,7 +49,7 @@ pub struct SyntaxInfo {
 
 ///|UUID(2204ecdf-1b80-4a4d-b16d-f52f9c7f4a08)
 pub fn SyntaxInfo::new() -> Self {
-  SyntaxInfo::{
+  {
     previous_sibling: None,
     next_sibling: None,
     prev: None,
@@ -91,7 +91,7 @@ pub enum Syntax {
 }
 
 ///|UUID(bec402de-e38b-45ca-9ae4-48b52e8ac3c7)
-let default_syntax_atom : Syntax = Syntax::Atom(
+let default_syntax_atom : Syntax = Atom(
   info=Default::default(),
   content="",
   position=[],
@@ -157,7 +157,7 @@ pub fn Syntax::list(
       Atom(..) => num_descendants += 1
     }
   }
-  Syntax::List(
+  List(
     info=Default::default(),
     kind~,
     open_position~,
@@ -196,7 +196,7 @@ pub fn Syntax::atom(
   position~ : Array[SingleLineSpan],
   kind~ : AtomKind,
 ) -> Self {
-  Syntax::Atom(info=Default::default(), position~, content~, kind~)
+  Atom(info=Default::default(), position~, content~, kind~)
 }
 
 ///|UUID(d98843b3-75e9-4a9a-8a4c-9f21308b9dca)

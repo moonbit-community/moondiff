@@ -187,7 +187,7 @@ fn fallback_test_unit(
   start_line : Int,
   position_line : Int,
 ) -> ImplUnit {
-  ImplUnit::{
+  {
     root: @syntax.Syntax::atom(
       content=source,
       position=[

@@ -21,7 +21,7 @@ fn parsed_item(source : String) -> @cst.CstNode raise {
 
 ///|
 fn list_kind_test_atom() -> Syntax {
-  Syntax::atom(content="item", position=[], kind=@syntax.AtomKind::Normal)
+  Syntax::atom(content="item", position=[], kind=Normal)
 }
 
 ///|
@@ -41,9 +41,9 @@ test "ListKind preserves exact NodeKind equality" {
   let function_node = parsed_item("fn f { () }")
   let same_function_node = parsed_item("fn g { () }")
   let let_node = parsed_item("let value = 1")
-  assert_true(function_node.kind is @cst.Impl_Function)
-  assert_true(same_function_node.kind is @cst.Impl_Function)
-  assert_true(let_node.kind is @cst.Impl_Let)
+  assert_true(function_node.kind is Impl_Function)
+  assert_true(same_function_node.kind is Impl_Function)
+  assert_true(let_node.kind is Impl_Let)
   let function_kind = list_kind(function_node.kind)
   let same_function_kind = list_kind(same_function_node.kind)
   let let_kind = list_kind(let_node.kind)
@@ -73,7 +73,7 @@ test "only anonymous delimiter-free single-child lists collapse" {
     close_position=[],
     kind=function_kind,
   )
-  guard identified is Syntax::List(kind=Some(actual_kind), children~, ..) else {
+  guard identified is List(kind=Some(actual_kind), children~, ..) else {
     fail("expected a list with an explicit kind")
   }
   assert_true(actual_kind == function_kind)
@@ -84,7 +84,7 @@ test "only anonymous delimiter-free single-child lists collapse" {
     children=[list_kind_test_atom()],
     close_position=[],
   )
-  guard anonymous is Syntax::Atom(content="item", ..) else {
+  guard anonymous is Atom(content="item", ..) else {
     fail("expected an anonymous list to collapse to its only child")
   }
 }

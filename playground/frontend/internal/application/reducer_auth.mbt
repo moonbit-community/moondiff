@@ -106,7 +106,7 @@ fn update_auth(
         { ..model, auth_revision: model.auth_revision + 1, },
         Authorizing(starting_device(id), ""),
       )
-      (next, device_request(next, @github_client.Start, id, 0, emit))
+      (next, device_request(next, Start, id, 0, emit))
     }
     DeviceUpdated(revision, id, starting, result) => {
       guard revision == model.auth_revision &&
@@ -164,7 +164,7 @@ fn update_auth(
       )
       (
         next,
-        @github_client.auth_device_request(@github_client.Cancel, id, 0, result => {
+        @github_client.auth_device_request(Cancel, id, 0, result => {
           emit(Auth(DeviceCancelFinished(revision, id, result)))
         }),
       )

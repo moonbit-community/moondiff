@@ -266,8 +266,8 @@ fn ast_should_render_as_block_replacement(
   segment : ArrayView[(Int?, Int?)],
   hunk : @ast_hunks.AstHunk,
 ) -> Bool {
-  let lhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
-  let rhs_lines : @hashmap.HashMap[Int, Bool] = @hashmap.HashMap([])
+  let lhs_lines : @hashmap.HashMap[Int, Bool] = HashMap([])
+  let rhs_lines : @hashmap.HashMap[Int, Bool] = HashMap([])
   let mut all_present_sides_are_novel = true
   for pair in segment {
     let lhs_novel = ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs)

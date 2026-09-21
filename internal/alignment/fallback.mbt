@@ -1,9 +1,9 @@
 ///|
 fn computation_stage(stage : @computation.Stage) -> ComputationStage {
   match stage {
-    @computation.TopLevelAlignment => TopLevelAlignment
-    @computation.SyntaxMatching => SyntaxMatching
-    @computation.IntralineMatching => IntralineMatching
+    TopLevelAlignment => TopLevelAlignment
+    SyntaxMatching => SyntaxMatching
+    IntralineMatching => IntralineMatching
   }
 }
 
@@ -19,7 +19,7 @@ fn detailed_ast_edit_document(
     pipeline,
     !pipeline.ignore_comments,
   ) catch {
-    @computation.ScopeLimitExceeded(stage~, limit~) => {
+    ScopeLimitExceeded(stage~, limit~) => {
       let reason : FallbackReason = ComputationLimitExceeded(
         stage=computation_stage(stage),
         limit~,
@@ -92,7 +92,7 @@ fn detailed_ast_root_list_document(
     pipeline,
     !pipeline.ignore_comments,
   ) catch {
-    @computation.ScopeLimitExceeded(stage~, limit~) =>
+    ScopeLimitExceeded(stage~, limit~) =>
       return whole_file_fallback(
         pipeline,
         ComputationLimitExceeded(stage=computation_stage(stage), limit~),

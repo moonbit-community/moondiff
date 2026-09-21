@@ -202,10 +202,10 @@ pub fn RegionProjection::inputs(
   if home_shell(model) {
     self.tree = None
     self.overall = None
-    return [(@application.Home, Home(model.auth, model.home))]
+    return [(Home, Home(model.auth, model.home))]
   }
   let inputs : Array[(@application.Region, RegionInput)] = [
-    (@application.Toolbar, Toolbar(toolbar_input(model))),
+    (Toolbar, Toolbar(toolbar_input(model))),
   ]
   guard model.phase is Showing(view) else {
     self.tree = None
@@ -232,7 +232,7 @@ pub fn RegionProjection::inputs(
         Loading("Checking that the pull request stayed unchanged…")
       Showing(_) => Empty
     }
-    inputs.push((@application.Status, Status(status)))
+    inputs.push((Status, Status(status)))
     return inputs
   }
   let metadata = view.files.map(f => TreeMetadata::{
@@ -261,7 +261,7 @@ pub fn RegionProjection::inputs(
   let is_pull = view.reference.target is PullRequest(_)
   inputs.push(
     (
-      @application.FileTree,
+      FileTree,
       FileTree({
         generation: model.generation,
         tree,
@@ -274,17 +274,14 @@ pub fn RegionProjection::inputs(
   for index, file in view.files {
     let input = file_input(is_pull, model, index, file)
     enabled = enabled || input.navigation_enabled
-    inputs.push((@application.File(file.file.filename), File(input)))
+    inputs.push((File(file.file.filename), File(input)))
   }
   inputs.push(
-    (
-      @application.Navigation,
-      Navigation({ generation: model.generation, enabled, }),
-    ),
+    (Navigation, Navigation({ generation: model.generation, enabled, })),
   )
   inputs.push(
     (
-      @application.ViewedSummary,
+      ViewedSummary,
       ViewedSummary(viewed_summary_input(is_pull, view.files.length(), model)),
     ),
   )
@@ -304,7 +301,7 @@ pub fn RegionProjection::inputs(
   }
   inputs.push(
     (
-      @application.Discussion,
+      Discussion,
       Discussion({
         is_pull,
         review: model.review.read_view(paths~, group~),
@@ -315,7 +312,7 @@ pub fn RegionProjection::inputs(
   if is_pull {
     inputs.push(
       (
-        @application.PullMergeStatus,
+        PullMergeStatus,
         PullMergeStatus({
           state: model.pull_merge,
           auth: model.auth,

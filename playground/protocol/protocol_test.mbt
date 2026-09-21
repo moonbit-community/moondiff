@@ -515,7 +515,7 @@ test "merge requests validate snapshots and preserve read/write classification" 
   assert_true(@protocol.decode_request(status.encode()) == status)
   assert_true(@protocol.decode_request(merge.encode()) == merge)
   let bad_requests : Array[@protocol.GitHubRequest] = [
-    @protocol.GitHubRequest::PullMergeStatusGet({
+    PullMergeStatusGet({
       owner: "alice",
       repo: "repo",
       number: "0",

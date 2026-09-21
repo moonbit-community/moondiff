@@ -263,16 +263,16 @@ fn child_text_or_empty(
 ///|
 fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
   match item.kind {
-    @cst.Impl_Import => {
+    Impl_Import => {
       let kind = child_text_or_empty(source, item, "kind")
       Some("import:\{kind}")
     }
-    @cst.Impl_Extend => {
+    Impl_Extend => {
       let type_name = child_text_or_empty(source, item, "type_name")
       let trait_name = child_text_or_empty(source, item, "trait")
       Some("extend:\{type_name}:\{trait_name}")
     }
-    @cst.Impl_Function => {
+    Impl_Function => {
       let name = labelled_span_text(source, item, "name")
       if first_child_text(source, item, "method") is Some(method_name) {
         let receiver_prefix = if first_child_text(source, item, "op") ==
@@ -288,19 +288,19 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
         name.map(fn(name) { "fn:::\{name}" })
       }
     }
-    @cst.Impl_TypeAbstract
-    | @cst.Impl_TypeAlias
-    | @cst.Impl_RecordStruct
-    | @cst.Impl_TupleStruct
-    | @cst.Impl_EnumVariant
-    | @cst.Impl_ExtensibleEnum
-    | @cst.Impl_ExtendEnum
-    | @cst.Impl_Suberror
-    | @cst.Impl_SuberrorEnum =>
+    Impl_TypeAbstract
+    | Impl_TypeAlias
+    | Impl_RecordStruct
+    | Impl_TupleStruct
+    | Impl_EnumVariant
+    | Impl_ExtensibleEnum
+    | Impl_ExtendEnum
+    | Impl_Suberror
+    | Impl_SuberrorEnum =>
       first_child_text(source, item, "name").map(fn(name) { "type:\{name}" })
-    @cst.Impl_Trait =>
+    Impl_Trait =>
       first_child_text(source, item, "name").map(fn(name) { "trait:\{name}" })
-    @cst.Impl_Let => {
+    Impl_Let => {
       let name = if first_child_text(source, item, "pattern") is Some(name) {
         Some(name)
       } else {
@@ -308,7 +308,7 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
       }
       name.map(fn(name) { "let:\{name}" })
     }
-    @cst.Impl_Const => {
+    Impl_Const => {
       let name = if first_child_text(source, item, "pattern") is Some(name) {
         Some(name)
       } else {
@@ -316,9 +316,9 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
       }
       name.map(fn(name) { "const:\{name}" })
     }
-    @cst.Impl_Test =>
+    Impl_Test =>
       first_child_text(source, item, "name").map(fn(name) { "test:\{name}" })
-    @cst.Impl_ImplMethod | @cst.Impl_ImplRelation => {
+    Impl_ImplMethod | Impl_ImplRelation => {
       let trait_name = labelled_span_text(source, item, "name").unwrap_or("")
       let self_type = child_text_or_empty(source, item, "type")
       if first_child_text(source, item, "method") is Some(method_text) {
@@ -331,12 +331,12 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
         Some("impl:\{self_type}:\{trait_name}")
       }
     }
-    @cst.Impl_EnumView => {
+    Impl_EnumView => {
       let name = labelled_span_text(source, item, "name").unwrap_or("")
       let method_name = child_text_or_empty(source, item, "method")
       Some("view:\{name}:\{method_name}")
     }
-    @cst.Impl_Using => {
+    Impl_Using => {
       let package_name = child_text_or_empty(source, item, "name")
       let body = child_text_or_empty(source, item, "body")
       Some("using:\{package_name}:\{body}")
@@ -348,7 +348,7 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
 ///|
 fn root_child_is_visible(source : String, node : @cst.CstNode) -> Bool {
   match node.kind {
-    @cst.Syntax_Eof | @cst.Missing => false
+    Syntax_Eof | Missing => false
     _ => !cst_node_text(source, node).is_empty()
   }
 }
@@ -427,7 +427,7 @@ fn make_impl_unit(
     source_lines.length(),
   )
   let range : @model.LineRange = { start, len: end_ - start, }
-  ImplUnit::{
+  {
     root,
     uuid: nodes_uuid(source, nodes),
     semantic_key: item.bind(fn(item) { impl_semantic_key(source, item) }),
@@ -462,7 +462,7 @@ fn collect_impl_units_detailed(
     }
   }
   if !pending.is_empty() {
-    inputs.push(ImplUnitInput::{ nodes: pending, item: None, })
+    inputs.push({ nodes: pending, item: None, })
   }
 
   let retained_inputs : Array[ImplUnitInput] = []
@@ -480,7 +480,7 @@ fn collect_impl_units_detailed(
         next_start_line = input.nodes[ignored_start].loc.start.lnum
       }
       if ignored_start > 0 {
-        retained_inputs.push(ImplUnitInput::{
+        retained_inputs.push({
           nodes: input.nodes[:ignored_start].to_owned(),
           item: None,
         })

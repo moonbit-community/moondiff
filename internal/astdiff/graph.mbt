@@ -140,7 +140,7 @@ pub impl Hash for Vertex with fn hash_combine(self, hasher) {
 
 ///|UUID(afad7258-28b5-4bb5-9467-f4f96c0c67ee)
 fn can_pop_either_parent(entered : Stack[EnteredDelimiter]) -> Bool {
-  entered.peek() is Some(EnteredDelimiter::PopEither(_))
+  entered.peek() is Some(PopEither(_))
 }
 
 ///|UUID(e63c3a51-11c4-4535-a83c-1976c578085b)
@@ -149,7 +149,7 @@ fn push_both_delimiters(
   lhs_delim : Syntax,
   rhs_delim : Syntax,
 ) -> Stack[EnteredDelimiter] {
-  entered.push(EnteredDelimiter::PopBoth(lhs_delim, rhs_delim))
+  entered.push(PopBoth(lhs_delim, rhs_delim))
 }
 
 ///|UUID(8c49501e-b4f4-4755-8da7-96b97da680d7)
@@ -157,7 +157,7 @@ fn try_pop_both(
   entered : Stack[EnteredDelimiter],
 ) -> (Syntax, Syntax, Stack[EnteredDelimiter])? {
   match entered.peek() {
-    Some(EnteredDelimiter::PopBoth(lhs_delim, rhs_delim)) =>
+    Some(PopBoth(lhs_delim, rhs_delim)) =>
       entered.pop().map(new_stack => (lhs_delim, rhs_delim, new_stack))
     _ => None
   }
@@ -168,14 +168,12 @@ fn try_pop_lhs(
   entered : Stack[EnteredDelimiter],
 ) -> (Syntax, Stack[EnteredDelimiter])? {
   match entered.peek() {
-    Some(EnteredDelimiter::PopEither(lhs_delims, rhs_delims)) =>
+    Some(PopEither(lhs_delims, rhs_delims)) =>
       if lhs_delims.peek() is Some(lhs_delim) {
         let mut entered = entered.pop().unwrap()
         let new_lhs_delims = lhs_delims.pop().unwrap()
         if !new_lhs_delims.is_empty() || !rhs_delims.is_empty() {
-          entered = entered.push(
-            EnteredDelimiter::PopEither(new_lhs_delims, rhs_delims),
-          )
+          entered = entered.push(PopEither(new_lhs_delims, rhs_delims))
         }
         Some((lhs_delim, entered))
       } else {
@@ -190,14 +188,12 @@ fn try_pop_rhs(
   entered : Stack[EnteredDelimiter],
 ) -> (Syntax, Stack[EnteredDelimiter])? {
   match entered.peek() {
-    Some(EnteredDelimiter::PopEither(lhs_delims, rhs_delims)) =>
+    Some(PopEither(lhs_delims, rhs_delims)) =>
       if rhs_delims.peek() is Some(rhs_delim) {
         let mut entered = entered.pop().unwrap()
         let new_rhs_delims = rhs_delims.pop().unwrap()
         if !lhs_delims.is_empty() || !new_rhs_delims.is_empty() {
-          entered = entered.push(
-            EnteredDelimiter::PopEither(lhs_delims, new_rhs_delims),
-          )
+          entered = entered.push(PopEither(lhs_delims, new_rhs_delims))
         }
         Some((rhs_delim, entered))
       } else {
@@ -217,11 +213,8 @@ fn push_lhs_delimiter(
       entered
       .pop()
       .unwrap()
-      .push(EnteredDelimiter::PopEither(lhs_delims.push(delimiter), rhs_delims))
-    _ =>
-      entered.push(
-        EnteredDelimiter::PopEither(Stack::new().push(delimiter), Stack::new()),
-      )
+      .push(PopEither(lhs_delims.push(delimiter), rhs_delims))
+    _ => entered.push(PopEither(Stack::new().push(delimiter), Stack::new()))
   }
 }
 
@@ -235,11 +228,8 @@ fn push_rhs_delimiter(
       entered
       .pop()
       .unwrap()
-      .push(EnteredDelimiter::PopEither(lhs_delims, rhs_delims.push(delimiter)))
-    _ =>
-      entered.push(
-        EnteredDelimiter::PopEither(Stack::new(), Stack::new().push(delimiter)),
-      )
+      .push(PopEither(lhs_delims, rhs_delims.push(delimiter)))
+    _ => entered.push(PopEither(Stack::new(), Stack::new().push(delimiter)))
   }
 }
 
@@ -250,7 +240,7 @@ fn Vertex::is_end(self : Vertex) -> Bool {
 
 ///|UUID(66a58d63-0909-4ffb-ac33-5c1bc5933f8e)
 pub fn Vertex::new(lhs~ : Syntax?, rhs~ : Syntax?) -> Vertex {
-  Vertex::{
+  {
     neighbours: Ref(None),
     predecessor: Ref(None),
     lhs_syntax: lhs,
@@ -433,7 +423,7 @@ fn set_neighbours(
         v.parents,
       )
       let vertex = allocate_if_new(
-        Vertex::{
+        {
           neighbours: Ref(None),
           predecessor: Ref(None),
           lhs_syntax,
@@ -493,7 +483,7 @@ fn set_neighbours(
           parents_next,
         )
         let vertex = allocate_if_new(
-          Vertex::{
+          {
             neighbours: Ref(None),
             predecessor: Ref(None),
             lhs_syntax,
@@ -524,7 +514,7 @@ fn set_neighbours(
         let edge = if lhs_kind is Comment {
           Edge::ReplacedComment(levenshtein_pct~)
         } else {
-          Edge::ReplacedString(levenshtein_pct~)
+          ReplacedString(levenshtein_pct~)
         }
         let (lhs_syntax, rhs_syntax, lhs_parent_id, rhs_parent_id, parents) = pop_all_parents(
           lhs_syntax.next_sibling(),
@@ -534,7 +524,7 @@ fn set_neighbours(
           v.parents,
         )
         let vertex = allocate_if_new(
-          Vertex::{
+          {
             neighbours: Ref(None),
             predecessor: Ref(None),
             lhs_syntax,
@@ -561,7 +551,7 @@ fn set_neighbours(
           v.parents,
         )
         let vertex = allocate_if_new(
-          Vertex::{
+          {
             neighbours: Ref(None),
             predecessor: Ref(None),
             lhs_syntax,
@@ -585,7 +575,7 @@ fn set_neighbours(
           parents_next,
         )
         let vertex = allocate_if_new(
-          Vertex::{
+          {
             neighbours: Ref(None),
             predecessor: Ref(None),
             lhs_syntax,
@@ -612,7 +602,7 @@ fn set_neighbours(
           v.parents,
         )
         let vertex = allocate_if_new(
-          Vertex::{
+          {
             neighbours: Ref(None),
             predecessor: Ref(None),
             lhs_syntax,
@@ -637,7 +627,7 @@ fn set_neighbours(
           parents_next,
         )
         let vertex = allocate_if_new(
-          Vertex::{
+          {
             neighbours: Ref(None),
             predecessor: Ref(None),
             lhs_syntax,
@@ -686,7 +676,7 @@ fn populate_change_map(
           if e is ReplacedComment(..) {
             ChangeKind::ReplacedComment(lhs=first, rhs=second)
           } else {
-            ChangeKind::ReplacedString(lhs=first, rhs=second)
+            ReplacedString(lhs=first, rhs=second)
           }
         }
         if levenshtein_pct > 20 {

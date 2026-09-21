@@ -23,7 +23,7 @@
 ///
 /// ```mbt check
 /// test {
-///   let result = diff(
+///   let result = @mbtdiff.diff(
 ///     "fn helper() { 1 }",
 ///     "fn helper() { 2 }",
 ///     old_name="helper_test.mbt",
@@ -55,7 +55,7 @@ pub fn diff(
   }
   let mode = match options.mode {
     Ast => @alignment.AlignedDiffMode::Ast
-    Lexical => @alignment.AlignedDiffMode::Lexical
+    Lexical => Lexical
   }
   let result = @alignment.calculate_diff_document(
     old_source,

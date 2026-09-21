@@ -111,8 +111,8 @@ pub fn author_label(user : ApiCommentUser?) -> String {
 ///|
 fn review_side_from_api(side : @protocol.CommentSide?) -> ReviewSide? {
   match side {
-    Some(@protocol.CommentSide::Left) => Some(Left)
-    Some(@protocol.CommentSide::Right) => Some(Right)
+    Some(Left) => Some(Left)
+    Some(Right) => Some(Right)
     _ => None
   }
 }

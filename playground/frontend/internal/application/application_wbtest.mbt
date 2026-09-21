@@ -2283,7 +2283,7 @@ fn review_reply_test_model() -> Model {
     path: "src/main.mbt",
     line: Some(2),
     original_line: Some(2),
-    side: Some(@protocol.CommentSide::Right),
+    side: Some(Right),
     position: Some(3),
     commit_id: "head",
     in_reply_to_id: None,
@@ -2333,16 +2333,13 @@ test "reply targets and drafts guard deletion in every ordering" {
       )
       assert_true(@comments.draft_blocks_deletion(guarded.review, id))
       assert_false(
-        @comments.draft_blocks_deletion(
-          guarded.review,
-          @comments.ReviewComment(21L),
-        ),
+        @comments.draft_blocks_deletion(guarded.review, ReviewComment(21L)),
       )
       for
         deletion in [
           None,
           Some(@comments.ConfirmDelete(id)),
-          Some(@comments.DeleteFailed(id, "retry")),
+          Some(DeleteFailed(id, "retry")),
         ] {
         let guarded = with_review(
           guarded,
