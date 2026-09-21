@@ -2,13 +2,69 @@ import { rpcRequest } from '../../tests/protocol-fixtures.mjs';
 import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import { randomBytes } from 'node:crypto';
-import { request as httpRequest } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
+import { once } from 'node:events';
 import { writeFileSync } from 'node:fs';
 import { buildServer, startServer, browser } from './server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from './viewed-fixture.mjs';
 import { startHomeServer, searchPull, searchPage, commitSha, sealHomeCursor, legacyPullCursor } from './home-fixture.mjs';
 
 before(buildServer);
+
+async function listen(server) {
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  return server.address().port;
+}
+
+async function closeServer(server) {
+  server.closeAllConnections();
+  await new Promise(resolve => server.close(resolve));
+}
+
+test('automatic fixture ports retry an address-in-use allocation', async t => {
+  const occupied = createServer((_request, response) => response.end('occupied'));
+  const occupiedPort = await listen(occupied);
+  t.after(() => closeServer(occupied));
+  let allocations = 0;
+  const allocatePort = async () => {
+    allocations++;
+    if (allocations === 1) return occupiedPort;
+    const reservation = createServer();
+    const port = await listen(reservation);
+    await closeServer(reservation);
+    return port;
+  };
+  const f = await startServer(undefined, { allocatePort });
+  t.after(() => f.close());
+  assert.equal(allocations, 2);
+  assert.notEqual(f.port, occupiedPort);
+  assert.equal(await (await fetch(`${f.base}/healthz`)).text(), 'ok\n');
+});
+
+test('an unrelated health server cannot satisfy fixture readiness', async t => {
+  const unrelated = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.end('ok\n');
+  });
+  const port = await listen(unrelated);
+  t.after(() => closeServer(unrelated));
+  await assert.rejects(
+    startServer(undefined, { port }),
+    /Address already in use|EADDRINUSE/i,
+  );
+});
+
+test('fixture restart keeps the first successful port', async t => {
+  const f = await startServer();
+  t.after(() => f.close());
+  const { port, base } = f;
+  await f.stop();
+  await f.start();
+  assert.equal(f.port, port);
+  assert.equal(f.base, base);
+  assert.equal(await (await fetch(`${f.base}/healthz`)).text(), 'ok\n');
+});
 
 test('anonymous status is read only and session creation validates origin and JSON', async t => {
   const f = await startServer(); t.after(() => f.close());
@@ -703,6 +759,9 @@ test('a late refresh cannot overwrite a newly confirmed device identity', async 
 const viewedArgs = { owner: 'alice', repo: 'repo', number: '42' };
 const viewedSnapshot = { id: 'PR_fixture', baseRefOid: '1'.repeat(40), headRefOid: 'a'.repeat(40) };
 const viewedWrite = { ...viewedArgs, path: 'new/目录 name.mbt', viewed: true, base_sha: viewedSnapshot.baseRefOid, head_sha: viewedSnapshot.headRefOid };
+const viewedReadsFor = (state, who, args) => state.reads.filter(read =>
+  read.who === who && read.owner.toLowerCase() === args.owner.toLowerCase() &&
+  read.repo.toLowerCase() === args.repo.toLowerCase() && String(read.number) === String(args.number));
 function viewedPage(nodes, hasNextPage = false, endCursor = null, totalCount = nodes.length, snapshot = viewedSnapshot) {
   return { data: { repository: { pullRequest: { ...snapshot, files: { totalCount, nodes, pageInfo: { hasNextPage, endCursor } } } } } };
 }
@@ -822,9 +881,8 @@ for (const viewed of [true, false]) {
     for (const [reader, scope] of [
       [bob, viewedArgs], [restored, { ...viewedArgs, repo: 'other' }], [restored, { ...viewedArgs, number: '43' }],
     ]) assert((await reader.rpc('github.pull.viewed.get', scope)).ok);
-    await new Promise(r => setTimeout(r, 50));
     assert.equal(settled, false);
-    assert.equal(f.state.reads.filter(r => r.who === 'alice' && r.repo.toLowerCase() === 'repo' && r.number === 42).length, 0);
+    assert.equal(viewedReadsFor(f.state, 'alice', viewedArgs).length, 0);
     hold.release.resolve();
     const result = await confirming;
     assert(result.ok, JSON.stringify(result));
@@ -841,12 +899,13 @@ test('Viewed serializes multiple files and continues after a failed mutation', a
   const one = user.rpc('github.pull.file.viewed.set', { ...viewedWrite, path: first });
   await hold.entered.promise;
   const two = user.rpc('github.pull.file.viewed.set', { ...viewedWrite, path: second });
-  // Ensure the second request has reached the backend before issuing the read.
-  await new Promise(r => setTimeout(r, 50));
+  // A completed independent scope proves the server has continued scheduling
+  // after the second request was submitted without entering this scope's FIFO.
+  assert((await user.rpc('github.pull.viewed.get', { ...viewedArgs, number: '43' })).ok);
   const read = user.rpc('github.pull.viewed.get', viewedArgs);
-  await new Promise(r => setTimeout(r, 50));
+  assert((await user.rpc('github.pull.viewed.get', { ...viewedArgs, number: '44' })).ok);
   assert.equal(f.state.mutations.length, 1);
-  assert.equal(f.state.reads.length, 0);
+  assert.equal(viewedReadsFor(f.state, 'alice', viewedArgs).length, 0);
   hold.release.resolve();
   assert.equal((await one).ok, false);
   assert.equal((await two).ok, true);

@@ -13,6 +13,16 @@ export function buildServer() {
   const result = spawnSync('moon', ['build', 'playground/backend/main', '--target', 'wasm', '--release'], { cwd: repository, encoding: 'utf8' });
   if (result.status !== 0) throw new Error(result.stdout + result.stderr);
 }
+
+async function availablePort(host) {
+  const placeholder = createServer();
+  placeholder.listen(0, host);
+  await once(placeholder, 'listening');
+  const port = placeholder.address().port;
+  await new Promise((resolve, reject) => placeholder.close(error => error ? reject(error) : resolve()));
+  return port;
+}
+
 export async function startServer(handler, options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'moondiff-server-'));
   const host = '127.0.0.1';
@@ -20,6 +30,10 @@ export async function startServer(handler, options = {}) {
   if (!options.staticDir) mkdirSync(staticDir);
   if (!options.staticDir) writeFileSync(join(staticDir, 'index.html'), '<!doctype html><title>fixture</title>');
   if (!options.staticDir) writeFileSync(join(staticDir, 'styles.css'), 'body { color: navy; }');
+  const readinessToken = randomBytes(32).toString('hex');
+  const readinessName = `__moondiff_ready_${randomBytes(12).toString('hex')}.txt`;
+  const readinessPath = join(staticDir, readinessName);
+  writeFileSync(readinessPath, readinessToken);
   writeFileSync(join(root, 'outside.txt'), 'secret');
   if (!options.staticDir) symlinkSync(join(root, 'outside.txt'), join(staticDir, 'escape'));
   const requests = [];
@@ -61,49 +75,97 @@ export async function startServer(handler, options = {}) {
   });
   stub.listen(0, '127.0.0.1');
   await once(stub, 'listening');
-  const placeholder = createServer();
-  placeholder.listen(0, host);
-  await once(placeholder, 'listening');
-  const port = options.port || placeholder.address().port;
-  await new Promise(r => placeholder.close(r));
-  const base = new URL(`http://${host}:${port}`).origin;
   const stubURL = `http://127.0.0.1:${stub.address().port}`;
   const database = join(root, 'sessions.db');
-  const env = { ...process.env, MOONDIFF_LISTEN: `${host}:${port}`, MOONDIFF_PUBLIC_URL: base, MOONDIFF_STATIC_DIR: staticDir, MOONDIFF_DATABASE: database, MOONDIFF_TOKEN_KEY: randomBytes(64).toString('base64'), MOONDIFF_GITHUB_CLIENT_ID: 'test-client', MOONDIFF_GITHUB_INSTALL_URL: 'https://github.com/apps/test/installations/new', MOONDIFF_TEST_MODE: '1', MOONDIFF_TEST_GITHUB_URL: stubURL, MOONDIFF_TEST_OAUTH_URL: stubURL, ...options.env };
+  const env = { ...process.env, MOONDIFF_STATIC_DIR: staticDir, MOONDIFF_DATABASE: database, MOONDIFF_TOKEN_KEY: randomBytes(64).toString('base64'), MOONDIFF_GITHUB_CLIENT_ID: 'test-client', MOONDIFF_GITHUB_INSTALL_URL: 'https://github.com/apps/test/installations/new', MOONDIFF_TEST_MODE: '1', MOONDIFF_TEST_GITHUB_URL: stubURL, MOONDIFF_TEST_OAUTH_URL: stubURL, ...options.env };
   delete env.MOONDIFF_GITHUB_CLIENT_SECRET;
+  let port;
+  let base;
   let child;
+  let childClosed;
   let output = '';
-  async function stop() {
-    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
-    child.kill('SIGTERM');
-    await once(child, 'exit');
+  function usePort(nextPort) {
+    if (!Number.isInteger(nextPort) || nextPort < 1 || nextPort > 65535) throw new Error(`Invalid fixture port: ${nextPort}`);
+    port = nextPort;
+    base = new URL(`http://${host}:${port}`).origin;
+    env.MOONDIFF_LISTEN = options.env?.MOONDIFF_LISTEN ?? `${host}:${port}`;
+    env.MOONDIFF_PUBLIC_URL = options.env?.MOONDIFF_PUBLIC_URL ?? base;
   }
-  async function start(overrides = {}) {
+  async function stop() {
+    if (!child) return;
+    if (child.pid && child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    await childClosed;
+    child = undefined;
+    childClosed = undefined;
+  }
+  async function launch(overrides = {}) {
     const runtime = process.env.MOONRUN_OVERRIDE || 'moonrun';
     child = spawn(runtime, [options.wasmPath || serverWasm], { cwd: root, env: { ...env, ...overrides }, stdio: ['ignore', 'pipe', 'pipe'] });
+    childClosed = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));
     let spawnError;
     child.on('error', error => { spawnError = error; });
     output = '';
     child.stdout.on('data', b => { output += b; });
     child.stderr.on('data', b => { output += b; });
-    child.on('exit', (code, signal) => options.onExit?.(code, signal, output));
+    child.on('close', (code, signal) => options.onExit?.(code, signal, output));
     for (let i = 0; i < 200; i++) {
       if (spawnError) throw new Error(`Could not start ${runtime}: ${spawnError.message}`);
-      if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Wasm server exited: ${output}`);
-      try { if ((await fetch(base + '/healthz', { signal: AbortSignal.timeout(200) })).ok) return; } catch {}
+      if (child.exitCode !== null || child.signalCode !== null) {
+        await childClosed;
+        throw new Error(`Wasm server exited: ${output}`);
+      }
+      try {
+        const response = await fetch(`${base}/${readinessName}`, { signal: AbortSignal.timeout(200) });
+        if (response.ok && await response.text() === readinessToken) return;
+      } catch {}
       await new Promise(r => setTimeout(r, 25));
     }
+    await stop();
     throw new Error(`Wasm server did not start: ${output}`);
   }
-  try { await start(); } catch (error) { await stop(); stub.closeAllConnections(); stub.close(); rmSync(root, { recursive: true, force: true }); throw error; }
+  async function start(overrides = {}) {
+    if (port === undefined) throw new Error('Fixture port has not been allocated');
+    await launch(overrides);
+  }
+  try {
+    const attempts = options.port === undefined ? 5 : 1;
+    const allocate = options.allocatePort || availablePort;
+    let lastError;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      usePort(options.port ?? await allocate(host, attempt));
+      try {
+        await launch();
+        lastError = undefined;
+        break;
+      } catch (error) {
+        await stop();
+        lastError = error;
+        if (options.port !== undefined || !/Address already in use|EADDRINUSE/i.test(String(error))) break;
+      }
+    }
+    if (lastError) throw lastError;
+  } catch (error) {
+    await stop();
+    stub.closeAllConnections();
+    await new Promise(r => stub.close(r));
+    if (options.staticDir) rmSync(readinessPath, { force: true });
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
   return {
-    root, base, port, env, database, requests, devices, approve, get output() { return output; }, start, stop,
+    root, get base() { return base; }, get port() { return port; }, env, database, requests, devices, approve, get output() { return output; }, start, stop,
     sql(sql, params = []) {
       const result = spawnSync('python3', ['-c', 'import sqlite3,json,sys; db=sqlite3.connect(sys.argv[1]); rows=db.execute(sys.argv[2],json.loads(sys.argv[3])).fetchall(); db.commit(); print(json.dumps(rows))', database, sql, JSON.stringify(params)], { encoding: 'utf8' });
       if (result.status !== 0) throw new Error(result.stderr);
       return JSON.parse(result.stdout);
     },
-    async close() { await stop(); stub.closeAllConnections(); await new Promise(r => stub.close(r)); rmSync(root, { recursive: true, force: true }); },
+    async close() {
+      await stop();
+      stub.closeAllConnections();
+      await new Promise(r => stub.close(r));
+      if (options.staticDir) rmSync(readinessPath, { force: true });
+      rmSync(root, { recursive: true, force: true });
+    },
   };
 }
 
