@@ -110,25 +110,6 @@ const QUERY_KEY_CHECK : String = "SELECT value FROM metadata WHERE name='key-che
 const DB_INSERT_KEY_CHECK : String = "INSERT INTO metadata VALUES ('key-check-v1', ?)"
 
 ///|
-const QUERY_ANONYMOUS_MIGRATION : String = "SELECT 1 FROM metadata WHERE name='anonymous-session-lifetime-v1'"
-
-///|
-const DB_MARK_ANONYMOUS_MIGRATION : String = "INSERT INTO metadata VALUES ('anonymous-session-lifetime-v1', 'done')"
-
-///|
-const DB_DELETE_LEGACY_IDLE_SESSIONS : String =
-  #|DELETE FROM sessions WHERE tokens=''
-  #|AND NOT EXISTS (
-  #|  SELECT 1 FROM authorizations a WHERE a.session_id=sessions.id
-  #|  AND a.phase IN ('starting','pending','verifying') AND a.expires>?
-  #|)
-
-///|
-const DB_TIGHTEN_LEGACY_ACTIVE_SESSIONS : String =
-  #|UPDATE sessions SET expires=MIN(expires, ?)
-  #|WHERE tokens=''
-
-///|
 const QUERY_ANONYMOUS_SESSION_COUNT : String = "SELECT COUNT(*) FROM sessions WHERE tokens='' AND expires>?"
 
 ///|

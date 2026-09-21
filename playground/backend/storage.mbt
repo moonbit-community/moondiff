@@ -87,25 +87,6 @@ fn App::open(config : Config) -> App raise {
       Text(seal(config.key, "database", "key-check", b"moondiff-v1")),
     ])
   }
-  // Run once for databases created before anonymous sessions became short lived.
-  execute(db, DB_BEGIN_IMMEDIATE, [])
-  {
-    errdefer execute(db, DB_ROLLBACK, [])
-    let migration = db.prepare(QUERY_ANONYMOUS_MIGRATION)
-    let already_migrated = migration.step()
-    migration.finalize()
-    if !already_migrated {
-      let timestamp = now()
-      execute(db, DB_DELETE_EXPIRED_SESSIONS, [Integer(timestamp)])
-      execute(db, DB_DELETE_EXPIRED_AUTHORIZATIONS, [Integer(timestamp)])
-      execute(db, DB_DELETE_LEGACY_IDLE_SESSIONS, [Integer(timestamp)])
-      execute(db, DB_TIGHTEN_LEGACY_ACTIVE_SESSIONS, [
-        Integer(timestamp + ANONYMOUS_SESSION_LIFETIME),
-      ])
-      execute(db, DB_MARK_ANONYMOUS_MIGRATION, [])
-    }
-    execute(db, DB_COMMIT, [])
-  }
   { config, db, refreshes: {}, devices: {}, viewed_scopes: {}, }
 }
 

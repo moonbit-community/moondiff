@@ -62,10 +62,9 @@ reserving a new device authorization atomically advances the session state and
 extends expiry through its fixed 15-minute deadline plus a 5-minute grace
 period. Reusing an active authorization repairs a shorter session against that
 authorization's existing deadline without sliding it on repeated starts. Token
-installation extends expiry to 30 days in the same transaction. A one-time
-startup migration deletes idle legacy anonymous sessions and tightens active
-ones to 20 minutes. Creation removes expired records and checks the configurable
-unsigned-in session cap under a SQLite write transaction.
+installation extends expiry to 30 days in the same transaction. Creation removes
+expired records and checks the configurable unsigned-in session cap under a
+SQLite write transaction.
 The only browser credential is a
 random HttpOnly, SameSite=Lax cookie; HTTPS uses a Secure cookie restricted to the
 current host. SQLite stores its SHA-256 digest, the GitHub user ID, CSRF token and

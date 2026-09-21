@@ -220,10 +220,8 @@ minutes. Starting a new device authorization extends the session through the
 authorization's fixed 15-minute deadline plus a 5-minute grace period. Reusing
 an active authorization repairs a shorter session to that same fixed deadline;
 repeated start requests do not keep sliding it forward. Successful sign-in
-extends the session to 30 days in the same database transaction. On first
-startup after this upgrade, idle legacy anonymous sessions are deleted and
-active legacy sign-ins are limited to 20 minutes.
-Logout ends the current playground session without
+extends the session to 30 days in the same database transaction. Logout ends
+the current playground session without
 uninstalling the GitHub App or revoking other GitHub sessions.
 
 Back up **both the database and the original encryption key**, with the key in a
