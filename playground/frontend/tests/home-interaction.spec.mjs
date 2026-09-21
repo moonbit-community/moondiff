@@ -144,7 +144,7 @@ test('the tab bar stays available while scrolling long lists', async ({ page }) 
   await expect(page.getByRole('tablist')).toBeInViewport();
 });
 
-for (const width of [1280, 375, 320]) for (const colorScheme of ['light', 'dark']) test(`${width}px ${colorScheme} dashboard fits long titles, accounts and large counts`, async ({ page }) => {
+for (const width of [1280, 375, 320]) for (const colorScheme of ['light', 'dark']) test(`${width}px ${colorScheme} dashboard fits long titles, accounts and large counts`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme });
   const state = await setup(page, async ({ route, kind }) => {
     if (kind === 'ViewerPullsGet') await route.fulfill({ json: success('ViewerPulls', { items: [pull(1, { title: 'Title'.repeat(32), repo: 'repository'.repeat(10), author: 'author'.repeat(10), draft: true })], total_count: 2147483647 }) });
@@ -171,5 +171,5 @@ for (const width of [1280, 375, 320]) for (const colorScheme of ['light', 'dark'
   const menu = page.getByRole('menu', { name: 'Account', exact: true }); await expect(menu).toBeVisible();
   const box = await menu.boundingBox(); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width);
   await page.keyboard.press('Escape');
-  await page.screenshot({ path: `/tmp/moondiff-home-${width}-${colorScheme}.png`, fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath(`home-${width}-${colorScheme}.png`), fullPage: true });
 });

@@ -26,7 +26,7 @@ const fixture = await startServer((request, response) => {
     }
     return true;
   }
-}, { staticDir: assets, port: e2ePort, onExit(code, signal, output) {
+}, { staticDir: assets, port: e2ePort, env: { MOONDIFF_ANONYMOUS_SESSION_LIMIT: '100000' }, onExit(code, signal, output) {
   if (code !== 0 && signal !== 'SIGTERM') console.error(`Playground server exited (${code}, ${signal}):\n${output}`);
 } });
 async function shutdown() { await fixture.close(); rmSync(assets, { recursive: true, force: true }); process.exit(0); }

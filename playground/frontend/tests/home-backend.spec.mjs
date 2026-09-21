@@ -9,6 +9,14 @@ import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
 import { reviews, authored, selectTab, signOut } from './home-fixture.mjs';
 const row = (page, number) => reviews(page).locator('.home-pull').filter({ has: page.getByRole('link', { name: `Pull request ${number}`, exact: true, includeHidden: true }) });
 
+async function expectInvalidCursor(page, base, action) {
+  const [response] = await Promise.all([
+    page.waitForResponse(candidate => candidate.url() === base + '/api/rpc' && candidate.status() === 400),
+    action(),
+  ]);
+  expect((await response.json()).error.code).toBe('invalid_cursor');
+}
+
 test('pre-upgrade PR cursors reload each list through the real backend and preserve commit caches', async ({ page, context }) => {
   const assets = mkdtempSync(join(tmpdir(), 'moondiff-home-browser-'));
   cpSync(join(repository, 'playground/frontend/public'), assets, { recursive: true });
@@ -21,7 +29,7 @@ test('pre-upgrade PR cursors reload each list through the real backend and prese
     const user = browser(f); await user.login();
     const [name, value] = user.cookie.split('=');
     await context.addCookies([{ name, value, url: f.base, httpOnly: true, sameSite: 'Lax' }]);
-    const calls = [], failures = [], cursors = new Map();
+    const calls = [], cursors = new Map();
     await page.route(f.base + '/api/rpc', async route => {
       const request = fixtureRequest(route.request().postDataJSON());
       calls.push(request);
@@ -34,9 +42,6 @@ test('pre-upgrade PR cursors reload each list through the real backend and prese
         await route.fulfill({ response, json });
       } else await route.continue();
     });
-    page.on('response', async response => {
-      if (response.url() === f.base + '/api/rpc' && response.status() === 400) failures.push((await response.json()).error.code);
-    });
     await page.goto(f.base);
     await selectTab(page, 'ReviewRequested');
     await expect(reviews(page).locator('.home-pull')).toHaveCount(50);
@@ -48,7 +53,7 @@ test('pre-upgrade PR cursors reload each list through the real backend and prese
     for (const [kind, list] of [['ReviewRequested', reviews(page)], ['Authored', authored(page)]]) {
       await selectTab(page, kind);
       const more = list.locator(':scope > .home-page-actions').getByRole('button', { name: 'Load more' });
-      await more.click();
+      await expectInvalidCursor(page, f.base, () => more.click());
       await expect.poll(() => pullCalls(kind).length).toBe(3);
       expect(pullCalls(kind).map(c => c.args.cursor)).toEqual([undefined, cursors.get(kind), undefined]);
       await expect(list.locator('.home-pull')).toHaveCount(50);
@@ -61,7 +66,6 @@ test('pre-upgrade PR cursors reload each list through the real backend and prese
     await one.getByRole('button', { name: 'Load more', exact: true }).click();
     await expect(one.locator('.home-commit')).toHaveCount(200);
     expect(calls.filter(c => c.op === 'github.pull.commits.get')).toHaveLength(2);
-    expect(failures).toEqual(['invalid_cursor', 'invalid_cursor']);
   } finally {
     await f.close(); rmSync(assets, { recursive: true, force: true });
   }
@@ -79,12 +83,9 @@ test('same-account sign-in in another tab recovers each expired cursor through t
     const user = browser(f); await user.login();
     const [name, value] = user.cookie.split('=');
     await context.addCookies([{ name, value, url: f.base, httpOnly: true, sameSite: 'Lax' }]);
-    const calls = [], failures = [];
+    const calls = [];
     page.on('request', request => {
       if (request.url() === f.base + '/api/rpc') calls.push(fixtureRequest(request.postDataJSON()));
-    });
-    page.on('response', async response => {
-      if (response.url() === f.base + '/api/rpc' && response.status() === 400) failures.push((await response.json()).error.code);
     });
     await page.addInitScript(() => { window.homeDocumentId = crypto.randomUUID(); });
     await page.goto(f.base);
@@ -117,7 +118,7 @@ test('same-account sign-in in another tab recovers each expired cursor through t
     for (const kind of ['Authored', 'ReviewRequested']) expect(pullCalls(kind)).toHaveLength(stalePulls[kind]);
 
     await selectTab(page, 'ReviewRequested');
-    await one.getByRole('button', { name: 'Load more', exact: true }).click();
+    await expectInvalidCursor(page, f.base, () => one.getByRole('button', { name: 'Load more', exact: true }).click());
     await expect.poll(() => commitCalls(1).length).toBe(3);
     expect(commitCalls(1)[1].args.cursor).toBeTruthy();
     expect(commitCalls(1)[2].args.cursor).toBeUndefined();
@@ -130,7 +131,7 @@ test('same-account sign-in in another tab recovers each expired cursor through t
 
     // PR recovery leaves both expanded state and unrelated cached commits intact.
     const reviewMore = reviews(page).locator(':scope > .home-page-actions').getByRole('button', { name: 'Load more' });
-    await reviewMore.click();
+    await expectInvalidCursor(page, f.base, () => reviewMore.click());
     await expect.poll(() => pullCalls('ReviewRequested').length).toBe(3);
     expect(pullCalls('ReviewRequested')[1].args.cursor).toBeTruthy();
     expect(pullCalls('ReviewRequested')[2].args.cursor).toBeUndefined();
@@ -144,7 +145,7 @@ test('same-account sign-in in another tab recovers each expired cursor through t
 
     await selectTab(page, 'Authored');
     const authoredMore = authored(page).locator(':scope > .home-page-actions').getByRole('button', { name: 'Load more' });
-    await authoredMore.click();
+    await expectInvalidCursor(page, f.base, () => authoredMore.click());
     await expect.poll(() => pullCalls('Authored').length).toBe(3);
     expect(pullCalls('Authored')[2].args.cursor).toBeUndefined();
     await expect(authored(page).locator('.home-pull')).toHaveCount(50);
@@ -153,7 +154,6 @@ test('same-account sign-in in another tab recovers each expired cursor through t
     await selectTab(page, 'ReviewRequested');
     await reviewMore.click();
     await expect(reviews(page).locator('.home-pull')).toHaveCount(51);
-    expect(failures).toEqual(['invalid_cursor', 'invalid_cursor', 'invalid_cursor']);
     expect(await page.evaluate(() => window.homeDocumentId)).toBe(documentId);
     await other.close();
   } finally {

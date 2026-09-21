@@ -75,7 +75,7 @@ async function authorize(page, code) {
 }
 
 test('real Wasm device login displays and copies the code, opens GitHub and completes automatically', async ({ page, context }) => {
-  const external = [], publicRequests = [], backendReads = [], responses = [];
+  const external = [], publicRequests = [], backendReads = [], responseBodies = [];
   const sessions = [];
   page.on('request', request => {
     if (new URL(request.url()).origin !== e2eOrigin) {
@@ -83,7 +83,9 @@ test('real Wasm device login displays and copies the code, opens GitHub and comp
       publicRequests.push(request);
     }
   });
-  page.on('response', async response => { if (response.url().includes('/api/auth/')) responses.push(await response.text().catch(() => '')); });
+  page.on('response', response => {
+    if (response.url().includes('/api/auth/')) responseBodies.push(response.text());
+  });
   page.on('request', request => { if (request.url().endsWith('/api/auth/session')) sessions.push(request); });
   page.on('request', request => {
     if (request.url().endsWith('/api/rpc') && request.postDataJSON()?.request?.$tag === 'CommitGet') backendReads.push(request);
@@ -130,6 +132,7 @@ test('real Wasm device login displays and copies the code, opens GitHub and comp
     expect(headers).not.toHaveProperty('authorization');
     expect(headers).not.toHaveProperty('x-github-api-version');
   }
+  const responses = await Promise.all(responseBodies);
   expect(responses.join('')).not.toMatch(/device_code|access_token|refresh_token|client_secret/);
 });
 
@@ -234,21 +237,39 @@ test('a delayed successful poll cannot replace a newer sign-in after cancellatio
 });
 
 test('initial session resolution precedes change loading even when navigating during startup', async ({ page }) => {
-  let release; const gate = new Promise(r => { release = r; });
-  const calls = [];
-  await page.route('**/api/auth/status', async handler => { await gate; await handler.continue(); });
+  let releaseStatus;
+  const statusRelease = new Promise(resolve => { releaseStatus = resolve; });
+  let markStatusEntered;
+  const statusEntered = new Promise(resolve => { markStatusEntered = resolve; });
+  let statusReleased = false;
+  const githubRequests = [];
+  await page.route('**/api/auth/status', async handler => {
+    markStatusEntered();
+    await statusRelease;
+    await handler.continue();
+  });
   page.on('request', request => {
     const url = request.url();
-    if (url.startsWith('https://api.github.com/repos/fixture/repo/commits/') && !url.includes('/comments')) calls.push(new URL(url).pathname.split('/').at(-1));
+    if (url.startsWith('https://api.github.com/')) {
+      githubRequests.push({ url, afterStatusRelease: statusReleased });
+    }
   });
   await page.goto(route);
+  await statusEntered;
   await page.waitForFunction(() => document.querySelector('input'));
   const nextSha = '1111111111111111111111111111111111111111';
   await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); dispatchEvent(new Event('focus')); }, `/fixture/repo/commit/${nextSha}`);
-  await page.waitForTimeout(100); expect(calls).toEqual([]); release();
+  statusReleased = true;
+  releaseStatus();
   await expect(page.getByText('Fixture root commit', { exact: true }).first()).toBeVisible();
-  expect(calls.length).toBeGreaterThan(0);
-  expect(calls.every(sha => sha === nextSha)).toBe(true);
+  expect(githubRequests.length).toBeGreaterThan(0);
+  expect(githubRequests.every(request => request.afterStatusRelease)).toBe(true);
+  const commitRequests = githubRequests.filter(request => {
+    const url = new URL(request.url);
+    return url.pathname.includes('/commits/') && !url.pathname.endsWith('/comments');
+  });
+  expect(commitRequests.length).toBeGreaterThan(0);
+  expect(commitRequests.every(request => new URL(request.url).pathname.split('/').at(-1) === nextSha)).toBe(true);
 });
 
 test('legacy hash links display an invalid-link error without loading a change', async ({ page }) => {

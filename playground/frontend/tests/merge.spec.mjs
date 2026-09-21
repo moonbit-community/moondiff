@@ -91,8 +91,10 @@ test('anonymous merge card requires sign-in and never calls the protected status
   await expect(card.getByText('Sign in to load CI and merge status', { exact: true })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Sign in to merge', exact: true })).toBeVisible();
   expect(state.calls.filter(call => call.op === 'github.pull.merge.status')).toHaveLength(0);
+  await expect.poll(() => state.authStatusCalls).toBe(1);
+  const authStatusCalls = state.authStatusCalls;
   await page.evaluate(() => window.reactivate());
-  await page.waitForTimeout(100);
+  await expect.poll(() => state.authStatusCalls).toBe(authStatusCalls + 1);
   expect(state.calls.filter(call => call.op === 'github.pull.merge.status')).toHaveLength(0);
 });
 
