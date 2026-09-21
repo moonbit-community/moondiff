@@ -122,10 +122,10 @@ Signed-in reads use the backend so private repositories remain available. A
 browser CORS, network or rate-limit failure is shown as an error; it is not
 retried through the backend.
 
-Sign-in displays a verification code on the playground page. Copy it, open
-GitHub, and authorize the device in the new window; the playground updates
-automatically. A page reload restores an unexpired code. Cancel sign-in before
-starting a new attempt.
+Sign-in displays a verification code on the playground page. Select **Copy code
+and open GitHub** to copy it and open the authorization page in a new window;
+the playground updates automatically after the device is authorized. A page
+reload restores an unexpired code. Cancel sign-in before starting a new attempt.
 
 ## Docker
 

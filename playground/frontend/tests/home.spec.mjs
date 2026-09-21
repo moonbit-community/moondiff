@@ -219,7 +219,7 @@ for (const invalidInput of [false, true]) test(`finishing real device sign-in on
   await page.getByRole('button', { name: 'Sign in with GitHub' }).first().click();
   await expect(page.locator('.device-code').first()).toBeVisible();
   const code = await page.locator('.device-code').first().textContent();
-  const opened = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Open GitHub' }).first().click();
+  const opened = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Copy code and open GitHub' }).first().click();
   const verification = await opened;
   await verification.getByRole('textbox', { name: 'Verification code' }).fill(code);
   await verification.getByRole('button', { name: 'Authorize device' }).click();

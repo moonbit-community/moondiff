@@ -38,10 +38,36 @@ async function fixtureCommentRefresh(page) {
   return { refresh };
 }
 
-async function authorize(page, code) {
+async function openAuthorization(page) {
   const opened = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Open GitHub' }).click();
-  const verification = await opened;
+  await page.getByRole('button', { name: 'Copy code and open GitHub' }).click();
+  return opened;
+}
+
+async function controlStyle(locator) {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      display: style.display,
+      boxSizing: style.boxSizing,
+      minHeight: style.minHeight,
+      padding: style.padding,
+      border: style.border,
+      borderRadius: style.borderRadius,
+      backgroundColor: style.backgroundColor,
+      color: style.color,
+      boxShadow: style.boxShadow,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+      whiteSpace: style.whiteSpace,
+      cursor: style.cursor,
+    };
+  });
+}
+
+async function authorize(page, code) {
+  const verification = await openAuthorization(page);
   await verification.getByRole('textbox', { name: 'Verification code' }).fill(code);
   await verification.getByRole('button', { name: 'Authorize device' }).click();
   await expect(verification.getByText('Device authorized. Return to Moondiff.')).toBeVisible();
@@ -70,12 +96,18 @@ test('real Wasm device login displays and copies the code, opens GitHub and comp
   expect((await context.cookies()).some(c => c.name === 'moondiff')).toBe(false);
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
   await expect(page.locator('.device-code')).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  const openGitHub = page.getByRole('button', { name: 'Copy code and open GitHub' });
+  const cancelSignIn = page.getByRole('button', { name: 'Cancel sign-in' });
+  expect(await controlStyle(openGitHub)).toEqual(await controlStyle(cancelSignIn));
   expect(context.pages()).toHaveLength(1);
   const code = await page.locator('.device-code').textContent();
-  await page.getByRole('button', { name: 'Copy code' }).click();
+  const verification = await openAuthorization(page);
   await expect(page.getByRole('status')).toContainText('Code copied.');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
-  await authorize(page, code);
+  await verification.getByRole('textbox', { name: 'Verification code' }).fill(code);
+  await verification.getByRole('button', { name: 'Authorize device' }).click();
+  await expect(verification.getByText('Device authorized. Return to Moondiff.')).toBeVisible();
+  await verification.close();
   await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   expect((await context.cookies()).find(c => c.name === 'moondiff')).toMatchObject({ httpOnly: true, sameSite: 'Lax', path: '/' });
   expect(sessions).toHaveLength(1);

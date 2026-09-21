@@ -452,7 +452,9 @@ input {
   font: inherit;
 }
 
-button {
+button,
+.device-open {
+  box-sizing: border-box;
   display: inline-flex;
   min-height: 2rem;
   align-items: center;
@@ -472,12 +474,14 @@ button {
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
-button:hover {
+button:hover,
+.device-open:hover {
   border-color: #353535;
   background: #353535;
 }
 
-button:active {
+button:active,
+.device-open:active {
   transform: translateY(1px);
 }
 
@@ -488,13 +492,15 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-button.secondary {
+button.secondary,
+.device-open {
   border-color: var(--border);
   color: var(--foreground);
   background: var(--surface);
 }
 
-button.secondary:hover {
+button.secondary:hover,
+.device-open:hover {
   border-color: #bcbcbc;
   background: var(--surface-subtle);
 }
@@ -2846,7 +2852,7 @@ button.segmented-option.active,
 .device-auth p { margin: 0; }
 .device-code-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .device-code { font-family: ui-monospace, monospace; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.12em; user-select: all; }
-.device-open { display: inline-block; text-decoration: none; }
+.device-open { text-decoration: none; }
 .device-progress { font-size: 0.875rem; }
 
 .viewed-control, .viewed-label, .viewed-progress-content, .viewed-sign-in {
