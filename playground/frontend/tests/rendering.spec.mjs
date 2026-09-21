@@ -16,6 +16,36 @@ function unchanged(before, after, paths) {
   expect(after.errors).toEqual([]);
 }
 
+test('file regions restore exact render containment after their height changes', async ({ page }) => {
+  const fixture = syntheticFixture({ files: 3, declarations: 8 });
+  await installRenderingFixture(page, fixture);
+  await page.goto(route(fixture)); await loaded(page, fixture);
+  const file = card(page, 0);
+  const geometry = () => file.evaluate(element => ({
+    contained: element.dataset.renderContained,
+    visibility: getComputedStyle(element).contentVisibility,
+    intrinsic: parseFloat(element.style.getPropertyValue('--file-intrinsic-block-size')),
+  }));
+  const expanded = await geometry();
+  expect(expanded).toMatchObject({ contained: 'true', visibility: 'auto' });
+  expect(expanded.intrinsic).toBeGreaterThan(0);
+
+  await file.locator('.file-toggle').click();
+  await expect(file).toHaveClass('file-card');
+  await settleRegions(page);
+  const collapsed = await geometry();
+  expect(collapsed).toMatchObject({ contained: 'true', visibility: 'auto' });
+  expect(collapsed.intrinsic).toBeGreaterThan(0);
+  expect(collapsed.intrinsic).toBeLessThan(expanded.intrinsic);
+
+  await file.locator('.file-toggle').click();
+  await expect(file).toHaveClass('file-card expanded');
+  await settleRegions(page);
+  const restored = await geometry();
+  expect(restored).toMatchObject({ contained: 'true', visibility: 'auto' });
+  expect(Math.abs(restored.intrinsic - expanded.intrinsic)).toBeLessThan(1);
+});
+
 for (const algorithm of ['Token', 'Tree']) for (const layout of ['Split', 'Unified']) {
   test(`file, section, tree and draft isolation: ${algorithm}/${layout}`, async ({ page }) => {
     await installRenderProbe(page);

@@ -50,6 +50,16 @@ order. Immediately before execution, navigation rechecks its sequence, generatio
 target mount, and the current pending updates. A route change or target unmount
 cancels it, including its focus transfer.
 
+The same shared layout batch establishes browser rendering isolation for file
+cards. It first measures each card's real content-box height, writes that value as
+its intrinsic block-size fallback, and only then enables `content-visibility`.
+When a file region commits, its containment marker is removed before the next
+read batch and restored after the new exact height is written. This preserves
+scroll geometry and sticky navigation while allowing unrelated page-height
+changes, such as opening CI details, to skip offscreen diff subtrees. The region
+host remains `display: contents`; containment belongs to the file card so region
+mounting and grid layout keep their existing box semantics.
+
 Editor interaction is captured from the registered draft node at the event
 boundary and restored in the same region commit, before another browser event can
 modify the replacement editor. No global editor query is needed.
@@ -80,11 +90,15 @@ synthetic cases with 4 × 12 and 12 × 80 file/declaration sizes.
 
 Run `npm run test:playground` from the repository root for functional browser
 regressions. Run `npm run test:playground:stress` (or `npm run test:e2e:stress` from
-`playground`) for the six rendering pressure cases in `rendering.stress.mjs`.
+`playground`) for the seven rendering pressure cases in `rendering.stress.mjs`.
 The stress configuration reuses the browser/server setup and uses one worker;
 the default E2E configuration selects only `*.spec.mjs` and excludes stress cases.
 Performance attachments record four alternating file toggles at normal and 6×
-CPU speed. Counts, rather than timing thresholds, are the regression contract.
+CPU speed. Their render counts, rather than timing thresholds, are the regression
+contract. The CI disclosure case separately sends trusted pointer input through
+CDP and measures through the second animation frame. On the synthetic-large page
+at 6× CPU it requires the contained median to stay below 80% of a same-page
+`content-visibility: visible` baseline and attaches the raw samples.
 To compare release bundles, build the frontend in both workspaces, then run:
 
 ```sh

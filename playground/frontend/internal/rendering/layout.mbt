@@ -11,7 +11,7 @@ extern "js" fn initialize_layout() -> Unit =
   #|         const reads = [];
   #|         for (const record of this.dirty) {
   #|           if (record.alive && record.host.isConnected) {
-  #|             reads.push([record, record.elements.map(el => el.getBoundingClientRect().height)]);
+  #|             reads.push([record, record.read()]);
   #|           }
   #|         }
   #|         this.dirty.clear();
@@ -30,14 +30,28 @@ extern "js" fn observe_layout(host : String, region : String) -> () -> Unit =
   #|   const host = document.getElementById(hostId);
   #|   const main = host.closest('.change-main') ?? document.querySelector('.change-main');
   #|   const elements = [];
+  #|   let prepare = () => {};
+  #|   let read = () => elements.map(el => el.getBoundingClientRect().height);
   #|   let write = () => {};
   #|   if (region.startsWith('file:')) {
   #|     const file = host.querySelector('.file-card');
   #|     const heading = file?.querySelector('.file-heading');
   #|     if (heading) {
   #|       elements.push(heading, file);
+  #|       prepare = () => { file.removeAttribute('data-render-contained'); };
+  #|       read = () => {
+  #|         const style = getComputedStyle(file);
+  #|         // Intrinsic block-size substitutes the content box, not borders or padding.
+  #|         const edges = ['borderTopWidth', 'borderBottomWidth', 'paddingTop', 'paddingBottom']
+  #|           .reduce((height, property) => height + (parseFloat(style[property]) || 0), 0);
+  #|         return [heading.getBoundingClientRect().height, Math.max(0, file.getBoundingClientRect().height - edges)];
+  #|       };
   #|       write = heights => {
   #|         file.style.setProperty('--file-heading-inset', `${heights[0]}px`);
+  #|         if (Number.isFinite(heights[1]) && heights[1] > 0) {
+  #|           file.style.setProperty('--file-intrinsic-block-size', `${heights[1]}px`);
+  #|           file.setAttribute('data-render-contained', 'true');
+  #|         }
   #|         if (main) main.__moondiffChangeLanding = null;
   #|       };
   #|     }
@@ -56,7 +70,7 @@ extern "js" fn observe_layout(host : String, region : String) -> () -> Unit =
   #|       main.__moondiffChangeLanding = null;
   #|     };
   #|   }
-  #|   const record = { alive: true, host, elements, write };
+  #|   const record = { alive: true, host, elements, prepare, read, write };
   #|   const onResize = () => { if (main) main.__moondiffChangeLanding = null; state.dirty.add(record); state.schedule(); };
   #|   const onScroll = () => {
   #|     const landing = main?.__moondiffChangeLanding;
@@ -94,7 +108,10 @@ extern "js" fn invalidate_layout(host : String) -> Unit =
   #| host => {
   #|   const state = globalThis.__moondiffRegionLayout;
   #|   const record = state.records.get(host);
-  #|   if (record) state.dirty.add(record);
+  #|   if (record) {
+  #|     record.prepare();
+  #|     state.dirty.add(record);
+  #|   }
   #| }
 
 ///|
