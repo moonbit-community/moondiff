@@ -63,7 +63,7 @@ async function fixtureValue(state, op, args) {
 }
 
 export async function installRenderingFixture(page, fixture, options = {}) {
-  const state = { fixture, authenticated: false, viewed: {}, contentGate: null, writeGate: null, calls: [], ...options };
+  const state = { fixture, authenticated: false, viewed: {}, contentGate: null, writeGate: null, calls: [], authStatusCalls: 0, ...options };
   await page.route('https://api.github.com/repos/example/regions/**', async route => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace('/repos/example/regions/', '');
@@ -98,8 +98,10 @@ export async function installRenderingFixture(page, fixture, options = {}) {
   });
   await page.route('**/api/**', async route => {
     if (new URL(route.request().url()).pathname === '/api/auth/status') {
-      return route.fulfill({ json: successFixture('auth.status', { authenticated: state.authenticated, csrf_token: 'fixture',
+      await route.fulfill({ json: successFixture('auth.status', { authenticated: state.authenticated, csrf_token: 'fixture',
         ...(state.authenticated ? { login: 'reviewer', user_id: '1' } : {}) }) });
+      state.authStatusCalls++;
+      return;
     }
     const { op, args } = fixtureRequest(route.request().postDataJSON());
     const { value, failure } = await fixtureValue(state, op, args);

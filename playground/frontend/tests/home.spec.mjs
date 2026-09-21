@@ -57,38 +57,66 @@ test('commit expansion is lazy and cached while PR and fork commit links open in
   await expect(link).toHaveAttribute('href', `/upstream/repo/pull/1/commits/${'1'.padStart(40, '0')}`);
   await expect(link).toHaveAttribute('target', '_blank');
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-  // Observe modifier handling, then prevent navigation in this test listener.
-  // Exercise actual native new-tab navigation separately with a middle click.
-  expect(await link.evaluate(el => ['ctrlKey', 'metaKey', 'shiftKey', 'altKey'].map(key => {
-    let prevented;
-    el.addEventListener('click', event => { prevented = event.defaultPrevented; event.preventDefault(); }, { once: true });
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, [key]: true }));
-    return prevented;
-  }))).toEqual([false, false, false, false]);
-  const popupReady = page.context().waitForEvent('page'); await link.click({ button: 'middle' });
-  const popup = await popupReady; await expect(popup).toHaveURL(/\/pull\/1\/commits\//); await popup.close();
+  // Observe after application bubbling handlers, then prevent only the test's
+  // modifier/auxiliary clicks from performing their native navigation.
+  await link.evaluate(el => {
+    const observed = [];
+    const listener = event => {
+      if (!event.composedPath().includes(el)) return;
+      observed.push({
+        type: event.type,
+        button: event.button,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        defaultPrevented: event.defaultPrevented,
+      });
+      event.preventDefault();
+    };
+    window.commitLinkEvents = observed;
+    window.addEventListener('click', listener);
+    window.addEventListener('auxclick', listener);
+    window.removeCommitLinkObserver = () => {
+      window.removeEventListener('click', listener);
+      window.removeEventListener('auxclick', listener);
+    };
+  });
+  for (const modifier of ['Control', 'Meta', 'Shift', 'Alt']) await link.click({ modifiers: [modifier] });
+  await link.click({ button: 'middle' });
+  const observed = await page.evaluate(() => {
+    window.removeCommitLinkObserver();
+    return window.commitLinkEvents;
+  });
+  expect(observed).toHaveLength(5);
+  expect(observed.every(event => !event.defaultPrevented)).toBe(true);
+  expect(observed.slice(0, 4).map(event => [event.type, event.button, event.ctrlKey, event.metaKey, event.shiftKey, event.altKey])).toEqual([
+    ['click', 0, true, false, false, false],
+    ['click', 0, false, true, false, false],
+    ['click', 0, false, false, true, false],
+    ['click', 0, false, false, false, true],
+  ]);
+  expect(observed[4]).toMatchObject({ type: 'auxclick', button: 1 });
   const documentId = await page.evaluate(() => window.dashboardDocumentId);
   const homepageUrl = page.url();
   const prLink = one.getByRole('link', { name: 'Pull request 1', exact: true });
+  await expect(prLink).toHaveAttribute('href', '/upstream/repo/pull/1');
   await expect(prLink).toHaveAttribute('target', '_blank');
   await expect(prLink).toHaveAttribute('rel', 'noopener noreferrer');
-  const prReady = page.waitForEvent('popup'); await prLink.click();
-  const pr = await prReady;
+  const [pr] = await Promise.all([page.waitForEvent('popup'), prLink.click()]);
   await expect(pr).toHaveURL(/\/upstream\/repo\/pull\/1$/);
   await expect(pr.getByText('Loaded PR', { exact: true })).toBeVisible();
   await expect(pr.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   expect(await pr.evaluate(() => window.opener)).toBeNull();
   await pr.close();
-  const commitReady = page.waitForEvent('popup'); await link.click();
-  const commit = await commitReady;
+  const [commit] = await Promise.all([page.waitForEvent('popup'), link.click()]);
   await expect(commit).toHaveURL(/\/upstream\/repo\/pull\/1\/commits\/0+1$/);
   await expect(commit.getByText('Loaded commit', { exact: true })).toBeVisible();
   await expect(commit.locator('.hero-workspace').getByRole('button', { name: 'Account: alice' })).toBeVisible();
   expect(await commit.evaluate(() => window.opener)).toBeNull();
   expect(state.calls.some(c => c.kind === 'CommitGet' && c.args.owner === 'fork')).toBe(true);
   await commit.close();
-  const keyboardReady = page.waitForEvent('popup'); await link.press('Enter');
-  const keyboardCommit = await keyboardReady;
+  const [keyboardCommit] = await Promise.all([page.waitForEvent('popup'), link.press('Enter')]);
   await expect(keyboardCommit.getByText('Loaded commit', { exact: true })).toBeVisible();
   await keyboardCommit.close();
   await expect(page).toHaveURL(homepageUrl);
@@ -193,7 +221,7 @@ test('page restoration resumes aborted commit pages without losing loaded lists 
   pending.release(); await expect(one.locator('.home-commit')).toHaveCount(1);
 });
 
-test('mobile dashboard wraps long titles and repositories with working keyboard controls', async ({ page }) => {
+test('mobile dashboard wraps long titles and repositories with working keyboard controls', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await setup(page, async ({ route, kind }) => {
     if (kind !== 'ViewerPullsGet') return false;
@@ -204,7 +232,7 @@ test('mobile dashboard wraps long titles and repositories with working keyboard 
   await expect(reviews(page).getByRole('button', { name: /Collapse/ })).toHaveAttribute('aria-expanded', 'true');
   await expect(reviews(page).getByRole('link', { name: /Commit 1/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: '/tmp/moondiff-home-mobile.png', fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('home-mobile.png'), fullPage: true });
 });
 
 for (const invalidInput of [false, true]) test(`finishing real device sign-in on the anonymous homepage immediately shows the dashboard${invalidInput ? ' after an invalid landing URL' : ''}`, async ({ page }) => {

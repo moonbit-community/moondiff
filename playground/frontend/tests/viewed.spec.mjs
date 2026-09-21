@@ -124,7 +124,7 @@ async function expectViewedWrite(state, path, viewed, action) {
 const refresh = page => page.evaluate(() => window.reactivate());
 
 for (const width of [1280, 390]) {
-  test(`Viewed restores, marks, expands, preserves cache and supports keyboard at ${width}px`, async ({ page }) => {
+  test(`Viewed restores, marks, expands, preserves cache and supports keyboard at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 850 });
     const waiting = gate();
     const state = await install(page, { readGate: waiting, states: { alice: { 'src/a.txt': 'Viewed', 'src/new name.txt': 'Dismissed' } } });
@@ -168,7 +168,7 @@ for (const width of [1280, 390]) {
     await expect(page.getByText('2 / 3 files viewed', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const bounds = await box(page, 1).boundingBox(); expect(bounds.x + bounds.width).toBeLessThan(width);
-    await page.screenshot({ path: `/tmp/moondiff-viewed-${width}.png`, fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath(`viewed-${width}.png`), fullPage: true });
     await page.reload();
     await expect(box(page, 1)).toBeChecked();
     await expect(card(page, 1)).not.toHaveClass(/expanded/);
