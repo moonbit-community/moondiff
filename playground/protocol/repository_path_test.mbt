@@ -55,7 +55,7 @@ test "repository filenames roundtrip unchanged through source comments and Viewe
       files: [{ path, state: Viewed, }],
     })
     let decoded : @protocol.RpcValue = @protocol.decode(
-      @json.parse(result.to_json().stringify()),
+      @json.parse(ToJson::to_json(result).stringify()),
     )
     assert_true(decoded == result)
   }

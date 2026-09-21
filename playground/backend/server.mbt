@@ -43,7 +43,7 @@ async fn[T : ToJson] respond_json(
   value : T,
   cookies? : Array[@http.Cookie] = [],
 ) -> Unit {
-  let body = (@protocol.Response::Success(value~) : @protocol.Response[T]).to_json()
+  let body = ToJson::to_json((Success(value~) : @protocol.Response[T]))
   respond(conn, 200, @utf8.encode(body.stringify()), cookies~)
 }
 

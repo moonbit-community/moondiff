@@ -18,9 +18,9 @@ fn rpc_error(error : Error) -> (Int, Json) {
   }
   (
     status,
-    (
-      @protocol.Response::Failure(error={ status, code, message, }) :
-      @protocol.Response[Unit]).to_json(),
+    ToJson::to_json(
+      (Failure(error={ status, code, message, }) : @protocol.Response[Unit]),
+    ),
   )
 }
 
