@@ -9,8 +9,17 @@ export function instrumentRenderProbe(source) {
   // Keep the hook in the temporary bundle, alongside the existing render probe.
   inject(/function \w+runtime7Sandbox5flush\(self\) \{/, match => {
     const flush = match.match(/function (\w+)/)[1];
-    return `if (globalThis.__moondiffFrameBarrier?.hold(self, () => ${flush}(self))) return;`;
+    return `
+      const pendingPaints = globalThis.__moondiffPendingPaints ??= new Set();
+      if (!self.paint_scheduled) {
+        pendingPaints.add(self);
+        if (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.pendingPaints = pendingPaints.size;
+      }
+      if (globalThis.__moondiffFrameBarrier?.hold(self, () => ${flush}(self))) return;`;
   });
+  inject(/self\.paint_scheduled = false;/, `
+    globalThis.__moondiffPendingPaints?.delete(self);
+    if (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.pendingPaints = globalThis.__moondiffPendingPaints?.size ?? 0;`);
   inject(/function \w+runtime10diff__node\(old, new_, sandbox, parent, anchor\) \{/, `
     const probe = globalThis.__moondiffMetrics;
     if (probe) {
@@ -40,7 +49,8 @@ export function instrumentRenderProbe(source) {
 
 export async function installRenderProbe(page) {
   await page.addInitScript(() => {
-    globalThis.__moondiffMetrics = { files: {}, active: {}, errors: [], longTasks: [] };
+    globalThis.__moondiffPendingPaints = new Set();
+    globalThis.__moondiffMetrics = { files: {}, active: {}, errors: [], longTasks: [], pendingPaints: 0 };
     addEventListener('error', event => __moondiffMetrics.errors.push(event.message));
     new PerformanceObserver(list => {
       for (const entry of list.getEntries()) __moondiffMetrics.longTasks.push({ start: entry.startTime, duration: entry.duration });
@@ -48,13 +58,46 @@ export async function installRenderProbe(page) {
   });
 }
 
-export async function settleRegions(page) {
-  // Includes the central commit, regional commit, and batched layout acknowledgement.
-  await page.evaluate(() => new Promise(resolve => {
-    let frames = 5;
-    const next = () => --frames ? requestAnimationFrame(next) : resolve();
-    requestAnimationFrame(next);
-  }));
+export async function settleRegions(page, timeout = 5_000) {
+  // Two consecutive idle animation frames cover central/regional paints and a
+  // layout callback that schedules more work later in the same frame.
+  const result = await page.evaluate(timeout => new Promise(resolve => {
+    let stableFrames = 0;
+    let animationFrame = 0;
+    let finished = false;
+    const snapshot = () => {
+      const layout = globalThis.__moondiffRegionLayout;
+      const pending = globalThis.__moondiffPendingPaints;
+      return {
+        pendingPaints: pending?.size ?? 0,
+        pendingMounts: pending ? [...pending].map(sandbox => sandbox.mount) : [],
+        layoutFrame: layout?.frame ?? 0,
+        layoutDirty: layout?.dirty?.size ?? 0,
+        layoutCallbacks: layout?.callbacks?.length ?? 0,
+      };
+    };
+    const done = value => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      resolve(value);
+    };
+    const next = () => {
+      animationFrame = requestAnimationFrame(() => {
+        animationFrame = 0;
+        const state = snapshot();
+        const idle = state.pendingPaints === 0 && state.layoutFrame === 0 &&
+          state.layoutDirty === 0 && state.layoutCallbacks === 0;
+        stableFrames = idle ? stableFrames + 1 : 0;
+        if (stableFrames >= 2) done({ ok: true, state });
+        else next();
+      });
+    };
+    const timer = setTimeout(() => done({ ok: false, state: snapshot(), stableFrames }), timeout);
+    next();
+  }), timeout);
+  if (!result.ok) throw new Error(`Regional rendering did not become idle: ${JSON.stringify(result)}`);
 }
 
 export async function renderCounts(page) {

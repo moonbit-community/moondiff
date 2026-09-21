@@ -49,6 +49,10 @@ async function effects(page) {
   return page.evaluate(() => navigationEffects);
 }
 
+async function currentEffects(page) {
+  return page.evaluate(() => navigationEffects);
+}
+
 async function openFiles(page, indices) {
   await page.evaluate(indices => {
     for (const index of indices) {
@@ -101,7 +105,7 @@ for (const algorithm of ['Token', 'Tree']) for (const layout of ['Split', 'Unifi
         document.querySelector('[aria-label="Open src/unrelated-2.mbt"]').click();
       });
       await barrier.blocked();
-      expect(await effects(page)).toEqual([]);
+      expect(await currentEffects(page)).toEqual([]);
     } finally { await barrier.release(); }
     await expectFileLanding(page, 2);
     expect(await effects(page)).toEqual([['file', 'moondiff-file-2']]);
@@ -123,7 +127,7 @@ for (const algorithm of ['Token', 'Tree']) for (const layout of ['Split', 'Unifi
       await barrier.blocked();
       // A is already waiting on its region when the unchanged B receives intent.
       await openFiles(page, [2]);
-      expect(await effects(page)).toEqual([]);
+      expect(await currentEffects(page)).toEqual([]);
     } finally { await barrier.release(); }
     await expectFileLanding(page, 2);
     expect(await effects(page)).toEqual([['file', 'moondiff-file-2']]);
@@ -145,7 +149,7 @@ for (const algorithm of ['Token', 'Tree']) for (const layout of ['Split', 'Unifi
         await barrier.blocked();
         await barrier.release([region(order[0])]);
         await expect(card(page, order[0])).toHaveClass('file-card expanded');
-        expect(await effects(page)).toEqual([]);
+        expect(await currentEffects(page)).toEqual([]);
       } finally { await barrier.release(); }
       await expectFileLanding(page, 2);
       expect(await effects(page)).toEqual([['file', 'moondiff-file-2']]);
@@ -172,7 +176,7 @@ for (const algorithm of ['Token', 'Tree']) for (const layout of ['Split', 'Unifi
         }, last);
         await barrier.blocked();
         await barrier.release([region(last === 'file' ? 2 : 1)]);
-        expect(await effects(page)).toEqual([]);
+        expect(await currentEffects(page)).toEqual([]);
       } finally { await barrier.release(); }
       if (last === 'file') {
         await expectFileLanding(page, 2);
@@ -202,7 +206,7 @@ test('page commit: later revisions and newly scheduled regions join the wait', a
     });
     await barrier.blocked();
     await barrier.release([region(0)]);
-    expect(await effects(page)).toEqual([]);
+    expect(await currentEffects(page)).toEqual([]);
   } finally { await barrier.release(); }
   await expectFileLanding(page, 2);
   expect(await effects(page)).toEqual([['file', 'moondiff-file-2']]);

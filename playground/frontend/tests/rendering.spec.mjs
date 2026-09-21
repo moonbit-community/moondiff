@@ -167,7 +167,6 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
       // destination commit; capturing it used to erase the saved focus intent.
       pending.resolve();
       if (action !== 'route') await expect(card(page, 2).locator('table').first()).toBeVisible();
-      await settleRegions(page);
       if (action === 'search') await search.focus();
       if (action === 'outside click') await page.getByRole('heading', { name: 'Comments', exact: true }).click();
     } finally {
