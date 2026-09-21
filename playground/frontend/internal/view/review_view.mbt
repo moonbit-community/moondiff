@@ -686,19 +686,15 @@ fn auth_controls(
               attrs=@html.Attrs::build().aria_label("GitHub verification code"),
               flow.user_code,
             ),
-            @html.button(
-              type_="button",
-              class="secondary",
-              on_click=emit(Auth(CopyDeviceCode)),
-              "Copy code",
-            ),
             @html.a(
               href=flow.verification_uri,
               target=Blank,
               rel="noopener noreferrer",
               class="secondary device-open",
-              attrs=@html.Attrs::build().role("button"),
-              "Open GitHub ↗",
+              attrs=@html.Attrs::build()
+                .role("button")
+                .on_click(_ => emit(Auth(CopyDeviceCode))),
+              "Copy code and open GitHub ↗",
             ),
           ])
         } else {

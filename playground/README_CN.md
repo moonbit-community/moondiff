@@ -114,8 +114,8 @@ Checks 与 Commit statuses 让合并卡片同时展示两类 GitHub CI 结果；
 登录后的读取仍由后端完成，以支持私有仓库。浏览器遇到 CORS、网络或限额错误时
 会显示错误，不会改走后端匿名代理。
 
-登录时，playground 页面会显示验证码。复制验证码并打开 GitHub，
-在新窗口中完成设备授权；playground 会自动更新登录状态。
+登录时，playground 页面会显示验证码。点击 **Copy code and open GitHub**，
+验证码会被复制，并在新窗口中打开 GitHub 授权页面；完成设备授权后，playground 会自动更新登录状态。
 刷新页面后会恢复尚未过期的验证码。开始新一轮登录前，先取消当前登录。
 
 ## Docker
