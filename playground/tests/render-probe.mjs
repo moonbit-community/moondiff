@@ -78,3 +78,52 @@ export async function toggleCommit(page, id = 'moondiff-file-0') {
     file.querySelector('.file-toggle').click();
   }), id);
 }
+
+// Measure a trusted pointer interaction through the second animation frame
+// after the native details state changes. The extra frame makes the duration a
+// stable proxy for the first paint that can display the new state.
+export async function toggleDetailsPaint(page, selector, inputSession) {
+  const box = await page.evaluate(selector => {
+    const summary = document.querySelector(selector);
+    const details = summary?.closest('details');
+    if (!summary || !details) throw new Error(`Missing details summary: ${selector}`);
+    summary.scrollIntoView({ block: 'nearest' });
+    const rect = summary.getBoundingClientRect();
+    if (!rect.width || !rect.height) throw new Error(`Details summary is not visible: ${selector}`);
+    globalThis.__moondiffDetailsPaint = new Promise(resolve => {
+      const open = details.open;
+      summary.addEventListener('pointerdown', event => {
+        const dispatched = performance.now();
+        const started = event.timeStamp;
+        const observer = new MutationObserver(() => {
+          if (details.open === open) return;
+          observer.disconnect();
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            const finished = performance.now();
+            resolve({
+              duration: finished - started,
+              inputDelay: dispatched - started,
+              frameDelay: finished - dispatched,
+              open: details.open,
+            });
+          }));
+        });
+        observer.observe(details, { attributes: true, attributeFilter: ['open'] });
+      }, { once: true });
+    });
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  }, selector);
+  const session = inputSession ?? await page.context().newCDPSession(page);
+  try {
+    await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...box });
+    await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...box, button: 'left', buttons: 1, clickCount: 1 });
+    await session.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...box, button: 'left', buttons: 0, clickCount: 1 });
+    return await page.evaluate(async () => {
+      const result = await globalThis.__moondiffDetailsPaint;
+      delete globalThis.__moondiffDetailsPaint;
+      return result;
+    });
+  } finally {
+    if (!inputSession) await session.detach();
+  }
+}

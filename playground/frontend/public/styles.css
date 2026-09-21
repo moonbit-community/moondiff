@@ -1544,6 +1544,11 @@ button.file-tree-row.selected {
   scroll-margin-top: calc(var(--toolbar-inset) + var(--change-title-height) + 0.5rem);
 }
 
+.file-card[data-render-contained="true"] {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto var(--file-intrinsic-block-size);
+}
+
 .file-card.expanded {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.025);
 }
