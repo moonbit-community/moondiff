@@ -18,17 +18,17 @@ fn Client::send_device(
     Start | Retry =>
       (
         "/api/auth/device/start",
-        @protocol.DeviceStart::{ attempt_id: id, }.to_json(),
+        ToJson::to_json(@protocol.DeviceStart::{ attempt_id: id, }),
       )
     Poll =>
       (
         "/api/auth/device/poll",
-        @protocol.DeviceAuthorization::{ authorization_id: id, }.to_json(),
+        ToJson::to_json(@protocol.DeviceAuthorization::{ authorization_id: id, }),
       )
     Cancel =>
       (
         "/api/auth/device/cancel",
-        @protocol.DeviceAuthorization::{ authorization_id: id, }.to_json(),
+        ToJson::to_json(@protocol.DeviceAuthorization::{ authorization_id: id, }),
       )
   }
   self.send(

@@ -42,7 +42,7 @@ fn harness() -> (Client, Network) {
 ///|
 fn[T : ToJson] TestCall::reply(self : TestCall, value : T) -> Unit {
   let response : @protocol.Response[T] = Success(value~)
-  (self.receive)(Ok((200, response.to_json().stringify())))
+  (self.receive)(Ok((200, ToJson::to_json(response).stringify())))
 }
 
 ///|
@@ -290,7 +290,7 @@ test "transport sends v2 JSON and CSRF; errors and malformed responses stay acti
     code: "permission_denied",
     message: "No access",
   })
-  (call.receive)(Ok((403, denied.to_json().stringify())))
+  (call.receive)(Ok((403, ToJson::to_json(denied).stringify())))
   assert_true(
     results[0]
     is Err(
@@ -342,7 +342,7 @@ test "success responses with non-2xx HTTP status are rejected with that status" 
     let (client, n) = harness()
     let results : Array[Result[Unit, Error]] = []
     client.send("/api/rpc", "{}", r => results.push(r))
-    (n.last().receive)(Ok((http_status, response.to_json().stringify())))
+    (n.last().receive)(Ok((http_status, ToJson::to_json(response).stringify())))
     guard results[0] is Err(HttpRequestError(status~, code~, detail~)) else {
       fail("Expected an HTTP error for a non-2xx success response")
     }
@@ -363,7 +363,7 @@ test "valid failure responses retain the server status code and message" {
     let (client, n) = harness()
     let results : Array[Result[Unit, Error]] = []
     client.send("/api/rpc", "{}", r => results.push(r))
-    (n.last().receive)(Ok((http_status, response.to_json().stringify())))
+    (n.last().receive)(Ok((http_status, ToJson::to_json(response).stringify())))
     assert_true(
       results[0]
       is Err(

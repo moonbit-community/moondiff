@@ -116,7 +116,7 @@ fn Client::cache_public(
   key : String,
   value : @protocol.RpcValue,
 ) -> Unit {
-  let bytes = @utf8.encode(value.to_json().stringify()).length()
+  let bytes = @utf8.encode(ToJson::to_json(value).stringify()).length()
   if bytes > 4 * 1048576 {
     return
   }

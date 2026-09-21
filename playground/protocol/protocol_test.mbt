@@ -212,14 +212,14 @@ test "every RPC result and response envelope roundtrips including int64 ids" {
   }
   roundtrip(
     (
-      @protocol.Response::Failure(error={
+      Failure(error={
         status: 403,
         code: "permission_denied",
         message: "No access",
       }) : @protocol.Response[@protocol.RpcValue]),
   )
-  roundtrip((@protocol.Response::Success(value=()) : @protocol.Response[Unit]))
-  assert_true(issue.to_json() is { "id": "9007199254740993", .. })
+  roundtrip((Success(value=()) : @protocol.Response[Unit]))
+  assert_true(ToJson::to_json(issue) is { "id": "9007199254740993", .. })
 }
 
 ///|
