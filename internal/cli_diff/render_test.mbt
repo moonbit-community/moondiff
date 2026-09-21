@@ -8,7 +8,7 @@ test "render renders CST-backed inline diff" {
     #|fn f() {
     #|  foo(baz(bar))
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
   let expected =
     #|[section #1 matched] old lines 1-3; new lines 1-3 · fn f() {
     #|--- old.mbt: lines 1-3
@@ -32,12 +32,12 @@ test "render renders structural changes with negative context as zero" {
     #|fn f() {
     #|  let value = 2
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(context_lines=-2),
+    options=@cli_diff.Options::new(context_lines=-2),
   )
   assert_true(result.contains("let value = 1"))
   assert_true(result.contains("let value = 2"))
@@ -48,7 +48,7 @@ test "render ignores Unicode whitespace-only changes structurally" {
   let old_source = "let value = 1\n"
   for unicode_space in ["\u{00a0}", "\u{3000}"] {
     let new_source = "let\{unicode_space}value = 1\n"
-    let result = render("old.mbt", old_source, "new.mbt", new_source)
+    let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
     assert_eq(result, "")
   }
 }
@@ -56,7 +56,7 @@ test "render ignores Unicode whitespace-only changes structurally" {
 ///|
 test "render returns before parsing identical sources" {
   let source = "fn broken("
-  let result = render("old.mbt", source, "new.mbt", source)
+  let result = @cli_diff.render("old.mbt", source, "new.mbt", source)
   assert_eq(result, "--- old.mbt\n+++ new.mbt\nNo changes.\n")
 }
 
@@ -70,12 +70,12 @@ test "render colors file headers blue" {
     #|fn f() {
     #|  foo(baz(bar))
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
   assert_true(
     result.contains(
@@ -94,12 +94,12 @@ test "render shows partial rhs highlight for wrapped call" {
     #|fn f() {
     #|  foo(baz(bar))
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
   assert_true(
     result.contains(
@@ -124,12 +124,12 @@ test "render colors line numbers without prefix backgrounds or separators" {
     #|fn f() {
     #|  let x = 2
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
 
   assert_true(
@@ -173,7 +173,7 @@ test "render keeps wrapped call matched when adding a sibling call" {
     #|  println("Hello, world!")
     #|  println(5 + 6)
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
   let interleaved_prefix =
     #|2 .   println(
     #|. 2   println("Hello, world!")
@@ -204,7 +204,7 @@ test "render keeps inserted case marker statements novel" {
     #|  println(marker)
     #|  println(fib(8))
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
 
   assert_true(result.contains(". 3   let marker = \"case-002\""))
   assert_true(result.contains(". 4   println(marker)"))
@@ -235,7 +235,7 @@ test "render separates mostly block replacements with one aligned line" {
     #|    _ => fail("expected debug_inspect failure")
     #|  }
     #| }
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
   let separated_block =
     #|2 .   let result = try! @debug.debug_inspect(1)
     #|3 .   let is_err = match result {
@@ -262,12 +262,12 @@ test "render highlights only changed word inside string literal" {
     #|fn f() {
     #|  println("alpha zeta gamma")
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
   assert_true(
     result.contains(
@@ -287,12 +287,12 @@ test "render highlights only changed word inside string literal" {
 test "render does not highlight unchanged trailing delimiter at line end" {
   let old_source = "let a:FixedArray[Int] = FixedArray::make(3, 2)\n"
   let new_source = "let a:FixedArray[Int] = FixedArray::make(3, 3)\n"
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
   assert_true(
     result.contains(
@@ -312,7 +312,7 @@ test "render does not highlight unchanged trailing delimiter at line end" {
 test "render falls back to tokdiff on parser errors" {
   let old_source = "fn broken("
   let new_source = "fn fixed() -> Int { 1 }"
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
   assert_true(result.has_prefix("note: fallback to tokdiff"))
   assert_true(result.contains("--- old.mbt"))
   assert_true(result.contains("+++ new.mbt"))
@@ -340,7 +340,7 @@ test "render uses per-top-level diff without UUIDs" {
     #|fn z() {
     #|  alpha(gamma(beta))
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
   assert_true(
     result.contains("[section #1 matched] old lines 1-3; new lines 1-3"),
   )
@@ -362,7 +362,7 @@ test "render uses per-top-level diff without UUIDs" {
 
 ///|
 test "render summarizes pure reorder without expanding empty fragments" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt", "fn first() {}\nfn second() {}", "new.mbt", "fn second() {}\nfn first() {}",
   )
   assert_eq(
@@ -373,7 +373,7 @@ test "render summarizes pure reorder without expanding empty fragments" {
 
 ///|
 test "render reports mixed reorder and changed fragment coordinates" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt", "fn first() { old_value() }\nfn second() {}", "new.mbt", "fn second() {}\nfn first() { new_value() }",
   )
   assert_true(result.has_prefix("note: top-level declarations reordered\n"))
@@ -384,7 +384,7 @@ test "render reports mixed reorder and changed fragment coordinates" {
 
 ///|
 test "render groups deleted declarations in old order" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt", "fn first() {}\nfn removed() {}\nfn keep() {}", "new.mbt", "fn keep() {}",
   )
   assert_true(result.has_prefix("Deleted declarations (old order):\n"))
@@ -409,7 +409,7 @@ test "render matches no-UUID top-level roots after insertion" {
     #|fn target() {
     #|  foo(baz(bar))
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
 
   assert_true(result.contains("--- old.mbt: lines 2-4"))
   assert_true(result.contains("+++ new.mbt: lines 3-5"))
@@ -434,12 +434,12 @@ test "render falls back to single-definition tokdiff for graph limit" {
     #|fn target() {
     #|  foo(baz(bar))
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(graph_limit=0),
+    options=@cli_diff.Options::new(graph_limit=0),
   )
 
   assert_true(
@@ -454,12 +454,12 @@ test "render falls back to single-definition tokdiff for graph limit" {
 
 ///|
 test "render uses whole-document tokdiff for root graph limit" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     "test {\n  inspect(old_value)\n}",
     "new.mbt",
     "test {\n  inspect(new_value)\n}",
-    options=Options::new(graph_limit=0),
+    options=@cli_diff.Options::new(graph_limit=0),
   )
   assert_true(
     result.has_prefix(
@@ -478,12 +478,12 @@ test "render reports pure comment changes as empty when ignored" {
   let new_source =
     #|/// new docs
     #|fn value() -> Int { 1 } // new trailing
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(ignore_comments=true),
+    options=@cli_diff.Options::new(ignore_comments=true),
   )
   assert_eq(
     result, "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
@@ -492,12 +492,12 @@ test "render reports pure comment changes as empty when ignored" {
 
 ///|
 test "render reports blank-line and final-newline changes as empty when ignored" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     "fn stable() -> Int { 1 }",
     "new.mbt",
     "fn stable() -> Int { 1 }\n\n\t\n\u{2003}",
-    options=Options::new(ignore_comments=true),
+    options=@cli_diff.Options::new(ignore_comments=true),
   )
   assert_eq(
     result, "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
@@ -506,12 +506,12 @@ test "render reports blank-line and final-newline changes as empty when ignored"
 
 ///|
 test "parser fallback reports ignored blank-line changes with the shared empty state" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     "fn broken( {\n",
     "new.mbt",
     "fn broken( {\n\u{3000}\n",
-    options=Options::new(ignore_comments=true),
+    options=@cli_diff.Options::new(ignore_comments=true),
   )
   assert_eq(
     result, "--- old.mbt\n+++ new.mbt\nNo changes besides comments or blank lines.\n",
@@ -530,12 +530,12 @@ test "render keeps ignored comments neutral around code changes" {
     #|fn value() -> Int {
     #|  new_value()  // new explanation
     #|}
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(ignore_comments=true, use_color=true),
+    options=@cli_diff.Options::new(ignore_comments=true, use_color=true),
   )
   assert_true(result.contains("old docs"), msg=result)
   assert_true(result.contains("new docs"), msg=result)
@@ -561,12 +561,12 @@ test "render keeps ignored comments neutral around code changes" {
 
 ///|
 test "render does not treat slashes inside strings as comments" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     "fn url() -> String { \"https://old.example/a//b\" }",
     "new.mbt",
     "fn url() -> String { \"https://new.example/a//b\" }",
-    options=Options::new(ignore_comments=true),
+    options=@cli_diff.Options::new(ignore_comments=true),
   )
   assert_false(result.contains("No changes besides comments or blank lines."))
   assert_true(result.contains("https://old.example/a//b"))
@@ -582,24 +582,24 @@ test "render ignores UUID and block separator comment changes" {
     #|///|
     #|///|UUID(new-id)
     #|fn value() -> Int { 1 }
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     old_source,
     "new.mbt",
     new_source,
-    options=Options::new(ignore_comments=true),
+    options=@cli_diff.Options::new(ignore_comments=true),
   )
   assert_true(result.contains("No changes besides comments or blank lines."))
 }
 
 ///|
 test "parser fallback applies comment filtering in tokdiff" {
-  let result = render(
+  let result = @cli_diff.render(
     "old.mbt",
     "fn broken( { old_value // old comment",
     "new.mbt",
     "fn broken( { new_value // new comment",
-    options=Options::new(ignore_comments=true, use_color=true),
+    options=@cli_diff.Options::new(ignore_comments=true, use_color=true),
   )
   assert_true(result.has_prefix("note: fallback to tokdiff"))
   assert_true(result.contains("old comment"), msg=result)
@@ -618,7 +618,7 @@ test "render keeps whole-file root-list diff when unkeyed top-level items cannot
     #|test {
     #|  inspect(2)
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
 
   assert_true(result.has_prefix("--- old.mbt\n+++ new.mbt\n"))
   assert_false(result.contains(": line"))
@@ -650,7 +650,13 @@ test "non terminate" {
     #|    ...
     #|  }
     #|}
-  let result = render("old.mbt", old, "new.mbt", new, options=Options::new())
+  let result = @cli_diff.render(
+    "old.mbt",
+    old,
+    "new.mbt",
+    new,
+    options=@cli_diff.Options::new(),
+  )
   assert_true(
     result.contains(
       "2 10   let builder = StringBuilder::new(size_hint=bytes.length())",
@@ -681,7 +687,7 @@ test "render keeps UUID-aligned top-level changes on the CST path" {
     #|fn target() {
     #|  foo(baz(bar))
     #|}
-  let result = render("old.mbt", old_source, "new.mbt", new_source)
+  let result = @cli_diff.render("old.mbt", old_source, "new.mbt", new_source)
 
   assert_true(result.contains("--- old.mbt: lines 3-6"))
   assert_true(result.contains("+++ new.mbt: lines 5-8"))
@@ -692,7 +698,7 @@ test "render keeps UUID-aligned top-level changes on the CST path" {
 
 ///|UUID(827921ba-b988-4e71-a6cb-566e48865be0)
 test "render highlights inserted dot access and dot call from the dot" {
-  let field_result = render(
+  let field_result = @cli_diff.render(
     "old.mbt",
     (
       #|fn f() {
@@ -705,7 +711,7 @@ test "render highlights inserted dot access and dot call from the dot" {
       #|  obj.field
       #|}
     ),
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
   assert_true(
     field_result.contains(
@@ -713,7 +719,7 @@ test "render highlights inserted dot access and dot call from the dot" {
     ),
   )
 
-  let call_result = render(
+  let call_result = @cli_diff.render(
     "old.mbt",
     (
       #|fn f() {
@@ -726,7 +732,7 @@ test "render highlights inserted dot access and dot call from the dot" {
       #|  obj.method()
       #|}
     ),
-    options=Options::new(use_color=true),
+    options=@cli_diff.Options::new(use_color=true),
   )
   assert_true(
     call_result.contains(

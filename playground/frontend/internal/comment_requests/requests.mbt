@@ -2,9 +2,8 @@
 fn comment_list_args(reference : CommitRef) -> @protocol.CommentsList {
   let target = match reference.target {
     PullRequest(number) => @protocol.CommentTarget::Pull(number~)
-    Commit(sha) => @protocol.CommentTarget::Commit(sha~)
-    PullCommit(number, sha) =>
-      @protocol.CommentTarget::PullCommit(number~, sha~)
+    Commit(sha) => Commit(sha~)
+    PullCommit(number, sha) => PullCommit(number~, sha~)
   }
   { owner: reference.owner, repo: reference.repo, target, }
 }
@@ -45,12 +44,7 @@ pub fn create_issue_comment_request(
   emit : @rabbita.Emit[Result[ApiIssueComment, Error]],
 ) -> @rabbita.Cmd {
   @github_client.create_issue_comment(
-    @protocol.IssueCommentCreate::{
-      owner: reference.owner,
-      repo: reference.repo,
-      number,
-      body,
-    },
+    { owner: reference.owner, repo: reference.repo, number, body, },
     generation,
     emit,
   )
@@ -67,7 +61,7 @@ pub fn create_review_comment_request(
   emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
   @github_client.create_review_comment(
-    @protocol.ReviewCommentCreate::{
+    {
       owner: reference.owner,
       repo: reference.repo,
       number,
@@ -75,9 +69,9 @@ pub fn create_review_comment_request(
       path: anchor.path,
       line: anchor.line,
       side: if anchor.side is Left {
-        @protocol.CommentSide::Left
+        Left
       } else {
-        @protocol.CommentSide::Right
+        Right
       },
       body,
     },
@@ -97,7 +91,7 @@ pub fn create_commit_comment_request(
 ) -> @rabbita.Cmd {
   guard anchor.position is Some(position) else { return @rabbita.none }
   @github_client.create_commit_comment(
-    @protocol.CommitCommentCreate::{
+    {
       owner: reference.owner,
       repo: reference.repo,
       sha,
@@ -120,13 +114,7 @@ pub fn create_review_reply_request(
   emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
   @github_client.create_review_reply(
-    @protocol.ReviewReplyCreate::{
-      owner: reference.owner,
-      repo: reference.repo,
-      number,
-      comment_id,
-      body,
-    },
+    { owner: reference.owner, repo: reference.repo, number, comment_id, body, },
     generation,
     emit,
   )

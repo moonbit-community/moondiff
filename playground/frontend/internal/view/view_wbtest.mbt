@@ -1,7 +1,7 @@
 ///|
 fn build_file_tree(files : ArrayView[FileState]) -> Array[FileTreeRow] {
   build_file_tree_metadata(
-    files.map(f => TreeMetadata::{
+    files.map(f => {
       path: f.file.filename,
       previous_filename: f.file.previous_filename,
       status: f.file.status,

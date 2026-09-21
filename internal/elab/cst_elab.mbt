@@ -25,24 +25,20 @@ fn CstElabCtx::new(source : String) -> Self {
     }
   }
   line_ranges.push((line_start, source.length()))
-  CstElabCtx::{
-    source,
-    line_widths: LineWidths::from_str(source),
-    line_ranges,
-  }
+  { source, line_widths: LineWidths::from_str(source), line_ranges, }
 }
 
 ///|
 fn node_has_type_atoms(kind : @cst.NodeKind) -> Bool {
   kind.is_type() ||
   (match kind {
-    @cst.Name_Constructor
-    | @cst.Name_Constr
-    | @cst.Name_ConstrId
-    | @cst.Expr_Constr
-    | @cst.Pattern_Constr
-    | @cst.Pattern_ConstrAny
-    | @cst.Pattern_SpecialConstr => true
+    Name_Constructor
+    | Name_Constr
+    | Name_ConstrId
+    | Expr_Constr
+    | Pattern_Constr
+    | Pattern_ConstrAny
+    | Pattern_SpecialConstr => true
     _ => false
   })
 }
@@ -50,19 +46,19 @@ fn node_has_type_atoms(kind : @cst.NodeKind) -> Bool {
 ///|
 fn syntax_kind_is_token(kind : @cst.NodeKind) -> Bool {
   match kind {
-    @cst.Syntax_Keyword
-    | @cst.Syntax_Delimiter
-    | @cst.Syntax_Separator
-    | @cst.Syntax_Operator
-    | @cst.Syntax_Identifier
-    | @cst.Syntax_Label
-    | @cst.Syntax_Accessor
-    | @cst.Syntax_Literal
-    | @cst.Syntax_Interpolation
-    | @cst.Syntax_Attribute
-    | @cst.Syntax_Comment
-    | @cst.Syntax_Eof
-    | @cst.Syntax_Unexpected => true
+    Syntax_Keyword
+    | Syntax_Delimiter
+    | Syntax_Separator
+    | Syntax_Operator
+    | Syntax_Identifier
+    | Syntax_Label
+    | Syntax_Accessor
+    | Syntax_Literal
+    | Syntax_Interpolation
+    | Syntax_Attribute
+    | Syntax_Comment
+    | Syntax_Eof
+    | Syntax_Unexpected => true
     _ => false
   }
 }
@@ -72,25 +68,24 @@ fn literal_atom_kind(node : @cst.CstNode) -> AtomKind {
   for entry in node.children {
     let (_, child) = entry
     match child.kind {
-      @cst.Constant_Bool => return AtomKind::Keyword
-      @cst.Constant_Byte
-      | @cst.Constant_Bytes
-      | @cst.Constant_Char
-      | @cst.Constant_String
-      | @cst.Constant_Regex =>
-        return AtomKind::String(StringKind::StringLiteral)
-      @cst.Constant_Int
-      | @cst.Constant_Int64
-      | @cst.Constant_UInt
-      | @cst.Constant_UInt64
-      | @cst.Constant_Float
-      | @cst.Constant_Double
-      | @cst.Constant_BigInt => return AtomKind::Normal
+      Constant_Bool => return Keyword
+      Constant_Byte
+      | Constant_Bytes
+      | Constant_Char
+      | Constant_String
+      | Constant_Regex => return String(StringLiteral)
+      Constant_Int
+      | Constant_Int64
+      | Constant_UInt
+      | Constant_UInt64
+      | Constant_Float
+      | Constant_Double
+      | Constant_BigInt => return Normal
       _ => ()
     }
   }
   // Multiline string tokens carry only a scalar payload in the new CST.
-  AtomKind::String(StringKind::StringLiteral)
+  String(StringLiteral)
 }
 
 ///|
@@ -109,19 +104,16 @@ fn syntax_atom_kind(
   type_context : Bool,
 ) -> AtomKind {
   match node.kind {
-    @cst.Syntax_Comment => AtomKind::Comment
-    @cst.Syntax_Keyword => AtomKind::Keyword
-    @cst.Syntax_Operator if content == "readonly" ||
+    Syntax_Comment => Comment
+    Syntax_Keyword => Keyword
+    Syntax_Operator if content == "readonly" ||
       content == "extend" ||
-      content == "→" => AtomKind::Keyword
-    @cst.Syntax_Interpolation => AtomKind::String(StringKind::StringLiteral)
-    @cst.Syntax_Literal => literal_atom_kind(node)
-    @cst.Syntax_Identifier | @cst.Syntax_Accessor if starts_with_uppercase_name(
-        content,
-      ) ||
-      (type_context && content.length() > 0 && content[0] == '@') =>
-      AtomKind::Type
-    _ => AtomKind::Normal
+      content == "→" => Keyword
+    Syntax_Interpolation => String(StringLiteral)
+    Syntax_Literal => literal_atom_kind(node)
+    Syntax_Identifier | Syntax_Accessor if starts_with_uppercase_name(content) ||
+      (type_context && content.length() > 0 && content[0] == '@') => Type
+    _ => Normal
   }
 }
 
@@ -217,7 +209,7 @@ fn CstElabCtx::gap_position(
   let start_col = self.source[line_start:start].to_owned().to_array().length() +
     1
   let end_col = self.source[line_start:end_].to_owned().to_array().length() + 1
-  SingleLineSpan::{ line, start_col, end_col, }
+  { line, start_col, end_col, }
 }
 
 ///|
@@ -246,7 +238,7 @@ fn CstElabCtx::append_gap(
       Syntax::atom(
         content~,
         position=[self.gap_position(start, i)],
-        kind=AtomKind::Normal,
+        kind=Normal,
       ),
     )
   }
@@ -284,7 +276,7 @@ fn CstElabCtx::elab_syntax_token(
   node : @cst.CstNode,
   type_context : Bool,
 ) -> Syntax? {
-  if node.kind is @cst.Syntax_Eof {
+  if node.kind is Syntax_Eof {
     return None
   }
   let content = self.node_text(node)
@@ -311,7 +303,7 @@ fn CstElabCtx::elab_node(
     return self.elab_syntax_token(node, inherited_type_context)
   }
   match node.kind {
-    @cst.Missing | @cst.Leaf(_) => None
+    Missing | Leaf(_) => None
     kind => {
       let type_context = inherited_type_context || node_has_type_atoms(kind)
       let open_index = first_child_with_label(node.children, "open")

@@ -48,10 +48,10 @@ async fn write_stdout(message : String) -> Unit {
 
 ///|UUID(07090eb9-2c1a-4f1c-902b-014898f20578)
 fn moondiff_command() -> @argparse.Command {
-  @argparse.Command(
+  Command(
     "moondiff",
     options=[
-      @argparse.OptionArg(
+      OptionArg(
         "graph-limit",
         short='g',
         about="Maximum syntax graph size before falling back to tokdiff",
@@ -59,25 +59,21 @@ fn moondiff_command() -> @argparse.Command {
       ),
     ],
     flags=[
-      @argparse.FlagArg(
-        "no-color",
-        about="Disable ANSI colors",
-        action=@argparse.FlagAction::SetFalse,
-      ),
-      @argparse.FlagArg(
+      FlagArg("no-color", about="Disable ANSI colors", action=SetFalse),
+      FlagArg(
         "ignore-comments",
         about="Ignore MoonBit comment-only and blank-line-only differences",
-        action=@argparse.FlagAction::SetTrue,
+        action=SetTrue,
       ),
-      @argparse.FlagArg(
+      FlagArg(
         "ignore-tests",
         about="Ignore *_test.mbt / *_wbtest.mbt file pairs and top-level MoonBit test and async test blocks",
-        action=@argparse.FlagAction::SetTrue,
+        action=SetTrue,
       ),
     ],
     positionals=[
-      @argparse.PositionArg("old-file", num_args=@argparse.ValueRange::single()),
-      @argparse.PositionArg("new-file", num_args=@argparse.ValueRange::single()),
+      PositionArg("old-file", num_args=@argparse.ValueRange::single()),
+      PositionArg("new-file", num_args=@argparse.ValueRange::single()),
     ],
   )
 }

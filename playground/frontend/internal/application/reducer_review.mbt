@@ -64,8 +64,7 @@ fn update_review(
     }
     PageReactivated => {
       guard !(model.auth is DeviceCancelling(_, _)) &&
-        !(model.auth
-        is Authorizing({ phase: @protocol.DevicePhase::Starting, .. }, _)) &&
+        !(model.auth is Authorizing({ phase: Starting, .. }, _)) &&
         !(model.auth is AuthChecking) else {
         return (model, @rabbita.none)
       }

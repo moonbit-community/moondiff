@@ -59,11 +59,11 @@ fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
 
   fn walk(lines : Array[Array[Char]], syntax : Syntax) -> Unit raise {
     match syntax {
-      Syntax::Atom(content~, position~, ..) => {
+      Atom(content~, position~, ..) => {
         assert_true(!position.is_empty())
         assert_eq(positions_text(lines, position), content)
       }
-      Syntax::List(
+      List(
         open_content~,
         open_position~,
         children~,
@@ -92,8 +92,8 @@ fn assert_source_faithful(source : String, syntax : Syntax) -> Unit raise {
 ///|
 fn collect_delims(syntax : Syntax, delims : Array[(String, String)]) -> Unit {
   match syntax {
-    Syntax::Atom(..) => ()
-    Syntax::List(open_content~, children~, close_content~, ..) => {
+    Atom(..) => ()
+    List(open_content~, children~, close_content~, ..) => {
       if !open_content.is_empty() || !close_content.is_empty() {
         delims.push((open_content, close_content))
       }
@@ -122,8 +122,8 @@ fn has_delim(
 ///|
 fn syntax_contains(syntax : Syntax, content : String) -> Bool {
   match syntax {
-    Syntax::Atom(content=atom_content, ..) => atom_content == content
-    Syntax::List(open_content~, children~, close_content~, ..) => {
+    Atom(content=atom_content, ..) => atom_content == content
+    List(open_content~, children~, close_content~, ..) => {
       if open_content == content || close_content == content {
         return true
       }
@@ -149,13 +149,13 @@ fn cst_contains_kind(
 ///|
 fn atom_kind(syntax : Syntax, wanted : String) -> @dsyntax.AtomKind? {
   match syntax {
-    Syntax::Atom(content~, kind~, ..) =>
+    Atom(content~, kind~, ..) =>
       if content == wanted {
         Some(kind)
       } else {
         None
       }
-    Syntax::List(children~, ..) => {
+    List(children~, ..) => {
       for child in children {
         if atom_kind(child, wanted) is Some(kind) {
           return Some(kind)
@@ -169,8 +169,8 @@ fn atom_kind(syntax : Syntax, wanted : String) -> @dsyntax.AtomKind? {
 ///|
 fn collect_brace_blocks(syntax : Syntax, blocks : Array[Syntax]) -> Unit {
   match syntax {
-    Syntax::Atom(..) => ()
-    Syntax::List(open_content~, close_content~, children~, ..) => {
+    Atom(..) => ()
+    List(open_content~, close_content~, children~, ..) => {
       if open_content == "{" && close_content == "}" {
         blocks.push(syntax)
       }
@@ -191,11 +191,11 @@ fn push_line_once(lines : Array[Int], line : Int) -> Unit {
 ///|
 fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
   match syntax {
-    Syntax::Atom(position~, ..) =>
+    Atom(position~, ..) =>
       for span in position {
         push_line_once(lines, span.line)
       }
-    Syntax::List(open_position~, children~, close_position~, ..) => {
+    List(open_position~, children~, close_position~, ..) => {
       for span in open_position {
         push_line_once(lines, span.line)
       }
@@ -233,11 +233,11 @@ fn add_span_coverage(
 ///|
 fn collect_coverage(syntax : Syntax, coverage : Array[Array[Int]]) -> Unit {
   match syntax {
-    Syntax::Atom(position~, ..) =>
+    Atom(position~, ..) =>
       for span in position {
         add_span_coverage(coverage, span)
       }
-    Syntax::List(open_position~, children~, close_position~, ..) => {
+    List(open_position~, children~, close_position~, ..) => {
       for span in open_position {
         add_span_coverage(coverage, span)
       }
@@ -274,9 +274,9 @@ fn assert_non_whitespace_covered_once(
 test "CST elaboration preserves the exact list node kind" {
   let source = "fn f { () }"
   let node = only_item(source)
-  assert_true(node.kind is @cst.Impl_Function)
+  assert_true(node.kind is Impl_Function)
   let syntax = @elab.elab_cst(source, node)
-  guard syntax is Syntax::List(kind=Some(kind), ..) else {
+  guard syntax is List(kind=Some(kind), ..) else {
     fail("expected the function item to elaborate to an identified list")
   }
   assert_true(kind == ListKind::from_node_kind(node.kind))
@@ -336,9 +336,7 @@ test "CST elaboration exposes block statements as siblings" {
   let blocks = Array()
   collect_brace_blocks(syntax, blocks)
   assert_eq(blocks.length(), 1)
-  guard blocks[0] is Syntax::List(children~, ..) else {
-    fail("expected block list")
-  }
+  guard blocks[0] is List(children~, ..) else { fail("expected block list") }
   let line_sets = children.map(syntax_lines)
   assert_true(line_sets.any(fn(lines) { lines == [3] }))
   assert_true(line_sets.any(fn(lines) { lines == [4] }))
@@ -398,40 +396,28 @@ test "new CST syntax kinds retain display atom categories" {
     #|  // note
     #|}
   let syntax = @elab.elab_cst(source, only_item(source))
-  assert_true(atom_kind(syntax, "fn") == Some(@dsyntax.AtomKind::Keyword))
-  assert_true(atom_kind(syntax, "true") == Some(@dsyntax.AtomKind::Keyword))
-  assert_true(atom_kind(syntax, "42") == Some(@dsyntax.AtomKind::Normal))
+  assert_true(atom_kind(syntax, "fn") == Some(Keyword))
+  assert_true(atom_kind(syntax, "true") == Some(Keyword))
+  assert_true(atom_kind(syntax, "42") == Some(Normal))
   assert_true(
-    atom_kind(syntax, "\"value=\\{value}\"") ==
-    Some(@dsyntax.AtomKind::String(@dsyntax.StringKind::StringLiteral)),
+    atom_kind(syntax, "\"value=\\{value}\"") == Some(String(StringLiteral)),
   )
-  assert_true(atom_kind(syntax, "@pkg") == Some(@dsyntax.AtomKind::Type))
-  assert_true(atom_kind(syntax, "Type") == Some(@dsyntax.AtomKind::Type))
+  assert_true(atom_kind(syntax, "@pkg") == Some(Type))
+  assert_true(atom_kind(syntax, "Type") == Some(Type))
   let operator_keyword_source = "pub(readonly) fn extend(a : Bool, b : Bool) { a → b }"
   let operator_keyword_syntax = @elab.elab_cst(
     operator_keyword_source,
     only_item(operator_keyword_source),
   )
-  assert_true(
-    atom_kind(operator_keyword_syntax, "readonly") ==
-    Some(@dsyntax.AtomKind::Keyword),
-  )
-  assert_true(
-    atom_kind(operator_keyword_syntax, "extend") ==
-    Some(@dsyntax.AtomKind::Keyword),
-  )
-  assert_true(
-    atom_kind(operator_keyword_syntax, "→") ==
-    Some(@dsyntax.AtomKind::Keyword),
-  )
+  assert_true(atom_kind(operator_keyword_syntax, "readonly") == Some(Keyword))
+  assert_true(atom_kind(operator_keyword_syntax, "extend") == Some(Keyword))
+  assert_true(atom_kind(operator_keyword_syntax, "→") == Some(Keyword))
   let comment_source = "// note\nlet x = 1"
   let comment_syntax = @elab.elab_cst(
     comment_source,
     @cst.parse_structure(comment_source).root(),
   )
-  assert_true(
-    atom_kind(comment_syntax, "// note") == Some(@dsyntax.AtomKind::Comment),
-  )
+  assert_true(atom_kind(comment_syntax, "// note") == Some(Comment))
 }
 
 ///|
@@ -453,10 +439,10 @@ test "parser 0.3.19 CST additions elaborate source-faithfully" {
   for
     predicate in [
       fn(kind) { kind is @cst.Expr_ErrDefer },
-      fn(kind) { kind is @cst.Pattern_ConstrAny },
-      fn(kind) { kind is @cst.Expr_LexMatch },
-      fn(kind) { kind is @cst.Case_LexScanCase },
-      fn(kind) { kind is @cst.List_LexScanCaseList },
+      fn(kind) { kind is Pattern_ConstrAny },
+      fn(kind) { kind is Expr_LexMatch },
+      fn(kind) { kind is Case_LexScanCase },
+      fn(kind) { kind is List_LexScanCaseList },
     ] {
     assert_true(cst_contains_kind(root, predicate))
   }
@@ -464,8 +450,8 @@ test "parser 0.3.19 CST additions elaborate source-faithfully" {
   assert_source_faithful(source, syntax)
   assert_non_whitespace_covered_once(source, syntax)
   for keyword in ["nocancel", "errdefer", "lexmatch"] {
-    assert_true(atom_kind(syntax, keyword) == Some(@dsyntax.AtomKind::Keyword))
+    assert_true(atom_kind(syntax, keyword) == Some(Keyword))
   }
-  assert_true(atom_kind(syntax, "@pkg") == Some(@dsyntax.AtomKind::Type))
-  assert_true(atom_kind(syntax, "T") == Some(@dsyntax.AtomKind::Type))
+  assert_true(atom_kind(syntax, "@pkg") == Some(Type))
+  assert_true(atom_kind(syntax, "T") == Some(Type))
 }

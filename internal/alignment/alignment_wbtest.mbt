@@ -93,7 +93,7 @@ fn align_impl_units_by_key(
     alignment_test_budget(),
     use_uuid~,
   ) catch {
-    @computation.ScopeLimitExceeded(..) => panic()
+    ScopeLimitExceeded(..) => panic()
   }
 }
 
@@ -112,7 +112,7 @@ test "fresh pipeline scopes have independent budget state" {
   fresh.budget.charge(1U, TopLevelAlignment)
   for budget in [pipeline.budget, fresh.budget] {
     try budget.charge(1U, TopLevelAlignment) catch {
-      @computation.ScopeLimitExceeded(stage~, limit~) => {
+      ScopeLimitExceeded(stage~, limit~) => {
         assert_true(stage is TopLevelAlignment)
         assert_eq(limit, 1U)
       }
@@ -660,7 +660,7 @@ test "body fingerprints are charged and cached once per alignment" {
   let rejected_cache : Array[ImplFuzzyBody?] = Array::make(units.length(), None)
   let insufficient = @computation.ScopeBudget::new(work - 1)
   try impl_fuzzy_body_at(units, 0, rejected_cache, insufficient) catch {
-    @computation.ScopeLimitExceeded(stage~, limit~) => {
+    ScopeLimitExceeded(stage~, limit~) => {
       assert_true(stage is TopLevelAlignment)
       assert_eq(limit, work - 1)
       assert_true(rejected_cache[0] is None)
@@ -676,7 +676,7 @@ test "body fingerprints are charged and cached once per alignment" {
   }
   assert_eq(first.mass, second.mass)
   try budget.charge(1U, TopLevelAlignment) catch {
-    @computation.ScopeLimitExceeded(stage~, limit~) => {
+    ScopeLimitExceeded(stage~, limit~) => {
       assert_true(stage is TopLevelAlignment)
       assert_eq(limit, work)
     }
@@ -1589,13 +1589,13 @@ test "renamed declarations render one paired hunk in lexical and AST modes" {
 ///|
 fn find_atom(node : @syntax.Syntax, content : String) -> @syntax.Syntax? {
   match node {
-    @syntax.Syntax::Atom(content=actual, ..) =>
+    Atom(content=actual, ..) =>
       if actual == content {
         Some(node)
       } else {
         None
       }
-    @syntax.Syntax::List(children~, ..) => {
+    List(children~, ..) => {
       for child in children {
         if find_atom(child, content) is Some(found) {
           return Some(found)
@@ -1642,12 +1642,10 @@ test "CST wrappers do not hide inserted sibling statements" {
   }
 
   let rhs_inserted_atom = find_atom(rhs_roots[0], "5").unwrap()
-  assert_true(
-    change_map.get(rhs_inserted_atom) is Some(@syntax.ChangeKind::Novel),
-  )
+  assert_true(change_map.get(rhs_inserted_atom) is Some(Novel))
   let lhs_string = find_atom(lhs_roots[0], "\"Hello, world!\"").unwrap()
   match change_map.get(lhs_string) {
-    Some(@syntax.ChangeKind::Unchanged(opposite)) =>
+    Some(Unchanged(opposite)) =>
       @debug.assert_eq(opposite.content_id(), lhs_string.content_id())
     _ => panic()
   }
@@ -2126,15 +2124,15 @@ test "implementation unit ranges are exact across universal newlines" {
     ] {
     let units = parse_units(source)
     assert_eq(units.length(), 2)
-    assert_true(units[0].range == @model.LineRange::{ start: 0, len: 1, })
-    assert_true(units[1].range == @model.LineRange::{ start: 1, len: 1, })
+    assert_true(units[0].range == { start: 0, len: 1, })
+    assert_true(units[1].range == { start: 1, len: 1, })
   }
 
   let documented = parse_units(
     "/// docs\nfn first() {}\n\n/// next\nfn second() {}\n",
   )
-  assert_true(documented[0].range == @model.LineRange::{ start: 0, len: 2, })
-  assert_true(documented[1].range == @model.LineRange::{ start: 3, len: 2, })
+  assert_true(documented[0].range == { start: 0, len: 2, })
+  assert_true(documented[1].range == { start: 3, len: 2, })
 }
 
 ///|

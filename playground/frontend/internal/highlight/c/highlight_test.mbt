@@ -101,11 +101,8 @@ test "C operators use complete tokens" {
   let operators = "++ -- -> << >> <= >= == != && || += -= *= /= %= &= |= ^= <<= >>= + - * / % & | ^ = < > ! ~ ? : . ... # ##"
   assert_eq(
     colored_line("x \{operators}"),
-    [("x", @highlight.Variable)] +
-    operators
-    .split(" ")
-    .to_array()
-    .map(word => (word.to_owned(), @highlight.Operator)),
+    [("x", Variable)] +
+    operators.split(" ").to_array().map(word => (word.to_owned(), Operator)),
   )
 }
 

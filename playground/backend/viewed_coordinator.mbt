@@ -23,7 +23,7 @@ async fn[T] App::with_viewed_scope(
   let coordinator = match self.viewed_scopes.get(key) {
     Some(coordinator) => coordinator
     None => {
-      let coordinator = { mutex: @async.Mutex(), users: 0, }
+      let coordinator = { mutex: Mutex(), users: 0, }
       self.viewed_scopes[key] = coordinator
       coordinator
     }

@@ -58,7 +58,7 @@ fn pending_api_status(id : String) -> ApiAuthStatus {
     ..anonymous_api_status(),
     device_flow: Some({
       id,
-      phase: @protocol.DevicePhase::Pending,
+      phase: Pending,
       user_code: "ABCD-EFGH",
       verification_uri: "https://github.com/login/device",
       expires_at: 2000000000,
@@ -97,10 +97,7 @@ test "cancel and logout ignore late device, copy and session responses" {
   let waiting = with_auth(initial_model(), auth_status_from_api(status))
   let result = Ok({
     ..signed_in_api_status("alice"),
-    device_flow: status.device_flow.map(flow => {
-      ..flow,
-      phase: @protocol.DevicePhase::Completed,
-    }),
+    device_flow: status.device_flow.map(flow => { ..flow, phase: Completed, }),
   })
   let (cancelling, _) = update_auth(waiting, CancelSignIn, emit)
   let (logging_out, _) = update_auth(waiting, Logout, emit)
@@ -187,7 +184,7 @@ test "responses must match both the current attempt and echoed authorization ID"
 ///|
 test "pending session errors retain recovery identity and can distinguish terminal device errors" {
   let pending = pending_api_status("device-attempt-00001")
-  for phase in [@protocol.Expired, @protocol.Denied, @protocol.Failed] {
+  for phase in [@protocol.Expired, Denied, Failed] {
     let terminal = {
       ..pending,
       device_flow: pending.device_flow.map(flow => {
@@ -200,10 +197,7 @@ test "pending session errors retain recovery identity and can distinguish termin
   }
   let cancelled = {
     ..pending,
-    device_flow: pending.device_flow.map(flow => {
-      ..flow,
-      phase: @protocol.DevicePhase::Cancelled,
-    }),
+    device_flow: pending.device_flow.map(flow => { ..flow, phase: Cancelled, }),
   }
   assert_true(auth_status_from_api(cancelled) is Anonymous(_))
   assert_true(

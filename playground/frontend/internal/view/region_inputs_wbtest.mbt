@@ -90,7 +90,7 @@ test "file inputs ignore another file, tree controls and draft text outside thei
   let other = test_file_input(initial, 1)
   for
     msg in [
-      @application.Load(@application.ToggleFile(1, 0)),
+      @application.Load(ToggleFile(1, 0)),
       Ui(FileTreeSearchChanged("query")),
       Ui(FileTreeWidthChanged(400)),
       Ui(ToggleFileTreeDirectory("src")),
@@ -126,7 +126,7 @@ test "merge status changes invalidate only the independent merge region" {
   assert_false(
     RegionProjection::new()
     .inputs(region_model())
-    .any(entry => entry.0 is @application.PullMergeStatus),
+    .any(entry => entry.0 is PullMergeStatus),
   )
   let model = pull_region_model()
   let projection = RegionProjection::new()
@@ -154,7 +154,7 @@ test "merge status changes invalidate only the independent merge region" {
     let (before_region, before_input) = before[index]
     let (after_region, after_input) = after[index]
     assert_true(before_region == after_region)
-    if before_region is @application.PullMergeStatus {
+    if before_region is PullMergeStatus {
       assert_false(before_input == after_input)
     } else {
       assert_true(before_input == after_input)

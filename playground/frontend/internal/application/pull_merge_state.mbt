@@ -49,7 +49,7 @@ fn pull_merge_status_pending(status : @protocol.ApiPullMergeStatus) -> Bool {
   (
     status.mergeable is None ||
     status.rebaseable is None ||
-    status.ci_summary is Some(@protocol.ApiCiState::Pending)
+    status.ci_summary is Some(Pending)
   )
 }
 

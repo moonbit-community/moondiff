@@ -18,7 +18,7 @@ pub struct FileDerivation {
 pub fn FileDerivation::new() -> FileDerivation {
   {
     source: None,
-    patch: @review.NotCommentable,
+    patch: NotCommentable,
     rows: Map([]),
     visibility: None,
     projection: { lines: Map([]), editors: Map([]), },

@@ -18,7 +18,7 @@ fn Coordinator::forward(
   self : Coordinator,
   raw : @rabbita.Emit[Event],
 ) -> @rabbita.Emit[@application.Msg] {
-  @cmd.Emit(msg => @cmd.custom_cmd(_ => self.run(raw({ message: Some(msg), }))))
+  Emit(msg => @cmd.custom_cmd(_ => self.run(raw({ message: Some(msg), }))))
 }
 
 ///|

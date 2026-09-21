@@ -142,7 +142,7 @@ fn update_viewed(
         model.auth is SignedIn(user_id=Some(user_id), ..) else {
         return (model, @rabbita.none)
       }
-      let desired = before != @protocol.FileViewedState::Viewed
+      let desired = before != Viewed
       let record : ViewedRecord = {
         id: new_auth_attempt_id(),
         user_id,

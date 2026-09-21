@@ -73,11 +73,7 @@ test "merge card renders GitHub-style CI summary warnings and safe job links" {
       ..@application.PullMergeState::new(),
       status: Some(pull_merge_view_status()),
     },
-    auth: @application.SignedIn(
-      login=Some("alice"),
-      user_id=Some("1"),
-      install_url=None,
-    ),
+    auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
     snapshot_stale: false,
   })
   assert_true(
@@ -122,18 +118,11 @@ test "merge card distinguishes stale draft conflict unknown and merged states" {
   let input = fn(status) {
     PullMergeInput::{
       state: state(status),
-      auth: @application.SignedIn(
-        login=Some("alice"),
-        user_id=Some("1"),
-        install_url=None,
-      ),
+      auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
       snapshot_stale: false,
     }
   }
-  let anonymous = render_pull_merge({
-    ..input(base),
-    auth: @application.Anonymous(None),
-  })
+  let anonymous = render_pull_merge({ ..input(base), auth: Anonymous(None), })
   assert_true(anonymous.contains("Sign in to merge"), msg=anonymous)
   let stale = render_pull_merge({ ..input(base), snapshot_stale: true, })
   assert_true(stale.contains("Load latest"), msg=stale)
@@ -151,21 +140,13 @@ test "merge card distinguishes stale draft conflict unknown and merged states" {
   assert_true(merged.contains("pull request is merged"), msg=merged)
   let blocked = render_pull_merge({
     ..input({ ..base, mergeable_state: "blocked", }),
-    auth: @application.SignedIn(
-      login=Some("alice"),
-      user_id=Some("1"),
-      install_url=None,
-    ),
+    auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
   })
   assert_true(blocked.contains("Repository rules currently block"), msg=blocked)
   assert_true(blocked.contains("disabled"), msg=blocked)
   let behind = render_pull_merge({
     ..input({ ..base, mergeable_state: "behind", }),
-    auth: @application.SignedIn(
-      login=Some("alice"),
-      user_id=Some("1"),
-      install_url=None,
-    ),
+    auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
   })
   assert_true(behind.contains("Rebase and merge"), msg=behind)
 }
@@ -185,16 +166,16 @@ test "merge region sits between discussion and changed files" {
           drawer_open: false,
           preferred_width: 300,
           display: {
-            mode: @change.Split,
-            algorithm: @change.LexicalAlgorithm,
+            mode: Split,
+            algorithm: LexicalAlgorithm,
             ignore_comments: false,
             ignore_tests: false,
           },
         },
         [
-          { region: @application.Discussion, id: "discussion", },
-          { region: @application.PullMergeStatus, id: "merge", },
-          { region: @application.File("src/main.mbt"), id: "file", },
+          { region: Discussion, id: "discussion", },
+          { region: PullMergeStatus, id: "merge", },
+          { region: File("src/main.mbt"), id: "file", },
         ],
       ),
     )

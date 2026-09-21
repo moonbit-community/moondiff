@@ -41,7 +41,7 @@ fn auth_device_id(auth : AuthStatus) -> String? {
 fn starting_device(id : String) -> ApiDeviceFlow {
   {
     id,
-    phase: @protocol.DevicePhase::Starting,
+    phase: Starting,
     user_code: "",
     verification_uri: "",
     expires_at: 0,

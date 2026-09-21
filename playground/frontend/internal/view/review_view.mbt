@@ -670,9 +670,9 @@ fn auth_controls(
       @html.div(class="auth-controls device-auth", [
         @html.p(
           class="device-prompt",
-          if flow.phase == @protocol.DevicePhase::Starting {
+          if flow.phase == Starting {
             "Starting GitHub sign-in…"
-          } else if flow.phase == @protocol.DevicePhase::Verifying {
+          } else if flow.phase == Verifying {
             "Confirming your GitHub account…"
           } else {
             "Enter this code on GitHub to sign in:"
@@ -710,7 +710,7 @@ fn auth_controls(
             notice
           } else if !flow.message.is_empty() {
             flow.message
-          } else if flow.phase == @protocol.DevicePhase::Pending {
+          } else if flow.phase == Pending {
             "Waiting for authorization. This page will update automatically."
           } else {
             "Keep this page open. Sign-in will continue automatically."

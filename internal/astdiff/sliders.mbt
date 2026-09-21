@@ -1,8 +1,8 @@
 ///|UUID(89bda497-6076-4334-9b19-5ccb51ca46eb)
 fn first_line_span(node : Syntax) -> SingleLineSpan? {
   match node {
-    Syntax::Atom(position~, ..) => position.get(0)
-    Syntax::List(open_position~, children~, close_position~, ..) => {
+    Atom(position~, ..) => position.get(0)
+    List(open_position~, children~, close_position~, ..) => {
       if open_position.length() > 0 {
         return Some(open_position[0])
       }
@@ -19,8 +19,8 @@ fn first_line_span(node : Syntax) -> SingleLineSpan? {
 ///|UUID(58b4e28c-85b6-4908-ab93-a9fa72735043)
 fn last_line_span(node : Syntax) -> SingleLineSpan? {
   match node {
-    Syntax::Atom(position~, ..) => position.last()
-    Syntax::List(open_position~, children~, close_position~, ..) => {
+    Atom(position~, ..) => position.last()
+    List(open_position~, children~, close_position~, ..) => {
       if close_position is [.., last] {
         return Some(last)
       }
@@ -50,8 +50,8 @@ fn distance_between(prev : Syntax, next : Syntax) -> Int {
 ///|UUID(ac67c943-c495-4cb7-8a0a-02aeacceb1c7)
 fn is_novel_deep(node : Syntax, change_map : ChangeMap) -> Bool {
   match node {
-    Syntax::Atom(..) => change_map.get(node) is Some(Novel)
-    Syntax::List(children~, ..) =>
+    Atom(..) => change_map.get(node) is Some(Novel)
+    List(children~, ..) =>
       if !(change_map.get(node) is Some(Novel)) {
         false
       } else {
@@ -74,7 +74,7 @@ fn unchanged_descendants(
       Some(Unchanged(_)) => found.push(node)
       Some(Novel) | Some(ReplacedComment(..) | ReplacedString(..)) =>
         match node {
-          Syntax::List(children~, ..) =>
+          List(children~, ..) =>
             unchanged_descendants(children, found, change_map)
           _ => ()
         }
@@ -111,12 +111,12 @@ fn unchanged_descendants_for_outer_slider(
   for node in nodes {
     let is_unchanged = change_map.get(node) is Some(Unchanged(_))
     match node {
-      Syntax::Atom(..) =>
+      Atom(..) =>
         if is_unchanged {
           found.push(node)
           return
         }
-      Syntax::List(children~, ..) =>
+      List(children~, ..) =>
         if is_unchanged {
           found.push(node)
           return
@@ -141,13 +141,8 @@ fn push_unchanged_to_ancestor(
   guard change_map.get(inner) is Some(inner_change) else { return }
   let delimiters_match = match (root, inner) {
     (
-      Syntax::List(
-        kind=root_kind,
-        open_content=root_open,
-        close_content=root_close,
-        ..
-      ),
-      Syntax::List(
+      List(kind=root_kind, open_content=root_open, close_content=root_close, ..),
+      List(
         kind=inner_kind,
         open_content=inner_open,
         close_content=inner_close,
@@ -174,13 +169,8 @@ fn push_unchanged_to_descendant(
   guard change_map.get(root) is Some(root_change) else { return }
   let delimiters_match = match (root, inner) {
     (
-      Syntax::List(
-        kind=root_kind,
-        open_content=root_open,
-        close_content=root_close,
-        ..
-      ),
-      Syntax::List(
+      List(kind=root_kind, open_content=root_open, close_content=root_close, ..),
+      List(
         kind=inner_kind,
         open_content=inner_open,
         close_content=inner_close,
@@ -203,12 +193,12 @@ fn fix_nested_slider_prefer_inner(
   node : Syntax,
   change_map : ChangeMap,
 ) -> Unit {
-  if node is Syntax::List(children~, ..) {
+  if node is List(children~, ..) {
     match change_map.get(node) {
       Some(Novel) => {
         let found = Array()
         unchanged_descendants(children, found, change_map)
-        if found is [candidate] && candidate is Syntax::List(..) {
+        if found is [candidate] && candidate is List(..) {
           push_unchanged_to_ancestor(node, candidate, change_map)
         }
       }
@@ -225,13 +215,13 @@ fn fix_nested_slider_prefer_outer(
   node : Syntax,
   change_map : ChangeMap,
 ) -> Unit {
-  if node is Syntax::List(children~, ..) {
+  if node is List(children~, ..) {
     match change_map.get(node) {
       Some(Unchanged(_)) => {
         let found = Array()
         unchanged_descendants_for_outer_slider(children, found, change_map)
         if found is [candidate] &&
-          candidate is Syntax::List(..) &&
+          candidate is List(..) &&
           change_map.get(candidate) is Some(Novel) {
           push_unchanged_to_descendant(node, candidate, change_map)
         }
@@ -420,7 +410,7 @@ fn fix_all_sliders_one_step(
   change_map : ChangeMap,
 ) -> Unit {
   for node in nodes {
-    if node is Syntax::List(children~, ..) {
+    if node is List(children~, ..) {
       fix_all_sliders_one_step(children, change_map)
     }
   }

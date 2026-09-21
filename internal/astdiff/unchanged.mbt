@@ -197,14 +197,14 @@ fn mark_syntax_subtree(
       } else {
         match (lhs, rhs) {
           (
-            Syntax::List(
+            List(
               kind=lhs_kind,
               open_content=lhs_open,
               close_content=lhs_close,
               children=lhs_children,
               ..
             ),
-            Syntax::List(
+            List(
               kind=rhs_kind,
               open_content=rhs_open,
               close_content=rhs_close,

@@ -4,7 +4,7 @@ fn test_span(
   start_col : Int,
   end_col : Int,
 ) -> @span.SingleLineSpan {
-  @span.SingleLineSpan::{ line, start_col, end_col, }
+  { line, start_col, end_col, }
 }
 
 ///|UUID(e501c2b7-6c26-4f4b-81da-20dafcb87266)
@@ -12,7 +12,7 @@ fn test_string_atom(content : String) -> Syntax {
   Syntax::atom(
     content~,
     position=[test_span(1, 1, content.length() + 3)],
-    kind=AtomKind::String(StringKind::StringLiteral),
+    kind=String(StringLiteral),
   )
 }
 
@@ -77,7 +77,7 @@ test "change_positions narrows replaced string to changed word" {
   init_all_info([lhs], [rhs])
 
   let change_map = ChangeMap::new()
-  change_map.insert(rhs, ChangeKind::ReplacedString(lhs~, rhs~))
+  change_map.insert(rhs, ReplacedString(lhs~, rhs~))
   let budget = @computation.ScopeBudget::new(@computation.default_scope_limit())
   let positions = change_positions_with_budget([rhs], change_map, budget)
 
