@@ -1,4 +1,16 @@
 ///|
+async fn wait_for_viewed_users(app : App, key : String, expected : Int) -> Unit {
+  for _ in 0..<10000 {
+    if app.viewed_scopes.get(key) is Some(coordinator) &&
+      coordinator.users == expected {
+      return
+    }
+    @async.pause()
+  }
+  fail("Viewed coordinator did not reach \{expected} users")
+}
+
+///|
 async test "Viewed FIFO survives holder cancellation and failed waits and cleans idle scopes" {
   let db = @sqlite3.Connection::open(":memory:")
   defer db.close()
@@ -75,13 +87,13 @@ async test "Viewed FIFO survives holder cancellation and failed waits and cleans
     let first = group.spawn(() => {
       app.with_viewed_scope(Some(session), p, () => log.push(1))
     })
-    @async.sleep(1)
+    wait_for_viewed_users(app, "1:alice/repo:42", 2)
     let second = group.spawn(() => {
       app.with_viewed_scope(Some({ ..session, id: "another", }), p, () => {
         log.push(2)
       })
     })
-    @async.sleep(1)
+    wait_for_viewed_users(app, "1:alice/repo:42", 3)
     assert_eq(app.viewed_scopes["1:alice/repo:42"].users, 3)
     assert_eq(log.length(), 0)
     released = true
