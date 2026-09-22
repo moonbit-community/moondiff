@@ -1,0 +1,125 @@
+///|
+async fn wait_for_viewed_users(
+  app : @storage.App,
+  key : String,
+  expected : Int,
+) -> Unit {
+  for _ in 0..<10000 {
+    if app.viewed_scopes.get(key) is Some(coordinator) &&
+      coordinator.users == expected {
+      return
+    }
+    @async.pause()
+  }
+  fail("Viewed coordinator did not reach \{expected} users")
+}
+
+///|
+async test "Viewed FIFO survives holder cancellation and failed waits and cleans idle scopes" {
+  let db = @sqlite3.Connection::open(":memory:")
+  defer db.close()
+  let app : @storage.App = {
+    config: {
+      anonymous_session_limit: 512,
+      listen: "",
+      public_url: "",
+      static_dir: "",
+      database: "",
+      key: b"",
+      client_id: "",
+      install_url: "",
+      api_url: "",
+      oauth_url: "",
+      secure: false,
+    },
+    db,
+    refreshes: {},
+    devices: {},
+    viewed_scopes: {},
+  }
+  let session : @storage.Session = {
+    id: "session",
+    csrf: "",
+    expires: 0,
+    epoch: 0,
+    user: "1",
+    login: "alice",
+    tokens: "unused",
+    access_expires: 0,
+    refresh_expires: 0,
+  }
+  let p : @protocol.PullViewedGet = {
+    owner: "Alice",
+    repo: "Repo",
+    number: "42",
+  }
+  let entered = @async.Mutex()
+  entered.acquire()
+  let release = @async.Mutex()
+  release.acquire()
+  let log : Array[Int] = []
+  @async.with_task_group(group => {
+    let mut released = false
+    defer (if !released { release.release() })
+    let writer = group.spawn(() => {
+      with_viewed_scope(app, Some(session), p, () => {
+        @async.protect_from_cancel(() => {
+          entered.release()
+          release.acquire()
+          log.push(0)
+        })
+      })
+    })
+    entered.acquire()
+    writer.cancel()
+    try
+      (
+        @async.with_timeout(5, () => {
+          with_viewed_scope(app, Some(session), p, () => {
+            fail("a timed out waiter must not execute")
+          })
+        }) : Unit)
+    catch {
+      @async.TimeoutError => ()
+      error => raise error
+    } noraise {
+      _ => fail("expected a queue timeout")
+    }
+    assert_eq(app.viewed_scopes.length(), 1)
+    assert_eq(app.viewed_scopes["1:alice/repo:42"].users, 1)
+    // Two waiters, including a separate session, must keep their arrival order.
+    let first = group.spawn(() => {
+      with_viewed_scope(app, Some(session), p, () => log.push(1))
+    })
+    wait_for_viewed_users(app, "1:alice/repo:42", 2)
+    let second = group.spawn(() => {
+      with_viewed_scope(app, Some({ ..session, id: "another", }), p, () => {
+        log.push(2)
+      })
+    })
+    wait_for_viewed_users(app, "1:alice/repo:42", 3)
+    assert_eq(app.viewed_scopes["1:alice/repo:42"].users, 3)
+    assert_eq(log.length(), 0)
+    released = true
+    release.release()
+    first.wait()
+    second.wait()
+  })
+  assert_eq(log, [0, 1, 2])
+  assert_eq(app.viewed_scopes.length(), 0)
+  try
+    (
+      with_viewed_scope(app, Some(session), p, () => {
+        raise @common.RpcError(502, "test_failure", "failed operation")
+      }) : Unit)
+  catch {
+    @common.RpcError(502, _, _) => ()
+    error => raise error
+  } noraise {
+    _ => fail("expected an operation failure")
+  }
+  assert_eq(app.viewed_scopes.length(), 0)
+  with_viewed_scope(app, Some(session), p, () => log.push(3))
+  assert_eq(log, [0, 1, 2, 3])
+  assert_eq(app.viewed_scopes.length(), 0)
+}

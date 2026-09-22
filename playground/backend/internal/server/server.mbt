@@ -1,0 +1,349 @@
+///|
+priv struct ResponseWriter {
+  connection : @http.ServerConnection
+  mut started : Bool
+}
+
+///|
+async fn respond(
+  conn : ResponseWriter,
+  status : Int,
+  body : Bytes,
+  content_type? : String = "application/json; charset=utf-8",
+  headers? : @http.Headers = {},
+  cookies? : Array[@http.Cookie] = [],
+  head? : Bool = false,
+) -> Unit {
+  headers["Content-Type"] = content_type
+  headers["Content-Length"] = body.length().to_string()
+  headers["Cache-Control"] = "no-store"
+  headers["X-Content-Type-Options"] = "nosniff"
+  headers["Referrer-Policy"] = "no-referrer"
+  headers["X-Frame-Options"] = "DENY"
+  conn.started = true
+  conn.connection.send_response(
+    status,
+    if status < 400 {
+      "OK"
+    } else {
+      "Error"
+    },
+    extra_headers=headers,
+    cookies~,
+  )
+  if !head {
+    conn.connection.write(body)
+  }
+  conn.connection.end_response()
+}
+
+///|
+async fn[T : ToJson] respond_json(
+  conn : ResponseWriter,
+  value : T,
+  cookies? : Array[@http.Cookie] = [],
+) -> Unit {
+  let body = ToJson::to_json((Success(value~) : @protocol.Response[T]))
+  respond(conn, 200, @utf8.encode(body.stringify()), cookies~)
+}
+
+///|
+async fn static_file(
+  app : @storage.App,
+  request : @http.Request,
+  conn : ResponseWriter,
+  raw_path : String,
+) -> Unit {
+  let path = @common.decode_component(raw_path)
+  guard path.has_prefix("/") &&
+    (path == "/" || @common.valid_path(path[1:].to_owned())) else {
+    raise @common.RpcError(404, "not_found", "Page not found.")
+  }
+  let name = if path == "/" || @common.change_path(path) {
+    "/index.html"
+  } else {
+    path
+  }
+  // Canonicalize both paths before opening, including any symlink components.
+  let root = app.config.static_dir
+  let full = @fs.realpath(root + name) catch {
+    _ => raise @common.RpcError(404, "not_found", "Page not found.")
+  }
+  guard full.has_prefix(root + "/") && @fs.kind(full) == Regular else {
+    raise @common.RpcError(404, "not_found", "Page not found.")
+  }
+  let file = @fs.open(full, mode=ReadOnly)
+  defer file.close()
+  let content_type = match name {
+    [.., .. ".html"] => "text/html; charset=utf-8"
+    [.., .. ".css"] => "text/css; charset=utf-8"
+    [.., .. ".js"] | [.., .. ".mjs"] => "text/javascript; charset=utf-8"
+    [.., .. ".svg"] => "image/svg+xml"
+    [.., .. ".png"] => "image/png"
+    [.., .. ".wasm"] => "application/wasm"
+    _ => "application/octet-stream"
+  }
+  conn.started = true
+  conn.connection.send_response(200, "OK", extra_headers={
+    "Content-Type": content_type,
+    "Content-Length": file.size().to_string(),
+    "Cache-Control": "no-cache",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  })
+  if request.meth != Head {
+    conn.connection.write_reader(file)
+  }
+  conn.connection.end_response()
+}
+
+///|
+async fn handle(
+  app : @storage.App,
+  request : @http.Request,
+  reader : &@io.Reader,
+  conn : ResponseWriter,
+) -> Unit {
+  let path = request.path.split("?").next().unwrap_or("").to_owned()
+  if request.meth == Get && path == "/healthz" {
+    respond(conn, 200, b"ok\n", content_type="text/plain")
+    return
+  }
+  if request.meth == Get && path == "/api/auth/status" {
+    let session = @auth.request_session(app, request)
+    let current = if session is Some(session) && !session.tokens.is_empty() {
+      Some(
+        @github.authenticated(app, session) catch {
+          error => {
+            guard error is @common.RpcError(401, _, _) ||
+              error is @crypto.InvalidCiphertext else {
+              raise error
+            }
+            app.expire_auth(session)
+            guard app.session(session.id) is Some(current) else {
+              raise @common.RpcError(
+                401, "authentication_required", "Session ended.",
+              )
+            }
+            current
+          }
+        },
+      )
+    } else {
+      session
+    }
+    respond_json(conn, @auth.status(app, current))
+    return
+  }
+  let session = @auth.request_session(app, request)
+  if request.meth == Post && path == "/api/auth/session" {
+    guard request.headers.get("Origin") == Some(app.config.public_url) else {
+      raise @common.RpcError(
+        403, "csrf_failed", "The request origin is invalid.",
+      )
+    }
+    guard request.headers.get("Content-Type") == Some("application/json") else {
+      raise @common.RpcError(
+        415, "invalid_arguments", "Expected application/json.",
+      )
+    }
+    let bytes = @httpio.read_bounded(reader, 1024)
+    let value = @json.parse(@utf8.decode(bytes)) catch {
+      _ =>
+        raise @common.RpcError(
+          400, "invalid_arguments", "Invalid JSON request.",
+        )
+    }
+    guard value == Json::object({}) else {
+      raise @common.RpcError(
+        400, "invalid_arguments", "Expected an empty JSON object.",
+      )
+    }
+    match session {
+      Some(session) => respond_json(conn, @auth.status(app, Some(session)))
+      None => {
+        let (cookie, created) = app.create_session()
+        respond_json(conn, @auth.status(app, Some(created)), cookies=[
+          @auth.cookie(app, cookie),
+        ])
+      }
+    }
+    return
+  }
+  if path == "/auth/login" || path == "/auth/callback" {
+    raise @common.RpcError(404, "not_found", "Page not found.")
+  }
+  if request.meth == Post &&
+    [
+      "/api/auth/device/start", "/api/auth/device/poll", "/api/auth/device/cancel",
+    ].contains(path) {
+    let session = @auth.csrf_check(app, request, session)
+    guard request.headers
+      .get("Content-Type")
+      .unwrap_or("")
+      .has_prefix("application/json") else {
+      raise @common.RpcError(
+        415, "invalid_arguments", "Expected application/json.",
+      )
+    }
+    let bytes = @httpio.read_bounded(reader, 1024)
+    let value = @json.parse(@utf8.decode(bytes)) catch {
+      _ =>
+        raise @common.RpcError(
+          400, "invalid_arguments", "Invalid JSON request.",
+        )
+    }
+    let id = if path.has_suffix("/start") {
+      let args : @protocol.DeviceStart = @protocol.decode(value) catch {
+        _ =>
+          raise @common.RpcError(
+            400, "invalid_arguments", "Invalid device request.",
+          )
+      }
+      args.attempt_id
+    } else {
+      let args : @protocol.DeviceAuthorization = @protocol.decode(value) catch {
+        _ =>
+          raise @common.RpcError(
+            400, "invalid_arguments", "Invalid device request.",
+          )
+      }
+      args.authorization_id
+    }
+    guard @common.valid_attempt_id(id) else {
+      raise @common.RpcError(
+        400, "invalid_arguments", "Invalid authorization identifier.",
+      )
+    }
+    let flow_id = if path.has_suffix("/start") {
+      app.begin_device(session, id)
+    } else if path.has_suffix("/cancel") {
+      app.cancel_device(session, id)
+    } else {
+      guard app.device(session.id, id) is Some(flow) && flow.target_id == id else {
+        raise @common.RpcError(
+          404, "authorization_not_found", "This authorization does not belong to this session.",
+        )
+      }
+      id
+    }
+    if !path.has_suffix("/cancel") {
+      @device.advance_device(app, session.id, flow_id)
+    }
+    respond_json(conn, @auth.device_response(app, session.id, flow_id, id))
+    return
+  }
+  if request.meth == Post && path == "/api/auth/logout" {
+    let session = @auth.csrf_check(app, request, session)
+    app.logout(session)
+    // A late logout response must not replace a newer session cookie.
+    respond_json(conn, ())
+    return
+  }
+  if request.meth == Post && path == "/api/rpc" {
+    guard session is Some(active) && !active.tokens.is_empty() else {
+      raise @common.RpcError(
+        401, "authentication_required", "Sign in to GitHub to continue.",
+      )
+    }
+    guard request.headers
+      .get("Content-Type")
+      .unwrap_or("")
+      .has_prefix("application/json") else {
+      raise @common.RpcError(
+        415, "invalid_arguments", "Expected application/json.",
+      )
+    }
+    let bytes = @httpio.read_bounded(reader, 131072)
+    let value = @json.parse(@utf8.decode(bytes)) catch {
+      _ =>
+        raise @common.RpcError(
+          400, "invalid_arguments", "Invalid JSON request.",
+        )
+    }
+    let rpc = @protocol.decode_request(value) catch {
+      @protocol.ProtocolError(code, message) =>
+        raise @common.RpcError(400, code, message)
+      _ =>
+        raise @common.RpcError(400, "invalid_arguments", "Invalid RPC request.")
+    }
+    if rpc.is_write() {
+      ignore(@auth.csrf_check(app, request, session))
+    }
+    respond_json(conn, @rpc.dispatch(app, session, rpc))
+    return
+  }
+  guard request.meth == Get || request.meth == Head else {
+    raise @common.RpcError(405, "method_not_allowed", "Method not allowed.")
+  }
+  static_file(app, request, conn, path)
+}
+
+///|
+/// Run the configured single-process HTTP server.
+pub async fn run() -> Unit {
+  let config = @config.Config::load()
+  let config = { ..config, static_dir: @fs.realpath(config.static_dir), }
+  // Hold a process lock for the lifetime of the server. Refresh coalescing is
+  // deliberately in-process; sharing a database between servers is unsupported.
+  let lock = @fs.open(
+    config.database + ".lock",
+    mode=ReadWrite,
+    create_mode=OpenOrCreate,
+    permission=0o600,
+  )
+  defer lock.close()
+  guard lock.try_lock(Exclusive) else {
+    fail("Another server is using this database")
+  }
+  let database_file = @fs.open(
+    config.database,
+    mode=ReadWrite,
+    create_mode=OpenOrCreate,
+    permission=0o600,
+  )
+  database_file.close()
+  @fs.chmod(config.database, 0o600)
+  let app = @storage.App::open(config) catch {
+    @sqlite3.SqliteError(code~, msg~, ..) =>
+      fail("SQLite initialization failed (\{code.to_repr()}): \{msg}")
+    error => raise error
+  }
+  defer app.db.close()
+  @fs.chmod(config.database, 0o600)
+  let server = @http.Server(@socket.Addr::parse(config.listen), reuse_addr=true)
+  defer server.close()
+  println("Moondiff listening on \{server.addr}")
+  server.run_forever(allow_failure=true, max_connections=128) <| ((
+    request,
+    reader,
+    conn,
+  ) => {
+    let conn = ResponseWriter::{ connection: conn, started: false, }
+    @async.with_timeout(60000, () => handle(app, request, reader, conn)) catch {
+      error => {
+        // A tab can close while headers/body are being written. Sending an
+        // error response on that same connection would start a second response
+        // and violate the HTTP sender's state machine. Abort only this request.
+        if conn.started || @async.is_being_cancelled() {
+          raise error
+        }
+        let error : Error = if error is @crypto.InvalidCiphertext {
+          @common.RpcError(
+            401, "authentication_required", "Your session cannot be decrypted. Sign in again.",
+          )
+        } else {
+          error
+        }
+        let (status, body) = @common.rpc_error(error)
+        respond(
+          conn,
+          status,
+          @utf8.encode(body.stringify()),
+          head=request.meth == Head,
+        )
+      }
+    }
+  })
+}

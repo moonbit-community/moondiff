@@ -1,0 +1,33 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/config"
+
+// Values
+pub const ANONYMOUS_SESSION_LIFETIME : Int64 = 1200
+
+pub const AUTHENTICATED_SESSION_LIFETIME : Int64 = 2592000
+
+pub const DEVICE_AUTHORIZATION_GRACE : Int64 = 300
+
+pub const DEVICE_AUTHORIZATION_LIFETIME : Int64 = 900
+
+// Errors
+
+// Types and methods
+pub(all) struct Config {
+  listen : String
+  public_url : String
+  static_dir : String
+  database : String
+  key : Bytes
+  client_id : String
+  install_url : String
+  api_url : String
+  oauth_url : String
+  secure : Bool
+  anonymous_session_limit : Int
+}
+pub fn Config::load() -> Self raise
+
+// Type aliases
+
+// Traits

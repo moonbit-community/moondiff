@@ -1,0 +1,11 @@
+///|
+pub const ANONYMOUS_SESSION_LIFETIME : Int64 = 20L * 60
+
+///|
+pub const DEVICE_AUTHORIZATION_LIFETIME : Int64 = 15L * 60
+
+///|
+pub const DEVICE_AUTHORIZATION_GRACE : Int64 = 5L * 60
+
+///|
+pub const AUTHENTICATED_SESSION_LIFETIME : Int64 = 30L * 86400

@@ -126,19 +126,3 @@ The backend serves static resources and the app entry for valid change routes.
 It rejects path traversal and symlinks outside the static root.
 The health check endpoint becomes available after the database and listener have
 initialized.
-
-## Regression tests
-
-- Encryption tests: token envelopes, padding and comparison.
-- Shared protocol tests: all request/response roundtrips, strict validation, large IDs and source decoding on JS, Wasm, Wasm GC and Native.
-- Backend integration tests: run in a Wasm runtime with a temporary SQLite
-  database and local GitHub/OAuth mock services. They cover existing WAL
-  databases, login and refresh without a client secret, shared polling, slow-down
-  intervals, cancellation/expiry/denial, transient recovery and restart.
-- Browser authentication tests: real Wasm device login in Chromium, code copying,
-  explicit verification, reload, cancellation
-  and delayed responses. The other frontend browser tests cover review regressions
-  with same-origin RPC mock data.
-- MoonBit transport tests with controlled network and timers: state versions, identifiers, concurrent polls, cancellation, late success/failure, lost start responses, canonical ID recovery and page unload.
-
-See [verification commands](../README.md#checks-and-tests) to run these tests.

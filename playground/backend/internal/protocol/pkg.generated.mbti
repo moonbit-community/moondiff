@@ -1,0 +1,56 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/protocol"
+
+import {
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn alnum(Char) -> Bool
+
+pub fn change_path(String) -> Bool
+
+pub fn comment_for_protocol(Json) -> Json raise
+
+pub fn decimal(String) -> Bool
+
+pub fn decode_component(String) -> String raise
+
+pub fn[T : @json.FromJson + ToJson] decode_github(Json) -> T raise
+
+pub fn encode_component(String) -> String
+
+pub fn field(Json, String) -> Json
+
+pub fn github_id(Json) -> String raise
+
+pub fn normalize(Json) -> Json
+
+pub fn optional_string(Json, String) -> String
+
+pub fn positive_int(Json, String, Int) -> Int raise
+
+pub fn rpc_error(Error) -> (Int, Json)
+
+pub fn string(Json, String) -> String raise
+
+pub fn valid_attempt_id(String) -> Bool
+
+pub fn valid_owner(String) -> Bool
+
+pub fn valid_path(String) -> Bool
+
+pub fn valid_repo(String) -> Bool
+
+pub fn valid_sha(String) -> Bool
+
+// Errors
+pub(all) suberror RpcError {
+  RpcError(Int, String, String)
+}
+
+// Types and methods
+
+// Type aliases
+
+// Traits

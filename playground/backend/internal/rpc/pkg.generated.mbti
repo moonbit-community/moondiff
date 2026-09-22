@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/rpc"
+
+import {
+  "moonbit-community/moondiff-playground-protocol",
+  "moonbit-community/moondiff-playground-server/internal/storage",
+}
+
+// Values
+pub async fn dispatch(@storage.App, @storage.Session?, @moondiff-playground-protocol.GitHubRequest) -> @moondiff-playground-protocol.RpcValue
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

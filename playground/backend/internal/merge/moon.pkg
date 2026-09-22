@@ -1,0 +1,8 @@
+import {
+  "moonbit-community/moondiff-playground-protocol" @protocol,
+  "moonbit-community/moondiff-playground-server/internal/protocol" @common,
+  "moonbit-community/moondiff-playground-server/internal/github",
+  "moonbit-community/moondiff-playground-server/internal/storage",
+}
+
+supported_targets = "native+wasm"

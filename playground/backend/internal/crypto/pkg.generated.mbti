@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/crypto"
+
+// Values
+pub fn constant_time_equal(Bytes, Bytes) -> Bool
+
+pub fn digest(String) -> String
+
+pub fn random_id() -> String raise
+
+pub fn seal(Bytes, String, String, Bytes) -> String raise
+
+pub fn unseal(Bytes, String, String, String) -> Bytes raise
+
+// Errors
+pub(all) suberror InvalidCiphertext
+
+// Types and methods
+
+// Type aliases
+
+// Traits

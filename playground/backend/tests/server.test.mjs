@@ -158,8 +158,9 @@ function raw(f, path, method = 'GET') {
 
 test('Wasm serves direct routes and HEAD; denies traversal, symlinks, missing paths', async t => {
   const f = await startServer(); t.after(() => f.close());
+  const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
   for (const path of ['/', '/alice/repo/pull/42', '/alice/repo/commit/123abcd', '/alice/repo/pull/42/commits/123abcd']) {
-    const res = await fetch(f.base + path); assert.equal(res.status, 200); assert.match(await res.text(), /fixture/);
+    const res = await fetch(f.base + path); assert.equal(res.status, 200); assert.equal(res.headers.get('content-security-policy'), contentSecurityPolicy); assert.match(await res.text(), /fixture/);
   }
   const head = await fetch(f.base + '/styles.css', { method: 'HEAD' }); assert.equal(head.status, 200); assert.equal(await head.text(), '');
   for (const path of ['/missing', '/alice/repo/pull/0', '/..%2Foutside.txt', '/escape', '/a/%2e%2e/styles.css']) assert.equal((await raw(f, path)).status, 404, path);
