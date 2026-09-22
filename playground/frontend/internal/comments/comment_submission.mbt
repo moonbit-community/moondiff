@@ -14,6 +14,11 @@ fn open_comment_draft(model : Model, kind : DraftKind) -> (Model, Effects) {
     snapshot: model.review.context.snapshot,
     id: { generation: model.generation, sequence, },
     kind,
+    target_path: match kind {
+      InlineDraft(_, anchor) => Some(anchor.path)
+      ReplyDraft(id) => model.review.index.owners.get(ReviewComment(id).key())
+      OverallDraft => None
+    },
     body: "",
     error: None,
   }

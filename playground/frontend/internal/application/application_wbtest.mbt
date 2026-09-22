@@ -2412,5 +2412,11 @@ test "reply targets and drafts guard deletion in every ordering" {
     ),
     emit,
   )
-  assert_true(finished.review.draft() is None)
+  assert_true(finished.review.draft().unwrap().submitting)
+  let (synced, _) = review_test_refresh(
+    finished,
+    { ..empty, review_comments: [reply], },
+    emit,
+  )
+  assert_true(synced.review.draft() is None)
 }

@@ -67,6 +67,16 @@ pub extend PermissionSummary with Eq::{not_equal, equal}
 ///|
 #deprecated
 #doc(hidden)
+pub extend PendingReviewReceipt with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend PendingReviewStatus with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
 pub extend ReadStatus with Eq::{not_equal, equal}
 
 ///|

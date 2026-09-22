@@ -35,6 +35,9 @@ fn finish_comment_submission(
     return (model_with_comment_auth_failure(failed, error), [])
   }
   guard model.route is Some(reference) else { return (model, []) }
+  if model.review.submission() is Some(SyncingReview(_)) {
+    return (model, comments_request(reference, generation))
+  }
   (
     with_review(model, {
       ..model.review,
@@ -53,4 +56,13 @@ fn insert_issue_comment(model : Model, comment : ApiIssueComment) -> Model {
 ///|
 fn insert_commit_comment(model : Model, comment : ApiCommitComment) -> Model {
   with_review(model, merge_cache(model.review, PublishedCommit(comment)))
+}
+
+///|
+fn insert_review_receipt(model : Model, comment : ApiReviewComment) -> Model {
+  match review_receipt(model, comment) {
+    Some(receipt) =>
+      with_review(model, merge_cache(model.review, PublishedReview(receipt)))
+    None => model
+  }
 }

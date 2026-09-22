@@ -56,6 +56,7 @@ test "interrupted submissions preserve editable drafts and reject every late ope
       PostingReview => ReviewCommentCreated(7, 4, Err(error))
       PostingCommit => CommitCommentCreated(7, 4, Err(error))
       PostingReply => ReviewReplyCreated(7, 4, Err(error))
+      SyncingReview(_) => panic()
     }
     for model in [recovered, update(recovered, SubmitDraft).0] {
       let (ignored, effects) = update(model, late)

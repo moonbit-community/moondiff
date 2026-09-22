@@ -158,6 +158,23 @@ pub(all) struct Failure {
   code : String?
 } derive(Eq)
 
+pub(all) struct PendingReviewReceipt {
+  id : Int64
+  url : String
+  kind : DraftKind
+  path : String
+  generation : Int
+  status : PendingReviewStatus
+} derive(Eq)
+pub fn PendingReviewReceipt::key(Self) -> String
+
+pub(all) enum PendingReviewStatus {
+  ReceiptSyncing
+  ReceiptWaiting
+  ReceiptSyncFailed
+  ReceiptPrChanged
+} derive(Eq)
+
 pub(all) enum Permission {
   Allowed
   Denied(String)
@@ -186,6 +203,7 @@ pub(all) enum ReadStatus {
 pub struct ReadView {
   permissions : PermissionSummary
   group : CommentGroup
+  pending_review_receipts : ReadOnlyArray[PendingReviewReceipt]
   generation : Int
   snapshot_stale : Bool
   login : String?
@@ -255,6 +273,7 @@ pub(all) enum SubmissionPhase {
   PostingReview
   PostingCommit
   PostingReply
+  SyncingReview(Int64)
 } derive(Eq)
 
 // Type aliases
