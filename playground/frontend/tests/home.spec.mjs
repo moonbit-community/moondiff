@@ -251,6 +251,7 @@ for (const invalidInput of [false, true]) test(`finishing real device sign-in on
   const verification = await opened;
   await verification.getByRole('textbox', { name: 'Verification code' }).fill(code);
   await verification.getByRole('button', { name: 'Authorize device' }).click();
+  await expect(verification.getByText('Device authorized. Return to Moondiff.')).toBeVisible();
   await verification.close();
   await expect(page.getByRole('button', { name: 'Account: alice' })).toBeVisible();
   await expect(authored(page).getByText('You have no open pull requests.')).toBeVisible();
