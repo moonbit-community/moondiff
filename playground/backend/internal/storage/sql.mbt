@@ -1,3 +1,10 @@
+// SQL naming rule:
+//
+// When adding SQL statements, define every application-specific SQL name—such
+// as a table, column, index, or trigger name—as a constant in this package's
+// `names.mbt`, then interpolate that constant instead of embedding the name
+// directly in the SQL.
+
 ///|
 #cfg(target="native")
 const DB_ENABLE_WAL : String = "PRAGMA journal_mode=WAL"
@@ -12,87 +19,87 @@ const DB_SET_BUSY_TIMEOUT : String = "PRAGMA busy_timeout=5000"
 
 ///|
 const DB_CREATE_METADATA : String =
-  #|CREATE TABLE IF NOT EXISTS metadata (
-  #|  name TEXT PRIMARY KEY,
-  #|  value TEXT NOT NULL
-  #|)
+  $|CREATE TABLE IF NOT EXISTS \{TABLE_METADATA} (
+  $|  \{COLUMN_NAME} TEXT PRIMARY KEY,
+  $|  \{COLUMN_VALUE} TEXT NOT NULL
+  $|)
 
 ///|
 const DB_CREATE_SESSIONS : String =
-  #|CREATE TABLE IF NOT EXISTS sessions (
-  #|  id TEXT PRIMARY KEY,
-  #|  csrf TEXT NOT NULL,
-  #|  expires INTEGER NOT NULL,
-  #|  epoch INTEGER NOT NULL DEFAULT 0,
-  #|  user_id TEXT NOT NULL DEFAULT '',
-  #|  login TEXT NOT NULL DEFAULT '',
-  #|  tokens TEXT NOT NULL DEFAULT '',
-  #|  access_expires INTEGER NOT NULL DEFAULT 0,
-  #|  refresh_expires INTEGER NOT NULL DEFAULT 0
-  #|)
+  $|CREATE TABLE IF NOT EXISTS \{TABLE_SESSIONS} (
+  $|  \{COLUMN_ID} TEXT PRIMARY KEY,
+  $|  \{COLUMN_CSRF} TEXT NOT NULL,
+  $|  \{COLUMN_EXPIRES} INTEGER NOT NULL,
+  $|  \{COLUMN_EPOCH} INTEGER NOT NULL DEFAULT 0,
+  $|  \{COLUMN_USER_ID} TEXT NOT NULL DEFAULT '',
+  $|  \{COLUMN_LOGIN} TEXT NOT NULL DEFAULT '',
+  $|  \{COLUMN_TOKENS} TEXT NOT NULL DEFAULT '',
+  $|  \{COLUMN_ACCESS_EXPIRES} INTEGER NOT NULL DEFAULT 0,
+  $|  \{COLUMN_REFRESH_EXPIRES} INTEGER NOT NULL DEFAULT 0
+  $|)
 
 ///|
 const DB_CREATE_AUTHORIZATIONS : String =
-  #|CREATE TABLE IF NOT EXISTS authorizations (
-  #|  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  #|  id TEXT NOT NULL,
-  #|  target_id TEXT NOT NULL,
-  #|  epoch INTEGER NOT NULL,
-  #|  phase TEXT NOT NULL,
-  #|  credentials TEXT NOT NULL DEFAULT '',
-  #|  user_code TEXT NOT NULL DEFAULT '',
-  #|  verification_uri TEXT NOT NULL DEFAULT '',
-  #|  expires INTEGER NOT NULL,
-  #|  next_poll INTEGER NOT NULL DEFAULT 0,
-  #|  interval INTEGER NOT NULL DEFAULT 5,
-  #|  backoff INTEGER NOT NULL DEFAULT 0,
-  #|  token_issued INTEGER NOT NULL DEFAULT 0,
-  #|  message TEXT NOT NULL DEFAULT '',
-  #|  PRIMARY KEY (session_id, id)
-  #|)
+  $|CREATE TABLE IF NOT EXISTS \{TABLE_AUTHORIZATIONS} (
+  $|  \{COLUMN_SESSION_ID} TEXT NOT NULL REFERENCES \{TABLE_SESSIONS}(\{COLUMN_ID}) ON DELETE CASCADE,
+  $|  \{COLUMN_ID} TEXT NOT NULL,
+  $|  \{COLUMN_TARGET_ID} TEXT NOT NULL,
+  $|  \{COLUMN_EPOCH} INTEGER NOT NULL,
+  $|  \{COLUMN_PHASE} TEXT NOT NULL,
+  $|  \{COLUMN_CREDENTIALS} TEXT NOT NULL DEFAULT '',
+  $|  \{COLUMN_USER_CODE} TEXT NOT NULL DEFAULT '',
+  $|  \{COLUMN_VERIFICATION_URI} TEXT NOT NULL DEFAULT '',
+  $|  \{COLUMN_EXPIRES} INTEGER NOT NULL,
+  $|  \{COLUMN_NEXT_POLL} INTEGER NOT NULL DEFAULT 0,
+  $|  \{COLUMN_INTERVAL} INTEGER NOT NULL DEFAULT 5,
+  $|  \{COLUMN_BACKOFF} INTEGER NOT NULL DEFAULT 0,
+  $|  \{COLUMN_TOKEN_ISSUED} INTEGER NOT NULL DEFAULT 0,
+  $|  \{COLUMN_MESSAGE} TEXT NOT NULL DEFAULT '',
+  $|  PRIMARY KEY (\{COLUMN_SESSION_ID}, \{COLUMN_ID})
+  $|)
 
 ///|
 const DB_CREATE_ONE_ACTIVE_DEVICE_INDEX : String =
-  #|CREATE UNIQUE INDEX IF NOT EXISTS one_active_device ON authorizations(session_id)
-  #|WHERE phase IN ('starting', 'pending', 'verifying')
+  $|CREATE UNIQUE INDEX IF NOT EXISTS \{INDEX_ONE_ACTIVE_DEVICE} ON \{TABLE_AUTHORIZATIONS}(\{COLUMN_SESSION_ID})
+  $|WHERE \{COLUMN_PHASE} IN ('starting', 'pending', 'verifying')
 
 ///|
 // Preserve the foreign-key contract even when the host does not let us
 // enable foreign_keys. These triggers also apply to databases created by Native.
 const DB_CREATE_AUTHORIZATION_SESSION_INSERT_TRIGGER : String =
-  #|CREATE TRIGGER IF NOT EXISTS authorizations_require_session_insert
-  #|BEFORE INSERT ON authorizations
-  #|WHEN NOT EXISTS (SELECT 1 FROM sessions WHERE id=NEW.session_id)
-  #|BEGIN
-  #|  SELECT RAISE(ABORT, 'authorization session is missing');
-  #|END
+  $|CREATE TRIGGER IF NOT EXISTS \{TRIGGER_AUTHORIZATIONS_REQUIRE_SESSION_INSERT}
+  $|BEFORE INSERT ON \{TABLE_AUTHORIZATIONS}
+  $|WHEN NOT EXISTS (SELECT 1 FROM \{TABLE_SESSIONS} WHERE \{COLUMN_ID}=NEW.\{COLUMN_SESSION_ID})
+  $|BEGIN
+  $|  SELECT RAISE(ABORT, 'authorization session is missing');
+  $|END
 
 ///|
 const DB_CREATE_AUTHORIZATION_SESSION_UPDATE_TRIGGER : String =
-  #|CREATE TRIGGER IF NOT EXISTS authorizations_require_session_update
-  #|BEFORE UPDATE OF session_id ON authorizations
-  #|WHEN NOT EXISTS (SELECT 1 FROM sessions WHERE id=NEW.session_id)
-  #|BEGIN
-  #|  SELECT RAISE(ABORT, 'authorization session is missing');
-  #|END
+  $|CREATE TRIGGER IF NOT EXISTS \{TRIGGER_AUTHORIZATIONS_REQUIRE_SESSION_UPDATE}
+  $|BEFORE UPDATE OF \{COLUMN_SESSION_ID} ON \{TABLE_AUTHORIZATIONS}
+  $|WHEN NOT EXISTS (SELECT 1 FROM \{TABLE_SESSIONS} WHERE \{COLUMN_ID}=NEW.\{COLUMN_SESSION_ID})
+  $|BEGIN
+  $|  SELECT RAISE(ABORT, 'authorization session is missing');
+  $|END
 
 ///|
 const DB_CREATE_SESSION_AUTHORIZATION_PARENT_TRIGGER : String =
-  #|CREATE TRIGGER IF NOT EXISTS sessions_preserve_authorization_parent
-  #|BEFORE UPDATE OF id ON sessions
-  #|WHEN NEW.id IS NOT OLD.id
-  #|  AND EXISTS (SELECT 1 FROM authorizations WHERE session_id=OLD.id)
-  #|BEGIN
-  #|  SELECT RAISE(ABORT, 'session has a pending authorization');
-  #|END
+  $|CREATE TRIGGER IF NOT EXISTS \{TRIGGER_SESSIONS_PRESERVE_AUTHORIZATION_PARENT}
+  $|BEFORE UPDATE OF \{COLUMN_ID} ON \{TABLE_SESSIONS}
+  $|WHEN NEW.\{COLUMN_ID} IS NOT OLD.\{COLUMN_ID}
+  $|  AND EXISTS (SELECT 1 FROM \{TABLE_AUTHORIZATIONS} WHERE \{COLUMN_SESSION_ID}=OLD.\{COLUMN_ID})
+  $|BEGIN
+  $|  SELECT RAISE(ABORT, 'session has a pending authorization');
+  $|END
 
 ///|
 const DB_CREATE_SESSION_DELETE_AUTHORIZATIONS_TRIGGER : String =
-  #|CREATE TRIGGER IF NOT EXISTS sessions_delete_authorizations
-  #|AFTER DELETE ON sessions
-  #|BEGIN
-  #|  DELETE FROM authorizations WHERE session_id=OLD.id;
-  #|END
+  $|CREATE TRIGGER IF NOT EXISTS \{TRIGGER_SESSIONS_DELETE_AUTHORIZATIONS}
+  $|AFTER DELETE ON \{TABLE_SESSIONS}
+  $|BEGIN
+  $|  DELETE FROM \{TABLE_AUTHORIZATIONS} WHERE \{COLUMN_SESSION_ID}=OLD.\{COLUMN_ID};
+  $|END
 
 ///|
 const DB_BEGIN_IMMEDIATE : String = "BEGIN IMMEDIATE"
@@ -104,100 +111,100 @@ const DB_COMMIT : String = "COMMIT"
 const DB_ROLLBACK : String = "ROLLBACK"
 
 ///|
-const QUERY_KEY_CHECK : String = "SELECT value FROM metadata WHERE name='key-check-v1'"
+const QUERY_KEY_CHECK : String = "SELECT \{COLUMN_VALUE} FROM \{TABLE_METADATA} WHERE \{COLUMN_NAME}='key-check-v1'"
 
 ///|
-const DB_INSERT_KEY_CHECK : String = "INSERT INTO metadata VALUES ('key-check-v1', ?)"
+const DB_INSERT_KEY_CHECK : String = "INSERT INTO \{TABLE_METADATA} VALUES ('key-check-v1', ?)"
 
 ///|
-const QUERY_ANONYMOUS_SESSION_COUNT : String = "SELECT COUNT(*) FROM sessions WHERE tokens='' AND expires>?"
+const QUERY_ANONYMOUS_SESSION_COUNT : String = "SELECT COUNT(*) FROM \{TABLE_SESSIONS} WHERE \{COLUMN_TOKENS}='' AND \{COLUMN_EXPIRES}>?"
 
 ///|
 const QUERY_SESSION : String =
-  #|SELECT csrf, expires, epoch, user_id, login, tokens, access_expires, refresh_expires
-  #|FROM sessions
-  #|WHERE id=? AND expires>?
+  $|SELECT \{COLUMN_CSRF}, \{COLUMN_EXPIRES}, \{COLUMN_EPOCH}, \{COLUMN_USER_ID}, \{COLUMN_LOGIN}, \{COLUMN_TOKENS}, \{COLUMN_ACCESS_EXPIRES}, \{COLUMN_REFRESH_EXPIRES}
+  $|FROM \{TABLE_SESSIONS}
+  $|WHERE \{COLUMN_ID}=? AND \{COLUMN_EXPIRES}>?
 
 ///|
-const DB_DELETE_EXPIRED_SESSIONS : String = "DELETE FROM sessions WHERE expires<=?"
+const DB_DELETE_EXPIRED_SESSIONS : String = "DELETE FROM \{TABLE_SESSIONS} WHERE \{COLUMN_EXPIRES}<=?"
 
 ///|
-const DB_DELETE_EXPIRED_AUTHORIZATIONS : String = "DELETE FROM authorizations WHERE expires<=?"
+const DB_DELETE_EXPIRED_AUTHORIZATIONS : String = "DELETE FROM \{TABLE_AUTHORIZATIONS} WHERE \{COLUMN_EXPIRES}<=?"
 
 ///|
-const DB_INSERT_SESSION : String = "INSERT INTO sessions (id,csrf,expires) VALUES (?,?,?)"
+const DB_INSERT_SESSION : String = "INSERT INTO \{TABLE_SESSIONS} (\{COLUMN_ID},\{COLUMN_CSRF},\{COLUMN_EXPIRES}) VALUES (?,?,?)"
 
 ///|
-const DB_DELETE_SESSION : String = "DELETE FROM sessions WHERE id=?"
+const DB_DELETE_SESSION : String = "DELETE FROM \{TABLE_SESSIONS} WHERE \{COLUMN_ID}=?"
 
 ///|
 const DB_INSTALL_SESSION_TOKENS : String =
-  #|UPDATE sessions
-  #|SET user_id=?, login=?, tokens=?, access_expires=?, refresh_expires=?, epoch=epoch+?, expires=?
-  #|WHERE id=? AND epoch=? AND expires>?
+  $|UPDATE \{TABLE_SESSIONS}
+  $|SET \{COLUMN_USER_ID}=?, \{COLUMN_LOGIN}=?, \{COLUMN_TOKENS}=?, \{COLUMN_ACCESS_EXPIRES}=?, \{COLUMN_REFRESH_EXPIRES}=?, \{COLUMN_EPOCH}=\{COLUMN_EPOCH}+?, \{COLUMN_EXPIRES}=?
+  $|WHERE \{COLUMN_ID}=? AND \{COLUMN_EPOCH}=? AND \{COLUMN_EXPIRES}>?
 
 ///|
 const DB_EXPIRE_SESSION_AUTH : String =
-  #|UPDATE sessions SET tokens='', epoch=epoch+1, expires=MIN(expires, ?)
-  #|WHERE id=? AND epoch=?
+  $|UPDATE \{TABLE_SESSIONS} SET \{COLUMN_TOKENS}='', \{COLUMN_EPOCH}=\{COLUMN_EPOCH}+1, \{COLUMN_EXPIRES}=MIN(\{COLUMN_EXPIRES}, ?)
+  $|WHERE \{COLUMN_ID}=? AND \{COLUMN_EPOCH}=?
 
 ///|
 const DB_START_CURRENT_SESSION_AUTHORIZATION : String =
-  #|UPDATE sessions SET expires=MAX(expires, ?), epoch=epoch+1
-  #|WHERE id=? AND epoch=? AND expires>?
+  $|UPDATE \{TABLE_SESSIONS} SET \{COLUMN_EXPIRES}=MAX(\{COLUMN_EXPIRES}, ?), \{COLUMN_EPOCH}=\{COLUMN_EPOCH}+1
+  $|WHERE \{COLUMN_ID}=? AND \{COLUMN_EPOCH}=? AND \{COLUMN_EXPIRES}>?
 
 ///|
 const DB_EXTEND_CURRENT_SESSION_AUTHORIZATION : String =
-  #|UPDATE sessions SET expires=MAX(expires, ?)
-  #|WHERE id=? AND epoch=? AND expires>?
+  $|UPDATE \{TABLE_SESSIONS} SET \{COLUMN_EXPIRES}=MAX(\{COLUMN_EXPIRES}, ?)
+  $|WHERE \{COLUMN_ID}=? AND \{COLUMN_EPOCH}=? AND \{COLUMN_EXPIRES}>?
 
 ///|
 const DB_INCREMENT_CURRENT_SESSION_EPOCH : String =
-  #|UPDATE sessions SET epoch=epoch+1
-  #|WHERE id=? AND epoch=?
+  $|UPDATE \{TABLE_SESSIONS} SET \{COLUMN_EPOCH}=\{COLUMN_EPOCH}+1
+  $|WHERE \{COLUMN_ID}=? AND \{COLUMN_EPOCH}=?
 
 ///|
 const QUERY_AUTHORIZATION : String =
-  #|SELECT target_id, epoch, phase, credentials, user_code, verification_uri,
-  #|       expires, next_poll, interval, backoff, token_issued, message
-  #|FROM authorizations
-  #|WHERE session_id=? AND id=?
+  $|SELECT \{COLUMN_TARGET_ID}, \{COLUMN_EPOCH}, \{COLUMN_PHASE}, \{COLUMN_CREDENTIALS}, \{COLUMN_USER_CODE}, \{COLUMN_VERIFICATION_URI},
+  $|       \{COLUMN_EXPIRES}, \{COLUMN_NEXT_POLL}, \{COLUMN_INTERVAL}, \{COLUMN_BACKOFF}, \{COLUMN_TOKEN_ISSUED}, \{COLUMN_MESSAGE}
+  $|FROM \{TABLE_AUTHORIZATIONS}
+  $|WHERE \{COLUMN_SESSION_ID}=? AND \{COLUMN_ID}=?
 
 ///|
 const QUERY_VISIBLE_AUTHORIZATION : String =
-  #|SELECT id FROM authorizations
-  #|WHERE session_id=? AND phase != 'alias'
-  #|ORDER BY (phase IN ('starting', 'pending', 'verifying')) DESC, epoch DESC, rowid DESC
-  #|LIMIT 1
+  $|SELECT \{COLUMN_ID} FROM \{TABLE_AUTHORIZATIONS}
+  $|WHERE \{COLUMN_SESSION_ID}=? AND \{COLUMN_PHASE} != 'alias'
+  $|ORDER BY (\{COLUMN_PHASE} IN ('starting', 'pending', 'verifying')) DESC, \{COLUMN_EPOCH} DESC, rowid DESC
+  $|LIMIT 1
 
 ///|
 const DB_INSERT_AUTHORIZATION_ALIAS : String =
-  #|INSERT INTO authorizations (session_id, id, target_id, epoch, phase, expires)
-  #|VALUES (?, ?, ?, ?, 'alias', ?)
+  $|INSERT INTO \{TABLE_AUTHORIZATIONS} (\{COLUMN_SESSION_ID}, \{COLUMN_ID}, \{COLUMN_TARGET_ID}, \{COLUMN_EPOCH}, \{COLUMN_PHASE}, \{COLUMN_EXPIRES})
+  $|VALUES (?, ?, ?, ?, 'alias', ?)
 
 ///|
 const DB_INSERT_STARTING_AUTHORIZATION : String =
-  #|INSERT INTO authorizations (session_id, id, target_id, epoch, phase, expires)
-  #|VALUES (?, ?, ?, ?, 'starting', ?)
+  $|INSERT INTO \{TABLE_AUTHORIZATIONS} (\{COLUMN_SESSION_ID}, \{COLUMN_ID}, \{COLUMN_TARGET_ID}, \{COLUMN_EPOCH}, \{COLUMN_PHASE}, \{COLUMN_EXPIRES})
+  $|VALUES (?, ?, ?, ?, 'starting', ?)
 
 ///|
 const DB_INSERT_CANCELLED_AUTHORIZATION : String =
-  #|INSERT INTO authorizations (session_id, id, target_id, epoch, phase, expires)
-  #|VALUES (?, ?, ?, ?, 'cancelled', ?)
+  $|INSERT INTO \{TABLE_AUTHORIZATIONS} (\{COLUMN_SESSION_ID}, \{COLUMN_ID}, \{COLUMN_TARGET_ID}, \{COLUMN_EPOCH}, \{COLUMN_PHASE}, \{COLUMN_EXPIRES})
+  $|VALUES (?, ?, ?, ?, 'cancelled', ?)
 
 ///|
 const DB_END_AUTHORIZATION : String =
-  #|UPDATE authorizations SET phase=?, credentials='', message=?
-  #|WHERE session_id=? AND id=? AND phase IN ('starting', 'pending', 'verifying')
+  $|UPDATE \{TABLE_AUTHORIZATIONS} SET \{COLUMN_PHASE}=?, \{COLUMN_CREDENTIALS}='', \{COLUMN_MESSAGE}=?
+  $|WHERE \{COLUMN_SESSION_ID}=? AND \{COLUMN_ID}=? AND \{COLUMN_PHASE} IN ('starting', 'pending', 'verifying')
 
 ///|
 const DB_COMPLETE_AUTHORIZATION : String =
-  #|UPDATE authorizations SET phase='completed', credentials='', message=''
-  #|WHERE session_id=? AND id=?
+  $|UPDATE \{TABLE_AUTHORIZATIONS} SET \{COLUMN_PHASE}='completed', \{COLUMN_CREDENTIALS}='', \{COLUMN_MESSAGE}=''
+  $|WHERE \{COLUMN_SESSION_ID}=? AND \{COLUMN_ID}=?
 
 ///|
 const DB_SAVE_AUTHORIZATION : String =
-  #|UPDATE authorizations
-  #|SET phase=?, credentials=?, user_code=?, verification_uri=?, expires=?,
-  #|    next_poll=?, interval=?, backoff=?, token_issued=?, message=?
-  #|WHERE session_id=? AND id=?
+  $|UPDATE \{TABLE_AUTHORIZATIONS}
+  $|SET \{COLUMN_PHASE}=?, \{COLUMN_CREDENTIALS}=?, \{COLUMN_USER_CODE}=?, \{COLUMN_VERIFICATION_URI}=?, \{COLUMN_EXPIRES}=?,
+  $|    \{COLUMN_NEXT_POLL}=?, \{COLUMN_INTERVAL}=?, \{COLUMN_BACKOFF}=?, \{COLUMN_TOKEN_ISSUED}=?, \{COLUMN_MESSAGE}=?
+  $|WHERE \{COLUMN_SESSION_ID}=? AND \{COLUMN_ID}=?
