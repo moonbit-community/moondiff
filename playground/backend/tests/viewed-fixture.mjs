@@ -21,6 +21,7 @@ export async function startViewedServer(options = {}) {
     files: ['src/main.mbt', 'src/second.mbt'], states: new Map(), holds: [],
     comments: [], ...options.state,
   };
+  const commentLists = new Map();
   const snapshot = () => ({ id: 'PR_fixture', baseRefOid: state.base, headRefOid: state.head });
   const scope = (who, args) => `${who}:${args.owner.toLowerCase()}/${args.repo.toLowerCase()}:${args.number}`;
   state.forScope = (who = 'alice', args = viewedArgs) => {
@@ -73,15 +74,19 @@ export async function startViewedServer(options = {}) {
       return true;
     }
     if (r.path.includes('/comments')) {
+      const endpoint = r.path.split('?')[0];
       if (r.method === 'POST') {
         const comment = {
           id: state.comments.length + 1, ...r.body, user: { id: who === 'bob' ? 2 : 1, login: who },
           html_url: 'https://github.com/alice/repo/pull/42#comment', created_at: '2026-09-11T00:00:00Z',
         };
         state.comments.push(comment);
+        const comments = commentLists.get(endpoint) ?? [];
+        comments.push(comment);
+        commentLists.set(endpoint, comments);
         return send(comment);
       }
-      return send([]);
+      return send(commentLists.get(endpoint) ?? []);
     }
     if (r.path.includes('/compare/')) return send({ merge_base_commit: { sha: state.base } });
     if (r.path.includes('/files?')) return send(files);
