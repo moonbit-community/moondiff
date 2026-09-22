@@ -195,6 +195,65 @@ test "published inline reviews retain the Posting editor until verified, includi
 
 ///|
 #warnings("-alert_unstable")
+test "a synchronizing root preserves its editor and all orphaned replies until confirmation" {
+  let (published, root) = receipt_test_publish_inline(
+    receipt_test_session([]),
+    90,
+    "submitted root body",
+  )
+  let first = receipt_test_comment(
+    91,
+    "first surviving reply",
+    reply_to=root.id,
+  )
+  let second = receipt_test_comment(
+    92,
+    "second surviving reply",
+    reply_to=root.id,
+  )
+  let waiting = receipt_test_refresh(
+    published,
+    receipt_test_bundle([second, first]),
+  )
+  let confirmed = receipt_test_refresh(
+    waiting,
+    receipt_test_bundle([second, first, root]),
+  )
+  let file = receipt_test_file()
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for (session, formal) in [(waiting, false), (confirmed, true)] {
+    for file_index in [Some(0), None] {
+      let read = if file_index is Some(_) {
+        session.read_view(path=root.path)
+      } else {
+        session.read_view(paths=[])
+      }
+      let discussions = prepare_discussions(
+        file_index.map(_ => file.file),
+        file_index,
+        read,
+        emit,
+      )
+      assert_eq(discussions.items.length(), 1)
+      assert_eq(
+        discussions.items[0].key,
+        read.comment_key(ReviewComment(root.id)),
+      )
+      let rendered = @rabbita.render_to_string(() => {
+        @rabbita.Val::constant(fallback_discussions(discussions, file_index))
+      })
+      assert_eq(rendered.split("class=\"review-thread\"").count() - 1, 1)
+      for body in [root.body, first.body, second.body] {
+        assert_eq(rendered.split(body).count() - 1, 1)
+      }
+      assert_eq(rendered.contains("Posting…"), !formal, msg=rendered)
+      assert_false(rendered.contains("pending-review-receipt"), msg=rendered)
+    }
+  }
+}
+
+///|
+#warnings("-alert_unstable")
 test "published replies retain the thread editor and fall back if the root disappears" {
   let root = receipt_test_comment(20, "root")
   let existing = receipt_test_comment(21, "existing reply", reply_to=root.id)

@@ -1779,6 +1779,75 @@ test("failed review synchronization retains Posting and retries without repostin
   expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.review.comment.create").length)).toBe(1);
 });
 
+test("Posting root preserves replies across collapse, layouts, refresh and root restoration", async ({ page }) => {
+  await installApi(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  const body = "Root missing before its first verified list";
+  const replies = ["First reply to the missing root", "Second reply to the missing root"];
+  await page.evaluate(replies => {
+    const dispatch = window.__dispatch;
+    window.__dispatch = async message => {
+      const result = await dispatch(message);
+      if (message.op === "github.review.comment.create") {
+        const state = window.__fake;
+        state.missingRoot = result;
+        state.reviewComments = state.reviewComments.filter(c => c.id !== result.id);
+        state.reviewComments.push(...replies.map((body, index) => ({
+          ...result, id: String(25 + index), body,
+          html_url: `https://github.com/comment/${25 + index}`,
+          in_reply_to_id: result.id,
+        })));
+        state.delayNextList = true;
+      }
+      return result;
+    };
+  }, replies);
+  await openNewLineComment(page, 2);
+  await page.locator(".inline-comment-editor-row textarea").fill(body);
+  await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+  await expect(page.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
+  await page.evaluate(() => window.__fake.releaseList());
+
+  const file = page.locator("#moondiff-file-0");
+  const thread = page.locator(".review-thread").filter({ hasText: replies[0] });
+  async function expectPendingThread() {
+    await expect(thread).toHaveCount(1);
+    await expect(thread).toBeVisible();
+    await expect(thread.locator(".github-comment-body")).toHaveText(replies);
+    await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
+    await expect(page.locator(".comment-editor")).toHaveCount(1);
+    await expect(page.locator(".comment-editor textarea")).toHaveValue(body);
+    await expect(page.locator(".comment-editor textarea")).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
+    await expect(page.locator(".comment-editor .comment-error"))
+      .toHaveText("Waiting for GitHub to sync this comment. Refresh to retry.");
+  }
+  for (const layout of ["Split", "Unified"]) {
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    await expectPendingThread();
+    await expect(file.locator(".inline-discussion-row").filter({ hasText: replies[0] })).toHaveCount(1);
+    await page.getByRole("button", { name: "Collapse src/main.mbt", exact: true }).click();
+    await expectPendingThread();
+    await expect(page.locator(".file-discussions").filter({ hasText: replies[0] }))
+      .toContainText("Not shown in current view");
+    const lists = await page.evaluate(() => window.__fake.commentListCalls);
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(lists);
+    await expectPendingThread();
+    await page.getByRole("button", { name: "Expand src/main.mbt", exact: true }).click();
+    await expectPendingThread();
+    await expect(file.locator(".inline-discussion-row").filter({ hasText: replies[0] })).toHaveCount(1);
+  }
+  await page.evaluate(() => window.__fake.reviewComments.push(window.__fake.missingRoot));
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(thread.locator(".github-comment-body")).toHaveText([body, ...replies]);
+  await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
+  await expect(thread).toHaveCount(1);
+  await expect(thread).toBeVisible();
+});
+
 test("line creation after a PR update stays Posting and allows loading the latest snapshot", async ({ page }) => {
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
