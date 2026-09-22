@@ -514,12 +514,18 @@ async function controlViewedTimers(page) {
       return id;
     };
     window.clearTimeout = id => { if (!jobs.delete(id)) cancel(id); };
+    window.viewedTimerDelays = () => [...jobs.values()]
+      .map(job => job.at - now)
+      .sort((a, b) => a - b);
     window.advanceViewed = delta => {
       now += delta;
       for (const [id, job] of jobs) if (job.at <= now) { jobs.delete(id); job.run(); }
     };
   });
 }
+const waitForViewedTimer = (page, delay) => expect.poll(
+  () => page.evaluate(() => window.viewedTimerDelays()),
+).toContain(delay);
 const advanceViewed = (page, ms) => page.evaluate(ms => window.advanceViewed(ms), ms);
 
 for (const viewed of [true, false]) {
@@ -536,6 +542,7 @@ for (const viewed of [true, false]) {
     expect(record).toMatchObject({ user_id: '1', owner: 'alice', repo: 'repo', number: '42', path: files[0].filename, viewed, base_sha: base, head_sha: head });
     expect(Object.keys(record).sort()).toEqual(['id', 'user_id', 'owner', 'repo', 'number', 'path', 'viewed', 'base_sha', 'head_sha'].sort());
     for (const [i, delay] of [2000, 4000].entries()) {
+      await waitForViewedTimer(page, delay);
       await advanceViewed(page, delay);
       await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(i + 3);
       await readFinished(page);
@@ -546,6 +553,7 @@ for (const viewed of [true, false]) {
     }
     // GitHub finishes the original write after the timeout and multiple old reads.
     state.states.alice[files[0].filename] = viewed ? 'Viewed' : 'Unviewed';
+    await waitForViewedTimer(page, 8000);
     await advanceViewed(page, 8000);
     await expect(box(page)).toBeEnabled();
     await expect(box(page)).toBeChecked({ checked: viewed });
@@ -563,6 +571,7 @@ test('confirmation retries have a finite schedule, tolerate read errors and rest
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await waitingForConfirmation(page); await readFinished(page);
   let count = 2;
   for (const delay of [2000, 4000, 8000, 16000, 30000, 30000]) {
+    await waitForViewedTimer(page, delay);
     await advanceViewed(page, delay - 1);
     expect(calls(state, 'github.pull.viewed.get')).toHaveLength(count);
     await advanceViewed(page, 1);
@@ -578,7 +587,10 @@ test('confirmation retries have a finite schedule, tolerate read errors and rest
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(9);
   await readFinished(page);
   state.states.alice[files[0].filename] = 'Viewed';
+  await waitForViewedTimer(page, 2000);
   await advanceViewed(page, 2000);
+  await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(10);
+  await readFinished(page);
   await expect(box(page)).toBeEnabled();
   await expect(box(page)).toBeChecked();
   expect(state.states.alice[files[0].filename]).toBe('Viewed');
@@ -598,6 +610,7 @@ test('rate limits pause confirmation and page restoration opens a new round', as
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(3);
   await readFinished(page);
   state.states.alice[files[0].filename] = 'Viewed';
+  await waitForViewedTimer(page, 2000);
   await advanceViewed(page, 2000);
   await expect(box(page)).toBeEnabled();
   await expect(box(page)).toBeChecked();
