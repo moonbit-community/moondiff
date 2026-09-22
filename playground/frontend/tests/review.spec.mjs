@@ -1668,7 +1668,118 @@ test("late list cannot replace a newer verified refresh", async ({ page }) => {
   await expect(page.getByText("Existing inline comment", { exact: true })).toHaveCount(0);
 });
 
-test("line creation after a PR update shows a receipt without inserting an unverified anchor", async ({ page }) => {
+for (const kind of ["inline", "reply"]) {
+  test(`${kind} stays Posting through the delayed list and final validation`, async ({ page }) => {
+    await installApi(page, pullTarget(), { authenticated: true });
+    await page.goto(reviewPath());
+    await waitForSignedInComments(page);
+    if (kind === "inline") await openNewLineComment(page, 2);
+    else await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+    const body = `${kind} remains visible until GitHub synchronization finishes`;
+    const editor = page.locator(".comment-editor textarea");
+    await editor.fill(body);
+    const draftId = await editor.getAttribute("data-draft-id");
+    await editor.evaluate(node => { window.__postingEditor = node; });
+    await page.evaluate(() => { window.__fake.delayCreate = true; });
+    await page.getByRole("button", { name: "Post comment", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseCreate)).toBe("function");
+    await page.evaluate(() => {
+      window.__fake.delayNextList = true;
+      window.__fake.releaseCreate();
+    });
+    await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+
+    const file = page.locator("#moondiff-file-0");
+    const formal = file.locator(".github-comment-body").filter({ hasText: body });
+    async function expectPosting() {
+      await expect(page.locator(".comment-editor")).toHaveCount(1);
+      await expect(editor).toHaveAttribute("data-draft-id", draftId);
+      await expect(editor).toHaveValue(body);
+      await expect(editor).toBeDisabled();
+      expect(await editor.evaluate(node => node === window.__postingEditor)).toBe(true);
+      await expect(page.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
+      await expect(page.locator(".line-comment-button").first()).toBeDisabled();
+      await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
+      await expect(page.locator(".comment-notice")).toHaveCount(0);
+      await expect(formal).toHaveCount(0);
+    }
+    await expectPosting();
+    await page.evaluate(body => {
+      const file = document.querySelector("#moondiff-file-0");
+      const frames = [];
+      const record = () => frames.push({
+        editor: file.querySelectorAll(".comment-editor").length,
+        formal: [...file.querySelectorAll(".github-comment-body")]
+          .filter(node => node.textContent === body).length,
+      });
+      const observer = new MutationObserver(record);
+      observer.observe(file, { childList: true, subtree: true, characterData: true });
+      record();
+      window.__postingSwap = { frames, observer, record };
+      const dispatch = window.__dispatch;
+      window.__dispatch = async message => {
+        if (message.op === "github.pull.get") {
+          await new Promise(resolve => { window.__fake.releaseValidation = resolve; });
+        }
+        return dispatch(message);
+      };
+      window.__fake.releaseList();
+    }, body);
+    await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseValidation)).toBe("function");
+    await expectPosting();
+    await page.evaluate(() => window.__fake.releaseValidation());
+    await expect(formal).toBeVisible();
+    await expect(editor).toHaveCount(0);
+    await expect(page.locator(".comment-notice")).toHaveText("Comment published.");
+    await expect(page.getByRole("button", { name: "Add overall comment" })).toBeEnabled();
+    const frames = await page.evaluate(() => {
+      window.__postingSwap.record();
+      window.__postingSwap.observer.disconnect();
+      return window.__postingSwap.frames;
+    });
+    expect(frames.every(frame => frame.editor + frame.formal === 1)).toBe(true);
+    expect(await page.evaluate(kind => window.__fake.calls.filter(c =>
+      c.op === (kind === "inline" ? "github.review.comment.create" : "github.review.reply.create")
+    ).length, kind)).toBe(1);
+  });
+}
+
+test("failed review synchronization retains Posting and retries without reposting", async ({ page }) => {
+  await installApi(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
+  const body = "Published before synchronization failed";
+  const editor = page.locator(".comment-editor");
+  await editor.locator("textarea").fill(body);
+  await page.evaluate(() => {
+    const dispatch = window.__dispatch;
+    window.__dispatch = async message => {
+      if (message.op === "github.comments.list" && window.__fake.failSync) {
+        throw Object.assign(new Error("Sync unavailable"), { status: 503 });
+      }
+      const result = await dispatch(message);
+      if (message.op === "github.review.comment.create") window.__fake.failSync = true;
+      return result;
+    };
+  });
+  await editor.getByRole("button", { name: "Post comment", exact: true }).click();
+  await expect(editor.locator(".comment-error"))
+    .toHaveText("Comment published, but syncing failed. Refresh to retry.");
+  await expect(editor.locator("textarea")).toHaveValue(body);
+  await expect(editor.locator("textarea")).toBeDisabled();
+  await expect(editor.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
+  await expect(editor.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
+  await page.evaluate(() => { window.__fake.failSync = false; });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.locator(".github-comment-body").filter({ hasText: body })).toBeVisible();
+  await expect(editor).toHaveCount(0);
+  expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.review.comment.create").length)).toBe(1);
+});
+
+test("line creation after a PR update stays Posting and allows loading the latest snapshot", async ({ page }) => {
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
@@ -1683,10 +1794,17 @@ test("line creation after a PR update shows a receipt without inserting an unver
   await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
   await page.evaluate(() => window.__fake.releaseCreate());
   await expect(page.locator(".published-comment-link")).toBeVisible();
-  await expect(page.locator(".comment-notice")).toHaveText("Comment published.");
-  await expect(page.getByText("Published on the old snapshot", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".comment-notice")).toHaveCount(0);
+  await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
+  const editor = page.locator("#moondiff-file-0 .comment-editor");
+  await expect(editor.locator("textarea")).toHaveValue("Published on the old snapshot");
+  await expect(editor.locator("textarea")).toBeDisabled();
+  await expect(editor.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
+  await expect(editor.locator(".comment-error"))
+    .toHaveText("Comment published. PR updated. Load latest to see it.");
   await expect(page.getByRole("button", { name: "Load latest" })).toBeEnabled();
   await page.getByRole("button", { name: "Load latest" }).click();
+  await expect(editor).toHaveCount(0);
   await expect(page.getByText("Published on the old snapshot", { exact: true })).toBeVisible();
 });
 
