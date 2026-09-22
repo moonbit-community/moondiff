@@ -169,7 +169,7 @@ test "projection chooses the first visible occurrence independently of rendering
       assert_eq(projection.editors.get(key), Some("0:first:0:0:0"))
     }
     let item = InlineDiscussion::{
-      id: ReviewComment(1L),
+      key: "1:review:1",
       file_index: Some(0),
       anchor: Some({ path: "a.txt", side: Right, line: 1, position: Some(2), }),
       location: "a.txt",
@@ -377,7 +377,7 @@ test "source rows precede both sides of discussion and the selected editor" {
         position: Some(if side is Left { 1 } else { 2 }),
       }
       let item = InlineDiscussion::{
-        id: ReviewComment(id),
+        key: "1:review:\{id}",
         file_index: Some(0),
         anchor: Some(anchor),
         location: anchor_location(anchor),

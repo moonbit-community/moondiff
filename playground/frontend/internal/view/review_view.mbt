@@ -835,19 +835,6 @@ fn comments_overview(
       _ => @html.nothing
     },
     fallback_discussions(prepare_discussions(None, None, review, emit), None),
-    if review.draft_visible() &&
-      review.draft() is Some(draft) &&
-      draft.kind is ReplyDraft(id) &&
-      !review.valid_reply_target(id) {
-      @html.div(class="unavailable-reply-draft", [
-        @html.p(
-          "The root comment is unavailable. Your reply draft is preserved; copy its text or cancel it.",
-        ),
-        comment_editor(draft, review, emit, unavailable=true),
-      ])
-    } else {
-      @html.nothing
-    },
     if is_pull {
       @html.div(class="overall-comments", [
         @html.div(issue_views),
