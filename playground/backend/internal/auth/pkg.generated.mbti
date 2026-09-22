@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/auth"
+
+import {
+  "moonbit-community/moondiff-playground-protocol",
+  "moonbit-community/moondiff-playground-server/internal/storage",
+  "moonbitlang/async/http",
+}
+
+// Values
+pub fn cookie(@storage.App, String) -> @http.Cookie
+
+pub fn csrf_check(@storage.App, @http.Request, @storage.Session?) -> @storage.Session raise
+
+pub fn device_response(@storage.App, String, String, String) -> @moondiff-playground-protocol.DeviceResponse raise
+
+pub fn request_session(@storage.App, @http.Request) -> @storage.Session? raise
+
+pub fn status(@storage.App, @storage.Session?) -> @moondiff-playground-protocol.ApiAuthStatus raise
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

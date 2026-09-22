@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/viewed"
+
+import {
+  "moonbit-community/moondiff-playground-protocol",
+  "moonbit-community/moondiff-playground-server/internal/storage",
+}
+
+// Values
+pub async fn pull_viewed(@storage.App, @storage.Session?, @moondiff-playground-protocol.PullViewedGet) -> @moondiff-playground-protocol.ApiPullViewed
+
+pub async fn set_file_viewed(@storage.App, @storage.Session?, @moondiff-playground-protocol.PullFileViewedSet) -> @moondiff-playground-protocol.ApiFileViewedResult
+
+pub async fn[T] with_viewed_scope(@storage.App, @storage.Session?, @moondiff-playground-protocol.PullViewedGet, async () -> T) -> T
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

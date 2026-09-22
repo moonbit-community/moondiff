@@ -1,0 +1,79 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/storage"
+
+import {
+  "moonbit-community/moondiff-playground-protocol",
+  "moonbit-community/moondiff-playground-server/internal/config",
+  "moonbit-community/sqlite3",
+  "moonbitlang/async",
+}
+
+// Values
+pub fn now() -> Int64
+
+pub fn now_ms() -> Int64
+
+// Errors
+
+// Types and methods
+pub(all) struct App {
+  config : @config.Config
+  db : @sqlite3.Connection
+  refreshes : Map[String, @async.Lazy[Session]]
+  devices : Map[String, @async.Lazy[Unit]]
+  viewed_scopes : Map[String, ViewedCoordinator]
+}
+pub fn App::begin_device(Self, Session, String) -> String raise
+pub fn App::cancel_device(Self, Session, String) -> String raise
+pub fn App::create_session(Self) -> (String, Session) raise
+pub fn App::device(Self, String, String) -> DeviceFlow? raise
+pub fn App::device_current(Self, String, String) -> DeviceFlow? raise
+pub fn App::end_device(Self, DeviceFlow, String, String) -> Unit raise
+pub fn App::expire_auth(Self, Session) -> Unit raise
+pub fn App::install_tokens(Self, Session, String, String, Json, issued_at? : Int64, device_id? : String) -> Session raise
+pub fn App::logout(Self, Session) -> Unit raise
+pub fn App::open(@config.Config) -> Self raise
+pub fn App::save_device(Self, DeviceFlow) -> Unit raise
+pub fn App::session(Self, String) -> Session? raise
+pub fn App::still_current(Self, Session) -> Bool raise
+pub fn App::token_payload(Self, Session) -> Json raise
+pub fn App::visible_device(Self, Session) -> DeviceFlow? raise
+
+pub(all) struct DeviceFlow {
+  session_id : String
+  id : String
+  target_id : String
+  epoch : Int64
+  phase : String
+  credentials : String
+  user_code : String
+  verification_uri : String
+  expires : Int64
+  next_poll : Int64
+  interval : Int64
+  backoff : Int64
+  token_issued : Int64
+  message : String
+}
+pub fn DeviceFlow::public_status(Self) -> @moondiff-playground-protocol.ApiDeviceFlow
+
+pub(all) struct Session {
+  id : String
+  csrf : String
+  expires : Int64
+  epoch : Int64
+  user : String
+  login : String
+  tokens : String
+  access_expires : Int64
+  refresh_expires : Int64
+}
+
+pub(all) struct ViewedCoordinator {
+  mutex : @async.Mutex
+  mut users : Int
+}
+
+// Type aliases
+
+// Traits

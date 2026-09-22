@@ -1,0 +1,13 @@
+import {
+  "moonbit-community/moondiff-playground-protocol" @protocol,
+  "moonbit-community/moondiff-playground-server/internal/protocol" @common,
+  "moonbit-community/moondiff-playground-server/internal/config",
+  "moonbit-community/moondiff-playground-server/internal/crypto",
+  "moonbitlang/async",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbit-community/sqlite3",
+}
+
+supported_targets = "native+wasm"

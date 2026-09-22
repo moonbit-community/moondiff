@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/github"
+
+import {
+  "moonbit-community/moondiff-playground-protocol",
+  "moonbit-community/moondiff-playground-server/internal/storage",
+  "moonbitlang/async/http",
+}
+
+// Values
+pub async fn authenticated(@storage.App, @storage.Session, rejected_token? : String) -> @storage.Session
+
+pub async fn comments(@storage.App, @storage.Session?, String) -> Json
+
+pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json, source? : Bool) -> (@http.Response, Bytes)
+
+pub async fn github_json(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json) -> Json
+
+pub async fn graphql(@storage.App, @storage.Session?, String, Json) -> Json
+
+pub fn pull_from_graphql(Json) -> Json
+
+pub fn pull_snapshot(Json) -> PullSnapshot raise
+
+pub fn pull_variables(@moondiff-playground-protocol.PullViewedGet) -> Json raise
+
+pub async fn upstream(String, String, @http.RequestMethod, String, Json?, source? : Bool, accept? : String) -> (@http.Response, Bytes)
+
+pub fn upstream_json(Bytes) -> Json raise
+
+// Errors
+
+// Types and methods
+pub(all) struct PullSnapshot {
+  id : String
+  base : String
+  head : String
+} derive(Eq)
+pub fn PullSnapshot::equal(Self, Self) -> Bool
+pub fn PullSnapshot::not_equal(Self, Self) -> Bool
+
+// Type aliases
+
+// Traits

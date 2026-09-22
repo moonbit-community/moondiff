@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-playground-server/internal/merge"
+
+import {
+  "moonbit-community/moondiff-playground-protocol",
+  "moonbit-community/moondiff-playground-server/internal/storage",
+}
+
+// Values
+pub async fn pull_merge_status(@storage.App, @storage.Session?, @moondiff-playground-protocol.PullMergeStatusGet) -> @moondiff-playground-protocol.ApiPullMergeStatus
+
+pub async fn pull_rebase_merge(@storage.App, @storage.Session?, @moondiff-playground-protocol.PullRebaseMerge) -> @moondiff-playground-protocol.ApiPullMergeResult
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

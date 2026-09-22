@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/env",
+  "moonbitlang/x/crypto" @xcrypto,
+}
+
+supported_targets = "native+wasm"

@@ -1,0 +1,12 @@
+import {
+  "moonbit-community/moondiff-playground-protocol" @api,
+  "moonbitlang/async",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/buffer",
+}
+
+import {
+  "moonbitlang/core/json",
+} for "wbtest"
+
+supported_targets = "native+wasm"
