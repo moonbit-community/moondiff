@@ -108,7 +108,11 @@ pub fn Session::draft_path(self : Session) -> String? {
   match self.draft() {
     Some({ kind: InlineDraft(_, anchor), .. }) => Some(anchor.path)
     Some({ kind: ReplyDraft(id), .. }) =>
-      self.index.owners.get(ReviewComment(id).key())
+      if self.submission() is Some(SyncingReview(_)) {
+        self.draft_target_path()
+      } else {
+        self.index.owners.get(ReviewComment(id).key())
+      }
     _ => None
   }
 }
@@ -155,6 +159,7 @@ pub fn Session::permission_summary(self : Session) -> PermissionSummary {
 pub struct ReadView {
   permissions : PermissionSummary
   group : CommentGroup
+  pending_review_receipts : ReadOnlyArray[PendingReviewReceipt]
   generation : Int
   snapshot_stale : Bool
   login : String?
@@ -220,6 +225,12 @@ pub fn Session::read_view(
     None => draft_path is None || !paths.contains(draft_path.unwrap_or(""))
   }
   let selected_draft = if own_draft { self.draft() } else { None }
+  let pending_review_receipts = self.pending_review_receipts.filter(receipt => {
+    match path {
+      Some(path) => receipt.path == path
+      None => !paths.contains(receipt.path)
+    }
+  })
   let deletion = self.deletion.filter(deletion => {
     let id = match deletion {
       ConfirmDelete(id) | Deleting(id) | DeleteFailed(id, _) => id
@@ -236,6 +247,7 @@ pub fn Session::read_view(
   {
     permissions: self.permission_summary(),
     group,
+    pending_review_receipts: ReadOnlyArray::from_array(pending_review_receipts),
     generation: self.generation(),
     snapshot_stale: self.snapshot_stale,
     login: self.login,

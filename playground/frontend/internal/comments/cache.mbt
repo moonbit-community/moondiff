@@ -3,7 +3,7 @@ priv enum CacheChange {
   Received(ApiCommentBundle, Snapshot?)
   PublishedIssue(ApiIssueComment)
   PublishedCommit(ApiCommitComment)
-  PublishedReview(String)
+  PublishedReview(PendingReviewReceipt)
   Removed(CommentId)
 }
 
@@ -15,6 +15,11 @@ fn merge_cache(session : Session, change : CacheChange) -> Session {
   }
   match change {
     Received(bundle, snapshot) => {
+      let review_synced = match session.submission() {
+        Some(SyncingReview(id)) =>
+          bundle.review_comments.any(comment => comment.id == id)
+        _ => false
+      }
       let pending = session.receipts
       let received = copy_bundle(bundle)
       for comment in pending.issue_comments {
@@ -33,6 +38,19 @@ fn merge_cache(session : Session, change : CacheChange) -> Session {
         verified_snapshot: snapshot,
         refresh: RefreshIdle,
         refresh_error: None,
+        editor: if review_synced {
+          Empty
+        } else {
+          session.editor
+        },
+        notice: if review_synced {
+          Some("Comment published.")
+        } else {
+          session.notice
+        },
+        pending_review_receipts: reconcile_pending_review_receipts(
+          session, bundle,
+        ),
         receipts: {
           issue_comments: pending.issue_comments.filter(c => {
             !bundle.issue_comments.any(b => b.id == c.id)
@@ -76,13 +94,27 @@ fn merge_cache(session : Session, change : CacheChange) -> Session {
         refresh_id: session.refresh_id + 1,
       }
     }
-    PublishedReview(url) =>
+    PublishedReview(receipt) => {
+      let pending_review_receipts = session.pending_review_receipts.copy()
+      if !current.review_comments.any(c => c.id == receipt.id) &&
+        !pending_review_receipts.any(r => r.key() == receipt.key()) {
+        pending_review_receipts.push(receipt)
+      }
       {
         ..session,
-        published_url: Some(url),
+        pending_review_receipts,
+        editor: match session.editor {
+          Submitting(draft, operation) if pending_review_receipts.any(r => {
+              r.id == receipt.id
+            }) =>
+            Submitting(draft, { ..operation, phase: SyncingReview(receipt.id), })
+          _ => Empty
+        },
+        published_url: Some(receipt.url),
         refresh: RefreshIdle,
         refresh_id: session.refresh_id + 1,
       }
+    }
     Removed(id) => {
       let deleted = session.deleted.copy()
       if !deleted.contains(id) {

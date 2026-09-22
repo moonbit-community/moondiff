@@ -33,7 +33,13 @@ pub fn permission(review : Session, action : Action) -> Permission {
       if !review.snapshot_stale {
         return Denied("The snapshot is current.")
       }
-      if review.draft() is Some(_) || review.deletion is Some(Deleting(_)) {
+      // A published review only needs synchronization; loading the latest
+      // snapshot must remain available when its original snapshot is stale.
+      if (
+          review.draft() is Some(_) &&
+          !(review.submission() is Some(SyncingReview(_)))
+        ) ||
+        review.deletion is Some(Deleting(_)) {
         return Denied(
           "Finish the current draft or deletion before loading the latest snapshot.",
         )

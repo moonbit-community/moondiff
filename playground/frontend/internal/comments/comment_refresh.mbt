@@ -19,6 +19,7 @@ fn begin_comments_refresh(model : Model) -> (Model, Effects) {
     refresh_id: id,
     refresh,
     refresh_error: None,
+    pending_review_receipts: pending_review_receipts_for_refresh(model.review),
   })
   let command = match reference.target {
     PullRequest(number) =>
@@ -55,6 +56,10 @@ fn mark_snapshot_stale(model : Model) -> Model {
     snapshot_stale: true,
     refresh: RefreshIdle,
     refresh_error: None,
+    pending_review_receipts: pending_review_receipts_with_status(
+      model.review,
+      ReceiptPrChanged,
+    ),
   })
 }
 
@@ -66,6 +71,14 @@ fn fail_comments_refresh(model : Model, error : Failure) -> Model {
       ..model.review,
       refresh: RefreshIdle,
       refresh_error: Some(message),
+      pending_review_receipts: pending_review_receipts_with_status(
+        model.review,
+        if model.review.snapshot_stale {
+          ReceiptPrChanged
+        } else {
+          ReceiptSyncFailed
+        },
+      ),
       comments: if model.review.comments is CommentsReady(_) {
         model.review.comments
       } else {

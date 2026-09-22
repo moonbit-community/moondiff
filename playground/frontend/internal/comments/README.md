@@ -17,7 +17,10 @@ previous session and has no browser, RPC or Rabbita dependency. Collection reads
 | Writes invalidate an already pending list immediately | `merge_cache` in `cache.mbt`, during the write response transition |
 | Deleted comments cannot reappear from an old or eventual-consistency list | Session deletion tombstones in `merge_cache` |
 | Issue/commit receipts survive until observed, without duplicate IDs | Receipt overlay in `merge_cache` |
-| PR review writes display only their receipt before verification | `PublishedReview`, followed by a fresh metadata/list/metadata cycle |
+| PR review writes keep the frozen editor in Posting until verification | `SyncingReview` consumes the write response while retaining the draft and its ID |
+| Published reviews cannot be edited, cancelled or submitted again during synchronization | `editor.mbt`, `permissions.mbt`; receipts track IDs independently from the frozen draft body |
+| Every pending review ID advances through syncing, waiting, failure or PR-change state | Refresh transitions reconcile receipts only after metadata/list/metadata validation |
+| A verified list atomically replaces the Posting editor with its formal comment | `Received` in `merge_cache`, matched by review comment ID |
 | Verified comments and line drafts belong to a snapshot | `Snapshot`, `verified_snapshot`, `DraftData.snapshot`, `target_permission` |
 | Only live root comments can receive replies | `valid_reply_target`; `ReviewThread.id` always uses the original root ID |
 | Buttons and transitions use the same operation rules | `permission(session, action)` returns `Allowed` or `Denied(reason)` |
@@ -42,6 +45,11 @@ For a new asynchronous operation, allocate a fresh number when starting the
 request, capture generation and number in its response constructor, and consume
 that response only in its expected phase. Put write acknowledgements in
 `merge_cache`; never separately update the list and schedule its invalidation.
+Pending review receipts are deduplicated by generation and comment ID, and are
+cleared by the same reset path as the rest of the comment session. They are not
+rendered as separate cards. Failed or interrupted synchronization keeps the
+published draft frozen; Refresh retries the read without repeating the write.
+If the PR changed, Load latest remains available for an already published draft.
 
 ## Projection and browser interaction
 
@@ -66,7 +74,8 @@ does not change draft identity or body, and is not persisted in the URL or stora
 
 Comment lists use generation plus typed comment IDs. Threads retain the original
 root ID after root deletion. Draft keys use generation plus a separate draft
-sequence. Source rows, semantic sections and file containers also have stable
+sequence. The editor keeps this key through publication and synchronization.
+Source rows, semantic sections and file containers also have stable
 keys, so inserting replies or other cards cannot replace an active editor.
 
 `application/editor_lifecycle.mbt` is the only browser interaction adapter. It

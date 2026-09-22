@@ -39,6 +39,7 @@ pub(all) enum SubmissionPhase {
   PostingReview
   PostingCommit
   PostingReply
+  SyncingReview(Int64)
 } derive(Eq)
 
 ///|
@@ -46,6 +47,8 @@ pub struct Session {
   priv index : CommentIndex
   priv draft_sequence : Int
   priv receipts : ApiCommentBundle
+  // Track published review IDs until a verified list can replace the editor.
+  priv pending_review_receipts : Array[PendingReviewReceipt]
   priv context : Context
   verified_snapshot : Snapshot?
   refresh_id : Int
@@ -73,6 +76,7 @@ pub fn Session::new(enabled? : Bool = false) -> Session {
     index: CommentIndex::new(),
     draft_sequence: 0,
     receipts: { issue_comments: [], review_comments: [], commit_comments: [], },
+    pending_review_receipts: [],
     context: { generation: 0, route: None, snapshot: None, enabled, },
     verified_snapshot: None,
     refresh_id: 0,

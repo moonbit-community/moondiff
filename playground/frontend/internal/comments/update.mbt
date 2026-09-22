@@ -209,6 +209,7 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
         snapshot: draft.snapshot,
         id: draft.id,
         kind: draft.kind,
+        target_path: model.review.draft_target_path(),
         body,
         error: None,
       }
@@ -342,11 +343,7 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
       }
       finish_comment_submission(
         match result {
-          Ok(comment) =>
-            with_review(
-              model,
-              merge_cache(model.review, PublishedReview(comment.html_url)),
-            )
+          Ok(comment) => insert_review_receipt(model, comment)
           Err(_) => model
         },
         generation,
@@ -378,11 +375,7 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
       }
       finish_comment_submission(
         match result {
-          Ok(comment) =>
-            with_review(
-              model,
-              merge_cache(model.review, PublishedReview(comment.html_url)),
-            )
+          Ok(comment) => insert_review_receipt(model, comment)
           Err(_) => model
         },
         generation,
