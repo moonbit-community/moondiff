@@ -1,6 +1,6 @@
 ///|
 priv struct InlineDiscussion {
-  id : @comments.CommentId
+  key : String
   file_index : Int?
   anchor : ReviewAnchor?
   location : String
@@ -13,7 +13,6 @@ priv struct InlineDiscussion {
 // shared across the file fragments.
 priv struct InlineDiscussions {
   cache : FileDerivation?
-  generation : Int
   items : Array[InlineDiscussion]
   projection : ReviewProjection
   index : Map[String, Array[InlineDiscussion]]
@@ -26,7 +25,6 @@ priv struct InlineDiscussions {
 fn empty_discussions() -> InlineDiscussions {
   {
     cache: None,
-    generation: 0,
     items: [],
     projection: { lines: Map([]), editors: Map([]), },
     index: {},
@@ -53,7 +51,6 @@ fn prepare_discussions(
 ) -> InlineDiscussions {
   let result = {
     ..empty_discussions(),
-    generation: review.generation,
     projection,
     draft: review.draft(),
     cache,
@@ -72,7 +69,8 @@ fn prepare_discussions(
   let patch = file
     .map(file => canonical_patch(cache, file))
     .unwrap_or(NotCommentable)
-  for thread in @comments.file_threads(review.group, file_index, patch) {
+  let threads = @comments.file_threads(review.group, file_index, patch)
+  for thread in threads {
     let root = thread.root
     let side : @review.ReviewSide = if root.side == Some(Left) {
       Left
@@ -97,7 +95,7 @@ fn prepare_discussions(
       root.path + " · Line unavailable"
     }
     result.items.push({
-      id: thread.id,
+      key: review.comment_key(thread.id),
       file_index: thread.file_index,
       anchor,
       location,
@@ -127,7 +125,7 @@ fn prepare_discussions(
         comment.line.map(n => "Line \{n}").unwrap_or("Line unavailable"),
       )
     result.items.push({
-      id: CommitComment(comment.id),
+      key: review.comment_key(CommitComment(comment.id)),
       file_index: discussion.file_index,
       anchor,
       location,
@@ -141,6 +139,28 @@ fn prepare_discussions(
         review,
         emit,
       ),
+    })
+  }
+  if review.draft_visible() &&
+    review.draft() is Some(draft) &&
+    draft.kind is ReplyDraft(id) &&
+    !review.valid_reply_target(id) {
+    result.items.push({
+      key: draft.id.key(),
+      file_index,
+      anchor: None,
+      location: "Thread unavailable",
+      outdated: false,
+      content: @html.div(class="unavailable-reply-draft", [
+        if !draft.submitting {
+          @html.p(
+            "The root comment is unavailable. Your reply draft is preserved; copy its text or cancel it.",
+          )
+        } else {
+          @html.nothing
+        },
+        result.editor,
+      ]),
     })
   }
   for item in result.items {
@@ -192,10 +212,9 @@ fn inline_cards(
         discussion_key(file_index, anchor.side, anchor.line),
       ) ==
       Some(site) {
-      let key = "\{discussions.generation}:\{item.id.key()}"
       cards.push(
         (
-          key,
+          item.key,
           inline_discussion_row(
             "inline-discussion-row",
             anchor,
@@ -247,7 +266,7 @@ fn fallback_discussions(
         )
       })
       .unwrap_or(false) {
-      items["\{discussions.generation}:\{item.id.key()}"] = @html.div(
+      items[item.key] = @html.div(
         class=if item.outdated {
           "outdated-discussions"
         } else {
