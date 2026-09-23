@@ -30,7 +30,7 @@ async function setup(page, handler) {
     switch (kind) {
       case 'ViewerPullsGet': value = success('ViewerPulls', { items: args.kind.$tag === 'Authored' ? [pull(3, { draft: true })] : [pull(1), pull(2, { owner: 'another', repo: 'project' })], total_count: args.kind.$tag === 'Authored' ? 1 : 2 }); break;
       case 'PullCommitsGet': value = success('PullCommits', commits(1, 1)); break;
-      case 'PullGet': value = successFixture('github.pull.get', { title: 'Loaded PR', html_url: 'https://github.com/upstream/repo/pull/1', base: { sha: base, repo: { full_name: 'upstream/repo' } }, head: { sha: head, repo: { full_name: 'fork/repo' } }, additions: 0, deletions: 0, changed_files: 0 }); break;
+      case 'PullGet': value = successFixture('github.pull.get', { title: 'Loaded PR', html_url: 'https://github.com/upstream/repo/pull/1', base: { sha: base, repo: { full_name: 'upstream/repo' } }, head: { sha: head, repo: { full_name: 'fork/repo' } }, additions: 0, deletions: 0, changed_files: 0, commits: 0 }); break;
       case 'CompareGet': value = successFixture('github.compare.get', { merge_base_commit: { sha: base } }); break;
       case 'PullFiles': value = successFixture('github.pull.files', []); break;
       case 'CommentsList': value = successFixture('github.comments.list', { issue_comments: [], review_comments: [], commit_comments: [] }); break;

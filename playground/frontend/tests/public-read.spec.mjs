@@ -8,7 +8,7 @@ const repository = 'https://api.github.com/repos/example/project';
 const pull = {
   title: 'Public read fixture', html_url: 'https://github.com/example/project/pull/42',
   base: { sha: base }, head: { sha: head },
-  additions: 1, deletions: 1, changed_files: 1,
+  additions: 1, deletions: 1, changed_files: 1, commits: 0,
 };
 const file = {
   filename: 'src/example.mbt', status: 'modified', additions: 1, deletions: 1,
