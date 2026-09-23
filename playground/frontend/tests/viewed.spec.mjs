@@ -46,7 +46,7 @@ async function install(page, options = {}) {
       op = 'github.pull.get'; args = { number: '42' };
       value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42',
         base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } },
-        additions: state.files.length, deletions: state.files.length, changed_files: state.files.length };
+        additions: state.files.length, deletions: state.files.length, changed_files: state.files.length, commits: 0 };
     } else if (/^commits\/[^/]+$/.test(resource)) {
       op = 'github.commit.get'; args = { sha: resource.split('/')[1] };
       value = { sha: args.sha, html_url: `https://github.com/alice/repo/commit/${args.sha}`,
@@ -74,7 +74,7 @@ async function install(page, options = {}) {
     const { op, args } = fixtureRequest(request.postDataJSON());
     state.calls.push({ op, args });
     let value, failure;
-    if (op === 'github.pull.get') value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length };
+    if (op === 'github.pull.get') value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length, commits: 0 };
     else if (op === 'github.compare.get') value = { merge_base_commit: { sha: merge } };
     else if (op === 'github.pull.files') value = state.files;
     else if (op === 'github.commit.get') value = { sha: args.sha, html_url: `https://github.com/alice/repo/commit/${args.sha}`, commit: { message: 'Commit fixture' }, parents: [{ sha: base }], stats: { additions: 3, deletions: 3, total: 6 }, files };

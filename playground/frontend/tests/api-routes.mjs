@@ -7,6 +7,9 @@ export function fixtureURL({ request }) {
     case 'CommitGet': return `${base}/commits/${a.sha}?per_page=100&page=${a.page}`;
     case 'PullGet': return `${base}/pulls/${a.number}`;
     case 'CompareGet': return `${base}/compare/${a.base}...${a.head}`;
+    case 'RangeCompareGet': return `${base}/compare/${a.base}...${a.head}?per_page=100&page=${a.page}`;
+    case 'PullCommitPageGet': return `${base}/pulls/${a.number}/commits?per_page=100&page=${a.page}`;
+    case 'ResolveShaGet': return `${base}/commits/${a.sha}`;
     case 'PullFiles': return `${base}/pulls/${a.number}/files?per_page=100&page=${a.page}`;
     case 'ContentGet': return `https://raw.githubusercontent.com/${a.owner}/${a.repo}/${a.revision}/${a.path.split('/').map(encodeURIComponent).join('/')}`;
     default: return '';

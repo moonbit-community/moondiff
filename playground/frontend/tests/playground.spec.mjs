@@ -469,6 +469,7 @@ function pullMetadata(head) {
     additions: head === pullHeadTwo ? 103 : 102,
     deletions: 101,
     changed_files: 101,
+    commits: 0,
   };
 }
 

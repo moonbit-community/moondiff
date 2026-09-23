@@ -179,6 +179,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
         additions: options.additions ?? 1,
         deletions: options.deletions ?? 1,
         changed_files: 1,
+        commits: 0,
       };
     }
     function file() {
