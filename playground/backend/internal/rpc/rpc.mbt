@@ -46,6 +46,27 @@ pub async fn dispatch(
           @github.github_json(app, session, request.public_path().unwrap()),
         ),
       )
+    RangeCompareGet(_) =>
+      RangeCompare(
+        @common.decode_github(
+          @github.github_json(app, session, request.public_path().unwrap()),
+        ),
+      )
+    PullCommitPageGet(_) =>
+      PullCommitPage(
+        @common.decode_github(
+          @github.github_json(app, session, request.public_path().unwrap()),
+        ),
+      )
+    ResolveShaGet(p) => {
+      let (_, bytes) = @github.github(
+        app,
+        session,
+        request.public_path().unwrap(),
+        accept="application/vnd.github.sha",
+      )
+      ResolvedSha(@common.resolved_sha(p.sha, @utf8.decode(bytes)))
+    }
     PullFiles(_) =>
       Files(
         @common.decode_github(

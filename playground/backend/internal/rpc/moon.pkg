@@ -8,6 +8,7 @@ import {
   "moonbit-community/moondiff-playground-server/internal/viewed",
   "moonbitlang/async",
   "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/encoding/utf8",
 }
 
 supported_targets = "native+wasm"

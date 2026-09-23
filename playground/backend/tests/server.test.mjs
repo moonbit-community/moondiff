@@ -159,7 +159,7 @@ function raw(f, path, method = 'GET') {
 test('Wasm serves direct routes and HEAD; denies traversal, symlinks, missing paths', async t => {
   const f = await startServer(); t.after(() => f.close());
   const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
-  for (const path of ['/', '/alice/repo/pull/42', '/alice/repo/commit/123abcd', '/alice/repo/pull/42/commits/123abcd']) {
+  for (const path of ['/', '/alice/repo/pull/42', '/alice/repo/commit/123abcd', '/alice/repo/pull/42/commits/123abcd', '/alice/repo/compare/123abcd..abcdef0', '/alice/repo/pull/42/compare/123abcd..abcdef0']) {
     const res = await fetch(f.base + path); assert.equal(res.status, 200); assert.equal(res.headers.get('content-security-policy'), contentSecurityPolicy); assert.match(await res.text(), /fixture/);
   }
   const head = await fetch(f.base + '/styles.css', { method: 'HEAD' }); assert.equal(head.status, 200); assert.equal(await head.text(), '');
@@ -420,6 +420,79 @@ test('content size limit, comment normalization, ownership, writes and errors', 
   for (const [op, fields] of creates) assert.equal((await user.rpc(`github.${op}.create`, { ...repo, ...fields, body: 'hello' })).value.id, '123');
   assert.equal((await user.rpc('github.commit.get', { ...args, repo: 'limited' })).error.code, 'rate_limit');
   assert.equal((await user.rpc('github.commit.get', { ...args, repo: 'private' })).error.code, 'not_found_or_not_installed');
+});
+
+test('private paged interval comparison is a read-only authenticated RPC', async t => {
+  const base = 'a'.repeat(40), head = 'b'.repeat(40);
+  const f = await startServer((request, response) => {
+    if (!request.path.startsWith('/repos/alice/private/compare/')) return false;
+    response.end(JSON.stringify({
+      base_commit: { sha: base, commit: { message: 'Base change' }, parents: [] },
+      merge_base_commit: { sha: base }, total_commits: 1,
+      commits: [{ sha: head, commit: { message: 'Private change' }, parents: [{ sha: base }] }],
+      files: [],
+    }));
+    return true;
+  });
+  t.after(() => f.close());
+  const user = browser(f);
+  await user.login();
+  const args = { owner: 'alice', repo: 'private', base, head, page: 1 };
+  const result = await user.rpc('github.range.compare.get', args);
+  assert.equal(result.ok, true);
+  assert.equal(result.value.total_commits, 1);
+  assert.equal(result.value.commits.at(-1).sha, head);
+  const upstream = f.requests.find(r => r.path.includes(`/compare/${base}...${head}`));
+  assert.equal(upstream.path, `/repos/alice/private/compare/${base}...${head}?per_page=100&page=1`);
+  assert.equal(upstream.headers.authorization, 'Bearer access-alice');
+  const before = f.requests.length;
+  assert.equal((await user.rpc('github.range.compare.get', { ...args, page: 0 })).error.code, 'invalid_arguments');
+  assert.equal(f.requests.length, before);
+});
+
+test('PR #19 shaped compare and commit page decode without head_commit', async t => {
+  const base = 'a'.repeat(40), head = 'b'.repeat(40);
+  const commits = Array.from({ length: 20 }, (_, i) => ({
+    sha: i === 19 ? head : i.toString(16).padStart(40, '0'),
+    commit: { message: `PR commit ${i + 1}` },
+    parents: [{ sha: i === 0 ? base : (i - 1).toString(16).padStart(40, '0') }],
+  }));
+  const f = await startServer((request, response) => {
+    if (request.path === `/repos/alice/private/compare/${base}...${head}?per_page=100&page=1`) {
+      response.end(JSON.stringify({
+        base_commit: { sha: base, commit: { message: 'Base change' }, parents: [] }, merge_base_commit: { sha: base },
+        total_commits: 20, commits, files: [],
+      }));
+      return true;
+    }
+    if (request.path === '/repos/alice/private/pulls/19/commits?per_page=100&page=1') {
+      response.end(JSON.stringify(commits));
+      return true;
+    }
+    if (request.path === '/repos/alice/private/commits/bbbbbbb') {
+      response.setHeader('content-type', 'text/plain');
+      response.end(`${head}\n`);
+      return true;
+    }
+    return false;
+  });
+  t.after(() => f.close());
+  const user = browser(f);
+  await user.login();
+  const repo = { owner: 'alice', repo: 'private' };
+  const compare = await user.rpc('github.range.compare.get', { ...repo, base, head, page: 1 });
+  assert.equal(compare.ok, true, JSON.stringify(compare));
+  assert.equal(compare.value.commits.length, 20);
+  assert.equal(compare.value.commits[0].parents[0].sha, base);
+  assert.equal(compare.value.head_commit, undefined);
+  const page = await user.rpc('github.pull.commit.page.get', { ...repo, number: '19', page: 1 });
+  assert.equal(page.ok, true, JSON.stringify(page));
+  assert.equal(page.value.length, 20);
+  assert.equal(page.value[1].parents[0].sha, page.value[0].sha);
+  const resolved = await user.rpc('github.sha.resolve.get', { ...repo, sha: 'bbbbbbb' });
+  assert.equal(resolved.value, head);
+  assert.equal(f.requests.find(r => r.path.endsWith('/commits/bbbbbbb')).headers.accept, 'application/vnd.github.sha');
+  assert.equal((await user.rpc('github.sha.resolve.get', { ...repo, sha: 'aaaaaaa' })).error.code, 'invalid_github_response');
 });
 
 test('rejected access tokens refresh once; abandoned waiters cannot discard rotation', async t => {

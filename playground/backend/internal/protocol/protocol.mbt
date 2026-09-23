@@ -80,6 +80,13 @@ pub using @api {
 ///|
 pub fn change_path(path : String) -> Bool {
   let parts = path.split("/").map(StringView::to_owned).collect()
+  fn interval(value : String) -> Bool {
+    match value.split_once("..") {
+      Some((base, head)) =>
+        valid_sha(base.to_owned()) && valid_sha(head.to_owned())
+      None => false
+    }
+  }
   match parts {
     ["", owner, repo, "commit", sha] =>
       valid_owner(owner) && valid_repo(repo) && valid_sha(sha)
@@ -90,6 +97,13 @@ pub fn change_path(path : String) -> Bool {
       valid_repo(repo) &&
       decimal(number) &&
       valid_sha(sha)
+    ["", owner, repo, "compare", value] =>
+      valid_owner(owner) && valid_repo(repo) && interval(value)
+    ["", owner, repo, "pull", number, "compare", value] =>
+      valid_owner(owner) &&
+      valid_repo(repo) &&
+      decimal(number) &&
+      interval(value)
     _ => false
   }
 }
@@ -175,6 +189,15 @@ pub fn comment_for_protocol(value : Json) -> Json raise {
 ///|
 pub fn[T : FromJson + ToJson] decode_github(value : Json) -> T raise {
   @api.decode_github(value) catch {
+    @api.ProtocolError(_, message) =>
+      raise RpcError(502, "invalid_github_response", message)
+    error => raise error
+  }
+}
+
+///|
+pub fn resolved_sha(requested : String, response : String) -> String raise {
+  @api.resolved_sha(requested, response) catch {
     @api.ProtocolError(_, message) =>
       raise RpcError(502, "invalid_github_response", message)
     error => raise error

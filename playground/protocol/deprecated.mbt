@@ -227,6 +227,36 @@ pub extend ApiCompare with ToJson::{to_json}
 ///|
 #deprecated
 #doc(hidden)
+pub extend ApiRangeCommit with @moonbitlang/core/json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiRangeCommit with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiRangeCommit with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiRangeCompare with @moonbitlang/core/json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiRangeCompare with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiRangeCompare with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
 pub extend ApiFile with @moonbitlang/core/json.FromJson::{from_json}
 
 ///|
@@ -632,6 +662,21 @@ pub extend CompareGet with ToJson::{to_json}
 ///|
 #deprecated
 #doc(hidden)
+pub extend RangeCompareGet with @moonbitlang/core/json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend RangeCompareGet with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend RangeCompareGet with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
 pub extend ContentGet with @moonbitlang/core/json.FromJson::{from_json}
 
 ///|
@@ -898,3 +943,33 @@ pub extend PullViewedGet with Eq::{not_equal, equal}
 #deprecated
 #doc(hidden)
 pub extend PullViewedGet with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend PullCommitPageGet with @moonbitlang/core/json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend PullCommitPageGet with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend PullCommitPageGet with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ResolveShaGet with @moonbitlang/core/json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ResolveShaGet with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ResolveShaGet with ToJson::{to_json}

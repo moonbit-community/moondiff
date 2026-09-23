@@ -18,6 +18,8 @@ pub fn github_id(Json) -> String raise
 
 pub fn normalize_github(Json) -> Json
 
+pub fn resolved_sha(String, String) -> String raise
+
 pub fn valid_attempt_id(String) -> Bool
 
 pub fn valid_owner(String) -> Bool
@@ -167,6 +169,7 @@ pub(all) struct ApiPull {
   additions : Int
   deletions : Int
   changed_files : Int
+  commits : Int?
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiPullBranch {
@@ -216,6 +219,20 @@ pub(all) struct ApiPullViewed {
   base_sha : String
   head_sha : String
   files : Array[ApiFileViewed]
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiRangeCommit {
+  sha : String
+  commit : ApiCommitInfo
+  parents : Array[ApiParent]
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiRangeCompare {
+  base_commit : ApiRangeCommit
+  merge_base_commit : ApiParent
+  total_commits : Int
+  commits : Array[ApiRangeCommit]
+  files : Array[ApiFile]?
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiRepository {
@@ -356,6 +373,9 @@ pub(all) enum GitHubRequest {
   PullViewedGet(PullViewedGet)
   PullFileViewedSet(PullFileViewedSet)
   CompareGet(CompareGet)
+  RangeCompareGet(RangeCompareGet)
+  PullCommitPageGet(PullCommitPageGet)
+  ResolveShaGet(ResolveShaGet)
   PullFiles(PullFiles)
   ContentGet(ContentGet)
   CommentsList(CommentsList)
@@ -377,6 +397,13 @@ pub(all) struct IssueCommentCreate {
   repo : String
   number : String
   body : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct PullCommitPageGet {
+  owner : String
+  repo : String
+  number : String
+  page : Int
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct PullCommitsGet {
@@ -431,6 +458,20 @@ pub(all) struct PullViewedGet {
   number : String
 } derive(Eq, ToJson, @json.FromJson)
 
+pub(all) struct RangeCompareGet {
+  owner : String
+  repo : String
+  base : String
+  head : String
+  page : Int
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ResolveShaGet {
+  owner : String
+  repo : String
+  sha : String
+} derive(Eq, ToJson, @json.FromJson)
+
 pub(all) enum Response[T] {
   Success(value~ : T)
   Failure(error~ : ApiError)
@@ -470,6 +511,9 @@ pub(all) enum RpcValue {
   PullViewed(ApiPullViewed)
   FileViewed(ApiFileViewedResult)
   Compare(ApiCompare)
+  RangeCompare(ApiRangeCompare)
+  PullCommitPage(Array[ApiRangeCommit])
+  ResolvedSha(String)
   Files(Array[ApiFile])
   Content(ApiSource)
   Comments(ApiCommentBundle)

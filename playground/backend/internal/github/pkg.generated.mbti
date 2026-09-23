@@ -12,7 +12,7 @@ pub async fn authenticated(@storage.App, @storage.Session, rejected_token? : Str
 
 pub async fn comments(@storage.App, @storage.Session?, String) -> Json
 
-pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json, source? : Bool) -> (@http.Response, Bytes)
+pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json, source? : Bool, accept? : String) -> (@http.Response, Bytes)
 
 pub async fn github_json(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json) -> Json
 

@@ -30,6 +30,8 @@ pub fn optional_string(Json, String) -> String
 
 pub fn positive_int(Json, String, Int) -> Int raise
 
+pub fn resolved_sha(String, String) -> String raise
+
 pub fn rpc_error(Error) -> (Int, Json)
 
 pub fn string(Json, String) -> String raise
