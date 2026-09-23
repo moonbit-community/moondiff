@@ -43,6 +43,9 @@ RPC 请求使用 `{"v":2,"request":GitHubRequest}` 格式。例如：
 | `PullMergeStatusGet` | `number`、`expected_base_sha`、`expected_head_sha` | `PullMergeStatus(ApiPullMergeStatus)` |
 | `PullRebaseMerge` | `number`、`expected_base_sha`、`expected_head_sha` | `PullMergeResult(ApiPullMergeResult)` |
 | `CompareGet` | `base`、`head` | `Compare(ApiCompare)` |
+| `RangeCompareGet` | SHA `base`、SHA `head`、`page` | `RangeCompare(ApiRangeCompare)` |
+| `PullCommitPageGet` | `number`、`page`（1–3） | `PullCommitPage(Array[ApiRangeCommit])` |
+| `ResolveShaGet` | 短或完整 `sha` | `ResolvedSha(String)` |
 | `PullFiles` | `number`、`page` | `Files(Array[ApiFile])` |
 | `ContentGet` | `path`、`revision` | `Content(ApiSource)` |
 | `CommentsList` | `target` | `Comments(ApiCommentBundle)` |
@@ -58,6 +61,14 @@ RPC 请求使用 `{"v":2,"request":GitHubRequest}` 格式。例如：
 评论侧别为 `Left` 或 `Right`，分别编码为 `{"$tag":"Left"}` 或 `{"$tag":"Right"}`。
 `ApiSource` 包含 `base64`、`size` 和 `content_type`；
 `ApiSource::decode` 校验 Base64 编码，并检查解码后的字节长度。
+
+`RangeCompareGet` 按每页 100 个提交读取 GitHub compare API。`ApiRangeCompare`
+包含比较起点与 merge base SHA、提交总数、提交摘要和可选文件列表。比较终点沿用请求中的固定 SHA，因为 GitHub 响应不含 `head_commit`。
+每个 `ApiRangeCommit` 还包含其父提交 SHA。
+GitHub 只在第一页返回文件，最多 300 个；第一页达到 300 个文件时前端不提供区间 review。
+
+PR 区间选择器对不超过 250 个提交的 PR 使用 `PullCommitPageGet`，每页 100 个，并在每页后复核 PR 的 base、head、仓库和提交数。超过 250 个提交或数量缺失时，使用固定 SHA 的 compare 分页。`ResolveShaGet` 使用 GitHub 的 SHA 媒体类型，仅接受与输入前缀匹配的完整 SHA，再进行分享区间的比较。
+PR 提交列表完整加载后，选择器只支持从 merge base 到 PR head 的单父提交链；分叉或合并历史仍可查看完整 PR diff。
 
 ## 登录后首页
 

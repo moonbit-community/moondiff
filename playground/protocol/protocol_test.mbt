@@ -6,7 +6,7 @@ fn[T : FromJson + ToJson] roundtrip(value : T) -> Unit raise {
 }
 
 ///|
-test "all fifteen requests roundtrip and classify writes" {
+test "all requests roundtrip and classify writes" {
   let requests : Array[@protocol.GitHubRequest] = [
     CommitGet({ owner: "alice", repo: "repo", sha: "123abcd", page: 1, }),
     PullGet({ owner: "alice", repo: "repo", number: "42", }),
@@ -30,6 +30,15 @@ test "all fifteen requests roundtrip and classify writes" {
       base: "123abcd",
       head: "abcdef0",
     }),
+    RangeCompareGet({
+      owner: "alice",
+      repo: "repo",
+      base: "123abcd",
+      head: "abcdef0",
+      page: 2,
+    }),
+    PullCommitPageGet({ owner: "alice", repo: "repo", number: "42", page: 2, }),
+    ResolveShaGet({ owner: "alice", repo: "repo", sha: "123abcd", }),
     PullFiles({ owner: "alice", repo: "repo", number: "42", page: 2, }),
     ContentGet({
       owner: "alice",
@@ -167,6 +176,7 @@ test "every RPC result and response envelope roundtrips including int64 ids" {
       additions: 1,
       deletions: 0,
       changed_files: 1,
+      commits: Some(1),
     }),
     PullMergeStatus({
       base_sha: "123abcd",
@@ -195,6 +205,31 @@ test "every RPC result and response envelope roundtrips including int64 ids" {
       message: "Pull Request successfully merged",
     }),
     Compare({ merge_base_commit: { sha: "123abcd", }, }),
+    RangeCompare({
+      base_commit: {
+        sha: "123abcd",
+        commit: { message: "Base change", },
+        parents: [],
+      },
+      merge_base_commit: { sha: "123abcd", },
+      total_commits: 1,
+      commits: [
+        {
+          sha: "abcdef0",
+          commit: { message: "Change", },
+          parents: [{ sha: "123abcd", }],
+        },
+      ],
+      files: Some([file]),
+    }),
+    PullCommitPage([
+      {
+        sha: "abcdef0",
+        commit: { message: "Change", },
+        parents: [{ sha: "123abcd", }],
+      },
+    ]),
+    ResolvedSha("abcdef0"),
     Files([file]),
     Content({ base64: "aGk=", size: 2, content_type: "text/plain", }),
     Comments({
@@ -220,6 +255,36 @@ test "every RPC result and response envelope roundtrips including int64 ids" {
   )
   roundtrip((Success(value=()) : @protocol.Response[Unit]))
   assert_true(ToJson::to_json(issue) is { "id": "9007199254740993", .. })
+}
+
+///|
+test "GitHub compare decodes without a head_commit and SHA resolution validates prefix" {
+  let base = "a".repeat(40)
+  let head = "b".repeat(40)
+  let raw = @json.parse(
+    "{\"base_commit\":{\"sha\":\"" +
+    base +
+    "\",\"commit\":{\"message\":\"Base change\"},\"parents\":[]},\"merge_base_commit\":{\"sha\":\"" +
+    base +
+    "\"},\"total_commits\":1,\"commits\":[{\"sha\":\"" +
+    head +
+    "\",\"commit\":{\"message\":\"Change\"},\"parents\":[{\"sha\":\"" +
+    base +
+    "\"}]}],\"files\":[]}",
+  )
+  let compare : @protocol.ApiRangeCompare = @protocol.decode_github(raw)
+  assert_eq(compare.base_commit.commit.message, "Base change")
+  assert_eq(compare.commits[0].sha, head)
+  assert_eq(compare.commits[0].parents[0].sha, base)
+  assert_eq(@protocol.resolved_sha("BBBBBBB", "\{head}\n"), head)
+  for invalid in ["bbbbbbb", "c".repeat(40), "z".repeat(40)] {
+    try @protocol.resolved_sha("bbbbbbb", invalid) catch {
+      @protocol.ProtocolError("invalid_github_response", _) => ()
+      error => raise error
+    } noraise {
+      _ => fail("accepted invalid resolved SHA")
+    }
+  }
 }
 
 ///|

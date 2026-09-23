@@ -143,6 +143,7 @@ pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
     PullViewedGet(_) => false
     PullFileViewedSet(_) => true
     CompareGet(_) => false
+    RangeCompareGet(_) | PullCommitPageGet(_) | ResolveShaGet(_) => false
     PullFiles(_) => false
     ContentGet(_) => false
     CommentsList(_) => false
@@ -171,6 +172,9 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
     PullViewedGet(p) => (p.owner, p.repo)
     PullFileViewedSet(p) => (p.owner, p.repo)
     CompareGet(p) => (p.owner, p.repo)
+    RangeCompareGet(p) => (p.owner, p.repo)
+    PullCommitPageGet(p) => (p.owner, p.repo)
+    ResolveShaGet(p) => (p.owner, p.repo)
     PullFiles(p) => (p.owner, p.repo)
     ContentGet(p) => (p.owner, p.repo)
     CommentsList(p) => (p.owner, p.repo)
@@ -223,6 +227,20 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
       check_sha(p.base)
       check_sha(p.head)
     }
+    RangeCompareGet(p) => {
+      check_sha(p.base)
+      check_sha(p.head)
+      require(
+        p.page >= 1 && p.page <= 10000,
+        "invalid_arguments",
+        "Invalid page.",
+      )
+    }
+    PullCommitPageGet(p) => {
+      check_pull_number(p.number)
+      require(p.page >= 1 && p.page <= 3, "invalid_arguments", "Invalid page.")
+    }
+    ResolveShaGet(p) => check_sha(p.sha)
     PullFiles(p) => {
       check_number(p.number)
       require(

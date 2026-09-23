@@ -9,6 +9,9 @@ const operations = {
   'github.pull.rebase.merge': ['PullRebaseMerge', 'PullMergeResult'],
   'github.pull.get': ['PullGet', 'Pull'],
   'github.compare.get': ['CompareGet', 'Compare'],
+  'github.range.compare.get': ['RangeCompareGet', 'RangeCompare'],
+  'github.pull.commit.page.get': ['PullCommitPageGet', 'PullCommitPage'],
+  'github.sha.resolve.get': ['ResolveShaGet', 'ResolvedSha'],
   'github.pull.files': ['PullFiles', 'Files'],
   'github.content.get': ['ContentGet', 'Content'],
   'github.comments.list': ['CommentsList', 'Comments'],
@@ -59,8 +62,17 @@ const comment = (v, kind) => {
 export function modeledValue(kind, value) {
   switch (kind) {
     case 'Commit': return { ...pick(value, 'sha html_url'), commit: pick(value.commit, 'message'), parents: value.parents.map(v => pick(v, 'sha')), stats: pick(value.stats, 'additions deletions total'), files: value.files.map(file) };
-    case 'Pull': return { ...pick(value, 'title html_url additions deletions changed_files'), ...Object.fromEntries(['base', 'head'].map(k => [k, { sha: value[k].sha, ...(value[k].repo ? { repo: pick(value[k].repo, 'full_name') } : {}) }])) };
+    case 'Pull': return { ...pick(value, 'title html_url additions deletions changed_files commits'), ...Object.fromEntries(['base', 'head'].map(k => [k, { sha: value[k].sha, ...(value[k].repo ? { repo: pick(value[k].repo, 'full_name') } : {}) }])) };
     case 'Compare': return { merge_base_commit: pick(value.merge_base_commit, 'sha') };
+    case 'RangeCompare': return {
+      base_commit: { sha: value.base_commit.sha, commit: pick(value.base_commit.commit, 'message'), parents: value.base_commit.parents.map(parent => pick(parent, 'sha')) },
+      merge_base_commit: pick(value.merge_base_commit, 'sha'),
+      total_commits: value.total_commits,
+      commits: value.commits.map(v => ({ sha: v.sha, commit: pick(v.commit, 'message'), parents: v.parents.map(parent => pick(parent, 'sha')) })),
+      ...(value.files ? { files: value.files.map(file) } : {}),
+    };
+    case 'PullCommitPage': return value.map(v => ({ sha: v.sha, commit: pick(v.commit, 'message'), parents: v.parents.map(parent => pick(parent, 'sha')) }));
+    case 'ResolvedSha': return value;
     case 'Files': return value.map(file);
     case 'Content': return { base64: value.base64, size: value.size, content_type: value.content_type || value.contentType || 'application/octet-stream' };
     case 'Comments': return { issue_comments: value.issue_comments.map(v => comment(v, 'IssueComment')), review_comments: value.review_comments.map(v => comment(v, 'ReviewComment')), commit_comments: value.commit_comments.map(v => comment(v, 'CommitComment')) };

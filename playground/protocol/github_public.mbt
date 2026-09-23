@@ -27,6 +27,15 @@ pub fn GitHubRequest::public_path(self : GitHubRequest) -> String? {
     PullGet(p) => Some("/repos/\{p.owner}/\{p.repo}/pulls/\{p.number}")
     CompareGet(p) =>
       Some("/repos/\{p.owner}/\{p.repo}/compare/\{p.base}...\{p.head}")
+    RangeCompareGet(p) =>
+      Some(
+        "/repos/\{p.owner}/\{p.repo}/compare/\{p.base}...\{p.head}?per_page=100&page=\{p.page}",
+      )
+    PullCommitPageGet(p) =>
+      Some(
+        "/repos/\{p.owner}/\{p.repo}/pulls/\{p.number}/commits?per_page=100&page=\{p.page}",
+      )
+    ResolveShaGet(p) => Some("/repos/\{p.owner}/\{p.repo}/commits/\{p.sha}")
     PullFiles(p) =>
       Some(
         "/repos/\{p.owner}/\{p.repo}/pulls/\{p.number}/files?per_page=100&page=\{p.page}",

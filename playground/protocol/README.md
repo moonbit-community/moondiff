@@ -46,6 +46,9 @@ A successful response to that request has a typed `RpcValue` payload:
 | `PullMergeStatusGet` | `number`, `expected_base_sha`, `expected_head_sha` | `PullMergeStatus(ApiPullMergeStatus)` |
 | `PullRebaseMerge` | `number`, `expected_base_sha`, `expected_head_sha` | `PullMergeResult(ApiPullMergeResult)` |
 | `CompareGet` | `base`, `head` | `Compare(ApiCompare)` |
+| `RangeCompareGet` | SHA `base`, SHA `head`, `page` | `RangeCompare(ApiRangeCompare)` |
+| `PullCommitPageGet` | `number`, `page` (1–3) | `PullCommitPage(Array[ApiRangeCommit])` |
+| `ResolveShaGet` | short or full `sha` | `ResolvedSha(String)` |
 | `PullFiles` | `number`, `page` | `Files(Array[ApiFile])` |
 | `ContentGet` | `path`, `revision` | `Content(ApiSource)` |
 | `CommentsList` | `target` | `Comments(ApiCommentBundle)` |
@@ -62,6 +65,24 @@ Comment targets are `Commit(sha~)`, `Pull(number~)` or
 `{"$tag":"Left"}` or `{"$tag":"Right"}`. `ApiSource` contains
 `base64`, `size` and `content_type`; `ApiSource::decode` validates the Base64 and
 checks its decoded byte length.
+
+`RangeCompareGet` reads the GitHub compare API with 100 commits per page.
+`ApiRangeCompare` includes the base and merge-base SHAs, the total commit
+count, commit messages and an optional file list. The requested head SHA is
+retained from the fixed request because GitHub does not return `head_commit`.
+Each `ApiRangeCommit` also carries its parent SHAs.
+GitHub provides files
+only on page one and limits that list to 300; the frontend declines to review
+an interval when page one contains 300 files.
+
+The PR interval selector loads up to 250 commits from `PullCommitPageGet`, in
+pages of 100, and checks PR base, head, repositories and commit count after
+each page. Larger PRs or PRs without a commit count use fixed SHA compare
+pages. `ResolveShaGet` uses GitHub's SHA media type and accepts only a complete
+SHA matching the requested prefix before a shared interval is compared.
+The PR selector enables intervals only when the complete commit list forms a
+single-parent chain from merge base to PR head. The full PR diff remains
+available for branched or merged histories.
 
 ## Signed-in homepage
 

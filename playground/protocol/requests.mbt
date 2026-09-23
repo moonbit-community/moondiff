@@ -35,6 +35,30 @@ pub(all) struct CompareGet {
 } derive(Eq, FromJson, ToJson)
 
 ///|
+pub(all) struct RangeCompareGet {
+  owner : String
+  repo : String
+  base : String
+  head : String
+  page : Int
+} derive(Eq, FromJson, ToJson)
+
+///|
+pub(all) struct PullCommitPageGet {
+  owner : String
+  repo : String
+  number : String
+  page : Int
+} derive(Eq, FromJson, ToJson)
+
+///|
+pub(all) struct ResolveShaGet {
+  owner : String
+  repo : String
+  sha : String
+} derive(Eq, FromJson, ToJson)
+
+///|
 pub(all) struct PullFiles {
   owner : String
   repo : String
@@ -114,6 +138,9 @@ pub(all) enum GitHubRequest {
   PullViewedGet(PullViewedGet)
   PullFileViewedSet(PullFileViewedSet)
   CompareGet(CompareGet)
+  RangeCompareGet(RangeCompareGet)
+  PullCommitPageGet(PullCommitPageGet)
+  ResolveShaGet(ResolveShaGet)
   PullFiles(PullFiles)
   ContentGet(ContentGet)
   CommentsList(CommentsList)

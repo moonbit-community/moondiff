@@ -3,13 +3,15 @@ test "root deployment routes reject hashes and unsafe paths" {
   for
     path in [
       "/alice/repo/commit/123abcd", "/alice/repo/pull/42", "/alice/repo/pull/42/commits/abcdef0",
+      "/alice/repo/compare/123abcd..abcdef0", "/alice/repo/pull/42/compare/123abcd..abcdef0",
     ] {
     assert_true(change_path(path))
   }
   for
     path in [
       "#/alice/repo/pull/42", "/alice/repo/pull/0", "/alice/repo/pull/42/files",
-      "/alice/repo/commit/abc", "/-alice/repo/pull/42",
+      "/alice/repo/commit/abc", "/-alice/repo/pull/42", "/alice/repo/compare/main..abcdef0",
+      "/alice/repo/compare/123abcd...abcdef0",
     ] {
     assert_false(change_path(path))
   }

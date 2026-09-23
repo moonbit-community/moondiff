@@ -196,6 +196,7 @@ pub async fn github(
   meth? : @http.RequestMethod = Get,
   body? : Json,
   source? : Bool = false,
+  accept? : String = "",
 ) -> (@http.Response, Bytes) {
   guard session is Some(session) && !session.tokens.is_empty() else {
     raise @common.RpcError(
@@ -211,6 +212,7 @@ pub async fn github(
     token,
     body,
     source~,
+    accept~,
   )
   guard app.still_current(current) else {
     raise @common.RpcError(
@@ -227,6 +229,7 @@ pub async fn github(
       token,
       body,
       source~,
+      accept~,
     )
     guard app.still_current(refreshed) else {
       raise @common.RpcError(
