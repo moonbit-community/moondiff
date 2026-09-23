@@ -6,6 +6,7 @@ pub(all) enum Msg {
   Auth(AuthMsg)
   Review(ReviewMsg)
   Load(LoadMsg)
+  Range(RangeMsg)
   Ui(UiMsg)
 }
 
@@ -22,6 +23,7 @@ pub fn update(
     Auth(msg) => update_auth(model, msg, emit)
     Review(msg) => update_review(model, msg, emit)
     Load(msg) => update_load(model, msg, emit)
+    Range(msg) => update_range(model, msg, emit)
     Ui(msg) => update_ui(model, msg, emit)
   }
   let (next, viewed_command) = reconcile_viewed(model, next, msg, emit)

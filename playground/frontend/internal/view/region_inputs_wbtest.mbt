@@ -51,6 +51,7 @@ fn region_model() -> Model {
     viewed: @application.ViewedState::new(),
     pull_merge: @application.PullMergeState::new(),
     review,
+    range: None,
   }
 }
 
@@ -75,6 +76,7 @@ fn pull_region_model() -> Model {
     additions: 2,
     deletions: 2,
     changed_files: 2,
+    commits: None,
   }
   {
     ..model,

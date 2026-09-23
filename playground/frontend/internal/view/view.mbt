@@ -115,6 +115,10 @@ fn landing_details() -> @rabbita.Html {
           @html.span(class="list-arrow", "→"),
           @html.code("github.com/owner/repo/pull/number/changes/sha"),
         ]),
+        @html.li([
+          @html.span(class="list-arrow", "→"),
+          @html.code("github.com/owner/repo/compare/A..B"),
+        ]),
       ]),
       @html.p(
         "Commit links stay fixed to their SHA. Pull request links load the latest PR head whenever they are opened.",
@@ -153,7 +157,14 @@ fn hero_view(
       [
         @html.div(class="hero-copy", brand_view()),
         @html.div(class="hero-controls", [
-          @html.span(class="workspace-url", title=model.input, model.input),
+          if model.pull_range_form {
+            @html.div(
+              class="input-panel workspace-input-panel",
+              commit_form(model, emit),
+            )
+          } else {
+            @html.span(class="workspace-url", title=model.input, model.input)
+          },
         ]),
         workspace_actions(model, emit),
         account_menu(model.auth, emit),

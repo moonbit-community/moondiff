@@ -2,10 +2,11 @@
 extern "js" fn fetch_public_text(
   path : String,
   source : Bool,
+  sha : Bool,
   completed : (Int, String, Bool) -> Unit,
   failed : (String, String) -> Unit,
 ) -> () -> Unit =
-  #| (path, source, completed, failed) => {
+  #| (path, source, sha, completed, failed) => {
   #|   const controller = new AbortController();
   #|   let timedOut = false;
   #|   const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
@@ -14,7 +15,7 @@ extern "js" fn fetch_public_text(
   #|       const response = await fetch('https://api.github.com' + path, {
   #|         method: 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store',
   #|         redirect: 'error', signal: controller.signal,
-  #|         headers: { Accept: source ? 'application/vnd.github.raw+json' : 'application/vnd.github+json' },
+  #|         headers: { Accept: sha ? 'application/vnd.github.sha' : source ? 'application/vnd.github.raw+json' : 'application/vnd.github+json' },
   #|       });
   #|       const limit = source ? 1048576 : 8388608;
   #|       const chunks = [];
@@ -36,7 +37,9 @@ extern "js" fn fetch_public_text(
   #|       let offset = 0;
   #|       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   #|       let text;
-  #|       if (source && response.ok) {
+  #|       if (sha && response.ok) {
+  #|         text = JSON.stringify(new TextDecoder('utf-8', { fatal: true }).decode(bytes).trim());
+  #|       } else if (source && response.ok) {
   #|         let binary = '';
   #|         for (let i = 0; i < size; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
   #|         text = JSON.stringify({ base64: btoa(binary), size,
@@ -109,10 +112,12 @@ fn public_fetch(
   path : String,
   source : Bool,
   done : (Result[Json, Error]) -> Unit,
+  sha? : Bool = false,
 ) -> () -> Unit {
   fetch_public_text(
     path,
     source,
+    sha,
     (status, text, rate_limited) => {
       done(
         Ok(github_response(status, text, rate_limited)) catch {

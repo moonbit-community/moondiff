@@ -40,7 +40,13 @@ fn file_input(
     generation: model.generation,
     index,
     display: display_options(model),
-    review: model.review.read_view(path=file.file.filename),
+    review: if model.route
+      .map(reference => reference.target is (Range(_, _) | PullRange(_, _, _)))
+      .unwrap_or(false) {
+      @comments.Session::new().read_view(path=file.file.filename)
+    } else {
+      model.review.read_view(path=file.file.filename)
+    },
     viewed: viewed_control(is_pull, model, index, file.file.filename),
     navigation_enabled: @application.file_navigation_enabled(model, index),
   }
@@ -60,6 +66,7 @@ fn display_options(model : Model) -> DisplayOptions {
 pub(all) struct ToolbarInput {
   input : String
   landing : Bool
+  pull_range_form : Bool
   drawer_open : Bool
   auth : @application.AuthStatus
   file_count : Int?
@@ -74,6 +81,9 @@ fn toolbar_input(model : Model) -> ToolbarInput {
   {
     input: model.input,
     landing: landing_mode(model),
+    pull_range_form: model.route
+    .map(reference => reference.target is PullRange(_, _, _))
+    .unwrap_or(false),
     drawer_open: model.file_tree.drawer_open,
     auth: model.auth,
     file_count: match model.phase {
@@ -135,6 +145,14 @@ pub(all) struct PullMergeInput {
 } derive(Eq)
 
 ///|
+pub(all) struct RangePanelInput {
+  reference : @github.CommitRef
+  state : @application.RangeState
+  stats : @protocol.ApiStats
+  file_count : Int
+} derive(Eq)
+
+///|
 pub(all) enum StatusInput {
   Empty
   Loading(String)
@@ -151,6 +169,7 @@ pub(all) enum RegionInput {
   ViewedSummary(ViewedSummaryInput)
   Discussion(DiscussionInput)
   PullMergeStatus(PullMergeInput)
+  RangePanel(RangePanelInput)
   File(FileInput)
 } derive(Eq)
 
@@ -160,10 +179,12 @@ pub(all) struct ShellInput {
   generation : Int
   landing : Bool
   showing : Bool
+  selector_only : Bool
   message : String
   drawer_open : Bool
   preferred_width : Int
   display : DisplayOptions
+  range_limit : Bool
 } derive(Eq)
 
 ///|
@@ -173,6 +194,7 @@ pub fn shell_input(model : Model) -> ShellInput {
     generation: model.generation,
     landing: landing_mode(model),
     showing: model.phase is Showing(_),
+    selector_only: model.phase is ShowingPullSelector(_),
     message: match model.phase {
       Showing(view) => view.message
       _ => ""
@@ -180,6 +202,12 @@ pub fn shell_input(model : Model) -> ShellInput {
     drawer_open: model.file_tree.drawer_open,
     preferred_width: model.file_tree.preferred_width,
     display: display_options(model),
+    range_limit: model.route
+    .map(reference => {
+      reference.target is (Range(_, _) | PullRange(_, _, _)) &&
+      model.range.map(r => r.too_many_files).unwrap_or(false)
+    })
+    .unwrap_or(false),
   }
 }
 
@@ -207,6 +235,24 @@ pub fn RegionProjection::inputs(
   let inputs : Array[(@application.Region, RegionInput)] = [
     (Toolbar, Toolbar(toolbar_input(model))),
   ]
+  if model.phase is ShowingPullSelector(pull) &&
+    model.route is Some(reference) &&
+    model.range is Some(state) {
+    self.tree = None
+    self.overall = None
+    inputs.push(
+      (
+        RangePanel,
+        RangePanel({
+          reference,
+          state,
+          stats: @github.pull_stats(pull),
+          file_count: pull.changed_files,
+        }),
+      ),
+    )
+    return inputs
+  }
   guard model.phase is Showing(view) else {
     self.tree = None
     self.overall = None
@@ -220,6 +266,11 @@ pub fn RegionProjection::inputs(
       LoadingPullMetadata(..) => Loading("Loading pull request metadata…")
       LoadingPullCommitMetadata(..) =>
         Loading("Loading pull request commit metadata…")
+      LoadingRangePullMetadata(..) =>
+        Loading("Loading pull request context for this commit interval…")
+      LoadingRangePullCompare(..) =>
+        Loading("Finding the pull request merge base…")
+      LoadingRange(..) => Loading("Loading commit interval…")
       LoadingPullSnapshot(page~, ..) =>
         Loading(
           if page > 0 {
@@ -230,6 +281,11 @@ pub fn RegionProjection::inputs(
         )
       ValidatingPullSnapshot(..) =>
         Loading("Checking that the pull request stayed unchanged…")
+      LoadingPullSelectorCompare(..) =>
+        Loading("Finding the pull request merge base…")
+      ValidatingPullSelector(..) =>
+        Loading("Checking that the pull request stayed unchanged…")
+      ShowingPullSelector(_) => Empty
       Showing(_) => Empty
     }
     inputs.push((Status, Status(status)))
@@ -259,6 +315,20 @@ pub fn RegionProjection::inputs(
     }
   }
   let is_pull = view.reference.target is PullRequest(_)
+  let is_range = view.reference.target is (Range(_, _) | PullRange(_, _, _))
+  if model.range is Some(state) {
+    inputs.push(
+      (
+        RangePanel,
+        RangePanel({
+          reference: view.reference,
+          state,
+          stats: view.stats,
+          file_count: view.files.length(),
+        }),
+      ),
+    )
+  }
   inputs.push(
     (
       FileTree,
@@ -279,12 +349,14 @@ pub fn RegionProjection::inputs(
   inputs.push(
     (Navigation, Navigation({ generation: model.generation, enabled, })),
   )
-  inputs.push(
-    (
-      ViewedSummary,
-      ViewedSummary(viewed_summary_input(is_pull, view.files.length(), model)),
-    ),
-  )
+  if !is_range {
+    inputs.push(
+      (
+        ViewedSummary,
+        ViewedSummary(viewed_summary_input(is_pull, view.files.length(), model)),
+      ),
+    )
+  }
   let paths = metadata.map(f => f.path)
   let group = match self.overall {
     Some((generation, version, old_tree, group)) if generation ==
@@ -299,16 +371,18 @@ pub fn RegionProjection::inputs(
       group
     }
   }
-  inputs.push(
-    (
-      Discussion,
-      Discussion({
-        is_pull,
-        review: model.review.read_view(paths~, group~),
-        auth: model.auth,
-      }),
-    ),
-  )
+  if !is_range {
+    inputs.push(
+      (
+        Discussion,
+        Discussion({
+          is_pull,
+          review: model.review.read_view(paths~, group~),
+          auth: model.auth,
+        }),
+      ),
+    )
+  }
   if is_pull {
     inputs.push(
       (

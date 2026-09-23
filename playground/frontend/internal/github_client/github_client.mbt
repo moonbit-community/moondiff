@@ -114,6 +114,63 @@ pub fn get_compare(
 }
 
 ///|
+pub fn get_range_compare(
+  args : @protocol.RangeCompareGet,
+  generation : Int,
+  emit : @rabbita.Emit[Result[@protocol.ApiRangeCompare, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    RangeCompareGet(args),
+    generation,
+    value => {
+      guard value is RangeCompare(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn get_pull_commit_page(
+  args : @protocol.PullCommitPageGet,
+  generation : Int,
+  emit : @rabbita.Emit[Result[Array[@protocol.ApiRangeCommit], Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    PullCommitPageGet(args),
+    generation,
+    value => {
+      guard value is PullCommitPage(data) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      data
+    },
+    emit,
+  )
+}
+
+///|
+pub fn resolve_sha(
+  args : @protocol.ResolveShaGet,
+  generation : Int,
+  emit : @rabbita.Emit[Result[String, Error]],
+) -> @rabbita.Cmd {
+  rpc_command(
+    ResolveShaGet(args),
+    generation,
+    value => {
+      guard value is ResolvedSha(sha) else {
+        raise invalid_response("Unexpected RPC result kind.")
+      }
+      @protocol.resolved_sha(args.sha, sha)
+    },
+    emit,
+  )
+}
+
+///|
 pub fn get_pull_files(
   args : @protocol.PullFiles,
   generation : Int,

@@ -99,6 +99,7 @@ test "decode pull request metadata and choose merge base and head" {
     }),
   )
   assert_false(same_pull_snapshot(pull, { ..pull, changed_files: 3, }))
+  assert_false(same_pull_snapshot(pull, { ..pull, commits: Some(20), }))
   let stats = pull_stats(pull)
   assert_eq(stats.additions, 7)
   assert_eq(stats.deletions, 3)
@@ -234,6 +235,7 @@ test "fork pull revisions retain base and head repositories" {
     additions: 1,
     deletions: 1,
     changed_files: 1,
+    commits: None,
   }
   let compare = ApiCompare::{
     merge_base_commit: { sha: "3333333333333333333333333333333333333333", },
@@ -255,4 +257,33 @@ test "fork pull revisions retain base and head repositories" {
   })
   assert_true(pair.old_url.unwrap().contains("/upstream/project/"))
   assert_true(pair.new_url.unwrap().contains("/contributor/project-fork/"))
+}
+
+///|
+test "fork intervals read merge base from upstream and PR commits from fork" {
+  let base = "a".repeat(40)
+  let head = "b".repeat(40)
+  let pull : ApiPull = {
+    title: "fork",
+    html_url: "url",
+    base: {
+      sha: "c".repeat(40),
+      repo: Some({ full_name: "upstream/project", }),
+    },
+    head: { sha: head, repo: Some({ full_name: "fork/project", }), },
+    additions: 1,
+    deletions: 1,
+    changed_files: 1,
+    commits: None,
+  }
+  let reference = pull_range_reference("upstream", "project", "17", base, head)
+  let (old, new) = range_revisions(
+    reference,
+    base,
+    head,
+    Some(pull),
+    Some(base),
+  )
+  assert_eq(old.repository.owner, "upstream")
+  assert_eq(new.repository.owner, "fork")
 }

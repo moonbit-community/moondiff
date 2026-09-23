@@ -781,7 +781,7 @@ fn comments_overview(
       emit,
     )
   }
-  @html.section(class="comments-overview", [
+  @html.section(id="comments", class="comments-overview", [
     @html.div(class="comments-toolbar", [
       @html.div([
         @html.p(class="section-label", "GitHub discussion"),

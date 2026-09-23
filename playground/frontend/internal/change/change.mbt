@@ -129,6 +129,35 @@ pub fn finish_pull(
 }
 
 ///|
+pub fn finish_range(
+  reference : CommitRef,
+  base : String,
+  head : String,
+  pull : ApiPull?,
+  pull_merge_base : String?,
+  files : Array[ApiFile],
+) -> ChangeView {
+  let (old_revision, new_revision) = range_revisions(
+    reference, base, head, pull, pull_merge_base,
+  )
+  let mut additions = 0
+  let mut deletions = 0
+  for file in files {
+    additions += file.additions
+    deletions += file.deletions
+  }
+  finish_change(
+    reference,
+    Some(old_revision),
+    new_revision,
+    "Commit interval \{base}..\{head}",
+    "https://github.com/\{reference.owner}/\{reference.repo}/compare/\{base}...\{head}",
+    { additions, deletions, total: additions + deletions, },
+    files,
+  )
+}
+
+///|
 pub fn set_file_state(
   view : ChangeView,
   index : Int,

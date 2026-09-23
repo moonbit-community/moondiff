@@ -2,9 +2,11 @@
 package "moonbit-community/moondiff-playground/internal/view"
 
 import {
+  "moonbit-community/moondiff-playground-protocol",
   "moonbit-community/moondiff-playground/internal/application",
   "moonbit-community/moondiff-playground/internal/change",
   "moonbit-community/moondiff-playground/internal/comments",
+  "moonbit-community/moondiff-playground/internal/github",
   "moonbit-community/moondiff/model",
   "moonbit-community/rabbita/cmd",
   "moonbit-community/rabbita/html",
@@ -80,6 +82,13 @@ pub(all) struct PullMergeInput {
   snapshot_stale : Bool
 } derive(Eq)
 
+pub(all) struct RangePanelInput {
+  reference : @github.CommitRef
+  state : @application.RangeState
+  stats : @moondiff-playground-protocol.ApiStats
+  file_count : Int
+} derive(Eq)
+
 pub(all) enum RegionInput {
   Home(@application.AuthStatus, @application.HomeState)
   Toolbar(ToolbarInput)
@@ -89,6 +98,7 @@ pub(all) enum RegionInput {
   ViewedSummary(ViewedSummaryInput)
   Discussion(DiscussionInput)
   PullMergeStatus(PullMergeInput)
+  RangePanel(RangePanelInput)
   File(FileInput)
 } derive(Eq)
 pub fn RegionInput::draft_id(Self) -> String
@@ -104,10 +114,12 @@ pub(all) struct ShellInput {
   generation : Int
   landing : Bool
   showing : Bool
+  selector_only : Bool
   message : String
   drawer_open : Bool
   preferred_width : Int
   display : DisplayOptions
+  range_limit : Bool
 } derive(Eq)
 
 pub(all) enum StatusInput {
@@ -119,6 +131,7 @@ pub(all) enum StatusInput {
 pub(all) struct ToolbarInput {
   input : String
   landing : Bool
+  pull_range_form : Bool
   drawer_open : Bool
   auth : @application.AuthStatus
   file_count : Int?

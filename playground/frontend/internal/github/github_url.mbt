@@ -3,6 +3,8 @@ pub(all) enum ChangeTarget {
   Commit(String)
   PullRequest(String)
   PullCommit(String, String)
+  Range(String, String)
+  PullRange(String, String, String)
 } derive(Eq)
 
 ///|
@@ -38,6 +40,39 @@ pub fn pull_commit_reference(
   sha : String,
 ) -> CommitRef {
   { owner, repo, target: PullCommit(number, sha), }
+}
+
+///|
+pub fn range_reference(
+  owner : String,
+  repo : String,
+  base : String,
+  head : String,
+) -> CommitRef {
+  { owner, repo, target: Range(base, head), }
+}
+
+///|
+pub fn pull_range_reference(
+  owner : String,
+  repo : String,
+  number : String,
+  base : String,
+  head : String,
+) -> CommitRef {
+  { owner, repo, target: PullRange(number, base, head), }
+}
+
+///|
+pub fn range_endpoints(value : String) -> (String, String)? {
+  guard value.split_once("..") is Some((base, head)) else { return None }
+  let base = base.to_owned()
+  let head = head.to_owned()
+  if valid_sha(base) && valid_sha(head) {
+    Some((base, head))
+  } else {
+    None
+  }
 }
 
 ///|
@@ -143,10 +178,13 @@ pub fn parse_change_url(input : String) -> Result[CommitRef, String] {
       }
       pull_commit_reference(owner, repo, number, sha)
     }
-    _ =>
-      return Err(
-        "Use a GitHub /commit/{sha}, /pull/{number}, or /pull/{number}/commits/{sha} URL.",
-      )
+    [owner, repo, "compare", interval] => {
+      guard range_endpoints(interval) is Some((base, head)) else {
+        return Err("Use two commit SHAs separated by .. in a compare link.")
+      }
+      range_reference(owner, repo, base, head)
+    }
+    _ => return Err("Use a GitHub commit, pull request, or compare/A..B URL.")
   }
   if !valid_owner(reference.owner) || !valid_repo(reference.repo) {
     return Err("The repository owner or name is invalid.")

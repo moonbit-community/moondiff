@@ -7,6 +7,11 @@ pub extend DiscussionInput with Eq::{not_equal, equal}
 ///|
 #deprecated
 #doc(hidden)
+pub extend RangePanelInput with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
 pub extend DisplayOptions with Eq::{not_equal, equal}
 
 ///|

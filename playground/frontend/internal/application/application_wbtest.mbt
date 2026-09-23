@@ -38,6 +38,7 @@ test "stale commit responses are discarded by generation" {
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: None,
+    range: None,
     review: initial_review_state(),
   }
   let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
@@ -69,12 +70,13 @@ fn pull_test_model(
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: None,
+    range: None,
     review: initial_review_state(),
   }
 }
 
 ///|
-test "pull metadata starts a pinned snapshot and enforces the file limit" {
+test "pull metadata starts a pinned snapshot and opens an over-limit selector" {
   let reference = pull_reference("moonbitlang", "core", "4082")
   let pull = decode_pull(read_fixture("testdata/github/pull.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
@@ -114,15 +116,94 @@ test "pull metadata starts a pinned snapshot and enforces the file limit" {
   assert_eq(pinned.base.sha, pull.base.sha)
   assert_eq(pinned.head.sha, pull.head.sha)
 
-  let (over_limit, _) = update_load(
+  let (at_limit, _) = update_load(
     loading,
-    PullMetadataLoaded(8, 0, Ok({ ..pull, changed_files: 3_001, })),
+    PullMetadataLoaded(8, 0, Ok({ ..pull, changed_files: 3_000, })),
     emit,
   )
-  guard over_limit.phase is LoadFailed(limit_message) else {
-    fail("expected an over-limit pull request to fail")
+  assert_true(at_limit.phase is LoadingPullSnapshot(page=1, ..))
+
+  let large_pull = { ..pull, changed_files: 3_001, }
+  let (over_limit, _) = update_load(
+    loading,
+    PullMetadataLoaded(8, 0, Ok(large_pull)),
+    emit,
+  )
+  assert_true(over_limit.phase is LoadingPullSelectorCompare(attempt=0, ..))
+  let compare = decode_compare(
+    read_fixture("testdata/github/pull_compare.json"),
+  )
+  let (validating, _) = update_load(
+    over_limit,
+    PullCompareLoaded(8, 0, Ok(compare)),
+    emit,
+  )
+  assert_true(validating.phase is ValidatingPullSelector(attempt=0, ..))
+  let (ready, _) = update_load(
+    validating,
+    PullValidationLoaded(8, 0, Ok(large_pull)),
+    emit,
+  )
+  assert_true(ready.phase is ShowingPullSelector(_))
+  guard ready.range is Some(range) else {
+    fail("expected commit interval choices")
   }
-  assert_true(limit_message.contains("3,000-file API limit"))
+  assert_eq(range.base_sha, compare.merge_base_commit.sha)
+  assert_eq(range.head_sha, large_pull.head.sha)
+  assert_eq(range.pull_merge_base, Some(compare.merge_base_commit.sha))
+  assert_eq(range.loading_page, Some(1))
+  assert_true(range.pull == Some(large_pull))
+  assert_true(@github.PULL_FILE_LIMIT_ERROR.contains("3,000-file API limit"))
+}
+
+///|
+test "over-limit selector retries a changed snapshot once and ignores old replies" {
+  let reference = pull_reference("moonbitlang", "core", "4082")
+  let initial = {
+    ..decode_pull(read_fixture("testdata/github/pull.json")),
+    changed_files: 3_001,
+  }
+  let compare = decode_compare(
+    read_fixture("testdata/github/pull_compare.json"),
+  )
+  let newer = { ..initial, head: { ..initial.head, sha: "d".repeat(40), }, }
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let validating = pull_test_model(
+    reference,
+    4,
+    ValidatingPullSelector(reference~, attempt=0, metadata=initial, compare~),
+  )
+  let (retrying, _) = update_load(
+    validating,
+    PullValidationLoaded(4, 0, Ok(newer)),
+    emit,
+  )
+  guard retrying.phase
+    is LoadingPullSelectorCompare(attempt=1, metadata=latest, ..) else {
+    fail("expected one selector retry")
+  }
+  assert_eq(latest.head.sha, newer.head.sha)
+  assert_true(
+    update_load(retrying, PullCompareLoaded(4, 0, Ok(compare)), emit).0 ==
+    retrying,
+  )
+  assert_true(
+    update_load(retrying, PullFilesPageLoaded(4, 0, 1, Ok([])), emit).0 ==
+    retrying,
+  )
+  let (second_validation, _) = update_load(
+    retrying,
+    PullCompareLoaded(4, 1, Ok(compare)),
+    emit,
+  )
+  assert_true(second_validation.phase is ValidatingPullSelector(attempt=1, ..))
+  let changed_again = { ..newer, base: { ..newer.base, sha: "e".repeat(40), }, }
+  let (failed, _) = update_load(
+    second_validation,
+    PullValidationLoaded(4, 1, Ok(changed_again)),
+    emit,
+  )
+  assert_true(failed.phase is LoadFailed(PULL_CHANGED_ERROR))
 }
 
 ///|
@@ -447,6 +528,7 @@ fn diff_test_model(view : ChangeView) -> Model {
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: None,
+    range: None,
     review: initial_review_state(),
   }
 }
@@ -1070,6 +1152,7 @@ fn review_test_pull() -> ApiPull {
     additions: 1,
     deletions: 1,
     changed_files: 1,
+    commits: None,
   }
 }
 
@@ -1303,6 +1386,7 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: Some("reviewer"),
+    range: None,
     review: review_fixture(
       initial_review_state(),
       refresh=RefreshIdle,
@@ -1350,6 +1434,7 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
     additions: 1,
     deletions: 1,
     changed_files: 1,
+    commits: None,
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (next, _) = update_review(
@@ -1462,6 +1547,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id: Some("reviewer"),
+    range: None,
     review: review_fixture(
       initial_review_state(),
       refresh=RefreshIdle,
@@ -1667,6 +1753,7 @@ fn auth_test_model(
     auth_revision: 0,
     restore_pending: false,
     last_authenticated_user_id,
+    range: None,
     review: review_fixture(
       initial_review_state(),
       deletion=None,

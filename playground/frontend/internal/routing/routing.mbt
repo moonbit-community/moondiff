@@ -7,6 +7,8 @@ pub fn canonical_github_url(reference : CommitRef) -> String {
       "https://github.com/\{reference.owner}/\{reference.repo}/pull/\{number}"
     PullCommit(number, sha) =>
       "https://github.com/\{reference.owner}/\{reference.repo}/pull/\{number}/commits/\{sha}"
+    Range(base, head) | PullRange(_, base, head) =>
+      "https://github.com/\{reference.owner}/\{reference.repo}/compare/\{base}..\{head}"
   }
 }
 
@@ -18,6 +20,10 @@ pub fn playground_route(reference : CommitRef) -> String {
       "/\{reference.owner}/\{reference.repo}/pull/\{number}"
     PullCommit(number, sha) =>
       "/\{reference.owner}/\{reference.repo}/pull/\{number}/commits/\{sha}"
+    Range(base, head) =>
+      "/\{reference.owner}/\{reference.repo}/compare/\{base}..\{head}"
+    PullRange(number, base, head) =>
+      "/\{reference.owner}/\{reference.repo}/pull/\{number}/compare/\{base}..\{head}"
   }
 }
 
@@ -38,12 +44,29 @@ pub fn reference_from_route(fragment : String?) -> Result[CommitRef?, String] {
     ["", owner, repo, "pull", number, "commits", sha]
     | [owner, repo, "pull", number, "commits", sha] =>
       pull_commit_reference(owner, repo, number, sha)
+    ["", owner, repo, "compare", interval]
+    | [owner, repo, "compare", interval] => {
+      guard range_endpoints(interval) is Some((base, head)) else {
+        return Err("This shared playground link is not valid.")
+      }
+      range_reference(owner, repo, base, head)
+    }
+    ["", owner, repo, "pull", number, "compare", interval]
+    | [owner, repo, "pull", number, "compare", interval] => {
+      guard range_endpoints(interval) is Some((base, head)) else {
+        return Err("This shared playground link is not valid.")
+      }
+      pull_range_reference(owner, repo, number, base, head)
+    }
     _ => return Err("This shared playground link is not valid.")
   }
   let valid_target = match reference.target {
     Commit(sha) => valid_sha(sha)
     PullRequest(number) => valid_pull_number(number)
     PullCommit(number, sha) => valid_pull_number(number) && valid_sha(sha)
+    Range(base, head) => valid_sha(base) && valid_sha(head)
+    PullRange(number, base, head) =>
+      valid_pull_number(number) && valid_sha(base) && valid_sha(head)
   }
   if !valid_owner(reference.owner) ||
     !valid_repo(reference.repo) ||

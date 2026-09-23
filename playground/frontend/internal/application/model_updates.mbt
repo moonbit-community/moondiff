@@ -48,7 +48,14 @@ fn with_auth(model : Model, auth : AuthStatus) -> Model {
     if auth is AuthChecking {
       IdentityChecking
     } else {
-      Identity(auth is SignedIn(..), login)
+      Identity(
+        auth is SignedIn(..) &&
+        !(model.phase is ShowingPullSelector(_)) &&
+        !model.route
+        .map(reference => range_reference_parts(reference) is Some(_))
+        .unwrap_or(false),
+        login,
+      )
     },
   )
   { ..model, auth, last_authenticated_user_id: user_id, review, }

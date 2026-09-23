@@ -14,6 +14,7 @@ fn pending_review_pull() -> ApiPull {
     additions: 1,
     deletions: 1,
     changed_files: 1,
+    commits: None,
   }
 }
 

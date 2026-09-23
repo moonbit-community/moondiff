@@ -453,6 +453,7 @@ input {
 }
 
 button,
+a.range-apply,
 .device-open {
   box-sizing: border-box;
   display: inline-flex;
@@ -475,12 +476,14 @@ button,
 }
 
 button:hover,
+a.range-apply:hover,
 .device-open:hover {
   border-color: #353535;
   background: #353535;
 }
 
 button:active,
+a.range-apply:active,
 .device-open:active {
   transform: translateY(1px);
 }
@@ -493,6 +496,7 @@ a:focus-visible {
 }
 
 button.secondary,
+a.range-apply,
 .device-open {
   border-color: var(--border);
   color: var(--foreground);
@@ -500,6 +504,7 @@ button.secondary,
 }
 
 button.secondary:hover,
+a.range-apply:hover,
 .device-open:hover {
   border-color: #bcbcbc;
   background: var(--surface-subtle);
@@ -788,6 +793,19 @@ button.compact {
   line-height: 2rem;
 }
 
+.hero-workspace .workspace-input-panel .input-row {
+  padding-block: 0.1rem;
+}
+
+.hero-workspace .workspace-input-panel .input-row input {
+  height: 2rem;
+  font-size: 0.8rem;
+}
+
+.hero-workspace .workspace-input-panel .submit-button {
+  min-height: 1.9rem;
+}
+
 
 .submit-button {
   min-height: 2.25rem;
@@ -1016,6 +1034,11 @@ button.segmented-option:active {
 
 .workspace .results {
   margin-top: 0;
+}
+
+.results.selector-only {
+  max-width: 56rem;
+  margin-inline: auto;
 }
 
 .change-layout {
@@ -3149,6 +3172,60 @@ button.rebase-merge-button:disabled { cursor: default; opacity: 0.58; }
 }
 
 /* Regions are independent roots without introducing layout boxes. */
+.range-panel {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  margin: 0.75rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 0.9rem;
+  background: var(--surface);
+  font-size: 0.8rem;
+}
+
+.range-panel-heading,
+.range-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.range-panel-heading h3 { margin: 0; font-size: 1rem; }
+.range-review-title { min-width: 0; overflow-wrap: anywhere; }
+.range-title-separator { color: var(--muted); white-space: nowrap; }
+.range-panel-heading > span { color: var(--muted-strong); }
+.range-selector-form { display: flex; flex-wrap: wrap; align-items: end; gap: 0.7rem; }
+.range-field { display: grid; flex: 1 1 14rem; gap: 0.35rem; min-width: 0; font-weight: 600; }
+.range-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  color: var(--foreground);
+  background: var(--surface);
+  font: 0.78rem var(--mono);
+}
+.range-selector-form > .range-apply { align-self: end; }
+.range-selector-form > a.range-apply { text-decoration: none; }
+.range-summary,
+.range-error,
+.range-limit { margin: 0; }
+.range-error { color: var(--red); }
+.range-manual-reason { margin: 0 0 0.5rem; color: var(--muted); }
+.range-limit { border-radius: 0.4rem; padding: 0.65rem; color: var(--warning); background: var(--surface-subtle); }
+.range-links { justify-content: flex-start; }
+.range-links a,
+.range-limit a { color: var(--home-link); }
+.range-commits ol { display: grid; gap: 0.35rem; margin: 0.5rem 0; padding-left: 1.4rem; }
+.range-commits li { overflow-wrap: anywhere; }
+.range-commits li code { margin-right: 0.6rem; }
+.range-loading { margin-right: 0.5rem; color: var(--muted); }
+
 .render-region { display: contents; }
 /* Rabbita mount inserts an empty placeholder before the rendered root. */
 .render-region > div:not([class]):empty { display: none; }

@@ -8,6 +8,7 @@ using @github {
   file_diff_mode,
   first_parent,
   pull_revisions,
+  range_revisions,
   pull_stats,
   repository_commit_revisions,
   source_pair_for_revisions,

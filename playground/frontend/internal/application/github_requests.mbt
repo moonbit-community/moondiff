@@ -8,7 +8,7 @@ fn commit_request(
 ) -> @rabbita.Cmd {
   let sha = match reference.target {
     Commit(sha) | PullCommit(_, sha) => sha
-    PullRequest(_) => ""
+    PullRequest(_) | Range(_, _) | PullRange(_, _, _) => ""
   }
   @github_client.get_commit(
     { owner: repository.owner, repo: repository.repo, sha, page, },

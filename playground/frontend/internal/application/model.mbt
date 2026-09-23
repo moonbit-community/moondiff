@@ -10,6 +10,9 @@ pub(all) enum Phase {
   )
   LoadingPullMetadata(reference~ : CommitRef, attempt~ : Int)
   LoadingPullCommitMetadata(reference~ : CommitRef)
+  LoadingRangePullMetadata(reference~ : CommitRef)
+  LoadingRangePullCompare(reference~ : CommitRef)
+  LoadingRange(reference~ : CommitRef)
   LoadingPullSnapshot(
     reference~ : CommitRef,
     attempt~ : Int,
@@ -25,8 +28,20 @@ pub(all) enum Phase {
     compare~ : ApiCompare,
     files~ : Array[ApiFile]
   )
+  LoadingPullSelectorCompare(
+    reference~ : CommitRef,
+    attempt~ : Int,
+    metadata~ : ApiPull
+  )
+  ValidatingPullSelector(
+    reference~ : CommitRef,
+    attempt~ : Int,
+    metadata~ : ApiPull,
+    compare~ : ApiCompare
+  )
   LoadFailed(String)
   Showing(ChangeView)
+  ShowingPullSelector(ApiPull)
 } derive(Eq)
 
 ///|
@@ -48,6 +63,7 @@ pub(all) struct Model {
   home : HomeState
   pull_merge : PullMergeState
   review : Session
+  range : RangeState?
 } derive(Eq)
 
 ///|
@@ -70,6 +86,7 @@ fn initial_model() -> Model {
     home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     review: initial_review_state(),
+    range: None,
   }
 }
 

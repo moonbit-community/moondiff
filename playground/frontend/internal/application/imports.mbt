@@ -30,6 +30,7 @@ using @change {
   ensure_expanded_file_documents,
   finish_commit,
   finish_pull,
+  finish_range,
   initial_side,
   set_file_state,
   source_requests_for_file,
@@ -64,5 +65,6 @@ using @protocol {
   type ApiFile,
   type ApiIssueComment,
   type ApiPull,
+  type ApiRangeCompare,
   type ApiReviewComment,
 }

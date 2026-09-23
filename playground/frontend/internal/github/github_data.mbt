@@ -105,7 +105,8 @@ pub fn same_pull_snapshot(initial : ApiPull, verified : ApiPull) -> Bool {
   initial.head.sha == verified.head.sha &&
   initial.base.repo == verified.base.repo &&
   initial.head.repo == verified.head.repo &&
-  initial.changed_files == verified.changed_files
+  initial.changed_files == verified.changed_files &&
+  initial.commits == verified.commits
 }
 
 ///|
@@ -217,6 +218,37 @@ pub fn pull_revisions(
     }),
     { repository: branch_repository(pull.head, fallback), sha: pull.head.sha, },
   )
+}
+
+///|
+pub fn range_revisions(
+  reference : CommitRef,
+  base : String,
+  head : String,
+  pull : ApiPull?,
+  pull_merge_base : String?,
+) -> (Revision, Revision) {
+  let fallback = reference_repository(reference)
+  let (base_repo, head_repo) = match pull {
+    Some(snapshot) => {
+      let upstream = branch_repository(snapshot.base, fallback)
+      let fork = branch_repository(snapshot.head, fallback)
+      (
+        if base == snapshot.base.sha || pull_merge_base == Some(base) {
+          upstream
+        } else {
+          fork
+        },
+        if head == snapshot.base.sha || pull_merge_base == Some(head) {
+          upstream
+        } else {
+          fork
+        },
+      )
+    }
+    None => (fallback, fallback)
+  }
+  ({ repository: base_repo, sha: base, }, { repository: head_repo, sha: head, })
 }
 
 ///|

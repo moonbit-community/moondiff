@@ -5,6 +5,29 @@ const PULL_CHANGED_ERROR : String = "This pull request changed while it was load
 const MAX_PULL_LOAD_ATTEMPT : Int = 1
 
 ///|
+fn pull_range_state(pull : ApiPull, merge_base : String) -> RangeState {
+  {
+    ..range_state(merge_base, pull.head.sha, Some(pull)),
+    loading_page: None,
+    next_page: if pull.commits == Some(0) {
+      None
+    } else {
+      Some(1)
+    },
+    total_commits: pull.commits.unwrap_or(0),
+    pull_merge_base: Some(merge_base),
+  }
+}
+
+///|
+fn auto_load_pull_commits(pull : ApiPull) -> Bool {
+  match pull.commits {
+    Some(count) => count > 0 && count <= 250
+    None => true
+  }
+}
+
+///|
 fn show_pull(
   model : Model,
   reference : CommitRef,
@@ -16,20 +39,48 @@ fn show_pull(
   match finish_pull(reference, pull, compare, files) {
     Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
     Ok(view) => {
+      let base = view.old_revision.map(r => r.sha).unwrap_or(pull.base.sha)
+      let range = pull_range_state(pull, base)
       let shown = ensure_expanded_file_documents(
         view,
         model.diff_algorithm,
         ignore_comments=model.ignore_comments,
         ignore_tests=model.ignore_tests,
       )
+      let ready = with_phase({ ..model, range: Some(range), }, Showing(shown))
+      let (next, commit_command) = if auto_load_pull_commits(pull) {
+        update_range(ready, LoadMore, emit)
+      } else {
+        (ready, @rabbita.none)
+      }
       (
-        with_phase(model, Showing(shown)),
+        next,
         @rabbita.batch([
           commands_for_change(view, model.generation, emit),
           comments_request(reference, model.generation, emit),
+          commit_command,
         ]),
       )
     }
+  }
+}
+
+///|
+fn show_pull_selector(
+  model : Model,
+  pull : ApiPull,
+  compare : ApiCompare,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let range = pull_range_state(pull, compare.merge_base_commit.sha)
+  let ready = with_phase(
+    { ..model, range: Some(range), },
+    ShowingPullSelector(pull),
+  )
+  if auto_load_pull_commits(pull) {
+    update_range(ready, LoadMore, emit)
+  } else {
+    (ready, @rabbita.none)
   }
 }
 
@@ -43,8 +94,18 @@ fn start_pull_snapshot(
 ) -> (Model, @rabbita.Cmd) {
   if metadata.changed_files > @github.MAX_PULL_FILES {
     return (
-      with_phase(model, LoadFailed(@github.PULL_FILE_LIMIT_ERROR)),
-      @rabbita.none,
+      with_phase(
+        model,
+        LoadingPullSelectorCompare(reference~, attempt~, metadata~),
+      ),
+      pull_compare_request(
+        reference,
+        metadata.base.sha,
+        metadata.head.sha,
+        model.generation,
+        attempt,
+        emit,
+      ),
     )
   }
   (
@@ -139,6 +200,25 @@ fn validate_or_retry_pull_snapshot(
 }
 
 ///|
+fn validate_or_retry_pull_selector(
+  model : Model,
+  reference : CommitRef,
+  attempt : Int,
+  metadata : ApiPull,
+  compare : ApiCompare,
+  verified : ApiPull,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  if !same_pull_snapshot(metadata, verified) {
+    if attempt < MAX_PULL_LOAD_ATTEMPT {
+      return start_pull_snapshot(model, reference, attempt + 1, verified, emit)
+    }
+    return (with_phase(model, LoadFailed(PULL_CHANGED_ERROR)), @rabbita.none)
+  }
+  show_pull_selector(model, verified, compare, emit)
+}
+
+///|
 fn begin_change_load(
   model : Model,
   reference : CommitRef,
@@ -146,6 +226,10 @@ fn begin_change_load(
   preserve_draft? : Bool = false,
 ) -> (Model, @rabbita.Cmd) {
   let generation = model.generation + 1
+  let range = range_reference_parts(reference).map(pair => {
+    let (base, head) = pair
+    range_state(base, head, None)
+  })
   let (phase, command) = match reference.target {
     Commit(_) => {
       let repository = reference_repository(reference)
@@ -164,7 +248,47 @@ fn begin_change_load(
         LoadingPullCommitMetadata(reference~),
         pull_commit_metadata_request(reference, generation, emit),
       )
+    Range(base, head) =>
+      (
+        LoadingRange(reference~),
+        range_start_resolution(
+          reference,
+          range_state(base, head, None),
+          generation,
+          emit,
+        ),
+      )
+    PullRange(number, _, _) =>
+      (
+        LoadingRangePullMetadata(reference~),
+        @github_client.get_pull(
+          { owner: reference.owner, repo: reference.repo, number, },
+          generation,
+          result => emit(Range(RangePullLoaded(generation, result))),
+        ),
+      )
   }
+  let reset_review = @comments.update(
+      comment_session_context(model.review, {
+        generation,
+        route: Some(reference),
+        snapshot: None,
+        enabled: range is None,
+      }),
+      Reset(range is None, preserve_draft),
+    ).0
+  let login = match model.auth {
+    SignedIn(login~, ..) => login
+    _ => None
+  }
+  let review = @comments.update(
+      reset_review,
+      if model.auth is AuthChecking {
+        IdentityChecking
+      } else {
+        Identity(model.auth is SignedIn(..) && range is None, login)
+      },
+    ).0
   (
     {
       ..model,
@@ -173,18 +297,13 @@ fn begin_change_load(
       restore_pending: false,
       phase,
       route: Some(reference),
+      range,
       file_tree: reset_file_tree_state(model.file_tree),
-      review: @comments.update(
-        comment_session_context(model.review, {
-          generation,
-          route: Some(reference),
-          snapshot: None,
-          enabled: true,
-        }),
-        Reset(true, preserve_draft),
-      ).0,
+      review,
     },
-    if !(reference.target is PullRequest(_)) {
+    if range is Some(_) {
+      @rabbita.batch([@github_client.cancel_before(generation), command])
+    } else if !(reference.target is PullRequest(_)) {
       @rabbita.batch([
         @github_client.cancel_before(generation),
         command,
