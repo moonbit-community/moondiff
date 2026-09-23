@@ -29,6 +29,12 @@ pub fn home_pull_key(@moondiff-playground-protocol.ApiPullSummary) -> String
 
 pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
 
+pub fn range_commit_after(RangeState, String, String) -> Bool
+
+pub fn range_pull_history_unsupported(RangeState) -> Bool
+
+pub fn range_pull_selector_ready(RangeState) -> Bool
+
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> Transition
 
 // Errors
@@ -166,6 +172,7 @@ pub(all) struct Model {
   home : HomeState
   pull_merge : PullMergeState
   review : @comments.Session
+  range : RangeState?
 } derive(Eq)
 
 pub(all) enum Msg {
@@ -175,6 +182,7 @@ pub(all) enum Msg {
   Auth(AuthMsg)
   Review(ReviewMsg)
   Load(LoadMsg)
+  Range(RangeMsg)
   Ui(UiMsg)
 }
 
@@ -188,10 +196,16 @@ pub(all) enum Phase {
   LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int, first~ : @moondiff-playground-protocol.ApiCommit?, files~ : Array[@moondiff-playground-protocol.ApiFile])
   LoadingPullMetadata(reference~ : @github.CommitRef, attempt~ : Int)
   LoadingPullCommitMetadata(reference~ : @github.CommitRef)
+  LoadingRangePullMetadata(reference~ : @github.CommitRef)
+  LoadingRangePullCompare(reference~ : @github.CommitRef)
+  LoadingRange(reference~ : @github.CommitRef)
   LoadingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare?, page~ : Int, files~ : Array[@moondiff-playground-protocol.ApiFile])
   ValidatingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare, files~ : Array[@moondiff-playground-protocol.ApiFile])
+  LoadingPullSelectorCompare(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull)
+  ValidatingPullSelector(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare)
   LoadFailed(String)
   Showing(@change.ChangeView)
+  ShowingPullSelector(@moondiff-playground-protocol.ApiPull)
 } derive(Eq)
 
 pub(all) enum PullMergeMsg {
@@ -215,6 +229,38 @@ pub(all) struct PullMergeState {
 } derive(Eq)
 pub fn PullMergeState::new() -> Self
 
+pub(all) enum RangeMsg {
+  FromSelected(String)
+  ToSelected(String)
+  ToggleCommits
+  LoadMore
+  CopyLink
+  RangePullLoaded(Int, Result[@moondiff-playground-protocol.ApiPull, Error])
+  RangePullCompareLoaded(Int, Result[@moondiff-playground-protocol.ApiCompare, Error])
+  RangeShaResolved(Int, Bool, Bool, Result[String, Error])
+  RangePageLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiRangeCompare, Error])
+  RangePullCommitPageLoaded(Int, Int, Result[Array[@moondiff-playground-protocol.ApiRangeCommit], Error])
+  RangePullCommitPageValidated(Int, Int, Array[@moondiff-playground-protocol.ApiRangeCommit], Result[@moondiff-playground-protocol.ApiPull, Error])
+}
+
+pub(all) struct RangeState {
+  from_sha : String
+  to_sha : String
+  base_sha : String
+  head_sha : String
+  commits : Array[@moondiff-playground-protocol.ApiRangeCommit]
+  linear_commits : Array[@moondiff-playground-protocol.ApiRangeCommit]?
+  total_commits : Int
+  loading_page : Int?
+  next_page : Int?
+  error : String?
+  expanded : Bool
+  comparison : @moondiff-playground-protocol.ApiRangeCompare?
+  pull : @moondiff-playground-protocol.ApiPull?
+  pull_merge_base : String?
+  too_many_files : Bool
+} derive(Eq)
+
 pub(all) enum Region {
   Home
   Shell
@@ -225,6 +271,7 @@ pub(all) enum Region {
   ViewedSummary
   Discussion
   PullMergeStatus
+  RangePanel
   File(String)
 } derive(Eq, Hash)
 pub fn Region::key(Self) -> String
@@ -264,6 +311,7 @@ pub(all) struct Transition {
 pub(all) enum UiMsg {
   InputChanged(String)
   Submit
+  RetryRoute
   RouteChanged(@url.Url)
   SelectView(@change.ViewMode)
   ToggleFileTreeDrawer

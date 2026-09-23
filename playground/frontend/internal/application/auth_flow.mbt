@@ -29,7 +29,7 @@ fn sign_in_restarts_change_load(model : Model) -> Bool {
     return false
   }
   match model.phase {
-    Idle | Showing(_) => false
+    Idle | Showing(_) | ShowingPullSelector(_) => false
     _ => true
   }
 }
@@ -53,6 +53,9 @@ fn finish_sign_in(
   guard next.route is Some(reference) else { return (next, command) }
   if restart {
     return begin_sign_in_change_reload(next, reference, transition, emit)
+  }
+  if next.phase is ShowingPullSelector(_) {
+    return (next, command)
   }
   (
     next,

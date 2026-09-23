@@ -145,3 +145,42 @@ test "old hash links are invalid" {
   )
   assert_true(reference_from_route(Some("#/a/b/pull/42")) is Err(_))
 }
+
+///|
+test "two-dot SHA intervals round-trip with and without pull context" {
+  let base = "a".repeat(40)
+  let head = "b".repeat(40)
+  let generic = range_reference("alice", "repo", base, head)
+  let pull = pull_range_reference("alice", "repo", "17", base, head)
+  for reference in [generic, pull] {
+    guard reference_from_playground_url(
+        "https://example.test\{playground_route(reference)}",
+      )
+      is Ok(Some(parsed)) else {
+      fail("expected interval route to round-trip")
+    }
+    assert_true(parsed == reference)
+    assert_eq(
+      canonical_github_url(reference),
+      "https://github.com/alice/repo/compare/\{base}..\{head}",
+    )
+  }
+  guard parse_change_url(
+      "https://github.com/alice/repo/compare/abcdef1..1234567",
+    )
+    is Ok(short) else {
+    fail("expected two-dot GitHub compare link")
+  }
+  assert_true(short.target is Range("abcdef1", "1234567"))
+  assert_true(
+    reference_from_route(Some("/alice/repo/pull/17/compare/abcdef1..1234567"))
+    is Ok(Some(_)),
+  )
+  for
+    value in [
+      "https://github.com/alice/repo/compare/abcdef1...1234567", "https://github.com/alice/repo/compare/main..1234567",
+      "https://github.com/alice/repo/compare/abcdef1..v1",
+    ] {
+    assert_true(parse_change_url(value) is Err(_))
+  }
+}

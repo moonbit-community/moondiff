@@ -3,7 +3,10 @@ fn comment_context(model : Model) -> @comments.Context {
   {
     generation: model.generation,
     route: model.route,
-    enabled: true,
+    enabled: !(model.phase is ShowingPullSelector(_)) &&
+    !model.route
+    .map(reference => range_reference_parts(reference) is Some(_))
+    .unwrap_or(false),
     snapshot: match model.phase {
       Showing(view) =>
         Some({

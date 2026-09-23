@@ -22,7 +22,7 @@ pub fn region_view(
             @html.button(
               type_="button",
               class="secondary",
-              on_click=emit(Ui(Submit)),
+              on_click=emit(Ui(RetryRoute)),
               "Try again",
             ),
           ])
@@ -37,6 +37,7 @@ pub fn region_view(
     Discussion(input) =>
       comments_overview(input.is_pull, input.review, input.auth, emit)
     PullMergeStatus(input) => pull_merge_status_view(input, emit)
+    RangePanel(input) => range_panel_view(input, emit)
     File(input) => {
       let file = input.file
       let options = input.display
@@ -122,7 +123,9 @@ pub fn shell_view(
     class=if input.landing { "shell landing" } else { "shell workspace" },
     [
       host(Toolbar),
-      if input.showing {
+      if input.selector_only {
+        @html.section(class="results selector-only", [host(RangePanel)])
+      } else if input.showing {
         @html.section(class="results", [
           @html.div(
             class="change-layout",
@@ -143,10 +146,13 @@ pub fn shell_view(
                   ),
                 [
                   commit_message_view(input.message, host(Navigation)),
+                  host(RangePanel),
                   host(ViewedSummary),
                   host(Discussion),
                   host(PullMergeStatus),
-                  if files.is_empty() {
+                  if input.range_limit {
+                    @html.nothing
+                  } else if files.is_empty() {
                     @html.div(
                       class="file-list",
                       @html.div(

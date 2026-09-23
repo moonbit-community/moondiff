@@ -63,6 +63,91 @@ test "page restoration keeps loaded content collapse choices and current account
 }
 
 ///|
+test "restored PR commit pages retain the diff and validate the resumed page" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let pull = { ..review_test_pull(), commits: Some(101), }
+  let first = pull_page_items(0, 100, 101, pull.head.sha)
+  let before = {
+    ..restoration_model(),
+    range: Some({
+      ..range_state(pull.base.sha, pull.head.sha, Some(pull)),
+      commits: first,
+      total_commits: 101,
+      loading_page: Some(2),
+      next_page: Some(2),
+      expanded: true,
+    }),
+  }
+  let hidden = update_auth(before, RestoreAuth, emit).0
+  let restored = restoration_status(hidden, Ok(signed_in_api_status("alice")))
+  assert_eq(restored.generation, before.generation)
+  assert_true(restored.phase == before.phase)
+  assert_true(
+    restored.range is Some({ loading_page: Some(2), expanded: true, .. }),
+  )
+  assert_eq(restored.range.unwrap().commits.length(), 100)
+  let last = pull_page_items(100, 1, 101, pull.head.sha)
+  let (validating, _) = update_range(
+    restored,
+    RangePullCommitPageLoaded(restored.generation, 2, Ok(last)),
+    emit,
+  )
+  assert_true(validating.phase == before.phase)
+  let (done, _) = update_range(
+    validating,
+    RangePullCommitPageValidated(restored.generation, 2, last, Ok(pull)),
+    emit,
+  )
+  assert_eq(done.range.unwrap().commits.length(), 101)
+  assert_eq(done.range.unwrap().next_page, None)
+  assert_eq(done.range.unwrap().loading_page, None)
+}
+
+///|
+test "restored large PR selector resumes its compare page without restarting" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let pull = { ..review_test_pull(), commits: Some(251), }
+  let first = pull_page_items(0, 100, 251, pull.head.sha)
+  let before = {
+    ..restoration_model(),
+    phase: ShowingPullSelector(pull),
+    range: Some({
+      ..range_state(pull.base.sha, pull.head.sha, Some(pull)),
+      commits: first,
+      total_commits: 251,
+      loading_page: Some(2),
+      next_page: Some(2),
+      expanded: true,
+    }),
+  }
+  let hidden = update_auth(before, RestoreAuth, emit).0
+  let restored = restoration_status(hidden, Ok(signed_in_api_status("alice")))
+  assert_eq(restored.generation, before.generation)
+  assert_true(restored.phase == before.phase)
+  assert_eq(restored.range.unwrap().commits.length(), 100)
+  let second : ApiRangeCompare = {
+    base_commit: {
+      sha: pull.base.sha,
+      commit: { message: "Base", },
+      parents: [],
+    },
+    merge_base_commit: { sha: pull.base.sha, },
+    total_commits: 251,
+    commits: pull_page_items(100, 100, 251, pull.head.sha),
+    files: None,
+  }
+  let (loaded, _) = update_range(
+    restored,
+    RangePageLoaded(restored.generation, 2, Ok(second)),
+    emit,
+  )
+  assert_true(loaded.phase == before.phase)
+  assert_eq(loaded.range.unwrap().commits.length(), 200)
+  assert_eq(loaded.range.unwrap().next_page, Some(3))
+  assert_eq(loaded.range.unwrap().loading_page, None)
+}
+
+///|
 test "failed restoration retains its marker until a later status or login succeeds" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let before = restoration_model()

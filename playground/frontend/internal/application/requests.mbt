@@ -83,6 +83,9 @@ fn comments_request(
   generation : Int,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
+  if range_reference_parts(reference) is Some(_) {
+    return @rabbita.none
+  }
   emit(Review(BeginCommentsRefresh(generation, reference)))
 }
 

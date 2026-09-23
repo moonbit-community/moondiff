@@ -8,6 +8,7 @@ fn immutable_public_request(request : @protocol.GitHubRequest) -> Bool {
   match request {
     CommitGet(p) => full_sha(p.sha)
     CompareGet(p) => full_sha(p.base) && full_sha(p.head)
+    RangeCompareGet(p) => full_sha(p.base) && full_sha(p.head)
     ContentGet(p) => full_sha(p.revision)
     _ => false
   }
@@ -24,6 +25,18 @@ fn public_decode(
       CommitGet(_) => Commit(@protocol.decode_github(value))
       PullGet(_) => Pull(@protocol.decode_github(value))
       CompareGet(_) => Compare(@protocol.decode_github(value))
+      RangeCompareGet(_) => RangeCompare(@protocol.decode_github(value))
+      PullCommitPageGet(_) => PullCommitPage(@protocol.decode_github(value))
+      ResolveShaGet(p) => {
+        guard value is String(sha) else {
+          raise HttpRequestError(
+            status=502,
+            code="invalid_github_response",
+            detail="GitHub returned an invalid commit SHA.",
+          )
+        }
+        ResolvedSha(@protocol.resolved_sha(p.sha, sha))
+      }
       PullFiles(_) => Files(@protocol.decode_github(value))
       ContentGet(_) => {
         let source : @protocol.ApiSource = @protocol.decode_github(value)
@@ -277,17 +290,22 @@ fn Client::perform_public(
     }
     _ => {
       let path = request.public_path().unwrap()
-      pending.abort = public_fetch(path, request is ContentGet(_), result => {
-        done(
-          match result {
-            Err(error) => Err(error)
-            Ok(raw) =>
-              Ok(public_decode(request, raw)) catch {
-                error => Err(error)
-              }
-          },
-        )
-      })
+      pending.abort = public_fetch(
+        path,
+        request is ContentGet(_),
+        result => {
+          done(
+            match result {
+              Err(error) => Err(error)
+              Ok(raw) =>
+                Ok(public_decode(request, raw)) catch {
+                  error => Err(error)
+                }
+            },
+          )
+        },
+        sha=request is ResolveShaGet(_),
+      )
     }
   }
 }

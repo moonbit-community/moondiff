@@ -10,6 +10,17 @@ fn restore_page_requests(
   match next.phase {
     Showing(view) => {
       let commands = [comments_request(reference, next.generation, emit)]
+      if next.range is Some(state) && state.loading_page is Some(page) {
+        commands.push(
+          range_commit_page_request(
+            reference,
+            state,
+            page,
+            next.generation,
+            emit,
+          ),
+        )
+      }
       for index, file in view.files {
         for request in source_requests_for_file(view, index) {
           let (side, location) = request
@@ -26,6 +37,21 @@ fn restore_page_requests(
       }
       (next, @rabbita.batch(commands))
     }
+    ShowingPullSelector(_) =>
+      match next.range {
+        Some({ loading_page: Some(page), .. } as state) =>
+          (
+            next,
+            range_commit_page_request(
+              reference,
+              state,
+              page,
+              next.generation,
+              emit,
+            ),
+          )
+        _ => (next, @rabbita.none)
+      }
     LoadFailed(_) => (next, comments_request(reference, next.generation, emit))
     _ => begin_change_load(next, reference, emit, preserve_draft=true)
   }

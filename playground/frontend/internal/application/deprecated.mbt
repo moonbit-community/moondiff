@@ -98,3 +98,8 @@ pub extend ViewedRecord with ToJson::{to_json}
 #deprecated
 #doc(hidden)
 pub extend ViewedState with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend RangeState with Eq::{not_equal, equal}

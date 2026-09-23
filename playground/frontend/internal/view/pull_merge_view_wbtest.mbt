@@ -162,9 +162,11 @@ test "merge region sits between discussion and changed files" {
           generation: 1,
           landing: false,
           showing: true,
+          selector_only: false,
           message: "Review",
           drawer_open: false,
           preferred_width: 300,
+          range_limit: false,
           display: {
             mode: Split,
             algorithm: LexicalAlgorithm,

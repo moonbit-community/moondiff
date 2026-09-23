@@ -72,35 +72,59 @@ fn update_load(
       if generation != model.generation {
         return (model, @rabbita.none)
       }
-      guard model.phase
-        is LoadingPullSnapshot(
+      match model.phase {
+        LoadingPullSelectorCompare(
+          reference~,
+          attempt=expected_attempt,
+          metadata~
+        ) if attempt == expected_attempt =>
+          match result {
+            Err(error) =>
+              (
+                with_phase(model, LoadFailed(error_message(error, true))),
+                @rabbita.none,
+              )
+            Ok(compare) =>
+              (
+                with_phase(
+                  model,
+                  ValidatingPullSelector(
+                    reference~,
+                    attempt~,
+                    metadata~,
+                    compare~,
+                  ),
+                ),
+                pull_validation_request(reference, generation, attempt, emit),
+              )
+          }
+        LoadingPullSnapshot(
           reference~,
           attempt=expected_attempt,
           metadata~,
           compare=_,
           page~,
           files~
-        ) &&
-        attempt == expected_attempt else {
-        return (model, @rabbita.none)
-      }
-      match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
-        Ok(compare) =>
-          continue_pull_snapshot(
-            model,
-            reference,
-            attempt,
-            metadata,
-            Some(compare),
-            page,
-            files,
-            emit,
-          )
+        ) if attempt == expected_attempt =>
+          match result {
+            Err(error) =>
+              (
+                with_phase(model, LoadFailed(error_message(error, true))),
+                @rabbita.none,
+              )
+            Ok(compare) =>
+              continue_pull_snapshot(
+                model,
+                reference,
+                attempt,
+                metadata,
+                Some(compare),
+                page,
+                files,
+                emit,
+              )
+          }
+        _ => (model, @rabbita.none)
       }
     }
     PullFilesPageLoaded(generation, attempt, page, result) => {
@@ -161,27 +185,43 @@ fn update_load(
       if generation != model.generation {
         return (model, @rabbita.none)
       }
-      guard model.phase
-        is ValidatingPullSnapshot(
+      match model.phase {
+        ValidatingPullSelector(
+          reference~,
+          attempt=expected_attempt,
+          metadata~,
+          compare~
+        ) if attempt == expected_attempt =>
+          match result {
+            Err(error) =>
+              (
+                with_phase(model, LoadFailed(error_message(error, true))),
+                @rabbita.none,
+              )
+            Ok(verified) =>
+              validate_or_retry_pull_selector(
+                model, reference, attempt, metadata, compare, verified, emit,
+              )
+          }
+        ValidatingPullSnapshot(
           reference~,
           attempt=expected_attempt,
           metadata~,
           compare~,
           files~
-        ) &&
-        attempt == expected_attempt else {
-        return (model, @rabbita.none)
-      }
-      match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
-        Ok(verified) =>
-          validate_or_retry_pull_snapshot(
-            model, reference, attempt, metadata, compare, files, verified, emit,
-          )
+        ) if attempt == expected_attempt =>
+          match result {
+            Err(error) =>
+              (
+                with_phase(model, LoadFailed(error_message(error, true))),
+                @rabbita.none,
+              )
+            Ok(verified) =>
+              validate_or_retry_pull_snapshot(
+                model, reference, attempt, metadata, compare, files, verified, emit,
+              )
+          }
+        _ => (model, @rabbita.none)
       }
     }
     CommitPageLoaded(generation, page, result) => {

@@ -40,11 +40,19 @@ pub fn pull_commit_reference(String, String, String, String) -> CommitRef
 
 pub fn pull_merge_base(@moondiff-playground-protocol.ApiCompare) -> String
 
+pub fn pull_range_reference(String, String, String, String, String) -> CommitRef
+
 pub fn pull_reference(String, String, String) -> CommitRef
 
 pub fn pull_revisions(CommitRef, @moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiCompare) -> (Revision?, Revision)
 
 pub fn pull_stats(@moondiff-playground-protocol.ApiPull) -> @moondiff-playground-protocol.ApiStats
+
+pub fn range_endpoints(String) -> (String, String)?
+
+pub fn range_reference(String, String, String, String) -> CommitRef
+
+pub fn range_revisions(CommitRef, String, String, @moondiff-playground-protocol.ApiPull?, String?) -> (Revision, Revision)
 
 pub fn raw_url(CommitRef, String, String) -> String
 
@@ -79,6 +87,8 @@ pub(all) enum ChangeTarget {
   Commit(String)
   PullRequest(String)
   PullCommit(String, String)
+  Range(String, String)
+  PullRange(String, String, String)
 } derive(Eq)
 
 pub(all) enum CheckedSource {

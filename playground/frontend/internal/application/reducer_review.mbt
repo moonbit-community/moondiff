@@ -53,6 +53,12 @@ fn update_review(
   msg : ReviewMsg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
+  if model.route
+    .map(reference => range_reference_parts(reference) is Some(_))
+    .unwrap_or(false) &&
+    !(msg is PageReactivated) {
+    return (model, @rabbita.none)
+  }
   let event : @comments.Event = match msg {
     Domain(event) => event
     LoadLatestSnapshot => {

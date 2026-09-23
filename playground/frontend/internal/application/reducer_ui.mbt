@@ -2,6 +2,7 @@
 pub(all) enum UiMsg {
   InputChanged(String)
   Submit
+  RetryRoute
   RouteChanged(@url.Url)
   SelectView(ViewMode)
   ToggleFileTreeDrawer
@@ -15,6 +16,15 @@ pub(all) enum UiMsg {
   SelectDiffAlgorithm(DiffAlgorithm)
   ToggleIgnoreComments
   ToggleIgnoreTests
+}
+
+///|
+fn submitted_reference(model : Model) -> Result[CommitRef, String] {
+  match model.route {
+    Some(reference) if reference.target is PullRange(_, _, _) &&
+      model.input == canonical_github_url(reference) => Ok(reference)
+    _ => parse_change_url(model.input)
+  }
 }
 
 ///|
@@ -200,8 +210,13 @@ fn update_ui(
       }
       ({ ..model, ignore_tests, phase, }, @rabbita.none)
     }
+    RetryRoute =>
+      match model.route {
+        Some(reference) => begin_change_load(model, reference, emit)
+        None => return update_ui(model, Submit, emit)
+      }
     Submit =>
-      match parse_change_url(model.input) {
+      match submitted_reference(model) {
         Err(message) =>
           (
             {
@@ -209,6 +224,7 @@ fn update_ui(
               generation: model.generation + 1,
               restore_pending: false,
               phase: LoadFailed(message),
+              range: None,
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @rabbita.none,
@@ -246,6 +262,7 @@ fn update_ui(
               restore_pending: false,
               phase: LoadFailed(message),
               route: None,
+              range: None,
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @github_client.cancel_before(model.generation + 1),
@@ -259,6 +276,7 @@ fn update_ui(
               restore_pending: false,
               phase: Idle,
               route: None,
+              range: None,
               file_tree: reset_file_tree_state(model.file_tree),
             },
             @github_client.cancel_before(model.generation + 1),

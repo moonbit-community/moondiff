@@ -4,6 +4,7 @@ fn comment_list_args(reference : CommitRef) -> @protocol.CommentsList {
     PullRequest(number) => @protocol.CommentTarget::Pull(number~)
     Commit(sha) => Commit(sha~)
     PullCommit(number, sha) => PullCommit(number~, sha~)
+    Range(_, head) | PullRange(_, _, head) => Commit(sha=head)
   }
   { owner: reference.owner, repo: reference.repo, target, }
 }
