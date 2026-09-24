@@ -825,6 +825,7 @@ test('short PR interval resolves a fork commit and reloads with a static URL', a
   await expect(page.locator('.range-review')).toContainText('1 commit');
   await expect(workspace.locator('.workspace-url')).toHaveText(githubUrl);
   await expect(workspace.locator('.workspace-url')).toHaveAttribute('title', githubUrl);
+  await expect(workspace.locator('.workspace-url')).toHaveAttribute('href', githubUrl);
   await expect(workspace.locator('form, #commit-url')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'View diff' })).toHaveCount(0);
   expect(calls.filter(c => c.op === 'github.sha.resolve.get').map(c => c.args.owner)).toEqual(['upstream', 'upstream', 'fork']);
@@ -834,6 +835,7 @@ test('short PR interval resolves a fork commit and reloads with a static URL', a
   await expect(page.locator('.range-review')).toContainText('1 commit');
   await expect(workspace.locator('.workspace-url')).toHaveText(githubUrl);
   await expect(workspace.locator('.workspace-url')).toHaveAttribute('title', githubUrl);
+  await expect(workspace.locator('.workspace-url')).toHaveAttribute('href', githubUrl);
   await expect(workspace.locator('form, #commit-url')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'View diff' })).toHaveCount(0);
   expect(calls.filter(c => c.op === 'github.sha.resolve.get')).toHaveLength(count);

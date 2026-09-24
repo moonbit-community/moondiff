@@ -287,6 +287,8 @@ for (const [kind, path, githubUrl] of shareRoutes) {
       await expect(page.locator('.shell.workspace')).toBeVisible();
       await expect(page.locator('.hero-workspace .workspace-url')).toHaveText(githubUrl);
       await expect(page.locator('.hero-workspace .workspace-url')).toHaveAttribute('title', githubUrl);
+      await expect(page.locator('.hero-workspace .workspace-url')).toHaveAttribute('href', githubUrl);
+      await expect(page.locator('.hero-workspace .workspace-url')).toHaveAttribute('target', '_blank');
       await expect(page.locator('.empty-state.loading')).toHaveText('Checking GitHub session…');
       await expect(page.locator('.hero-landing, #commit-url, .route-example, .supported-links, .public-note')).toHaveCount(0);
       expect(await page.evaluate(() => window.shareLandingSeen)).toBe(false);

@@ -2,10 +2,13 @@ import { expect } from "@playwright/test";
 
 export async function checkToolbar(page) {
   const hero = page.locator(".hero-workspace");
-  await expect(hero.locator("input:not([type=checkbox]), form, a, .submit-arrow, .copy-button, .view-toggle")).toHaveCount(0);
+  await expect(hero.locator("input:not([type=checkbox]), form, a:not(.workspace-url), .submit-arrow, .copy-button, .view-toggle")).toHaveCount(0);
   const url = hero.locator(".workspace-url");
   await expect(url).toBeVisible();
   await expect(url).toHaveAttribute("title", await url.textContent());
+  await expect(url).toHaveAttribute("href", await url.textContent());
+  await expect(url).toHaveAttribute("target", "_blank");
+  await expect(url).toHaveAttribute("rel", "noopener noreferrer");
   await expect(hero.locator(".workspace-actions button:not(.file-tree-trigger)")).toHaveText([
     "Token", "Tree", "Split", "Unified",
   ]);
