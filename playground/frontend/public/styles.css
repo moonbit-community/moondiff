@@ -793,20 +793,6 @@ button.compact {
   line-height: 2rem;
 }
 
-.hero-workspace .workspace-input-panel .input-row {
-  padding-block: 0.1rem;
-}
-
-.hero-workspace .workspace-input-panel .input-row input {
-  height: 2rem;
-  font-size: 0.8rem;
-}
-
-.hero-workspace .workspace-input-panel .submit-button {
-  min-height: 1.9rem;
-}
-
-
 .submit-button {
   min-height: 2.25rem;
   padding-inline: 0.8rem;

@@ -66,7 +66,6 @@ fn display_options(model : Model) -> DisplayOptions {
 pub(all) struct ToolbarInput {
   input : String
   landing : Bool
-  pull_range_form : Bool
   drawer_open : Bool
   auth : @application.AuthStatus
   file_count : Int?
@@ -81,9 +80,6 @@ fn toolbar_input(model : Model) -> ToolbarInput {
   {
     input: model.input,
     landing: landing_mode(model),
-    pull_range_form: model.route
-    .map(reference => reference.target is PullRange(_, _, _))
-    .unwrap_or(false),
     drawer_open: model.file_tree.drawer_open,
     auth: model.auth,
     file_count: match model.phase {

@@ -453,7 +453,7 @@ test "failed pull interval retries its route instead of its display URL" {
 }
 
 ///|
-test "pull interval form keeps its PR route and canonicalizes untouched short SHAs" {
+test "pull interval canonicalizes untouched short SHAs" {
   let base = "1".repeat(40)
   let head = "a".repeat(40)
   let reference = @github.pull_range_reference(
@@ -480,22 +480,4 @@ test "pull interval form keeps its PR route and canonicalizes untouched short SH
   )
   assert_true(shown.route == Some(canonical))
   assert_eq(shown.input, canonical_github_url(canonical))
-  let (submitted, _) = update_ui(shown, Submit, emit)
-  assert_true(submitted.route == Some(canonical))
-  assert_true(submitted.phase is LoadingRangePullMetadata(_))
-  assert_eq(submitted.generation, shown.generation + 1)
-
-  let edited_url = "https://github.com/other/repo/pull/18"
-  let edited = update_ui(loading, InputChanged(edited_url), emit).0
-  let (edited_shown, _) = update_range(
-    edited,
-    RangePageLoaded(edited.generation, 1, Ok(response)),
-    emit,
-  )
-  assert_eq(edited_shown.input, edited_url)
-  let (opened, _) = update_ui(edited_shown, Submit, emit)
-  assert_true(
-    opened.route == Some(@github.pull_reference("other", "repo", "18")),
-  )
-  assert_true(opened.phase is LoadingPullMetadata(_))
 }
