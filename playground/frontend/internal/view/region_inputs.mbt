@@ -253,7 +253,12 @@ pub fn RegionProjection::inputs(
     self.tree = None
     self.overall = None
     let status : StatusInput = match model.phase {
-      Idle => Empty
+      Idle =>
+        if model.route is Some(_) {
+          Loading("Checking GitHub session…")
+        } else {
+          Empty
+        }
       LoadFailed(message) => Failed(message, model.auth)
       LoadingCommit(page~, ..) =>
         Loading(

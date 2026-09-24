@@ -86,6 +86,78 @@ fn pull_region_model() -> Model {
 }
 
 ///|
+test "session check selects workspace for every valid share route" {
+  let base = "a".repeat(40)
+  let head = "b".repeat(40)
+  for
+    path in [
+      "/owner/repo/pull/17",
+      "/owner/repo/commit/\{head}",
+      "/owner/repo/pull/17/commits/\{head}",
+      "/owner/repo/compare/\{base}..\{head}",
+      "/owner/repo/pull/17/compare/\{base}..\{head}",
+    ] {
+    guard @routing.reference_from_route(Some(path)) is Ok(Some(reference)) else {
+      fail("expected a valid share route: \{path}")
+    }
+    let input = @routing.canonical_github_url(reference)
+    let model = {
+      ..region_model(),
+      input,
+      generation: 0,
+      phase: Idle,
+      route: Some(reference),
+      auth: AuthChecking,
+    }
+    let shell = shell_input(model)
+    assert_false(shell.home)
+    assert_false(shell.landing)
+    let regions = RegionProjection::new().inputs(model)
+    assert_eq(regions.length(), 2)
+    guard regions[0].1 is Toolbar(toolbar) else {
+      fail("expected a workspace toolbar")
+    }
+    assert_false(toolbar.landing)
+    assert_eq(toolbar.input, input)
+    assert_true(regions[1].1 is Status(Loading("Checking GitHub session…")))
+  }
+}
+
+///|
+test "root session check and invalid routes keep their existing layouts" {
+  let root = {
+    ..region_model(),
+    input: "",
+    generation: 0,
+    phase: Idle,
+    route: None,
+    auth: AuthChecking,
+  }
+  let root_shell = shell_input(root)
+  assert_true(root_shell.home)
+  assert_true(root_shell.landing)
+  let root_regions = RegionProjection::new().inputs(root)
+  assert_eq(root_regions.length(), 1)
+  assert_true(root_regions[0].1 is Home(AuthChecking, _))
+
+  let message = "This shared playground link is not valid."
+  let invalid = { ..root, phase: LoadFailed(message), }
+  let invalid_shell = shell_input(invalid)
+  assert_false(invalid_shell.home)
+  assert_true(invalid_shell.landing)
+  let invalid_regions = RegionProjection::new().inputs(invalid)
+  assert_eq(invalid_regions.length(), 2)
+  guard invalid_regions[0].1 is Toolbar(toolbar) else {
+    fail("expected the link input")
+  }
+  assert_true(toolbar.landing)
+  guard invalid_regions[1].1 is Status(Failed(actual, AuthChecking)) else {
+    fail("expected the invalid-link error")
+  }
+  assert_eq(actual, message)
+}
+
+///|
 test "file inputs ignore another file, tree controls and draft text outside their owner" {
   let initial = region_model()
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)

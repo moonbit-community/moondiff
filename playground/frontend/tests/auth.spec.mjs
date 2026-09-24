@@ -38,6 +38,24 @@ async function fixtureCommentRefresh(page) {
   return { refresh };
 }
 
+async function observeLandingDuringStartup(page) {
+  await page.addInitScript(() => {
+    const landing = '.shell.landing, .hero-landing, #commit-url, .route-example, .supported-links, .public-note';
+    window.shareLandingSeen = false;
+    const inspect = node => {
+      if (node?.nodeType === Node.ELEMENT_NODE &&
+          (node.matches(landing) || node.querySelector(landing))) window.shareLandingSeen = true;
+    };
+    inspect(document.documentElement);
+    new MutationObserver(records => {
+      for (const record of records) {
+        if (record.type === 'attributes') inspect(record.target);
+        for (const node of record.addedNodes) inspect(node);
+      }
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'id'] });
+  });
+}
+
 async function openAuthorization(page) {
   const opened = page.waitForEvent('popup');
   await page.getByRole('button', { name: 'Copy code and open GitHub' }).click();
@@ -236,6 +254,49 @@ test('a delayed successful poll cannot replace a newer sign-in after cancellatio
   await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
 
+const shareBase = 'a'.repeat(40);
+const shareHead = 'b'.repeat(40);
+const shareRoutes = [
+  ['PR', '/fixture/repo/pull/17', 'https://github.com/fixture/repo/pull/17'],
+  ['commit', route, `https://github.com/fixture/repo/commit/${sha}`],
+  ['PR commit', `/fixture/repo/pull/17/commits/${shareHead}`, `https://github.com/fixture/repo/pull/17/commits/${shareHead}`],
+  ['comparison', `/fixture/repo/compare/${shareBase}..${shareHead}`, `https://github.com/fixture/repo/compare/${shareBase}..${shareHead}`],
+  ['PR comparison', `/fixture/repo/pull/17/compare/${shareBase}..${shareHead}`, `https://github.com/fixture/repo/compare/${shareBase}..${shareHead}`],
+];
+
+for (const [kind, path, githubUrl] of shareRoutes) {
+  test(`${kind} share route shows its workspace while the first session check is pending`, async ({ page }) => {
+    let releaseStatus;
+    const statusGate = new Promise(resolve => { releaseStatus = resolve; });
+    let markStatusEntered;
+    const statusEntered = new Promise(resolve => { markStatusEntered = resolve; });
+    const githubReads = [];
+    await observeLandingDuringStartup(page);
+    await page.route('**/api/auth/status', async handler => {
+      markStatusEntered();
+      await statusGate;
+      await handler.continue().catch(() => {});
+    });
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (url.hostname === 'api.github.com' || url.pathname === '/api/rpc') githubReads.push(request.url());
+    });
+    try {
+      await page.goto(path);
+      await statusEntered;
+      await expect(page.locator('.shell.workspace')).toBeVisible();
+      await expect(page.locator('.hero-workspace .workspace-url')).toHaveText(githubUrl);
+      await expect(page.locator('.hero-workspace .workspace-url')).toHaveAttribute('title', githubUrl);
+      await expect(page.locator('.empty-state.loading')).toHaveText('Checking GitHub session…');
+      await expect(page.locator('.hero-landing, #commit-url, .route-example, .supported-links, .public-note')).toHaveCount(0);
+      expect(await page.evaluate(() => window.shareLandingSeen)).toBe(false);
+      expect(githubReads).toEqual([]);
+    } finally {
+      releaseStatus();
+    }
+  });
+}
+
 test('initial session resolution precedes change loading even when navigating during startup', async ({ page }) => {
   let releaseStatus;
   const statusRelease = new Promise(resolve => { releaseStatus = resolve; });
@@ -243,6 +304,7 @@ test('initial session resolution precedes change loading even when navigating du
   const statusEntered = new Promise(resolve => { markStatusEntered = resolve; });
   let statusReleased = false;
   const githubRequests = [];
+  await observeLandingDuringStartup(page);
   await page.route('**/api/auth/status', async handler => {
     markStatusEntered();
     await statusRelease;
@@ -250,15 +312,26 @@ test('initial session resolution precedes change loading even when navigating du
   });
   page.on('request', request => {
     const url = request.url();
-    if (url.startsWith('https://api.github.com/')) {
+    if (url.startsWith('https://api.github.com/') || new URL(url).pathname === '/api/rpc') {
       githubRequests.push({ url, afterStatusRelease: statusReleased });
     }
   });
   await page.goto(route);
   await statusEntered;
-  await page.waitForFunction(() => document.querySelector('input'));
+  await expect(page.locator('.hero-workspace .workspace-url')).toHaveText(`https://github.com/fixture/repo/commit/${sha}`);
+  await expect(page.locator('.empty-state.loading')).toHaveText('Checking GitHub session…');
+  expect(githubRequests).toEqual([]);
+  const intermediate = '/fixture/repo/pull/17';
+  await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); }, intermediate);
+  await expect(page.locator('.hero-workspace .workspace-url')).toHaveText('https://github.com/fixture/repo/pull/17');
+  await expect(page.locator('.empty-state.loading')).toHaveText('Checking GitHub session…');
+  expect(githubRequests).toEqual([]);
   const nextSha = '1111111111111111111111111111111111111111';
   await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); dispatchEvent(new Event('focus')); }, `/fixture/repo/commit/${nextSha}`);
+  await expect(page.locator('.hero-workspace .workspace-url')).toHaveText(`https://github.com/fixture/repo/commit/${nextSha}`);
+  await expect(page.locator('.empty-state.loading')).toHaveText('Checking GitHub session…');
+  expect(await page.evaluate(() => window.shareLandingSeen)).toBe(false);
+  expect(githubRequests).toEqual([]);
   statusReleased = true;
   releaseStatus();
   await expect(page.getByText('Fixture root commit', { exact: true }).first()).toBeVisible();
