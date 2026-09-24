@@ -157,7 +157,14 @@ fn hero_view(
       [
         @html.div(class="hero-copy", brand_view()),
         @html.div(class="hero-controls", [
-          @html.span(class="workspace-url", title=model.input, model.input),
+          @html.a(
+            href=model.input,
+            target=Blank,
+            rel="noopener noreferrer",
+            class="workspace-url",
+            title=model.input,
+            model.input,
+          ),
         ]),
         workspace_actions(model, emit),
         account_menu(model.auth, emit),
