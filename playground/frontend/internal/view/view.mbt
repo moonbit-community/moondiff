@@ -1009,7 +1009,7 @@ fn commit_message_view(
 ///|
 fn landing_mode(model : Model) -> Bool {
   match model.phase {
-    Idle => true
+    Idle => model.route is None
     LoadFailed(_) => model.route is None
     _ => false
   }
