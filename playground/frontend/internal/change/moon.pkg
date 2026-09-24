@@ -1,6 +1,8 @@
 import {
   "moonbit-community/moondiff-playground/internal/metrics",
   "moonbit-community/moondiff-playground/internal/highlight/c" @highlight_c,
+  "moonbit-community/moondiff-playground/internal/highlight/javascript" @highlight_javascript,
+  "moonbit-community/moondiff-playground/internal/highlight/json" @highlight_json,
   "moonbit-community/moondiff-playground/internal/highlight/moonbit" @highlight_moonbit,
   "moonbit-community/moondiff-playground/internal/highlight/yaml" @highlight_yaml,
   "moonbit-community/moondiff-playground-protocol" @protocol,

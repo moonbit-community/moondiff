@@ -103,14 +103,24 @@ test "highlight routing is case sensitive and independent for every rename side"
     ("config.YML", "enabled: true", None),
     ("config.Yaml", "enabled: true", None),
     ("config.yaml.txt", "enabled: true", None),
+    ("config.json", "{\"enabled\":true}", Some(Operator)),
+    ("moon.mod.json", "{\"name\":\"example/demo\"}", Some(Operator)),
+    ("code.js", "const x = 1;", Some(Keyword)),
+    ("code.mjs", "export const x = 1;", Some(Keyword)),
+    ("code.cjs", "const x = 1;", Some(Keyword)),
+    ("config.JSON", "{\"enabled\":true}", None),
+    ("code.JS", "const x = 1;", None),
+    ("code.MJS", "const x = 1;", None),
+    ("code.CJS", "const x = 1;", None),
+    ("code.jsx", "const x = 1;", None),
+    ("code.ts", "const x = 1;", None),
     ("code.mbt", "let x = 1", Some(Keyword)),
     ("moon.mod", "name = \"example/demo\"", Some(Variable)),
     ("src/moon.mod", "name = \"example/demo\"", Some(Variable)),
     ("moon.pkg", "import { \"moonbitlang/core/json\" }", Some(Keyword)),
     ("src/moon.pkg", "options(\"is-main\": true)", Some(Function)),
-    ("moon.mod.json", "name = \"example/demo\"", None),
     ("src/notmoon.mod", "name = \"example/demo\"", None),
-    ("src/moon.pkg.json", "import {}", None),
+    ("src/moon.pkg.json", "{}", Some(Operator)),
     ("notmoon.pkg", "import {}", None),
     ("src/MOON.PKG", "import {}", None),
     ("code.txt", "int x = 1;", None),
@@ -135,6 +145,17 @@ test "highlight routing is case sensitive and independent for every rename side"
       assert_eq(highlights.old.map(h => h.line(1)[0].kind), old_kind)
       assert_eq(highlights.new.map(h => h.line(1)[0].kind), new_kind)
     }
+  }
+}
+
+///|
+test "JSON manifests use JSON key and value scopes" {
+  for path in ["moon.mod.json", "src/moon.mod.json", "src/moon.pkg.json"] {
+    let highlights = source_highlights(path, "{\"name\":\"demo\",\"ok\":true}").unwrap()
+    assert_eq(highlights.line(1)[0].kind, Operator)
+    assert_eq(highlights.line(1)[1].kind, Variable)
+    assert_eq(highlights.line(1)[3].kind, StringLiteral)
+    assert_eq(highlights.line(1)[7].kind, Boolean)
   }
 }
 

@@ -71,6 +71,35 @@ const yamlBefore = [
 const yamlAfter = yamlBefore.replace("11", "22").replace("123abc", "456abc")
   .replace("443", "8443").replace("echo", "printf").replace("second", "final");
 
+const jsonBefore = [
+  '{"title":"中文😀\\n","enabled":true,"count":11,"empty":null}',
+  '{"items":[false,3]}',
+].join("\r\n");
+const jsonAfter = jsonBefore.replace("11", "22").replace("false,3", "false,4");
+const javascriptBefore = [
+  "// 中文😀 before",
+  "class Greeter { async greet(name) { return `Hi ${name}\\n`; } }",
+  "const ratio = 12 / 3;",
+  "const rx = /a[b/]c/g;",
+  "if (ratio) /x+/.test(name);",
+].join("\r\n");
+const javascriptAfter = javascriptBefore.replace("before", "after").replace("12 / 3", "24 / 3");
+
+const jsonJavascriptFiles = [
+  { filename: "src/config.json", old: jsonBefore, new: jsonAfter, kinds: ["variable", "variable"] },
+  { filename: "src/app.js", old: javascriptBefore, new: javascriptAfter, kinds: ["comment", "comment"] },
+  { filename: "src/module.mjs", old: "export const value = 1;", new: "export const value = 2;", kinds: ["keyword", "keyword"] },
+  { filename: "src/entry.cjs", old: "const value = 1;", new: "const value = 2;", kinds: ["keyword", "keyword"] },
+  { filename: "src/added.json", status: "added", old: "", new: '{"value":2}', kinds: [null, "variable"] },
+  { filename: "src/deleted.js", status: "removed", old: "const value = 1;", new: "", kinds: ["keyword", null] },
+  { filename: "src/from_js.json", previous_filename: "src/was_js.js", old: "const value = 1;", new: '{"value":2}', kinds: ["keyword", "variable"] },
+  { filename: "src/from_json.js", previous_filename: "src/was_json.json", old: '{"value":1}', new: "const value = 2;", kinds: ["variable", "keyword"] },
+  { filename: "src/upper.JSON", old: '{"value":1}', new: '{"value":2}', kinds: [null, null] },
+  { filename: "src/upper.JS", old: "const value = 1;", new: "const value = 2;", kinds: [null, null] },
+  { filename: "src/component.jsx", old: "const value = 1;", new: "const value = 2;", kinds: [null, null] },
+  { filename: "src/types.ts", old: "const value = 1;", new: "const value = 2;", kinds: [null, null] },
+];
+
 const yamlFiles = [
   { filename: "src/config.yaml", old: yamlBefore, new: yamlAfter, kinds: ["variable", "variable"] },
   { filename: "src/config.yml", old: "enabled: true\rvalue: 1", new: "enabled: false\rvalue: 2", kinds: ["boolean", "boolean"] },
@@ -677,3 +706,102 @@ for (const layout of ["Split", "Unified"]) {
     await expectOriginalLines(file, layout, old, current);
   });
 }
+
+for (const layout of ["Split", "Unified"]) {
+  for (const theme of ["light", "dark"]) {
+    test(`${layout} ${theme}: JSON and JavaScript syntax preserves text and colors`, async ({ page }) => {
+      const sources = [
+        ...jsonJavascriptFiles.slice(0, 2),
+        ...jsonJavascriptFiles.slice(4, 8),
+      ];
+      const errors = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.emulateMedia({ colorScheme: theme });
+      const requests = await installSources(page, sources);
+      await page.goto(path);
+      for (const [index] of sources.entries()) {
+        await ensureFileExpanded(page.locator(`#moondiff-file-${index}`));
+      }
+      const palette = colors[theme];
+      for (const algorithm of ["Token", "Tree"]) {
+        await page.getByRole("button", { name: algorithm, exact: true }).click();
+        await page.getByRole("button", { name: layout, exact: true }).click();
+        const jsonFile = page.locator("#moondiff-file-0");
+        const javascriptFile = page.locator("#moondiff-file-1");
+        await expect(jsonFile.locator(".syntax-variable").filter({ hasText: /^"title"$/ }).first()).toHaveCSS("color", palette.variable);
+        for (const kind of ["string", "escape", "number", "operator"]) {
+          await expect(jsonFile.locator(`.syntax-${kind}`).first()).toHaveCSS("color", palette[kind]);
+        }
+        await expect(jsonFile.locator(".syntax-boolean").first()).toHaveCSS("color", palette.keyword);
+        await expect(jsonFile.locator(".syntax-keyword").first()).toHaveCSS("color", palette.keyword);
+        for (const kind of ["control", "type", "function", "variable", "number", "string", "escape", "comment", "operator", "interpolation"]) {
+          await expect(javascriptFile.locator(`.syntax-${kind}`).first()).toHaveCSS("color", palette[kind]);
+        }
+        await expect(javascriptFile.locator(".syntax-async").first()).toHaveCSS("color", palette.control);
+        await expect(javascriptFile.locator(".syntax-string").filter({ hasText: /^\/a\[b\/\]c\/g$/ }).first()).toHaveCSS("color", palette.string);
+        await expect(javascriptFile.locator(".syntax-operator").filter({ hasText: /^\/$/ }).first()).toHaveCSS("color", palette.operator);
+        for (const file of [jsonFile, javascriptFile]) {
+          for (const side of ["del", "add"]) {
+            await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", palette[side]);
+            await expect(file.locator(`td.${side} .syntax-number`).first()).toHaveCSS("color", palette.number);
+          }
+          await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix")).toHaveCount(0);
+        }
+        await expectOriginalLines(jsonFile, layout, jsonBefore, jsonAfter);
+        await expectOriginalLines(javascriptFile, layout, javascriptBefore, javascriptAfter);
+        for (const [index, oldKind, newKind] of [
+          [2, null, "variable"],
+          [3, "keyword", null],
+          [4, "keyword", "variable"],
+          [5, "variable", "keyword"],
+        ]) {
+          const source = sources[index];
+          const file = page.locator(`#moondiff-file-${index}`);
+          for (const [side, kind] of [["del", oldKind], ["add", newKind]]) {
+            if (kind) {
+              await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toHaveCSS("color", palette[kind]);
+              await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", palette[side]);
+            } else {
+              await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
+            }
+          }
+          await expectOriginalLines(file, layout, source.old, source.new);
+        }
+      }
+      expect(requests).toHaveLength(sources.length * 2 - 2);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test("JSON and JavaScript extensions additions deletions and language renames survive controls", async ({ page }) => {
+  const requests = await installSources(page, jsonJavascriptFiles);
+  await page.goto(path);
+  for (const index of jsonJavascriptFiles.keys()) {
+    await ensureFileExpanded(page.locator(`#moondiff-file-${index}`));
+  }
+  const count = requests.length;
+  expect(count).toBe(jsonJavascriptFiles.length * 2 - 2);
+  for (const algorithm of ["Token", "Tree"]) {
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const layout of ["Split", "Unified"]) {
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      for (const [index, source] of jsonJavascriptFiles.entries()) {
+        const file = page.locator(`#moondiff-file-${index}`);
+        for (const [side, kind] of [["del", source.kinds[0]], ["add", source.kinds[1]]]) {
+          if (kind) await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toBeVisible();
+          else await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
+        }
+        await expectOriginalLines(file, layout, source.old, source.new);
+      }
+    }
+  }
+  for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
+    await page.getByRole("checkbox", { name: filter, exact: true }).click();
+    await expectOriginalLines(page.locator("#moondiff-file-0"), "Unified", jsonBefore, jsonAfter);
+    await expectOriginalLines(page.locator("#moondiff-file-1"), "Unified", javascriptBefore, javascriptAfter);
+  }
+  expect(requests.length).toBe(count);
+  expect(requests).not.toContain("true:src/added.json");
+  expect(requests).not.toContain("false:src/deleted.js");
+});
