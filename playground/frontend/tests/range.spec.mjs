@@ -811,34 +811,33 @@ test('failed PR commit page keeps the diff and retries from the same page', asyn
   expect(await page.evaluate(() => document.querySelector('.file-card') === window.originalCard)).toBe(true);
 });
 
-test('short PR interval resolves a fork commit before comparing and reloads with full SHAs', async ({ page }) => {
+test('short PR interval resolves a fork commit and reloads with a static URL', async ({ page }) => {
   const calls = await privateFixture(page, {
     resolveSha: args => args.owner === 'upstream' && args.sha === 'bbbbbbb'
       ? { error: { status: 404, code: 'not_found_or_not_installed', message: 'Not found' } }
       : args.sha === 'aaaaaaa' ? base : middle,
   });
+  const route = `/upstream/project/pull/17/compare/${base}..${middle}`;
+  const githubUrl = `https://github.com/upstream/project/compare/${base}..${middle}`;
+  const workspace = page.locator('.hero-workspace');
   await page.goto('/upstream/project/pull/17/compare/aaaaaaa..bbbbbbb');
-  await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+  await expect(page).toHaveURL(route);
   await expect(page.locator('.range-review')).toContainText('1 commit');
-  const input = page.getByLabel('Public GitHub commit or pull request URL');
-  await expect(input).toHaveValue(`https://github.com/upstream/project/compare/${base}..${middle}`);
+  await expect(workspace.locator('.workspace-url')).toHaveText(githubUrl);
+  await expect(workspace.locator('.workspace-url')).toHaveAttribute('title', githubUrl);
+  await expect(workspace.locator('form, #commit-url')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View diff' })).toHaveCount(0);
   expect(calls.filter(c => c.op === 'github.sha.resolve.get').map(c => c.args.owner)).toEqual(['upstream', 'upstream', 'fork']);
   const count = calls.filter(c => c.op === 'github.sha.resolve.get').length;
-  const comparisons = calls.filter(c => c.op === 'github.range.compare.get').length;
-  await page.getByRole('button', { name: 'View diff' }).click();
-  await expect.poll(() => calls.filter(c => c.op === 'github.range.compare.get').length).toBe(comparisons + 1);
-  await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
-  await expect(page.locator('.range-review')).toContainText('1 commit');
-  expect(calls.filter(c => c.op === 'github.content.get' && c.args.owner === 'fork' && c.args.ref === middle).length)
-    .toBeGreaterThanOrEqual(2);
   await page.reload();
+  await expect(page).toHaveURL(route);
   await expect(page.locator('.range-review')).toContainText('1 commit');
+  await expect(workspace.locator('.workspace-url')).toHaveText(githubUrl);
+  await expect(workspace.locator('.workspace-url')).toHaveAttribute('title', githubUrl);
+  await expect(workspace.locator('form, #commit-url')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View diff' })).toHaveCount(0);
   expect(calls.filter(c => c.op === 'github.sha.resolve.get')).toHaveLength(count);
-  await input.fill(`https://github.com/upstream/project/compare/${base}..${head}`);
-  await page.getByRole('button', { name: 'View diff' }).click();
-  await expect(page).toHaveURL(`/upstream/project/compare/${base}..${head}`);
-  await expect(page.locator('.range-review')).toContainText('2 commits');
-  expect(calls.some(c => c.op === 'github.content.get' && c.args.owner === 'upstream' && c.args.ref === head)).toBe(true);
+  expect(calls.some(c => c.op === 'github.content.get' && c.args.owner === 'fork' && c.args.ref === middle)).toBe(true);
 });
 
 test('nonancestor, empty and 300-file intervals report the correct review state', async ({ page }) => {

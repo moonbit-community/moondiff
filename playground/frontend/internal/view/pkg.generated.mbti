@@ -131,7 +131,6 @@ pub(all) enum StatusInput {
 pub(all) struct ToolbarInput {
   input : String
   landing : Bool
-  pull_range_form : Bool
   drawer_open : Bool
   auth : @application.AuthStatus
   file_count : Int?

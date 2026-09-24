@@ -19,15 +19,6 @@ pub(all) enum UiMsg {
 }
 
 ///|
-fn submitted_reference(model : Model) -> Result[CommitRef, String] {
-  match model.route {
-    Some(reference) if reference.target is PullRange(_, _, _) &&
-      model.input == canonical_github_url(reference) => Ok(reference)
-    _ => parse_change_url(model.input)
-  }
-}
-
-///|
 fn update_ui(
   model : Model,
   msg : UiMsg,
@@ -216,7 +207,7 @@ fn update_ui(
         None => return update_ui(model, Submit, emit)
       }
     Submit =>
-      match submitted_reference(model) {
+      match parse_change_url(model.input) {
         Err(message) =>
           (
             {

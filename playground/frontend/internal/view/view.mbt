@@ -157,14 +157,7 @@ fn hero_view(
       [
         @html.div(class="hero-copy", brand_view()),
         @html.div(class="hero-controls", [
-          if model.pull_range_form {
-            @html.div(
-              class="input-panel workspace-input-panel",
-              commit_form(model, emit),
-            )
-          } else {
-            @html.span(class="workspace-url", title=model.input, model.input)
-          },
+          @html.span(class="workspace-url", title=model.input, model.input),
         ]),
         workspace_actions(model, emit),
         account_menu(model.auth, emit),
