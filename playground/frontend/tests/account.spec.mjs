@@ -90,12 +90,16 @@ test('homepage, PR and commit tabs share account changes and sign-out', async ({
   const prReady = page.waitForEvent('popup');
   await one.getByRole('link', { name: 'Pull request 1', exact: true }).click();
   const pr = await prReady;
+  await pr.bringToFront();
+  await expect(account(pr)).toHaveAccessibleName('Account: alice', { timeout: 15_000 });
+  await page.bringToFront();
   await one.getByRole('button', { name: /Expand commits/ }).click();
   const commitReady = page.waitForEvent('popup');
   await one.getByRole('link', { name: /Commit 1/ }).click();
   const commit = await commitReady;
+  await commit.bringToFront();
+  await expect(account(commit)).toHaveAccessibleName('Account: alice', { timeout: 15_000 });
   const pages = [page, pr, commit];
-  for (const current of pages) await expect(account(current)).toHaveAccessibleName('Account: alice');
   state.user = 'bob';
   for (const current of pages) {
     await reactivate(current);
