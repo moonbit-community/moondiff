@@ -21,6 +21,12 @@ fn source_highlights(
     Some(@highlight_c.highlight(source))
   } else if path.has_suffix(".yaml") || path.has_suffix(".yml") {
     Some(@highlight_yaml.highlight(source))
+  } else if path.has_suffix(".json") {
+    Some(@highlight_json.highlight(source))
+  } else if path.has_suffix(".js") ||
+    path.has_suffix(".mjs") ||
+    path.has_suffix(".cjs") {
+    Some(@highlight_javascript.highlight(source))
   } else {
     None
   }
