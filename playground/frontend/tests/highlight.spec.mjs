@@ -103,6 +103,38 @@ const dockerfileAfter = dockerfileBefore.replace("COUNT=11", "COUNT=22")
   .replace("echo ok", "echo ready").replace("exit 0", "exit 1");
 const repositoryDockerfile = readFileSync(new URL("../../Dockerfile", import.meta.url), "utf8");
 
+const markdownBefore = [
+  "# GFM **preview**",
+  "> - [x] review ~~old~~ [site](https://example.test)",
+  "| Name | Value |",
+  "| :--- | ----: |",
+  "| 中文😀 | `inline` |",
+  '<span class="note">HTML</span> &amp;  ',
+  "```mbt",
+  "let moon = 11",
+  "```",
+  "```c",
+  "int c_value = 11;",
+  "```",
+  "```yaml",
+  "enabled: true # yaml",
+  "```",
+  "```json",
+  '{"enabled":true,"count":11}',
+  "```",
+  "```javascript",
+  "const jsValue = 11;",
+  "```",
+  "```dockerfile",
+  "FROM alpine AS build11",
+  "```",
+].join("\r\n");
+const markdownAfter = markdownBefore
+  .replace("~~old~~", "~~new~~")
+  .replaceAll("11", "22")
+  .replace("true # yaml", "false # yaml")
+  .replace('"enabled":true', '"enabled":false');
+
 const dockerfileFiles = [
   ...["Dockerfile", "Containerfile", "src/Dockerfile.dev", "src/Containerfile.test", "src/app.dockerfile", "src/app.containerfile"]
     .map(filename => ({ filename, old: dockerfileBefore, new: dockerfileAfter, kinds: ["keyword", "keyword"] })),
@@ -854,6 +886,71 @@ test("JSON and JavaScript extensions additions deletions and language renames su
   expect(requests).not.toContain("true:src/added.json");
   expect(requests).not.toContain("false:src/deleted.js");
 });
+
+for (const layout of ["Split", "Unified"]) {
+  for (const theme of ["light", "dark"]) {
+    test(`${layout} ${theme}: GFM and embedded fence languages preserve text and diff backgrounds`, async ({ page }) => {
+      const errors = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.emulateMedia({ colorScheme: theme });
+      const requests = await installSources(page, [{
+        filename: "README.md", old: markdownBefore, new: markdownAfter,
+      }]);
+      await page.goto(path);
+      const file = page.locator("#moondiff-file-0");
+      await ensureFileExpanded(file);
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      const palette = colors[theme];
+      await expect(file.locator("table")).toHaveClass(new RegExp(`\\b${layout.toLowerCase()}\\b`));
+      for (const [kind, color] of [
+        ["keyword", "keyword"], ["control", "control"], ["modifier", "keyword"],
+        ["function", "function"], ["type", "type"], ["variable", "variable"],
+        ["number", "number"], ["boolean", "keyword"], ["string", "string"],
+        ["escape", "escape"], ["comment", "comment"], ["operator", "operator"],
+        ["attribute", "control"],
+      ]) {
+        await expect(file.locator(`.syntax-${kind}`).first()).toHaveCSS("color", palette[color]);
+      }
+      for (const [kind, text] of [
+        ["keyword", "let"], ["type", "int"], ["variable", "enabled"],
+        ["keyword", "const"], ["keyword", "FROM"],
+      ]) {
+        await expect(file.locator(`.syntax-${kind}`).filter({ hasText: new RegExp(`^${text}$`) }).first()).toBeVisible();
+      }
+      for (const side of ["del", "add"]) {
+        await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", palette[side]);
+        await expect(file.locator(`td.${side} .syntax-number`).first()).toHaveCSS("color", palette.number);
+      }
+      await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix, [class^=syntax-] [class^=syntax-]")).toHaveCount(0);
+      await expectOriginalLines(file, layout, markdownBefore, markdownAfter);
+      expect(requests).toHaveLength(2);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+for (const layout of ["Split", "Unified"]) {
+  test(`${layout}: Markdown long-line fallback keeps later block state and source`, async ({ page }) => {
+    const crowded = "[x](https://example.test) ".repeat(1_500);
+    const old = [crowded, "# after", "```json", "true", "```"].join("\r\n");
+    const current = old.replace("https://example.test", "https://changed.test").replace("true", "false");
+    await installSources(page, [{ filename: "generated.markdown", old, new: current }]);
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(path);
+    const file = page.locator("#moondiff-file-0");
+    await ensureFileExpanded(file);
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    for (const side of ["del", "add"]) {
+      const cell = file.locator(`td.${side}`).filter({ hasText: "[x](http" });
+      await expect(cell).toHaveCount(1);
+      await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
+      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+    }
+    await expect(file.locator(".syntax-control").filter({ hasText: /^#$/ }).first()).toBeVisible();
+    await expect(file.locator(".syntax-boolean").first()).toBeVisible();
+    await expectOriginalLines(file, layout, old, current);
+  });
+}
 
 for (const layout of ["Split", "Unified"]) {
   for (const theme of ["light", "dark"]) {
