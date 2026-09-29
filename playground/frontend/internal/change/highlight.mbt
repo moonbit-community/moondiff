@@ -11,12 +11,26 @@ fn is_moonbit_file(path : String) -> Bool {
 }
 
 ///|
+fn is_dockerfile(path : String) -> Bool {
+  let parts = path.split("/").to_array()
+  let name = parts[parts.length() - 1]
+  name == "Dockerfile" ||
+  name == "Containerfile" ||
+  name.has_prefix("Dockerfile.") ||
+  name.has_prefix("Containerfile.") ||
+  name.has_suffix(".dockerfile") ||
+  name.has_suffix(".containerfile")
+}
+
+///|
 fn source_highlights(
   path : String,
   source : String,
 ) -> @highlight.SourceHighlights? {
   if is_moonbit_file(path) {
     Some(@highlight_moonbit.highlight(source))
+  } else if is_dockerfile(path) {
+    Some(@highlight_dockerfile.highlight(source))
   } else if path.has_suffix(".c") || path.has_suffix(".h") {
     Some(@highlight_c.highlight(source))
   } else if path.has_suffix(".yaml") || path.has_suffix(".yml") {
