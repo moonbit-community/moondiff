@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
 import { ensureFileExpanded } from "./file-actions.mjs";
@@ -84,6 +85,35 @@ const javascriptBefore = [
   "if (ratio) /x+/.test(name);",
 ].join("\r\n");
 const javascriptAfter = javascriptBefore.replace("before", "after").replace("12 / 3", "24 / 3");
+
+const dockerfileBefore = [
+  "# syntax=docker/dockerfile:1",
+  "FROM --platform=$BUILDPLATFORM alpine AS build",
+  "ARG COUNT=11",
+  "ENV ENABLED=true HOME=/root",
+  "RUN --mount=type=cache,target=/tmp printf \"$HOME\\n\" && \\",
+  "# removed continuation comment",
+  "  if true; then echo ok; fi",
+  "COPY <<'EOF' /message",
+  "literal $HOME 中文😀<&>",
+  "EOF",
+  'HEALTHCHECK --interval=5s CMD ["sh", "-c", "exit 0"]',
+].join("\r\n");
+const dockerfileAfter = dockerfileBefore.replace("COUNT=11", "COUNT=22")
+  .replace("echo ok", "echo ready").replace("exit 0", "exit 1");
+const repositoryDockerfile = readFileSync(new URL("../../Dockerfile", import.meta.url), "utf8");
+
+const dockerfileFiles = [
+  ...["Dockerfile", "Containerfile", "src/Dockerfile.dev", "src/Containerfile.test", "src/app.dockerfile", "src/app.containerfile"]
+    .map(filename => ({ filename, old: dockerfileBefore, new: dockerfileAfter, kinds: ["keyword", "keyword"] })),
+  { filename: "src/added.dockerfile", status: "added", old: "", new: "FROM scratch", kinds: [null, "keyword"] },
+  { filename: "src/deleted.containerfile", status: "removed", old: "FROM alpine", new: "", kinds: ["keyword", null] },
+  { filename: "src/from-text.dockerfile", previous_filename: "src/from-text.txt", old: "FROM fake", new: "FROM scratch", kinds: [null, "keyword"] },
+  { filename: "src/to-text.txt", previous_filename: "src/Dockerfile.old", old: "FROM alpine", new: "FROM scratch", kinds: ["keyword", null] },
+  { filename: "src/dockerfile", old: "FROM alpine", new: "FROM scratch", kinds: [null, null] },
+  { filename: "src/app.Dockerfile", old: "FROM alpine", new: "FROM scratch", kinds: [null, null] },
+  { filename: ".dockerignore", old: "FROM alpine", new: "FROM scratch", kinds: [null, null] },
+];
 
 const jsonJavascriptFiles = [
   { filename: "src/config.json", old: jsonBefore, new: jsonAfter, kinds: ["variable", "variable"] },
@@ -390,6 +420,25 @@ for (const layout of ["Split", "Unified"]) {
     expect(errors).toEqual([]);
   });
 }
+
+test("the repository playground Dockerfile renders with its original text", async ({ page }) => {
+  const current = repositoryDockerfile
+    .replace("FROM node:22-bookworm-slim", "FROM node:23-bookworm-slim")
+    .replace("RUN apt-get update", "RUN apt-get upgrade")
+    .replace("COPY --from=build /opt", "COPY --from=build2 /opt")
+    .replace("EXPOSE 4173", "EXPOSE 4174");
+  await installSources(page, [{ filename: "playground/Dockerfile", old: repositoryDockerfile, new: current }]);
+  await page.goto(path);
+  const file = page.locator("#moondiff-file-0");
+  await ensureFileExpanded(file);
+  for (const layout of ["Split", "Unified"]) {
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    await expect(file.locator(".syntax-keyword").filter({ hasText: /^FROM$/ }).first()).toBeVisible();
+    await expect(file.locator(".syntax-function").filter({ hasText: /^apt-get$/ }).first()).toBeVisible();
+    await expect(file.locator(".syntax-attribute").filter({ hasText: /^--from$/ }).first()).toBeVisible();
+    await expectOriginalLines(file, layout, repositoryDockerfile, current);
+  }
+});
 
 for (const algorithm of ["Token", "Tree"]) {
   for (const layout of ["Split", "Unified"]) {
@@ -805,3 +854,88 @@ test("JSON and JavaScript extensions additions deletions and language renames su
   expect(requests).not.toContain("true:src/added.json");
   expect(requests).not.toContain("false:src/deleted.js");
 });
+
+for (const layout of ["Split", "Unified"]) {
+  for (const theme of ["light", "dark"]) {
+    test(`${layout} ${theme}: Dockerfile syntax preserves source and diff backgrounds`, async ({ page }) => {
+      const errors = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.emulateMedia({ colorScheme: theme });
+      await installSources(page, [dockerfileFiles[0]]);
+      await page.goto(path);
+      const file = page.locator("#moondiff-file-0");
+      await ensureFileExpanded(file);
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      const palette = colors[theme];
+      for (const kind of ["keyword", "control", "function", "variable", "number", "boolean", "string", "escape", "interpolation", "comment", "operator", "attribute", "attribute-parameter"]) {
+        const expectedColor = kind === "attribute" ? palette.control
+          : kind === "boolean" ? palette.keyword : palette[kind];
+        await expect(file.locator(`.syntax-${kind}`).first()).toHaveCSS("color", expectedColor);
+      }
+      for (const side of ["del", "add"]) {
+        await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", palette[side]);
+        await expect(file.locator(`td.${side} .syntax-number`).first()).toHaveCSS("color", palette.number);
+      }
+      await expect(file.locator("tag, script, [class^=syntax-] .diff-prefix, .syntax-comment [class^=syntax-]")).toHaveCount(0);
+      await expectOriginalLines(file, layout, dockerfileBefore, dockerfileAfter);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test("Dockerfile filename variants, renames and absent sides reuse highlights across controls", async ({ page }) => {
+  const requests = await installSources(page, dockerfileFiles);
+  await page.goto(path);
+  for (const index of dockerfileFiles.keys()) {
+    await ensureFileExpanded(page.locator(`#moondiff-file-${index}`));
+  }
+  const count = requests.length;
+  expect(count).toBe(dockerfileFiles.length * 2 - 2);
+  for (const algorithm of ["Token", "Tree"]) {
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    for (const layout of ["Split", "Unified"]) {
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      for (const [index, source] of dockerfileFiles.entries()) {
+        const file = page.locator(`#moondiff-file-${index}`);
+        for (const [side, kind] of [["del", source.kinds[0]], ["add", source.kinds[1]]]) {
+          if (kind) await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toBeVisible();
+          else await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
+        }
+        await expectOriginalLines(file, layout, source.old, source.new);
+      }
+    }
+  }
+  for (const filter of ["Ignore comments", "Ignore tests", "Ignore comments", "Ignore tests"]) {
+    await page.getByRole("checkbox", { name: filter, exact: true }).click();
+    await expectOriginalLines(page.locator("#moondiff-file-0"), "Unified", dockerfileBefore, dockerfileAfter);
+  }
+  expect(requests.length).toBe(count);
+  expect(requests).not.toContain("true:src/added.dockerfile");
+  expect(requests).not.toContain("false:src/deleted.containerfile");
+});
+
+for (const layout of ["Split", "Unified"]) {
+  test(`${layout}: Dockerfile long-line fallback retains continuation state`, async ({ page }) => {
+    const crowded = "RUN " + "true;".repeat(2_000) + " \\";
+    const old = [crowded, "echo $HOME", "FROM scratch"].join("\r\n");
+    const current = old.replace("true;true;", "false;true;").replace("$HOME", "${HOME}");
+    const source = { filename: "Dockerfile.generated", old, new: current };
+    await installSources(page, [source]);
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(path);
+    const file = page.locator("#moondiff-file-0");
+    await ensureFileExpanded(file);
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    for (const side of ["del", "add"]) {
+      const prefix = side === "del" ? "RUN true;true;" : "RUN false;true;";
+      const cell = file.locator(`td.${side}`).filter({ hasText: prefix });
+      await expect(cell).toHaveCount(1);
+      await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
+      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+    }
+    await expect(file.locator(".syntax-function").filter({ hasText: /^echo$/ }).first()).toBeVisible();
+    await expect(file.locator(".syntax-variable").filter({ hasText: /^HOME$/ }).first()).toBeVisible();
+    await expect(file.locator(".syntax-keyword").filter({ hasText: /^FROM$/ }).first()).toBeVisible();
+    await expectOriginalLines(file, layout, old, current);
+  });
+}
