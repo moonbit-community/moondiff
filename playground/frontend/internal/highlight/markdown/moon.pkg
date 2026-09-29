@@ -1,0 +1,11 @@
+import {
+  "moonbit-community/moondiff-playground/internal/highlight",
+  "moonbit-community/moondiff-playground/internal/highlight/c" @highlight_c,
+  "moonbit-community/moondiff-playground/internal/highlight/dockerfile" @highlight_dockerfile,
+  "moonbit-community/moondiff-playground/internal/highlight/javascript" @highlight_javascript,
+  "moonbit-community/moondiff-playground/internal/highlight/json" @highlight_json,
+  "moonbit-community/moondiff-playground/internal/highlight/moonbit" @highlight_moonbit,
+  "moonbit-community/moondiff-playground/internal/highlight/yaml" @highlight_yaml,
+}
+
+supported_targets = "js"
