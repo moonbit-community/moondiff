@@ -37,6 +37,8 @@ fn source_highlights(
     Some(@highlight_yaml.highlight(source))
   } else if path.has_suffix(".json") {
     Some(@highlight_json.highlight(source))
+  } else if path.has_suffix(".md") || path.has_suffix(".markdown") {
+    Some(@highlight_markdown.highlight(source))
   } else if path.has_suffix(".js") ||
     path.has_suffix(".mjs") ||
     path.has_suffix(".cjs") {
