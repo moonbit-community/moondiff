@@ -29,7 +29,6 @@ fn token_kind(token : @tokens.Token) -> HighlightKind? {
     | TRY_QUESTION
     | TRY_EXCLAMATION
     | LEXMATCH
-    | LEXMATCH_QUESTION
     | LEXSCAN => Some(Control)
     PUB | PRIV | READONLY | EXTERN | MUTABLE => Some(Modifier)
     IMPORT
@@ -39,9 +38,6 @@ fn token_kind(token : @tokens.Token) -> HighlightKind? {
     | DERIVE
     | IMPL
     | WITH
-    | TYPEALIAS
-    | TRAITALIAS
-    | FNALIAS
     | FN
     | LET
     | VAR
@@ -82,6 +78,7 @@ fn token_kind(token : @tokens.Token) -> HighlightKind? {
     | EQ_TILDE
     | MINUS
     | PLUS
+    | STAR
     | BAR
     | AMPERAMPER
     | AMPER

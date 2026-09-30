@@ -237,7 +237,7 @@ test "classification matrix" {
   // attributes and package references carry identifier-grade weight
   inspect(kinds_of("#deprecated(\"msg\")"), content="W")
   inspect(kinds_of("@debug.debug_inspect(x)"), content="W_WPWP")
-  // Keywords introduced by lexer 0.3.16 remain identifier-grade tokens.
+  // Recently introduced keywords remain identifier-grade tokens.
   inspect(kinds_of("var errdefer nocancel"), content="W_W_W")
   // Unicode identifiers are Word, not Punct
   inspect(kinds_of("let 名 = 1"), content="W_W_P_W")
