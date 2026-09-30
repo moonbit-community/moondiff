@@ -412,6 +412,12 @@ test "new CST syntax kinds retain display atom categories" {
   assert_true(atom_kind(operator_keyword_syntax, "readonly") == Some(Keyword))
   assert_true(atom_kind(operator_keyword_syntax, "extend") == Some(Keyword))
   assert_true(atom_kind(operator_keyword_syntax, "→") == Some(Keyword))
+  let separator_source = "fn f() -> Unit { () }"
+  let separator_syntax = @elab.elab_cst(
+    separator_source,
+    only_item(separator_source),
+  )
+  assert_true(atom_kind(separator_syntax, "->") == Some(Normal))
   let comment_source = "// note\nlet x = 1"
   let comment_syntax = @elab.elab_cst(
     comment_source,
@@ -421,7 +427,7 @@ test "new CST syntax kinds retain display atom categories" {
 }
 
 ///|
-test "parser 0.3.19 CST additions elaborate source-faithfully" {
+test "current parser CST additions elaborate source-faithfully" {
   let source =
     #|fn modern(value : Error) nocancel {
     #|  errdefer cleanup()
@@ -430,6 +436,7 @@ test "parser 0.3.19 CST additions elaborate source-faithfully" {
     #|      re"a" => 1
     #|      _ => 0
     #|    }
+    #|    &@pkg.Unknown::.. => 0
     #|    _ => 0
     #|  }
     #|}
@@ -438,11 +445,12 @@ test "parser 0.3.19 CST additions elaborate source-faithfully" {
   let root = parsed.root()
   for
     predicate in [
-      fn(kind) { kind is @cst.Expr_ErrDefer },
-      fn(kind) { kind is Pattern_ConstrAny },
-      fn(kind) { kind is Expr_LexMatch },
-      fn(kind) { kind is Case_LexScanCase },
-      fn(kind) { kind is List_LexScanCaseList },
+      fn(kind : @cst.NodeKind) { kind is Expr_ErrDefer },
+      fn(kind : @cst.NodeKind) { kind is Pattern_ConstrAny },
+      fn(kind : @cst.NodeKind) { kind is Pattern_ConstrUnknown },
+      fn(kind : @cst.NodeKind) { kind is Expr_LexMatch },
+      fn(kind : @cst.NodeKind) { kind is Case_LexScanCase },
+      fn(kind : @cst.NodeKind) { kind is List_LexScanCaseList },
     ] {
     assert_true(cst_contains_kind(root, predicate))
   }
@@ -454,4 +462,5 @@ test "parser 0.3.19 CST additions elaborate source-faithfully" {
   }
   assert_true(atom_kind(syntax, "@pkg") == Some(Type))
   assert_true(atom_kind(syntax, "T") == Some(Type))
+  assert_true(atom_kind(syntax, "Unknown") == Some(Type))
 }

@@ -99,7 +99,7 @@ test "default and explicit AST modes are identical" {
 }
 
 ///|
-test "parser 0.3.19 syntax stays on the structural pipeline" {
+test "current parser syntax stays on the structural pipeline" {
   let old_source =
     #|fn modern(value : Error) nocancel {
     #|  errdefer old_cleanup()

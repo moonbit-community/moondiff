@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/lexer/tokens",
   "moonbitlang/parser/untyped_cst" @cst,
   "moonbit-community/moondiff/internal/syntax" @dsyntax,
   "moonbit-community/moondiff/internal/span",

@@ -6,7 +6,7 @@ import {
   "moonbit-community/moondiff/internal/span",
   "moonbit-community/prettyprinter",
   "moonbitlang/core/hashmap",
-  "moonbitlang/parser/untyped_cst",
+  "moonbitlang/parser/untyped_cst/node",
 }
 
 // Values
@@ -42,7 +42,7 @@ pub fn ChangeMap::insert_deep_unchanged(Self, node~ : Syntax, opposite_node~ : S
 pub fn ChangeMap::new() -> Self
 
 type ListKind derive(Eq)
-pub fn ListKind::from_node_kind(@untyped_cst.NodeKind) -> Self
+pub fn ListKind::from_node_kind(@node.NodeKind) -> Self
 
 pub(all) enum MatchKind {
   Novel

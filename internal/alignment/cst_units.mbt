@@ -151,7 +151,7 @@ fn parse_uuid_line(line : String) -> String? {
 ///|
 fn is_ownline_comment(node : @cst.CstNode) -> Bool {
   match node.kind {
-    Syntax_Comment => {
+    Syntax_Token(TK_COMMENT) => {
       for entry in node.children {
         let (label, child) = entry
         if label == Some("comment") && child.kind is Comment_Ownline {
@@ -348,7 +348,7 @@ fn impl_semantic_key(source : String, item : @cst.CstNode) -> String? {
 ///|
 fn root_child_is_visible(source : String, node : @cst.CstNode) -> Bool {
   match node.kind {
-    Syntax_Eof | Missing => false
+    Syntax_Token(TK_EOF) | Missing => false
     _ => !cst_node_text(source, node).is_empty()
   }
 }
@@ -372,7 +372,8 @@ fn test_trailing_comments(
   let comments : Array[@cst.CstNode] = []
   for entry in item.children {
     let (_, child) = entry
-    if child.kind is Syntax_Comment && child.loc.start.cnum >= test_end.cnum {
+    if child.kind is Syntax_Token(TK_COMMENT) &&
+      child.loc.start.cnum >= test_end.cnum {
       comments.push(child)
     }
   }
