@@ -38,6 +38,7 @@ fn node_has_type_atoms(kind : @cst.NodeKind) -> Bool {
     | Expr_Constr
     | Pattern_Constr
     | Pattern_ConstrAny
+    | Pattern_ConstrUnknown
     | Pattern_SpecialConstr => true
     _ => false
   })
@@ -45,47 +46,94 @@ fn node_has_type_atoms(kind : @cst.NodeKind) -> Bool {
 
 ///|
 fn syntax_kind_is_token(kind : @cst.NodeKind) -> Bool {
+  kind.is_syntax_token()
+}
+
+///|
+fn token_kind_is_keyword(kind : @tokens.TokenKind) -> Bool {
   match kind {
-    Syntax_Keyword
-    | Syntax_Delimiter
-    | Syntax_Separator
-    | Syntax_Operator
-    | Syntax_Identifier
-    | Syntax_Label
-    | Syntax_Accessor
-    | Syntax_Literal
-    | Syntax_Interpolation
-    | Syntax_Attribute
-    | Syntax_Comment
-    | Syntax_Eof
-    | Syntax_Unexpected => true
+    TK_FALSE
+    | TK_TRUE
+    | TK_PUB
+    | TK_PRIV
+    | TK_READONLY
+    | TK_IMPORT
+    | TK_EXTERN
+    | TK_BREAK
+    | TK_CONTINUE
+    | TK_STRUCT
+    | TK_ENUM
+    | TK_TRAIT
+    | TK_DERIVE
+    | TK_IMPL
+    | TK_WITH
+    | TK_RAISE
+    | TK_THROW
+    | TK_TRY
+    | TK_CATCH
+    | TK_ASYNC
+    | TK_AS
+    | TK_ELSE
+    | TK_FN
+    | TK_IF
+    | TK_LET
+    | TK_VAR
+    | TK_PROOF_ASSERT
+    | TK_PROOF_LET
+    | TK_CONST
+    | TK_MATCH
+    | TK_USING
+    | TK_MUTABLE
+    | TK_TYPE
+    | TK_WHILE
+    | TK_RETURN
+    | TK_TEST
+    | TK_LOOP
+    | TK_GUARD
+    | TK_GUARD_EXCLAMATION
+    | TK_DEFER
+    | TK_ERRDEFER
+    | TK_FOR
+    | TK_IN
+    | TK_IS
+    | TK_SUBERROR
+    | TK_AND
+    | TK_FORALL
+    | TK_EXISTS
+    | TK_IMPLIES
+    | TK_LETREC
+    | TK_ENUMVIEW
+    | TK_EXTENUM
+    | TK_DECLARE
+    | TK_NORAISE
+    | TK_NOCANCEL
+    | TK_NOBREAK
+    | TK_WHERE
+    | TK_TRY_QUESTION
+    | TK_TRY_EXCLAMATION
+    | TK_LEXMATCH
+    | TK_LEXSCAN
+    | TK_EXTEND
+    | TK_PACKAGE => true
     _ => false
   }
 }
 
 ///|
-fn literal_atom_kind(node : @cst.CstNode) -> AtomKind {
-  for entry in node.children {
-    let (_, child) = entry
-    match child.kind {
-      Constant_Bool => return Keyword
-      Constant_Byte
-      | Constant_Bytes
-      | Constant_Char
-      | Constant_String
-      | Constant_Regex => return String(StringLiteral)
-      Constant_Int
-      | Constant_Int64
-      | Constant_UInt
-      | Constant_UInt64
-      | Constant_Float
-      | Constant_Double
-      | Constant_BigInt => return Normal
-      _ => ()
-    }
+fn token_kind_is_string(kind : @tokens.TokenKind) -> Bool {
+  match kind {
+    TK_CHAR
+    | TK_BYTE
+    | TK_BYTES
+    | TK_STRING
+    | TK_MULTILINE_STRING
+    | TK_MULTILINE_INTERP
+    | TK_INTERP
+    | TK_BYTES_INTERP
+    | TK_REGEX_LITERAL
+    | TK_REGEX_INTERP => true
+    _ => false
   }
-  // Multiline string tokens carry only a scalar payload in the new CST.
-  String(StringLiteral)
 }
 
 ///|
@@ -104,14 +152,13 @@ fn syntax_atom_kind(
   type_context : Bool,
 ) -> AtomKind {
   match node.kind {
-    Syntax_Comment => Comment
-    Syntax_Keyword => Keyword
-    Syntax_Operator if content == "readonly" ||
-      content == "extend" ||
-      content == "→" => Keyword
-    Syntax_Interpolation => String(StringLiteral)
-    Syntax_Literal => literal_atom_kind(node)
-    Syntax_Identifier | Syntax_Accessor if starts_with_uppercase_name(content) ||
+    Syntax_Token(TK_COMMENT) => Comment
+    Syntax_Token(kind) if token_kind_is_keyword(kind) => Keyword
+    Syntax_Token(kind) if token_kind_is_string(kind) => String(StringLiteral)
+    Syntax_Token(TK_UIDENT | TK_DOT_UIDENT) => Type
+    Syntax_Token(TK_LIDENT | TK_DOT_LIDENT | TK_PACKAGE_NAME) if starts_with_uppercase_name(
+        content,
+      ) ||
       (type_context && content.length() > 0 && content[0] == '@') => Type
     _ => Normal
   }
@@ -276,7 +323,7 @@ fn CstElabCtx::elab_syntax_token(
   node : @cst.CstNode,
   type_context : Bool,
 ) -> Syntax? {
-  if node.kind is Syntax_Eof {
+  if node.kind is Syntax_Token(TK_EOF) {
     return None
   }
   let content = self.node_text(node)

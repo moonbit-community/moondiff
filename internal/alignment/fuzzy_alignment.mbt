@@ -91,12 +91,23 @@ priv struct ImplSemanticPair {
 ///|
 fn first_name_token(node : @cst.CstNode) -> @cst.CstNode? {
   match node.kind {
-    Syntax_Identifier | Syntax_Literal =>
-      if node.source_span.0 < node.source_span.1 {
-        Some(node)
-      } else {
-        None
-      }
+    Syntax_Token(
+      TK_LIDENT
+      | TK_UIDENT
+      | TK_PACKAGE_NAME
+      | TK_UNDERSCORE
+      | TK_INT
+      | TK_FLOAT
+      | TK_DOUBLE
+      | TK_CHAR
+      | TK_BYTE
+      | TK_BYTES
+      | TK_STRING
+      | TK_MULTILINE_STRING
+      | TK_REGEX_LITERAL
+      | TK_FALSE
+      | TK_TRUE
+    ) => if node.source_span.0 < node.source_span.1 { Some(node) } else { None }
     _ => {
       for entry in node.children {
         let (_, child) = entry
@@ -233,16 +244,8 @@ fn impl_function_body(item : @cst.CstNode) -> @cst.CstNode? {
 ///|
 fn impl_body_token_kind(kind : @cst.NodeKind) -> Bool {
   match kind {
-    Syntax_Keyword
-    | Syntax_Delimiter
-    | Syntax_Separator
-    | Syntax_Operator
-    | Syntax_Identifier
-    | Syntax_Label
-    | Syntax_Accessor
-    | Syntax_Literal
-    | Syntax_Interpolation
-    | Syntax_Attribute => true
+    Syntax_Token(TK_COMMENT | TK_NEWLINE | TK_EOF) => false
+    Syntax_Token(_) => true
     _ => false
   }
 }
@@ -271,7 +274,7 @@ fn collect_impl_body_tokens(
   tokens : Array[String],
   normalize_call_name? : Bool = false,
 ) -> Unit {
-  if node.kind is Syntax_Comment {
+  if node.kind is Syntax_Token(TK_COMMENT) {
     return
   }
   if impl_body_token_kind(node.kind) {
