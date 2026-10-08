@@ -214,12 +214,25 @@ It can also be run manually; only runs on `main` publish images. To pin a releas
 or use an image from a fork, change `services.moondiff.image` in `compose.yaml` to
 the corresponding GHCR tag.
 
-### Static resource compression
+### Static resource compression and caching
 
 `npm run build` minifies the MoonBit release JavaScript with esbuild before
-writing `dist/static/index.js`. It prints the original, minified and gzip level 5
+writing `dist/static/index.<sha256>.js`. It prints the original, minified and gzip level 5
 sizes. Both local development and Docker builds use this step; install the
 Playground dependencies with `npm ci` before building locally.
+
+The build hashes the final JS and CSS bytes, emits `index.<sha256>.js` and
+`styles.<sha256>.css`, and updates their references in `index.html`. These assets
+use `Cache-Control: public, max-age=31536000, immutable`; unchanged content keeps
+the same URL across builds. HTML uses `no-cache` with a content ETag, so repeat
+GET/HEAD requests with a matching `If-None-Match` return 304 without a body, and
+new releases are discovered on the next visit. Other unversioned static files
+also revalidate with ETags. API responses retain `no-store`.
+
+Deploy HTML and its hashed assets together. During rolling deployments, keep
+previous hashed assets available for pages that fetched the old HTML just before
+the update. Proxies/CDNs should preserve the backend's cache headers and ETags;
+do not apply the immutable policy to HTML, API routes, or fixed asset names.
 
 The [Nginx configuration](deploy/nginx.conf) enables gzip level 5 for JavaScript,
 CSS and SVG, as well as Nginx's default HTML type. It includes `text/javascript`,
@@ -241,7 +254,9 @@ sizes. `--compressed` decodes the gzip response before saving it for comparison.
 ```sh
 MOONDIFF_ORIGIN=https://diff.example
 MOONDIFF_CHECK_DIR=$(mktemp -d)
-for asset in index.js styles.css; do
+curl --fail --silent --show-error --compressed \
+  -o "$MOONDIFF_CHECK_DIR/index.html" "$MOONDIFF_ORIGIN/"
+for asset in $(sed -nE 's@.*"/((index|styles)\.[0-9a-f]{64}\.(js|css))".*@\1@p' "$MOONDIFF_CHECK_DIR/index.html"); do
   curl --fail --silent --show-error --compressed -H 'Accept-Encoding: gzip' \
     -D - -w 'gzip transfer: %{size_download} bytes\n' \
     -o "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_ORIGIN/$asset"
@@ -426,7 +441,9 @@ same-origin API.
 
 Browser fixtures use the release minifier, injecting rendering probes before
 minification where needed. Release artifact checks reject test probes and limit
-`index.js` to 2,500,000 bytes, or 500,000 bytes after gzip level 5.
+`index.<sha256>.js` to 2,500,000 bytes, or 500,000 bytes after gzip level 5.
+Cache regressions cover stable/changed asset URLs, conditional GET/HEAD, and
+browser cache reuse on an ordinary repeat visit.
 
 Rendering stress tests run separately with `npm run test:e2e:stress` (or
 `npm run test:playground:stress` from the repository root). This runs the six

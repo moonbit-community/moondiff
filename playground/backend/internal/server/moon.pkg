@@ -16,6 +16,7 @@ import {
   "moonbitlang/async/socket",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/crypto" @xcrypto,
   "moonbit-community/sqlite3",
 }
 

@@ -48,57 +48,6 @@ async fn[T : ToJson] respond_json(
 }
 
 ///|
-async fn static_file(
-  app : @storage.App,
-  request : @http.Request,
-  conn : ResponseWriter,
-  raw_path : String,
-) -> Unit {
-  let path = @common.decode_component(raw_path)
-  guard path.has_prefix("/") &&
-    (path == "/" || @common.valid_path(path[1:].to_owned())) else {
-    raise @common.RpcError(404, "not_found", "Page not found.")
-  }
-  let name = if path == "/" || @common.change_path(path) {
-    "/index.html"
-  } else {
-    path
-  }
-  // Canonicalize both paths before opening, including any symlink components.
-  let root = app.config.static_dir
-  let full = @fs.realpath(root + name) catch {
-    _ => raise @common.RpcError(404, "not_found", "Page not found.")
-  }
-  guard full.has_prefix(root + "/") && @fs.kind(full) == Regular else {
-    raise @common.RpcError(404, "not_found", "Page not found.")
-  }
-  let file = @fs.open(full, mode=ReadOnly)
-  defer file.close()
-  let content_type = match name {
-    [.., .. ".html"] => "text/html; charset=utf-8"
-    [.., .. ".css"] => "text/css; charset=utf-8"
-    [.., .. ".js"] | [.., .. ".mjs"] => "text/javascript; charset=utf-8"
-    [.., .. ".svg"] => "image/svg+xml"
-    [.., .. ".png"] => "image/png"
-    [.., .. ".wasm"] => "application/wasm"
-    _ => "application/octet-stream"
-  }
-  conn.started = true
-  conn.connection.send_response(200, "OK", extra_headers={
-    "Content-Type": content_type,
-    "Content-Length": file.size().to_string(),
-    "Cache-Control": "no-cache",
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
-  })
-  if request.meth != Head {
-    conn.connection.write_reader(file)
-  }
-  conn.connection.end_response()
-}
-
-///|
 async fn handle(
   app : @storage.App,
   request : @http.Request,
