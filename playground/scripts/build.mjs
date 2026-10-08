@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, copyFileSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gzipSync } from 'node:zlib';
 import { minifyFrontend } from './minify.mjs';
+import { writeStaticAssets } from './static-assets.mjs';
 const playground = resolve(import.meta.dirname, '..');
 const repository = resolve(playground, '..');
 const target = mkdtempSync(join(tmpdir(), 'moondiff-release-'));
@@ -14,11 +15,9 @@ try {
     if (build.error) throw build.error;
     if (build.status !== 0) throw new Error(`MoonBit ${backend} build failed (${build.status}).`);
   }
-  mkdirSync(join(staging, 'static'));
-  cpSync(join(playground, 'frontend/public'), join(staging, 'static'), { recursive: true });
   const source = readFileSync(join(target, 'js/release/build/moonbit-community/moondiff-playground/main/main.js'), 'utf8');
   const client = minifyFrontend(source);
-  writeFileSync(join(staging, 'static/index.js'), client);
+  writeStaticAssets(join(playground, 'frontend/public'), join(staging, 'static'), client);
   copyFileSync(join(target, 'wasm/release/build/moonbit-community/moondiff-playground-server/main/main.wasm'), join(staging, 'moondiff-server.wasm'));
   rmSync(join(playground, 'dist'), { recursive: true, force: true });
   renameSync(staging, join(playground, 'dist'));

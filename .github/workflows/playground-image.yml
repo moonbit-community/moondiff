@@ -81,7 +81,9 @@ jobs:
             sleep 1
           done
           test "$health" = healthy
-          for path in /healthz / /index.js /styles.css /alice/repo/pull/42 /api/auth/status; do
+          asset_paths=$(curl --fail --silent --show-error --max-time 10 http://127.0.0.1:4173/ |
+            python3 -c 'import re,sys; paths = re.findall(r"(?:href|src)=\"(/(?:index|styles)\.[0-9a-f]{64}\.(?:js|css))\"", sys.stdin.read()); assert len(paths) == 2, paths; print("\n".join(paths))')
+          for path in /healthz / $asset_paths /alice/repo/pull/42 /api/auth/status; do
             curl --fail --silent --show-error --max-time 10 --output /dev/null "http://127.0.0.1:4173$path"
           done
 

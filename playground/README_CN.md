@@ -194,11 +194,22 @@ Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
 如需固定版本或使用 fork 发布的镜像，将 `compose.yaml` 中的 `services.moondiff.image`
 改为对应的 GHCR 镜像标签。
 
-### 静态资源压缩
+### 静态资源压缩与缓存
 
 `npm run build` 会使用 esbuild 压缩 MoonBit release JavaScript，再写入
-`dist/static/index.js`，并输出原始、minify 后和 gzip level 5 后的体积。
+`dist/static/index.<sha256>.js`，并输出原始、minify 后和 gzip level 5 后的体积。
 本地开发和 Docker 构建都使用这一步骤；本地构建前需在 Playground 目录执行 `npm ci`。
+
+构建根据最终 JS/CSS 内容生成 `index.<sha256>.js`、`styles.<sha256>.css`，
+并更新 `index.html` 中的引用。哈希资源使用
+`Cache-Control: public, max-age=31536000, immutable`，内容不变时跨构建保持同一 URL。
+HTML 使用 `no-cache` 和内容 ETag：GET/HEAD 携带匹配的 `If-None-Match` 时返回无正文的 304，
+发布新版本后下次访问即可获取新入口。其他固定名称的静态文件也通过 ETag 重新验证；
+API 响应继续使用 `no-store`。
+
+部署时应一起更新 HTML 和其引用的哈希资源。滚动发布期间应保留旧哈希资源，
+以便刚取得旧 HTML 的页面仍能完成加载。代理/CDN 应保留后端的缓存头与 ETag，
+不要把不可变缓存策略应用到 HTML、API 路径或固定名称资源。
 
 [Nginx 配置](deploy/nginx.conf) 为 JavaScript、CSS 和 SVG 启用 gzip level 5，
 同时保留 Nginx 默认压缩的 HTML 类型。配置包含后端实际使用的 `text/javascript`，
@@ -217,7 +228,9 @@ sudo nginx -t && sudo nginx -s reload
 ```sh
 MOONDIFF_ORIGIN=https://diff.example
 MOONDIFF_CHECK_DIR=$(mktemp -d)
-for asset in index.js styles.css; do
+curl --fail --silent --show-error --compressed \
+  -o "$MOONDIFF_CHECK_DIR/index.html" "$MOONDIFF_ORIGIN/"
+for asset in $(sed -nE 's@.*"/((index|styles)\.[0-9a-f]{64}\.(js|css))".*@\1@p' "$MOONDIFF_CHECK_DIR/index.html"); do
   curl --fail --silent --show-error --compressed -H 'Accept-Encoding: gzip' \
     -D - -w 'gzip transfer: %{size_download} bytes\n' \
     -o "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_ORIGIN/$asset"
