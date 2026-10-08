@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
+    "esbuild": "0.28.2",
     "web-ext": "10.5.0"
   }
 }

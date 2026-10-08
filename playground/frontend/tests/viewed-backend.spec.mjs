@@ -1,10 +1,11 @@
 import { expect, test as baseTest } from '@playwright/test';
-import { cpSync, copyFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { browser, repository } from '../../backend/tests/server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from '../../backend/tests/viewed-fixture.mjs';
 import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
+import { minifyFrontend } from '../../scripts/minify.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 import { ensureFileExpanded } from './file-actions.mjs';
 
@@ -13,7 +14,7 @@ const test = baseTest.extend({
     // The Playwright webServer builds both targets before any test starts.
     const assets = mkdtempSync(join(tmpdir(), 'moondiff-viewed-browser-'));
     cpSync(join(repository, 'playground/frontend/public'), assets, { recursive: true });
-    copyFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), join(assets, 'index.js'));
+    writeFileSync(join(assets, 'index.js'), minifyFrontend(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), 'utf8')));
     const f = await startViewedServer({ staticDir: assets });
     const user = browser(f);
     try {
