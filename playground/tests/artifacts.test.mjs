@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { gzipSync } from 'node:zlib';
 import { repository, startServer, browser } from '../backend/tests/server-fixture.mjs';
 const dist = join(repository, 'playground/dist');
 
@@ -16,6 +17,15 @@ test('release contains a Wasm module and self-contained root assets runnable wit
   assert(!existsSync(join(repository, 'playground/server.mjs')));
   assert(!existsSync(join(repository, '.github/workflows/pages.yml')));
   const client = readFileSync(join(staticDir, 'index.js'), 'utf8');
+  const clientBytes = Buffer.byteLength(client);
+  const gzipBytes = gzipSync(client, { level: 5 }).length;
+  t.diagnostic(`Frontend JS: ${clientBytes} bytes, ${gzipBytes} bytes gzip level 5`);
+  assert(clientBytes <= 2_500_000, `Release JS exceeds the 2.5 MB budget: ${clientBytes} bytes`);
+  assert(gzipBytes <= 500_000, `Release JS exceeds the 500 KB gzip budget: ${gzipBytes} bytes`);
+  // These hooks are injected by render-probe.mjs; the optional metrics sink is part of the app.
+  for (const probe of ['__moondiffPendingPaints', '__moondiffFrameBarrier', '__moondiffProbeRegion']) {
+    assert(!client.includes(probe), `Test probe leaked into release JS: ${probe}`);
+  }
   assert(!client.includes('chrome.runtime') && !client.includes('__moondiffExtensionHost'));
   assert(client.includes('https://api.github.com'));
   assert(!existsSync(join(staticDir, 'http-client.js')));

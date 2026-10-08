@@ -138,7 +138,7 @@ Create `playground/.env` with the GitHub App settings and persistent token key
 from [Runtime configuration](#runtime-configuration). For local access, keep
 `MOONDIFF_PUBLIC_URL=http://localhost:4173`. For production, set it to the external
 HTTPS origin and configure Nginx on the Docker host using the
-[Nginx example](deploy/nginx.conf.example).
+[Nginx example](deploy/nginx.conf).
 
 Run the following Compose commands from `playground/`:
 
@@ -196,8 +196,9 @@ Then change `services.moondiff.image` in `playground/compose.yaml` to
 docker compose -f playground/compose.yaml up -d --pull never
 ```
 
-The build stage installs Node.js 22 and the latest MoonBit toolchain, matching
-the existing CI setup. To select a specific MoonBit release, pass
+The build stage installs Node.js 22, the locked npm development dependencies
+(including esbuild), and the latest MoonBit toolchain, matching the existing CI
+setup. To select a specific MoonBit release, pass
 `--build-arg MOONBIT_VERSION=<version>` using a version accepted by the official
 MoonBit installer. The runtime image contains `moonrun`, trusted CA certificates,
 the Wasm backend and static assets, and runs as UID/GID `10001:10001`. `.env`, local
@@ -212,6 +213,55 @@ on `main`, it publishes `ghcr.io/<owner>/<repository>-playground:latest` and
 It can also be run manually; only runs on `main` publish images. To pin a release
 or use an image from a fork, change `services.moondiff.image` in `compose.yaml` to
 the corresponding GHCR tag.
+
+### Static resource compression
+
+`npm run build` minifies the MoonBit release JavaScript with esbuild before
+writing `dist/static/index.js`. It prints the original, minified and gzip level 5
+sizes. Both local development and Docker builds use this step; install the
+Playground dependencies with `npm ci` before building locally.
+
+The [Nginx configuration](deploy/nginx.conf) enables gzip level 5 for JavaScript,
+CSS and SVG, as well as Nginx's default HTML type. It includes `text/javascript`,
+the backend's JavaScript MIME type, and sets `Vary: Accept-Encoding`. Compression
+is performed by Nginx; direct requests to the backend on port 4173 are uncompressed.
+Updating the application image does not update the host's Nginx configuration.
+
+Apply the example's gzip settings to the active HTTPS server configuration, then
+check and reload Nginx on the deployment host:
+
+```sh
+sudo nginx -t && sudo nginx -s reload
+```
+
+Replace the origin below with the deployed HTTPS origin. These GET requests
+check both assets through Nginx and print their response headers and transfer
+sizes. `--compressed` decodes the gzip response before saving it for comparison.
+
+```sh
+MOONDIFF_ORIGIN=https://diff.example
+MOONDIFF_CHECK_DIR=$(mktemp -d)
+for asset in index.js styles.css; do
+  curl --fail --silent --show-error --compressed -H 'Accept-Encoding: gzip' \
+    -D - -w 'gzip transfer: %{size_download} bytes\n' \
+    -o "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_ORIGIN/$asset"
+  curl --fail --silent --show-error -H 'Accept-Encoding: identity' \
+    -D - -w 'identity transfer: %{size_download} bytes\n' \
+    -o "$MOONDIFF_CHECK_DIR/$asset.identity" "$MOONDIFF_ORIGIN/$asset"
+  curl --fail --silent --show-error -H 'Accept-Encoding: gzip;q=0' \
+    -D - -o "$MOONDIFF_CHECK_DIR/$asset.q0" "$MOONDIFF_ORIGIN/$asset"
+  cmp "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_CHECK_DIR/$asset.identity"
+  cmp "$MOONDIFF_CHECK_DIR/$asset.q0" "$MOONDIFF_CHECK_DIR/$asset.identity"
+done
+rm -r "$MOONDIFF_CHECK_DIR"
+```
+
+The gzip responses must contain `Content-Encoding: gzip` and a `Vary` header
+including `Accept-Encoding`, with smaller transfer sizes. The identity and
+`gzip;q=0` responses must have no `Content-Encoding`; both comparisons should
+succeed. For a repeatable first-paint comparison, use a cold browser cache,
+10 Mbps bandwidth, 100 ms latency and the same anonymous auth-status response;
+record the measured FCP rather than treating an earlier measurement as a limit.
 
 ## Sessions and backup
 
@@ -373,6 +423,10 @@ Tests start their own Wasm server on port 4173, so stop the local development
 server first. They use temporary SQLite databases and a local GitHub/OAuth stub;
 no real GitHub credentials are required. Frontend regression tests mock the
 same-origin API.
+
+Browser fixtures use the release minifier, injecting rendering probes before
+minification where needed. Release artifact checks reject test probes and limit
+`index.js` to 2,500,000 bytes, or 500,000 bytes after gzip level 5.
 
 Rendering stress tests run separately with `npm run test:e2e:stress` (or
 `npm run test:playground:stress` from the repository root). This runs the six

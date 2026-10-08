@@ -126,7 +126,7 @@ Checks 与 Commit statuses 让合并卡片同时展示两类 GitHub CI 结果；
 
 按照[运行时配置](#运行时配置)创建 `playground/.env`，填写 GitHub App 配置和持久保存的密钥。
 本地访问时保留 `MOONDIFF_PUBLIC_URL=http://localhost:4173`；生产环境中，
-将其设置为对外提供服务的 HTTPS 源地址，并参考 [Nginx 示例](deploy/nginx.conf.example)
+将其设置为对外提供服务的 HTTPS 源地址，并参考 [Nginx 示例](deploy/nginx.conf)
 在 Docker 宿主机上配置 Nginx。
 
 以下 Compose 命令均在 `playground/` 目录中执行：
@@ -179,7 +179,8 @@ docker build -f playground/Dockerfile -t moondiff-playground:local .
 docker compose -f playground/compose.yaml up -d --pull never
 ```
 
-构建阶段会安装 Node.js 22 和最新的 MoonBit 工具链，与现有 CI 配置保持一致。
+构建阶段会安装 Node.js 22、锁文件指定的 npm 开发依赖（包括 esbuild）和最新的 MoonBit 工具链，
+与现有 CI 配置保持一致。
 如需指定 MoonBit 版本，传入 `--build-arg MOONBIT_VERSION=<version>`，
 版本值需使用 MoonBit 官方安装器支持的格式。运行时镜像包含 `moonrun`、受信任的 CA 证书、
 Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
@@ -192,6 +193,49 @@ Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
 也可以手动运行工作流；只有在 `main` 上运行时才会发布镜像。
 如需固定版本或使用 fork 发布的镜像，将 `compose.yaml` 中的 `services.moondiff.image`
 改为对应的 GHCR 镜像标签。
+
+### 静态资源压缩
+
+`npm run build` 会使用 esbuild 压缩 MoonBit release JavaScript，再写入
+`dist/static/index.js`，并输出原始、minify 后和 gzip level 5 后的体积。
+本地开发和 Docker 构建都使用这一步骤；本地构建前需在 Playground 目录执行 `npm ci`。
+
+[Nginx 配置](deploy/nginx.conf) 为 JavaScript、CSS 和 SVG 启用 gzip level 5，
+同时保留 Nginx 默认压缩的 HTML 类型。配置包含后端实际使用的 `text/javascript`，
+并设置 `Vary: Accept-Encoding`。传输压缩由 Nginx 完成，直接请求后端 4173 端口仍返回未压缩内容。
+更新应用镜像不会更新宿主机上的 Nginx 配置。
+
+将示例中的 gzip 设置加入正在使用的 HTTPS server 配置，然后在部署主机检查并重载 Nginx：
+
+```sh
+sudo nginx -t && sudo nginx -s reload
+```
+
+将下方地址替换为实际 HTTPS 源地址。以下 GET 请求通过 Nginx 检查两种资源，
+并输出响应头和传输字节数；`--compressed` 会先解压 gzip 响应再保存，用于内容比较。
+
+```sh
+MOONDIFF_ORIGIN=https://diff.example
+MOONDIFF_CHECK_DIR=$(mktemp -d)
+for asset in index.js styles.css; do
+  curl --fail --silent --show-error --compressed -H 'Accept-Encoding: gzip' \
+    -D - -w 'gzip transfer: %{size_download} bytes\n' \
+    -o "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_ORIGIN/$asset"
+  curl --fail --silent --show-error -H 'Accept-Encoding: identity' \
+    -D - -w 'identity transfer: %{size_download} bytes\n' \
+    -o "$MOONDIFF_CHECK_DIR/$asset.identity" "$MOONDIFF_ORIGIN/$asset"
+  curl --fail --silent --show-error -H 'Accept-Encoding: gzip;q=0' \
+    -D - -o "$MOONDIFF_CHECK_DIR/$asset.q0" "$MOONDIFF_ORIGIN/$asset"
+  cmp "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_CHECK_DIR/$asset.identity"
+  cmp "$MOONDIFF_CHECK_DIR/$asset.q0" "$MOONDIFF_CHECK_DIR/$asset.identity"
+done
+rm -r "$MOONDIFF_CHECK_DIR"
+```
+
+gzip 响应应包含 `Content-Encoding: gzip`，`Vary` 中应包含 `Accept-Encoding`，
+且传输体积应更小。identity 和 `gzip;q=0` 响应不应包含 `Content-Encoding`，两次内容比较都应成功。
+复测首屏时，使用冷缓存、10 Mbps 带宽、100 ms 延迟以及相同的匿名登录状态响应，
+记录实际 FCP，不将先前实验的耗时设为硬性门槛。
 
 ## 会话与备份
 
@@ -333,6 +377,10 @@ npm run test:e2e
 下方的跳转扩展测试还会使用 Firefox。测试会自行在 4173 端口启动 Wasm 服务，
 因此请先停止本地开发服务。测试使用临时 SQLite 数据库和本地 GitHub/OAuth 模拟服务，
 无需真实的 GitHub 凭据。前端回归测试会模拟同源 API。
+
+浏览器测试使用正式构建的 minify 配置，需要渲染探针时先注入再压缩。
+发布产物检查会拒绝包含测试探针的脚本，并限制 `index.js` 不超过 2,500,000 字节，
+gzip level 5 后不超过 500,000 字节。
 
 渲染压力测试单独使用 `npm run test:e2e:stress` 运行；在仓库根目录则使用
 `npm run test:playground:stress`。该命令以单 worker 运行 6 项夹具/CPU 组合，
