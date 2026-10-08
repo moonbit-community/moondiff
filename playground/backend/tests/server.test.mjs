@@ -1,10 +1,11 @@
 import { rpcRequest } from '../../tests/protocol-fixtures.mjs';
 import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createServer, request as httpRequest } from 'node:http';
 import { once } from 'node:events';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildServer, startServer, browser } from './server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from './viewed-fixture.mjs';
 import { startHomeServer, searchPull, searchPage, commitSha, sealHomeCursor, legacyPullCursor } from './home-fixture.mjs';
@@ -166,6 +167,100 @@ test('Wasm serves direct routes and HEAD; denies traversal, symlinks, missing pa
   for (const path of ['/missing', '/alice/repo/pull/0', '/..%2Foutside.txt', '/escape', '/a/%2e%2e/styles.css']) assert.equal((await raw(f, path)).status, 404, path);
   assert.equal((await raw(f, '/%XX')).status, 400);
   assert.equal((await raw(f, '/', 'POST')).status, 405);
+});
+
+test('static ETags revalidate GET and HEAD while HTML and fixed asset names stay fresh', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  const staticDir = f.env.MOONDIFF_STATIC_DIR;
+  writeFileSync(join(staticDir, 'index.js'), 'console.log("fixture");');
+  writeFileSync(join(staticDir, 'index.deadbeef.js'), 'console.log("unversioned");');
+  for (const path of ['/', '/index.html', '/alice/repo/pull/42', '/styles.css', '/index.js', '/index.js?v=123', '/index.deadbeef.js']) {
+    const response = await fetch(f.base + path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get('cache-control'), 'no-cache');
+    const etag = response.headers.get('etag');
+    assert.match(etag, /^(?:W\/)?"[^"]+"$/);
+    const body = await response.text();
+    const strongTag = etag.replace(/^W\//, '');
+    for (const method of ['GET', 'HEAD']) {
+      for (const tag of [strongTag, `W/${strongTag}`, `"old,tag", W/${strongTag}, "another"`, '*']) {
+        const cached = await fetch(f.base + path, { method, headers: { 'If-None-Match': tag } });
+        assert.equal(cached.status, 304, `${method} ${path}: ${tag}`);
+        assert.equal(cached.statusText, 'Not Modified');
+        assert.equal(cached.headers.get('etag'), etag);
+        assert.equal(cached.headers.get('cache-control'), 'no-cache');
+        assert.equal(cached.headers.get('content-length'), null);
+        assert.equal(cached.headers.get('transfer-encoding'), null);
+        assert.equal(cached.headers.get('content-security-policy'), response.headers.get('content-security-policy'));
+        assert.equal(await cached.text(), '');
+      }
+      const fresh = await fetch(f.base + path, { method, headers: { 'If-None-Match': '"old"' } });
+      assert.equal(fresh.status, 200);
+      assert.equal(fresh.headers.get('etag'), etag);
+      assert.equal(fresh.headers.get('content-length'), String(Buffer.byteLength(body)));
+      assert.equal(await fresh.text(), method === 'HEAD' ? '' : body);
+    }
+  }
+  const previous = await fetch(f.base + '/');
+  const oldEtag = previous.headers.get('etag');
+  const oldHtml = await previous.text();
+  const htmlPath = join(staticDir, 'index.html');
+  const { atime, mtime } = statSync(htmlPath);
+  const newHtml = oldHtml.replace('fixture', 'updated');
+  assert.equal(Buffer.byteLength(newHtml), Buffer.byteLength(oldHtml));
+  writeFileSync(htmlPath, newHtml);
+  utimesSync(htmlPath, atime, mtime);
+  const updated = await fetch(f.base + '/', { headers: { 'If-None-Match': oldEtag } });
+  assert.equal(updated.status, 200);
+  assert.notEqual(updated.headers.get('etag'), oldEtag);
+  assert.equal(await updated.text(), newHtml);
+  const direct = await fetch(f.base + '/alice/repo/commit/123abcd');
+  assert.equal(direct.headers.get('etag'), updated.headers.get('etag'));
+  await direct.text();
+  for (const path of ['/missing', '/escape']) {
+    const missing = await fetch(f.base + path, { headers: { 'If-None-Match': '*' } });
+    assert.equal(missing.status, 404);
+    assert.equal(missing.headers.get('cache-control'), 'no-store');
+    await missing.text();
+  }
+  const api = await fetch(f.base + '/api/auth/status', { headers: { 'If-None-Match': '*' } });
+  assert.equal(api.status, 200);
+  assert.equal(api.headers.get('cache-control'), 'no-store');
+  assert.equal(api.headers.get('etag'), null);
+  await api.text();
+});
+
+test('only content-hashed JS and CSS use immutable caching', async t => {
+  const f = await startServer(); t.after(() => f.close());
+  const staticDir = f.env.MOONDIFF_STATIC_DIR;
+  for (const [name, extension, type, content] of [
+    ['index', 'js', 'text/javascript', 'console.log("release");'],
+    ['styles', 'css', 'text/css', readFileSync(join(staticDir, 'styles.css'), 'utf8')],
+  ]) {
+    const hash = createHash('sha256').update(content).digest('hex');
+    const path = `/${name}.${hash}.${extension}`;
+    writeFileSync(join(staticDir, path), content);
+    for (const method of ['GET', 'HEAD']) {
+      const response = await fetch(f.base + path + '?release=1', { method });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      assert.equal(response.headers.get('etag'), `"${hash}"`);
+      assert.equal(response.headers.get('content-type'), `${type}; charset=utf-8`);
+      assert.equal(response.headers.get('content-length'), String(Buffer.byteLength(content)));
+      assert.equal(await response.text(), method === 'HEAD' ? '' : content);
+      const cached = await fetch(f.base + path, { method, headers: { 'If-None-Match': `W/"${hash}"` } });
+      assert.equal(cached.status, 304);
+      assert.equal(cached.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      assert.equal(await cached.text(), '');
+    }
+  }
+  for (const name of [`index.${'g'.repeat(64)}.js`, `other.${'a'.repeat(64)}.js`, `index.${'a'.repeat(63)}.js`]) {
+    writeFileSync(join(staticDir, name), 'unversioned');
+    const response = await fetch(f.base + '/' + name);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-cache');
+    await response.text();
+  }
 });
 
 test('device login without a client secret, user isolation, encrypted persistence and restart', async t => {

@@ -1,16 +1,19 @@
-import { cpSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildServer, startServer, repository } from '../backend/tests/server-fixture.mjs';
 import { instrumentRenderProbe } from './render-probe.mjs';
 import { e2ePort } from './e2e-config.mjs';
+import { minifyFrontend } from '../scripts/minify.mjs';
+import { writeStaticAssets } from '../scripts/static-assets.mjs';
 const assets = mkdtempSync(join(tmpdir(), 'moondiff-e2e-assets-'));
 buildServer();
 const build = spawnSync('moon', ['build', 'playground/frontend/main', '--target', 'js', '--release'], { cwd: repository, stdio: 'inherit' });
 if (build.status !== 0) process.exit(build.status || 1);
-cpSync(join(repository, 'playground/frontend/public'), assets, { recursive: true });
-writeFileSync(join(assets, 'index.js'), instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), 'utf8')));
+// Probe injection matches MoonBit names, so it must precede minification.
+const source = readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-playground/main/main.js'), 'utf8');
+writeStaticAssets(join(repository, 'playground/frontend/public'), assets, minifyFrontend(instrumentRenderProbe(source)));
 const fixture = await startServer((request, response) => {
   if (request.path.startsWith('/search/issues?')) {
     response.end(JSON.stringify({ items: [], total_count: 0, incomplete_results: false }));

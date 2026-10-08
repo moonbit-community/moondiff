@@ -15,8 +15,10 @@ RUN apt-get update \
 
 # The frontend imports the root MoonBit module through moon.work.
 WORKDIR /src
+COPY playground/package.json playground/package-lock.json ./playground/
+RUN npm --prefix playground ci --include=dev
 COPY . .
-# The release builder uses only Node.js built-ins, so npm dependencies are unnecessary.
+# esbuild minifies the MoonBit frontend output in the build stage.
 RUN moon update && npm run build
 
 FROM debian:bookworm-slim AS runtime
