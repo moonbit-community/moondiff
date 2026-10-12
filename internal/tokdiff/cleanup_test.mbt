@@ -1,5 +1,5 @@
 ///|
-fn count_substring(text : String, needle : String) -> Int {
+fn count_substring(text : String, needle : String) -> Int32 {
   let mut rest = text.view()
   let mut count = 0
   while rest.find(needle) is Some(index) {

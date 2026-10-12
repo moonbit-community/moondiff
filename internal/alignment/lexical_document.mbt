@@ -11,7 +11,7 @@ fn document_lines(source : String) -> Array[String] {
 fn lexical_source_document(
   old_source : String,
   new_source : String,
-  context : Int,
+  context : Int32,
   ignore_comments : Bool,
 ) -> @model.HunkDocument {
   let old = document_lines(old_source)
@@ -23,7 +23,7 @@ fn lexical_source_document(
 fn lexical_view_document(
   old : SourceView,
   new : SourceView,
-  context : Int,
+  context : Int32,
   ignore_comments : Bool,
 ) -> @model.HunkDocument {
   @diff_ignore.restore_document(
@@ -44,7 +44,7 @@ fn lexical_edit_document(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
   pipeline : DiffPipelineContext,
-  context : Int,
+  context : Int32,
 ) -> @model.HunkDocument {
   let old_local = unit_source_view(pipeline.old_view, old_unit)
   let new_local = unit_source_view(pipeline.new_view, new_unit)
@@ -55,7 +55,7 @@ fn lexical_edit_document(
 fn complete_lexical_edit_context(
   old_unit : ImplUnit?,
   new_unit : ImplUnit?,
-) -> Int {
+) -> Int32 {
   @cmp.maximum(
     old_unit.map(unit => unit.range.len).unwrap_or(0),
     new_unit.map(unit => unit.range.len).unwrap_or(0),

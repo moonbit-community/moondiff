@@ -2,7 +2,7 @@
 fn viewed_control(
   is_pull : Bool,
   model : Model,
-  index : Int,
+  index : Int32,
   path : String,
 ) -> ViewedControl {
   let file = model.viewed.files.get(index)
@@ -103,7 +103,7 @@ fn viewed_checkbox_input(
 ///|
 fn viewed_summary_input(
   is_pull : Bool,
-  total : Int,
+  total : Int32,
   model : Model,
 ) -> ViewedSummaryInput {
   {

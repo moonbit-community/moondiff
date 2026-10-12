@@ -8,12 +8,12 @@
 // Keep the core line-diff budget stable across core-library releases. Beyond
 // this edit distance the core implementation remains correct and deliberately
 // uses its conservative heuristic result.
-const CORE_LINE_DIFF_CUTOFF : Int = 4_096
+const CORE_LINE_DIFF_CUTOFF : Int32 = 4_096
 
 ///|
 priv struct ComparableLine {
   text : String
-  key : (Int, Int)
+  key : (Int32, Int32)
 } derive(Eq, Hash)
 
 ///|
@@ -26,7 +26,11 @@ fn original_diff_lines(lines : ArrayView[String]) -> Array[ComparableLine] {
 }
 
 ///|
-fn repeated_near(lines : ArrayView[String], index : Int, text : String) -> Bool {
+fn repeated_near(
+  lines : ArrayView[String],
+  index : Int32,
+  text : String,
+) -> Bool {
   let start = if index > 32 { index - 32 } else { 0 }
   let end = if index + 33 < lines.length() {
     index + 33
@@ -48,8 +52,8 @@ fn repeated_near(lines : ArrayView[String], index : Int, text : String) -> Bool 
 fn is_soft_line(
   old : ArrayView[String],
   new : ArrayView[String],
-  old_index : Int,
-  new_index : Int,
+  old_index : Int32,
+  new_index : Int32,
 ) -> Bool {
   let text = old[old_index]
   let toks = tokenize_line(text)
@@ -81,7 +85,7 @@ fn is_equal_edit(edit : @diff.Edit) -> Bool {
 }
 
 ///|
-fn edit_bounds(edit : @diff.Edit) -> (Int, Int, Int, Int) {
+fn edit_bounds(edit : @diff.Edit) -> (Int32, Int32, Int32, Int32) {
   match edit {
     Delete(old_index~, old_len~, new_index~) =>
       (old_index, new_index, old_index + old_len, new_index)

@@ -1,17 +1,17 @@
 ///|
 pub(all) enum LoadMsg {
-  CommitPageLoaded(Int, Int, Result[ApiCommit, Error])
-  ToggleFile(Int, Int)
-  ToggleSection(Int, Int, String)
-  NavigateChange(Int, Int, String, Int, Int)
-  OpenFile(Int, Int)
-  RetryFile(Int, Int)
-  SourceLoaded(Int, Int, SourceSide, Result[(String, Bytes), Error])
-  PullMetadataLoaded(Int, Int, Result[ApiPull, Error])
-  PullCompareLoaded(Int, Int, Result[ApiCompare, Error])
-  PullFilesPageLoaded(Int, Int, Int, Result[Array[ApiFile], Error])
-  PullValidationLoaded(Int, Int, Result[ApiPull, Error])
-  PullCommitMetadataLoaded(Int, Result[ApiPull, Error])
+  CommitPageLoaded(Int32, Int32, Result[ApiCommit, Error])
+  ToggleFile(Int32, Int32)
+  ToggleSection(Int32, Int32, String)
+  NavigateChange(Int32, Int32, String, Int32, Int32)
+  OpenFile(Int32, Int32)
+  RetryFile(Int32, Int32)
+  SourceLoaded(Int32, Int32, SourceSide, Result[(String, Bytes), Error])
+  PullMetadataLoaded(Int32, Int32, Result[ApiPull, Error])
+  PullCompareLoaded(Int32, Int32, Result[ApiCompare, Error])
+  PullFilesPageLoaded(Int32, Int32, Int32, Result[Array[ApiFile], Error])
+  PullValidationLoaded(Int32, Int32, Result[ApiPull, Error])
+  PullCommitMetadataLoaded(Int32, Result[ApiPull, Error])
 }
 
 ///|

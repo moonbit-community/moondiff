@@ -1,5 +1,5 @@
 ///|
-fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
+fn review_test_view(target~ : ChangeTarget = PullRequest("17")) -> ChangeView {
   let reference = CommitRef::{ owner: "upstream", repo: "project", target, }
   let repository = RepositoryRef::{ owner: "upstream", repo: "project", }
   let head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -27,12 +27,12 @@ fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
 
 ///|
 fn review_comment_fixture(
-  id : Int,
-  line? : Int = 2,
-  side? : @protocol.CommentSide = Right,
-  position? : Int? = Some(3),
-  commit_id? : String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  reply_to? : Int64? = None,
+  id : Int32,
+  line~ : Int32 = 2,
+  side~ : @protocol.CommentSide = Right,
+  position~ : Int32? = Some(3),
+  commit_id~ : String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  reply_to~ : Int64? = None,
 ) -> ApiReviewComment {
   {
     id: Int64::from_int(id),

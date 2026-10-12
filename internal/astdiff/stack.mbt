@@ -31,7 +31,7 @@ pub fn[T] Stack::peek(self : Stack[T]) -> T? {
 }
 
 ///|UUID(5607dc9b-cdc2-4f40-923e-fc0891e0e5c6)
-pub fn[T] Stack::size(self : Stack[T]) -> UInt {
+pub fn[T] Stack::size(self : Stack[T]) -> UInt32 {
   let mut count = 0U
   let mut stack = self
   while stack is Stack(Some(node)) {

@@ -2,8 +2,8 @@
 fn commit_request(
   reference : CommitRef,
   repository : RepositoryRef,
-  generation : Int,
-  page : Int,
+  generation : Int32,
+  page : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let sha = match reference.target {
@@ -20,7 +20,7 @@ fn commit_request(
 ///|
 fn pull_commit_metadata_request(
   reference : CommitRef,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let number = match reference.target {
@@ -41,8 +41,8 @@ fn pull_commit_metadata_request(
 ///|
 fn pull_metadata_request(
   reference : CommitRef,
-  generation : Int,
-  attempt : Int,
+  generation : Int32,
+  attempt : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let number = match reference.target {
@@ -65,8 +65,8 @@ fn pull_compare_request(
   reference : CommitRef,
   base_sha : String,
   head_sha : String,
-  generation : Int,
-  attempt : Int,
+  generation : Int32,
+  attempt : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.get_compare(
@@ -84,9 +84,9 @@ fn pull_compare_request(
 ///|
 fn pull_files_request(
   reference : CommitRef,
-  generation : Int,
-  attempt : Int,
-  page : Int,
+  generation : Int32,
+  attempt : Int32,
+  page : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let number = match reference.target {
@@ -108,8 +108,8 @@ fn pull_files_request(
 ///|
 fn pull_validation_request(
   reference : CommitRef,
-  generation : Int,
-  attempt : Int,
+  generation : Int32,
+  attempt : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let number = match reference.target {

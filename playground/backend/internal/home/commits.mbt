@@ -1,7 +1,7 @@
 ///|
 priv enum CommitPosition {
   GraphQL(String)
-  Compare(Int)
+  Compare(Int32)
 } derive(FromJson, ToJson)
 
 ///|
@@ -9,8 +9,8 @@ priv struct CommitCursor {
   position : CommitPosition
   base : String
   head : String
-  loaded : Int
-  total : Int
+  loaded : Int32
+  total : Int32
 } derive(FromJson, ToJson)
 
 ///|
@@ -165,7 +165,7 @@ pub async fn pull_commits(
     )
     guard home_count(@common.field(raw, "total_commits")) == total_count &&
       @common.field(raw, "commits") is Array(commits) &&
-      commits.length() == Int::min(100, total_count - already_loaded) else {
+      commits.length() == Int32::min(100, total_count - already_loaded) else {
       raise home_invalid()
     }
     (

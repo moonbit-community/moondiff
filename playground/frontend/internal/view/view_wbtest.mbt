@@ -87,7 +87,7 @@ fn ready_test_file(
   file : ApiFile,
   old : Array[String],
   new : Array[String],
-  expanded? : Bool = true,
+  expanded~ : Bool = true,
 ) -> FileState {
   {
     file,
@@ -102,9 +102,9 @@ fn ready_test_file(
 
 ///|
 fn test_file_tree_state(
-  search_query? : String = "",
-  selected_statuses? : Array[String] = [],
-  collapsed_directories? : Array[String] = [],
+  search_query~ : String = "",
+  selected_statuses~ : Array[String] = [],
+  collapsed_directories~ : Array[String] = [],
 ) -> FileTreeState {
   {
     drawer_open: false,
@@ -144,7 +144,7 @@ fn file_tree_row_summary(row : FileTreeRow) -> String {
 }
 
 ///|
-fn file_tree_row_depth(row : FileTreeRow) -> Int {
+fn file_tree_row_depth(row : FileTreeRow) -> Int32 {
   match row {
     TreeDirectory(depth~, ..) | TreeFile(depth~, ..) => depth
   }

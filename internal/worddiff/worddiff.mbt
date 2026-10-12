@@ -1,17 +1,17 @@
 ///|
-const WORD_TOKEN_LIMIT : Int = 4_096
+const WORD_TOKEN_LIMIT : Int32 = 4_096
 
 ///|
-const WORD_DIFF_CUTOFF : Int = 4_096
+const WORD_DIFF_CUTOFF : Int32 = 4_096
 
 ///|
-const DEFAULT_LINE_CHARACTER_LIMIT : UInt = 16_384
+const DEFAULT_LINE_CHARACTER_LIMIT : UInt32 = 16_384
 
 ///|
-const DEFAULT_DOCUMENT_CHARACTER_LIMIT : UInt = 1_048_576
+const DEFAULT_DOCUMENT_CHARACTER_LIMIT : UInt32 = 1_048_576
 
 ///|
-const DEFAULT_DOCUMENT_TOKEN_LIMIT : UInt = 65_536
+const DEFAULT_DOCUMENT_TOKEN_LIMIT : UInt32 = 65_536
 
 ///|
 /// A shared, monotonically-decreasing budget for optional intraline word
@@ -19,9 +19,9 @@ const DEFAULT_DOCUMENT_TOKEN_LIMIT : UInt = 65_536
 /// units. The line limit applies independently to each side; the document
 /// limits combine the old and new sides of every attempted refinement.
 pub struct RefinementBudget {
-  line_character_limit : UInt
-  remaining_characters : Ref[UInt]
-  remaining_tokens : Ref[UInt]
+  line_character_limit : UInt32
+  remaining_characters : Ref[UInt32]
+  remaining_tokens : Ref[UInt32]
 }
 
 ///|
@@ -29,9 +29,9 @@ pub struct RefinementBudget {
 /// smaller limits are accepted so internal tests can exercise exact budget
 /// boundaries without building large documents.
 pub fn RefinementBudget::new(
-  line_character_limit? : UInt = DEFAULT_LINE_CHARACTER_LIMIT,
-  character_limit? : UInt = DEFAULT_DOCUMENT_CHARACTER_LIMIT,
-  token_limit? : UInt = DEFAULT_DOCUMENT_TOKEN_LIMIT,
+  line_character_limit~ : UInt32 = DEFAULT_LINE_CHARACTER_LIMIT,
+  character_limit~ : UInt32 = DEFAULT_DOCUMENT_CHARACTER_LIMIT,
+  token_limit~ : UInt32 = DEFAULT_DOCUMENT_TOKEN_LIMIT,
 ) -> RefinementBudget {
   {
     line_character_limit,
@@ -43,9 +43,9 @@ pub fn RefinementBudget::new(
 ///|
 // Charge both sides as one operation. No state changes unless both amounts fit.
 fn charge_pair(
-  remaining : Ref[UInt],
-  old_units : UInt,
-  new_units : UInt,
+  remaining : Ref[UInt32],
+  old_units : UInt32,
+  new_units : UInt32,
 ) -> Bool {
   let available = remaining.val
   if old_units > available {
@@ -62,8 +62,8 @@ fn charge_pair(
 ///|
 fn RefinementBudget::charge_characters(
   self : RefinementBudget,
-  old_length : Int,
-  new_length : Int,
+  old_length : Int32,
+  new_length : Int32,
 ) -> Bool {
   charge_pair(
     self.remaining_characters,
@@ -75,8 +75,8 @@ fn RefinementBudget::charge_characters(
 ///|
 fn RefinementBudget::line_lengths_within_limit(
   self : RefinementBudget,
-  old_length : Int,
-  new_length : Int,
+  old_length : Int32,
+  new_length : Int32,
 ) -> Bool {
   old_length.reinterpret_as_uint() <= self.line_character_limit &&
   new_length.reinterpret_as_uint() <= self.line_character_limit
@@ -85,8 +85,8 @@ fn RefinementBudget::line_lengths_within_limit(
 ///|
 fn RefinementBudget::charge_tokens(
   self : RefinementBudget,
-  old_count : Int,
-  new_count : Int,
+  old_count : Int32,
+  new_count : Int32,
 ) -> Bool {
   charge_pair(
     self.remaining_tokens,
@@ -151,8 +151,8 @@ fn push_segment(
 fn push_token_range(
   segments : Array[@model.DiffSegment],
   tokens : ArrayView[String],
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   kind : @model.DiffSegmentKind,
 ) -> Unit {
   let text = StringBuilder()
@@ -246,7 +246,7 @@ pub fn refine_line(
 pub fn replacement_ranges(
   first : @diff.Edit,
   second : @diff.Edit,
-) -> ((Int, Int), (Int, Int))? {
+) -> ((Int32, Int32), (Int32, Int32))? {
   match (first, second) {
     (
       Delete(old_index=old_start, old_len~, ..),

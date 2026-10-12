@@ -3,31 +3,31 @@ pub(all) enum ReviewMsg {
   Domain(@comments.Event)
   RefreshComments
   LoadLatestSnapshot
-  BeginCommentsRefresh(Int, CommitRef)
-  CommentsMetadataLoaded(Int, Int, Result[ApiPull, Error])
-  CommentsValidated(Int, Int, Result[ApiPull, Error])
+  BeginCommentsRefresh(Int32, CommitRef)
+  CommentsMetadataLoaded(Int32, Int32, Result[ApiPull, Error])
+  CommentsValidated(Int32, Int32, Result[ApiPull, Error])
   AskDelete(@comments.CommentId)
   CancelDelete
   ConfirmCommentDelete(@comments.CommentId)
   CommentDeleted(
-    Int,
-    Int,
+    Int32,
+    Int32,
     @comments.CommentId,
     Result[@protocol.DeleteResult, Error]
   )
-  CommentsLoaded(Int, Int, Result[ApiCommentBundle, Error])
+  CommentsLoaded(Int32, Int32, Result[ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
-  OpenInlineDraft(Int, ReviewAnchor)
+  OpenInlineDraft(Int32, ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, Int, ReviewAnchor, Result[ApiPull, Error])
-  IssueCommentCreated(Int, Int, Result[ApiIssueComment, Error])
-  ReviewCommentCreated(Int, Int, Result[ApiReviewComment, Error])
-  CommitCommentCreated(Int, Int, Result[ApiCommitComment, Error])
-  ReviewReplyCreated(Int, Int, Result[ApiReviewComment, Error])
+  CommentHeadChecked(Int32, Int32, ReviewAnchor, Result[ApiPull, Error])
+  IssueCommentCreated(Int32, Int32, Result[ApiIssueComment, Error])
+  ReviewCommentCreated(Int32, Int32, Result[ApiReviewComment, Error])
+  CommitCommentCreated(Int32, Int32, Result[ApiCommitComment, Error])
+  ReviewReplyCreated(Int32, Int32, Result[ApiReviewComment, Error])
 }
 
 ///|

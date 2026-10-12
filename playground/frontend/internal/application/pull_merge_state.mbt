@@ -1,18 +1,18 @@
 ///|
 pub(all) struct PullMergeState {
-  epoch : Int
-  serial : Int
+  epoch : Int32
+  serial : Int32
   status : @protocol.ApiPullMergeStatus?
   loading : Bool
   submitting : Bool
   error : String?
-  retry : Int
+  retry : Int32
   poll_scheduled : Bool
   stale : Bool
 } derive(Eq)
 
 ///|
-fn empty_pull_merge_state(epoch : Int) -> PullMergeState {
+fn empty_pull_merge_state(epoch : Int32) -> PullMergeState {
   {
     epoch,
     serial: 0,

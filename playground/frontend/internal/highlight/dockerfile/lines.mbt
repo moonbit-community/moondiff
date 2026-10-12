@@ -1,7 +1,7 @@
 ///|
 priv struct SourceLine {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
@@ -32,7 +32,7 @@ fn source_lines(source : String) -> Array[SourceLine] {
 }
 
 ///|
-fn skip_space(source : String, start : Int, end : Int) -> Int {
+fn skip_space(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = start
   while cursor < end && source[cursor] is (' ' | '\t') {
     cursor += 1
@@ -41,7 +41,7 @@ fn skip_space(source : String, start : Int, end : Int) -> Int {
 }
 
 ///|
-fn trim_space_end(source : String, start : Int, end : Int) -> Int {
+fn trim_space_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = end
   while cursor > start && source[cursor - 1] is (' ' | '\t') {
     cursor -= 1
@@ -50,17 +50,17 @@ fn trim_space_end(source : String, start : Int, end : Int) -> Int {
 }
 
 ///|
-fn ascii_word_end(source : String, start : Int, end : Int) -> Int {
+fn ascii_word_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = start
   while cursor < end &&
-        source[cursor] is ('a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-') {
+        source[cursor] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '_' | '-') {
     cursor += 1
   }
   cursor
 }
 
 ///|
-fn token_end(source : String, start : Int, end : Int) -> Int {
+fn token_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = start
   while cursor < end &&
         !(source[cursor]

@@ -1,7 +1,7 @@
 ///|
 pub fn get_viewer_pulls(
   args : @protocol.ViewerPullsGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiViewerPulls, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -20,7 +20,7 @@ pub fn get_viewer_pulls(
 ///|
 pub fn get_pull_commits(
   args : @protocol.PullCommitsGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiPullCommits, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(

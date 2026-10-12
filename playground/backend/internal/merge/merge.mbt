@@ -12,7 +12,7 @@ priv struct MergeSnapshot {
 
 ///|
 fn invalid_merge_response(
-  message? : String = "GitHub returned invalid pull request merge data.",
+  message~ : String = "GitHub returned invalid pull request merge data.",
 ) -> Error {
   @common.RpcError(502, "invalid_github_response", message)
 }
@@ -140,7 +140,7 @@ fn ci_summary(
 }
 
 ///|
-fn ci_page_count(value : Json) -> Int raise {
+fn ci_page_count(value : Json) -> Int32 raise {
   guard @common.field(value, "total_count") is Number(total, ..) &&
     total >= 0 &&
     total <= 10000 &&

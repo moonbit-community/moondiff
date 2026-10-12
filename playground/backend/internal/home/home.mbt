@@ -2,14 +2,14 @@
 priv struct SearchWindow {
   since : Int64
   until : Int64
-  page : Int
-  offset : Int
+  page : Int32
+  offset : Int32
 } derive(FromJson, ToJson)
 
 ///|
 priv struct PullSearchCursor {
   windows : Array[SearchWindow]
-  total : Int
+  total : Int32
   total_confirmed : Bool
 } derive(FromJson, ToJson)
 
@@ -85,7 +85,7 @@ fn home_invalid() -> Error {
 }
 
 ///|
-fn home_count(value : Json) -> Int raise {
+fn home_count(value : Json) -> Int32 raise {
   guard value is Number(n, ..) &&
     n >= 0 &&
     n <= 2147483647.0 &&
@@ -235,8 +235,8 @@ pub async fn viewer_pulls(
     // Fill the logical page across window boundaries. An offset lets the next
     // request resume a partially consumed GitHub page without putting PR data
     // into the cursor or loading more than 50 rows in the browser at once.
-    let offset = Int::min(window.offset, items.length())
-    let take = Int::min(50 - result.length(), items.length() - offset)
+    let offset = Int32::min(window.offset, items.length())
+    let take = Int32::min(50 - result.length(), items.length() - offset)
     for item in items[offset:offset + take] {
       result.push(item)
     }

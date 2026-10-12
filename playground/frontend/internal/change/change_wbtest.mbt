@@ -108,7 +108,7 @@ fn ready_test_file(
   file : ApiFile,
   old : Array[String],
   new : Array[String],
-  expanded? : Bool = true,
+  expanded~ : Bool = true,
 ) -> FileState {
   {
     file,

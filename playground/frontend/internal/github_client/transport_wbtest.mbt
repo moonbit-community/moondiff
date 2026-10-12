@@ -4,13 +4,13 @@ priv struct TestCall {
   meth : String
   csrf : String
   body : String
-  receive : (Result[(Int, String), String]) -> Unit
+  receive : (Result[(Int32, String), String]) -> Unit
   mut aborted : Bool
 }
 
 ///|
 priv struct TestTimer {
-  ms : Int
+  ms : Int32
   run : () -> Unit
   mut cleared : Bool
 }
@@ -63,15 +63,15 @@ fn Network::tick(self : Network) -> Unit {
 }
 
 ///|
-fn Network::timer_count(self : Network) -> Int {
+fn Network::timer_count(self : Network) -> Int32 {
   self.timers.filter(t => !t.cleared).length()
 }
 
 ///|
 fn status_fixture(
   id? : String,
-  phase? : @protocol.DevicePhase = Pending,
-  csrf? : String = "csrf-123",
+  phase~ : @protocol.DevicePhase = Pending,
+  csrf~ : String = "csrf-123",
 ) -> @protocol.ApiAuthStatus {
   {
     authenticated: phase is Completed,
@@ -246,7 +246,7 @@ test "logout and disposal cancel all public reads" {
 fn device_fixture(
   request_id : String,
   id? : String,
-  phase? : @protocol.DevicePhase = Pending,
+  phase~ : @protocol.DevicePhase = Pending,
 ) -> @protocol.DeviceResponse {
   { request_id, status: status_fixture(id?, phase~), }
 }
@@ -255,7 +255,7 @@ fn device_fixture(
 fn seed(
   client : Client,
   network : Network,
-  id? : String = "attempt-0000000000",
+  id~ : String = "attempt-0000000000",
 ) -> Unit {
   client.status(_ => ())
   network.last().reply(status_fixture(id~))

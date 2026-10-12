@@ -12,14 +12,14 @@ priv enum AstBuildResult {
 }
 
 ///|
-type NovelRangeMap = @hashmap.HashMap[Int, Array[(Int, Int)]]
+type NovelRangeMap = @hashmap.HashMap[Int32, Array[(Int32, Int32)]]
 
 ///|
 fn add_novel_range(
   ranges : NovelRangeMap,
-  line : Int,
-  start_col : Int,
-  end_col : Int,
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
 ) -> Unit {
   if line >= 0 && end_col > start_col {
     ranges.get_or_init(line, fn() { [] }).push((start_col, end_col))
@@ -100,7 +100,7 @@ fn bridge_ast_changed_whitespace(
 ///|
 fn ast_line_segments_impl(
   text : String,
-  line_ranges : Array[(Int, Int)]?,
+  line_ranges : Array[(Int32, Int32)]?,
 ) -> Array[@model.DiffSegment] {
   let chars = text.to_array()
   if chars.is_empty() {
@@ -156,7 +156,7 @@ fn ast_line_segments_impl(
 
 ///|
 fn ast_diff_line(
-  index : Int,
+  index : Int32,
   text : String,
   ranges : NovelRangeMap,
 ) -> @model.DiffLine {
@@ -166,7 +166,7 @@ fn ast_diff_line(
 
 ///|
 fn ast_pair_is_context(
-  pair : (Int?, Int?),
+  pair : (Int32?, Int32?),
   hunk : @ast_hunks.AstHunk,
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
@@ -182,7 +182,7 @@ fn ast_pair_is_context(
 
 ///|
 fn ast_change_row(
-  pair : (Int?, Int?),
+  pair : (Int32?, Int32?),
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
   old_ranges : NovelRangeMap,
@@ -204,7 +204,7 @@ fn ast_change_row(
 
 ///|
 fn ast_hunk_blocks(
-  pairs : ArrayView[(Int?, Int?)],
+  pairs : ArrayView[(Int32?, Int32?)],
   hunk : @ast_hunks.AstHunk,
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
@@ -242,32 +242,35 @@ fn ast_hunk_blocks(
 }
 
 ///|
-fn ast_line_is_novel(line : Int?, novel_lines : @ast_hunks.LineSet) -> Bool {
+fn ast_line_is_novel(line : Int32?, novel_lines : @ast_hunks.LineSet) -> Bool {
   line is Some(line) && novel_lines.contains(line)
 }
 
 ///|
 fn ast_pair_side_is_changed(
-  line : Int?,
-  opposite : Int?,
+  line : Int32?,
+  opposite : Int32?,
   novel_lines : @ast_hunks.LineSet,
 ) -> Bool {
   ast_line_is_novel(line, novel_lines) || (line is Some(_) && opposite is None)
 }
 
 ///|
-fn ast_pair_has_change(pair : (Int?, Int?), hunk : @ast_hunks.AstHunk) -> Bool {
+fn ast_pair_has_change(
+  pair : (Int32?, Int32?),
+  hunk : @ast_hunks.AstHunk,
+) -> Bool {
   ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs) ||
   ast_pair_side_is_changed(pair.1, pair.0, hunk.novel_rhs)
 }
 
 ///|
 fn ast_should_render_as_block_replacement(
-  segment : ArrayView[(Int?, Int?)],
+  segment : ArrayView[(Int32?, Int32?)],
   hunk : @ast_hunks.AstHunk,
 ) -> Bool {
-  let lhs_lines : @hashmap.HashMap[Int, Bool] = HashMap([])
-  let rhs_lines : @hashmap.HashMap[Int, Bool] = HashMap([])
+  let lhs_lines : @hashmap.HashMap[Int32, Bool] = HashMap([])
+  let rhs_lines : @hashmap.HashMap[Int32, Bool] = HashMap([])
   let mut all_present_sides_are_novel = true
   for pair in segment {
     let lhs_novel = ast_pair_side_is_changed(pair.0, pair.1, hunk.novel_lhs)
@@ -294,8 +297,8 @@ fn ast_should_render_as_block_replacement(
 
 ///|
 fn append_ast_segment_lines(
-  output : Array[(Int?, Int?)],
-  segment : ArrayView[(Int?, Int?)],
+  output : Array[(Int32?, Int32?)],
+  segment : ArrayView[(Int32?, Int32?)],
   hunk : @ast_hunks.AstHunk,
 ) -> Unit {
   if ast_should_render_as_block_replacement(segment, hunk) {
@@ -316,11 +319,11 @@ fn append_ast_segment_lines(
 
 ///|
 fn reduce_ast_sparse_replacements(
-  lines : ArrayView[(Int?, Int?)],
+  lines : ArrayView[(Int32?, Int32?)],
   hunk : @ast_hunks.AstHunk,
-) -> Array[(Int?, Int?)] {
-  let output : Array[(Int?, Int?)] = []
-  let segment : Array[(Int?, Int?)] = []
+) -> Array[(Int32?, Int32?)] {
+  let output : Array[(Int32?, Int32?)] = []
+  let segment : Array[(Int32?, Int32?)] = []
   for pair in lines {
     if ast_pair_has_change(pair, hunk) {
       segment.push(pair)
@@ -336,12 +339,12 @@ fn reduce_ast_sparse_replacements(
 
 ///|
 fn ast_hunk_side_range(
-  pairs : ArrayView[(Int?, Int?)],
+  pairs : ArrayView[(Int32?, Int32?)],
   old_side : Bool,
-) -> (Int, Int) {
-  let first : Ref[Int?] = Ref(None)
-  let last : Ref[Int?] = Ref(None)
-  let fallback : Ref[Int?] = Ref(None)
+) -> (Int32, Int32) {
+  let first : Ref[Int32?] = Ref(None)
+  let last : Ref[Int32?] = Ref(None)
+  let fallback : Ref[Int32?] = Ref(None)
   for pair in pairs {
     let selected = if old_side { pair.0 } else { pair.1 }
     let opposite = if old_side { pair.1 } else { pair.0 }
@@ -366,7 +369,7 @@ fn ast_document_from_positions(
   new_lines : ArrayView[String],
   lhs_positions : ArrayView[MatchedPos],
   rhs_positions : ArrayView[MatchedPos],
-  context : Int,
+  context : Int32,
   reduce_sparse_replacements : Bool,
 ) -> AstBuildResult {
   let out_of_bounds = ast_position_out_of_bounds_sides(
@@ -415,7 +418,7 @@ fn ast_document_from_positions(
 ///|
 fn span_columns_are_in_bounds(
   span : @span.SingleLineSpan,
-  line_len : Int,
+  line_len : Int32,
 ) -> Bool {
   if span.start_col == 0 {
     span.end_col >= 0 && span.end_col <= line_len + 1

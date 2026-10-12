@@ -4,7 +4,7 @@ pub(all) struct ViewedPending {
   stored : Bool
   before : @protocol.FileViewedState
   expanded : Bool
-  expansion_revision : Int
+  expansion_revision : Int32
   confirming : Bool
 } derive(Eq)
 
@@ -14,15 +14,15 @@ pub(all) struct ViewedFile {
   pending : ViewedPending?
   error : String?
   touched : Bool
-  expansion_revision : Int
+  expansion_revision : Int32
 } derive(Eq)
 
 ///|
 pub(all) struct ViewedState {
   user_id : String?
-  epoch : Int
-  serial : Int
-  read_serial : Int
+  epoch : Int32
+  serial : Int32
+  read_serial : Int32
   files : Array[ViewedFile]
   loading : Bool
   ready : Bool
@@ -30,12 +30,12 @@ pub(all) struct ViewedState {
   error : String?
   stale : Bool
   storage_ready : Bool
-  retry : Int
+  retry : Int32
   poll_scheduled : Bool
 } derive(Eq)
 
 ///|
-fn empty_viewed_state(epoch : Int) -> ViewedState {
+fn empty_viewed_state(epoch : Int32) -> ViewedState {
   {
     user_id: None,
     epoch,
@@ -76,7 +76,7 @@ fn viewed_page(model : Model) -> (CommitRef, String, String)? {
 
 ///|
 // Resolve the accepted draft by path; its stored index may predate file ordering.
-fn viewed_draft_file(model : Model) -> Int? {
+fn viewed_draft_file(model : Model) -> Int32? {
   guard model.phase is Showing(view) &&
     model.review.draft() is Some(draft) &&
     draft.id.generation == model.generation &&
@@ -106,7 +106,7 @@ fn viewed_draft_file(model : Model) -> Int? {
 }
 
 ///|
-fn record_viewed_interaction(model : Model, index : Int) -> Model {
+fn record_viewed_interaction(model : Model, index : Int32) -> Model {
   guard model.phase is Showing(view) &&
     view.reference.target is PullRequest(_) &&
     view.files.get(index) is Some(_) else {
@@ -130,7 +130,7 @@ fn record_viewed_interaction(model : Model, index : Int) -> Model {
 ///|
 fn viewed_scope(
   model : Model,
-) -> (Int, Int, String?, String?, CommitRef, String, String)? {
+) -> (Int32, Int32, String?, String?, CommitRef, String, String)? {
   guard model.phase is Showing(view) &&
     view.reference.target is PullRequest(_) &&
     view.pull_snapshot is Some(snapshot) &&
@@ -158,7 +158,7 @@ fn viewed_writing(state : ViewedState) -> Bool {
 }
 
 ///|
-fn with_viewed_file(model : Model, index : Int, file : ViewedFile) -> Model {
+fn with_viewed_file(model : Model, index : Int32, file : ViewedFile) -> Model {
   let files = model.viewed.files.copy()
   files[index] = file
   { ..model, viewed: { ..model.viewed, files, }, }
@@ -167,7 +167,7 @@ fn with_viewed_file(model : Model, index : Int, file : ViewedFile) -> Model {
 ///|
 fn viewed_expansion(
   model : Model,
-  index : Int,
+  index : Int32,
   expanded : Bool,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {

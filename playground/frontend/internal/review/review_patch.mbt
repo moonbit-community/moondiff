@@ -7,9 +7,9 @@ pub(all) enum ReviewSide {
 ///|
 pub(all) struct ReviewAnchor {
   path : String
-  line : Int
+  line : Int32
   side : ReviewSide
-  position : Int?
+  position : Int32?
 } derive(Debug, Eq)
 
 ///|
@@ -20,8 +20,8 @@ pub(all) enum CanonicalPatch {
 
 ///|
 priv struct PatchRange {
-  start : Int
-  count : Int
+  start : Int32
+  count : Int32
 }
 
 ///|
@@ -31,7 +31,7 @@ priv struct PatchHeader {
 }
 
 ///|
-fn parse_patch_decimal(value : String) -> Int? {
+fn parse_patch_decimal(value : String) -> Int32? {
   if value.is_empty() {
     return None
   }
@@ -205,7 +205,7 @@ pub fn parse_canonical_patch(path : String, patch : String?) -> CanonicalPatch {
 pub fn canonical_anchor(
   patch : CanonicalPatch,
   side : ReviewSide,
-  line : Int,
+  line : Int32,
 ) -> ReviewAnchor? {
   guard patch is Commentable(anchors) else { return None }
   for anchor in anchors {

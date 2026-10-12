@@ -24,8 +24,8 @@ pub fn ignored_change_subject(
 fn diff_cache_key(
   diff_mode : FileDiffMode,
   algorithm : DiffAlgorithm,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
 ) -> CacheKey {
   match diff_mode {
     LineDiff => Line
@@ -37,8 +37,8 @@ fn diff_cache_key(
 pub fn cached_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
 ) -> CachedDiffResult? {
   file.diff_cache.get(
     diff_cache_key(file.diff_mode, algorithm, ignore_comments~, ignore_tests~),
@@ -117,8 +117,8 @@ fn calculate_file_document(
 pub fn ensure_file_document(
   file : FileState,
   algorithm : DiffAlgorithm,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
 ) -> FileState {
   let file = if file.diff_cache.highlights is None &&
     file.old_side is Ready(old) &&
@@ -158,8 +158,8 @@ pub fn ensure_file_document(
 pub fn ensure_expanded_file_documents(
   view : ChangeView,
   algorithm : DiffAlgorithm,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
 ) -> ChangeView {
   let files = view.files.copy()
   for index, file in files {

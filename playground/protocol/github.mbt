@@ -1,8 +1,8 @@
 ///|
 pub(all) struct ApiStats {
-  additions : Int
-  deletions : Int
-  total : Int
+  additions : Int32
+  deletions : Int32
+  total : Int32
 } derive(Eq, FromJson, ToJson)
 
 ///|
@@ -20,9 +20,9 @@ pub(all) struct ApiFile {
   filename : String
   previous_filename : String?
   status : String
-  additions : Int
-  deletions : Int
-  changes : Int
+  additions : Int32
+  deletions : Int32
+  changes : Int32
   patch : String?
 } derive(Eq, FromJson, ToJson)
 
@@ -53,10 +53,10 @@ pub(all) struct ApiPull {
   html_url : String
   base : ApiPullBranch
   head : ApiPullBranch
-  additions : Int
-  deletions : Int
-  changed_files : Int
-  commits : Int?
+  additions : Int32
+  deletions : Int32
+  changed_files : Int32
+  commits : Int32?
 } derive(Eq, FromJson, ToJson)
 
 ///|
@@ -76,7 +76,7 @@ pub(all) struct ApiRangeCommit {
 pub(all) struct ApiRangeCompare {
   base_commit : ApiRangeCommit
   merge_base_commit : ApiParent
-  total_commits : Int
+  total_commits : Int32
   commits : Array[ApiRangeCommit]
   files : Array[ApiFile]?
 } derive(Eq, FromJson, ToJson)

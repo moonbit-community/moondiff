@@ -1,7 +1,7 @@
 ///|
 fn colored_line(
   source : String,
-  line? : Int = 1,
+  line~ : Int32 = 1,
 ) -> Array[(String, @highlight.HighlightKind)] {
   let text = source.split("\n").to_array()[line - 1]
   @c.highlight(source)

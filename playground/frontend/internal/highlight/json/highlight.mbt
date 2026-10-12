@@ -135,16 +135,16 @@ fn mark_value(frames : Array[Frame]) -> Unit {
 
 ///|
 fn hex_digit(char : UInt16) -> Bool {
-  char is ('0'..='9' | 'a'..='f' | 'A'..='F')
+  char is ('0'..<='9' | 'a'..<='f' | 'A'..<='F')
 }
 
 ///|
 fn scan_string(
   source : String,
-  start : Int,
+  start : Int32,
   plain_kind : HighlightKind,
   spans : Array[HighlightSpan],
-) -> (Int, Bool) {
+) -> (Int32, Bool) {
   let mut i = start + 1
   let mut plain = start
   let mut closed = false
@@ -186,7 +186,7 @@ fn scan_string(
 }
 
 ///|
-fn token_end(source : String, index : Int) -> Bool {
+fn token_end(source : String, index : Int32) -> Bool {
   index == source.length() ||
   source[index] is (' ' | '\t' | '\r' | '\n' | ',' | ']' | '}')
 }
@@ -197,7 +197,7 @@ fn atom_separator(char : UInt16) -> Bool {
 }
 
 ///|
-fn keyword_end(source : String, start : Int, word : String) -> Int? {
+fn keyword_end(source : String, start : Int32, word : String) -> Int32? {
   let end = start + word.length()
   if end <= source.length() &&
     source[start:end] == word &&
@@ -210,11 +210,11 @@ fn keyword_end(source : String, start : Int, word : String) -> Int? {
 
 ///|
 fn digit(char : UInt16) -> Bool {
-  char is ('0'..='9')
+  char is ('0'..<='9')
 }
 
 ///|
-fn scan_number(source : String, start : Int) -> Int {
+fn scan_number(source : String, start : Int32) -> Int32 {
   let size = source.length()
   let mut i = start
   if source[i] == '-' {
@@ -225,7 +225,7 @@ fn scan_number(source : String, start : Int) -> Int {
   }
   if source[i] == '0' {
     i += 1
-  } else if source[i] is ('1'..='9') {
+  } else if source[i] is ('1'..<='9') {
     while i < size && digit(source[i]) {
       i += 1
     }

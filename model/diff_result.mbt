@@ -12,7 +12,7 @@ struct DiffResult {
 pub fn DiffResult::make(
   document : DiffDocument,
   status : DiffStatus,
-  ignore_reason? : IgnoreReason = FilteredContent,
+  ignore_reason~ : IgnoreReason = FilteredContent,
 ) -> DiffResult {
   {
     status,

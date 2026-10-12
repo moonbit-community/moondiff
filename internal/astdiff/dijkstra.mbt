@@ -2,7 +2,7 @@
 #valtype
 priv struct WeightedVertex {
   vertex : Vertex
-  distance : @cmp.Reverse[UInt]
+  distance : @cmp.Reverse[UInt32]
 } derive(Eq)
 
 ///|UUID(5b821e8f-5dc5-43ea-b19b-6473450629cd)
@@ -14,8 +14,8 @@ impl Compare for WeightedVertex with fn compare(self, other) {
 /// Return the shortest route from `start` to the end vertex.
 fn shortest_vertex_path(
   start : Vertex,
-  size_hint : Int,
-  graph_limit : Int,
+  size_hint : Int32,
+  graph_limit : Int32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Array[Vertex]] raise @computation.ScopeLimitExceeded {
   // We want to visit nodes with the shortest distance first, but
@@ -86,8 +86,8 @@ fn shortest_path_with_edges(route : Array[Vertex]) -> Array[(Edge, Vertex)] {
 /// necessary because a route of N vertices only has N-1 edges.
 pub fn shortest_path_with_budget(
   start : Vertex,
-  size_hint : Int,
-  graph_limit : Int,
+  size_hint : Int32,
+  graph_limit : Int32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Array[(Edge, Vertex)]] raise @computation.ScopeLimitExceeded {
   match shortest_vertex_path(start, size_hint, graph_limit, budget) {
@@ -125,7 +125,7 @@ fn edge_between(before : Vertex, after : Vertex) -> Edge {
 
 ///|UUID(a896833c-4b57-407b-a10b-a4e42597340c)
 /// What is the total number of AST nodes?
-fn node_count(root : Syntax?) -> UInt {
+fn node_count(root : Syntax?) -> UInt32 {
   let iter = root.succ(node => node.next_sibling())
   iter
   .map(node => {
@@ -142,7 +142,7 @@ fn mark_syntax_with_budget(
   lhs_syntax : Syntax?,
   rhs_syntax : Syntax?,
   change_map : ChangeMap,
-  graph_limit : UInt,
+  graph_limit : UInt32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   let lhs_node_count = node_count(lhs_syntax)

@@ -2,7 +2,7 @@
 async fn wait_for_viewed_users(
   app : @storage.App,
   key : String,
-  expected : Int,
+  expected : Int32,
 ) -> Unit {
   for _ in 0..<10000 {
     if app.viewed_scopes.get(key) is Some(coordinator) &&
@@ -57,7 +57,7 @@ async test "Viewed FIFO survives holder cancellation and failed waits and cleans
   entered.acquire()
   let release = @async.Mutex()
   release.acquire()
-  let log : Array[Int] = []
+  let log : Array[Int32] = []
   @async.with_task_group(group => {
     let mut released = false
     defer (if !released { release.release() })

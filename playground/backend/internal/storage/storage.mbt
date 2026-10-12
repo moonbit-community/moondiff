@@ -177,8 +177,8 @@ pub fn App::install_tokens(
   user : String,
   login : String,
   payload : Json,
-  issued_at? : Int64 = now(),
-  device_id? : String = "",
+  issued_at~ : Int64 = now(),
+  device_id~ : String = "",
 ) -> Session raise {
   let access = @common.optional_string(payload, "access_token")
   guard !access.is_empty() else {

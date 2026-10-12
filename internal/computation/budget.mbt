@@ -11,7 +11,7 @@ pub(all) enum Stage {
 /// Raised before work would exceed the current calculation scope's budget.
 /// Independent scopes do not charge one aggregate file-level budget.
 pub(all) suberror ScopeLimitExceeded {
-  ScopeLimitExceeded(stage~ : Stage, limit~ : UInt)
+  ScopeLimitExceeded(stage~ : Stage, limit~ : UInt32)
 } derive(Debug, Eq)
 
 ///|
@@ -19,25 +19,25 @@ pub(all) suberror ScopeLimitExceeded {
 /// Callers create fresh budgets for independent scopes. The limit is retained
 /// so fallback metadata reports the scope ceiling rather than remaining work.
 pub struct ScopeBudget {
-  limit : UInt
-  remaining : Ref[UInt]
+  limit : UInt32
+  remaining : Ref[UInt32]
 }
 
 ///|
-pub fn ScopeBudget::new(limit : UInt) -> ScopeBudget {
+pub fn ScopeBudget::new(limit : UInt32) -> ScopeBudget {
   { limit, remaining: Ref(limit), }
 }
 
 ///|
 /// Return the default work ceiling for each independent calculation scope.
-pub fn default_scope_limit() -> UInt {
+pub fn default_scope_limit() -> UInt32 {
   2_000_000
 }
 
 ///|
 pub fn ScopeBudget::charge(
   self : ScopeBudget,
-  units : UInt,
+  units : UInt32,
   stage : Stage,
 ) -> Unit raise ScopeLimitExceeded {
   if units > self.remaining.val {
@@ -51,8 +51,8 @@ pub fn ScopeBudget::charge(
 /// dimensions. This check must precede every corresponding matrix allocation.
 pub fn ScopeBudget::charge_matrix(
   self : ScopeBudget,
-  rows : Int,
-  columns : Int,
+  rows : Int32,
+  columns : Int32,
   stage : Stage,
 ) -> Unit raise ScopeLimitExceeded {
   if rows < 0 || columns < 0 {

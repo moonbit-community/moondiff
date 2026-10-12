@@ -2,8 +2,8 @@
 fn expand_file(
   model : Model,
   view : ChangeView,
-  generation : Int,
-  index : Int,
+  generation : Int32,
+  index : Int32,
   file : @change.FileState,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
@@ -54,7 +54,7 @@ fn expand_file(
 }
 
 ///|
-fn select_file(model : Model, index : Int) -> Model {
+fn select_file(model : Model, index : Int32) -> Model {
   {
     ..model,
     file_tree: {

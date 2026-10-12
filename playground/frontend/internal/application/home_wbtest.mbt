@@ -14,7 +14,7 @@ fn home_model() -> Model {
 ///|
 fn home_pull(
   number : String,
-  date? : String = "2026-09-17T00:00:00Z",
+  date~ : String = "2026-09-17T00:00:00Z",
 ) -> @protocol.ApiPullSummary {
   {
     owner: "upstream",
@@ -50,7 +50,7 @@ fn home_pulls_result(
 fn home_commit_result(
   model : Model,
   sha : String,
-  head? : String = "head",
+  head~ : String = "head",
   cursor? : String,
 ) -> Msg {
   Home(

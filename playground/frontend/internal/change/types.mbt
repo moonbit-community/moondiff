@@ -97,6 +97,6 @@ pub(all) struct ChangeView {
   message : String
   html_url : String
   stats : ApiStats
-  total_files : Int
+  total_files : Int32
   files : Array[FileState]
 } derive(Eq)

@@ -32,7 +32,7 @@ pub(all) struct ApiDeviceFlow {
   user_code : String
   verification_uri : String
   expires_at : Double
-  retry_after : Int
+  retry_after : Int32
   message : String
 } derive(Eq, FromJson, ToJson)
 

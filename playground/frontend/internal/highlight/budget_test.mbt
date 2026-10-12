@@ -1,5 +1,7 @@
 ///|
-fn counted_line_highlights(counts : Array[Int]) -> @highlight.SourceHighlights {
+fn counted_line_highlights(
+  counts : Array[Int32],
+) -> @highlight.SourceHighlights {
   let source = StringBuilder()
   let spans : Array[@highlight.HighlightSpan] = []
   let mut offset = 0

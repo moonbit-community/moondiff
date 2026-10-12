@@ -10,7 +10,7 @@ pub(all) struct Config {
   api_url : String
   oauth_url : String
   secure : Bool
-  anonymous_session_limit : Int
+  anonymous_session_limit : Int32
 }
 
 ///|
@@ -29,7 +29,7 @@ fn required_setting(name : String) -> String raise {
 }
 
 ///|
-fn root_url(value : String, local_only? : Bool = false) -> String raise {
+fn root_url(value : String, local_only~ : Bool = false) -> String raise {
   let origin = value.trim_end(chars="/").to_owned()
   let parts = origin.split("://").map(StringView::to_owned).collect()
   guard parts is [scheme, raw_authority] &&
@@ -81,7 +81,7 @@ fn root_url(value : String, local_only? : Bool = false) -> String raise {
     guard @common.decimal(port) && port.length() <= 5 else {
       fail("Invalid URL port")
     }
-    let number : Int = @json.from_json(@json.parse(port))
+    let number : Int32 = @json.from_json(@json.parse(port))
     guard number <= 65535 else { fail("Invalid URL port") }
     if (scheme == "https" && number == 443) ||
       (scheme == "http" && number == 80) {
@@ -127,7 +127,7 @@ pub fn Config::load() -> Config raise {
     anonymous_session_limit.length() <= 6 else {
     fail("MOONDIFF_ANONYMOUS_SESSION_LIMIT must be between 1 and 100000")
   }
-  let anonymous_session_limit : Int = @json.from_json(
+  let anonymous_session_limit : Int32 = @json.from_json(
     @json.parse(anonymous_session_limit),
   )
   guard anonymous_session_limit >= 1 && anonymous_session_limit <= 100000 else {

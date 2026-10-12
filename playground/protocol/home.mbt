@@ -32,7 +32,7 @@ pub(all) struct ApiPullSummary {
 ///|
 pub(all) struct ApiViewerPulls {
   items : Array[ApiPullSummary]
-  total_count : Int
+  total_count : Int32
   next_cursor : String?
   // A retryable search window remains; the result must not look complete.
   incomplete : String?
@@ -49,7 +49,7 @@ pub(all) struct ApiCommitSummary {
 ///|
 pub(all) struct ApiPullCommits {
   items : Array[ApiCommitSummary]
-  total_count : Int
+  total_count : Int32
   next_cursor : String?
   base_sha : String
   head_sha : String

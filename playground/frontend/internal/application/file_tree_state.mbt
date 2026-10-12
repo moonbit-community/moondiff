@@ -5,8 +5,8 @@ pub(all) struct FileTreeState {
   search_query : String
   selected_statuses : Array[String]
   collapsed_directories : Array[String]
-  selected_file_index : Int?
-  preferred_width : Int
+  selected_file_index : Int32?
+  preferred_width : Int32
 } derive(Eq)
 
 ///|
@@ -28,7 +28,7 @@ fn reset_file_tree_state(state : FileTreeState) -> FileTreeState {
 }
 
 ///|
-fn normalize_file_tree_width(width : Int) -> Int {
+fn normalize_file_tree_width(width : Int32) -> Int32 {
   if width < 240 {
     240
   } else if width > 640 {
@@ -39,7 +39,7 @@ fn normalize_file_tree_width(width : Int) -> Int {
 }
 
 ///|
-pub fn file_dom_id(index : Int) -> String {
+pub fn file_dom_id(index : Int32) -> String {
   "moondiff-file-\{index}"
 }
 

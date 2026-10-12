@@ -47,14 +47,14 @@ pub(all) enum FallbackReason {
   /// A structural position did not belong to the rendered source lines for
   /// one or both sides, so indexing it would have been unsafe.
   SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
-  GraphLimitExceeded(limit~ : UInt)
+  GraphLimitExceeded(limit~ : UInt32)
   /// The current calculation scope exhausted its configured work ceiling.
-  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt32)
 } derive(Debug, Eq)
 
 ///|
 /// A zero-based source range.
 pub(all) struct LineRange {
-  start : Int
-  len : Int
+  start : Int32
+  len : Int32
 } derive(Debug, Eq)

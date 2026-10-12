@@ -1,17 +1,21 @@
 ///|
 pub(all) enum Effect {
-  CommentsRequest(CommitRef, Int, (Result[ApiCommentBundle, Failure]) -> Event)
+  CommentsRequest(
+    CommitRef,
+    Int32,
+    (Result[ApiCommentBundle, Failure]) -> Event
+  )
   CommentHeadRequest(
     CommitRef,
     String,
-    Int,
+    Int32,
     (Result[ApiPull, Failure]) -> Event
   )
   CreateIssueCommentRequest(
     CommitRef,
     String,
     String,
-    Int,
+    Int32,
     (Result[ApiIssueComment, Failure]) -> Event
   )
   CreateReviewCommentRequest(
@@ -20,7 +24,7 @@ pub(all) enum Effect {
     String,
     ReviewAnchor,
     String,
-    Int,
+    Int32,
     (Result[ApiReviewComment, Failure]) -> Event
   )
   CreateCommitCommentRequest(
@@ -28,7 +32,7 @@ pub(all) enum Effect {
     String,
     ReviewAnchor,
     String,
-    Int,
+    Int32,
     (Result[ApiCommitComment, Failure]) -> Event
   )
   CreateReviewReplyRequest(
@@ -36,13 +40,13 @@ pub(all) enum Effect {
     String,
     Int64,
     String,
-    Int,
+    Int32,
     (Result[ApiReviewComment, Failure]) -> Event
   )
   DeleteCommentRequest(
     CommitRef,
     CommentId,
-    Int,
+    Int32,
     (Result[DeleteResult, Failure]) -> Event
   )
   Dispatch(Event)
@@ -51,7 +55,7 @@ pub(all) enum Effect {
 ///|
 fn raw_comments_request(
   reference : CommitRef,
-  generation : Int,
+  generation : Int32,
   respond : (Result[ApiCommentBundle, Failure]) -> Event,
 ) -> Effects {
   [CommentsRequest(reference, generation, respond)]
@@ -61,7 +65,7 @@ fn raw_comments_request(
 fn raw_comment_head_request(
   reference : CommitRef,
   number : String,
-  generation : Int,
+  generation : Int32,
   respond : (Result[ApiPull, Failure]) -> Event,
 ) -> Effects {
   [CommentHeadRequest(reference, number, generation, respond)]
@@ -72,7 +76,7 @@ fn raw_create_issue_comment_request(
   reference : CommitRef,
   number : String,
   body : String,
-  generation : Int,
+  generation : Int32,
   respond : (Result[ApiIssueComment, Failure]) -> Event,
 ) -> Effects {
   [CreateIssueCommentRequest(reference, number, body, generation, respond)]
@@ -85,7 +89,7 @@ fn raw_create_review_comment_request(
   commit_id : String,
   anchor : ReviewAnchor,
   body : String,
-  generation : Int,
+  generation : Int32,
   respond : (Result[ApiReviewComment, Failure]) -> Event,
 ) -> Effects {
   [
@@ -101,7 +105,7 @@ fn raw_create_commit_comment_request(
   sha : String,
   anchor : ReviewAnchor,
   body : String,
-  generation : Int,
+  generation : Int32,
   respond : (Result[ApiCommitComment, Failure]) -> Event,
 ) -> Effects {
   [
@@ -117,7 +121,7 @@ fn raw_create_review_reply_request(
   number : String,
   comment_id : Int64,
   body : String,
-  generation : Int,
+  generation : Int32,
   respond : (Result[ApiReviewComment, Failure]) -> Event,
 ) -> Effects {
   [
@@ -131,7 +135,7 @@ fn raw_create_review_reply_request(
 fn delete_comment_request(
   reference : CommitRef,
   id : CommentId,
-  generation : Int,
+  generation : Int32,
   respond : (Result[DeleteResult, Failure]) -> Event,
 ) -> Effects {
   [DeleteCommentRequest(reference, id, generation, respond)]

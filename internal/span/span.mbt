@@ -1,14 +1,14 @@
 ///|UUID(c6a0f8cd-be12-4d84-9af8-0d7654356da3)
 pub(all) struct SingleLineSpan {
-  line : Int
-  start_col : Int
-  end_col : Int
+  line : Int32
+  start_col : Int32
+  end_col : Int32
 } derive(Debug)
 
 ///|UUID(3694ba0a-e674-4b26-8d99-bd54c2c546bd)
 pub struct LineWidths {
   contents : Array[Char]
-  lines : Array[(Int, Int)]
+  lines : Array[(Int32, Int32)]
 }
 
 ///|UUID(472aa521-7ba5-4817-9180-4838b8416b23)
@@ -23,12 +23,12 @@ pub impl Debug for LineWidths with fn to_repr(self) {
 
 ///|UUID(c2453f0a-a480-4e28-bb5c-4ca37c519b2c)
 #alias("_[_]")
-pub fn LineWidths::at(self : Self, line : Int) -> ArrayView[Char] {
+pub fn LineWidths::at(self : Self, line : Int32) -> ArrayView[Char] {
   self.contents[self.lines[line].0:self.lines[line].1]
 }
 
 ///|UUID(5fde8c1c-43d9-41aa-9876-b54f660d01d9)
-pub fn LineWidths::get_line_width(self : Self, line : Int) -> Int {
+pub fn LineWidths::get_line_width(self : Self, line : Int32) -> Int32 {
   self.lines[line].1 - self.lines[line].0
 }
 

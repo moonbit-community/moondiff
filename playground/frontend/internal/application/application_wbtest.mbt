@@ -50,7 +50,7 @@ test "stale commit responses are discarded by generation" {
 ///|
 fn pull_test_model(
   reference : CommitRef,
-  generation : Int,
+  generation : Int32,
   phase : Phase,
 ) -> Model {
   {
@@ -538,7 +538,7 @@ fn ready_test_file(
   file : ApiFile,
   old : Array[String],
   new : Array[String],
-  expanded? : Bool = true,
+  expanded~ : Bool = true,
 ) -> FileState {
   {
     file,
@@ -1103,7 +1103,7 @@ test "HTTP request codes retain actionable GitHub guidance" {
 }
 
 ///|
-fn review_test_view(target? : ChangeTarget = PullRequest("17")) -> ChangeView {
+fn review_test_view(target~ : ChangeTarget = PullRequest("17")) -> ChangeView {
   let reference = CommitRef::{ owner: "upstream", repo: "project", target, }
   let repository = RepositoryRef::{ owner: "upstream", repo: "project", }
   let head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -1734,7 +1734,7 @@ fn auth_test_model(
   auth : AuthStatus,
   phase : Phase,
   route : CommitRef?,
-  last_authenticated_user_id? : String? = None,
+  last_authenticated_user_id~ : String? = None,
 ) -> Model {
   {
     viewed: empty_viewed_state(0),

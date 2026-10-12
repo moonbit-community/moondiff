@@ -1,13 +1,13 @@
 ///|
 fn scan_shell_double_part(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   opening : Bool,
   expand : Bool,
   state : ShellState,
   spans : Array[HighlightSpan],
-) -> (Int, Bool) {
+) -> (Int32, Bool) {
   let mut cursor = if opening { start + 1 } else { start }
   let mut plain = start
   while cursor < end {
@@ -18,7 +18,7 @@ fn scan_shell_double_part(
     }
     if source[cursor] == '\\' {
       add_span(spans, 0, plain, cursor, StringLiteral)
-      let escape_end = Int::min(cursor + 2, end)
+      let escape_end = Int32::min(cursor + 2, end)
       add_span(spans, 0, cursor, escape_end, Escape)
       cursor = escape_end
       plain = cursor
@@ -46,7 +46,7 @@ fn scan_shell_double_part(
 }
 
 ///|
-fn shell_word_end(source : String, start : Int, end : Int) -> Int {
+fn shell_word_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = start
   while cursor < end &&
         !(source[cursor]
@@ -71,8 +71,8 @@ fn shell_word_end(source : String, start : Int, end : Int) -> Int {
 ///|
 fn scan_shell(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   state : ShellState,
   expand : Bool,
   pending : Array[PendingHeredoc],
@@ -115,7 +115,7 @@ fn scan_shell(
       continue
     }
     if char == '\\' {
-      let escape_end = Int::min(cursor + 2, end)
+      let escape_end = Int32::min(cursor + 2, end)
       add_span(spans, 0, cursor, escape_end, Escape)
       cursor = escape_end
       continue
@@ -181,7 +181,7 @@ fn scan_shell(
       }
       let name = source[word_start:equal]
       let valid_name = !name.is_empty() &&
-        name[0] is ('a'..='z' | 'A'..='Z' | '_') &&
+        name[0] is ('a'..<='z' | 'A'..<='Z' | '_') &&
         variable_name_end(source, word_start, equal) == equal
       if valid_name {
         add_span(spans, 0, word_start, equal, Variable)

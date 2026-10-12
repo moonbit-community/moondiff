@@ -26,9 +26,9 @@ type DiffDocument = @model.DiffDocument
 priv struct DiffPipelineContext {
   old_view : SourceView
   new_view : SourceView
-  context : Int
-  graph_limit : UInt
-  scope_limit : UInt
+  context : Int32
+  graph_limit : UInt32
+  scope_limit : UInt32
   ignore_comments : Bool
   budget : @computation.ScopeBudget
 }
@@ -37,9 +37,9 @@ priv struct DiffPipelineContext {
 fn DiffPipelineContext::new(
   old_view : SourceView,
   new_view : SourceView,
-  context : Int,
-  graph_limit : UInt,
-  scope_limit : UInt,
+  context : Int32,
+  graph_limit : UInt32,
+  scope_limit : UInt32,
   ignore_comments : Bool,
 ) -> Self {
   {
@@ -187,12 +187,12 @@ fn calculate_diff_document_with_scope_limit(
   new_source : String,
   old_name : String,
   new_name : String,
-  context : Int,
-  graph_limit : UInt,
+  context : Int32,
+  graph_limit : UInt32,
   ignore_comments : Bool,
-  scope_limit : UInt,
-  ignore_tests? : Bool = false,
-  mode? : AlignedDiffMode = Ast,
+  scope_limit : UInt32,
+  ignore_tests~ : Bool = false,
+  mode~ : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
   let context = @cmp.maximum(context, 0)
   if old_source == new_source {

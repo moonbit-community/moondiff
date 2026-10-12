@@ -1,15 +1,15 @@
 // White-box tests for AST-specific line pairing and hunk grouping.
 
 ///|UUID(d7228f90-8748-409c-85dc-e7e69ec96c77)
-fn whole_line_span(line : Int, text : String) -> @span.SingleLineSpan {
+fn whole_line_span(line : Int32, text : String) -> @span.SingleLineSpan {
   { line, start_col: 1, end_col: text.length() + 1, }
 }
 
 ///|UUID(18960ac7-e004-469c-be30-f51141e1a28f)
 fn unchanged_line(
-  line : Int,
+  line : Int32,
   text : String,
-  opposite_line : Int,
+  opposite_line : Int32,
   opposite_text : String,
 ) -> @syntax.MatchedPos {
   {
@@ -19,7 +19,11 @@ fn unchanged_line(
 }
 
 ///|UUID(44fd5ac8-40bb-4819-93a8-73cb1f179e1f)
-fn novel_span(line : Int, start_col : Int, end_col : Int) -> @syntax.MatchedPos {
+fn novel_span(
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
+) -> @syntax.MatchedPos {
   { kind: Novel, pos: { line, start_col, end_col, }, }
 }
 

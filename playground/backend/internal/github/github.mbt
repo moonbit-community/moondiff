@@ -5,8 +5,8 @@ pub async fn upstream(
   meth : @http.RequestMethod,
   token : String,
   body : Json?,
-  source? : Bool = false,
-  accept? : String = "",
+  source~ : Bool = false,
+  accept~ : String = "",
 ) -> (@http.Response, Bytes) {
   @async.with_timeout(30000, () => {
     let headers : @http.Headers = {
@@ -155,7 +155,7 @@ async fn refresh_once(
 pub async fn authenticated(
   app : @storage.App,
   original : @storage.Session,
-  rejected_token? : String = "",
+  rejected_token~ : String = "",
 ) -> @storage.Session {
   guard app.session(original.id) is Some(current) &&
     current.epoch == original.epoch &&
@@ -193,10 +193,10 @@ pub async fn github(
   app : @storage.App,
   session : @storage.Session?,
   path : String,
-  meth? : @http.RequestMethod = Get,
+  meth~ : @http.RequestMethod = Get,
   body? : Json,
-  source? : Bool = false,
-  accept? : String = "",
+  source~ : Bool = false,
+  accept~ : String = "",
 ) -> (@http.Response, Bytes) {
   guard session is Some(session) && !session.tokens.is_empty() else {
     raise @common.RpcError(
@@ -255,7 +255,7 @@ pub async fn github_json(
   app : @storage.App,
   session : @storage.Session?,
   path : String,
-  meth? : @http.RequestMethod = Get,
+  meth~ : @http.RequestMethod = Get,
   body? : Json,
 ) -> Json {
   let (response, bytes) = github(app, session, path, meth~, body?)

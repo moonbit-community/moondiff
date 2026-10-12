@@ -7,10 +7,10 @@ priv struct ReviewProjection {
 
 ///|
 fn projection_site(
-  file : Int,
-  old_base : Int,
-  new_base : Int,
-  item : Int,
+  file : Int32,
+  old_base : Int32,
+  new_base : Int32,
+  item : Int32,
   fragment : String,
 ) -> String {
   "\{file}:\{fragment}:\{old_base}:\{new_base}:\{item}"
@@ -20,12 +20,12 @@ fn projection_site(
 fn project_document(
   projection : ReviewProjection,
   file : ApiFile,
-  index : Int,
+  index : Int32,
   document : @model.HunkDocument,
   mode : ViewMode,
-  old_base : Int,
-  new_base : Int,
-  fragment? : String = "line",
+  old_base : Int32,
+  new_base : Int32,
+  fragment~ : String = "line",
   cache? : FileDerivation,
 ) -> Unit {
   let mut line_index = 0
@@ -72,12 +72,12 @@ fn project_document(
 fn project_fragment(
   projection : ReviewProjection,
   file : ApiFile,
-  index : Int,
+  index : Int32,
   fragment : @mbtdiff.DiffFragment,
   mode : ViewMode,
   old_range : @mbtdiff.LineRange?,
   new_range : @mbtdiff.LineRange?,
-  section? : Int,
+  section? : Int32,
   cache? : FileDerivation,
 ) -> Unit {
   project_document(
@@ -97,7 +97,7 @@ fn project_fragment(
 fn append_file_projection(
   projection : ReviewProjection,
   file : FileState,
-  index : Int,
+  index : Int32,
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
@@ -179,7 +179,7 @@ fn append_file_projection(
 ///|
 fn file_projection(
   file : FileState,
-  index : Int,
+  index : Int32,
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
@@ -231,7 +231,7 @@ fn file_projection(
 fn projected_editor(
   discussions : InlineDiscussions,
   anchor : ReviewAnchor?,
-  file_index : Int,
+  file_index : Int32,
   site : String,
 ) -> Bool {
   match anchor {

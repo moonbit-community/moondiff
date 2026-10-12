@@ -14,8 +14,8 @@ priv struct ImplBodyTrigram {
 // Comment-free token trigrams for one function body. Mass counts duplicate
 // trigrams as well as unique ones so coverage remains asymmetric.
 priv struct ImplFuzzyBody {
-  trigrams : @hashmap.HashMap[ImplBodyTrigram, Int]
-  mass : Int
+  trigrams : @hashmap.HashMap[ImplBodyTrigram, Int32]
+  mass : Int32
 }
 
 ///|
@@ -106,8 +106,8 @@ priv enum TopLevelPlan {
 // `edits`; they are computed once when the plan is formed.
 priv struct PerUnitPlan {
   edits : Array[ImplEdit]
-  old_order : Array[Int]
-  new_order : Array[Int]
+  old_order : Array[Int32]
+  new_order : Array[Int32]
   reordered : Bool
 }
 

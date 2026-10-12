@@ -6,13 +6,19 @@ pub(all) enum HomeMsg {
   ToggleCommits(@protocol.ApiPullSummary)
   LoadCommits(String)
   PullsLoaded(
-    Int,
-    Int,
-    Int,
+    Int32,
+    Int32,
+    Int32,
     @protocol.ViewerPullKind,
     Result[@protocol.ApiViewerPulls, Error]
   )
-  CommitsLoaded(Int, Int, Int, String, Result[@protocol.ApiPullCommits, Error])
+  CommitsLoaded(
+    Int32,
+    Int32,
+    Int32,
+    String,
+    Result[@protocol.ApiPullCommits, Error]
+  )
 }
 
 ///|
@@ -91,9 +97,9 @@ fn begin_home_commits(
 ///|
 fn home_accepts(
   model : Model,
-  epoch : Int,
-  revision : Int,
-  generation : Int,
+  epoch : Int32,
+  revision : Int32,
+  generation : Int32,
 ) -> Bool {
   home_active(model) &&
   epoch == model.home.epoch &&

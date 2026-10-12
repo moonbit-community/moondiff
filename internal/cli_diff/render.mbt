@@ -52,8 +52,8 @@ fn source_lines(source : String) -> Array[String] {
 ///|
 fn terminal_options(
   options : Options,
-  old_max_line : Int,
-  new_max_line : Int,
+  old_max_line : Int32,
+  new_max_line : Int32,
 ) -> @terminal.RenderOptions {
   @terminal.RenderOptions::new(
     use_color=options.use_color,
@@ -172,7 +172,7 @@ fn section_kind(section : @model.DiffSection) -> String {
 }
 
 ///|
-fn section_title(index : Int, section : @model.DiffSection) -> String {
+fn section_title(index : Int32, section : @model.DiffSection) -> String {
   let old = section_old_range(section)
   let new = section_new_range(section)
   let title = "[section #\{index + 1} \{section_kind(section)}] " +
@@ -230,11 +230,11 @@ fn adjust_empty_side_hunk_anchors(
 fn render_section_fragment(
   old_label : String,
   new_label : String,
-  section_index : Int,
+  section_index : Int32,
   section : @model.DiffSection,
   options : Options,
-  old_line_count : Int,
-  new_line_count : Int,
+  old_line_count : Int32,
+  new_line_count : Int32,
 ) -> String {
   let fragment = section_fragment(section)
   if fragment.document.hunks.is_empty() && fragment.fallbacks.is_empty() {
@@ -270,8 +270,8 @@ fn render_top_level_document(
   new_label : String,
   top : @model.TopLevelDiff,
   options : Options,
-  old_line_count : Int,
-  new_line_count : Int,
+  old_line_count : Int32,
+  new_line_count : Int32,
 ) -> String {
   let buf = StringBuilder()
   let wrote = Ref(false)
@@ -288,7 +288,7 @@ fn render_top_level_document(
     }
   }
 
-  let deleted : Array[Int] = []
+  let deleted : Array[Int32] = []
   for section_index in top.old_order {
     if top.sections.get(section_index) is Some(Deleted(..)) {
       deleted.push(section_index)
@@ -319,8 +319,8 @@ fn render_whole_document(
   new_label : String,
   document : @model.HunkDocument,
   options : Options,
-  old_line_count : Int,
-  new_line_count : Int,
+  old_line_count : Int32,
+  new_line_count : Int32,
 ) -> String {
   let hunks = adjust_empty_side_hunk_anchors(
     document.hunks,
@@ -537,7 +537,7 @@ pub fn render(
   old_source : String,
   new_label : String,
   new_source : String,
-  options? : Options = Default::default(),
+  options~ : Options = Default::default(),
 ) -> String {
   let old_is_moonbit = old_label.has_suffix(".mbt")
   let new_is_moonbit = new_label.has_suffix(".mbt")

@@ -2,7 +2,7 @@
 pub fn delete_comment_request(
   reference : CommitRef,
   id : CommentId,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[DeleteResult, Error]],
 ) -> @rabbita.Cmd {
   let comment_id = match id {

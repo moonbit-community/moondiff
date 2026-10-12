@@ -1,7 +1,7 @@
 ///|
 pub fn get_pull_viewed(
   args : @protocol.PullViewedGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiPullViewed, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -20,7 +20,7 @@ pub fn get_pull_viewed(
 ///|
 pub fn set_file_viewed(
   args : @protocol.PullFileViewedSet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiFileViewedResult, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(

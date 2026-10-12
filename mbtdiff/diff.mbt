@@ -37,9 +37,9 @@
 pub fn diff(
   old_source : String,
   new_source : String,
-  old_name? : String = "old",
-  new_name? : String = "new",
-  options? : DiffOptions = Default::default(),
+  old_name~ : String = "old",
+  new_name~ : String = "new",
+  options~ : DiffOptions = Default::default(),
 ) -> DiffResult {
   if options.ignore_tests &&
     (@diff_ignore.is_test_file(old_name) || @diff_ignore.is_test_file(new_name)) {

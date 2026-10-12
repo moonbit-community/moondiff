@@ -25,7 +25,7 @@ pub fn Session::refresh(self : Session) -> CommentRefresh {
 }
 
 ///|
-pub fn Session::generation(self : Session) -> Int {
+pub fn Session::generation(self : Session) -> Int32 {
   self.context.generation
 }
 

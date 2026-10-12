@@ -1,7 +1,7 @@
 ///|
 fn consistency_pending(
   model : Model,
-  id : Int,
+  id : Int32,
   refresh : @comments.CommentRefresh,
 ) -> Model {
   let mut review = model.review

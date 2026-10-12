@@ -29,7 +29,7 @@
 /// ```
 pub struct Vertex {
   neighbours : Ref[Array[(Edge, Vertex)]?]
-  predecessor : Ref[(UInt, Vertex)?]
+  predecessor : Ref[(UInt32, Vertex)?]
   // TODO: experiment with storing SyntaxId only, and have a HashMap
   // from SyntaxId to Syntax.
   lhs_syntax : Syntax?
@@ -51,10 +51,10 @@ pub enum Edge {
   /// Is this node just punctuation? We penalise this case,
   /// because it's more useful to match e.g. a variable name
   /// than a comma.
-  UnchangedNode(depth_difference~ : UInt, probably_punctuation~ : Bool)
-  EnterUnchangedDelimiter(depth_difference~ : UInt)
-  ReplacedComment(levenshtein_pct~ : UInt)
-  ReplacedString(levenshtein_pct~ : UInt)
+  UnchangedNode(depth_difference~ : UInt32, probably_punctuation~ : Bool)
+  EnterUnchangedDelimiter(depth_difference~ : UInt32)
+  ReplacedComment(levenshtein_pct~ : UInt32)
+  ReplacedString(levenshtein_pct~ : UInt32)
   NovelAtomLHS
   NovelAtomRHS
   // TODO: An EnterNovelDelimiterBoth edge might help performance
@@ -252,7 +252,7 @@ pub fn Vertex::new(lhs~ : Syntax?, rhs~ : Syntax?) -> Vertex {
 }
 
 ///|UUID(09439f7f-5de9-4b87-b1be-248e286bd856)
-fn Edge::cost(self : Edge) -> UInt {
+fn Edge::cost(self : Edge) -> UInt32 {
   match self {
     // Matching nodes is always best.
     UnchangedNode(depth_difference~, probably_punctuation~) => {

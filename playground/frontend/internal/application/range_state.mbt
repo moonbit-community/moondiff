@@ -6,9 +6,9 @@ pub(all) struct RangeState {
   head_sha : String
   commits : Array[@protocol.ApiRangeCommit]
   linear_commits : Array[@protocol.ApiRangeCommit]?
-  total_commits : Int
-  loading_page : Int?
-  next_page : Int?
+  total_commits : Int32
+  loading_page : Int32?
+  next_page : Int32?
   error : String?
   expanded : Bool
   comparison : @protocol.ApiRangeCompare?
@@ -115,7 +115,7 @@ pub fn range_pull_history_unsupported(state : RangeState) -> Bool {
 }
 
 ///|
-fn range_commit_position(state : RangeState, sha : String) -> Int? {
+fn range_commit_position(state : RangeState, sha : String) -> Int32? {
   if sha == state.base_sha {
     return Some(0)
   }
@@ -155,7 +155,7 @@ pub fn range_commit_after(
 ///|
 fn range_page_error(
   state : RangeState,
-  page : Int,
+  page : Int32,
   data : @protocol.ApiRangeCompare,
 ) -> String? {
   let base = data.base_commit.sha
@@ -178,7 +178,7 @@ fn range_page_error(
     data.commits.length() > 100 ||
     data.total_commits < data.commits.length() ||
     data.commits.length() !=
-    Int::min(100, data.total_commits - state.commits.length()) {
+    Int32::min(100, data.total_commits - state.commits.length()) {
     return Some("GitHub returned an invalid commit interval page.")
   }
   if page == 1 && data.files is None {
@@ -219,7 +219,7 @@ fn range_page_error(
 ///|
 fn accept_range_page(
   state : RangeState,
-  page : Int,
+  page : Int32,
   data : @protocol.ApiRangeCompare,
 ) -> RangeState {
   let commits = state.commits.copy()

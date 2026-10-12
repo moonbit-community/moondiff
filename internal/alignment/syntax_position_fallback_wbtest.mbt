@@ -1,17 +1,17 @@
 ///|
 fn fallback_test_span(
-  line : Int,
-  start_col : Int,
-  end_col : Int,
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
 ) -> @span.SingleLineSpan {
   { line, start_col, end_col, }
 }
 
 ///|
 fn fallback_test_novel(
-  line : Int,
-  start_col : Int,
-  end_col : Int,
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
 ) -> MatchedPos {
   { kind: Novel, pos: fallback_test_span(line, start_col, end_col), }
 }
@@ -184,8 +184,8 @@ test "AST document validates primary and opposite positions before indexing" {
 ///|
 fn fallback_test_unit(
   source : String,
-  start_line : Int,
-  position_line : Int,
+  start_line : Int32,
+  position_line : Int32,
 ) -> ImplUnit {
   {
     root: @syntax.Syntax::atom(
@@ -204,7 +204,7 @@ fn fallback_test_unit(
 }
 
 ///|
-fn fallback_test_limit() -> UInt {
+fn fallback_test_limit() -> UInt32 {
   @computation.default_scope_limit()
 }
 

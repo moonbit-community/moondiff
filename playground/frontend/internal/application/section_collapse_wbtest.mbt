@@ -1,5 +1,5 @@
 ///|
-fn collapsed_sections(model : Model, index? : Int = 0) -> Array[String] {
+fn collapsed_sections(model : Model, index~ : Int32 = 0) -> Array[String] {
   guard model.phase is Showing(view) else { panic() }
   view.files[index].collapsed_sections
 }

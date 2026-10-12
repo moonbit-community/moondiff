@@ -136,7 +136,7 @@ test "ignore tests preserves CLI layout for files without tests" {
     #|fn first() { new_value() }
     #|///|UUID(second-id)
     #|fn second() { stable_value() }
-  let cases : Array[(String, String, UInt)] = [
+  let cases : Array[(String, String, UInt32)] = [
     ("", "fn inserted() { value() }", 3_000_000),
     ("fn deleted() { value() }", "", 3_000_000),
     (sectioned_old, sectioned_new, 3_000_000),

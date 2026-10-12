@@ -15,8 +15,8 @@ pub(all) struct MatchedPos {
 ///|UUID(800e3c11-f0dd-4202-8047-2c65537b4b03)
 priv struct WordPart {
   text : String
-  start : Int
-  end_ : Int
+  start : Int32
+  end_ : Int32
 }
 
 ///|UUID(7223d6dc-2ca6-46b2-b524-dd388be9d53f)
@@ -39,7 +39,7 @@ pub fn MatchKind::is_novel(self : Self) -> Bool {
 }
 
 ///|UUID(75e492e5-70a3-452a-bf1c-adb398a0db09)
-pub fn line_index(span : @span.SingleLineSpan) -> Int {
+pub fn line_index(span : @span.SingleLineSpan) -> Int32 {
   span.line - 1
 }
 
@@ -77,7 +77,7 @@ fn same_word_part_kind(kind : WordPartKind, ch : Char) -> Bool {
 }
 
 ///|UUID(23e682f0-8377-4384-a224-591ddab3bada)
-fn string_slice(chars : ArrayView[Char], start : Int, end_ : Int) -> String {
+fn string_slice(chars : ArrayView[Char], start : Int32, end_ : Int32) -> String {
   String::from_array(chars[start:end_].to_owned())
 }
 
@@ -117,9 +117,9 @@ fn split_word_parts(content : String) -> Array[WordPart] {
 fn relative_region_positions(
   content : String,
   positions : ArrayView[@span.SingleLineSpan],
-  first_line_padding : Int,
-  start : Int,
-  end_ : Int,
+  first_line_padding : Int32,
+  start : Int32,
+  end_ : Int32,
 ) -> Array[@span.SingleLineSpan] {
   if start >= end_ {
     return []
@@ -148,7 +148,7 @@ fn relative_region_positions(
 }
 
 ///|UUID(e6ad8aa3-0196-4422-aef1-d9b99d90c3a3)
-fn token_display_width(positions : ArrayView[@span.SingleLineSpan]) -> Int {
+fn token_display_width(positions : ArrayView[@span.SingleLineSpan]) -> Int32 {
   let width = Ref(0)
   for span in positions {
     width.val += span.end_col - span.start_col
@@ -161,7 +161,7 @@ fn first_line_padding_for_content(
   node : Syntax,
   positions : ArrayView[@span.SingleLineSpan],
   content : String,
-) -> Int {
+) -> Int32 {
   if positions.length() != 1 {
     return 0
   }
@@ -232,7 +232,7 @@ fn word_diffs_impl(
   let width = rhs_parts.length() + 1
   budget.charge_matrix(lhs_parts.length() + 1, width, IntralineMatching)
   let dp = Array::make((lhs_parts.length() + 1) * width, 0)
-  let index = fn(i : Int, j : Int) { i * width + j }
+  let index = fn(i : Int32, j : Int32) { i * width + j }
 
   let mut i = lhs_parts.length() - 1
   while i >= 0 {

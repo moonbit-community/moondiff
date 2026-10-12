@@ -35,7 +35,7 @@ fn change_controls(
 }
 
 ///|
-fn change_block_start_attrs(block : Int?) -> @html.Attrs {
+fn change_block_start_attrs(block : Int32?) -> @html.Attrs {
   let attrs = @html.Attrs::build()
   if block is Some(index) {
     attrs.data_set("change-block-start", index.to_string())

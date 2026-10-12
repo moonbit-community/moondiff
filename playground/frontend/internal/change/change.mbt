@@ -14,7 +14,7 @@ pub fn initial_side(url : String?, expanded : Bool) -> SideLoad {
 ///|
 pub fn source_requests_for_file(
   view : ChangeView,
-  index : Int,
+  index : Int32,
 ) -> Array[(SourceSide, SourceLocation)] {
   guard view.files.get(index) is Some(state) else { return [] }
   let pair = source_pair_for_revisions(
@@ -160,7 +160,7 @@ pub fn finish_range(
 ///|
 pub fn set_file_state(
   view : ChangeView,
-  index : Int,
+  index : Int32,
   state : FileState,
 ) -> ChangeView {
   let files = view.files.copy()

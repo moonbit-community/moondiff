@@ -1,5 +1,5 @@
 ///|UUID(dd23a24f-6ac3-473f-9c51-0994f0b96dbc)
-fn shared_prefix_len(lhs : ArrayView[Syntax], rhs : ArrayView[Syntax]) -> Int {
+fn shared_prefix_len(lhs : ArrayView[Syntax], rhs : ArrayView[Syntax]) -> Int32 {
   let limit = @cmp.minimum(lhs.length(), rhs.length())
   let mut i = 0
   while i < limit && lhs[i].content_id() == rhs[i].content_id() {
@@ -12,8 +12,8 @@ fn shared_prefix_len(lhs : ArrayView[Syntax], rhs : ArrayView[Syntax]) -> Int {
 fn shared_suffix_len(
   lhs : ArrayView[Syntax],
   rhs : ArrayView[Syntax],
-  prefix_len : Int,
-) -> Int {
+  prefix_len : Int32,
+) -> Int32 {
   let limit = @cmp.minimum(lhs.length(), rhs.length()) - prefix_len
   let mut i = 0
   while i < limit &&
@@ -41,11 +41,11 @@ fn root_matches_impl(
   lhs : ArrayView[Syntax],
   rhs : ArrayView[Syntax],
   budget : @computation.ScopeBudget,
-) -> Array[(Int, Int)] raise @computation.ScopeLimitExceeded {
+) -> Array[(Int32, Int32)] raise @computation.ScopeLimitExceeded {
   let width = rhs.length() + 1
   budget.charge_matrix(lhs.length() + 1, width, TopLevelAlignment)
   let dp = Array::make((lhs.length() + 1) * width, 0)
-  let index = fn(i : Int, j : Int) { i * width + j }
+  let index = fn(i : Int32, j : Int32) { i * width + j }
 
   let mut i = lhs.length()
   while i > 0 {
@@ -83,7 +83,7 @@ fn mark_root_segments(
   lhs_roots : ArrayView[Syntax],
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
-  graph_limit : UInt,
+  graph_limit : UInt32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   match (lhs_roots.length(), rhs_roots.length()) {
@@ -176,7 +176,7 @@ fn mark_syntax_subtree(
   lhs_root : Syntax?,
   rhs_root : Syntax?,
   change_map : ChangeMap,
-  graph_limit : UInt,
+  graph_limit : UInt32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   match (lhs_root, rhs_root) {
@@ -250,7 +250,7 @@ fn mark_syntax_roots_impl(
   lhs_roots : ArrayView[Syntax],
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
-  graph_limit : UInt,
+  graph_limit : UInt32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   let prefix_len = shared_prefix_len(lhs_roots, rhs_roots)
@@ -289,7 +289,7 @@ pub fn mark_syntax_roots_with_budget(
   lhs_roots : ArrayView[Syntax],
   rhs_roots : ArrayView[Syntax],
   change_map : ChangeMap,
-  graph_limit : UInt,
+  graph_limit : UInt32,
   budget : @computation.ScopeBudget,
 ) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded {
   mark_syntax_roots_impl(lhs_roots, rhs_roots, change_map, graph_limit, budget)

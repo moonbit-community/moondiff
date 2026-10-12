@@ -26,13 +26,13 @@ pub(all) struct DetailedDiffResult {
 pub fn calculate_diff_document(
   old_source : String,
   new_source : String,
-  old_name? : String = "old",
-  new_name? : String = "new",
-  context? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
-  mode? : AlignedDiffMode = Ast,
+  old_name~ : String = "old",
+  new_name~ : String = "new",
+  context~ : Int32 = 3,
+  graph_limit~ : UInt32 = 3_000_000,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
+  mode~ : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
   calculate_diff_document_with_scope_limit(
     old_source,
@@ -55,11 +55,11 @@ pub fn calculate_diff_document(
 pub fn diff_document_detailed(
   old_source : String,
   new_source : String,
-  context? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
-  mode? : AlignedDiffMode = Ast,
+  context~ : Int32 = 3,
+  graph_limit~ : UInt32 = 3_000_000,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
+  mode~ : AlignedDiffMode = Ast,
 ) -> DetailedDiffResult {
   calculate_diff_document(
     old_source,

@@ -1,5 +1,5 @@
 ///|
-pub fn file_navigation_enabled(model : Model, index : Int) -> Bool {
+pub fn file_navigation_enabled(model : Model, index : Int32) -> Bool {
   guard model.phase is Showing(view) &&
     view.files.get(index) is Some(file) &&
     file.expanded else {
@@ -20,8 +20,8 @@ pub fn file_navigation_enabled(model : Model, index : Int) -> Bool {
 ///|
 pub fn navigate_section_change(
   event : @dom.MouseEvent,
-  generation : Int,
-  direction : Int,
+  generation : Int32,
+  direction : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   find_section_change(
@@ -55,10 +55,10 @@ extern "js" fn section_change_inset(section : @dom.Element) -> Double =
 // collapsed section are targets, but cannot supply a reading position.
 extern "js" fn find_section_change(
   event : @dom.MouseEvent,
-  generation : Int,
-  direction : Int,
+  generation : Int32,
+  direction : Int32,
   inset : (@dom.Element) -> Double,
-  navigate : (Int, String, Int) -> @rabbita.Cmd,
+  navigate : (Int32, String, Int32) -> @rabbita.Cmd,
   none : @rabbita.Cmd,
 ) -> @rabbita.Cmd =
   #| (event, generation, direction, inset, navigate, none) => {
@@ -108,11 +108,11 @@ extern "js" fn find_section_change(
 
 ///|
 fn navigate_change_after_commit(
-  generation : Int,
-  file_index : Int,
+  generation : Int32,
+  file_index : Int32,
   section_key : String,
-  block : Int,
-  direction : Int,
+  block : Int32,
+  direction : Int32,
 ) -> @rabbita.Cmd {
   @cmd.custom_cmd(_ => {
     scroll_to_section_change(
@@ -128,11 +128,11 @@ fn navigate_change_after_commit(
 
 ///|
 extern "js" fn scroll_to_section_change(
-  generation : Int,
+  generation : Int32,
   file_id : String,
   section_key : String,
-  block : Int,
-  direction : Int,
+  block : Int32,
+  direction : Int32,
   inset : (@dom.Element) -> Double,
 ) -> Unit =
   #| (generation, fileId, sectionKey, block, direction, inset) => {

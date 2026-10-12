@@ -1,8 +1,8 @@
 ///|
 fn source_load_request(
   location : SourceLocation,
-  generation : Int,
-  index : Int,
+  generation : Int32,
+  index : Int32,
   side : SourceSide,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
@@ -14,8 +14,8 @@ fn source_load_request(
 ///|
 fn commands_for_file(
   view : ChangeView,
-  generation : Int,
-  index : Int,
+  generation : Int32,
+  index : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> Array[@rabbita.Cmd] {
   source_requests_for_file(view, index).map(request => {
@@ -27,7 +27,7 @@ fn commands_for_file(
 ///|
 fn commands_for_change(
   view : ChangeView,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let commands : Array[@rabbita.Cmd] = []
@@ -43,7 +43,7 @@ fn commands_for_change(
 
 ///|
 fn auth_status_request(
-  revision : Int,
+  revision : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.auth_status_request(result => {
@@ -54,8 +54,8 @@ fn auth_status_request(
 ///|
 fn reactivation_auth_status_request(
   reference : CommitRef?,
-  generation : Int,
-  revision : Int,
+  generation : Int32,
+  revision : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.auth_status_request(result => {
@@ -69,7 +69,7 @@ fn reactivation_auth_status_request(
 
 ///|
 fn auth_logout_request(
-  revision : Int,
+  revision : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.auth_logout_request(result => {
@@ -80,7 +80,7 @@ fn auth_logout_request(
 ///|
 fn comments_request(
   reference : CommitRef,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   if range_reference_parts(reference) is Some(_) {
@@ -94,7 +94,7 @@ fn device_request(
   model : Model,
   operation : @github_client.DeviceAction,
   id : String,
-  delay : Int,
+  delay : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.auth_device_request(operation, id, delay, result => {

@@ -84,7 +84,7 @@ fn[T] recover_home_cursor(page : HomePage[T], error : Error) -> HomePage[T] {
 fn[T] receive_home_page(
   previous : HomePage[T],
   items : Array[T],
-  total : Int,
+  total : Int32,
   cursor : String?,
   incomplete? : String,
 ) -> HomePage[T] {

@@ -20,7 +20,7 @@ let empty_group : CommentGroup = {
 
 ///|
 priv struct CommentIndex {
-  version : Int
+  version : Int32
   groups : Map[String, CommentGroup]
   owners : Map[String, String]
 } derive(Eq)
@@ -94,7 +94,7 @@ fn index_comments(before : Session, after : Session) -> Session {
 }
 
 ///|
-pub fn Session::comment_version(self : Session) -> Int {
+pub fn Session::comment_version(self : Session) -> Int32 {
   self.index.version
 }
 
@@ -160,7 +160,7 @@ pub struct ReadView {
   permissions : PermissionSummary
   group : CommentGroup
   pending_review_receipts : ReadOnlyArray[PendingReviewReceipt]
-  generation : Int
+  generation : Int32
   snapshot_stale : Bool
   login : String?
   deletion : CommentDeletion?
@@ -208,7 +208,7 @@ pub fn Session::overall_comments(
 pub fn Session::read_view(
   self : Session,
   path? : String,
-  paths? : ArrayView[String] = [],
+  paths~ : ArrayView[String] = [],
   group? : CommentGroup,
 ) -> ReadView {
   let group = match group {
@@ -358,7 +358,7 @@ pub fn ReadView::allowed(self : ReadView, action : Action) -> Bool {
 ///|
 pub fn file_threads(
   group : CommentGroup,
-  file_index : Int?,
+  file_index : Int32?,
   patch : @review.CanonicalPatch,
 ) -> Array[ReviewThread] {
   let comments = group.review_comments
@@ -400,7 +400,7 @@ pub fn file_threads(
 ///|
 pub fn file_commit_discussions(
   group : CommentGroup,
-  file_index : Int?,
+  file_index : Int32?,
   patch : @review.CanonicalPatch,
 ) -> Array[CommitDiscussion] {
   group.commit_comments
