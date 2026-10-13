@@ -66,9 +66,9 @@ fn pending_anchor() -> ReviewAnchor {
 ///|
 fn publish_inline_receipt(
   session : Session,
-  id : Int,
+  id : Int32,
   body : String,
-) -> (Session, ApiReviewComment, Int) {
+) -> (Session, ApiReviewComment, Int32) {
   let anchor = pending_anchor()
   let editing = update(session, OpenInlineDraft(0, anchor)).0
   let checking = update(update(editing, DraftBodyChanged(body)).0, SubmitDraft).0

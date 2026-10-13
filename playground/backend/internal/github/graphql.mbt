@@ -88,7 +88,7 @@ pub fn pull_snapshot(value : Json) -> PullSnapshot raise {
 
 ///|
 pub fn pull_variables(p : @protocol.PullViewedGet) -> Json raise {
-  let number : Int64 = @json.from_json(p.number.to_json())
+  let number : Int64 = @json.from_json(Json(p.number))
   { "owner": p.owner, "repo": p.repo, "number": number.to_int() }
 }
 

@@ -3,8 +3,8 @@
 // newline in an untrusted source. Character offsets keep slicing Unicode-safe.
 priv struct LineRangeScanner {
   chars : Array[Char]
-  mut line_start : Int
-  mut index : Int
+  mut line_start : Int32
+  mut index : Int32
   mut finished : Bool
 }
 
@@ -14,7 +14,7 @@ fn LineRangeScanner::new(source : String) -> Self {
 }
 
 ///|
-fn LineRangeScanner::next(self : Self) -> (Int, Int)? {
+fn LineRangeScanner::next(self : Self) -> (Int32, Int32)? {
   if self.finished {
     return None
   }
@@ -46,9 +46,9 @@ fn LineRangeScanner::next(self : Self) -> (Int, Int)? {
 /// Return half-open character ranges for lines separated by LF, CRLF, or CR.
 /// Newline characters are excluded and a terminator retains a final empty
 /// range.
-pub fn line_ranges(source : String) -> Array[(Int, Int)] {
+pub fn line_ranges(source : String) -> Array[(Int32, Int32)] {
   let scanner = LineRangeScanner::new(source)
-  let ranges : Array[(Int, Int)] = []
+  let ranges : Array[(Int32, Int32)] = []
   while scanner.next() is Some(range) {
     ranges.push(range)
   }

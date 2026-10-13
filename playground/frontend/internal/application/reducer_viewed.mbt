@@ -1,13 +1,13 @@
 ///|
 pub(all) enum ViewedMsg {
-  Toggle(Int, Int)
+  Toggle(Int32, Int32)
   Refresh
-  Restored(Int, Int, Result[Array[ViewedRecord], String])
-  Stored(Int, Int, ViewedRecord, Bool)
-  StorageFailed(Int)
-  Check(Int, Int, Int)
-  Loaded(Int, Int, Result[@protocol.ApiPullViewed, Error])
-  Saved(Int, Int, String, Result[@protocol.ApiFileViewedResult, Error])
+  Restored(Int32, Int32, Result[Array[ViewedRecord], String])
+  Stored(Int32, Int32, ViewedRecord, Bool)
+  StorageFailed(Int32)
+  Check(Int32, Int32, Int32)
+  Loaded(Int32, Int32, Result[@protocol.ApiPullViewed, Error])
+  Saved(Int32, Int32, String, Result[@protocol.ApiFileViewedResult, Error])
 }
 
 ///|
@@ -290,7 +290,7 @@ fn update_viewed(
 ///|
 fn rollback_viewed(
   model : Model,
-  index : Int,
+  index : Int32,
   file : ViewedFile,
   pending : ViewedPending,
   message : String,

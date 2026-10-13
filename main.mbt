@@ -12,7 +12,7 @@ priv struct CliOptions {
 }
 
 ///|UUID(9d8d9872-ee94-460e-99e1-8590c4ea178f)
-fn parse_graph_limit(text : String) -> UInt raise {
+fn parse_graph_limit(text : String) -> UInt32 raise {
   let limit = @string.parse_int(text)
   if limit < 0 {
     raise Failure::Failure("graph limit must be non-negative")
@@ -22,11 +22,11 @@ fn parse_graph_limit(text : String) -> UInt raise {
 
 ///|UUID(a34f9833-2141-48c6-8927-c7a3203564ee)
 #cfg(target="wasm")
-fn proc_exit_ffi(rval : Int) -> Unit = "wasi_snapshot_preview1" "proc_exit"
+fn proc_exit_ffi(rval : Int32) -> Unit = "wasi_snapshot_preview1" "proc_exit"
 
 ///|
 #cfg(target="native")
-extern "c" fn proc_exit_ffi(rval : Int) -> Unit = "exit"
+extern "c" fn proc_exit_ffi(rval : Int32) -> Unit = "exit"
 
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
 #moongrep.skip
@@ -114,7 +114,7 @@ fn render_cli_diff(
   options : CliOptions,
   old_source : String,
   new_source : String,
-  graph_limit : UInt,
+  graph_limit : UInt32,
 ) -> String {
   @cli_diff.render(
     options.old_path,

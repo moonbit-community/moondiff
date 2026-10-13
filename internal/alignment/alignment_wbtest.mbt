@@ -85,7 +85,7 @@ fn alignment_test_budget() -> @computation.ScopeBudget {
 fn align_impl_units_by_key(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
-  use_uuid? : Bool = true,
+  use_uuid~ : Bool = true,
 ) -> Array[ImplEdit] {
   align_impl_units_by_key_impl(
     old_units,
@@ -152,7 +152,7 @@ test "alignment state protects pairs and keeps excluded new units as inserts" {
 }
 
 ///|
-fn long_free_declaration(name : String, finish? : String = "finish") -> String {
+fn long_free_declaration(name : String, finish~ : String = "finish") -> String {
   let source =
     $|fn \{name}(input : Input) -> Output {
     $|  let first = step_one(input)
@@ -200,7 +200,7 @@ fn distinct_long_free_declaration(name : String, marker : String) -> String {
 }
 
 ///|
-fn many_independent_extraction_sources(count : Int) -> (String, String) {
+fn many_independent_extraction_sources(count : Int32) -> (String, String) {
   let old_declarations : Array[String] = []
   let new_declarations : Array[String] = []
   for i in 0..<count {
@@ -1507,10 +1507,10 @@ fn diff_document_for_test(
   old_source : String,
   new_source : String,
   mode : AlignedDiffMode,
-  context? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
+  context~ : Int32 = 3,
+  graph_limit~ : UInt32 = 3_000_000,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
 ) -> DetailedDiffResult {
   diff_document_detailed(
     old_source,
@@ -1763,8 +1763,8 @@ fn semantic_changed_text(result : DetailedDiffResult) -> String {
 ///|
 fn assert_fragment_bounds(
   fragment : @model.DiffFragment,
-  old_len : Int?,
-  new_len : Int?,
+  old_len : Int32?,
+  new_len : Int32?,
 ) -> Unit raise {
   for hunk in fragment.document.hunks {
     if old_len is Some(limit) {

@@ -5,18 +5,18 @@ pub(all) enum RangeMsg {
   ToggleCommits
   LoadMore
   CopyLink
-  RangePullLoaded(Int, Result[ApiPull, Error])
-  RangePullCompareLoaded(Int, Result[ApiCompare, Error])
-  RangeShaResolved(Int, Bool, Bool, Result[String, Error])
-  RangePageLoaded(Int, Int, Result[ApiRangeCompare, Error])
+  RangePullLoaded(Int32, Result[ApiPull, Error])
+  RangePullCompareLoaded(Int32, Result[ApiCompare, Error])
+  RangeShaResolved(Int32, Bool, Bool, Result[String, Error])
+  RangePageLoaded(Int32, Int32, Result[ApiRangeCompare, Error])
   RangePullCommitPageLoaded(
-    Int,
-    Int,
+    Int32,
+    Int32,
     Result[Array[@protocol.ApiRangeCommit], Error]
   )
   RangePullCommitPageValidated(
-    Int,
-    Int,
+    Int32,
+    Int32,
     Array[@protocol.ApiRangeCommit],
     Result[ApiPull, Error]
   )
@@ -28,7 +28,7 @@ fn range_resolve_request(
   sha : String,
   is_base : Bool,
   fork_attempt : Bool,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.resolve_sha(
@@ -44,7 +44,7 @@ fn range_resolve_request(
 fn range_start_resolution(
   reference : CommitRef,
   state : RangeState,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let repository = reference_repository(reference)
@@ -100,7 +100,7 @@ fn range_page_failure(
 ///|
 fn pull_commit_page_error(
   state : RangeState,
-  page : Int,
+  page : Int32,
   items : Array[@protocol.ApiRangeCommit],
   verified : ApiPull,
 ) -> String? {
@@ -116,7 +116,7 @@ fn pull_commit_page_error(
     )
   }
   if page != state.commits.length() / 100 + 1 ||
-    items.length() != Int::min(100, total - state.commits.length()) {
+    items.length() != Int32::min(100, total - state.commits.length()) {
     return Some(
       "GitHub returned an incomplete PR commit list. Refresh this PR.",
     )
@@ -143,7 +143,7 @@ fn pull_commit_page_error(
 ///|
 fn accept_pull_commit_page(
   state : RangeState,
-  page : Int,
+  page : Int32,
   items : Array[@protocol.ApiRangeCommit],
 ) -> RangeState {
   let commits = state.commits.copy()
@@ -175,8 +175,8 @@ fn range_compare_request(
   reference : CommitRef,
   base : String,
   head : String,
-  page : Int,
-  generation : Int,
+  page : Int32,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   @github_client.get_range_compare(
@@ -190,8 +190,8 @@ fn range_compare_request(
 fn range_commit_page_request(
   reference : CommitRef,
   state : RangeState,
-  page : Int,
-  generation : Int,
+  page : Int32,
+  generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   match (reference.target, state.pull) {
@@ -220,7 +220,7 @@ fn range_commit_page_request(
 fn range_page_loaded(
   model : Model,
   state : RangeState,
-  page : Int,
+  page : Int32,
   result : Result[ApiRangeCompare, Error],
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {

@@ -7,9 +7,9 @@ pub(all) enum ReviewRowKind {
 
 ///|
 pub(all) struct ReviewRow {
-  file_index : Int
-  old_line : Int?
-  new_line : Int?
+  file_index : Int32
+  old_line : Int32?
+  new_line : Int32?
   old_text : String?
   new_text : String?
   old_segments : ArrayView[@model.DiffSegment]?
@@ -27,7 +27,7 @@ pub(all) enum ReviewItem {
 }
 
 ///|
-fn review_hunk_range(start : Int, len : Int) -> String {
+fn review_hunk_range(start : Int32, len : Int32) -> String {
   if len == 1 {
     (start + 1).to_string()
   } else {
@@ -38,8 +38,8 @@ fn review_hunk_range(start : Int, len : Int) -> String {
 ///|
 fn review_hunk_header(
   hunk : @model.DiffHunk,
-  old_base : Int,
-  new_base : Int,
+  old_base : Int32,
+  new_base : Int32,
   hunk_context : String,
 ) -> String {
   let header = "@@ -\{review_hunk_range(hunk.old_start + old_base, hunk.old_len)} +\{review_hunk_range(hunk.new_start + new_base, hunk.new_len)} @@"
@@ -61,18 +61,18 @@ fn plain_review_segments(text : String) -> ArrayView[@model.DiffSegment] {
 
 ///|
 fn make_review_row(
-  file_index : Int,
+  file_index : Int32,
   _path : String,
   patch : CanonicalPatch,
-  old_line : Int?,
-  new_line : Int?,
+  old_line : Int32?,
+  new_line : Int32?,
   old_text : String?,
   new_text : String?,
   old_segments : ArrayView[@model.DiffSegment]?,
   new_segments : ArrayView[@model.DiffSegment]?,
   kind : ReviewRowKind,
   context : Bool,
-  change_block_start? : Bool = false,
+  change_block_start~ : Bool = false,
 ) -> ReviewRow {
   let old_anchor = match (context, old_line) {
     (false, Some(line)) => canonical_anchor(patch, Left, line)
@@ -100,12 +100,12 @@ fn make_review_row(
 
 ///|
 pub fn project_review_rows(
-  file_index : Int,
+  file_index : Int32,
   path : String,
   document : @model.HunkDocument,
   patch : CanonicalPatch,
-  old_base? : Int = 0,
-  new_base? : Int = 0,
+  old_base~ : Int32 = 0,
+  new_base~ : Int32 = 0,
 ) -> Array[ReviewRow] {
   let rows : Array[ReviewRow] = []
   for hunk in document.hunks {
@@ -199,14 +199,14 @@ pub fn project_review_rows(
 
 ///|
 pub fn project_review_items(
-  file_index : Int,
+  file_index : Int32,
   path : String,
   document : @model.HunkDocument,
   patch : CanonicalPatch,
-  old_base? : Int = 0,
-  new_base? : Int = 0,
-  show_hunk_headers? : Bool = true,
-  hunk_context? : String = "",
+  old_base~ : Int32 = 0,
+  new_base~ : Int32 = 0,
+  show_hunk_headers~ : Bool = true,
+  hunk_context~ : String = "",
 ) -> Array[ReviewItem] {
   let items : Array[ReviewItem] = []
   for hunk in document.hunks {

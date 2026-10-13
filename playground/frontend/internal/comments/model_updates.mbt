@@ -24,7 +24,7 @@ fn model_with_comment_auth_failure(model : Model, error : Failure) -> Model {
 ///|
 fn finish_comment_submission(
   model : Model,
-  generation : Int,
+  generation : Int32,
   error : Failure?,
 ) -> (Model, Effects) {
   if generation != model.generation {

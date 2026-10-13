@@ -35,7 +35,7 @@ pub fn Tok::text(self : Tok) -> String {
 /// The baseline alignment weight of a token class (integer; all scoring is
 /// integer so results are bit-identical on every backend). Token-level
 /// refinements such as comma downweighting are applied by the internal scorer.
-fn TokKind::weight(self : TokKind) -> Int {
+fn TokKind::weight(self : TokKind) -> Int32 {
   match self {
     Word | Str | Marker => 20
     Punct => 6
@@ -50,7 +50,7 @@ fn TokKind::weight(self : TokKind) -> Int {
 /// separator and is frequently introduced mechanically when formatting a
 /// construct across multiple lines, so it carries only the smallest non-zero
 /// amount of evidence. Other punctuation keeps the structural `Punct` weight.
-fn alignment_weight(token : Tok) -> Int {
+fn alignment_weight(token : Tok) -> Int32 {
   if token.kind is Punct && token.text == "," {
     1
   } else {
@@ -89,7 +89,7 @@ fn push_comment_tokens(toks : Array[Tok], body : String) -> Unit {
 }
 
 ///|
-fn fallback_char_class(c : Char) -> Int {
+fn fallback_char_class(c : Char) -> Int32 {
   if c.is_whitespace() {
     0
   } else if c.is_ascii_alphabetic() ||
@@ -103,12 +103,12 @@ fn fallback_char_class(c : Char) -> Int {
 }
 
 ///|
-fn starts_line_comment(line : String, offset : Int) -> Bool {
+fn starts_line_comment(line : String, offset : Int32) -> Bool {
   line.get_char(offset) == Some('/') && line.get_char(offset + 1) == Some('/')
 }
 
 ///|
-fn starts_marker(line : String, offset : Int) -> Bool {
+fn starts_marker(line : String, offset : Int32) -> Bool {
   starts_line_comment(line, offset) &&
   line.get_char(offset + 2) == Some('/') &&
   line.get_char(offset + 3) == Some('|')
@@ -129,7 +129,7 @@ fn lexer_complexity_within_limit(line : String) -> Bool {
 fn push_fallback_comment_tokens(
   toks : Array[Tok],
   line : String,
-  start : Int,
+  start : Int32,
 ) -> Unit {
   let mut offset = start
   while offset < line.length() {

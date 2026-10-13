@@ -36,8 +36,8 @@ fn open_comment_draft(model : Model, kind : DraftKind) -> (Model, Effects) {
 ///|
 fn owns_submission(
   model : Model,
-  generation : Int,
-  id : Int,
+  generation : Int32,
+  id : Int32,
   stage : SubmissionPhase,
 ) -> Bool {
   match model.review.editor {
@@ -52,9 +52,9 @@ fn owns_submission(
 ///|
 fn owns_response(
   session : Session,
-  generation : Int,
-  id : Int,
-  current : Int,
+  generation : Int32,
+  id : Int32,
+  current : Int32,
 ) -> Bool {
   generation == session.context.generation && id == current
 }

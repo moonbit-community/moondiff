@@ -68,7 +68,7 @@ fn receipt_test_refresh(
 
 ///|
 fn receipt_test_comment(
-  id : Int,
+  id : Int32,
   body : String,
   reply_to? : Int64,
 ) -> @protocol.ApiReviewComment {
@@ -96,7 +96,7 @@ fn receipt_test_anchor() -> ReviewAnchor {
 ///|
 fn receipt_test_publish_inline(
   session : @comments.Session,
-  id : Int,
+  id : Int32,
   body : String,
 ) -> (@comments.Session, @protocol.ApiReviewComment) {
   let anchor = receipt_test_anchor()

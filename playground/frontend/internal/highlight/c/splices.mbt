@@ -2,7 +2,7 @@
 priv struct SplicedSource {
   text : String
   // (logical offset, total removed UTF-16 units), in source order.
-  splices : Array[(Int, Int)]
+  splices : Array[(Int32, Int32)]
 }
 
 ///|

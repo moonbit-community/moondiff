@@ -1,8 +1,8 @@
 ///|
 /// CLI diff calculation and display options.
 pub struct Options {
-  context_lines : Int
-  graph_limit : UInt
+  context_lines : Int32
+  graph_limit : UInt32
   use_color : Bool
   ignore_comments : Bool
   ignore_tests : Bool
@@ -11,11 +11,11 @@ pub struct Options {
 ///|
 /// Construct safe CLI options, clamping a negative context radius to zero.
 pub fn Options::new(
-  context_lines? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  use_color? : Bool = false,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
+  context_lines~ : Int32 = 3,
+  graph_limit~ : UInt32 = 3_000_000,
+  use_color~ : Bool = false,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
 ) -> Options {
   {
     context_lines: if context_lines < 0 {

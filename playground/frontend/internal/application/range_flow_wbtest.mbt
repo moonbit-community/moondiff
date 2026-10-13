@@ -3,8 +3,8 @@ fn range_test_compare(
   base : String,
   head : String,
   merge : String,
-  total : Int,
-  count : Int,
+  total : Int32,
+  count : Int32,
   files : Array[ApiFile]?,
 ) -> ApiRangeCompare {
   let commits : Array[@protocol.ApiRangeCommit] = []
@@ -258,9 +258,9 @@ test "interval review waits for the final compare page" {
 
 ///|
 fn pull_page_items(
-  start : Int,
-  count : Int,
-  total : Int,
+  start : Int32,
+  count : Int32,
+  total : Int32,
   head : String,
 ) -> Array[@protocol.ApiRangeCommit] {
   let items : Array[@protocol.ApiRangeCommit] = []
@@ -299,7 +299,7 @@ test "PR commit API pages cover 100 and 250 commits with snapshot checks" {
     }
     let pages = (total + 99) / 100
     for page in 1..<=pages {
-      let count = Int::min(100, total - state.commits.length())
+      let count = Int32::min(100, total - state.commits.length())
       let items = pull_page_items(
         state.commits.length(),
         count,

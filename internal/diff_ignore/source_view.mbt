@@ -17,9 +17,9 @@ pub struct SourceView {
   source_lines : Array[String]
   line_views : Array[SourceLineView]
   lines : Array[String]
-  source_indices : Array[Int]
-  visible_indices : Array[Int]
-  source_line_offset : Int
+  source_indices : Array[Int32]
+  visible_indices : Array[Int32]
+  source_line_offset : Int32
 }
 
 ///|
@@ -46,9 +46,9 @@ fn source_line_is_blank(line : String) -> Bool {
 fn mark_ignored_range(
   ignored : Array[Array[Bool]],
   touched : Array[Bool],
-  line : Int,
-  start : Int,
-  end_ : Int,
+  line : Int32,
+  start : Int32,
+  end_ : Int32,
 ) -> Unit {
   guard ignored.get(line) is Some(mask) else { return }
   let start = @cmp.minimum(@cmp.maximum(start, 0), mask.length())
@@ -63,7 +63,7 @@ fn mark_ignored_range(
 fn mark_ignored_line(
   ignored : Array[Array[Bool]],
   touched : Array[Bool],
-  line : Int,
+  line : Int32,
 ) -> Unit {
   guard ignored.get(line) is Some(mask) else { return }
   touched[line] = true
@@ -131,10 +131,10 @@ fn mark_separator_lines(
 // The upstream lexer advances recursively once per lexical item. Keep the
 // safety decision in this lower-level package so comment view and token
 // diff use the same conservative threshold.
-const LEXER_COMPLEXITY_LIMIT : Int = 256
+const LEXER_COMPLEXITY_LIMIT : Int32 = 256
 
 ///|
-fn fallback_char_class(c : Char) -> Int {
+fn fallback_char_class(c : Char) -> Int32 {
   if c.is_whitespace() {
     0
   } else if c.is_ascii_alphabetic() ||
@@ -172,7 +172,7 @@ pub fn lexer_complexity_within_limit(line : String) -> Bool {
 ///|
 // Mirror enough quote handling to locate a real line comment without invoking
 // the recursive lexer on an externally supplied, unusually complex line.
-fn fallback_source_comment_start(line : String) -> Int? {
+fn fallback_source_comment_start(line : String) -> Int32? {
   let trimmed = line.trim_start()
   if trimmed.has_prefix("#|") || trimmed.has_prefix("$|") {
     return None
@@ -201,7 +201,7 @@ fn fallback_source_comment_start(line : String) -> Int? {
 }
 
 ///|
-fn source_comment_start(line : String) -> Int? {
+fn source_comment_start(line : String) -> Int32? {
   if !lexer_complexity_within_limit(line) {
     return fallback_source_comment_start(line)
   }
@@ -221,7 +221,7 @@ fn mark_comment(
   source_chars : ArrayView[Array[Char]],
   ignored : Array[Array[Bool]],
   touched : Array[Bool],
-  line_index : Int,
+  line_index : Int32,
 ) -> Unit {
   let line = source_lines[line_index]
   if source_line_is_blank(line) {
@@ -276,11 +276,11 @@ fn SourceLineView::fully_ignored(self : SourceLineView) -> Bool {
 ///|
 fn source_view_from_lines(
   line_views : Array[SourceLineView],
-  source_line_offset : Int,
+  source_line_offset : Int32,
 ) -> SourceView {
   let source_lines : Array[String] = []
   let lines : Array[String] = []
-  let source_indices : Array[Int] = []
+  let source_indices : Array[Int32] = []
   let visible_indices = Array::make(line_views.length(), -1)
   for source_index, line in line_views {
     source_lines.push(line.source)
@@ -348,8 +348,8 @@ fn make_source_view(
 /// by the same view so structural and lexical callers share one policy.
 pub fn SourceView::from_source(
   source : String,
-  ignored_ranges? : ArrayView[@basic.Location] = [],
-  ignore_comments? : Bool = false,
+  ignored_ranges~ : ArrayView[@basic.Location] = [],
+  ignore_comments~ : Bool = false,
 ) -> SourceView {
   make_source_view(
     if source == "" {
@@ -367,7 +367,7 @@ pub fn SourceView::from_source(
 /// whose public input distinguishes an empty array from a source string.
 pub fn SourceView::from_lines(
   lines : ArrayView[String],
-  ignore_comments? : Bool = false,
+  ignore_comments~ : Bool = false,
 ) -> SourceView {
   make_source_view(lines.to_owned(), [], ignore_comments)
 }
@@ -380,8 +380,8 @@ pub fn SourceView::lines(self : SourceView) -> ArrayView[String] {
 ///|
 pub fn SourceView::slice(
   self : SourceView,
-  source_start : Int,
-  source_len : Int,
+  source_start : Int32,
+  source_len : Int32,
 ) -> SourceView {
   let local_start = @cmp.minimum(
     @cmp.maximum(source_start - self.source_line_offset, 0),
@@ -400,8 +400,8 @@ pub fn SourceView::slice(
 ///|
 fn span_character_bounds(
   span : @span.SingleLineSpan,
-  line_len : Int,
-) -> (Int, Int)? {
+  line_len : Int32,
+) -> (Int32, Int32)? {
   if span.start_col == 0 {
     // Continuation spans use a zero-based start. Existing syntax producers
     // emit either a zero-based exclusive end or the one-based end sentinel.
@@ -421,7 +421,7 @@ fn span_character_bounds(
 }
 
 ///|
-fn visible_boundary(line : SourceLineView, boundary : Int) -> Int {
+fn visible_boundary(line : SourceLineView, boundary : Int32) -> Int32 {
   let mut visible = 0
   for index in 0..<@cmp.minimum(boundary, line.ignored.length()) {
     if !line.ignored[index] {

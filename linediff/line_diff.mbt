@@ -1,16 +1,16 @@
 ///|
-const LINE_DIFF_CUTOFF : Int = 4_096
+const LINE_DIFF_CUTOFF : Int32 = 4_096
 
 ///|
 fn make_diff_line(
-  index : Int,
+  index : Int32,
   segments : Array[@model.DiffSegment],
 ) -> @model.DiffLine {
   { index, segments: segments[:], }
 }
 
 ///|
-fn make_plain_diff_line(index : Int, text : String) -> @model.DiffLine {
+fn make_plain_diff_line(index : Int32, text : String) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = if text == "" {
     []
   } else {
@@ -23,8 +23,8 @@ fn make_plain_diff_line(index : Int, text : String) -> @model.DiffLine {
 fn plain_change_rows(
   old_lines : ArrayView[String],
   new_lines : ArrayView[String],
-  old_start : Int,
-  new_start : Int,
+  old_start : Int32,
+  new_start : Int32,
   budget : @worddiff.RefinementBudget,
 ) -> ArrayView[@model.DiffRow] {
   let rows : Array[@model.DiffRow] = []
@@ -69,7 +69,7 @@ fn plain_change_rows(
 }
 
 ///|
-fn edit_bounds(edit : @diff.Edit) -> (Int, Int, Int, Int) {
+fn edit_bounds(edit : @diff.Edit) -> (Int32, Int32, Int32, Int32) {
   match edit {
     Delete(old_index~, old_len~, new_index~) =>
       (old_index, new_index, old_index + old_len, new_index)
@@ -81,7 +81,7 @@ fn edit_bounds(edit : @diff.Edit) -> (Int, Int, Int, Int) {
 }
 
 ///|
-fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int, Int, Int, Int) {
+fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int32, Int32, Int32, Int32) {
   let (old_start, new_start, _, _) = edit_bounds(edits[0])
   let (_, _, old_end, new_end) = edit_bounds(edits[edits.length() - 1])
   (old_start, old_end - old_start, new_start, new_end - new_start)
@@ -173,7 +173,7 @@ fn plain_hunk(
 fn line_diff_with_budget(
   old : ArrayView[String],
   new : ArrayView[String],
-  context : Int,
+  context : Int32,
   budget : @worddiff.RefinementBudget,
 ) -> @model.HunkDocument {
   let context = if context < 0 { 0 } else { context }
@@ -196,7 +196,7 @@ fn line_diff_with_budget(
 pub fn line_diff(
   old~ : ArrayView[String],
   new~ : ArrayView[String],
-  context? : Int = 3,
+  context~ : Int32 = 3,
 ) -> @model.HunkDocument {
   line_diff_with_budget(old, new, context, @worddiff.RefinementBudget::new())
 }

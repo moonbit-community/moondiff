@@ -3,7 +3,7 @@ extern "js" fn fetch_public_text(
   path : String,
   source : Bool,
   sha : Bool,
-  completed : (Int, String, Bool) -> Unit,
+  completed : (Int32, String, Bool) -> Unit,
   failed : (String, String) -> Unit,
 ) -> () -> Unit =
   #| (path, source, sha, completed, failed) => {
@@ -66,7 +66,7 @@ extern "js" fn fetch_public_text(
 
 ///|
 fn github_response(
-  status : Int,
+  status : Int32,
   text : String,
   rate_limited : Bool,
 ) -> Json raise {
@@ -112,7 +112,7 @@ fn public_fetch(
   path : String,
   source : Bool,
   done : (Result[Json, Error]) -> Unit,
-  sha? : Bool = false,
+  sha~ : Bool = false,
 ) -> () -> Unit {
   fetch_public_text(
     path,

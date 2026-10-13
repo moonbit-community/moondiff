@@ -2,7 +2,7 @@
 priv struct CstElabCtx {
   source : String
   line_widths : LineWidths
-  line_ranges : Array[(Int, Int)]
+  line_ranges : Array[(Int32, Int32)]
 }
 
 ///|
@@ -168,7 +168,7 @@ fn syntax_atom_kind(
 fn first_child_with_label(
   children : ReadOnlyArray[(String?, @cst.CstNode)],
   wanted : String,
-) -> Int? {
+) -> Int32? {
   for i in 0..<children.length() {
     let (label, _) = children[i]
     if label == Some(wanted) {
@@ -182,7 +182,7 @@ fn first_child_with_label(
 fn last_child_with_label(
   children : ReadOnlyArray[(String?, @cst.CstNode)],
   wanted : String,
-) -> Int? {
+) -> Int32? {
   let mut i = children.length() - 1
   while i >= 0 {
     let (label, _) = children[i]
@@ -205,11 +205,11 @@ fn should_skip_child(label : String?) -> Bool {
 ///|
 fn is_gap_whitespace(ch : UInt16) -> Bool {
   match ch {
-    '\u{0009}'..='\u{000d}'
+    '\u{0009}'..<='\u{000d}'
     | '\u{0020}'
     | '\u{00a0}'
     | '\u{1680}'
-    | '\u{2000}'..='\u{200a}'
+    | '\u{2000}'..<='\u{200a}'
     | '\u{202f}'
     | '\u{205f}'
     | '\u{3000}'
@@ -221,13 +221,13 @@ fn is_gap_whitespace(ch : UInt16) -> Bool {
 ///|
 fn is_gap_word_char(ch : UInt16) -> Bool {
   match ch {
-    '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => true
+    '_' | '0'..<='9' | 'a'..<='z' | 'A'..<='Z' => true
     _ => false
   }
 }
 
 ///|
-fn CstElabCtx::find_line(self : Self, offset : Int) -> Int {
+fn CstElabCtx::find_line(self : Self, offset : Int32) -> Int32 {
   let mut low = 1
   let mut high = self.line_ranges.length() - 1
   let eof_line = high
@@ -248,8 +248,8 @@ fn CstElabCtx::find_line(self : Self, offset : Int) -> Int {
 ///|
 fn CstElabCtx::gap_position(
   self : Self,
-  start : Int,
-  end_ : Int,
+  start : Int32,
+  end_ : Int32,
 ) -> SingleLineSpan {
   let line = self.find_line(start)
   let (line_start, _) = self.line_ranges[line]
@@ -263,8 +263,8 @@ fn CstElabCtx::gap_position(
 fn CstElabCtx::append_gap(
   self : Self,
   children : Array[Syntax],
-  start_offset : Int,
-  end_offset : Int,
+  start_offset : Int32,
+  end_offset : Int32,
 ) -> Unit {
   let mut i = start_offset
   while i < end_offset {

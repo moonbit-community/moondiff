@@ -77,7 +77,7 @@ fn comment_editor(
   draft : CommentDraft,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  unavailable? : Bool = false,
+  unavailable~ : Bool = false,
 ) -> @rabbita.Html {
   @html.div(class="comment-editor", [
     comment_avatar(review.login),

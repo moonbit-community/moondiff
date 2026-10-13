@@ -1,8 +1,8 @@
 ///|UUID(65d38778-101d-4c7e-8ee6-803711f6a4f6)
 fn test_span(
-  line : Int,
-  start_col : Int,
-  end_col : Int,
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
 ) -> @span.SingleLineSpan {
   { line, start_col, end_col, }
 }
@@ -17,7 +17,7 @@ fn test_string_atom(content : String) -> Syntax {
 }
 
 ///|UUID(81d3736c-9a4e-4d96-8603-9c86d8f41c74)
-fn novel_width(positions : ArrayView[MatchedPos]) -> Int {
+fn novel_width(positions : ArrayView[MatchedPos]) -> Int32 {
   let width = Ref(0)
   for position in positions {
     if position.kind.is_novel() {

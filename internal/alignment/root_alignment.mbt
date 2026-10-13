@@ -11,10 +11,10 @@ priv struct AlignmentState {
   old_units : ArrayView[ImplUnit]
   new_units : ArrayView[ImplUnit]
   use_uuid : Bool
-  old_used : @hashmap.HashMap[Int, Bool]
-  new_used : @hashmap.HashMap[Int, Bool]
-  replacements : @hashmap.HashMap[Int, Int]
-  excluded_new : @hashmap.HashMap[Int, Bool]
+  old_used : @hashmap.HashMap[Int32, Bool]
+  new_used : @hashmap.HashMap[Int32, Bool]
+  replacements : @hashmap.HashMap[Int32, Int32]
+  excluded_new : @hashmap.HashMap[Int32, Bool]
 }
 
 ///|
@@ -35,7 +35,11 @@ fn AlignmentState::new(
 }
 
 ///|
-fn AlignmentState::pair(self : Self, old_index : Int, new_index : Int) -> Unit {
+fn AlignmentState::pair(
+  self : Self,
+  old_index : Int32,
+  new_index : Int32,
+) -> Unit {
   if !self.old_used.contains(old_index) &&
     !self.new_used.contains(new_index) &&
     !self.excluded_new.contains(new_index) {
@@ -46,7 +50,7 @@ fn AlignmentState::pair(self : Self, old_index : Int, new_index : Int) -> Unit {
 }
 
 ///|
-fn AlignmentState::exclude_new(self : Self, new_index : Int) -> Unit {
+fn AlignmentState::exclude_new(self : Self, new_index : Int32) -> Unit {
   self.excluded_new[new_index] = true
 }
 
@@ -71,7 +75,7 @@ fn AlignmentState::finish(self : Self) -> Array[ImplEdit] {
 ///|
 priv struct SemanticCandidateSet {
   pairs : Array[ImplSemanticPair]
-  new_used : @hashmap.HashMap[Int, Bool]
+  new_used : @hashmap.HashMap[Int32, Bool]
 }
 
 ///|
@@ -81,13 +85,13 @@ fn align_uuid_phase(state : AlignmentState) -> Unit {
   if !state.use_uuid {
     return
   }
-  let new_positions : @hashmap.HashMap[String, Array[Int]] = HashMap([])
+  let new_positions : @hashmap.HashMap[String, Array[Int32]] = HashMap([])
   for i in 0..<state.new_units.length() {
     if state.new_units[i].uuid is Some(uuid) {
       new_positions.get_or_init(uuid, fn() { [] }).push(i)
     }
   }
-  let new_offsets : @hashmap.HashMap[String, Int] = HashMap([])
+  let new_offsets : @hashmap.HashMap[String, Int32] = HashMap([])
   for i in 0..<state.old_units.length() {
     if state.old_units[i].uuid is Some(uuid) &&
       new_positions.get(uuid) is Some(indices) {
@@ -115,8 +119,8 @@ fn align_impl_units_by_uuid(
 
 ///|
 fn semantic_candidate_phase(state : AlignmentState) -> SemanticCandidateSet {
-  let old_key_counts : @hashmap.HashMap[String, Int] = HashMap([])
-  let new_key_counts : @hashmap.HashMap[String, Int] = HashMap([])
+  let old_key_counts : @hashmap.HashMap[String, Int32] = HashMap([])
+  let new_key_counts : @hashmap.HashMap[String, Int32] = HashMap([])
   for unit in state.old_units {
     if unit.semantic_key is Some(key) {
       old_key_counts[key] = old_key_counts.get(key).unwrap_or(0) + 1
@@ -131,16 +135,16 @@ fn semantic_candidate_phase(state : AlignmentState) -> SemanticCandidateSet {
   // Keep non-UUID semantic matches provisional until the extraction
   // challenge has inspected every key occupant. Duplicate keys retain their
   // original occurrence-order pairing and are never contestable.
-  let new_key_positions : @hashmap.HashMap[String, Array[Int]] = HashMap([])
+  let new_key_positions : @hashmap.HashMap[String, Array[Int32]] = HashMap([])
   for i in 0..<state.new_units.length() {
     if !state.new_used.contains(i) &&
       state.new_units[i].semantic_key is Some(key) {
       new_key_positions.get_or_init(key, fn() { [] }).push(i)
     }
   }
-  let key_offsets : @hashmap.HashMap[String, Int] = HashMap([])
+  let key_offsets : @hashmap.HashMap[String, Int32] = HashMap([])
   let pairs : Array[ImplSemanticPair] = []
-  let new_used : @hashmap.HashMap[Int, Bool] = HashMap([])
+  let new_used : @hashmap.HashMap[Int32, Bool] = HashMap([])
   for i in 0..<state.old_units.length() {
     if !state.old_used.contains(i) &&
       state.old_units[i].semantic_key is Some(key) &&
@@ -168,7 +172,7 @@ fn helper_extraction_phase(
   candidates : SemanticCandidateSet,
   budget : @computation.ScopeBudget,
 ) -> Unit raise @computation.ScopeLimitExceeded {
-  let new_challenge_used : @hashmap.HashMap[Int, Bool] = HashMap([])
+  let new_challenge_used : @hashmap.HashMap[Int32, Bool] = HashMap([])
   let old_body_cache : Array[ImplFuzzyBody?] = Array::make(
     state.old_units.length(),
     None,
@@ -207,7 +211,7 @@ fn exact_content_phase(state : AlignmentState) -> Unit {
   let old_roots = impl_roots(state.old_units)
   let new_roots = impl_roots(state.new_units)
   @syntax.init_all_info(old_roots, new_roots)
-  let old_content_counts : @hashmap.HashMap[UInt, Int] = HashMap([])
+  let old_content_counts : @hashmap.HashMap[UInt32, Int32] = HashMap([])
   for i in 0..<state.old_units.length() {
     if !state.old_used.contains(i) {
       let content_id = state.old_units[i].root.content_id()
@@ -217,7 +221,7 @@ fn exact_content_phase(state : AlignmentState) -> Unit {
         1
     }
   }
-  let new_content_positions : @hashmap.HashMap[UInt, Array[Int]] = HashMap([])
+  let new_content_positions : @hashmap.HashMap[UInt32, Array[Int32]] = HashMap([])
   for i in 0..<state.new_units.length() {
     if !state.new_used.contains(i) && !state.excluded_new.contains(i) {
       let content_id = state.new_units[i].root.content_id()
@@ -258,7 +262,7 @@ fn align_impl_units_by_key_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   budget : @computation.ScopeBudget,
-  use_uuid? : Bool = true,
+  use_uuid~ : Bool = true,
 ) -> Array[ImplEdit] raise @computation.ScopeLimitExceeded {
   let state = AlignmentState::new(old_units, new_units, use_uuid)
   align_uuid_phase(state)
@@ -280,8 +284,8 @@ fn impl_roots(units : ArrayView[ImplUnit]) -> Array[@syntax.Syntax] {
 
 ///|
 fn per_unit_plan(edits : Array[ImplEdit]) -> TopLevelPlan {
-  let old_order : Array[Int] = []
-  let new_order : Array[Int] = []
+  let old_order : Array[Int32] = []
+  let new_order : Array[Int32] = []
   for index, edit in edits {
     match edit {
       Replace(..) => {
@@ -304,13 +308,13 @@ fn per_unit_plan(edits : Array[ImplEdit]) -> TopLevelPlan {
       Delete(_) => -1
     }
   })
-  let old_matched : Array[Int] = []
+  let old_matched : Array[Int32] = []
   for index in old_order {
     if edits[index] is Replace(..) {
       old_matched.push(index)
     }
   }
-  let new_matched : Array[Int] = []
+  let new_matched : Array[Int32] = []
   for index in new_order {
     if edits[index] is Replace(..) {
       new_matched.push(index)
@@ -339,7 +343,7 @@ fn top_level_plan_impl(
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   budget : @computation.ScopeBudget,
-  ignore_uuid? : Bool = false,
+  ignore_uuid~ : Bool = false,
 ) -> TopLevelPlan raise @computation.ScopeLimitExceeded {
   if !ignore_uuid &&
     all_units_have_uuid(old_units) &&

@@ -129,8 +129,8 @@ test "semantic documents expose all section variants and both orders" {
   guard document is TopLevel(top) else { fail("expected a top-level document") }
   let sections = top.sections
   let _ : ArrayView[@model.DiffSection] = sections
-  let _ : ArrayView[Int] = top.old_order
-  let _ : ArrayView[Int] = top.new_order
+  let _ : ArrayView[Int32] = top.old_order
+  let _ : ArrayView[Int32] = top.new_order
   assert_true(
     sections
     is [

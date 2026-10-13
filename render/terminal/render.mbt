@@ -6,7 +6,7 @@ priv enum LineStyle {
 }
 
 ///|
-fn repeat_char(ch : Char, width : Int) -> String {
+fn repeat_char(ch : Char, width : Int32) -> String {
   let buf = StringBuilder(size_hint=width)
   for _ in 0..<width {
     buf.write_char(ch)
@@ -25,8 +25,8 @@ fn line_no_color(style : LineStyle) -> @chalk.Colors {
 
 ///|
 fn display_line_no(
-  line_index : Int?,
-  width : Int,
+  line_index : Int32?,
+  width : Int32,
   style : LineStyle,
   use_color : Bool,
 ) -> String {
@@ -50,10 +50,10 @@ fn display_line_no(
 
 ///|
 fn line_prefix(
-  old_line_index : Int?,
-  old_width : Int,
-  new_line_index : Int?,
-  new_width : Int,
+  old_line_index : Int32?,
+  old_width : Int32,
+  new_line_index : Int32?,
+  new_width : Int32,
   style : LineStyle,
   use_color : Bool,
 ) -> String {
@@ -129,8 +129,8 @@ fn append_document_change_line(
   buf : StringBuilder,
   line : @model.DiffLine,
   old_side : Bool,
-  old_width : Int,
-  new_width : Int,
+  old_width : Int32,
+  new_width : Int32,
   use_color : Bool,
 ) -> Unit {
   let changed_style = if old_side { Deleted } else { Added }
@@ -166,11 +166,11 @@ fn append_document_change_line(
 ///|
 fn append_document_context_line(
   buf : StringBuilder,
-  old_index : Int?,
-  new_index : Int?,
+  old_index : Int32?,
+  new_index : Int32?,
   text : String,
-  old_width : Int,
-  new_width : Int,
+  old_width : Int32,
+  new_width : Int32,
   use_color : Bool,
 ) -> Unit {
   buf.write_string(
@@ -185,8 +185,8 @@ fn append_document_context_line(
 fn append_document_change_row(
   buf : StringBuilder,
   row : @model.DiffRow,
-  old_width : Int,
-  new_width : Int,
+  old_width : Int32,
+  new_width : Int32,
   use_color : Bool,
 ) -> Unit {
   match row {
@@ -213,8 +213,8 @@ fn append_document_change_row(
 fn append_document_ignored_row(
   buf : StringBuilder,
   row : @model.DiffRow,
-  old_width : Int,
-  new_width : Int,
+  old_width : Int32,
+  new_width : Int32,
   use_color : Bool,
 ) -> Unit {
   match row {
@@ -273,12 +273,12 @@ fn append_document_ignored_row(
 }
 
 ///|
-fn update_document_max_line(max_line : Ref[Int], index : Int) -> Unit {
+fn update_document_max_line(max_line : Ref[Int32], index : Int32) -> Unit {
   max_line.val = @cmp.maximum(max_line.val, index + 1)
 }
 
 ///|
-fn document_line_widths(document : @model.HunkDocument) -> (Int, Int) {
+fn document_line_widths(document : @model.HunkDocument) -> (Int32, Int32) {
   let old_max = Ref(1)
   let new_max = Ref(1)
   for hunk in document.hunks {
@@ -307,7 +307,7 @@ fn document_line_widths(document : @model.HunkDocument) -> (Int, Int) {
 }
 
 ///|
-fn hinted_width(hint : Int?, document_width : Int) -> Int {
+fn hinted_width(hint : Int32?, document_width : Int32) -> Int32 {
   hint
   .map(line => @cmp.maximum(line, 1).to_string().length())
   .map(width => @cmp.maximum(width, document_width))
@@ -325,8 +325,8 @@ pub fn render_document(
   old_label : String,
   new_label : String,
   document : @model.HunkDocument,
-  options? : RenderOptions = Default::default(),
-  hunk_context? : String = "",
+  options~ : RenderOptions = Default::default(),
+  hunk_context~ : String = "",
 ) -> String {
   let (document_old_width, document_new_width) = document_line_widths(document)
   let old_width = hinted_width(options.old_max_line, document_old_width)

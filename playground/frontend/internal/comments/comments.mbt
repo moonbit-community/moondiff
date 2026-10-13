@@ -9,7 +9,7 @@ pub(all) enum CommentsStatus {
 ///|
 pub(all) enum DraftKind {
   OverallDraft
-  InlineDraft(Int, ReviewAnchor)
+  InlineDraft(Int32, ReviewAnchor)
   ReplyDraft(Int64)
 } derive(Eq)
 
@@ -45,17 +45,17 @@ pub(all) enum SubmissionPhase {
 ///|
 pub struct Session {
   priv index : CommentIndex
-  priv draft_sequence : Int
+  priv draft_sequence : Int32
   priv receipts : ApiCommentBundle
   // Track published review IDs until a verified list can replace the editor.
   priv pending_review_receipts : Array[PendingReviewReceipt]
   priv context : Context
   verified_snapshot : Snapshot?
-  refresh_id : Int
+  refresh_id : Int32
   priv refresh : CommentRefresh
   refresh_error : String?
   snapshot_stale : Bool
-  submission_id : Int
+  submission_id : Int32
   notice : String?
   published_url : String?
   can_comment : Bool
@@ -64,14 +64,14 @@ pub struct Session {
   authentication_error : String?
   priv comments : CommentsStatus
   priv editor : EditorState
-  deletion_id : Int
+  deletion_id : Int32
   deletion : CommentDeletion?
   // Successful deletions remain excluded from refreshes until the route generation changes.
   priv deleted : Array[CommentId]
 } derive(Eq)
 
 ///|
-pub fn Session::new(enabled? : Bool = false) -> Session {
+pub fn Session::new(enabled~ : Bool = false) -> Session {
   {
     index: CommentIndex::new(),
     draft_sequence: 0,
@@ -122,7 +122,7 @@ fn review_side_from_api(side : @protocol.CommentSide?) -> ReviewSide? {
 }
 
 ///|
-fn find_file_index(view : ChangeView, path : String) -> Int? {
+fn find_file_index(view : ChangeView, path : String) -> Int32? {
   for index, file in view.files {
     if file.file.filename == path {
       return Some(index)
@@ -171,7 +171,7 @@ pub(all) struct ReviewThread {
   id : CommentId
   root : ApiReviewComment
   replies : Array[ApiReviewComment]
-  file_index : Int?
+  file_index : Int32?
   outdated : Bool
 }
 
@@ -219,7 +219,7 @@ pub fn review_threads(
 ///|
 pub(all) struct CommitDiscussion {
   comment : ApiCommitComment
-  file_index : Int?
+  file_index : Int32?
   outdated : Bool
 }
 
@@ -240,8 +240,8 @@ pub fn commit_discussions(
 
 ///|
 pub(all) struct DraftId {
-  generation : Int
-  sequence : Int
+  generation : Int32
+  sequence : Int32
 } derive(Eq)
 
 ///|

@@ -7,12 +7,12 @@ priv struct ResponseWriter {
 ///|
 async fn respond(
   conn : ResponseWriter,
-  status : Int,
+  status : Int32,
   body : Bytes,
-  content_type? : String = "application/json; charset=utf-8",
-  headers? : @http.Headers = {},
-  cookies? : Array[@http.Cookie] = [],
-  head? : Bool = false,
+  content_type~ : String = "application/json; charset=utf-8",
+  headers~ : @http.Headers = {},
+  cookies~ : Array[@http.Cookie] = [],
+  head~ : Bool = false,
 ) -> Unit {
   headers["Content-Type"] = content_type
   headers["Content-Length"] = body.length().to_string()
@@ -41,7 +41,7 @@ async fn respond(
 async fn[T : ToJson] respond_json(
   conn : ResponseWriter,
   value : T,
-  cookies? : Array[@http.Cookie] = [],
+  cookies~ : Array[@http.Cookie] = [],
 ) -> Unit {
   let body = ToJson::to_json((Success(value~) : @protocol.Response[T]))
   respond(conn, 200, @utf8.encode(body.stringify()), cookies~)

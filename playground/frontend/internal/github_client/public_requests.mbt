@@ -173,7 +173,7 @@ fn Client::comment_pages(
   self : Client,
   pending : PublicPending,
   path : String,
-  page : Int,
+  page : Int32,
   accumulated : Array[Json],
   done : (Result[Array[Json], Error]) -> Unit,
 ) -> Unit {
@@ -314,7 +314,7 @@ fn Client::perform_public(
 fn Client::public_rpc(
   self : Client,
   request : @protocol.GitHubRequest,
-  generation : Int,
+  generation : Int32,
   done : (Result[@protocol.RpcValue, Error]) -> Unit,
 ) -> Unit {
   self.cancel_before(generation)

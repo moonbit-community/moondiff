@@ -69,7 +69,7 @@ fn home_commit_view(
   let p = value.pull
   let items : Map[String, @rabbita.Html] = Map([])
   for item in value.page.items {
-    let sha = item.sha[:Int::min(7, item.sha.length())].to_owned()
+    let sha = item.sha[:Int32::min(7, item.sha.length())].to_owned()
     items[item.sha] = @html.li(class="home-commit", [
       home_link(
         "/\{p.owner}/\{p.repo}/pull/\{p.number}/commits/\{item.sha}",

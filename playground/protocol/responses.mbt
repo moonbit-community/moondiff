@@ -1,6 +1,6 @@
 ///|
 pub(all) struct ApiError {
-  status : Int
+  status : Int32
   code : String
   message : String
 } derive(Eq, FromJson, ToJson)
@@ -37,7 +37,7 @@ pub(all) enum RpcValue {
 ///|
 pub(all) struct ApiSource {
   base64 : String
-  size : Int
+  size : Int32
   content_type : String
 } derive(Eq, FromJson, ToJson)
 

@@ -47,7 +47,7 @@ fn segment_name(kind : @mbtdiff.DiffSegmentKind) -> String {
 }
 
 ///|
-fn traverse_hunk_document(document : @mbtdiff.HunkDocument) -> Int {
+fn traverse_hunk_document(document : @mbtdiff.HunkDocument) -> Int32 {
   let _ : ArrayView[@mbtdiff.DiffHunk] = document.hunks
   let mut segments = 0
   for hunk in document.hunks {
@@ -108,8 +108,8 @@ test "external consumer exhaustively matches the semantic result" {
   }
   let _ : @mbtdiff.TopLevelDiff = top
   let _ : ArrayView[@mbtdiff.DiffSection] = top.sections
-  let _ : ArrayView[Int] = top.old_order
-  let _ : ArrayView[Int] = top.new_order
+  let _ : ArrayView[Int32] = top.old_order
+  let _ : ArrayView[Int32] = top.new_order
   assert_true(top.old_order is [0, 1])
   assert_true(top.new_order is [2, 0])
   assert_eq(top.sections.length(), 3)

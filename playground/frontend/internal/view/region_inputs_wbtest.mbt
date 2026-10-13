@@ -56,7 +56,7 @@ fn region_model() -> Model {
 }
 
 ///|
-fn test_file_input(model : Model, index : Int) -> FileInput {
+fn test_file_input(model : Model, index : Int32) -> FileInput {
   guard model.phase is Showing(view) else { panic() }
   file_input(false, model, index, view.files[index])
 }

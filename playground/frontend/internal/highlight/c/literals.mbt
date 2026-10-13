@@ -2,7 +2,7 @@
 fn collect_string(
   input : StringView,
   quote : Char,
-  start : Int,
+  start : Int32,
   spans : Array[HighlightSpan],
 ) -> StringView {
   let mut plain = start

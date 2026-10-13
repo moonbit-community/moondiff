@@ -1,12 +1,12 @@
 ///|
 fn parse_heredoc(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   shell : Bool,
   pending : Array[PendingHeredoc],
   spans : Array[HighlightSpan],
-) -> Int {
+) -> Int32 {
   let mut cursor = start + 2
   let mut strip_tabs = false
   if cursor < end && source[cursor] == '-' {
@@ -59,7 +59,7 @@ fn heredoc_content_start(
   source : String,
   line : SourceLine,
   strip_tabs : Bool,
-) -> Int {
+) -> Int32 {
   let mut start = line.start
   if strip_tabs {
     while start < line.end && source[start] == '\t' {

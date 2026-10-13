@@ -515,7 +515,7 @@ fn semantic_declaration_context_text(
 
 ///|
 pub fn semantic_section_title(
-  index : Int,
+  index : Int32,
   section : @mbtdiff.DiffSection,
 ) -> String {
   let kind = match section {
@@ -560,8 +560,8 @@ fn semantic_document_has_fallback(document : @mbtdiff.DiffDocument) -> Bool {
 ///|
 fn semantic_fragment_view(
   file : FileState,
-  file_index : Int,
-  section_index : Int?,
+  file_index : Int32,
+  section_index : Int32?,
   fragment : @mbtdiff.DiffFragment,
   old_range : @mbtdiff.LineRange?,
   new_range : @mbtdiff.LineRange?,
@@ -571,12 +571,12 @@ fn semantic_fragment_view(
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   whole : Bool,
-  expanded? : Bool = true,
-  generation? : Int = 0,
-  section_key? : String = "",
-  on_toggle? : @rabbita.Cmd = @rabbita.none,
-  show_hunk_headers? : Bool = true,
-  discussions? : InlineDiscussions = empty_discussions(),
+  expanded~ : Bool = true,
+  generation~ : Int32 = 0,
+  section_key~ : String = "",
+  on_toggle~ : @rabbita.Cmd = @rabbita.none,
+  show_hunk_headers~ : Bool = true,
+  discussions~ : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let title = section_index.map(index => {
     semantic_section_title(
@@ -647,14 +647,14 @@ fn semantic_fragment_view(
 ///|
 fn top_level_diff_view(
   file : FileState,
-  generation : Int,
-  file_index : Int,
+  generation : Int32,
+  file_index : Int32,
   top : @mbtdiff.TopLevelDiff,
   mode : ViewMode,
   show_hunk_headers : Bool,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  discussions? : InlineDiscussions = empty_discussions(),
+  discussions~ : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let sections : Map[String, @rabbita.Html] = Map([])
   let section_keys = semantic_section_keys(top.sections)
@@ -737,14 +737,14 @@ fn top_level_diff_view(
 ///|
 fn semantic_document_view(
   file : FileState,
-  generation : Int,
-  file_index : Int,
+  generation : Int32,
+  file_index : Int32,
   document : @mbtdiff.DiffDocument,
   mode : ViewMode,
   show_hunk_headers : Bool,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  discussions? : InlineDiscussions = empty_discussions(),
+  discussions~ : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   match document {
     Whole(fragment) =>
@@ -781,15 +781,15 @@ fn semantic_document_view(
 ///|
 fn file_diff_view(
   file : FileState,
-  generation : Int,
-  index : Int,
+  generation : Int32,
+  index : Int32,
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
   ignore_tests : Bool,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  discussions? : InlineDiscussions = empty_discussions(),
+  discussions~ : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let problem = if source_problem(file.old_side) is Some(message) {
     Some(message)
@@ -915,8 +915,8 @@ fn file_diff_view(
 ///|
 fn file_card(
   file : FileState,
-  generation : Int,
-  index : Int,
+  generation : Int32,
+  index : Int32,
   mode : ViewMode,
   algorithm : DiffAlgorithm,
   ignore_comments : Bool,
@@ -924,9 +924,9 @@ fn file_card(
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   navigation_enabled~ : Bool,
-  viewed? : @rabbita.Html = @html.nothing,
-  viewed_error? : @rabbita.Html = @html.nothing,
-  discussions? : InlineDiscussions = empty_discussions(),
+  viewed~ : @rabbita.Html = @html.nothing,
+  viewed_error~ : @rabbita.Html = @html.nothing,
+  discussions~ : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
   let toggle_label = if file.expanded { "Collapse" } else { "Expand" }
   @html.article(
@@ -1037,7 +1037,7 @@ fn semantic_section_key(section : @mbtdiff.DiffSection) -> String {
 fn semantic_section_keys(
   sections : ArrayView[@mbtdiff.DiffSection],
 ) -> Array[String] {
-  let occurrences : Map[String, Int] = Map([])
+  let occurrences : Map[String, Int32] = Map([])
   // Count every section before filtering so visibility cannot renumber siblings.
   sections.map(section => {
     let base = semantic_section_key(section)

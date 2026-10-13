@@ -2,11 +2,15 @@
 priv struct FlowContext {
   mapping : Bool
   mut key : Bool
-  column : Int
+  column : Int32
 }
 
 ///|
-fn push_block(blocks : Array[(Int, Bool)], indent : Int, key : Bool) -> Unit {
+fn push_block(
+  blocks : Array[(Int32, Bool)],
+  indent : Int32,
+  key : Bool,
+) -> Unit {
   while blocks.last() is Some((previous, _)) && previous >= indent {
     let _ = blocks.pop()
   }
@@ -28,7 +32,7 @@ fn collect_tokens(source : String) -> Array[HighlightSpan] {
   let flow : Array[FlowContext] = []
   // Block frames record the indentation of the owning ':' / '-' / '?' node,
   // including compact mappings in sequences, rather than the value column.
-  let blocks : Array[(Int, Bool)] = []
+  let blocks : Array[(Int32, Bool)] = []
   let mut row = 0
   let mut context_row = -1
   let mut node_column = -1

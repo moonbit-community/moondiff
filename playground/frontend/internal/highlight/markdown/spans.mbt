@@ -1,18 +1,18 @@
 ///|
 priv struct Candidate {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
   kind : HighlightKind
-  priority : Int
+  priority : Int32
 }
 
 ///|
 fn candidate(
   candidates : Array[Candidate],
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   kind : HighlightKind,
-  priority : Int,
+  priority : Int32,
 ) -> Unit {
   if start < end {
     candidates.push({ start, end, kind, priority, })
@@ -30,8 +30,8 @@ fn resolve_candidates(
   candidates.sort_by((a, b) => a.priority.compare(b.priority))
   let kinds : Array[HighlightKind?] = Array::make(source.length(), None)
   for item in candidates {
-    let start = Int::max(0, item.start)
-    let end = Int::min(source.length(), item.end)
+    let start = Int32::max(0, item.start)
+    let end = Int32::min(source.length(), item.end)
     for cursor in start..<end {
       if !(source[cursor] is ('\r' | '\n')) {
         kinds[cursor] = Some(item.kind)

@@ -20,9 +20,9 @@ fn moonbit_fence(language : String) -> Bool {
 fn collect_docs(
   source : String,
   tokens : ArrayView[@tokens.Triple],
-  offset : Int,
+  offset : Int32,
   spans : Array[HighlightSpan],
-  depth : Int,
+  depth : Int32,
 ) -> Unit {
   let mut fence : (String, Bool)? = None
   let code = StringBuilder()

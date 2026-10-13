@@ -1,11 +1,11 @@
 ///|
 enum FileTreeRow {
-  TreeDirectory(path~ : String, name~ : String, depth~ : Int)
+  TreeDirectory(path~ : String, name~ : String, depth~ : Int32)
   TreeFile(
-    index~ : Int,
+    index~ : Int32,
     path~ : String,
     name~ : String,
-    depth~ : Int,
+    depth~ : Int32,
     status~ : String,
     previous_path~ : String?
   )
@@ -15,7 +15,7 @@ enum FileTreeRow {
 priv enum FileTreeNode {
   TreeNodeDirectory(path~ : String, name~ : String)
   TreeNodeFile(
-    index~ : Int,
+    index~ : Int32,
     path~ : String,
     name~ : String,
     status~ : String,
@@ -26,7 +26,7 @@ priv enum FileTreeNode {
 ///|
 priv struct FileTreeProjection {
   visible_rows : Array[FileTreeRow]
-  matching_count : Int
+  matching_count : Int32
 }
 
 ///|
@@ -56,7 +56,7 @@ fn file_tree_children_for(
 ///|
 fn append_file_tree_rows(
   parent : String,
-  depth : Int,
+  depth : Int32,
   children : Map[String, Array[FileTreeNode]],
   rows : Array[FileTreeRow],
 ) -> Unit {
@@ -186,7 +186,7 @@ fn project_file_tree(
   let visible_rows : Array[FileTreeRow] = []
   if filtering {
     let query = state.search_query.trim().to_owned().to_lower()
-    let matching_files : Map[Int, Unit] = Map([])
+    let matching_files : Map[Int32, Unit] = Map([])
     let matching_directories : Map[String, Unit] = Map([])
     let mut matching_count = 0
     for row in rows {
@@ -274,7 +274,7 @@ fn file_tree_status_class(status : String) -> String {
 fn file_tree_row_view(
   row : FileTreeRow,
   state : FileTreeState,
-  generation : Int,
+  generation : Int32,
   filtering : Bool,
   viewed : Array[Bool],
   emit : @rabbita.Emit[Msg],
@@ -440,8 +440,8 @@ extern "js" fn trap_file_tree_tab(event : @dom.KeyboardEvent) -> Unit =
 extern "js" fn update_file_tree_resize(
   event : @dom.MouseEvent,
   action : String,
-  preferred_width : Int,
-) -> Int =
+  preferred_width : Int32,
+) -> Int32 =
   #| (event, action, preferredWidth) => {
   #|   const handle = event.currentTarget
   #|   if (!(handle instanceof HTMLElement)) return -1

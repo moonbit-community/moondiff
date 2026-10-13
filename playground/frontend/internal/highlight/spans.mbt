@@ -1,8 +1,8 @@
 ///|
-const MAX_LINE_SPANS : Int = 1024
+const MAX_LINE_SPANS : Int32 = 1024
 
 ///|
-const MAX_SOURCE_SPANS : Int = 16384
+const MAX_SOURCE_SPANS : Int32 = 16384
 
 ///|
 /// Index absolute, non-overlapping UTF-16 spans by one-based source line.
@@ -13,7 +13,7 @@ pub fn SourceHighlights::from_spans(
   spans : ArrayView[HighlightSpan],
 ) -> SourceHighlights {
   let starts = [0]
-  let ends : Array[Int] = []
+  let ends : Array[Int32] = []
   for i = 0; i < source.length(); {
     if source[i] == '\r' || source[i] == '\n' {
       ends.push(i)
@@ -43,13 +43,13 @@ pub fn SourceHighlights::from_spans(
       first += 1
     }
     let line = lines[index]
-    let limit = Int::min(MAX_LINE_SPANS, remaining)
+    let limit = Int32::min(MAX_LINE_SPANS, remaining)
     for cursor = first
         cursor < spans.length() && spans[cursor].start < ends[index]
         cursor = cursor + 1 {
       let span = spans[cursor]
-      let start = Int::max(span.start, starts[index])
-      let end = Int::min(span.end, ends[index])
+      let start = Int32::max(span.start, starts[index])
+      let end = Int32::min(span.end, ends[index])
       if start < end {
         // Drop the whole line as soon as it exceeds either budget. Do not
         // keep collecting spans that would create excessive rendering work.
@@ -75,9 +75,9 @@ pub fn SourceHighlights::from_spans(
 /// Append a nonempty span, translating fragment offsets into source offsets.
 pub fn add_span(
   spans : Array[HighlightSpan],
-  offset : Int,
-  start : Int,
-  end : Int,
+  offset : Int32,
+  start : Int32,
+  end : Int32,
   kind : HighlightKind,
 ) -> Unit {
   if start < end {

@@ -1,8 +1,8 @@
 ///|
 struct CommitTicket {
-  generation : Int
-  mount_instance : Int
-  revision : Int
+  generation : Int32
+  mount_instance : Int32
+  revision : Int32
 } derive(Eq)
 
 ///|
@@ -13,14 +13,14 @@ priv struct Waiting {
 
 ///|
 priv struct Mount {
-  generation : Int
-  instance : Int
+  generation : Int32
+  instance : Int32
   region : @application.Region
   host : String
   mut alive : Bool
   mut mounted : Bool
-  mut revision : Int
-  mut committed : Int
+  mut revision : Int32
+  mut committed : Int32
   mut input : @view.RegionInput?
   mut cache : @view.FileDerivation?
   mut app : @rabbita.App?
@@ -92,7 +92,7 @@ fn Coordinator::run(self : Coordinator, command : @rabbita.Cmd) -> Unit {
 ///|
 fn Coordinator::wait_for(
   self : Coordinator,
-  generation : Int,
+  generation : Int32,
   action : @application.AfterCommit,
 ) -> Unit {
   if generation != self.generation {
@@ -140,7 +140,7 @@ fn Coordinator::committed(
 ///|
 fn region_component(
   coordinator : Coordinator,
-  generation : Int,
+  generation : Int32,
   region : @application.Region,
   input : @rabbita.Val[@view.RegionInput],
   emit : @rabbita.Emit[@application.Msg],
@@ -172,7 +172,7 @@ fn region_component(
     init=_ => {
       (0, @cmd.custom_cmd(scheduler => mount.scheduler = Some(scheduler)))
     },
-    update=(_, revision : Int, _) => {
+    update=(_, revision : Int32, _) => {
       let ticket = { ..mount.ticket(), revision, }
       (
         revision,

@@ -51,7 +51,7 @@ fn viewed_interaction_loaded(model : Model) -> Model {
 }
 
 ///|
-fn viewed_interaction_anchor(path? : String = "src/main.mbt") -> ReviewAnchor {
+fn viewed_interaction_anchor(path~ : String = "src/main.mbt") -> ReviewAnchor {
   canonical_anchor(
     parse_canonical_patch(
       path,

@@ -1,7 +1,7 @@
 ///|
 pub fn get_pull_merge_status(
   args : @protocol.PullMergeStatusGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiPullMergeStatus, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -20,7 +20,7 @@ pub fn get_pull_merge_status(
 ///|
 pub fn rebase_merge_pull(
   args : @protocol.PullRebaseMerge,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiPullMergeResult, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(

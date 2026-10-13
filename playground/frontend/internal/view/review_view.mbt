@@ -4,7 +4,7 @@ fn review_segment_nodes(
   segments : ArrayView[@model.DiffSegment]?,
   changed_class : String,
   prefix : String,
-  highlights? : ArrayView[@highlight.HighlightSpan] = [],
+  highlights~ : ArrayView[@highlight.HighlightSpan] = [],
 ) -> Array[@rabbita.Html] {
   let nodes : Array[@rabbita.Html] = []
   if !prefix.is_empty() {
@@ -47,8 +47,8 @@ fn inline_draft_for_anchor(
 
 ///|
 fn review_gutter(
-  file_index : Int,
-  number : Int?,
+  file_index : Int32,
+  number : Int32?,
   anchor : ReviewAnchor?,
   class_name : String,
   review : @comments.ReadView,
@@ -79,7 +79,7 @@ fn review_gutter(
 fn inline_editor_row(
   review : @comments.ReadView,
   anchor : ReviewAnchor?,
-  columns : Int,
+  columns : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> (String, @rabbita.Html) {
   if inline_draft_for_anchor(review, anchor) is Some(draft) &&
@@ -126,10 +126,10 @@ fn split_review_line(
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   single_side? : @review.ReviewSide,
-  discussions? : InlineDiscussions = empty_discussions(),
-  site? : String = "",
-  change_block? : Int,
-  highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
+  discussions~ : InlineDiscussions = empty_discussions(),
+  site~ : String = "",
+  change_block? : Int32,
+  highlights~ : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let (old_class, new_class) = review_row_classes(row)
   let columns = if single_side is Some(_) { 2 } else { 4 }
@@ -219,9 +219,9 @@ fn split_review_line(
 
 ///|
 fn unified_source_line(
-  file_index : Int,
-  old_line : Int?,
-  new_line : Int?,
+  file_index : Int32,
+  old_line : Int32?,
+  new_line : Int32?,
   anchor : ReviewAnchor?,
   class_name : String,
   text : String?,
@@ -230,10 +230,10 @@ fn unified_source_line(
   prefix : String,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  discussions? : InlineDiscussions = empty_discussions(),
-  site? : String = "",
-  change_block? : Int,
-  syntax? : ArrayView[@highlight.HighlightSpan] = [],
+  discussions~ : InlineDiscussions = empty_discussions(),
+  site~ : String = "",
+  change_block? : Int32,
+  syntax~ : ArrayView[@highlight.HighlightSpan] = [],
 ) -> Array[(String, @rabbita.Html)] {
   let cards = inline_cards(discussions, file_index, old_line, new_line, 3, site)
   let items : Array[(String, @rabbita.Html)] = [
@@ -299,10 +299,10 @@ fn unified_review_line(
   row : ReviewRow,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  discussions? : InlineDiscussions = empty_discussions(),
-  site? : String = "",
-  change_block? : Int,
-  highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
+  discussions~ : InlineDiscussions = empty_discussions(),
+  site~ : String = "",
+  change_block? : Int32,
+  highlights~ : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let old_syntax = source_line_highlights(highlights.old, row.old_line)
   let new_syntax = source_line_highlights(highlights.new, row.new_line)
@@ -439,18 +439,18 @@ fn unified_review_line(
 ///|
 fn safe_review_diff(
   file : ApiFile,
-  file_index : Int,
+  file_index : Int32,
   document : @model.HunkDocument,
   mode : ViewMode,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
-  old_base? : Int = 0,
-  new_base? : Int = 0,
-  show_hunk_headers? : Bool = true,
-  hunk_context? : String = "",
-  fragment? : String = "line",
-  discussions? : InlineDiscussions = empty_discussions(),
-  highlights? : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
+  old_base~ : Int32 = 0,
+  new_base~ : Int32 = 0,
+  show_hunk_headers~ : Bool = true,
+  hunk_context~ : String = "",
+  fragment~ : String = "line",
+  discussions~ : InlineDiscussions = empty_discussions(),
+  highlights~ : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> @rabbita.Html {
   let single_side : @review.ReviewSide? = match (mode, file.status) {
     (Split, "added") => Some(Right)
@@ -466,7 +466,7 @@ fn safe_review_diff(
   }
   let rows : Map[String, @rabbita.Html] = Map([])
   // Count each source identity independently; comments never shift these keys.
-  let occurrences : Map[String, Int] = Map([])
+  let occurrences : Map[String, Int32] = Map([])
   let mut line_index = 0
   let mut block_index = -1
   for
@@ -641,7 +641,7 @@ fn review_thread_view(
 fn auth_controls(
   auth : @application.AuthStatus,
   emit : @rabbita.Emit[Msg],
-  show_install? : Bool = true,
+  show_install~ : Bool = true,
 ) -> @rabbita.Html {
   match auth {
     AuthChecking =>
@@ -865,9 +865,9 @@ fn comments_overview(
 ///|
 fn source_row_key(
   layout : String,
-  file_index : Int,
-  old_line : Int?,
-  new_line : Int?,
+  file_index : Int32,
+  old_line : Int32?,
+  new_line : Int32?,
 ) -> String {
   "source:\{layout}:\{file_index}:\{old_line.map(n => n.to_string()).unwrap_or("-")}:\{new_line.map(n => n.to_string()).unwrap_or("-")}"
 }

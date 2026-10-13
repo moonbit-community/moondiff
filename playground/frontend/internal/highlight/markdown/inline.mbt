@@ -1,11 +1,11 @@
 ///|
 fn find_exact_run(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   marker : UInt16,
-  count : Int,
-) -> Int? {
+  count : Int32,
+) -> Int32? {
   let mut cursor = start
   while cursor + count <= end {
     if source[cursor] == marker &&
@@ -26,7 +26,12 @@ fn find_exact_run(
 }
 
 ///|
-fn find_char(source : String, start : Int, end : Int, char : UInt16) -> Int? {
+fn find_char(
+  source : String,
+  start : Int32,
+  end : Int32,
+  char : UInt16,
+) -> Int32? {
   let mut cursor = start
   while cursor < end {
     if source[cursor] == char {
@@ -38,7 +43,7 @@ fn find_char(source : String, start : Int, end : Int, char : UInt16) -> Int? {
 }
 
 ///|
-fn escaped(source : String, index : Int, start : Int) -> Bool {
+fn escaped(source : String, index : Int32, start : Int32) -> Bool {
   let mut cursor = index
   while cursor > start && source[cursor - 1] == '\\' {
     cursor -= 1
@@ -54,11 +59,11 @@ fn markdown_space(char : UInt16) -> Bool {
 ///|
 fn emphasis_close(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   marker : UInt16,
-  count : Int,
-) -> Int? {
+  count : Int32,
+) -> Int32? {
   let mut cursor = start
   while cursor + count <= end {
     if source[cursor] == marker &&
@@ -84,8 +89,8 @@ fn emphasis_close(
 ///|
 fn add_code_spans(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -114,8 +119,8 @@ fn add_code_spans(
 ///|
 fn add_emphasis(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -163,8 +168,8 @@ fn add_emphasis(
 ///|
 fn add_links(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -182,7 +187,7 @@ fn add_links(
       Some(close) => {
         let after = close + 1
         let mut finish = after
-        let mut destination : (Int, Int)? = None
+        let mut destination : (Int32, Int32)? = None
         if after < end && source[after] == '(' {
           match find_char(source, after + 1, end, ')') {
             Some(right) => {
@@ -216,7 +221,7 @@ fn add_links(
             candidate(candidates, left, right, StringLiteral, 70)
             candidate(candidates, right, right + 1, Operator, 80)
           }
-          cursor = Int::max(close + 1, finish)
+          cursor = Int32::max(close + 1, finish)
         }
       }
     }
@@ -224,7 +229,7 @@ fn add_links(
 }
 
 ///|
-fn url_end(source : String, start : Int, end : Int) -> Int {
+fn url_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = start
   while cursor < end &&
         !(source[cursor] is (' ' | '\t' | '<' | '>' | '"' | '\'' | '`')) {
@@ -240,8 +245,8 @@ fn url_end(source : String, start : Int, end : Int) -> Int {
 ///|
 fn add_urls(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -259,7 +264,7 @@ fn add_urls(
     if prefix > 0 &&
       (
         cursor == start ||
-        !(source[cursor - 1] is ('a'..='z' | 'A'..='Z' | '0'..='9' | '_'))
+        !(source[cursor - 1] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '_'))
       ) {
       let finish = url_end(source, cursor + prefix, end)
       if finish > cursor + prefix {
@@ -272,13 +277,20 @@ fn add_urls(
       let mut left = cursor
       while left > start &&
             source[left - 1]
-            is ('a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '_' | '%' | '+' | '-') {
+            is ('a'..<='z'
+            | 'A'..<='Z'
+            | '0'..<='9'
+            | '.'
+            | '_'
+            | '%'
+            | '+'
+            | '-') {
         left -= 1
       }
       let mut right = cursor + 1
       let mut dot = false
       while right < end &&
-            source[right] is ('a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '-') {
+            source[right] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '.' | '-') {
         if source[right] == '.' {
           dot = true
         }
@@ -297,8 +309,8 @@ fn add_urls(
 ///|
 fn add_angle_autolinks(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -331,8 +343,8 @@ fn add_angle_autolinks(
 ///|
 fn add_escapes_entities(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -383,7 +395,7 @@ fn add_escapes_entities(
         if finish < end && source[finish] is ('x' | 'X') {
           finish += 1
           while finish < end &&
-                source[finish] is ('0'..='9' | 'a'..='f' | 'A'..='F') {
+                source[finish] is ('0'..<='9' | 'a'..<='f' | 'A'..<='F') {
             finish += 1
           }
         } else {
@@ -393,7 +405,7 @@ fn add_escapes_entities(
         }
       } else {
         while finish < end &&
-              source[finish] is ('a'..='z' | 'A'..='Z' | '0'..='9') {
+              source[finish] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9') {
           finish += 1
         }
       }
@@ -416,8 +428,8 @@ fn add_escapes_entities(
 ///|
 fn add_html(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   let mut cursor = start
@@ -440,13 +452,13 @@ fn add_html(
     if name_start < end && source[name_start] == '/' {
       name_start += 1
     }
-    if name_start >= end || !(source[name_start] is ('a'..='z' | 'A'..='Z')) {
+    if name_start >= end || !(source[name_start] is ('a'..<='z' | 'A'..<='Z')) {
       cursor += 1
       continue
     }
     let mut name_end = name_start + 1
     while name_end < end &&
-          source[name_end] is ('a'..='z' | 'A'..='Z' | '0'..='9' | '-') {
+          source[name_end] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '-') {
       name_end += 1
     }
     match find_char(source, name_end, end, '>') {
@@ -462,7 +474,7 @@ fn add_html(
             let attr_start = attr
             while attr < close &&
                   source[attr]
-                  is ('a'..='z' | 'A'..='Z' | '0'..='9' | ':' | '_' | '-') {
+                  is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | ':' | '_' | '-') {
               attr += 1
             }
             candidate(candidates, attr_start, attr, Attribute, 101)
@@ -481,8 +493,8 @@ fn add_html(
 ///|
 fn scan_inline(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Unit {
   add_emphasis(source, start, end, candidates)

@@ -10,7 +10,7 @@ pub(all) enum HomeLoad {
 ///|
 pub(all) struct HomePage[T] {
   items : Array[T]
-  total : Int?
+  total : Int32?
   cursor : String?
   load : HomeLoad
   refresh : HomeRefresh[T]?
@@ -22,10 +22,10 @@ pub(all) struct HomePage[T] {
 // been fetched. Failed refreshes retain both the visible data and retry cursor.
 pub(all) struct HomeRefresh[T] {
   items : Array[T]
-  total : Int?
+  total : Int32?
   cursor : String?
-  target : Int
-  cursor_restarts : Int
+  target : Int32
+  cursor_restarts : Int32
 } derive(Eq)
 
 ///|
@@ -34,13 +34,13 @@ pub(all) struct HomeCommits {
   expanded : Bool
   page : HomePage[@protocol.ApiCommitSummary]
   snapshot : (String, String)?
-  restarts : Int
+  restarts : Int32
 } derive(Eq)
 
 ///|
 pub(all) struct HomeState {
   user : String?
-  epoch : Int
+  epoch : Int32
   tab : @protocol.ViewerPullKind
   reviews : HomePage[@protocol.ApiPullSummary]
   authored : HomePage[@protocol.ApiPullSummary]
@@ -60,7 +60,7 @@ fn[T] empty_home_page() -> HomePage[T] {
 }
 
 ///|
-fn empty_home_state(epoch : Int) -> HomeState {
+fn empty_home_state(epoch : Int32) -> HomeState {
   {
     user: None,
     epoch,

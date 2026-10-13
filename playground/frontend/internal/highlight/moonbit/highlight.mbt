@@ -8,6 +8,6 @@ pub fn highlight(source : String) -> @highlight.SourceHighlights {
 }
 
 ///|
-fn slice(source : String, start : Int, end : Int) -> String {
+fn slice(source : String, start : Int32, end : Int32) -> String {
   source[start:end].to_owned()
 }

@@ -40,7 +40,7 @@ fn line_is_ignored(line : @model.DiffLine) -> Bool {
 }
 
 ///|
-fn line_number_text(number : Int?) -> String {
+fn line_number_text(number : Int32?) -> String {
   if number is Some(value) {
     value.to_string()
   } else {
@@ -49,7 +49,7 @@ fn line_number_text(number : Int?) -> String {
 }
 
 ///|
-fn hunk_note_at(notes : ArrayView[HunkNote?], hunk_index : Int) -> HunkNote? {
+fn hunk_note_at(notes : ArrayView[HunkNote?], hunk_index : Int32) -> HunkNote? {
   if notes.get(hunk_index) is Some(note) {
     note
   } else {
@@ -58,7 +58,11 @@ fn hunk_note_at(notes : ArrayView[HunkNote?], hunk_index : Int) -> HunkNote? {
 }
 
 ///|
-fn table_hunk_note(buf : StringBuilder, note : HunkNote, columns : Int) -> Unit {
+fn table_hunk_note(
+  buf : StringBuilder,
+  note : HunkNote,
+  columns : Int32,
+) -> Unit {
   buf <+
     "<tr><td class=\"hunk-note\" colspan=\"\{columns}\"><b class=\"hunk-note-title\">\{esc(note.title)}</b>: \{esc(note.body)}</td></tr>\n"
 }
@@ -72,10 +76,10 @@ fn pre_hunk_note(buf : StringBuilder, note : HunkNote) -> Unit {
 ///|
 fn split_row(
   buf : StringBuilder,
-  old_number : Int?,
+  old_number : Int32?,
   old_class : String,
   old_html : String,
-  new_number : Int?,
+  new_number : Int32?,
   new_class : String,
   new_html : String,
   line_numbers : Bool,
@@ -136,7 +140,7 @@ fn split_ignored_row(
 fn append_split_hunk(
   buf : StringBuilder,
   hunk : @model.DiffHunk,
-  hunk_index : Int,
+  hunk_index : Int32,
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
 ) -> Unit {
@@ -238,8 +242,8 @@ fn append_split_hunk(
 /// table. This function does not flatten a high-level semantic document.
 pub fn render_side_by_side(
   document : @model.HunkDocument,
-  line_numbers? : Bool = false,
-  hunk_notes? : ArrayView[HunkNote?] = [],
+  line_numbers~ : Bool = false,
+  hunk_notes~ : ArrayView[HunkNote?] = [],
 ) -> String {
   let buf = StringBuilder()
   buf <+ "<table class=\"split\">\n"
@@ -255,8 +259,8 @@ pub fn render_side_by_side(
 /// HTML table.
 pub fn render_side_by_side_hunks(
   document : @model.HunkDocument,
-  line_numbers? : Bool = false,
-  hunk_notes? : ArrayView[HunkNote?] = [],
+  line_numbers~ : Bool = false,
+  hunk_notes~ : ArrayView[HunkNote?] = [],
 ) -> Array[String] {
   let rendered : Array[String] = []
   for hunk_index, hunk in document.hunks {
@@ -284,8 +288,8 @@ fn unified_numbered_line(
   buf : StringBuilder,
   class_name : String,
   prefix : String,
-  old_number : Int?,
-  new_number : Int?,
+  old_number : Int32?,
+  new_number : Int32?,
   body : String,
 ) -> Unit {
   buf <+
@@ -332,8 +336,8 @@ fn unified_new_line(
 fn unified_ignored_line(
   buf : StringBuilder,
   line : @model.DiffLine,
-  old_number : Int?,
-  new_number : Int?,
+  old_number : Int32?,
+  new_number : Int32?,
   line_numbers : Bool,
 ) -> Unit {
   let body = line_html(line, "wa")
@@ -399,7 +403,7 @@ fn append_unified_ignored_row(
 fn append_unified_hunk(
   buf : StringBuilder,
   hunk : @model.DiffHunk,
-  hunk_index : Int,
+  hunk_index : Int32,
   line_numbers : Bool,
   hunk_notes : ArrayView[HunkNote?],
 ) -> Unit {
@@ -468,8 +472,8 @@ fn append_unified_hunk(
 /// flatten a high-level semantic document.
 pub fn render_unified(
   document : @model.HunkDocument,
-  line_numbers? : Bool = false,
-  hunk_notes? : ArrayView[HunkNote?] = [],
+  line_numbers~ : Bool = false,
+  hunk_notes~ : ArrayView[HunkNote?] = [],
 ) -> String {
   let buf = StringBuilder()
   if line_numbers {
@@ -493,8 +497,8 @@ pub fn render_unified(
 /// block.
 pub fn render_unified_hunks(
   document : @model.HunkDocument,
-  line_numbers? : Bool = false,
-  hunk_notes? : ArrayView[HunkNote?] = [],
+  line_numbers~ : Bool = false,
+  hunk_notes~ : ArrayView[HunkNote?] = [],
 ) -> Array[String] {
   let rendered : Array[String] = []
   for hunk_index, hunk in document.hunks {

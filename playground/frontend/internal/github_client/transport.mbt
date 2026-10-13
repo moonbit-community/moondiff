@@ -8,14 +8,14 @@ priv struct Transport {
     String,
     String,
     String,
-    (Result[(Int, String), String]) -> Unit,
+    (Result[(Int32, String), String]) -> Unit,
   ) -> () -> Unit
-  delay : (Int, () -> Unit) -> () -> Unit
+  delay : (Int32, () -> Unit) -> () -> Unit
 }
 
 ///|
 priv struct Pending {
-  generation : Int
+  generation : Int32
   auth : Bool
   poll : Bool
   mut active : Bool
@@ -25,14 +25,14 @@ priv struct Pending {
 
 ///|
 priv struct PollTask {
-  token : Int
+  token : Int32
   waiters : Array[(Result[@protocol.DeviceResponse, Error]) -> Unit]
   mut cancel_timer : () -> Unit
 }
 
 ///|
 priv struct PublicWaiter {
-  generation : Int
+  generation : Int32
   done : (Result[@protocol.RpcValue, Error]) -> Unit
 }
 
@@ -47,7 +47,7 @@ priv struct PublicPending {
 priv struct PublicCacheEntry {
   key : String
   value : @protocol.RpcValue
-  bytes : Int
+  bytes : Int32
 }
 
 ///|
@@ -55,17 +55,17 @@ priv struct Client {
   transport : Transport
   mut csrf : String
   mut authenticated : Bool
-  mut auth_revision : Int
-  mut status_sequence : Int
-  mut generation : Int
+  mut auth_revision : Int32
+  mut status_sequence : Int32
+  mut generation : Int32
   mut device_id : String?
   mut pending_start_id : String?
   mut poll_task : PollTask?
-  mut sequence : Int
-  pending : Map[Int, Pending]
+  mut sequence : Int32
+  pending : Map[Int32, Pending]
   public_pending : Map[String, PublicPending]
   mut public_cache : Array[PublicCacheEntry]
-  mut public_cache_bytes : Int
+  mut public_cache_bytes : Int32
 }
 
 ///|
@@ -102,8 +102,8 @@ fn Client::cancel_pending(self : Client, predicate : (Pending) -> Bool) -> Unit 
 }
 
 ///|
-fn Client::cancel_before(self : Client, generation : Int) -> Unit {
-  self.generation = Int::max(self.generation, generation)
+fn Client::cancel_before(self : Client, generation : Int32) -> Unit {
+  self.generation = Int32::max(self.generation, generation)
   self.cancel_pending(p => p.generation > 0 && p.generation < self.generation)
   self.cancel_public(false)
 }
@@ -156,7 +156,7 @@ fn Client::adopt_status(
 }
 
 ///|
-fn invalid_response(detail : String, status? : Int = 200) -> Error {
+fn invalid_response(detail : String, status~ : Int32 = 200) -> Error {
   HttpRequestError(status~, code="invalid_server_response", detail~)
 }
 
@@ -166,10 +166,10 @@ fn[T : FromJson + ToJson] Client::send(
   path : String,
   body : String,
   completed : (Result[T, Error]) -> Unit,
-  generation? : Int = 0,
-  auth? : Bool = false,
-  status? : Bool = false,
-  poll? : Bool = false,
+  generation~ : Int32 = 0,
+  auth~ : Bool = false,
+  status~ : Bool = false,
+  poll~ : Bool = false,
 ) -> Unit {
   self.cancel_before(generation)
   if generation > 0 && generation < self.generation {
@@ -258,7 +258,7 @@ fn[T : FromJson + ToJson] Client::send(
 fn Client::status(
   self : Client,
   completed : (Result[@protocol.ApiAuthStatus, Error]) -> Unit,
-  poll? : Bool = false,
+  poll~ : Bool = false,
 ) -> Unit {
   self.send(
     "/api/auth/status",

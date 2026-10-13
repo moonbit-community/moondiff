@@ -2,7 +2,7 @@
 fn settled_mount(
   coordinator : Coordinator,
   region : @application.Region,
-  instance : Int,
+  instance : Int32,
 ) -> Mount {
   let mount = {
     ..test_mount(),

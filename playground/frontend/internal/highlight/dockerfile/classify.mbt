@@ -68,7 +68,7 @@ fn is_decimal(word : StringView) -> Bool {
     return false
   }
   for char in word {
-    if !(char is ('0'..='9')) {
+    if !(char is ('0'..<='9')) {
       return false
     }
   }

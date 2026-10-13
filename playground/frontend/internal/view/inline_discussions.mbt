@@ -1,7 +1,7 @@
 ///|
 priv struct InlineDiscussion {
   key : String
-  file_index : Int?
+  file_index : Int32?
   anchor : ReviewAnchor?
   location : String
   outdated : Bool
@@ -16,7 +16,7 @@ priv struct InlineDiscussions {
   items : Array[InlineDiscussion]
   projection : ReviewProjection
   index : Map[String, Array[InlineDiscussion]]
-  draft_file_index : Int?
+  draft_file_index : Int32?
   draft : CommentDraft?
   editor : @rabbita.Html
 }
@@ -43,11 +43,11 @@ fn anchor_location(anchor : ReviewAnchor) -> String {
 ///|
 fn prepare_discussions(
   file : ApiFile?,
-  file_index : Int?,
+  file_index : Int32?,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
   cache? : FileDerivation,
-  projection? : ReviewProjection = { lines: Map([]), editors: Map([]), },
+  projection~ : ReviewProjection = { lines: Map([]), editors: Map([]), },
 ) -> InlineDiscussions {
   let result = {
     ..empty_discussions(),
@@ -178,10 +178,10 @@ fn prepare_discussions(
 ///|
 fn inline_cards(
   discussions : InlineDiscussions,
-  file_index : Int,
-  old_line : Int?,
-  new_line : Int?,
-  columns : Int,
+  file_index : Int32,
+  old_line : Int32?,
+  new_line : Int32?,
+  columns : Int32,
   site : String,
 ) -> Array[(String, @rabbita.Html)] {
   let cards : Array[(String, @rabbita.Html)] = []
@@ -233,7 +233,7 @@ fn inline_cards(
 fn inline_discussion_row(
   class_name : String,
   anchor : ReviewAnchor,
-  columns : Int,
+  columns : Int32,
   location : String,
   content : @rabbita.Html,
 ) -> @rabbita.Html {
@@ -254,7 +254,7 @@ fn inline_discussion_row(
 ///|
 fn fallback_discussions(
   discussions : InlineDiscussions,
-  file_index : Int?,
+  file_index : Int32?,
 ) -> @rabbita.Html {
   let items : Map[String, @rabbita.Html] = Map([])
   for item in discussions.items {
@@ -310,9 +310,9 @@ fn fallback_discussions(
 
 ///|
 fn discussion_key(
-  file_index : Int,
+  file_index : Int32,
   side : @review.ReviewSide,
-  line : Int,
+  line : Int32,
 ) -> String {
   let side = if side is Left { "L" } else { "R" }
   "\{file_index}:\{side}:\{line}"

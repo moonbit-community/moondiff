@@ -24,8 +24,8 @@ pub(all) enum HighlightKind {
 // Half-open UTF-16 columns, relative to a source line. Internal collectors use
 // the same shape for absolute offsets before indexing the completed source.
 pub(all) struct HighlightSpan {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
   kind : HighlightKind
 } derive(Eq, Debug)
 
@@ -49,7 +49,7 @@ pub fn FileHighlights::empty() -> FileHighlights {
 // Review rows already carry one-based, original-file line numbers.
 pub fn SourceHighlights::line(
   self : SourceHighlights,
-  number : Int,
+  number : Int32,
 ) -> ArrayView[HighlightSpan] {
   match self.lines.get(number - 1) {
     Some(line) => line[:]

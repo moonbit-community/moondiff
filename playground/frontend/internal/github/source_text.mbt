@@ -4,7 +4,7 @@
 // moondiff internal package across the workspace's module boundary.
 fn split_source_lines_bounded(
   source : String,
-  max_lines~ : Int,
+  max_lines~ : Int32,
 ) -> Array[String]? {
   if max_lines < 1 {
     return None

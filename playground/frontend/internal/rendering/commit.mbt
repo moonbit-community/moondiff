@@ -1,21 +1,21 @@
 ///|
 priv struct PendingNavigation {
-  sequence : Int
-  generation : Int
-  mut mount_instance : Int?
+  sequence : Int32
+  generation : Int32
+  mut mount_instance : Int32?
   action : @application.AfterCommit
 }
 
 ///|
 priv struct Coordinator {
   mut scheduler : &@cmd.Scheduler?
-  mut generation : Int
-  mut serial : Int
+  mut generation : Int32
+  mut serial : Int32
   mounts : Map[@application.Region, Mount]
-  mut revision : Int
-  mut committed : Int
+  mut revision : Int32
+  mut committed : Int32
   pending : Map[@application.Region, CommitTicket]
-  mut navigation_sequence : Int
+  mut navigation_sequence : Int32
   mut navigation : PendingNavigation?
 }
 
@@ -39,9 +39,9 @@ fn Coordinator::new() -> Coordinator {
 // Region inputs are still projected independently by the central graph.
 fn Coordinator::begin_update(
   self : Coordinator,
-  generation : Int,
+  generation : Int32,
   actions : Array[@application.AfterCommit],
-) -> Int {
+) -> Int32 {
   if self.generation != generation {
     self.generation = generation
     self.navigation = None
@@ -70,8 +70,8 @@ fn Coordinator::begin_update(
 ///|
 fn Coordinator::finish_update(
   self : Coordinator,
-  generation : Int,
-  revision : Int,
+  generation : Int32,
+  revision : Int32,
 ) -> Unit {
   guard generation == self.generation && revision == self.revision else {
     return
@@ -147,7 +147,7 @@ fn Coordinator::invalidate(
 ///|
 fn Coordinator::take_navigation(
   self : Coordinator,
-  sequence : Int,
+  sequence : Int32,
 ) -> @rabbita.Cmd? {
   guard self.navigation is Some(navigation) &&
     navigation.sequence == sequence &&
@@ -192,8 +192,8 @@ fn Coordinator::flush_navigation(self : Coordinator) -> Unit {
 ///|
 fn Coordinator::after_update(
   self : Coordinator,
-  generation : Int,
-  revision : Int,
+  generation : Int32,
+  revision : Int32,
   actions : Array[@application.AfterCommit],
 ) -> @rabbita.Cmd {
   @cmd.custom_cmd(

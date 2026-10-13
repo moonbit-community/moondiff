@@ -18,8 +18,8 @@ pub(all) enum DiffMode {
 /// Renderer-free diff options. Display labels, colors, and layouts belong to
 /// consumers and are intentionally absent from this calculation API.
 struct DiffOptions {
-  context_lines : Int
-  graph_limit : UInt
+  context_lines : Int32
+  graph_limit : UInt32
   ignore_comments : Bool
   ignore_tests : Bool
   mode : DiffMode
@@ -34,11 +34,11 @@ struct DiffOptions {
 /// and `async test` blocks after successful parsing. It composes independently
 /// with `ignore_comments`.
 pub fn DiffOptions::DiffOptions(
-  context_lines? : Int = 3,
-  graph_limit? : UInt = 3_000_000,
-  ignore_comments? : Bool = false,
-  ignore_tests? : Bool = false,
-  mode? : DiffMode = Ast,
+  context_lines~ : Int32 = 3,
+  graph_limit~ : UInt32 = 3_000_000,
+  ignore_comments~ : Bool = false,
+  ignore_tests~ : Bool = false,
+  mode~ : DiffMode = Ast,
 ) -> DiffOptions {
   {
     context_lines: if context_lines < 0 {

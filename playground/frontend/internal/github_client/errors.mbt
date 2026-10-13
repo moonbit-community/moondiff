@@ -1,6 +1,6 @@
 ///|
 pub(all) suberror HttpRequestError {
-  HttpRequestError(status~ : Int, code~ : String, detail~ : String)
+  HttpRequestError(status~ : Int32, code~ : String, detail~ : String)
 }
 
 ///|

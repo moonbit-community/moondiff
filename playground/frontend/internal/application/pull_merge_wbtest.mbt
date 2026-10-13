@@ -1,6 +1,6 @@
 ///|
 fn merge_test_model(
-  auth? : AuthStatus = SignedIn(
+  auth~ : AuthStatus = SignedIn(
     login=Some("alice"),
     user_id=Some("1"),
     install_url=None,
@@ -18,7 +18,7 @@ fn merge_test_model(
 
 ///|
 fn merge_test_status(
-  state? : @protocol.ApiCiState = Success,
+  state~ : @protocol.ApiCiState = Success,
 ) -> @protocol.ApiPullMergeStatus {
   {
     base_sha: "1111111111111111111111111111111111111111",

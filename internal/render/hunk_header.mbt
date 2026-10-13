@@ -1,5 +1,5 @@
 ///|
-fn range_text(start : Int, len : Int) -> String {
+fn range_text(start : Int32, len : Int32) -> String {
   if len == 1 {
     (start + 1).to_string()
   } else if len == 0 {
@@ -12,10 +12,10 @@ fn range_text(start : Int, len : Int) -> String {
 ///|
 /// Format the canonical unified-diff header for zero-based source ranges.
 pub fn hunk_header(
-  old_start : Int,
-  old_len : Int,
-  new_start : Int,
-  new_len : Int,
+  old_start : Int32,
+  old_len : Int32,
+  new_start : Int32,
+  new_len : Int32,
 ) -> String {
   "@@ -\{range_text(old_start, old_len)} +\{range_text(new_start, new_len)} @@"
 }

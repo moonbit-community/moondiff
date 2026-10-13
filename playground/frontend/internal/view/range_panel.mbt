@@ -1,6 +1,6 @@
 ///|
 fn range_short_sha(sha : String) -> String {
-  sha.view(start_offset=0, end_offset=Int::min(7, sha.length())).to_owned()
+  sha.view(start_offset=0, end_offset=Int32::min(7, sha.length())).to_owned()
 }
 
 ///|
@@ -93,7 +93,7 @@ fn range_manual_reason(state : @application.RangeState) -> String? {
 fn range_more_control(
   state : @application.RangeState,
   emit : @rabbita.Emit[Msg],
-  selector? : Bool = false,
+  selector~ : Bool = false,
 ) -> @rabbita.Html {
   let reason = if selector { range_manual_reason(state) } else { None }
   @html.fragment([

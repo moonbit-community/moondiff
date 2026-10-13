@@ -1,7 +1,7 @@
 ///|
 fn colored_line(
   source : String,
-  line? : Int = 1,
+  line~ : Int32 = 1,
 ) -> Array[(String, @highlight.HighlightKind)] {
   let text = source
     .replace_all(old="\r\n", new="\n")
@@ -19,7 +19,7 @@ fn has_token(
   source : String,
   token : String,
   kind : @highlight.HighlightKind,
-  line? : Int = 1,
+  line~ : Int32 = 1,
 ) -> Bool {
   colored_line(source, line~).any(item => item == (token, kind))
 }

@@ -1,7 +1,7 @@
 ///|
 priv enum Mode {
   Template(Bool)
-  Interpolation(Int)
+  Interpolation(Int32)
 }
 
 ///|
@@ -212,12 +212,12 @@ fn is_space(char : UInt16) -> Bool {
 
 ///|
 fn ascii_digit(char : UInt16) -> Bool {
-  char is ('0'..='9')
+  char is ('0'..<='9')
 }
 
 ///|
 fn identifier_start(char : UInt16) -> Bool {
-  char is ('a'..='z' | 'A'..='Z' | '_' | '$') ||
+  char is ('a'..<='z' | 'A'..<='Z' | '_' | '$') ||
   (char >= '\u0080' && !is_space(char))
 }
 
@@ -282,7 +282,7 @@ fn word_allows_expression(word : StringView, kind : HighlightKind) -> Bool {
 }
 
 ///|
-fn following_paren(source : String, start : Int) -> Bool {
+fn following_paren(source : String, start : Int32) -> Bool {
   let mut i = start
   while i < source.length() {
     if is_space(source[i]) {
@@ -295,7 +295,7 @@ fn following_paren(source : String, start : Int) -> Bool {
             !(source[i] == '*' && source[i + 1] == '/') {
         i += 1
       }
-      i = Int::min(i + 2, source.length())
+      i = Int32::min(i + 2, source.length())
     } else {
       break
     }
@@ -304,8 +304,8 @@ fn following_paren(source : String, start : Int) -> Bool {
 }
 
 ///|
-fn escaped_end(source : String, slash : Int) -> Int {
-  let mut end = Int::min(slash + 2, source.length())
+fn escaped_end(source : String, slash : Int32) -> Int32 {
+  let mut end = Int32::min(slash + 2, source.length())
   if end < source.length() && source[slash + 1] == '\r' && source[end] == '\n' {
     end += 1
   } else if end < source.length() && source.get_char(end) is None {
@@ -319,9 +319,9 @@ fn escaped_end(source : String, slash : Int) -> Int {
 ///|
 fn scan_quote(
   source : String,
-  start : Int,
+  start : Int32,
   spans : Array[HighlightSpan],
-) -> Int {
+) -> Int32 {
   let quote = source[start]
   let mut i = start + 1
   let mut plain = start
@@ -350,10 +350,10 @@ fn scan_quote(
 ///|
 fn scan_template(
   source : String,
-  start : Int,
+  start : Int32,
   opening : Bool,
   spans : Array[HighlightSpan],
-) -> (Int, TemplateStop) {
+) -> (Int32, TemplateStop) {
   let mut i = if opening { start + 1 } else { start }
   let mut plain = start
   while i < source.length() {
@@ -382,7 +382,7 @@ fn scan_template(
 }
 
 ///|
-fn scan_regex(source : String, start : Int) -> Int {
+fn scan_regex(source : String, start : Int32) -> Int32 {
   let mut i = start + 1
   let mut in_class = false
   while i < source.length() && !is_newline(source[i]) {
@@ -410,18 +410,18 @@ fn scan_regex(source : String, start : Int) -> Int {
 }
 
 ///|
-fn radix_digit(char : UInt16, radix : Int) -> Bool {
+fn radix_digit(char : UInt16, radix : Int32) -> Bool {
   if radix == 2 {
     char is ('0' | '1')
   } else if radix == 8 {
-    char is ('0'..='7')
+    char is ('0'..<='7')
   } else {
-    ascii_digit(char) || char is ('a'..='f' | 'A'..='F')
+    ascii_digit(char) || char is ('a'..<='f' | 'A'..<='F')
   }
 }
 
 ///|
-fn scan_number(source : String, start : Int) -> Int {
+fn scan_number(source : String, start : Int32) -> Int32 {
   let size = source.length()
   let mut i = start
   if i + 2 < size &&
@@ -482,7 +482,7 @@ fn scan_number(source : String, start : Int) -> Int {
 }
 
 ///|
-fn operator_end(source : String, start : Int) -> Int {
+fn operator_end(source : String, start : Int32) -> Int32 {
   let size = source.length()
   if start + 4 <= size && source[start:start + 4] == ">>>=" {
     return start + 4

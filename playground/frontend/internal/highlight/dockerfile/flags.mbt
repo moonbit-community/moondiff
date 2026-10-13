@@ -1,10 +1,10 @@
 ///|
 fn scan_flag(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   spans : Array[HighlightSpan],
-) -> Int {
+) -> Int32 {
   let mut cursor = start + 2
   while cursor < end && !(source[cursor] is (' ' | '\t' | '=' | ',')) {
     cursor += 1

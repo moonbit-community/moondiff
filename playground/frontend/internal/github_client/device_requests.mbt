@@ -12,7 +12,7 @@ fn Client::send_device(
   action : DeviceAction,
   id : String,
   completed : (Result[@protocol.DeviceResponse, Error]) -> Unit,
-  poll? : Bool = false,
+  poll~ : Bool = false,
 ) -> Unit {
   let (path, body) = match action {
     Start | Retry =>
@@ -64,7 +64,7 @@ fn Client::start(
   self : Client,
   id : String,
   completed : (Result[@protocol.DeviceResponse, Error]) -> Unit,
-  poll? : Bool = false,
+  poll~ : Bool = false,
 ) -> Unit {
   let revision = self.auth_revision
   self.pending_start_id = Some(id)
@@ -131,7 +131,7 @@ fn Client::schedule_poll(
   self : Client,
   action : DeviceAction,
   id : String,
-  delay : Int,
+  delay : Int32,
   completed : (Result[@protocol.DeviceResponse, Error]) -> Unit,
 ) -> Unit {
   let owns = () => {
@@ -163,7 +163,7 @@ fn Client::schedule_poll(
     }
   }
   task.cancel_timer = (self.transport.delay)(
-    Int::min(86400, Int::max(0, delay)) * 1000,
+    Int32::min(86400, Int32::max(0, delay)) * 1000,
     () => {
       if revision != self.auth_revision || !owns() {
         finish(Err(Cancelled))
@@ -183,7 +183,7 @@ fn Client::device(
   self : Client,
   action : DeviceAction,
   id : String,
-  delay : Int,
+  delay : Int32,
   completed : (Result[@protocol.DeviceResponse, Error]) -> Unit,
 ) -> Unit {
   match action {

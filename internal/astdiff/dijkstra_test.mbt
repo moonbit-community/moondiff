@@ -2,7 +2,7 @@
 using @syntax {type ChangeMap, type Syntax}
 
 ///|UUID(07773283-18ef-444e-8074-3b5ae7c18565)
-fn pos(line : Int) -> Array[@span.SingleLineSpan] {
+fn pos(line : Int32) -> Array[@span.SingleLineSpan] {
   [{ line, start_col: 0, end_col: 1, }]
 }
 

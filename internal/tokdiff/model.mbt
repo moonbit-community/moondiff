@@ -52,8 +52,8 @@ fn push_diff_segment(
 fn push_token_range(
   segments : Array[DiffSegment],
   tokens : ArrayView[Tok],
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   kind : DiffSegmentKind,
 ) -> Unit {
   let buf = StringBuilder()
@@ -195,12 +195,12 @@ fn projected_line_segments(
 }
 
 ///|
-fn make_diff_line(index : Int, segments : Array[DiffSegment]) -> DiffLine {
+fn make_diff_line(index : Int32, segments : Array[DiffSegment]) -> DiffLine {
   { index, segments: segments[:], }
 }
 
 ///|
-fn make_plain_diff_line(index : Int, text : String) -> DiffLine {
+fn make_plain_diff_line(index : Int32, text : String) -> DiffLine {
   make_diff_line(index, plain_segments(text))
 }
 
@@ -211,8 +211,8 @@ fn make_plain_diff_line(index : Int, text : String) -> DiffLine {
 fn semantic_change_rows(
   old_lines : ArrayView[ComparableLine],
   new_lines : ArrayView[ComparableLine],
-  old_start : Int,
-  new_start : Int,
+  old_start : Int32,
+  new_start : Int32,
   budget : @worddiff.RefinementBudget,
 ) -> ArrayView[DiffRow] {
   let rows : Array[DiffRow] = []
@@ -307,7 +307,7 @@ fn semantic_change_rows(
 }
 
 ///|
-fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int, Int, Int, Int) {
+fn hunk_range(edits : ArrayView[@diff.Edit]) -> (Int32, Int32, Int32, Int32) {
   let (old_start, new_start, _, _) = edit_bounds(edits[0])
   let (_, _, old_end, new_end) = edit_bounds(edits[edits.length() - 1])
   (old_start, old_end - old_start, new_start, new_end - new_start)
@@ -391,7 +391,7 @@ fn semantic_hunk(
 fn semantic_diff_with_refinement_budget(
   old : ArrayView[String],
   new : ArrayView[String],
-  context : Int,
+  context : Int32,
   line_cleanup : Bool,
   budget : @worddiff.RefinementBudget,
 ) -> HunkDocument {
@@ -406,7 +406,7 @@ fn semantic_diff_with_refinement_budget(
 fn comment_aware_diff(
   old : ArrayView[String],
   new : ArrayView[String],
-  context : Int,
+  context : Int32,
   line_cleanup : Bool,
   budget : @worddiff.RefinementBudget,
 ) -> HunkDocument {
@@ -429,7 +429,7 @@ fn comment_aware_diff(
 fn diff_with_refinement_budget(
   old : ArrayView[String],
   new : ArrayView[String],
-  context : Int,
+  context : Int32,
   line_cleanup : Bool,
   ignore_comments : Bool,
   budget : @worddiff.RefinementBudget,
@@ -451,9 +451,9 @@ fn diff_with_refinement_budget(
 pub fn diff(
   old~ : ArrayView[String],
   new~ : ArrayView[String],
-  context? : Int = 3,
-  line_cleanup? : Bool = false,
-  ignore_comments? : Bool = false,
+  context~ : Int32 = 3,
+  line_cleanup~ : Bool = false,
+  ignore_comments~ : Bool = false,
 ) -> HunkDocument {
   diff_with_refinement_budget(
     old,

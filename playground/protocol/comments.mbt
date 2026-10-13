@@ -20,10 +20,10 @@ pub(all) struct ApiReviewComment {
   created_at : String
   user : ApiCommentUser?
   path : String
-  line : Int?
-  original_line : Int?
+  line : Int32?
+  original_line : Int32?
   side : CommentSide?
-  position : Int?
+  position : Int32?
   commit_id : String
   in_reply_to_id : Int64?
 } derive(Eq, FromJson, ToJson)
@@ -36,8 +36,8 @@ pub(all) struct ApiCommitComment {
   created_at : String
   user : ApiCommentUser?
   path : String?
-  position : Int?
-  line : Int?
+  position : Int32?
+  line : Int32?
 } derive(Eq, FromJson, ToJson)
 
 ///|

@@ -7,25 +7,25 @@ pub(all) enum Event {
   IdentityChecking
   RecoverInterrupted
   RefreshComments
-  BeginCommentsRefresh(Int, CommitRef)
-  CommentsMetadataLoaded(Int, Int, Result[ApiPull, Failure])
-  CommentsValidated(Int, Int, Result[ApiPull, Failure])
+  BeginCommentsRefresh(Int32, CommitRef)
+  CommentsMetadataLoaded(Int32, Int32, Result[ApiPull, Failure])
+  CommentsValidated(Int32, Int32, Result[ApiPull, Failure])
   AskDelete(CommentId)
   CancelDelete
   ConfirmCommentDelete(CommentId)
-  CommentDeleted(Int, Int, CommentId, Result[DeleteResult, Failure])
-  CommentsLoaded(Int, Int, Result[ApiCommentBundle, Failure])
+  CommentDeleted(Int32, Int32, CommentId, Result[DeleteResult, Failure])
+  CommentsLoaded(Int32, Int32, Result[ApiCommentBundle, Failure])
   OpenOverallDraft
-  OpenInlineDraft(Int, ReviewAnchor)
+  OpenInlineDraft(Int32, ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, Int, ReviewAnchor, Result[ApiPull, Failure])
-  IssueCommentCreated(Int, Int, Result[ApiIssueComment, Failure])
-  ReviewCommentCreated(Int, Int, Result[ApiReviewComment, Failure])
-  CommitCommentCreated(Int, Int, Result[ApiCommitComment, Failure])
-  ReviewReplyCreated(Int, Int, Result[ApiReviewComment, Failure])
+  CommentHeadChecked(Int32, Int32, ReviewAnchor, Result[ApiPull, Failure])
+  IssueCommentCreated(Int32, Int32, Result[ApiIssueComment, Failure])
+  ReviewCommentCreated(Int32, Int32, Result[ApiReviewComment, Failure])
+  CommitCommentCreated(Int32, Int32, Result[ApiCommitComment, Failure])
+  ReviewReplyCreated(Int32, Int32, Result[ApiReviewComment, Failure])
 }
 
 ///|

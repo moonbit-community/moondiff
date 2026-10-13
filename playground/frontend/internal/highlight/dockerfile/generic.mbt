@@ -1,10 +1,10 @@
 ///|
 fn scan_single_continued(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   spans : Array[HighlightSpan],
-) -> (Int, Bool) {
+) -> (Int32, Bool) {
   let mut cursor = start
   while cursor < end && source[cursor] != '\'' {
     cursor += 1
@@ -19,11 +19,11 @@ fn scan_single_continued(
 ///|
 fn prepare_instruction_segment(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   state : InstructionState,
   spans : Array[HighlightSpan],
-) -> Int {
+) -> Int32 {
   let mut cursor = skip_space(source, start, end)
   if !state.prefix {
     return cursor
@@ -81,8 +81,8 @@ fn prepare_instruction_segment(
 ///|
 fn scan_generic(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   state : InstructionState,
   pending : Array[PendingHeredoc],
   spans : Array[HighlightSpan],
@@ -123,7 +123,7 @@ fn scan_generic(
       let next = scan_variable(source, cursor, end, spans)
       cursor = if next == cursor + 1 { cursor + 1 } else { next }
     } else if char == '\\' || char == '`' {
-      let escape_end = Int::min(cursor + 2, end)
+      let escape_end = Int32::min(cursor + 2, end)
       add_span(spans, 0, cursor, escape_end, Escape)
       cursor = escape_end
     } else if char == '<' && cursor + 1 < end && source[cursor + 1] == '<' {
@@ -164,8 +164,8 @@ fn scan_generic(
 ///|
 fn scan_instruction_segment(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   state : InstructionState,
   pending : Array[PendingHeredoc],
   spans : Array[HighlightSpan],
