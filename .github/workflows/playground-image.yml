@@ -48,6 +48,7 @@ jobs:
           platforms: linux/amd64
           load: true
           push: false
+          no-cache-filters: build
           build-args: |
             MOONBIT_VERSION=latest
           tags: |
