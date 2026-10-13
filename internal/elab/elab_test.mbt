@@ -182,14 +182,14 @@ fn collect_brace_blocks(syntax : Syntax, blocks : Array[Syntax]) -> Unit {
 }
 
 ///|
-fn push_line_once(lines : Array[Int], line : Int) -> Unit {
+fn push_line_once(lines : Array[Int32], line : Int32) -> Unit {
   if !lines.contains(line) {
     lines.push(line)
   }
 }
 
 ///|
-fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
+fn collect_syntax_lines(syntax : Syntax, lines : Array[Int32]) -> Unit {
   match syntax {
     Atom(position~, ..) =>
       for span in position {
@@ -210,7 +210,7 @@ fn collect_syntax_lines(syntax : Syntax, lines : Array[Int]) -> Unit {
 }
 
 ///|
-fn syntax_lines(syntax : Syntax) -> Array[Int] {
+fn syntax_lines(syntax : Syntax) -> Array[Int32] {
   let lines = Array()
   collect_syntax_lines(syntax, lines)
   lines.sort()
@@ -219,7 +219,7 @@ fn syntax_lines(syntax : Syntax) -> Array[Int] {
 
 ///|
 fn add_span_coverage(
-  coverage : Array[Array[Int]],
+  coverage : Array[Array[Int32]],
   span : @span.SingleLineSpan,
 ) -> Unit {
   let line = span.line - 1
@@ -231,7 +231,7 @@ fn add_span_coverage(
 }
 
 ///|
-fn collect_coverage(syntax : Syntax, coverage : Array[Array[Int]]) -> Unit {
+fn collect_coverage(syntax : Syntax, coverage : Array[Array[Int32]]) -> Unit {
   match syntax {
     Atom(position~, ..) =>
       for span in position {

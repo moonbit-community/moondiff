@@ -9,7 +9,7 @@ pub extern "js" fn count(path : String, operation : String) -> Unit =
   #| }
 
 ///|
-pub extern "js" fn active(kind : String, delta : Int) -> Unit =
+pub extern "js" fn active(kind : String, delta : Int32) -> Unit =
   #| (kind, delta) => {
   #|   const sink = globalThis.__moondiffMetrics;
   #|   if (!sink) return;

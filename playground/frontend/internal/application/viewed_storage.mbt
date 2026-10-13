@@ -25,15 +25,13 @@ fn ViewedRecord::target(self : ViewedRecord) -> @protocol.FileViewedState {
 ///|
 fn ViewedRecord::key(self : ViewedRecord) -> String {
   "moondiff.viewed.pending.v1:" +
-  [
+  Json([
     self.user_id,
     self.owner.to_lower(),
     self.repo.to_lower(),
     self.number,
     self.path,
-  ]
-  .to_json()
-  .stringify()
+  ]).stringify()
 }
 
 ///|
@@ -131,7 +129,7 @@ fn viewed_restore_request(
 ///|
 fn viewed_persist_request(
   model : Model,
-  index : Int,
+  index : Int32,
   record : ViewedRecord,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {

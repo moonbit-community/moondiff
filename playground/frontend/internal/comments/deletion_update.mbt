@@ -38,8 +38,8 @@ fn update_deletion(
 ///|
 fn finish_deletion(
   model : Model,
-  generation : Int,
-  operation : Int,
+  generation : Int32,
+  operation : Int32,
   id : CommentId,
   result : Result[DeleteResult, Failure],
 ) -> (Model, Effects) {

@@ -61,7 +61,7 @@ pub async fn pull_viewed(
   let cursors : Map[String, Bool] = Map([])
   let mut cursor : Json = Json::null()
   let mut snapshot : @github.PullSnapshot? = None
-  let mut total : Int? = None
+  let mut total : Int32? = None
   for _page in 0..<30 {
     let variables = @github.pull_variables(p)
     guard variables is Object(variables) else {

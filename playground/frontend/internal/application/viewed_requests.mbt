@@ -2,7 +2,7 @@
 fn begin_viewed_refresh(
   model : Model,
   emit : @rabbita.Emit[Msg],
-  restart? : Bool = true,
+  restart~ : Bool = true,
 ) -> (Model, @rabbita.Cmd) {
   guard viewed_scope(model) is Some(_) &&
     !model.viewed.stale &&
@@ -93,7 +93,7 @@ fn schedule_viewed_check(
 ///|
 fn viewed_write_request(
   model : Model,
-  index : Int,
+  index : Int32,
   record : ViewedRecord,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {

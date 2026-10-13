@@ -1,7 +1,7 @@
 ///|
 priv struct SourceLine {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
@@ -32,7 +32,12 @@ fn source_lines(source : String) -> Array[SourceLine] {
 }
 
 ///|
-fn skip_spaces(source : String, start : Int, end : Int, maximum : Int) -> Int {
+fn skip_spaces(
+  source : String,
+  start : Int32,
+  end : Int32,
+  maximum : Int32,
+) -> Int32 {
   let mut cursor = start
   while cursor < end && cursor - start < maximum && source[cursor] == ' ' {
     cursor += 1
@@ -41,7 +46,7 @@ fn skip_spaces(source : String, start : Int, end : Int, maximum : Int) -> Int {
 }
 
 ///|
-fn trim_space_end(source : String, start : Int, end : Int) -> Int {
+fn trim_space_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = end
   while cursor > start && source[cursor - 1] is (' ' | '\t') {
     cursor -= 1
@@ -51,7 +56,7 @@ fn trim_space_end(source : String, start : Int, end : Int) -> Int {
 
 ///|
 fn ascii_digit(char : UInt16) -> Bool {
-  char is ('0'..='9')
+  char is ('0'..<='9')
 }
 
 ///|

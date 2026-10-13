@@ -25,7 +25,7 @@ fn syntax_class(kind : @highlight.HighlightKind) -> String {
 ///|
 fn source_line_highlights(
   source : @highlight.SourceHighlights?,
-  line : Int?,
+  line : Int32?,
 ) -> ArrayView[@highlight.HighlightSpan] {
   match (source, line) {
     (Some(source), Some(line)) => source.line(line)
@@ -39,7 +39,7 @@ fn source_line_highlights(
 fn syntax_nodes(
   text : String,
   highlights : ArrayView[@highlight.HighlightSpan],
-  offset : Int,
+  offset : Int32,
 ) -> Array[@rabbita.Html] {
   let nodes : Array[@rabbita.Html] = []
   let mut cursor = 0
@@ -58,8 +58,8 @@ fn syntax_nodes(
     if span.start >= offset + text.length() {
       break
     }
-    let start = Int::max(cursor, span.start - offset)
-    let end = Int::min(text.length(), span.end - offset)
+    let start = Int32::max(cursor, span.start - offset)
+    let end = Int32::min(text.length(), span.end - offset)
     if start >= end {
       continue
     }

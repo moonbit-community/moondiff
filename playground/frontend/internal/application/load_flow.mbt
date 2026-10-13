@@ -2,7 +2,7 @@
 const PULL_CHANGED_ERROR : String = "This pull request changed while it was loading. Please try again."
 
 ///|
-const MAX_PULL_LOAD_ATTEMPT : Int = 1
+const MAX_PULL_LOAD_ATTEMPT : Int32 = 1
 
 ///|
 fn pull_range_state(pull : ApiPull, merge_base : String) -> RangeState {
@@ -88,7 +88,7 @@ fn show_pull_selector(
 fn start_pull_snapshot(
   model : Model,
   reference : CommitRef,
-  attempt : Int,
+  attempt : Int32,
   metadata : ApiPull,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
@@ -138,10 +138,10 @@ fn start_pull_snapshot(
 fn continue_pull_snapshot(
   model : Model,
   reference : CommitRef,
-  attempt : Int,
+  attempt : Int32,
   metadata : ApiPull,
   compare : ApiCompare?,
-  page : Int,
+  page : Int32,
   files : Array[ApiFile],
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
@@ -175,7 +175,7 @@ fn continue_pull_snapshot(
 fn validate_or_retry_pull_snapshot(
   model : Model,
   reference : CommitRef,
-  attempt : Int,
+  attempt : Int32,
   metadata : ApiPull,
   compare : ApiCompare,
   files : Array[ApiFile],
@@ -203,7 +203,7 @@ fn validate_or_retry_pull_snapshot(
 fn validate_or_retry_pull_selector(
   model : Model,
   reference : CommitRef,
-  attempt : Int,
+  attempt : Int32,
   metadata : ApiPull,
   compare : ApiCompare,
   verified : ApiPull,
@@ -223,7 +223,7 @@ fn begin_change_load(
   model : Model,
   reference : CommitRef,
   emit : @rabbita.Emit[Msg],
-  preserve_draft? : Bool = false,
+  preserve_draft~ : Bool = false,
 ) -> (Model, @rabbita.Cmd) {
   let generation = model.generation + 1
   let range = range_reference_parts(reference).map(pair => {

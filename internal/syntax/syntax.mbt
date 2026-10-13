@@ -17,7 +17,7 @@ pub fn ListKind::from_node_kind(node_kind : @cst.NodeKind) -> Self {
 }
 
 ///|UUID(36f67f34-7466-4f61-8b3d-4216a8be8dee)
-pub type SyntaxId = UInt // must non-zero
+pub type SyntaxId = UInt32 // must non-zero
 
 ///|UUID(d2ebef10-67f2-4bb6-ba40-9cb123ae7006)
 pub struct SyntaxInfo {
@@ -32,7 +32,7 @@ pub struct SyntaxInfo {
   /// The parent syntax node, if present.
   mut parent : Syntax?
   /// The number of nodes that are ancestors of this one.
-  mut num_ancestors : UInt
+  mut num_ancestors : UInt32
   mut num_after : UInt64
   /// A number that uniquely identifies this syntax node.
   mut unique_id : SyntaxId
@@ -41,7 +41,7 @@ pub struct SyntaxInfo {
   /// positions. Multiline comment indentation is normalized before keying.
   ///
   /// Values are sequential key ids, not hashes.
-  mut content_id : UInt
+  mut content_id : UInt32
   /// Is this the only node with this content? Ignores nodes on the
   /// other side.
   mut content_is_unique : Bool
@@ -86,7 +86,7 @@ pub enum Syntax {
     close_position~ : Array[SingleLineSpan],
     close_content~ : String,
     // number of all subnodes
-    num_descendants~ : UInt
+    num_descendants~ : UInt32
   )
 }
 
@@ -150,7 +150,7 @@ pub fn Syntax::list(
     kind is None {
     return children[0]
   }
-  let mut num_descendants : UInt = 0
+  let mut num_descendants : UInt32 = 0
   for child in children {
     match child {
       List(..) as child => num_descendants += child.num_descendants + 1
@@ -223,12 +223,12 @@ pub fn Syntax::id(self : Self) -> SyntaxId {
 }
 
 ///|UUID(1c5505ee-407a-4d91-8da0-f0c51d55de76)
-pub fn Syntax::content_id(self : Self) -> UInt {
+pub fn Syntax::content_id(self : Self) -> UInt32 {
   self.info().content_id
 }
 
 ///|UUID(bead19e5-664b-4f68-8928-0fe34ed94f36)
-pub fn Syntax::num_ancestors(self : Self) -> UInt {
+pub fn Syntax::num_ancestors(self : Self) -> UInt32 {
   self.info().num_ancestors
 }
 
@@ -266,7 +266,7 @@ fn init_info(
 }
 
 ///|UUID(4e56af18-aa47-4efd-9a8d-fbff78528443)
-type ContentId = UInt
+type ContentId = UInt32
 
 ///|UUID(4f54e639-9d2c-44a1-91f9-e57b5a57b9ba)
 fn set_content_is_unique(nodes : ArrayView[Syntax]) -> Unit {
@@ -307,7 +307,7 @@ fn find_nodes_with_unique_content(
 }
 
 ///|UUID(786c3580-5508-4015-af34-6476af74ce5a)
-type ContentKey = (String?, String?, UInt?, Array[UInt], Bool, Bool)
+type ContentKey = (String?, String?, UInt32?, Array[UInt32], Bool, Bool)
 
 ///|
 priv struct ListKindInterner {
@@ -320,7 +320,7 @@ fn ListKindInterner::new() -> Self {
 }
 
 ///|
-fn ListKindInterner::intern(self : Self, kind : ListKind) -> UInt {
+fn ListKindInterner::intern(self : Self, kind : ListKind) -> UInt32 {
   for i, existing_kind in self.kinds.iter2() {
     if existing_kind == kind {
       return i.reinterpret_as_uint()
@@ -334,7 +334,7 @@ fn ListKindInterner::intern(self : Self, kind : ListKind) -> UInt {
 ///|UUID(31918e2f-f46e-4be9-9922-71a56ffaa181)
 fn set_content_id(
   nodes : ArrayView[Syntax],
-  existing : @hashmap.HashMap[ContentKey, UInt],
+  existing : @hashmap.HashMap[ContentKey, UInt32],
   list_kinds : ListKindInterner,
 ) -> Unit {
   for node in nodes {
@@ -464,7 +464,7 @@ fn set_parent(nodes : ArrayView[Syntax], parent : Syntax?) -> Unit {
 }
 
 ///|UUID(250cf6fb-1fdc-4850-b78f-69873899d674)
-fn set_num_ancestors(nodes : ArrayView[Syntax], num_ancestors : UInt) -> Unit {
+fn set_num_ancestors(nodes : ArrayView[Syntax], num_ancestors : UInt32) -> Unit {
   for node in nodes {
     node.info().num_ancestors = num_ancestors
     if node is List(children~, ..) {

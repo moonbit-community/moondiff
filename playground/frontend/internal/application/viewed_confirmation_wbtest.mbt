@@ -38,7 +38,7 @@ test "mark and unmark keep their target through every old value and only a targe
       )
       assert_eq(viewed_test_expanded(waiting), viewed_test_expanded(writing))
       assert_true(viewed_test_toggle(waiting) == waiting)
-      assert_eq(waiting.viewed.retry, Int::min(attempt + 1, 6))
+      assert_eq(waiting.viewed.retry, Int32::min(attempt + 1, 6))
       assert_eq(waiting.viewed.poll_scheduled, attempt < 6)
       checking = if attempt < 6 { viewed_test_tick(waiting) } else { waiting }
     }

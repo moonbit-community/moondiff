@@ -19,9 +19,9 @@ fn block_header(input : StringView) -> StringView? {
 fn collect_block(
   source : String,
   lines : Array[SourceLine],
-  row : Int,
+  row : Int32,
   header : StringView,
-  parent_indent : Int,
+  parent_indent : Int32,
   kind : HighlightKind,
   spans : Array[HighlightSpan],
 ) -> StringView {
@@ -30,10 +30,10 @@ fn collect_block(
   if !tail.is_empty() {
     add_span(spans, 0, tail.start_offset(), end_offset(tail), Comment)
   }
-  let base = Int::max(0, parent_indent)
-  let mut indent : Int? = None
+  let base = Int32::max(0, parent_indent)
+  let mut indent : Int32? = None
   for char in header {
-    if char is ('1'..='9') {
+    if char is ('1'..<='9') {
       indent = Some(base + char.to_int() - '0'.to_int())
     }
   }

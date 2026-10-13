@@ -17,7 +17,7 @@ priv enum QuoteState {
 priv struct ShellState {
   mut quote : QuoteState
   mut command : Bool
-  mut substitution_depth : Int
+  mut substitution_depth : Int32
 }
 
 ///|
@@ -34,7 +34,7 @@ priv struct InstructionState {
   mut quote : QuoteState
   shell : ShellState
   mut json_string : Bool
-  mut argument_index : Int
+  mut argument_index : Int32
 }
 
 ///|

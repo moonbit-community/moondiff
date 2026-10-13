@@ -9,8 +9,8 @@ pub(all) struct DisplayOptions {
 ///|
 pub(all) struct FileInput {
   file : FileState
-  generation : Int
-  index : Int
+  generation : Int32
+  index : Int32
   display : DisplayOptions
   review : @comments.ReadView
   viewed : ViewedControl
@@ -32,7 +32,7 @@ pub impl Eq for FileInput with fn equal(a, b) {
 fn file_input(
   is_pull : Bool,
   model : Model,
-  index : Int,
+  index : Int32,
   file : FileState,
 ) -> FileInput {
   {
@@ -68,7 +68,7 @@ pub(all) struct ToolbarInput {
   landing : Bool
   drawer_open : Bool
   auth : @application.AuthStatus
-  file_count : Int?
+  file_count : Int32?
   diff_algorithm : DiffAlgorithm
   view_mode : ViewMode
   ignore_comments : Bool
@@ -114,7 +114,7 @@ pub impl Eq for TreeData with fn equal(a, b) {
 
 ///|
 pub(all) struct TreeInput {
-  generation : Int
+  generation : Int32
   tree : TreeData
   state : FileTreeState
   viewed : Array[Bool]
@@ -122,7 +122,7 @@ pub(all) struct TreeInput {
 
 ///|
 pub(all) struct NavigationInput {
-  generation : Int
+  generation : Int32
   enabled : Bool
 } derive(Eq)
 
@@ -145,7 +145,7 @@ pub(all) struct RangePanelInput {
   reference : @github.CommitRef
   state : @application.RangeState
   stats : @protocol.ApiStats
-  file_count : Int
+  file_count : Int32
 } derive(Eq)
 
 ///|
@@ -172,13 +172,13 @@ pub(all) enum RegionInput {
 ///|
 pub(all) struct ShellInput {
   home : Bool
-  generation : Int
+  generation : Int32
   landing : Bool
   showing : Bool
   selector_only : Bool
   message : String
   drawer_open : Bool
-  preferred_width : Int
+  preferred_width : Int32
   display : DisplayOptions
   range_limit : Bool
 } derive(Eq)
@@ -210,7 +210,7 @@ pub fn shell_input(model : Model) -> ShellInput {
 ///|
 pub struct RegionProjection {
   priv mut tree : TreeData?
-  priv mut overall : (Int, Int, TreeData, @comments.CommentGroup)?
+  priv mut overall : (Int32, Int32, TreeData, @comments.CommentGroup)?
 }
 
 ///|
@@ -409,8 +409,8 @@ fn home_shell(model : Model) -> Bool {
 ///|
 pub(all) struct ViewedControl {
   is_pull : Bool
-  generation : Int
-  index : Int
+  generation : Int32
+  index : Int32
   path : String
   checked : Bool
   syncing : Bool
@@ -425,8 +425,8 @@ pub(all) struct ViewedControl {
 ///|
 pub(all) struct ViewedSummaryInput {
   is_pull : Bool
-  total : Int
-  count : Int
+  total : Int32
+  count : Int32
   pending : Bool
   auth : @application.AuthStatus
   ready : Bool

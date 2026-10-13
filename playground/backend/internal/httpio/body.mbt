@@ -2,8 +2,8 @@
 /// Read a request or upstream response while enforcing its byte limit.
 pub async fn read_bounded(
   reader : &@io.Reader,
-  limit : Int,
-  source? : Bool = false,
+  limit : Int32,
+  source~ : Bool = false,
 ) -> Bytes {
   let out = @buffer.Buffer()
   while reader.read_some(max_len=65536) is Some(bytes) {

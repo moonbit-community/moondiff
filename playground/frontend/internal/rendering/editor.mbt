@@ -57,7 +57,7 @@ extern "js" fn dispose_editor(host : String) -> Unit =
 extern "js" fn active_draft(
   id : String,
   visible : Bool,
-  generation : Int,
+  generation : Int32,
 ) -> Unit =
   #| (id, visible, generation) => {
   #|   const state = globalThis.__moondiffEditorInteraction ??= {

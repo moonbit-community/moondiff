@@ -7,7 +7,7 @@ fn levenshtein_impl(
   lhs~ : Array[Char],
   rhs~ : Array[Char],
   budget : @computation.ScopeBudget,
-) -> Int raise @computation.ScopeLimitExceeded {
+) -> Int32 raise @computation.ScopeLimitExceeded {
   let m = lhs.length()
   let n = rhs.length()
   budget.charge_matrix(m + 1, n + 1, SyntaxMatching)

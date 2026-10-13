@@ -17,7 +17,7 @@ fn push_segment(
 }
 
 ///|
-fn ignored_source_line(index : Int, text : String) -> @model.DiffLine {
+fn ignored_source_line(index : Int32, text : String) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = if text == "" {
     []
   } else {
@@ -27,7 +27,7 @@ fn ignored_source_line(index : Int, text : String) -> @model.DiffLine {
 }
 
 ///|
-fn unchanged_visible_line(index : Int, text : String) -> @model.DiffLine {
+fn unchanged_visible_line(index : Int32, text : String) -> @model.DiffLine {
   let segments : Array[@model.DiffSegment] = if text == "" {
     []
   } else {
@@ -42,7 +42,7 @@ fn unchanged_visible_line(index : Int, text : String) -> @model.DiffLine {
 fn restore_visible_line(
   line : @model.DiffLine,
   view : SourceLineView,
-  source_index : Int,
+  source_index : Int32,
 ) -> @model.DiffLine {
   let visible_kinds : Array[@model.DiffSegmentKind] = []
   for segment in line.segments {
@@ -71,10 +71,10 @@ fn append_ignored_source_gap(
   blocks : Array[@model.DiffBlock],
   old : SourceView,
   new : SourceView,
-  old_start : Int,
-  old_end : Int,
-  new_start : Int,
-  new_end : Int,
+  old_start : Int32,
+  old_end : Int32,
+  new_start : Int32,
+  new_end : Int32,
 ) -> Unit {
   let rows : Array[@model.DiffRow] = []
   let old_len = old_end - old_start
@@ -112,7 +112,7 @@ fn append_ignored_source_gap(
 }
 
 ///|
-fn view_source_cursor(view : SourceView, index : Int) -> Int {
+fn view_source_cursor(view : SourceView, index : Int32) -> Int32 {
   if index < view.source_indices.length() {
     view.source_indices[index]
   } else {
@@ -121,7 +121,7 @@ fn view_source_cursor(view : SourceView, index : Int) -> Int {
 }
 
 ///|
-fn view_hunk_start(view : SourceView, index : Int) -> Int {
+fn view_hunk_start(view : SourceView, index : Int32) -> Int32 {
   if index == 0 {
     0
   } else {
@@ -135,9 +135,9 @@ fn append_mapped_context_lines(
   lines : ArrayView[@model.ContextLine],
   old : SourceView,
   new : SourceView,
-  old_cursor : Int,
-  new_cursor : Int,
-) -> (Int, Int) {
+  old_cursor : Int32,
+  new_cursor : Int32,
+) -> (Int32, Int32) {
   let mapped : Array[@model.ContextLine] = []
   let ignored : Array[@model.DiffRow] = []
   let mut old_cursor = old_cursor
@@ -211,9 +211,9 @@ fn append_mapped_rows(
   as_ignored : Bool,
   old : SourceView,
   new : SourceView,
-  old_cursor : Int,
-  new_cursor : Int,
-) -> (Int, Int) {
+  old_cursor : Int32,
+  new_cursor : Int32,
+) -> (Int32, Int32) {
   let changed : Array[@model.DiffRow] = []
   let ignored : Array[@model.DiffRow] = []
   let mut old_cursor = old_cursor

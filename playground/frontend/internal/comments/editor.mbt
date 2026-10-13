@@ -10,8 +10,8 @@ priv struct DraftData {
 
 ///|
 priv struct Operation {
-  generation : Int
-  id : Int
+  generation : Int32
+  id : Int32
   phase : SubmissionPhase
   body : String
 } derive(Eq)

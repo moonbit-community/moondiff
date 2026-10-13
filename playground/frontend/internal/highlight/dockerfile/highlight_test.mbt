@@ -1,7 +1,7 @@
 ///|
 fn colored_line(
   source : String,
-  line? : Int = 1,
+  line~ : Int32 = 1,
 ) -> Array[(String, @highlight.HighlightKind)] {
   let text = source
     .replace_all(old="\r\n", new="\n")

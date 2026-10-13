@@ -1,21 +1,21 @@
 ///|
 pub(all) enum AuthMsg {
-  AuthStatusLoaded(Int, Result[ApiAuthStatus, Error])
+  AuthStatusLoaded(Int32, Result[ApiAuthStatus, Error])
   ReactivationAuthStatusLoaded(
-    Int,
-    Int,
+    Int32,
+    Int32,
     CommitRef?,
     Result[ApiAuthStatus, Error]
   )
   StartSignIn
   RestoreAuth
-  DeviceUpdated(Int, String, Bool, Result[@protocol.DeviceResponse, Error])
+  DeviceUpdated(Int32, String, Bool, Result[@protocol.DeviceResponse, Error])
   CancelSignIn
-  DeviceCancelFinished(Int, String, Result[@protocol.DeviceResponse, Error])
+  DeviceCancelFinished(Int32, String, Result[@protocol.DeviceResponse, Error])
   CopyDeviceCode
-  DeviceCodeCopied(Int, String, Bool)
+  DeviceCodeCopied(Int32, String, Bool)
   Logout
-  AuthLogoutFinished(Int, Result[ApiAuthStatus, Error])
+  AuthLogoutFinished(Int32, Result[ApiAuthStatus, Error])
 }
 
 ///|
@@ -137,7 +137,10 @@ fn update_auth(
               Authorizing(
                 {
                   ..flow,
-                  retry_after: Int::min(60, Int::max(5, flow.retry_after * 2)),
+                  retry_after: Int32::min(
+                    60,
+                    Int32::max(5, flow.retry_after * 2),
+                  ),
                   message: "Connection interrupted. Sign-in will retry automatically.",
                 },
                 "",

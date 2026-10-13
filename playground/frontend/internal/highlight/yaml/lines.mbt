@@ -1,9 +1,9 @@
 ///|
 priv struct SourceLine {
-  start : Int
-  end : Int
-  next : Int
-  indent : Int
+  start : Int32
+  end : Int32
+  next : Int32
+  indent : Int32
 }
 
 ///|
@@ -50,7 +50,7 @@ fn separated(input : StringView) -> Bool {
 }
 
 ///|
-fn end_offset(input : StringView) -> Int {
+fn end_offset(input : StringView) -> Int32 {
   input.start_offset() + input.length()
 }
 
@@ -78,7 +78,7 @@ fn document_marker(input : StringView) -> Bool {
 }
 
 ///|
-fn comment_offset(line : StringView) -> Int {
+fn comment_offset(line : StringView) -> Int32 {
   for i = 0; i < line.length(); i = i + 1 {
     if line[i] == '#' && (i == 0 || line[i - 1] is (' ' | '\t')) {
       return i

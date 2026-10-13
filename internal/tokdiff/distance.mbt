@@ -8,7 +8,7 @@
 /// delete+insert so renames align, but expensive enough that two lines with
 /// nothing in common score ~250 permille, under the pairing threshold.
 /// Cross-kind substitution is not offered; it decomposes into delete+insert.
-fn subst_cost(a : Tok, b : Tok) -> Int? {
+fn subst_cost(a : Tok, b : Tok) -> Int32? {
   if a.kind == b.kind {
     if a.text == b.text {
       Some(0)
@@ -21,7 +21,7 @@ fn subst_cost(a : Tok, b : Tok) -> Int? {
 }
 
 ///|
-fn tok_mass(ts : ArrayView[Tok]) -> Int {
+fn tok_mass(ts : ArrayView[Tok]) -> Int32 {
   let mut m = 0
   for t in ts {
     m += alignment_weight(t)
@@ -31,7 +31,7 @@ fn tok_mass(ts : ArrayView[Tok]) -> Int {
 
 ///|
 /// Weighted token edit distance (scoring only: rolling rows).
-fn wdist(a : ArrayView[Tok], b : ArrayView[Tok]) -> Int {
+fn wdist(a : ArrayView[Tok], b : ArrayView[Tok]) -> Int32 {
   let n = b.length()
   let mut prev = Array::make(n + 1, 0)
   let mut acc = 0
@@ -64,12 +64,12 @@ fn wdist(a : ArrayView[Tok], b : ArrayView[Tok]) -> Int {
 /// Line similarity in permille: `1000 * (mass - dist) / mass` over both
 /// sides' weighted mass. Zero-mass lines (empty or filler-only) carry no
 /// evidence either way and pair only when textually identical.
-pub fn similarity(a : String, b : String) -> Int {
+pub fn similarity(a : String, b : String) -> Int32 {
   sim_toks(tokenize_line(a), tokenize_line(b))
 }
 
 ///|
-fn sim_toks(a : ArrayView[Tok], b : ArrayView[Tok]) -> Int {
+fn sim_toks(a : ArrayView[Tok], b : ArrayView[Tok]) -> Int32 {
   let m = tok_mass(a) + tok_mass(b)
   if m == 0 {
     if a.length() != b.length() {
@@ -87,7 +87,7 @@ fn sim_toks(a : ArrayView[Tok], b : ArrayView[Tok]) -> Int {
 
 ///|
 /// Pairing threshold in permille.
-const THETA : Int = 400
+const THETA : Int32 = 400
 
 ///|
 /// Monotone alignment of a replacement block, maximizing the total positive
@@ -97,7 +97,7 @@ const THETA : Int = 400
 fn align(
   olds : Array[Array[Tok]],
   news : Array[Array[Tok]],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let m = olds.length()
   let n = news.length()
   let dp = FixedArray::makei(m + 1, _ => FixedArray::make(n + 1, 0))
@@ -123,7 +123,7 @@ fn align(
       bp[i][j] = way
     }
   }
-  let out : Array[(Int?, Int?)] = []
+  let out : Array[(Int32?, Int32?)] = []
   let mut i = m
   let mut j = n
   while i > 0 || j > 0 {
@@ -210,8 +210,8 @@ priv enum Op {
 /// line.
 priv struct WindowAtom {
   token : Tok
-  line : Int
-  token_index : Int
+  line : Int32
+  token_index : Int32
   gap_before : String
 }
 
@@ -241,17 +241,17 @@ priv enum PairMode {
 /// Traceback steps use source indices so the same four-state kernel can feed
 /// both the independent per-line token operations and the window projection.
 priv enum PairStep {
-  PairEqual(Int, Int)
-  PairSub(Int, Int)
-  PairDelete(Int)
-  PairInsert(Int)
+  PairEqual(Int32, Int32)
+  PairSub(Int32, Int32)
+  PairDelete(Int32)
+  PairInsert(Int32)
 }
 
 ///|
 /// Naturalness of a boundary between two adjacent token spans. The score is
 /// deliberately language-class based (not character based): line ends win,
 /// then whitespace/comment filler, punctuation, and a token-kind transition.
-fn token_boundary_score(left : Tok?, right : Tok?) -> Int {
+fn token_boundary_score(left : Tok?, right : Tok?) -> Int32 {
   match (left, right) {
     (None, _) | (_, None) => 4
     (Some(a), Some(b)) =>
@@ -271,31 +271,31 @@ fn token_boundary_score(left : Tok?, right : Tok?) -> Int {
 /// The four traceback states distinguish a closed edit run from an open run
 /// that has consumed old tokens, new tokens, or both. Keeping this state in
 /// the DP makes opening and closing boundary scores globally composable.
-const PAIR_EQUAL : Int = 0
+const PAIR_EQUAL : Int32 = 0
 
 ///|
-const PAIR_OLD_CHANGED : Int = 1
+const PAIR_OLD_CHANGED : Int32 = 1
 
 ///|
-const PAIR_NEW_CHANGED : Int = 2
+const PAIR_NEW_CHANGED : Int32 = 2
 
 ///|
-const PAIR_BOTH_CHANGED : Int = 3
+const PAIR_BOTH_CHANGED : Int32 = 3
 
 ///|
-const PAIR_STATE_COUNT : Int = 4
+const PAIR_STATE_COUNT : Int32 = 4
 
 ///|
 /// Lexicographic path score. Lower edit cost and run count win; all other
 /// fields are maximized in the order used by `pair_score_better`.
 priv struct PairScore {
-  cost : Int
-  high_exact : Int
-  exact : Int
-  runs : Int
-  gap : Int
-  boundary : Int
-  right : Int
+  cost : Int32
+  high_exact : Int32
+  exact : Int32
+  runs : Int32
+  gap : Int32
+  boundary : Int32
+  right : Int32
 }
 
 ///|
@@ -388,7 +388,7 @@ fn gap_kind(gap : String) -> GapKind {
 }
 
 ///|
-fn gap_layout_score(old_gap : String, new_gap : String) -> Int {
+fn gap_layout_score(old_gap : String, new_gap : String) -> Int32 {
   if old_gap == new_gap {
     2
   } else if gap_kind(old_gap) == gap_kind(new_gap) {
@@ -399,21 +399,21 @@ fn gap_layout_score(old_gap : String, new_gap : String) -> Int {
 }
 
 ///|
-fn pair_has_old(state : Int) -> Bool {
+fn pair_has_old(state : Int32) -> Bool {
   state == PAIR_OLD_CHANGED || state == PAIR_BOTH_CHANGED
 }
 
 ///|
-fn pair_has_new(state : Int) -> Bool {
+fn pair_has_new(state : Int32) -> Bool {
   state == PAIR_NEW_CHANGED || state == PAIR_BOTH_CHANGED
 }
 
 ///|
 fn pair_changed_state(
-  state : Int,
+  state : Int32,
   consumes_old : Bool,
   consumes_new : Bool,
-) -> Int {
+) -> Int32 {
   let has_old = pair_has_old(state) || consumes_old
   let has_new = pair_has_new(state) || consumes_new
   if has_old && has_new {
@@ -433,9 +433,9 @@ fn pair_changed_state(
 fn pair_boundary(
   atoms : ArrayView[WindowAtom],
   trailing_gap : String,
-  index : Int,
+  index : Int32,
   mode : PairMode,
-) -> Int {
+) -> Int32 {
   match mode {
     PerLine => {
       let left = if index == 0 { None } else { Some(atoms[index - 1].token) }
@@ -477,9 +477,9 @@ fn pair_boundary(
 fn pair_open_boundary(
   atoms : ArrayView[WindowAtom],
   trailing_gap : String,
-  index : Int,
+  index : Int32,
   mode : PairMode,
-) -> Int {
+) -> Int32 {
   pair_boundary(atoms, trailing_gap, index, mode)
 }
 
@@ -487,9 +487,9 @@ fn pair_open_boundary(
 fn pair_close_boundary(
   atoms : ArrayView[WindowAtom],
   trailing_gap : String,
-  index : Int,
+  index : Int32,
   mode : PairMode,
-) -> Int {
+) -> Int32 {
   pair_boundary(atoms, trailing_gap, index, mode)
 }
 
@@ -497,7 +497,7 @@ fn pair_close_boundary(
 /// Whitespace and comment boilerplate carry no positional evidence. This
 /// keeps an equivalent leading/trailing spacer from moving a semantic edit;
 /// meaningful changed tokens still resolve otherwise exact ties to the right.
-fn pair_changed_position(atoms : ArrayView[WindowAtom], index : Int) -> Int {
+fn pair_changed_position(atoms : ArrayView[WindowAtom], index : Int32) -> Int32 {
   if atoms[index].token.kind is (Space | Filler) {
     0
   } else {
@@ -508,15 +508,15 @@ fn pair_changed_position(atoms : ArrayView[WindowAtom], index : Int) -> Int {
 ///|
 fn pair_changed_score(
   score : PairScore,
-  state : Int,
+  state : Int32,
   a : ArrayView[WindowAtom],
   b : ArrayView[WindowAtom],
   a_trailing_gap : String,
   b_trailing_gap : String,
   mode : PairMode,
-  old_index : Int,
-  new_index : Int,
-  edit_cost : Int,
+  old_index : Int32,
+  new_index : Int32,
+  edit_cost : Int32,
 ) -> PairScore {
   let consumes_old = old_index >= 0
   let consumes_new = new_index >= 0
@@ -564,9 +564,9 @@ fn pair_diagonal_gap_score(
   mode : PairMode,
   a : ArrayView[WindowAtom],
   b : ArrayView[WindowAtom],
-  old_index : Int,
-  new_index : Int,
-) -> Int {
+  old_index : Int32,
+  new_index : Int32,
+) -> Int32 {
   match mode {
     PerLine => 0
     Window => gap_layout_score(a[old_index].gap_before, b[new_index].gap_before)
@@ -574,7 +574,7 @@ fn pair_diagonal_gap_score(
 }
 
 ///|
-fn pair_high_exact_evidence(token : Tok, mode : PairMode) -> Int {
+fn pair_high_exact_evidence(token : Tok, mode : PairMode) -> Int32 {
   match mode {
     PerLine => 0
     Window =>
@@ -589,14 +589,14 @@ fn pair_high_exact_evidence(token : Tok, mode : PairMode) -> Int {
 ///|
 fn pair_equal_score(
   score : PairScore,
-  state : Int,
+  state : Int32,
   a : ArrayView[WindowAtom],
   b : ArrayView[WindowAtom],
   a_trailing_gap : String,
   b_trailing_gap : String,
   mode : PairMode,
-  old_index : Int,
-  new_index : Int,
+  old_index : Int32,
+  new_index : Int32,
 ) -> PairScore {
   let mut boundary = score.boundary
   if pair_has_old(state) {
@@ -621,7 +621,7 @@ fn pair_equal_score(
 ///|
 fn pair_finish_score(
   score : PairScore,
-  state : Int,
+  state : Int32,
   a : ArrayView[WindowAtom],
   b : ArrayView[WindowAtom],
   a_trailing_gap : String,
@@ -646,17 +646,17 @@ fn pair_finish_score(
 }
 
 ///|
-fn pair_row_index(column : Int, state : Int) -> Int {
+fn pair_row_index(column : Int32, state : Int32) -> Int32 {
   column * PAIR_STATE_COUNT + state
 }
 
 ///|
 fn pair_backpointer_index(
-  row : Int,
-  column : Int,
-  width : Int,
-  state : Int,
-) -> Int {
+  row : Int32,
+  column : Int32,
+  width : Int32,
+  state : Int32,
+) -> Int32 {
   (row * width + column) * PAIR_STATE_COUNT + state
 }
 
@@ -665,12 +665,12 @@ fn pair_backpointer_index(
 /// their numeric order supplies the final deterministic tie preference.
 fn pair_consider(
   scores : FixedArray[PairScore],
-  score_index : Int,
-  backpointers : FixedArray[Int],
-  backpointer_index : Int,
+  score_index : Int32,
+  backpointers : FixedArray[Int32],
+  backpointer_index : Int32,
   candidate : PairScore,
-  previous_state : Int,
-  way : Int,
+  previous_state : Int32,
+  way : Int32,
 ) -> Unit {
   let current = scores[score_index]
   let current_way = backpointers[backpointer_index] % PAIR_STATE_COUNT
@@ -964,12 +964,12 @@ fn pair_ops(a : Array[Tok], b : Array[Tok]) -> Array[Op] {
 }
 
 ///|
-const TRACEBACK_CELL_LIMIT : Int = 262144
+const TRACEBACK_CELL_LIMIT : Int32 = 262144
 
 ///|
 /// Division-first limit check avoids overflowing the backend-independent
 /// `Int` representation before allocating the traceback matrix.
-fn traceback_cells_within_limit(old_atoms : Int, new_atoms : Int) -> Bool {
+fn traceback_cells_within_limit(old_atoms : Int32, new_atoms : Int32) -> Bool {
   if old_atoms < 0 ||
     new_atoms < 0 ||
     old_atoms >= TRACEBACK_CELL_LIMIT ||

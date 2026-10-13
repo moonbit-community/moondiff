@@ -13,8 +13,8 @@ priv enum Directive {
 priv struct LexicalState {
   mut tag : Bool
   mut attribute : Bool
-  mut attribute_depth : Int
-  mut attribute_bracket : Int
+  mut attribute_depth : Int32
+  mut attribute_bracket : Int32
 }
 
 ///|

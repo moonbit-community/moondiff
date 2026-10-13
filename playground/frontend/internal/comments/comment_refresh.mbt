@@ -34,8 +34,8 @@ fn begin_comments_refresh(model : Model) -> (Model, Effects) {
 ///|
 fn comment_list_request(
   reference : CommitRef,
-  generation : Int,
-  id : Int,
+  generation : Int32,
+  id : Int32,
 ) -> Effects {
   raw_comments_request(reference, generation, result => {
     CommentsLoaded(generation, id, result)

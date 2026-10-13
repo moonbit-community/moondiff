@@ -93,7 +93,7 @@ fn token_kind(token : @tokens.Token) -> HighlightKind? {
 }
 
 ///|
-fn is_function(tokens : ArrayView[@tokens.Triple], index : Int) -> Bool {
+fn is_function(tokens : ArrayView[@tokens.Triple], index : Int32) -> Bool {
   if index > 0 && tokens[index - 1].0 is FN {
     return true
   }
@@ -116,10 +116,10 @@ fn is_function(tokens : ArrayView[@tokens.Triple], index : Int) -> Bool {
 ///|
 fn collect_tokens(
   source : String,
-  offset : Int,
+  offset : Int32,
   spans : Array[HighlightSpan],
-  depth : Int,
-  attribute? : Bool = false,
+  depth : Int32,
+  attribute~ : Bool = false,
 ) -> Unit {
   // Bound recursive embedded code; a partial highlight still preserves text.
   if depth >= 32 {

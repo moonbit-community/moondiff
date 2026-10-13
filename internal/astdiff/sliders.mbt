@@ -35,7 +35,7 @@ fn last_line_span(node : Syntax) -> SingleLineSpan? {
 }
 
 ///|UUID(66df5847-51b5-4dfe-892f-cf06d0b533b6)
-fn distance_between(prev : Syntax, next : Syntax) -> Int {
+fn distance_between(prev : Syntax, next : Syntax) -> Int32 {
   match (last_line_span(prev), first_line_span(next)) {
     (Some(prev_pos), Some(next_pos)) =>
       if prev_pos.line == next_pos.line {
@@ -238,10 +238,10 @@ fn fix_nested_slider_prefer_outer(
 fn novel_regions_after_unchanged(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-) -> Array[(Int, Int)] {
+) -> Array[(Int32, Int32)] {
   let regions = Array()
-  let mut region_start : Int? = None
-  let mut region_end : Int? = None
+  let mut region_start : Int32? = None
+  let mut region_end : Int32? = None
   let mut after_unchanged = false
   for i, node in nodes.iter2() {
     match change_map.get(node) {
@@ -280,10 +280,10 @@ fn novel_regions_after_unchanged(
 fn novel_regions_before_unchanged(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-) -> Array[(Int, Int)] {
+) -> Array[(Int32, Int32)] {
   let regions = Array()
-  let mut region_start : Int? = None
-  let mut region_end : Int? = None
+  let mut region_start : Int32? = None
+  let mut region_end : Int32? = None
   for i, node in nodes.iter2() {
     match change_map.get(node) {
       Some(Unchanged(_)) => {
@@ -312,8 +312,8 @@ fn novel_regions_before_unchanged(
 fn slide_to_prev_node(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-  start_idx : Int,
-  end_idx : Int,
+  start_idx : Int32,
+  end_idx : Int32,
 ) -> Unit {
   if start_idx == 0 || start_idx == end_idx {
     return
@@ -354,8 +354,8 @@ fn slide_to_prev_node(
 fn slide_to_next_node(
   nodes : ArrayView[Syntax],
   change_map : ChangeMap,
-  start_idx : Int,
-  end_idx : Int,
+  start_idx : Int32,
+  end_idx : Int32,
 ) -> Unit {
   if end_idx + 1 >= nodes.length() || start_idx == end_idx {
     return

@@ -13,7 +13,7 @@ priv enum Phase {
 ///|
 priv struct Model {
   review : Session
-  generation : Int
+  generation : Int32
   route : CommitRef?
   phase : Phase
   enabled : Bool
@@ -38,7 +38,7 @@ pub(all) struct Snapshot {
 
 ///|
 pub(all) struct Context {
-  generation : Int
+  generation : Int32
   route : CommitRef?
   snapshot : Snapshot?
   enabled : Bool

@@ -2,7 +2,7 @@
 fn[T] Client::rpc(
   self : Client,
   request : @protocol.GitHubRequest,
-  generation : Int,
+  generation : Int32,
   select : (@protocol.RpcValue) -> T raise,
   done : (Result[T, Error]) -> Unit,
 ) -> Unit {
@@ -49,7 +49,7 @@ fn[T] Client::rpc(
 ///|
 fn[T] rpc_command(
   request : @protocol.GitHubRequest,
-  generation : Int,
+  generation : Int32,
   select : (@protocol.RpcValue) -> T raise,
   emit : @rabbita.Emit[Result[T, Error]],
 ) -> @rabbita.Cmd {
@@ -59,7 +59,7 @@ fn[T] rpc_command(
 ///|
 pub fn get_commit(
   args : @protocol.CommitGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiCommit, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -78,7 +78,7 @@ pub fn get_commit(
 ///|
 pub fn get_pull(
   args : @protocol.PullGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiPull, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -97,7 +97,7 @@ pub fn get_pull(
 ///|
 pub fn get_compare(
   args : @protocol.CompareGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiCompare, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -116,7 +116,7 @@ pub fn get_compare(
 ///|
 pub fn get_range_compare(
   args : @protocol.RangeCompareGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiRangeCompare, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -135,7 +135,7 @@ pub fn get_range_compare(
 ///|
 pub fn get_pull_commit_page(
   args : @protocol.PullCommitPageGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[Array[@protocol.ApiRangeCommit], Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -154,7 +154,7 @@ pub fn get_pull_commit_page(
 ///|
 pub fn resolve_sha(
   args : @protocol.ResolveShaGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[String, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -173,7 +173,7 @@ pub fn resolve_sha(
 ///|
 pub fn get_pull_files(
   args : @protocol.PullFiles,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[Array[@protocol.ApiFile], Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -192,7 +192,7 @@ pub fn get_pull_files(
 ///|
 pub fn get_content(
   args : @protocol.ContentGet,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiSource, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -211,7 +211,7 @@ pub fn get_content(
 ///|
 pub fn list_comments(
   args : @protocol.CommentsList,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiCommentBundle, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -230,7 +230,7 @@ pub fn list_comments(
 ///|
 pub fn create_issue_comment(
   args : @protocol.IssueCommentCreate,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiIssueComment, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -249,7 +249,7 @@ pub fn create_issue_comment(
 ///|
 pub fn create_review_comment(
   args : @protocol.ReviewCommentCreate,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -268,7 +268,7 @@ pub fn create_review_comment(
 ///|
 pub fn create_commit_comment(
   args : @protocol.CommitCommentCreate,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiCommitComment, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -287,7 +287,7 @@ pub fn create_commit_comment(
 ///|
 pub fn create_review_reply(
   args : @protocol.ReviewReplyCreate,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -306,7 +306,7 @@ pub fn create_review_reply(
 ///|
 pub fn delete_issue_comment(
   args : @protocol.CommentDelete,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.DeleteResult, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -325,7 +325,7 @@ pub fn delete_issue_comment(
 ///|
 pub fn delete_review_comment(
   args : @protocol.CommentDelete,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.DeleteResult, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -344,7 +344,7 @@ pub fn delete_review_comment(
 ///|
 pub fn delete_commit_comment(
   args : @protocol.CommentDelete,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.DeleteResult, Error]],
 ) -> @rabbita.Cmd {
   rpc_command(
@@ -363,7 +363,7 @@ pub fn delete_commit_comment(
 ///|
 pub fn source_request(
   location : SourceLocation,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[(String, Bytes), Error]],
 ) -> @rabbita.Cmd {
   get_content(

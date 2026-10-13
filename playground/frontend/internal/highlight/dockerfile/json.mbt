@@ -1,11 +1,11 @@
 ///|
 fn scan_json_string_part(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   opening : Bool,
   spans : Array[HighlightSpan],
-) -> (Int, Bool) {
+) -> (Int32, Bool) {
   let mut cursor = if opening { start + 1 } else { start }
   let mut plain = start
   while cursor < end {
@@ -16,7 +16,7 @@ fn scan_json_string_part(
     }
     if source[cursor] == '\\' {
       add_span(spans, 0, plain, cursor, StringLiteral)
-      let escape_end = Int::min(cursor + 2, end)
+      let escape_end = Int32::min(cursor + 2, end)
       add_span(spans, 0, cursor, escape_end, Escape)
       cursor = escape_end
       plain = cursor
@@ -31,8 +31,8 @@ fn scan_json_string_part(
 ///|
 fn scan_json(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   state : InstructionState,
   spans : Array[HighlightSpan],
 ) -> Unit {

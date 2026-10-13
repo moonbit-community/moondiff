@@ -98,7 +98,7 @@ fn static_asset_hash(path : String) -> String? {
     _ => return None
   }
   guard hash.length() == 64 &&
-    hash.iter().all(c => c is ('0'..='9' | 'a'..='f')) else {
+    hash.iter().all(c => c is ('0'..<='9' | 'a'..<='f')) else {
     return None
   }
   Some(hash.to_owned())

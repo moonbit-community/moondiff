@@ -7,7 +7,7 @@ fn browser_send(
   meth : String,
   csrf : String,
   body : String,
-  completed : (Result[(Int, String), String]) -> Unit,
+  completed : (Result[(Int32, String), String]) -> Unit,
 ) -> () -> Unit {
   fetch_text(
     path,
@@ -25,7 +25,7 @@ extern "js" fn fetch_text(
   meth : String,
   csrf : String,
   body : String,
-  completed : (Int, String) -> Unit,
+  completed : (Int32, String) -> Unit,
   failed : (String) -> Unit,
 ) -> () -> Unit =
   #| (path, method, csrf, body, completed, failed) => {
@@ -39,7 +39,7 @@ extern "js" fn fetch_text(
   #| }
 
 ///|
-extern "js" fn browser_delay(ms : Int, callback : () -> Unit) -> () -> Unit =
+extern "js" fn browser_delay(ms : Int32, callback : () -> Unit) -> () -> Unit =
   #| (ms, callback) => { const timer = setTimeout(callback, ms); return () => clearTimeout(timer); }
 
 ///|
@@ -48,7 +48,7 @@ pub fn dispose() -> Unit {
 }
 
 ///|
-pub fn cancel_before(generation : Int) -> @rabbita.Cmd {
+pub fn cancel_before(generation : Int32) -> @rabbita.Cmd {
   @cmd.custom_cmd(_ => client.cancel_before(generation))
 }
 
@@ -78,7 +78,7 @@ pub fn auth_status_request(
 pub fn auth_device_request(
   action : DeviceAction,
   id : String,
-  delay : Int,
+  delay : Int32,
   emit : @rabbita.Emit[Result[@protocol.DeviceResponse, Error]],
 ) -> @rabbita.Cmd {
   command(done => client.device(action, id, delay, done), emit)

@@ -48,10 +48,10 @@ fn canonical_patch(
 fn review_items(
   cache : FileDerivation?,
   file : ApiFile,
-  index : Int,
+  index : Int32,
   document : @model.HunkDocument,
-  old_base : Int,
-  new_base : Int,
+  old_base : Int32,
+  new_base : Int32,
   fragment : String,
 ) -> Array[@review.ReviewItem] {
   let patch = canonical_patch(cache, file)

@@ -11,8 +11,8 @@ priv enum FenceLanguage {
 
 ///|
 priv struct CodeLine {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
 }
 
 ///|
@@ -85,7 +85,7 @@ fn add_fence_body(
 }
 
 ///|
-fn fence_run(source : String, start : Int, end : Int) -> (UInt16, Int)? {
+fn fence_run(source : String, start : Int32, end : Int32) -> (UInt16, Int32)? {
   if start >= end || !(source[start] is ('`' | '~')) {
     return None
   }

@@ -2,7 +2,7 @@
 pub(all) suberror InvalidCiphertext
 
 ///|
-fn random_bytes(length : Int) -> Bytes raise {
+fn random_bytes(length : Int32) -> Bytes raise {
   guard @env.rand(length) is Some(bytes) else {
     fail("System entropy unavailable")
   }

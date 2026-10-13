@@ -105,7 +105,7 @@ fn require(valid : Bool, code : String, message : String) -> Unit raise {
 ///|
 fn check_number(number : String) -> Unit raise {
   require(decimal(number), "invalid_arguments", "Invalid identifier.")
-  let id : Int64 = @json.from_json(number.to_json())
+  let id : Int64 = @json.from_json(Json(number))
   require(id > 0, "invalid_arguments", "Identifier out of range.")
 }
 
@@ -313,7 +313,7 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
 // GraphQL's Int is signed 32-bit, unlike REST identifiers.
 fn check_pull_number(number : String) -> Unit raise {
   check_number(number)
-  let id : Int64 = @json.from_json(number.to_json())
+  let id : Int64 = @json.from_json(Json(number))
   require(
     id <= 2147483647L,
     "invalid_arguments",

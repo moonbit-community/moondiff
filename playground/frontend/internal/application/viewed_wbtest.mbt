@@ -398,7 +398,7 @@ fn viewed_test_storage(model : Model) -> Model {
 }
 
 ///|
-fn viewed_test_stored(model : Model, index : Int) -> Model {
+fn viewed_test_stored(model : Model, index : Int32) -> Model {
   guard model.viewed.files.get(index) is Some({ pending: Some(pending), .. }) else {
     return model
   }

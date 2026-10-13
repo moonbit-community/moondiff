@@ -15,7 +15,12 @@ fn scalar_kind(input : StringView) -> HighlightKind {
 }
 
 ///|
-fn plain_line_end(source : String, start : Int, end : Int, flow : Bool) -> Int {
+fn plain_line_end(
+  source : String,
+  start : Int32,
+  end : Int32,
+  flow : Bool,
+) -> Int32 {
   for i = start; i < end; i = i + 1 {
     if (flow && flow_indicator(source[i])) ||
       (source[i] == '#' && (i == start || source[i - 1] is (' ' | '\t'))) ||
@@ -33,9 +38,9 @@ fn plain_line_end(source : String, start : Int, end : Int, flow : Bool) -> Int {
 fn collect_plain(
   source : String,
   lines : Array[SourceLine],
-  row : Int,
-  start : Int,
-  parent_indent : Int,
+  row : Int32,
+  start : Int32,
+  parent_indent : Int32,
   flow : Bool,
 ) -> (StringView, StringView) {
   let mut end = plain_line_end(source, start, lines[row].end, flow)

@@ -16,7 +16,7 @@ pub(all) struct CommitGet {
   owner : String
   repo : String
   sha : String
-  page : Int
+  page : Int32
 } derive(Eq, FromJson, ToJson)
 
 ///|
@@ -40,7 +40,7 @@ pub(all) struct RangeCompareGet {
   repo : String
   base : String
   head : String
-  page : Int
+  page : Int32
 } derive(Eq, FromJson, ToJson)
 
 ///|
@@ -48,7 +48,7 @@ pub(all) struct PullCommitPageGet {
   owner : String
   repo : String
   number : String
-  page : Int
+  page : Int32
 } derive(Eq, FromJson, ToJson)
 
 ///|
@@ -63,7 +63,7 @@ pub(all) struct PullFiles {
   owner : String
   repo : String
   number : String
-  page : Int
+  page : Int32
 } derive(Eq, FromJson, ToJson)
 
 ///|
@@ -96,7 +96,7 @@ pub(all) struct ReviewCommentCreate {
   number : String
   commit_id : String
   path : String
-  line : Int
+  line : Int32
   side : CommentSide
   body : String
 } derive(Eq, FromJson, ToJson)
@@ -107,7 +107,7 @@ pub(all) struct CommitCommentCreate {
   repo : String
   sha : String
   path : String
-  position : Int
+  position : Int32
   body : String
 } derive(Eq, FromJson, ToJson)
 
@@ -155,6 +155,6 @@ pub(all) enum GitHubRequest {
 
 ///|
 pub(all) struct RpcRequest {
-  v : Int
+  v : Int32
   request : GitHubRequest
 } derive(Eq, FromJson, ToJson)

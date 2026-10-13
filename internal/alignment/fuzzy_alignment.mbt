@@ -7,22 +7,22 @@ let impl_recursive_call_marker : String = "__MOONDIFF_RECURSIVE_CALL__"
 ///|
 // Final confidence is measured in permille. A candidate must retain at least
 // 70% weighted confidence after syntax receives three times the name weight.
-let impl_fuzzy_threshold : Int = 700
+let impl_fuzzy_threshold : Int32 = 700
 
 ///|
-let impl_extraction_min_body_mass : Int = 24
+let impl_extraction_min_body_mass : Int32 = 24
 
 ///|
-let impl_extraction_max_wrapper_percent : Int = 35
+let impl_extraction_max_wrapper_percent : Int32 = 35
 
 ///|
-let impl_extraction_min_continuity : Int = 800
+let impl_extraction_min_continuity : Int32 = 800
 
 ///|
-let impl_extraction_wrapper_margin : Int = 250
+let impl_extraction_wrapper_margin : Int32 = 250
 
 ///|
-let impl_extraction_old_margin : Int = 100
+let impl_extraction_old_margin : Int32 = 100
 
 ///|
 priv struct ImplFuzzyDecl {
@@ -33,20 +33,20 @@ priv struct ImplFuzzyDecl {
 
 ///|
 priv struct ImplFuzzyContent {
-  counts : @hashmap.HashMap[UInt, Int]
-  size : Int
+  counts : @hashmap.HashMap[UInt32, Int32]
+  size : Int32
 }
 
 ///|
 priv struct ImplFuzzyGap {
-  previous : Int?
-  next : Int?
+  previous : Int32?
+  next : Int32?
 } derive(Eq)
 
 ///|
 priv struct ImplFuzzyBestCandidate {
-  score : Int
-  index : Int
+  score : Int32
+  index : Int32
   tied : Bool
 }
 
@@ -58,8 +58,8 @@ fn ImplFuzzyBestCandidate::empty() -> Self {
 ///|
 fn ImplFuzzyBestCandidate::consider(
   self : Self,
-  index : Int,
-  score : Int,
+  index : Int32,
+  score : Int32,
 ) -> Self {
   if score > self.score {
     { score, index, tied: false, }
@@ -71,7 +71,7 @@ fn ImplFuzzyBestCandidate::consider(
 }
 
 ///|
-fn ImplFuzzyBestCandidate::unique_index(self : Self) -> Int? {
+fn ImplFuzzyBestCandidate::unique_index(self : Self) -> Int32? {
   if self.score >= impl_fuzzy_threshold && !self.tied {
     Some(self.index)
   } else {
@@ -83,8 +83,8 @@ fn ImplFuzzyBestCandidate::unique_index(self : Self) -> Int? {
 // Semantic-key pairs retain their occurrence-order default. Only a key that
 // occurs once on both sides is eligible for the extraction challenge.
 priv struct ImplSemanticPair {
-  old_index : Int
-  new_index : Int
+  old_index : Int32
+  new_index : Int32
   unique_key : Bool
 }
 
@@ -272,7 +272,7 @@ fn collect_impl_body_tokens(
   node : @cst.CstNode,
   declaration_name : String,
   tokens : Array[String],
-  normalize_call_name? : Bool = false,
+  normalize_call_name~ : Bool = false,
 ) -> Unit {
   if node.kind is Syntax_Token(TK_COMMENT) {
     return
@@ -321,7 +321,7 @@ fn make_impl_fuzzy_body(input : ImplFuzzyBodyInput) -> ImplFuzzyBody {
     input.declaration_name,
     tokens,
   )
-  let trigrams : @hashmap.HashMap[ImplBodyTrigram, Int] = HashMap([])
+  let trigrams : @hashmap.HashMap[ImplBodyTrigram, Int32] = HashMap([])
   let mass = if tokens.length() >= 3 { tokens.length() - 2 } else { 0 }
   for i in 0..<mass {
     let trigram = ImplBodyTrigram::{
@@ -340,7 +340,7 @@ fn make_impl_fuzzy_body(input : ImplFuzzyBodyInput) -> ImplFuzzyBody {
 // construction, and is charged before either collection is allocated.
 fn impl_fuzzy_body_at(
   units : ArrayView[ImplUnit],
-  index : Int,
+  index : Int32,
   cache : Array[ImplFuzzyBody?],
   budget : @computation.ScopeBudget,
 ) -> ImplFuzzyBody? raise @computation.ScopeLimitExceeded {
@@ -473,7 +473,7 @@ fn fuzzy_name_position_matches(
 fn clone_impl_fuzzy_syntax(
   node : @syntax.Syntax,
   name_node : @cst.CstNode,
-  replaced : Ref[Int],
+  replaced : Ref[Int32],
 ) -> @syntax.Syntax {
   match node {
     Atom(position~, content~, kind~, ..) => {
@@ -543,7 +543,10 @@ fn impl_fuzzy_info(
 ///|
 // Scores are permille: 70% asymmetric old-body coverage plus 30% Dice
 // similarity, both over the trigram multiset intersection.
-fn impl_body_continuity(old : ImplFuzzyBody, candidate : ImplFuzzyBody) -> Int {
+fn impl_body_continuity(
+  old : ImplFuzzyBody,
+  candidate : ImplFuzzyBody,
+) -> Int32 {
   if old.mass == 0 {
     return 0
   }
@@ -565,7 +568,7 @@ fn impl_body_continuity_with_budget(
   old : ImplFuzzyBody,
   candidate : ImplFuzzyBody,
   budget : @computation.ScopeBudget,
-) -> Int raise @computation.ScopeLimitExceeded {
+) -> Int32 raise @computation.ScopeLimitExceeded {
   budget.charge(old.trigrams.length().reinterpret_as_uint(), TopLevelAlignment)
   impl_body_continuity(old, candidate)
 }
@@ -596,8 +599,8 @@ fn impl_tail_delegate_matches_owner(
 // consumer also retains the declaration-kind constraint.
 fn impl_old_body_competitors_by_owner(
   old_units : ArrayView[ImplUnit],
-) -> @hashmap.HashMap[String, Array[Int]] {
-  let competitors : @hashmap.HashMap[String, Array[Int]] = HashMap([])
+) -> @hashmap.HashMap[String, Array[Int32]] {
+  let competitors : @hashmap.HashMap[String, Array[Int32]] = HashMap([])
   for i in 0..<old_units.length() {
     if old_units[i].fuzzy is Some(info) && info.body_input is Some(_) {
       competitors.get_or_init(info.owner, fn() { [] }).push(i)
@@ -608,14 +611,14 @@ fn impl_old_body_competitors_by_owner(
 
 ///|
 fn impl_helper_leads_other_old_declarations(
-  old_index : Int,
+  old_index : Int32,
   old_info : ImplFuzzyInfo,
   helper_info : ImplFuzzyInfo,
   helper_body : ImplFuzzyBody,
   old_units : ArrayView[ImplUnit],
   old_body_cache : Array[ImplFuzzyBody?],
-  old_competitors : @hashmap.HashMap[String, Array[Int]],
-  current_score : Int,
+  old_competitors : @hashmap.HashMap[String, Array[Int32]],
+  current_score : Int32,
   budget : @computation.ScopeBudget,
 ) -> Bool raise @computation.ScopeLimitExceeded {
   if !impl_fuzzy_declarations_compatible(old_info, helper_info) {
@@ -653,13 +656,13 @@ fn impl_semantic_challenge_helper(
   new_units : ArrayView[ImplUnit],
   old_body_cache : Array[ImplFuzzyBody?],
   new_body_cache : Array[ImplFuzzyBody?],
-  old_competitors : @hashmap.HashMap[String, Array[Int]],
+  old_competitors : @hashmap.HashMap[String, Array[Int32]],
   use_uuid : Bool,
-  new_uuid_used : @hashmap.HashMap[Int, Bool],
-  new_semantic_used : @hashmap.HashMap[Int, Bool],
-  new_challenge_used : @hashmap.HashMap[Int, Bool],
+  new_uuid_used : @hashmap.HashMap[Int32, Bool],
+  new_semantic_used : @hashmap.HashMap[Int32, Bool],
+  new_challenge_used : @hashmap.HashMap[Int32, Bool],
   budget : @computation.ScopeBudget,
-) -> Int? raise @computation.ScopeLimitExceeded {
+) -> Int32? raise @computation.ScopeLimitExceeded {
   if !pair.unique_key {
     return None
   }
@@ -675,7 +678,7 @@ fn impl_semantic_challenge_helper(
     return None
   }
 
-  let adjacent : Array[Int] = []
+  let adjacent : Array[Int32] = []
   for offset in [-1, 1] {
     let helper_index = pair.new_index + offset
     if helper_index >= 0 &&
@@ -753,8 +756,8 @@ fn impl_semantic_challenge_helper(
 ///|
 fn collect_impl_fuzzy_content(
   node : @syntax.Syntax,
-  counts : @hashmap.HashMap[UInt, Int],
-) -> Int {
+  counts : @hashmap.HashMap[UInt32, Int32],
+) -> Int32 {
   match node {
     // A list content id recursively fingerprints its complete CST subtree.
     // Counting atoms again would overweight shared punctuation and identifiers,
@@ -774,7 +777,7 @@ fn collect_impl_fuzzy_content(
 
 ///|
 fn make_impl_fuzzy_content(root : @syntax.Syntax) -> ImplFuzzyContent {
-  let counts : @hashmap.HashMap[UInt, Int] = HashMap([])
+  let counts : @hashmap.HashMap[UInt32, Int32] = HashMap([])
   let size = collect_impl_fuzzy_content(root, counts)
   { counts, size, }
 }
@@ -783,7 +786,7 @@ fn make_impl_fuzzy_content(root : @syntax.Syntax) -> ImplFuzzyContent {
 fn impl_fuzzy_syntax_similarity(
   old : ImplFuzzyContent,
   new : ImplFuzzyContent,
-) -> Int {
+) -> Int32 {
   let total = old.size + new.size
   if total == 0 {
     return 1000
@@ -801,9 +804,9 @@ fn impl_fuzzy_levenshtein(
   lhs : ArrayView[Char],
   rhs : ArrayView[Char],
   budget : @computation.ScopeBudget,
-) -> Int raise @computation.ScopeLimitExceeded {
+) -> Int32 raise @computation.ScopeLimitExceeded {
   budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, TopLevelAlignment)
-  let rows : Array[Array[Int]] = [
+  let rows : Array[Array[Int32]] = [
     Array::make(rhs.length() + 1, 0),
     Array::make(rhs.length() + 1, 0),
   ]
@@ -832,7 +835,7 @@ fn impl_fuzzy_name_similarity(
   old_name : String,
   new_name : String,
   budget : @computation.ScopeBudget,
-) -> Int raise @computation.ScopeLimitExceeded {
+) -> Int32 raise @computation.ScopeLimitExceeded {
   let old_chars = old_name.to_array()
   let new_chars = new_name.to_array()
   let max_length = @cmp.maximum(old_chars.length(), new_chars.length())
@@ -850,7 +853,7 @@ fn impl_fuzzy_score(
   new_info : ImplFuzzyInfo,
   new_content : ImplFuzzyContent,
   budget : @computation.ScopeBudget,
-) -> Int raise @computation.ScopeLimitExceeded {
+) -> Int32 raise @computation.ScopeLimitExceeded {
   let syntax = impl_fuzzy_syntax_similarity(old_content, new_content)
   let name = impl_fuzzy_name_similarity(old_info.name, new_info.name, budget)
   // Keep the score integral and deterministic: (3 * syntax + name) / 4.
@@ -859,12 +862,12 @@ fn impl_fuzzy_score(
 
 ///|
 fn impl_fuzzy_gaps(
-  length : Int,
-  anchor_ids : @hashmap.HashMap[Int, Int],
+  length : Int32,
+  anchor_ids : @hashmap.HashMap[Int32, Int32],
 ) -> Array[ImplFuzzyGap] {
-  let previous : Array[Int?] = Array::make(length, None)
-  let next : Array[Int?] = Array::make(length, None)
-  let mut current : Int? = None
+  let previous : Array[Int32?] = Array::make(length, None)
+  let next : Array[Int32?] = Array::make(length, None)
+  let mut current : Int32? = None
   for i in 0..<length {
     if anchor_ids.get(i) is Some(anchor_id) {
       current = Some(anchor_id)
@@ -895,8 +898,8 @@ fn impl_fuzzy_uuid_conflicts(old : ImplUnit, new : ImplUnit) -> Bool {
 
 ///|
 fn impl_fuzzy_candidate_score(
-  old_index : Int,
-  new_index : Int,
+  old_index : Int32,
+  new_index : Int32,
   old_units : ArrayView[ImplUnit],
   new_units : ArrayView[ImplUnit],
   old_gaps : ArrayView[ImplFuzzyGap],
@@ -905,7 +908,7 @@ fn impl_fuzzy_candidate_score(
   new_contents : ArrayView[ImplFuzzyContent?],
   use_uuid : Bool,
   budget : @computation.ScopeBudget,
-) -> Int? raise @computation.ScopeLimitExceeded {
+) -> Int32? raise @computation.ScopeLimitExceeded {
   if old_gaps[old_index] != new_gaps[new_index] ||
     (
       use_uuid &&
@@ -934,7 +937,7 @@ fn impl_fuzzy_candidate_score(
 fn align_fuzzy_impl_units(
   state : AlignmentState,
   budget : @computation.ScopeBudget,
-) -> Array[(Int, Int)] raise @computation.ScopeLimitExceeded {
+) -> Array[(Int32, Int32)] raise @computation.ScopeLimitExceeded {
   let old_units = state.old_units
   let new_units = state.new_units
   let old_used = state.old_used
@@ -946,8 +949,8 @@ fn align_fuzzy_impl_units(
     return []
   }
 
-  let old_anchor_ids : @hashmap.HashMap[Int, Int] = HashMap([])
-  let new_anchor_ids : @hashmap.HashMap[Int, Int] = HashMap([])
+  let old_anchor_ids : @hashmap.HashMap[Int32, Int32] = HashMap([])
+  let new_anchor_ids : @hashmap.HashMap[Int32, Int32] = HashMap([])
   for old_index, new_index in reliable {
     old_anchor_ids[old_index] = old_index
     new_anchor_ids[new_index] = old_index

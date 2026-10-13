@@ -1,10 +1,10 @@
 ///|
 pub(all) suberror RpcError {
-  RpcError(Int, String, String)
+  RpcError(Int32, String, String)
 }
 
 ///|
-pub fn rpc_error(error : Error) -> (Int, Json) {
+pub fn rpc_error(error : Error) -> (Int32, Json) {
   let (status, code, message) = match error {
     RpcError(status, code, message) => (status, code, message)
     @api.ProtocolError(code, message) => (400, code, message)
@@ -45,7 +45,7 @@ pub fn optional_string(value : Json, key : String) -> String {
 }
 
 ///|
-pub fn positive_int(value : Json, key : String, maximum : Int) -> Int raise {
+pub fn positive_int(value : Json, key : String, maximum : Int32) -> Int32 raise {
   guard field(value, key) is Number(number, ..) &&
     number >= 1 &&
     number <= maximum.to_double() &&

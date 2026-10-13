@@ -34,7 +34,7 @@ fn reconstruct_ops(ops : ArrayView[Op]) -> (String, String) {
 }
 
 ///|
-fn ops_cost(ops : ArrayView[Op]) -> Int {
+fn ops_cost(ops : ArrayView[Op]) -> Int32 {
   let mut cost = 0
   for op in ops {
     cost += match op {

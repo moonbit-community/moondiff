@@ -4,38 +4,38 @@ pub(all) enum Phase {
   LoadingCommit(
     reference~ : CommitRef,
     repository~ : RepositoryRef,
-    page~ : Int,
+    page~ : Int32,
     first~ : ApiCommit?,
     files~ : Array[ApiFile]
   )
-  LoadingPullMetadata(reference~ : CommitRef, attempt~ : Int)
+  LoadingPullMetadata(reference~ : CommitRef, attempt~ : Int32)
   LoadingPullCommitMetadata(reference~ : CommitRef)
   LoadingRangePullMetadata(reference~ : CommitRef)
   LoadingRangePullCompare(reference~ : CommitRef)
   LoadingRange(reference~ : CommitRef)
   LoadingPullSnapshot(
     reference~ : CommitRef,
-    attempt~ : Int,
+    attempt~ : Int32,
     metadata~ : ApiPull,
     compare~ : ApiCompare?,
-    page~ : Int,
+    page~ : Int32,
     files~ : Array[ApiFile]
   )
   ValidatingPullSnapshot(
     reference~ : CommitRef,
-    attempt~ : Int,
+    attempt~ : Int32,
     metadata~ : ApiPull,
     compare~ : ApiCompare,
     files~ : Array[ApiFile]
   )
   LoadingPullSelectorCompare(
     reference~ : CommitRef,
-    attempt~ : Int,
+    attempt~ : Int32,
     metadata~ : ApiPull
   )
   ValidatingPullSelector(
     reference~ : CommitRef,
-    attempt~ : Int,
+    attempt~ : Int32,
     metadata~ : ApiPull,
     compare~ : ApiCompare
   )
@@ -47,7 +47,7 @@ pub(all) enum Phase {
 ///|
 pub(all) struct Model {
   input : String
-  generation : Int
+  generation : Int32
   view_mode : ViewMode
   diff_algorithm : DiffAlgorithm
   ignore_comments : Bool
@@ -56,7 +56,7 @@ pub(all) struct Model {
   route : CommitRef?
   file_tree : FileTreeState
   auth : AuthStatus
-  auth_revision : Int
+  auth_revision : Int32
   restore_pending : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState

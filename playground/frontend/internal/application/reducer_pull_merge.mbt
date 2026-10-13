@@ -1,10 +1,10 @@
 ///|
 pub(all) enum PullMergeMsg {
   Refresh
-  Poll(Int, Int, Int)
-  StatusLoaded(Int, Int, Result[@protocol.ApiPullMergeStatus, Error])
+  Poll(Int32, Int32, Int32)
+  StatusLoaded(Int32, Int32, Result[@protocol.ApiPullMergeStatus, Error])
   Submit
-  MergeFinished(Int, Int, Result[@protocol.ApiPullMergeResult, Error])
+  MergeFinished(Int32, Int32, Result[@protocol.ApiPullMergeResult, Error])
 }
 
 ///|

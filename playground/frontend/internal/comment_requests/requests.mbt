@@ -12,7 +12,7 @@ fn comment_list_args(reference : CommitRef) -> @protocol.CommentsList {
 ///|
 pub fn comments_request(
   reference : CommitRef,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[ApiCommentBundle, Error]],
 ) -> @rabbita.Cmd {
   @github_client.list_comments(comment_list_args(reference), generation, emit)
@@ -22,7 +22,7 @@ pub fn comments_request(
 pub fn comment_head_request(
   reference : CommitRef,
   number : String,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[ApiPull, Error]],
 ) -> @rabbita.Cmd {
   @github_client.get_pull(
@@ -41,7 +41,7 @@ pub fn create_issue_comment_request(
   reference : CommitRef,
   number : String,
   body : String,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[ApiIssueComment, Error]],
 ) -> @rabbita.Cmd {
   @github_client.create_issue_comment(
@@ -58,7 +58,7 @@ pub fn create_review_comment_request(
   commit_id : String,
   anchor : ReviewAnchor,
   body : String,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
   @github_client.create_review_comment(
@@ -87,7 +87,7 @@ pub fn create_commit_comment_request(
   sha : String,
   anchor : ReviewAnchor,
   body : String,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[ApiCommitComment, Error]],
 ) -> @rabbita.Cmd {
   guard anchor.position is Some(position) else { return @rabbita.none }
@@ -111,7 +111,7 @@ pub fn create_review_reply_request(
   number : String,
   comment_id : Int64,
   body : String,
-  generation : Int,
+  generation : Int32,
   emit : @rabbita.Emit[Result[ApiReviewComment, Error]],
 ) -> @rabbita.Cmd {
   @github_client.create_review_reply(

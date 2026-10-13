@@ -1,8 +1,8 @@
 ///|
 fn test_span(
-  line : Int,
-  start_col : Int,
-  end_col : Int,
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
 ) -> @span.SingleLineSpan {
   { line, start_col, end_col, }
 }
@@ -10,9 +10,9 @@ fn test_span(
 ///|
 fn assert_mapped(
   mapping : @diff_ignore.SpanMapping,
-  line : Int,
-  start_col : Int,
-  end_col : Int,
+  line : Int32,
+  start_col : Int32,
+  end_col : Int32,
 ) -> Unit raise {
   guard mapping is Mapped(span) else { fail("expected a mapped span") }
   assert_eq(

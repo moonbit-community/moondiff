@@ -7,8 +7,8 @@ pub(all) enum UiMsg {
   SelectView(ViewMode)
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
-  FileTreeViewportChanged(Int)
-  FileTreeWidthChanged(Int)
+  FileTreeViewportChanged(Int32)
+  FileTreeWidthChanged(Int32)
   ToggleFileTreeSearch
   FileTreeSearchChanged(String)
   ToggleFileTreeStatus(String)

@@ -4,15 +4,15 @@
 /// top-level section.
 pub struct RenderOptions {
   use_color : Bool
-  old_max_line : Int?
-  new_max_line : Int?
+  old_max_line : Int32?
+  new_max_line : Int32?
 }
 
 ///|
 pub fn RenderOptions::new(
-  use_color? : Bool = false,
-  old_max_line? : Int,
-  new_max_line? : Int,
+  use_color~ : Bool = false,
+  old_max_line? : Int32,
+  new_max_line? : Int32,
 ) -> RenderOptions {
   { use_color, old_max_line, new_max_line, }
 }

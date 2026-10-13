@@ -15,7 +15,7 @@ pub(all) struct PendingReviewReceipt {
   url : String
   kind : DraftKind
   path : String
-  generation : Int
+  generation : Int32
   status : PendingReviewStatus
 } derive(Eq)
 

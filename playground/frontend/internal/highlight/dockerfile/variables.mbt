@@ -1,8 +1,8 @@
 ///|
-fn variable_name_end(source : String, start : Int, end : Int) -> Int {
+fn variable_name_end(source : String, start : Int32, end : Int32) -> Int32 {
   let mut cursor = start
   while cursor < end &&
-        source[cursor] is ('a'..='z' | 'A'..='Z' | '0'..='9' | '_') {
+        source[cursor] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '_') {
     cursor += 1
   }
   cursor
@@ -11,10 +11,10 @@ fn variable_name_end(source : String, start : Int, end : Int) -> Int {
 ///|
 fn scan_variable(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   spans : Array[HighlightSpan],
-) -> Int {
+) -> Int32 {
   if start + 1 >= end || source[start] != '$' {
     return start + 1
   }
@@ -45,13 +45,13 @@ fn scan_variable(
       cursor += 1
     }
     cursor
-  } else if source[start + 1] is ('a'..='z' | 'A'..='Z' | '_') {
+  } else if source[start + 1] is ('a'..<='z' | 'A'..<='Z' | '_') {
     add_span(spans, 0, start, start + 1, Interpolation)
     let name_end = variable_name_end(source, start + 1, end)
     add_span(spans, 0, start + 1, name_end, Variable)
     name_end
   } else if source[start + 1]
-    is ('0'..='9' | '@' | '*' | '#' | '?' | '-' | '$' | '!') {
+    is ('0'..<='9' | '@' | '*' | '#' | '?' | '-' | '$' | '!') {
     add_span(spans, 0, start, start + 1, Interpolation)
     add_span(spans, 0, start + 1, start + 2, Variable)
     start + 2
@@ -63,8 +63,8 @@ fn scan_variable(
 ///|
 fn scan_interpolated_text(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   kind : HighlightKind,
   expand : Bool,
   spans : Array[HighlightSpan],
@@ -91,11 +91,11 @@ fn scan_interpolated_text(
 ///|
 fn scan_double_quoted(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   expand : Bool,
   spans : Array[HighlightSpan],
-) -> (Int, Bool) {
+) -> (Int32, Bool) {
   let mut cursor = start + 1
   let mut plain = start
   while cursor < end {
@@ -106,7 +106,7 @@ fn scan_double_quoted(
     }
     if source[cursor] == '\\' {
       add_span(spans, 0, plain, cursor, StringLiteral)
-      let escape_end = Int::min(cursor + 2, end)
+      let escape_end = Int32::min(cursor + 2, end)
       add_span(spans, 0, cursor, escape_end, Escape)
       cursor = escape_end
       plain = cursor
@@ -126,10 +126,10 @@ fn scan_double_quoted(
 ///|
 fn scan_single_quoted(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   spans : Array[HighlightSpan],
-) -> (Int, Bool) {
+) -> (Int32, Bool) {
   let mut cursor = start + 1
   while cursor < end && source[cursor] != '\'' {
     cursor += 1

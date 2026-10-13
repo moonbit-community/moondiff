@@ -1,8 +1,8 @@
 ///|
 priv struct Prefix {
-  content : Int
-  indent : Int
-  quote_depth : Int
+  content : Int32
+  indent : Int32
+  quote_depth : Int32
 }
 
 ///|
@@ -63,7 +63,7 @@ fn block_prefix(
 }
 
 ///|
-fn thematic_break(source : String, start : Int, end : Int) -> Bool {
+fn thematic_break(source : String, start : Int32, end : Int32) -> Bool {
   if start >= end || !(source[start] is ('-' | '*' | '_')) {
     return false
   }
@@ -80,7 +80,7 @@ fn thematic_break(source : String, start : Int, end : Int) -> Bool {
 }
 
 ///|
-fn setext_underline(source : String, start : Int, end : Int) -> Bool {
+fn setext_underline(source : String, start : Int32, end : Int32) -> Bool {
   if start >= end || !(source[start] is ('=' | '-')) {
     return false
   }
@@ -93,7 +93,7 @@ fn setext_underline(source : String, start : Int, end : Int) -> Bool {
 }
 
 ///|
-fn table_delimiter(source : String, start : Int, end : Int) -> Bool {
+fn table_delimiter(source : String, start : Int32, end : Int32) -> Bool {
   let mut cursor = start
   let mut dashes = 0
   let mut cells = 0
@@ -144,8 +144,8 @@ fn add_table_pipes(
 ///|
 fn add_link_definition(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   candidates : Array[Candidate],
 ) -> Bool {
   if start >= end || source[start] != '[' {
@@ -174,10 +174,10 @@ fn add_link_definition(
 fn strip_fence_body_prefix(
   source : String,
   line : SourceLine,
-  indent : Int,
-  quote_depth : Int,
+  indent : Int32,
+  quote_depth : Int32,
   candidates : Array[Candidate],
-) -> Int {
+) -> Int32 {
   let mut cursor = line.start
   for _ in 0..<quote_depth {
     cursor = skip_spaces(source, cursor, line.end, 3)
@@ -199,7 +199,7 @@ fn strip_fence_body_prefix(
 }
 
 ///|
-fn html_block_tag(source : String, start : Int, end : Int) -> String? {
+fn html_block_tag(source : String, start : Int32, end : Int32) -> String? {
   if start >= end || source[start] != '<' {
     return None
   }
@@ -209,7 +209,7 @@ fn html_block_tag(source : String, start : Int, end : Int) -> String? {
   }
   let name_start = cursor
   while cursor < end &&
-        source[cursor] is ('a'..='z' | 'A'..='Z' | '0'..='9' | '-') {
+        source[cursor] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '-') {
     cursor += 1
   }
   if cursor == name_start {
@@ -219,7 +219,7 @@ fn html_block_tag(source : String, start : Int, end : Int) -> String? {
         start + 2 < end &&
         source[start] == '<' &&
         source[start + 1] == '!' &&
-        source[start + 2] is ('A'..='Z')
+        source[start + 2] is ('A'..<='Z')
       ) {
       Some("")
     } else {
@@ -244,7 +244,7 @@ fn html_block_tag(source : String, start : Int, end : Int) -> String? {
 }
 
 ///|
-fn html_comment_start(source : String, start : Int, end : Int) -> Int? {
+fn html_comment_start(source : String, start : Int32, end : Int32) -> Int32? {
   let mut cursor = start
   while cursor + 3 < end {
     if source[cursor:cursor + 4] == "<!--" {
@@ -256,7 +256,7 @@ fn html_comment_start(source : String, start : Int, end : Int) -> Int? {
 }
 
 ///|
-fn html_comment_end(source : String, start : Int, end : Int) -> Int? {
+fn html_comment_end(source : String, start : Int32, end : Int32) -> Int32? {
   let mut cursor = start
   while cursor + 2 < end {
     if source[cursor:cursor + 3] == "-->" {

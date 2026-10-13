@@ -3,7 +3,7 @@
 fn fixture_event(
   review : Session,
   event : @comments.Event,
-  view? : ChangeView = review_test_view(),
+  view~ : ChangeView = review_test_view(),
 ) -> Session {
   @comments.update(
     comment_session_context(review, {

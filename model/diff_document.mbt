@@ -22,7 +22,7 @@ pub(all) struct DiffSegment {
 /// `segments` is a zero-copy read-only view whose backing storage is never
 /// mutated after the line is published.
 pub(all) struct DiffLine {
-  index : Int
+  index : Int32
   segments : ArrayView[DiffSegment]
 } derive(Eq)
 
@@ -39,8 +39,8 @@ pub fn DiffLine::text(self : DiffLine) -> String {
 ///|
 /// One unchanged line shared by both inputs. Indices are zero-based.
 pub(all) struct ContextLine {
-  old_index : Int
-  new_index : Int
+  old_index : Int32
+  new_index : Int32
   text : String
 } derive(Eq)
 
@@ -71,10 +71,10 @@ pub(all) enum DiffBlock {
 /// line counts. Renderers derive display headers from these numeric ranges.
 /// `blocks` is a zero-copy read-only view with stable backing storage.
 pub(all) struct DiffHunk {
-  old_start : Int
-  old_len : Int
-  new_start : Int
-  new_len : Int
+  old_start : Int32
+  old_len : Int32
+  new_start : Int32
+  new_len : Int32
   blocks : ArrayView[DiffBlock]
 } derive(Eq)
 
@@ -88,15 +88,15 @@ pub(all) struct HunkDocument {
 } derive(Eq)
 
 ///|
-fn DiffLine::rebase_index(self : DiffLine, offset : Int) -> DiffLine {
+fn DiffLine::rebase_index(self : DiffLine, offset : Int32) -> DiffLine {
   { index: self.index + offset, segments: self.segments, }
 }
 
 ///|
 fn DiffBlock::rebase_indexes(
   self : DiffBlock,
-  old_line_offset : Int,
-  new_line_offset : Int,
+  old_line_offset : Int32,
+  new_line_offset : Int32,
 ) -> DiffBlock {
   match self {
     ContextBlock(lines) => {
@@ -140,8 +140,8 @@ fn DiffBlock::rebase_indexes(
 /// are rebased together.
 pub fn HunkDocument::rebase(
   self : HunkDocument,
-  old_line_offset : Int,
-  new_line_offset : Int,
+  old_line_offset : Int32,
+  new_line_offset : Int32,
 ) -> HunkDocument {
   let hunks : Array[DiffHunk] = []
   for hunk in self.hunks {

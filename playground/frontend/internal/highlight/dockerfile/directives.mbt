@@ -3,7 +3,7 @@ fn parser_directive(
   source : String,
   line : SourceLine,
   spans : Array[HighlightSpan],
-) -> (String, Int, Int)? {
+) -> (String, Int32, Int32)? {
   let mut cursor = skip_space(source, line.start, line.end)
   if cursor >= line.end || source[cursor] != '#' {
     return None

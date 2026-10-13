@@ -28,8 +28,8 @@ pub(all) enum DiffSection {
 /// sorted by that side's range. `reordered` compares only matched identities.
 pub(all) struct TopLevelDiff {
   sections : ArrayView[DiffSection]
-  old_order : ArrayView[Int]
-  new_order : ArrayView[Int]
+  old_order : ArrayView[Int32]
+  new_order : ArrayView[Int32]
   reordered : Bool
 } derive(Eq)
 

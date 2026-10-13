@@ -50,22 +50,22 @@ pub fn merge_file_pages(
 }
 
 ///|
-pub fn should_fetch_next_page(page : Int, file_count : Int) -> Bool {
+pub fn should_fetch_next_page(page : Int32, file_count : Int32) -> Bool {
   file_count == 100 && page < 30
 }
 
 ///|
-pub const MAX_PULL_FILES : Int = 3_000
+pub const MAX_PULL_FILES : Int32 = 3_000
 
 ///|
 pub const PULL_FILE_LIMIT_ERROR : String = "This pull request changes more than GitHub's 3,000-file API limit, so its complete diff cannot be loaded."
 
 ///|
 pub fn should_fetch_next_pull_page(
-  page : Int,
-  page_file_count : Int,
-  accumulated_file_count : Int,
-  expected_file_count : Int?,
+  page : Int32,
+  page_file_count : Int32,
+  accumulated_file_count : Int32,
+  expected_file_count : Int32?,
 ) -> Bool {
   if expected_file_count is Some(expected) && accumulated_file_count >= expected {
     return false
@@ -350,10 +350,10 @@ pub(all) enum CheckedSource {
 }
 
 ///|
-pub const MAX_SOURCE_BYTES : Int = 1_048_576
+pub const MAX_SOURCE_BYTES : Int32 = 1_048_576
 
 ///|
-pub const MAX_SOURCE_LINES : Int = 20_000
+pub const MAX_SOURCE_LINES : Int32 = 20_000
 
 ///|
 pub fn check_source(bytes : Bytes) -> CheckedSource {

@@ -3,10 +3,10 @@
 using @syntax {type MatchedPos}
 
 ///|UUID(43ea7bcf-0a8b-449e-aac4-dc8c0b633959)
-pub type LineSet = @hashmap.HashMap[Int, Bool]
+pub type LineSet = @hashmap.HashMap[Int32, Bool]
 
 ///|UUID(9675cda4-4b44-406d-9128-9d311f3dd4e7)
-type OppositeMap = @hashmap.HashMap[Int, Array[Int]]
+type OppositeMap = @hashmap.HashMap[Int32, Array[Int32]]
 
 ///|UUID(25fa302a-c9b4-48a4-ba05-4ea0b5d672bd)
 priv enum DisplaySide {
@@ -20,7 +20,7 @@ priv enum DisplaySide {
 pub(all) struct AstHunk {
   novel_lhs : LineSet
   novel_rhs : LineSet
-  lines : Array[(Int?, Int?)]
+  lines : Array[(Int32?, Int32?)]
 }
 
 ///|UUID(2e358b6e-82df-4236-8652-859c7030f9c3)
@@ -89,12 +89,14 @@ fn AstHunk::merge(self : Self, other : Self) -> Self {
 }
 
 ///|UUID(063b1c16-81dc-4dd7-a575-84b383f4f363)
-fn flip_line_pair(pair : (Int?, Int?)) -> (Int?, Int?) {
+fn flip_line_pair(pair : (Int32?, Int32?)) -> (Int32?, Int32?) {
   (pair.1, pair.0)
 }
 
 ///|UUID(3ac03240-83ed-41c1-a6b0-45887515ff26)
-fn flip_line_pairs(pairs : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
+fn flip_line_pairs(
+  pairs : ArrayView[(Int32?, Int32?)],
+) -> Array[(Int32?, Int32?)] {
   let flipped = Array(capacity=pairs.length())
   for pair in pairs {
     flipped.push(flip_line_pair(pair))
@@ -103,7 +105,9 @@ fn flip_line_pairs(pairs : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
 }
 
 ///|UUID(3a91091f-c3dd-45d6-b53f-68cbe34048d0)
-fn reversed_pairs(pairs : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
+fn reversed_pairs(
+  pairs : ArrayView[(Int32?, Int32?)],
+) -> Array[(Int32?, Int32?)] {
   let reversed = Array(capacity=pairs.length())
   let mut i = pairs.length()
   while i > 0 {
@@ -114,15 +118,15 @@ fn reversed_pairs(pairs : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
 }
 
 ///|UUID(edba51f3-f0ee-465a-8def-675360902dd6)
-fn push_line(line_set : LineSet, line : Int) -> Unit {
+fn push_line(line_set : LineSet, line : Int32) -> Unit {
   line_set.set(line, true)
 }
 
 ///|UUID(6dea4ff2-3924-4405-a4b9-2d2b915eb63d)
 fn add_opposite_line(
   opposites : OppositeMap,
-  line : Int,
-  opposite_line : Int,
+  line : Int32,
+  opposite_line : Int32,
 ) -> Unit {
   if line < 0 || opposite_line < 0 {
     return
@@ -177,7 +181,7 @@ fn lines_with_novel(
 }
 
 ///|UUID(0c609d1a-c14b-4e7f-9773-4e2a75230d63)
-fn sorted_line_set_lines(line_set : LineSet) -> Array[Int] {
+fn sorted_line_set_lines(line_set : LineSet) -> Array[Int32] {
   let lines = Array(capacity=line_set.length())
   for line, _ in line_set {
     lines.push(line)
@@ -187,7 +191,7 @@ fn sorted_line_set_lines(line_set : LineSet) -> Array[Int] {
 }
 
 ///|UUID(67f1ba22-01fd-49b9-884e-b047dd93fe23)
-fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int] {
+fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int32] {
   let seen = @hashmap.HashMap([])
   for mp in mps {
     let line = @syntax.line_index(mp.pos)
@@ -204,7 +208,7 @@ fn all_lines(mps : ArrayView[MatchedPos]) -> Array[Int] {
 }
 
 ///|UUID(744fbb0e-b4ab-4202-a020-f3b52d12dad5)
-fn next_line_after(lines : ArrayView[Int], prev_line : Int?) -> Int? {
+fn next_line_after(lines : ArrayView[Int32], prev_line : Int32?) -> Int32? {
   for line in lines {
     if prev_line is Some(prev) {
       if line > prev {
@@ -222,7 +226,7 @@ fn next_line_after(lines : ArrayView[Int], prev_line : Int?) -> Int? {
 // many-to-many line matches are skipped so they do not force bad alignment.
 fn matched_lines_from_unchanged(
   mps : ArrayView[MatchedPos],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let line_to_opposites = opposite_positions(mps)
   let opposite_to_lines = @hashmap.HashMap([])
   for self_line, opposite_lines in line_to_opposites {
@@ -280,9 +284,9 @@ fn matched_lines_from_unchanged(
 // Insert lines from the opposite side that were not anchored by unchanged
 // matches, preserving order around the existing pairs.
 fn merge_in_opposite_lines(
-  matched_lines : ArrayView[(Int?, Int?)],
-  novel_opposite_lines : ArrayView[Int],
-) -> Array[(Int?, Int?)] {
+  matched_lines : ArrayView[(Int32?, Int32?)],
+  novel_opposite_lines : ArrayView[Int32],
+) -> Array[(Int32?, Int32?)] {
   let merged = Array()
   let mut i = 0
   for pair in matched_lines {
@@ -315,7 +319,7 @@ fn merge_in_opposite_lines(
 fn all_matched_lines(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let lhs_matched_lines = matched_lines_from_unchanged(lhs_mps)
   let rhs_lines = all_lines(rhs_mps)
   let lines = merge_in_opposite_lines(lhs_matched_lines, rhs_lines)
@@ -327,10 +331,10 @@ fn all_matched_lines(
 // Extend matched lines to include leading and trailing file lines. Blank lines
 // at file edges often have no syntax positions but still need stable alignment.
 fn add_ends(
-  matched_lines : ArrayView[(Int?, Int?)],
-  lhs_line_count : Int,
-  rhs_line_count : Int,
-) -> Array[(Int?, Int?)] {
+  matched_lines : ArrayView[(Int32?, Int32?)],
+  lhs_line_count : Int32,
+  rhs_line_count : Int32,
+) -> Array[(Int32?, Int32?)] {
   let lhs_min = Ref(None)
   let rhs_min = Ref(None)
   for pair in matched_lines {
@@ -413,11 +417,11 @@ fn add_ends(
 // If blank lines immediately precede the current matched pair on both sides,
 // pair those blanks too. This improves visual alignment around sparse syntax.
 fn match_blanks_between(
-  current : (Int, Int),
-  prev : (Int, Int),
+  current : (Int32, Int32),
+  prev : (Int32, Int32),
   lhs_lines : ArrayView[String],
   rhs_lines : ArrayView[String],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let mut current_lhs = current.0
   let mut current_rhs = current.1
   if current_lhs == 0 || current_rhs == 0 {
@@ -442,10 +446,10 @@ fn match_blanks_between(
 
 ///|UUID(1ca7d2c0-48c9-4aeb-8a7d-fe55ebbd2e63)
 fn match_blanks_before(
-  current : (Int, Int),
+  current : (Int32, Int32),
   lhs_lines : ArrayView[String],
   rhs_lines : ArrayView[String],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let mut current_lhs = current.0
   let mut current_rhs = current.1
   if current_lhs == 0 || current_rhs == 0 {
@@ -475,10 +479,10 @@ fn match_blanks_before(
 // Add preceding blank-line matches for every anchored pair. Following blank
 // lines are handled by filling contiguous gaps after all anchors are known.
 fn match_preceding_blanks(
-  line_nums : ArrayView[(Int?, Int?)],
+  line_nums : ArrayView[(Int32?, Int32?)],
   lhs_lines : ArrayView[String],
   rhs_lines : ArrayView[String],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let prev_lhs = Ref(None)
   let prev_rhs = Ref(None)
   let matched = Array()
@@ -513,7 +517,9 @@ fn match_preceding_blanks(
 ///|UUID(a25a4c74-48e8-4578-9c20-d1a02ce224b3)
 // Ensure intermediate source lines are not skipped. Missing LHS/RHS lines are
 // inserted as one-sided pairs so renderers can preserve outer gaps.
-fn ensure_contiguous(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
+fn ensure_contiguous(
+  lines : ArrayView[(Int32?, Int32?)],
+) -> Array[(Int32?, Int32?)] {
   let contiguous = Array()
   let lhs_prev = Ref(None)
   let rhs_prev = Ref(None)
@@ -542,9 +548,9 @@ fn ensure_contiguous(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
 
 ///|UUID(8cbf444a-380a-4ce0-b6eb-fd231b6517fd)
 fn flush_gap_run(
-  compacted : Array[(Int?, Int?)],
-  lhs_unpaired : ArrayView[Int],
-  rhs_unpaired : ArrayView[Int],
+  compacted : Array[(Int32?, Int32?)],
+  lhs_unpaired : ArrayView[Int32],
+  rhs_unpaired : ArrayView[Int32],
 ) -> Unit {
   if lhs_unpaired.length() == 1 && rhs_unpaired.length() == 1 {
     compacted.push((Some(lhs_unpaired[0]), Some(rhs_unpaired[0])))
@@ -561,7 +567,7 @@ fn flush_gap_run(
 ///|UUID(d1c26121-dd90-4c2e-8bf0-f532bbe21e25)
 // Compact a single one-line gap from both sides into a paired row. Larger gaps
 // stay separate to avoid implying unrelated lines are equal.
-fn compact_gaps(items : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
+fn compact_gaps(items : ArrayView[(Int32?, Int32?)]) -> Array[(Int32?, Int32?)] {
   let compacted = Array()
   let lhs_unpaired = Array()
   let rhs_unpaired = Array()
@@ -589,7 +595,7 @@ pub fn all_matched_lines_filled(
   rhs_mps : ArrayView[MatchedPos],
   lhs_lines : ArrayView[String],
   rhs_lines : ArrayView[String],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let matched_lines = add_ends(
     all_matched_lines(lhs_mps, rhs_mps),
     lhs_lines.length(),
@@ -609,8 +615,8 @@ pub fn all_matched_lines_filled(
 fn novel_section_in_order(
   lhs_novel_mps : ArrayView[MatchedPos],
   rhs_novel_mps : ArrayView[MatchedPos],
-  lhs_prev_matched_line : Int?,
-  rhs_prev_matched_line : Int?,
+  lhs_prev_matched_line : Int32?,
+  rhs_prev_matched_line : Int32?,
   opposite_to_lhs : OppositeMap,
   opposite_to_rhs : OppositeMap,
 ) -> Array[(DisplaySide, MatchedPos)] {
@@ -747,10 +753,10 @@ fn sorted_novel_positions(
 
 ///|UUID(edb01f4c-b0af-4901-bc1e-f46dc7378ac0)
 fn next_opposite(
-  line : Int,
+  line : Int32,
   opposites : OppositeMap,
-  prev_opposite : Int?,
-) -> Int? {
+  prev_opposite : Int32?,
+) -> Int32? {
   if opposites.get(line) is Some(lines) {
     for opposite in lines {
       if prev_opposite is Some(prev) {
@@ -771,7 +777,7 @@ fn next_opposite(
 fn matched_novel_lines(
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
-) -> Array[(Int?, Int?)] {
+) -> Array[(Int32?, Int32?)] {
   let highest_lhs = Ref(None)
   let highest_rhs = Ref(None)
   let opposite_to_lhs = opposite_positions(lhs_mps)
@@ -831,7 +837,11 @@ fn matched_novel_lines(
 }
 
 ///|UUID(1ff98ba2-048e-4df1-9bd1-87b329990fc1)
-fn lines_are_close(max_lhs : Int?, max_rhs : Int?, line : (Int?, Int?)) -> Bool {
+fn lines_are_close(
+  max_lhs : Int32?,
+  max_rhs : Int32?,
+  line : (Int32?, Int32?),
+) -> Bool {
   let (lhs, rhs) = line
   match (max_lhs, lhs) {
     (Some(max_lhs), Some(lhs)) => if lhs <= max_lhs + 4 { return true }
@@ -845,7 +855,7 @@ fn lines_are_close(max_lhs : Int?, max_rhs : Int?, line : (Int?, Int?)) -> Bool 
 }
 
 ///|UUID(54ad6d0d-c800-4b85-b893-7f72f303b7d4)
-fn next_increasing(max_seen : Int?, line : Int?) -> Int? {
+fn next_increasing(max_seen : Int32?, line : Int32?) -> Int32? {
   match (max_seen, line) {
     (Some(max_seen), Some(line)) =>
       if line > max_seen {
@@ -859,14 +869,14 @@ fn next_increasing(max_seen : Int?, line : Int?) -> Int? {
 }
 
 ///|UUID(fa17a4ac-2948-4c91-a892-3a8f4e9d2fe6)
-fn update_max(max_seen : Ref[Int?], line : Int?) -> Unit {
+fn update_max(max_seen : Ref[Int32?], line : Int32?) -> Unit {
   if line is Some(line) {
     max_seen.val = Some(line)
   }
 }
 
 ///|UUID(d7298dd9-6fd5-484c-93f4-f14151798ee5)
-fn fill_increasing_line(max_seen : Ref[Int?], line : Int?) -> Int? {
+fn fill_increasing_line(max_seen : Ref[Int32?], line : Int32?) -> Int32? {
   let next_line = next_increasing(max_seen.val, line)
   update_max(max_seen, next_line)
   next_line
@@ -875,7 +885,9 @@ fn fill_increasing_line(max_seen : Ref[Int?], line : Int?) -> Int? {
 ///|UUID(f583e103-7bd9-4e38-ae85-51cb86af6dee)
 // Given line pairs that are ordered as well as possible, keep only
 // monotonically increasing line numbers. Earlier repeats are replaced by None.
-fn enforce_increasing(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
+fn enforce_increasing(
+  lines : ArrayView[(Int32?, Int32?)],
+) -> Array[(Int32?, Int32?)] {
   let ordered = Array()
   let max_lhs = Ref(None)
   let max_rhs = Ref(None)
@@ -891,7 +903,7 @@ fn enforce_increasing(lines : ArrayView[(Int?, Int?)]) -> Array[(Int?, Int?)] {
 
 ///|UUID(fc86b81e-d7a2-4fa6-9289-e50794a18993)
 fn find_novel_lines(
-  lines : ArrayView[(Int?, Int?)],
+  lines : ArrayView[(Int32?, Int32?)],
   all_lhs_novel : LineSet,
   all_rhs_novel : LineSet,
 ) -> (LineSet, LineSet) {
@@ -913,7 +925,7 @@ fn find_novel_lines(
 // Split modified line pairs into hunks. Lines within four rows of the latest
 // changed line stay in the same hunk; larger gaps start a new hunk.
 fn lines_to_hunks(
-  lines : ArrayView[(Int?, Int?)],
+  lines : ArrayView[(Int32?, Int32?)],
   lhs_mps : ArrayView[MatchedPos],
   rhs_mps : ArrayView[MatchedPos],
 ) -> Array[AstHunk] {
@@ -980,11 +992,11 @@ pub fn matched_pos_to_hunks(
 // Fill line gaps inside a hunk core so later context calculations see every
 // relevant line between the first and last changed pair.
 fn fill_between(
-  prev_lhs : Int?,
-  next_lhs : Int?,
-  prev_rhs : Int?,
-  next_rhs : Int?,
-) -> Array[(Int?, Int?)] {
+  prev_lhs : Int32?,
+  next_lhs : Int32?,
+  prev_rhs : Int32?,
+  next_rhs : Int32?,
+) -> Array[(Int32?, Int32?)] {
   let lhs_lines = Array()
   let rhs_lines = Array()
   match (prev_lhs, next_lhs) {
@@ -1012,15 +1024,15 @@ fn fill_between(
     rhs_lines.length()
   }
   for i in 0..<limit {
-    let lhs_line : Int? = lhs_lines.get(i)
-    let rhs_line : Int? = rhs_lines.get(i)
+    let lhs_line : Int32? = lhs_lines.get(i)
+    let rhs_line : Int32? = rhs_lines.get(i)
     filled.push((lhs_line, rhs_line))
   }
   filled
 }
 
 ///|UUID(97feb0f2-c6cc-4093-9c13-6870ac972bb3)
-fn extract_hunk_lines(hunk : AstHunk) -> Array[(Int?, Int?)] {
+fn extract_hunk_lines(hunk : AstHunk) -> Array[(Int32?, Int32?)] {
   let relevant = Array()
   let max_lhs = Ref(None)
   let max_rhs = Ref(None)
@@ -1060,8 +1072,8 @@ fn hunk_line_sets(hunk : AstHunk) -> (LineSet, LineSet) {
 // expansion.
 fn matched_lines_indexes_for_hunk(
   hunk : AstHunk,
-  matched_lines : ArrayView[(Int?, Int?)],
-) -> (Int, Int) {
+  matched_lines : ArrayView[(Int32?, Int32?)],
+) -> (Int32, Int32) {
   let (lhs_lines, rhs_lines) = hunk_line_sets(hunk)
   let start = Ref(None)
   let end_ = Ref(None)
@@ -1087,9 +1099,9 @@ fn matched_lines_indexes_for_hunk(
 // available matched-line table.
 pub fn contextual_index_range_for_hunk(
   hunk : AstHunk,
-  matched_lines : ArrayView[(Int?, Int?)],
-  radius : Int,
-) -> (Int, Int) {
+  matched_lines : ArrayView[(Int32?, Int32?)],
+  radius : Int32,
+) -> (Int32, Int32) {
   let (start, end_) = matched_lines_indexes_for_hunk(hunk, matched_lines)
   (
     @cmp.maximum(start - radius, 0),
@@ -1102,8 +1114,8 @@ pub fn contextual_index_range_for_hunk(
 // makes immediately adjacent hunks render as one block.
 pub fn merge_adjacent_hunks(
   hunks : ArrayView[AstHunk],
-  matched_lines : ArrayView[(Int?, Int?)],
-  context_lines : Int,
+  matched_lines : ArrayView[(Int32?, Int32?)],
+  context_lines : Int32,
 ) -> Array[AstHunk] {
   let merged = Array()
   let prev_hunk = Ref(None)

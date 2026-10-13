@@ -2,7 +2,7 @@
 fn begin_pull_merge_refresh(
   model : Model,
   emit : @rabbita.Emit[Msg],
-  restart? : Bool = true,
+  restart~ : Bool = true,
 ) -> (Model, @rabbita.Cmd) {
   guard pull_merge_scope(model) is Some((reference, number, base, head)) &&
     model.auth is SignedIn(..) &&

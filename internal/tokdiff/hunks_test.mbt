@@ -81,7 +81,7 @@ test "hunk notes are escaped immediately after matching headers in all views" {
     assert_true(header < note)
     assert_true(note < change)
     assert_eq(
-      html.split("class=\"hunk-note\"").length(),
+      html.split("class=\"hunk-note\"").count(),
       2,
       msg="only the first of two hunks has a note",
     )
@@ -154,7 +154,7 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
       let patch = semantic_patches[index]
       let header = patch.view(end_offset=patch.find("\n").unwrap())
       assert_true(rendered.contains(header))
-      assert_eq(rendered.split("class=\"hunk-header\"").length(), 2)
+      assert_eq(rendered.split("class=\"hunk-header\"").count(), 2)
     }
     assert_true(rendered_hunks[0].contains("First &lt;group&gt;"))
     assert_false(rendered_hunks[0].contains("Second &amp; group"))
@@ -167,7 +167,7 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
       let patch = plain_patches[index]
       let header = patch.view(end_offset=patch.find("\n").unwrap())
       assert_true(rendered.contains(header))
-      assert_eq(rendered.split("class=\"hunk-header\"").length(), 2)
+      assert_eq(rendered.split("class=\"hunk-header\"").count(), 2)
     }
   }
   let empty_semantic = @tokdiff.diff(old=[], new=[])

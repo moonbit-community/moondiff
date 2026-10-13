@@ -1,9 +1,9 @@
 ///|
 fn collect_escapes(
   source : String,
-  start : Int,
-  end : Int,
-  offset : Int,
+  start : Int32,
+  end : Int32,
+  offset : Int32,
   spans : Array[HighlightSpan],
 ) -> Unit {
   let mut plain = start
@@ -31,12 +31,12 @@ fn collect_escapes(
 ///|
 fn collect_string(
   source : String,
-  start : Int,
-  end : Int,
+  start : Int32,
+  end : Int32,
   elems : ArrayView[@tokens.InterpElem],
-  offset : Int,
+  offset : Int32,
   spans : Array[HighlightSpan],
-  depth : Int,
+  depth : Int32,
 ) -> Unit {
   let mut cursor = start
   for elem in elems {
