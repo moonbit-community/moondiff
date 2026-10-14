@@ -96,6 +96,24 @@
     requests, distinguish time spent in serial search-window queries from
     local processing, using request waterfalls or Server-Timing where appropriate.
 
+- [ ] Prioritize and bound source-content loading, and reuse cached results.
+  - Source: page-load performance analysis (2026-10-08), item 5.
+  - Affected areas: `playground/frontend/internal/change/change.mbt`,
+    `playground/frontend/internal/application/requests.mbt`,
+    `playground/frontend/internal/github_client/public_requests.mbt`, and
+    `playground/frontend/internal/application/home_state.mbt`.
+  - [ ] Prioritize viewport-visible files and navigation targets, and limit
+    concurrent old/new source-content requests from automatically expanded files.
+  - [ ] Extend the existing bounded anonymous-content cache to reuse content
+    across page reloads, keyed by repository, path, and full commit SHA;
+    define capacity limits and eviction behavior.
+  - [ ] Add short-lived homepage PR-list caches isolated by user and permissions.
+    Show cached results first, refresh in the background, and invalidate the
+    corresponding entries on identity changes or sign-out.
+  - [ ] Measure time to the first visible file, request counts, peak concurrency,
+    and cache hit rates on repeated reads and reloads. Add regressions for
+    request prioritization and identity-dependent cache invalidation.
+
 - [ ] Improve worst-case similarity work beyond the existing budget fallback.
   - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`,
     `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and
