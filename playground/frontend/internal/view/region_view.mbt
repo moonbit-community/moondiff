@@ -174,6 +174,7 @@ pub fn shell_view(
       @html.footer([
         @html.span("Built with Moondiff · "),
         @html.a(
+          escape=true,
           href="https://github.com/moonbit-community/moondiff",
           target=Blank,
           rel="noopener noreferrer",

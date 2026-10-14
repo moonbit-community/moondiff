@@ -43,6 +43,7 @@ fn comment_menu(
         }),
       [
         @html.a(
+          escape=true,
           href=html_url,
           target=Blank,
           rel="noopener noreferrer",

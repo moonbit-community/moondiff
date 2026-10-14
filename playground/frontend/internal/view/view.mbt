@@ -158,6 +158,7 @@ fn hero_view(
         @html.div(class="hero-copy", brand_view()),
         @html.div(class="hero-controls", [
           @html.a(
+            escape=true,
             href=model.input,
             target=Blank,
             rel="noopener noreferrer",

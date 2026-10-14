@@ -130,6 +130,7 @@ fn ci_details_view(status : @protocol.ApiPullMergeStatus) -> @rabbita.Html {
         match details_url {
           Some(url) =>
             @html.a(
+              escape=true,
               class="pull-ci-check-row",
               href=url,
               target=Blank,

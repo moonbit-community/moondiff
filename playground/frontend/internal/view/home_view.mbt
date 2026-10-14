@@ -1,6 +1,13 @@
 ///|
 fn home_link(path : String, label : String, class : String) -> @rabbita.Html {
-  @html.a(href=path, target=Blank, rel="noopener noreferrer", class~, label)
+  @html.a(
+    escape=true,
+    href=path,
+    target=Blank,
+    rel="noopener noreferrer",
+    class~,
+    label,
+  )
 }
 
 ///|

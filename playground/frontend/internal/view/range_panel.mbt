@@ -187,6 +187,7 @@ fn pull_range_selector(
           state.to_sha,
         )
         @html.a(
+          escape=true,
           href=@routing.playground_route(target),
           target=Blank,
           rel="noopener noreferrer",
@@ -285,6 +286,7 @@ fn range_review_panel(
           "GitHub compare lists at most 300 changed files. This interval may be incomplete, so its diff cannot be reviewed here. ",
         ),
         @html.a(
+          escape=true,
           href=github_url,
           target=Blank,
           rel="noopener noreferrer",
@@ -296,7 +298,7 @@ fn range_review_panel(
     },
     if commit_link is Some(url) {
       @html.div(class="range-links", [
-        @html.a(href="\{url}#comments", "Go to commit comments"),
+        @html.a(escape=true, href="\{url}#comments", "Go to commit comments"),
       ])
     } else {
       @html.nothing

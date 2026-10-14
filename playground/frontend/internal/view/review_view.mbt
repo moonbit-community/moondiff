@@ -658,6 +658,7 @@ fn auth_controls(
         ),
         if show_install && install_url is Some(url) {
           @html.a(
+            escape=true,
             href=url,
             target=Blank,
             rel="noopener noreferrer",
@@ -687,6 +688,7 @@ fn auth_controls(
               flow.user_code,
             ),
             @html.a(
+              escape=true,
               href=flow.verification_uri,
               target=Blank,
               rel="noopener noreferrer",
@@ -810,6 +812,7 @@ fn comments_overview(
     },
     if review.published_url is Some(url) {
       @html.a(
+        escape=true,
         class="published-comment-link",
         href=url,
         target=Blank,
