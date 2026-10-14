@@ -1,9 +1,10 @@
 ///|
-extern "js" fn same_highlights(
+fn same_highlights(
   a : @highlight.FileHighlights,
   b : @highlight.FileHighlights,
-) -> Bool =
-  #| (a, b) => a === b
+) -> Bool {
+  physical_equal(a, b)
+}
 
 ///|
 test "C headers and MoonBit apply line and source budgets independently per side" {

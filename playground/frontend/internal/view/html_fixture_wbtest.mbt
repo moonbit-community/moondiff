@@ -8,30 +8,35 @@ fn render_test_html(builder : () -> @html.Html) -> String {
 }
 
 ///|
-extern "js" fn create_view_fixture() -> String =
-  #| () => {
-  #|   const serial = globalThis.__moondiffViewFixtureSerial =
-  #|     (globalThis.__moondiffViewFixtureSerial ?? 0) + 1;
-  #|   const root = document.createElement('div');
-  #|   root.id = 'moonbit-view-fixture-' + serial;
-  #|   document.body.appendChild(root);
-  #|   return root.id;
-  #| }
+let view_fixture_serial : Ref[Int32] = Ref(0)
 
 ///|
-extern "js" fn remove_view_fixture(id : String) -> Unit =
-  #| id => document.getElementById(id).remove()
+fn create_view_fixture() -> String {
+  view_fixture_serial.val += 1
+  let id = "moonbit-view-fixture-\{view_fixture_serial.val}"
+  let root = @dom.document().create_element("div")
+  root.set_attribute("id", id)
+  @dom.document().get_body().unwrap().append_child(root.as_node())
+  id
+}
 
 ///|
-extern "js" fn view_fixture_html(id : String) -> String =
-  #| id => {
-  #|   const root = document.getElementById(id);
-  #|   const snapshot = root.cloneNode(true);
-  #|   // innerHTML omits a textarea's live value. Include that real DOM property
-  #|   // in the detached snapshot so existing editor-body assertions retain it.
-  #|   const values = [...root.querySelectorAll('textarea')].map(node => node.value);
-  #|   snapshot.querySelectorAll('textarea').forEach((node, index) => {
-  #|     node.textContent = values[index];
-  #|   });
-  #|   return snapshot.innerHTML;
-  #| }
+fn remove_view_fixture(id : String) -> Unit {
+  @browser.remove(@browser.element(id).unwrap())
+}
+
+///|
+fn view_fixture_html(id : String) -> String {
+  let root = @browser.element(id).unwrap()
+  let snapshot = @browser.clone_element(root)
+  // HTML serialization omits live textarea values; copy them into the detached clone.
+  let values : Array[String] = root
+    .query_selector_all("textarea")
+    .iter()
+    .map(node => @browser.property(node, "value"))
+    .collect()
+  for index, node in snapshot.query_selector_all("textarea").iter().collect() {
+    @browser.set_property(node, "textContent", values[index])
+  }
+  @browser.property(snapshot, "innerHTML")
+}

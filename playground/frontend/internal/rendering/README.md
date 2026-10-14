@@ -2,7 +2,7 @@
 
 The application reducer owns the only business model. Rendering inputs are
 read-only projections; region state contains only a render revision and lifecycle
-information. Rabbita 0.14.2 is used through its public API, without dependency edits.
+information. Rabbita 0.16.5 is used through its public API, without dependency edits.
 
 | Region | Invalidating inputs |
 | --- | --- |
@@ -63,6 +63,19 @@ mounting and grid layout keep their existing box semantics.
 Editor interaction is captured from the registered draft node at the event
 boundary and restored in the same region commit, before another browser event can
 modify the replacement editor. No global editor query is needed.
+
+The coordinator owns typed MoonBit layout and editor records. Layout measurements,
+read/write batching, callback queues and interaction restoration no longer live
+in JavaScript globals. The application owns the navigation landing snapshot and
+clears it on geometry changes, scrolling away or a new generation. File-tree
+pointer sessions are MoonBit records released when the tree region unloads.
+Missing host primitives are isolated in `../browser`; all existing DOM operations
+use Rabbita's public bindings.
+
+Browser tests observe scalar snapshots in `__moondiffMetrics.layout` (`frame`,
+`dirty`, `callbacks`, `records`) and `__moondiffMetrics.editor` (`records`, `active`,
+`listening`). These are diagnostic copies, not the live state. They preserve the
+idle and cleanup assertions without exposing or retaining nodes and closures.
 
 Completed commit callbacks clear their captured payloads, and central messages
 use envelopes emptied on receipt. This avoids retaining retired source snapshots
