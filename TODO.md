@@ -61,6 +61,21 @@
     [rendering boundary and performance notes](playground/frontend/internal/rendering/README.md)
     for the normal/6x CPU comparison and the repeatable benchmark command.
 
+- [ ] Reduce homepage startup cost with a static shell and lazy-loaded computation code.
+  - Source: page-load performance analysis (2026-10-08), item 3.
+  - Affected areas: `playground/frontend/public/index.html`,
+    `playground/frontend/main/`, `playground/scripts/build.mjs`,
+    `playground/frontend/internal/change/`, and
+    `playground/frontend/internal/highlight/`.
+  - [ ] Show a static loading shell while the startup script downloads and executes.
+  - [ ] Define loading boundaries that keep the diff engine, parser, lexer,
+    and language highlighters out of the homepage's initial bundle; load them
+    when opening a diff.
+  - [ ] Evaluate a Worker for diff computation after establishing lazy loading,
+    and ensure the full computation bundle is downloaded only when needed.
+  - [ ] Measure cold-cache FCP, initial JS transfer size, and the timing of
+    deferred bundle requests; verify navigation and diff behavior with browser tests.
+
 - [ ] Improve worst-case similarity work beyond the existing budget fallback.
   - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`,
     `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and
