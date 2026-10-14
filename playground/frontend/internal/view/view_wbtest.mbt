@@ -379,19 +379,17 @@ test "semantic section titles format declaration contexts" {
 test "test file notices follow diff results and preserve source load states" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let render = fn(file : FileState) {
-    @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(
-        file_diff_view(
-          file,
-          0,
-          0,
-          Split,
-          AstAlgorithm,
-          false,
-          true,
-          @comments.Session::new().read_view(),
-          emit,
-        ),
+    render_test_html(() => {
+      file_diff_view(
+        file,
+        0,
+        0,
+        Split,
+        AstAlgorithm,
+        false,
+        true,
+        @comments.Session::new().read_view(),
+        emit,
       )
     })
   }
@@ -465,19 +463,17 @@ test "AST structural-empty view preserves section fallback notices" {
     ),
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let rendered = @rabbita.render_to_string(() => {
-    @rabbita.Val::constant(
-      file_diff_view(
-        file,
-        0,
-        0,
-        Split,
-        AstAlgorithm,
-        false,
-        false,
-        @comments.Session::new().read_view(),
-        emit,
-      ),
+  let rendered = render_test_html(() => {
+    file_diff_view(
+      file,
+      0,
+      0,
+      Split,
+      AstAlgorithm,
+      false,
+      false,
+      @comments.Session::new().read_view(),
+      emit,
     )
   })
   assert_true(rendered.contains("Section #1 · Matched"), msg=rendered)
@@ -515,19 +511,17 @@ test "AST structural-empty view without fallback keeps its original DOM" {
     ),
   }
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let rendered = @rabbita.render_to_string(() => {
-    @rabbita.Val::constant(
-      file_diff_view(
-        file,
-        0,
-        0,
-        Split,
-        AstAlgorithm,
-        false,
-        false,
-        @comments.Session::new().read_view(),
-        emit,
-      ),
+  let rendered = render_test_html(() => {
+    file_diff_view(
+      file,
+      0,
+      0,
+      Split,
+      AstAlgorithm,
+      false,
+      false,
+      @comments.Session::new().read_view(),
+      emit,
     )
   })
   assert_eq(
@@ -568,18 +562,16 @@ test "same-line declarations retain every modified inserted and deleted section"
       assert_true(keys[0] != keys[1])
       for mode in [@change.Split, Unified] {
         let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-        let rendered = @rabbita.render_to_string(() => {
-          @rabbita.Val::constant(
-            top_level_diff_view(
-              file,
-              0,
-              0,
-              top,
-              mode,
-              false,
-              @comments.Session::new().read_view(),
-              emit,
-            ),
+        let rendered = render_test_html(() => {
+          top_level_diff_view(
+            file,
+            0,
+            0,
+            top,
+            mode,
+            false,
+            @comments.Session::new().read_view(),
+            emit,
           )
         })
         assert_eq(rendered.split("class=\"semantic-section\"").count(), 3)

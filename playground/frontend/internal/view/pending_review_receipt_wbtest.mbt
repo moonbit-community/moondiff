@@ -147,9 +147,7 @@ test "published inline reviews retain the Posting editor until verified, includi
       emit,
     )
     assert_eq(key, draft.id.key())
-    let rendered = @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(editor)
-    })
+    let rendered = render_test_html(() => editor)
     assert_true(rendered.contains("inline-right"), msg=rendered)
     assert_true(rendered.contains("colspan=\"\{columns}\""), msg=rendered)
     assert_true(rendered.contains("Posting…"), msg=rendered)
@@ -168,8 +166,8 @@ test "published inline reviews retain the Posting editor until verified, includi
       },
       emit,
     )
-    let rendered = @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(fallback_discussions(fallback, file_index))
+    let rendered = render_test_html(() => {
+      fallback_discussions(fallback, file_index)
     })
     assert_true(rendered.contains("file-discussions"), msg=rendered)
     assert_true(rendered.contains("Not shown in current view"), msg=rendered)
@@ -187,9 +185,7 @@ test "published inline reviews retain the Posting editor until verified, includi
     confirmed.read_view(path="src/main.mbt"),
     emit,
   )
-  let rendered = @rabbita.render_to_string(() => {
-    @rabbita.Val::constant(fallback_discussions(formal, Some(0)))
-  })
+  let rendered = render_test_html(() => fallback_discussions(formal, Some(0)))
   assert_true(rendered.contains(comment.body), msg=rendered)
   assert_false(rendered.contains("comment-editor"), msg=rendered)
   assert_false(rendered.contains("Posting…"), msg=rendered)
@@ -242,8 +238,8 @@ test "a synchronizing root preserves its editor and all orphaned replies until c
         discussions.items[0].key,
         read.comment_key(ReviewComment(root.id)),
       )
-      let rendered = @rabbita.render_to_string(() => {
-        @rabbita.Val::constant(fallback_discussions(discussions, file_index))
+      let rendered = render_test_html(() => {
+        fallback_discussions(discussions, file_index)
       })
       assert_eq(rendered.split("class=\"review-thread\"").count() - 1, 1)
       for body in [root.body, first.body, second.body] {
@@ -283,9 +279,7 @@ test "published replies retain the thread editor and fall back if the root disap
   for (session, formal) in [(published, false), (confirmed, true)] {
     let read = session.read_view(path="src/main.mbt")
     let thread = @comments.file_threads(read.group, Some(0), patch)[0]
-    let rendered = @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(review_thread_view(thread, read, emit))
-    })
+    let rendered = render_test_html(() => review_thread_view(thread, read, emit))
     assert_true(
       rendered.find(existing.body).unwrap() <
       rendered.find(created.body).unwrap(),
@@ -311,8 +305,8 @@ test "published replies retain the thread editor and fall back if the root disap
       read,
       emit,
     )
-    let rendered = @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(fallback_discussions(discussions, file_index))
+    let rendered = render_test_html(() => {
+      fallback_discussions(discussions, file_index)
     })
     assert_true(rendered.contains("Thread unavailable"), msg=rendered)
     assert_true(rendered.contains("Posting…"), msg=rendered)

@@ -39,17 +39,15 @@ test "only nonempty change blocks mark their first actual source row in either l
     for hunks in [[hunk], [hunk, hunk]] {
       for mode in [@change.Split, Unified] {
         for show_hunk_headers in [false, true] {
-          let rendered = @rabbita.render_to_string(() => {
-            @rabbita.Val::constant(
-              safe_review_diff(
-                fixture_file("target.mbt", "modified"),
-                0,
-                { hunks, },
-                mode,
-                @comments.Session::new().read_view(),
-                emit,
-                show_hunk_headers~,
-              ),
+          let rendered = render_test_html(() => {
+            safe_review_diff(
+              fixture_file("target.mbt", "modified"),
+              0,
+              { hunks, },
+              mode,
+              @comments.Session::new().read_view(),
+              emit,
+              show_hunk_headers~,
             )
           })
           let expected = count * hunks.length()
@@ -88,24 +86,22 @@ test "section headings leave navigation in the change title bar" {
   let hunk = projection_document_fixture().hunks[0]
   for hunks in [[], [hunk], [hunk, hunk]] {
     for expanded in [false, true] {
-      let rendered = @rabbita.render_to_string(() => {
-        @rabbita.Val::constant(
-          semantic_fragment_view(
-            ready_test_file(fixture_file("target.mbt", "modified"), [], []),
-            0,
-            Some(0),
-            { document: { hunks, }, fallbacks: [], },
-            Some({ start: 0, len: 1, }),
-            Some({ start: 0, len: 1, }),
-            None,
-            None,
-            Split,
-            @comments.Session::new().read_view(),
-            emit,
-            false,
-            expanded~,
-            section_key="stable-key",
-          ),
+      let rendered = render_test_html(() => {
+        semantic_fragment_view(
+          ready_test_file(fixture_file("target.mbt", "modified"), [], []),
+          0,
+          Some(0),
+          { document: { hunks, }, fallbacks: [], },
+          Some({ start: 0, len: 1, }),
+          Some({ start: 0, len: 1, }),
+          None,
+          None,
+          Split,
+          @comments.Session::new().read_view(),
+          emit,
+          false,
+          expanded~,
+          section_key="stable-key",
         )
       })
       assert_true(rendered.contains("data-section-key=\"stable-key\""))

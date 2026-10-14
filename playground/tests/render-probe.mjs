@@ -7,7 +7,10 @@ export function instrumentRenderProbe(source) {
   };
   // A test may hold a region's next paint while the shell and network proceed.
   // Keep the hook in the temporary bundle, alongside the existing render probe.
-  inject(/function \w+runtime7Sandbox5flush\(self\) \{/, match => {
+  // BrowserHost replaced Sandbox; retain the mount ID for regional barriers.
+  inject(/_host\.document = \w+VDom10initialize\([^;]+;/,
+    '_host.mount = element_id;');
+  inject(/function \w+runtime11BrowserHost14request__frame\(self\) \{/, match => {
     const flush = match.match(/function (\w+)/)[1];
     return `
       const pendingPaints = globalThis.__moondiffPendingPaints ??= new Set();
@@ -20,9 +23,10 @@ export function instrumentRenderProbe(source) {
   inject(/self\.paint_scheduled = false;/, `
     globalThis.__moondiffPendingPaints?.delete(self);
     if (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.pendingPaints = globalThis.__moondiffPendingPaints?.size ?? 0;`);
-  inject(/function \w+runtime10diff__node\(old, new_, sandbox, parent, anchor\) \{/, `
+  inject(/function \w+vdom10diff__node\(old, new_, scheduler, captured_link_listener, parent, anchor\) \{/, `
     const probe = globalThis.__moondiffMetrics;
     if (probe) {
+      const sandbox = scheduler.self;
       const region = sandbox.__moondiffProbeRegion ??= document.getElementById(sandbox.mount)?.closest('[data-region]')?.dataset.region ?? '';
       const element = old.$tag === 0 ? old._4 : parent;
       const path = region.startsWith('file:') ? region.slice(5) : element?.closest?.('[data-file-path]')?.dataset.filePath;
@@ -35,11 +39,11 @@ export function instrumentRenderProbe(source) {
     const file = input._0?.file;
     const probe = globalThis.__moondiffMetrics;
     if (probe && file) (probe.sources ??= []).push(new WeakRef(file));`);
-  inject(/function \w+runtime14cleanup__store\(id, sub_map, scheduler\) \{/, `
+  inject(/function \w+runtime14cleanup__store\(stores, id, sub_map, scheduler\) \{/, `
     if (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.active.runtimeStores--;`);
   // Both central Snapshot and region Int instantiations; avoid relying on generated suffixes.
   let stores = 0;
-  source = source.replace(/function \w+runtime7Sandbox22create__state__machine\w*\(scheduler, initialize, update, subscriptions\) \{/g, match => {
+  source = source.replace(/function \w+runtime22create__state__machine\w*\(initialize, update, subscriptions\) \{/g, match => {
     stores++;
     return `${match}\nif (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.active.runtimeStores = (globalThis.__moondiffMetrics.active.runtimeStores ?? 0) + 1;`;
   });

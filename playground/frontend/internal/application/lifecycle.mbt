@@ -24,7 +24,7 @@ pub fn app_subscriptions(model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
     @sub.batch([
       base,
       @sub.on_resize(viewport => {
-        emit(Ui(FileTreeViewportChanged(viewport.width)))
+        emit(Ui(FileTreeViewportChanged(viewport.width.to_int())))
       }),
     ])
   } else {
