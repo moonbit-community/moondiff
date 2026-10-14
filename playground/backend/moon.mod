@@ -5,8 +5,8 @@ version = "0.0.0"
 import {
   "moonbit-community/moondiff-playground-protocol@0.0.0",
   "moonbitlang/async@0.22.4",
-  "moonbitlang/x@0.5.1",
-  "moonbit-community/sqlite3@0.2.1",
+  "moonbitlang/x@0.5.5",
+  "moonbit-community/sqlite3@0.2.3",
 }
 
 preferred_target = "wasm"
