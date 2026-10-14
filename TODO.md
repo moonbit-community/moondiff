@@ -76,6 +76,26 @@
   - [ ] Measure cold-cache FCP, initial JS transfer size, and the timing of
     deferred bundle requests; verify navigation and diff behavior with browser tests.
 
+- [ ] Reduce serial initialization and GitHub connection setup costs.
+  - Source: page-load performance analysis (2026-10-08), item 4.
+  - Affected areas: `playground/frontend/internal/application/lifecycle.mbt`,
+    `playground/frontend/internal/application/load_flow.mbt`,
+    `playground/frontend/internal/application/home_state.mbt`,
+    `playground/backend/internal/github/github.mbt`, and
+    `playground/backend/internal/home/home.mbt`.
+  - [ ] Start the auth-status request from a lightweight bootstrap before the
+    main bundle finishes loading; fetch private data only after identity is confirmed.
+  - [ ] Evaluate server-side aggregation of PR initialization requests to reduce
+    browser/backend round trips. Preserve parallel compare/file-list loading
+    and the subsequent PR snapshot consistency check.
+  - [ ] Reuse authenticated backend GitHub connections through a bounded pool.
+    Measure connection counts and upstream latency to confirm the benefit;
+    anonymous browser-to-GitHub requests require separate measurement.
+  - [ ] Instrument static downloads, auth status, GitHub upstream requests,
+    JSON processing, and diff computation separately. For homepage Search
+    requests, distinguish time spent in serial search-window queries from
+    local processing, using request waterfalls or Server-Timing where appropriate.
+
 - [ ] Improve worst-case similarity work beyond the existing budget fallback.
   - Affected areas: `astdiff/graph.mbt`, `astdiff/levenshtein.mbt`,
     `astdiff/dijkstra.mbt`, `astdiff/unchanged.mbt`, and
