@@ -52,6 +52,7 @@ fn account_menu(
           Some(url) =>
             @html.div([
               @html.a(
+                escape=true,
                 href=url,
                 target=Blank,
                 rel="noopener noreferrer",
