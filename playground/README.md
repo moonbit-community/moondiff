@@ -403,6 +403,12 @@ authorization and installation must also be smoke-tested with your actual App.
 
 ## Checks and tests
 
+The DOM view fixtures remain MoonBit white-box tests. They are marked
+`#skip("browser DOM: npm run test:views")` for the regular Node test runner and
+run in real Chromium through the existing Playwright dependency. The browser
+runner compiles them with `moon test --build-only --include-skipped`, discovers
+the marked cases, and executes each unmodified test artifact in a fresh page.
+
 From `playground/`, check and test all frontend packages from the module root,
 including `internal/`, and run the backend checks:
 
@@ -427,9 +433,15 @@ transport tests. After MoonBit changes, run `moon fmt` and
 For browser tests:
 
 ```sh
+npm ci
 npx playwright install chromium firefox
 npm run test:e2e
 ```
+
+`test:views` runs the isolated component fixtures without starting the backend.
+`test:e2e` includes these component tests before the page integration suite.
+Both commands are also available at the repository root as `npm run test:views`
+and `npm run test:playground`.
 
 Use `npx playwright install --with-deps chromium firefox` if system libraries are
 missing, and `npm run test:e2e:ui` for the interactive runner. The playground

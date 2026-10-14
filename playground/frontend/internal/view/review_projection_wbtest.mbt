@@ -252,7 +252,7 @@ test "projection source identity does not depend on hunk headings" {
       show_hunk_headers=headers,
       discussions~,
     )
-    let rendered = @rabbita.render_to_string(() => @rabbita.Val::constant(html))
+    let rendered = render_test_html(() => html)
     assert_true(rendered.contains("inline-comment-editor-row"))
   }
 }
@@ -322,20 +322,18 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
     let projection = review_projection(view, model)
     assert_eq(!projection.lines.is_empty(), visible)
     let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-    let html = @rabbita.render_to_string(() => {
-      @rabbita.Val::constant(
-        @html.div(
-          class="file-list",
-          RegionProjection::new()
-          .inputs(model)
-          .filter_map(entry => {
-            let (_, input) = entry
-            match input {
-              File(_) => Some(region_view(input, emit, FileDerivation::new()))
-              _ => None
-            }
-          }),
-        ),
+    let html = render_test_html(() => {
+      @html.div(
+        class="file-list",
+        RegionProjection::new()
+        .inputs(model)
+        .filter_map(entry => {
+          let (_, input) = entry
+          match input {
+            File(_) => Some(region_view(input, emit, FileDerivation::new()))
+            _ => None
+          }
+        }),
       )
     })
     assert_eq(html.contains("<table"), visible)
@@ -412,9 +410,7 @@ test "source rows precede both sides of discussion and the selected editor" {
         emit,
         discussions~,
       )
-      let rendered = @rabbita.render_to_string(() => {
-        @rabbita.Val::constant(html)
-      })
+      let rendered = render_test_html(() => html)
       let old_code = rendered.find("old</b>").unwrap()
       let new_code = rendered.find("new</b>").unwrap()
       let left = rendered.find("Comment 1").unwrap()

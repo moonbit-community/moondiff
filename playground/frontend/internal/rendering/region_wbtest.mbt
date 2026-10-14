@@ -13,6 +13,7 @@ fn test_mount() -> Mount {
     cache: Some(@view.FileDerivation::new()),
     app: None,
     scheduler: None,
+    paint_scheduler: None,
     waiting: [],
     dispose_layout: None,
   }

@@ -1,7 +1,7 @@
 ///|
 #warnings("-alert_unstable")
 fn render_syntax_nodes(nodes : Array[@rabbita.Html]) -> String {
-  @rabbita.render_to_string(() => @rabbita.Val::constant(@html.div(nodes)))
+  render_test_html(() => @html.div(nodes))
 }
 
 ///|
@@ -70,19 +70,17 @@ test "semantic sections use original lines for highlights after reorder and same
       algorithm,
     )
     for mode in [@change.Split, Unified] {
-      let rendered = @rabbita.render_to_string(() => {
-        @rabbita.Val::constant(
-          file_diff_view(
-            file,
-            0,
-            0,
-            mode,
-            algorithm,
-            false,
-            false,
-            @comments.Session::new().read_view(),
-            emit,
-          ),
+      let rendered = render_test_html(() => {
+        file_diff_view(
+          file,
+          0,
+          0,
+          mode,
+          algorithm,
+          false,
+          false,
+          @comments.Session::new().read_view(),
+          emit,
         )
       })
       for number in ["11", "22", "33", "44", "55", "66"] {
@@ -113,19 +111,17 @@ test "C lexical fixes reach rendered diffs with original escaped source text" {
       algorithm,
     )
     for mode in [@change.Split, Unified] {
-      let rendered = @rabbita.render_to_string(() => {
-        @rabbita.Val::constant(
-          file_diff_view(
-            file,
-            0,
-            0,
-            mode,
-            algorithm,
-            false,
-            false,
-            @comments.Session::new().read_view(),
-            emit,
-          ),
+      let rendered = render_test_html(() => {
+        file_diff_view(
+          file,
+          0,
+          0,
+          mode,
+          algorithm,
+          false,
+          false,
+          @comments.Session::new().read_view(),
+          emit,
         )
       })
       for

@@ -25,6 +25,7 @@ priv struct Mount {
   mut cache : @view.FileDerivation?
   mut app : @rabbita.App?
   mut scheduler : &@cmd.Scheduler?
+  mut paint_scheduler : &@cmd.Scheduler?
   waiting : Array[Waiting]
   mut dispose_layout : (() -> Unit)?
 }
@@ -70,6 +71,7 @@ fn lifetime_loader(
       remove_host(mount.host)
       mount.app = None
       mount.scheduler = None
+      mount.paint_scheduler = None
       @metrics.active("mounts", -1)
       @metrics.active("subscriptions", -1)
       @metrics.active("stores", -1)
@@ -170,15 +172,38 @@ fn region_component(
     cache: Some(@view.FileDerivation::new()),
     app: None,
     scheduler: None,
+    paint_scheduler: None,
     waiting: [],
     dispose_layout: None,
   }
   coordinator.mounts[region] = mount
   @metrics.active("mounts", 1)
   let content : Ref[@rabbita.Val[@rabbita.Html]?] = Ref(None)
-  // Set Rabbita's public app construction context before creating region state.
-  // The assoc branch still owns that state's cleanup scope.
-  let app = @rabbita.new(() => content.val.unwrap())
+  // The assoc branch owns state and subscriptions. The mounted app has its own
+  // BrowserHost, so acquire its scheduler through a private DOM event bridge.
+  // This keeps regional painting independent without moving state out of the
+  // branch's cleanup scope.
+  let app = @rabbita.new(() => {
+    let bridge = @html.div(
+      id=mount.host + "-scheduler",
+      hidden=true,
+      attrs=@html.Attrs::build().on_click(_ => {
+        @cmd.custom_cmd(scheduler => {
+          guard mount.alive && mount.paint_scheduler is None else { return }
+          mount.paint_scheduler = Some(scheduler)
+          let ticket = mount.ticket()
+          scheduler.add(
+            @cmd.custom_cmd(
+              kind=@cmd.after_render,
+              once(() => coordinator.committed(mount, ticket)),
+            ),
+          )
+        })
+      }),
+      @html.nothing,
+    )
+    content.val.unwrap().map(html => @html.fragment([bridge, html]))
+  })
   let (revision, refresh) = @rabbita.create_state_with_init(
     init=_ => {
       (0, @cmd.custom_cmd(scheduler => mount.scheduler = Some(scheduler)))
@@ -187,10 +212,16 @@ fn region_component(
       let ticket = { ..mount.ticket(), revision, }
       (
         revision,
-        @cmd.custom_cmd(
-          kind=@cmd.after_render,
-          once(() => coordinator.committed(mount, ticket)),
-        ),
+        @cmd.custom_cmd(_ => {
+          if mount.paint_scheduler is Some(scheduler) {
+            scheduler.add(
+              @cmd.custom_cmd(
+                kind=@cmd.after_render,
+                once(() => coordinator.committed(mount, ticket)),
+              ),
+            )
+          }
+        }),
       )
     },
     subscriptions=(_, _) => {
@@ -229,13 +260,9 @@ fn region_component(
             scheduler.add(refresh(mount.revision))
           } else if mount.app is Some(app) && host_connected(mount.host) {
             mount.mounted = true
-            let ticket = mount.ticket()
-            scheduler.run_effect(
-              @cmd.after_render,
-              once(() => coordinator.committed(mount, ticket)),
-            )
             create_mount_root(mount.host)
             app.mount(mount.host + "-root")
+            connect_paint_scheduler(mount.host)
           }
         }),
       ),
@@ -246,6 +273,10 @@ fn region_component(
 
 ///|
 extern "js" fn host_connected(id : String) -> Bool = "id => !!document.getElementById(id)?.isConnected"
+
+///|
+extern "js" fn connect_paint_scheduler(id : String) -> Unit =
+  #| id => document.getElementById(id + '-scheduler').dispatchEvent(new MouseEvent('click'))
 
 ///|
 extern "js" fn remove_host(id : String) -> Unit = "id => document.getElementById(id + '-root')?.remove()"

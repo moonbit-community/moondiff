@@ -357,6 +357,11 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 
 ## 检查与测试
 
+DOM 视图夹具保留为 MoonBit 白盒测试，通过
+`#skip("browser DOM: npm run test:views")` 标记，不在普通 Node 测试运行器中执行。
+浏览器运行器复用已有的 Playwright，以 `moon test --build-only --include-skipped` 编译，
+发现这些标记用例后，在独立的 Chromium 页面中执行未经修改的测试产物。
+
 在 `playground/` 目录执行以下命令，从模块根目录检查并测试所有前端包
 （包括 `internal/`），并运行后端检查：
 
@@ -381,9 +386,13 @@ npm run test:server
 运行浏览器测试：
 
 ```sh
+npm ci
 npx playwright install chromium firefox
 npm run test:e2e
 ```
+
+`test:views` 单独运行组件夹具，不启动后端；`test:e2e` 会先运行这批组件测试，再运行页面集成测试。
+仓库根目录对应的命令为 `npm run test:views` 和 `npm run test:playground`。
 
 如果缺少系统库，使用 `npx playwright install --with-deps chromium firefox` 安装；
 使用 `npm run test:e2e:ui` 启动交互式测试界面。playground 测试使用 Chromium，

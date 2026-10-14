@@ -4,8 +4,8 @@ version = "0.0.0"
 
 import {
   "moonbit-community/moondiff-playground-protocol@0.0.0",
-  "moonbit-community/moondiff@0.0.6",
-  "moonbit-community/rabbita@0.14.2",
+  "moonbit-community/moondiff@0.0.10",
+  "moonbit-community/rabbita@0.16.5",
   "moonbitlang/lexer@0.4.2",
 }
 

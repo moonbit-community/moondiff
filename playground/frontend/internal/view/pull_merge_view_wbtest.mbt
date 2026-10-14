@@ -2,9 +2,7 @@
 #warnings("-alert_unstable")
 fn render_pull_merge(input : PullMergeInput) -> String {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  @rabbita.render_to_string(() => {
-    @rabbita.Val::constant(pull_merge_status_view(input, emit))
-  })
+  render_test_html(() => pull_merge_status_view(input, emit))
 }
 
 ///|
@@ -157,32 +155,30 @@ test "merge card distinguishes stale draft conflict unknown and merged states" {
 #warnings("-alert_unstable")
 #skip("browser DOM: npm run test:views")
 test "merge region sits between discussion and changed files" {
-  let rendered = @rabbita.render_to_string(() => {
-    @rabbita.Val::constant(
-      shell_view(
-        {
-          home: false,
-          generation: 1,
-          landing: false,
-          showing: true,
-          selector_only: false,
-          message: "Review",
-          drawer_open: false,
-          preferred_width: 300,
-          range_limit: false,
-          display: {
-            mode: Split,
-            algorithm: LexicalAlgorithm,
-            ignore_comments: false,
-            ignore_tests: false,
-          },
+  let rendered = render_test_html(() => {
+    shell_view(
+      {
+        home: false,
+        generation: 1,
+        landing: false,
+        showing: true,
+        selector_only: false,
+        message: "Review",
+        drawer_open: false,
+        preferred_width: 300,
+        range_limit: false,
+        display: {
+          mode: Split,
+          algorithm: LexicalAlgorithm,
+          ignore_comments: false,
+          ignore_tests: false,
         },
-        [
-          { region: Discussion, id: "discussion", },
-          { region: PullMergeStatus, id: "merge", },
-          { region: File("src/main.mbt"), id: "file", },
-        ],
-      ),
+      },
+      [
+        { region: Discussion, id: "discussion", },
+        { region: PullMergeStatus, id: "merge", },
+        { region: File("src/main.mbt"), id: "file", },
+      ],
     )
   })
   let discussion = rendered.find("id=\"discussion\"").unwrap_or(-1)
