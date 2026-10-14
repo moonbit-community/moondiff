@@ -9,6 +9,7 @@ priv struct PendingNavigation {
 ///|
 priv struct Coordinator {
   mut scheduler : &@cmd.Scheduler?
+  mut early_commands : Array[@rabbita.Cmd]
   mut generation : Int32
   mut serial : Int32
   mounts : Map[@application.Region, Mount]
@@ -23,6 +24,7 @@ priv struct Coordinator {
 fn Coordinator::new() -> Coordinator {
   {
     scheduler: None,
+    early_commands: [],
     generation: 0,
     serial: 0,
     mounts: {},
