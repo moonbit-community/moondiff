@@ -6,7 +6,7 @@ import {
   "moonbit-community/prettyprinter@0.4.11",
   "moonbit-community/chalk@0.0.1",
   "moonbitlang/lexer@0.4.2",
-  "moonbitlang/parser@0.4.3",
+  "moonbitlang/parser@0.4.4",
   "moonbitlang/async@0.22.4",
 }
 
