@@ -34,7 +34,7 @@ pub fn start(id : String) -> Unit {
         (
           Snapshot(model),
           @cmd.custom_cmd(scheduler => {
-            coordinator.scheduler = Some(scheduler)
+            coordinator.attach(scheduler)
             scheduler.add(
               @cmd.batch([
                 coordinator.after_update(generation, revision, []),

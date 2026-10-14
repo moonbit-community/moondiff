@@ -86,7 +86,18 @@ fn lifetime_loader(
 fn Coordinator::run(self : Coordinator, command : @rabbita.Cmd) -> Unit {
   if self.scheduler is Some(scheduler) {
     scheduler.add(command)
+  } else {
+    // BrowserHost evaluates the initial projection before draining init commands.
+    self.early_commands.push(command)
   }
+}
+
+///|
+fn Coordinator::attach(self : Coordinator, scheduler : &@cmd.Scheduler) -> Unit {
+  self.scheduler = Some(scheduler)
+  let commands = self.early_commands
+  self.early_commands = []
+  scheduler.add(@cmd.batch(commands))
 }
 
 ///|
