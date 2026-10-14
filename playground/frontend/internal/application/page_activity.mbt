@@ -4,7 +4,9 @@ priv suberror PageActivitySubscription {
 }
 
 ///|
-extern "js" fn page_is_active() -> Bool = "() => !document.hidden && document.hasFocus()"
+fn page_is_active() -> Bool {
+  !@dom.document().hidden() && @browser.has_focus()
+}
 
 ///|
 fn page_activity_sub_loader(

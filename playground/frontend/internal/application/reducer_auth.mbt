@@ -269,14 +269,11 @@ fn update_auth(
 }
 
 ///|
-extern "js" fn new_auth_attempt_id() -> String = "() => crypto.randomUUID()"
+fn new_auth_attempt_id() -> String {
+  @browser.random_uuid()
+}
 
 ///|
-extern "js" fn copy_device_code(
-  code : String,
-  completed : (Bool) -> Unit,
-) -> Unit =
-  #| (code, completed) => {
-  #|   if (!navigator.clipboard?.writeText) { completed(false); return; }
-  #|   navigator.clipboard.writeText(code).then(() => completed(true), () => completed(false));
-  #| }
+fn copy_device_code(code : String, completed : (Bool) -> Unit) -> Unit {
+  @browser.copy_text(code, completed)
+}

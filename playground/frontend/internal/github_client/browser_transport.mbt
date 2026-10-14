@@ -20,27 +20,49 @@ fn browser_send(
 }
 
 ///|
-extern "js" fn fetch_text(
+fn fetch_text(
   path : String,
   meth : String,
   csrf : String,
   body : String,
   completed : (Int32, String) -> Unit,
   failed : (String) -> Unit,
-) -> () -> Unit =
-  #| (path, method, csrf, body, completed, failed) => {
-  #|   const controller = new AbortController();
-  #|   Promise.resolve().then(() => fetch(path, { method, credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
-  #|     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-  #|     ...(method === 'GET' ? {} : {body})
-  #|   })).then(async response => completed(response.status, await response.text()))
-  #|     .catch(error => failed(error.message || String(error)));
-  #|   return () => controller.abort();
-  #| }
+) -> () -> Unit {
+  let controller = @browser.AbortController::new()
+  let options = @js.Object::new()
+  options.set("method", meth)
+  options.set("credentials", "same-origin")
+  options.set("cache", "no-store")
+  options.set("signal", controller.signal())
+  let headers = @js.Object::new()
+  headers.set("Content-Type", "application/json")
+  headers.set("X-CSRF-Token", csrf)
+  options.set("headers", headers.to_value())
+  if meth != "GET" {
+    options.set("body", body)
+  }
+  // Retain the original Promise.resolve().then(fetch) microtask boundary.
+  @dom.window().queue_microtask(() => {
+    @browser.subscribe(
+      @browser.fetch(path, options.to_value()),
+      response => {
+        @browser.subscribe(
+          response.text(),
+          text => completed(response.status(), text),
+          error => failed(@browser.error_message(error)),
+        )
+      },
+      error => failed(@browser.error_message(error)),
+    )
+  })
+  () => controller.abort()
+}
 
 ///|
-extern "js" fn browser_delay(ms : Int32, callback : () -> Unit) -> () -> Unit =
-  #| (ms, callback) => { const timer = setTimeout(callback, ms); return () => clearTimeout(timer); }
+fn browser_delay(ms : Int32, callback : () -> Unit) -> () -> Unit {
+  let timer = @dom.window().set_timeout(callback, ms)
+  () => @dom.window().clear_timeout(timer)
+}
 
 ///|
 pub fn dispose() -> Unit {
