@@ -5,6 +5,7 @@ fn render_syntax_nodes(nodes : Array[@rabbita.Html]) -> String {
 }
 
 ///|
+#skip("browser DOM: npm run test:views")
 test "syntax ranges intersect diff segments without changing text or markup" {
   let source = "let value = \"中😀<&>\\n\""
   let highlights = @highlight.SourceHighlights::from_spans(source, [
@@ -39,6 +40,7 @@ test "syntax ranges intersect diff segments without changing text or markup" {
 }
 
 ///|
+#skip("browser DOM: npm run test:views")
 test "plain, empty, and out-of-range lines render without syntax assumptions" {
   let source = "\t<script>&\"中文😀\"  \r"
   let plain = render_syntax_nodes(
@@ -57,6 +59,7 @@ test "plain, empty, and out-of-range lines render without syntax assumptions" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "semantic sections use original lines for highlights after reorder and same-line declarations" {
   let old = ["fn first() { 11 }", "", "let second = 22; let third = 33"]
   let new = ["let second = 44; let third = 55", "", "fn first() { 66 }"]
@@ -97,6 +100,7 @@ test "semantic sections use original lines for highlights after reorder and same
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "C lexical fixes reach rendered diffs with original escaped source text" {
   let old = [
     "struct", "#define BAD [[note(", "\\u4e2d;", "<:[nodiscard]:> int run\\U0001F600(void) { return 1; } // 中文😀<&>",

@@ -67,6 +67,7 @@ test "CI copy follows GitHub state wording and count grammar" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "merge card renders GitHub-style CI summary warnings and safe job links" {
   let rendered = render_pull_merge({
     state: {
@@ -107,6 +108,7 @@ test "merge card renders GitHub-style CI summary warnings and safe job links" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "merge card distinguishes stale draft conflict unknown and merged states" {
   let base = pull_merge_view_status()
   let state = fn(status) {
@@ -153,6 +155,7 @@ test "merge card distinguishes stale draft conflict unknown and merged states" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "merge region sits between discussion and changed files" {
   let rendered = @rabbita.render_to_string(() => {
     @rabbita.Val::constant(
