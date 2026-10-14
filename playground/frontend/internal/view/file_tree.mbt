@@ -406,102 +406,169 @@ fn file_tree_status_filters(
 }
 
 ///|
-extern "js" fn trap_file_tree_tab(event : @dom.KeyboardEvent) -> Unit =
-  #| (event) => {
-  #|   if (event.key !== "Tab") return
-  #|   const sidebar = event.currentTarget
-  #|   if (!(sidebar instanceof HTMLElement)) return
-  #|   const selector = [
-  #|     "a[href]",
-  #|     "button:not([disabled])",
-  #|     "input:not([disabled])",
-  #|     "select:not([disabled])",
-  #|     "textarea:not([disabled])",
-  #|     '[tabindex]:not([tabindex="-1"])',
-  #|   ].join(",")
-  #|   const focusable = Array.from(sidebar.querySelectorAll(selector)).filter(element => {
-  #|     if (!(element instanceof HTMLElement) || element.hidden) return false
-  #|     const style = getComputedStyle(element)
-  #|     return style.display !== "none" && style.visibility !== "hidden"
-  #|   })
-  #|   if (focusable.length === 0) return
-  #|   const first = focusable[0]
-  #|   const last = focusable[focusable.length - 1]
-  #|   if (event.shiftKey && document.activeElement === first) {
-  #|     event.preventDefault()
-  #|     last.focus({ preventScroll: true })
-  #|   } else if (!event.shiftKey && document.activeElement === last) {
-  #|     event.preventDefault()
-  #|     first.focus({ preventScroll: true })
-  #|   }
-  #| }
+fn trap_file_tree_tab(event : @dom.KeyboardEvent) -> Unit {
+  if event.key() != "Tab" {
+    return
+  }
+  guard @browser.current_element(event.current_target()) is Some(sidebar) else {
+    return
+  }
+  let selector = "a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex=\"-1\"])"
+  let focusable = sidebar
+    .query_selector_all(selector)
+    .iter()
+    .filter(element => {
+      if element.to_html_element() is None ||
+        (@browser.property(element, "hidden") : Bool) {
+        return false
+      }
+      let style = @dom.window().get_computed_style(element)
+      style["display"] != "none" && style["visibility"] != "hidden"
+    })
+    .collect()
+  guard focusable is [first, ..] &&
+    @dom.document().get_active_element() is Some(active) else {
+    return
+  }
+  let last = focusable[focusable.length() - 1]
+  if event.shift_key() && @browser.same(active, first) {
+    event.prevent_default()
+    @browser.focus(last)
+  } else if !event.shift_key() && @browser.same(active, last) {
+    event.prevent_default()
+    @browser.focus(first)
+  }
+}
 
 ///|
-extern "js" fn update_file_tree_resize(
+priv struct TreeDrag {
+  handle : @dom.Element
+  layout : @dom.Element
+  pointer_id : Int32
+  start_x : Double
+  start_width : Double
+  initial_width : Int32
+  mut width : Int32
+}
+
+///|
+let tree_drag : Ref[TreeDrag?] = Ref(None)
+
+///|
+fn tree_drag_width(
+  start_width : Double,
+  delta : Double,
+  viewport : Double,
+) -> Int32 {
+  let maximum = 240.0.max(640.0.min(viewport * 0.5))
+  240.0.max(maximum.min(start_width + delta)).round().to_int()
+}
+
+///|
+fn TreeDrag::finish(self : TreeDrag, cancel : Bool) -> Unit {
+  if cancel {
+    @browser.style(self.layout).set_property(
+      "--file-tree-preferred-width",
+      "\{self.initial_width}px",
+    )
+    self.handle.set_attribute("aria-valuenow", self.initial_width.to_string())
+  }
+  if self.handle.has_pointer_capture(self.pointer_id) {
+    self.handle.release_pointer_capture(self.pointer_id)
+  }
+  self.handle.class_list().remove("is-resizing")
+  self.layout.class_list().remove("is-resizing")
+  @dom.document()
+  .get_body()
+  .unwrap()
+  .as_element()
+  .class_list()
+  .remove("file-tree-resizing")
+  tree_drag.val = None
+}
+
+///|
+pub fn dispose_file_tree_resize() -> Unit {
+  if tree_drag.val is Some(drag) {
+    drag.finish(true)
+  }
+}
+
+///|
+fn update_file_tree_resize(
   event : @dom.MouseEvent,
   action : String,
   preferred_width : Int32,
-) -> Int32 =
-  #| (event, action, preferredWidth) => {
-  #|   const handle = event.currentTarget
-  #|   if (!(handle instanceof HTMLElement)) return -1
-  #|   if (action === "start") {
-  #|     if (!event.isPrimary) return -1
-  #|     if (event.pointerType === "mouse" && event.button !== 0) return -1
-  #|     if (handle.__moondiffFileTreeResize) return -1
-  #|     const layout = handle.closest(".change-layout")
-  #|     const sidebar = layout?.querySelector("#file-tree-sidebar")
-  #|     if (!(layout instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
-  #|       return -1
-  #|     }
-  #|     handle.__moondiffFileTreeResize = {
-  #|       pointerId: event.pointerId,
-  #|       startX: event.clientX,
-  #|       startWidth: sidebar.getBoundingClientRect().width,
-  #|       initialPreferredWidth: preferredWidth,
-  #|       width: preferredWidth,
-  #|       layout,
-  #|     }
-  #|     handle.setPointerCapture(event.pointerId)
-  #|     handle.classList.add("is-resizing")
-  #|     layout.classList.add("is-resizing")
-  #|     document.body.classList.add("file-tree-resizing")
-  #|     event.preventDefault()
-  #|     return -1
-  #|   }
-  #|   const active = handle.__moondiffFileTreeResize
-  #|   if (!active || active.pointerId !== event.pointerId) return -1
-  #|   if (action === "move") {
-  #|     const maximum = Math.max(240, Math.min(640, window.innerWidth * 0.5))
-  #|     const next = Math.round(Math.max(
-  #|       240,
-  #|       Math.min(maximum, active.startWidth + event.clientX - active.startX),
-  #|     ))
-  #|     active.width = next
-  #|     active.layout.style.setProperty("--file-tree-preferred-width", `${next}px`)
-  #|     handle.setAttribute("aria-valuenow", String(next))
-  #|     event.preventDefault()
-  #|     return -1
-  #|   }
-  #|   if (action !== "end" && action !== "cancel") return -1
-  #|   if (action === "cancel") {
-  #|     active.layout.style.setProperty(
-  #|       "--file-tree-preferred-width",
-  #|       `${active.initialPreferredWidth}px`,
-  #|     )
-  #|     handle.setAttribute("aria-valuenow", String(active.initialPreferredWidth))
-  #|   }
-  #|   const finalWidth = action === "end" ? active.width : -1
-  #|   if (handle.hasPointerCapture(event.pointerId)) {
-  #|     handle.releasePointerCapture(event.pointerId)
-  #|   }
-  #|   handle.classList.remove("is-resizing")
-  #|   active.layout.classList.remove("is-resizing")
-  #|   document.body.classList.remove("file-tree-resizing")
-  #|   delete handle.__moondiffFileTreeResize
-  #|   event.preventDefault()
-  #|   return finalWidth
-  #| }
+) -> Int32 {
+  guard event.to_pointer_event() is Some(pointer) &&
+    @browser.current_element(event.current_target()) is Some(handle) &&
+    handle.to_html_element() is Some(_) else {
+    return -1
+  }
+  if action == "start" {
+    if !pointer.get_is_primary() ||
+      (pointer.get_pointer_type() == "mouse" && pointer.get_button() != 0) {
+      return -1
+    }
+    if tree_drag.val is Some(active) {
+      if @browser.same(active.handle, handle) {
+        return -1
+      }
+      active.finish(true)
+    }
+    guard handle.closest(".change-layout") is Some(layout) &&
+      layout.query_selector("#file-tree-sidebar") is Some(sidebar) else {
+      return -1
+    }
+    tree_drag.val = Some({
+      handle,
+      layout,
+      pointer_id: pointer.get_pointer_id(),
+      start_x: pointer.get_client_x(),
+      start_width: sidebar.get_bounding_client_rect().get_width(),
+      initial_width: preferred_width,
+      width: preferred_width,
+    })
+    handle.set_pointer_capture(pointer.get_pointer_id())
+    handle.class_list().add("is-resizing")
+    layout.class_list().add("is-resizing")
+    @dom.document()
+    .get_body()
+    .unwrap()
+    .as_element()
+    .class_list()
+    .add("file-tree-resizing")
+    event.prevent_default()
+    return -1
+  }
+  guard tree_drag.val is Some(active) &&
+    @browser.same(active.handle, handle) &&
+    active.pointer_id == pointer.get_pointer_id() else {
+    return -1
+  }
+  if action == "move" {
+    let next = tree_drag_width(
+      active.start_width,
+      pointer.get_client_x() - active.start_x,
+      @dom.window().inner_width(),
+    )
+    active.width = next
+    @browser.style(active.layout).set_property(
+      "--file-tree-preferred-width",
+      "\{next}px",
+    )
+    handle.set_attribute("aria-valuenow", next.to_string())
+    event.prevent_default()
+    return -1
+  }
+  if action != "end" && action != "cancel" {
+    return -1
+  }
+  let width = if action == "end" { active.width } else { -1 }
+  active.finish(action == "cancel")
+  event.prevent_default()
+  width
+}
 
 ///|
 fn file_tree_resizer_view(

@@ -154,7 +154,7 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
       if (action === 'cancel') {
         // The source region still shows its old editor while both commits wait.
         await page.locator('.comment-editor').getByRole('button', { name: 'Cancel', exact: true }).evaluate(el => el.click());
-        await expect.poll(() => page.evaluate(() => __moondiffEditorInteraction.records.size)).toBe(0);
+        await expect.poll(() => page.evaluate(() => __moondiffMetrics.editor.records)).toBe(0);
       }
       await barrier.release([fileRegion]);
       await expect(editor).toHaveCount(0);
@@ -176,9 +176,9 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
     await settleRegions(page);
     if (action === 'cancel' || action === 'route') {
       await expect(editor).toHaveCount(0);
-      expect(await page.evaluate(() => __moondiffEditorInteraction.records.size)).toBe(0);
-      expect(await page.evaluate(() => __moondiffEditorInteraction.active)).toBe('');
-      expect(await page.evaluate(() => __moondiffEditorInteraction.stopListening)).toBeNull();
+      expect(await page.evaluate(() => __moondiffMetrics.editor.records)).toBe(0);
+      expect(await page.evaluate(() => __moondiffMetrics.editor.active)).toBe('');
+      expect(await page.evaluate(() => __moondiffMetrics.editor.listening)).toBe(false);
       if (action === 'route') await expect(page.getByRole('button', { name: /^Account:/ })).toBeFocused();
     } else {
       await expect(page.locator('.unavailable-reply-draft textarea')).toHaveCount(1);
@@ -214,8 +214,8 @@ test('source arrival and stale callbacks stay with their mount, repeated navigat
     let counts = await renderCounts(page);
     expect(counts.active).toMatchObject({ mounts: 2, stores: 2, subscriptions: 2, runtimeStores: 3, observers: 0 });
     expect(counts.errors).toEqual([]);
-    expect(await page.evaluate(() => __moondiffRegionLayout.records.size)).toBe(2);
-    expect(await page.evaluate(() => __moondiffEditorInteraction.records.size)).toBe(0);
+    expect(await page.evaluate(() => __moondiffMetrics.layout.records)).toBe(2);
+    expect(await page.evaluate(() => __moondiffMetrics.editor.records)).toBe(0);
     // Each immutable SHA is cached by the public reader; use a new revision to
     // exercise a pending source response on every navigation.
     const nextSha = (i + 1).toString(16).repeat(40);

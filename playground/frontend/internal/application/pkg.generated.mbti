@@ -21,6 +21,10 @@ pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
 
 pub fn auth_status_from_api(@moondiff-playground-protocol.ApiAuthStatus) -> AuthStatus
 
+pub fn clear_navigation_landing(@dom.Element) -> Unit
+
+pub fn clear_navigation_landings() -> Unit
+
 pub fn file_dom_id(Int) -> String
 
 pub fn file_navigation_enabled(Model, Int) -> Bool
@@ -28,6 +32,8 @@ pub fn file_navigation_enabled(Model, Int) -> Bool
 pub fn home_pull_key(@moondiff-playground-protocol.ApiPullSummary) -> String
 
 pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
+
+pub fn navigation_scrolled(@dom.Element) -> Unit
 
 pub fn range_commit_after(RangeState, String, String) -> Bool
 

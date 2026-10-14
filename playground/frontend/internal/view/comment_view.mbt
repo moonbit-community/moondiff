@@ -20,29 +20,74 @@ fn comment_avatar(login : String?) -> @rabbita.Html {
 }
 
 ///|
-extern "js" fn comment_avatar_url(login : String) -> String =
-  #| login => 'https://github.com/' + encodeURIComponent(login) + '.png?size=64'
+fn comment_avatar_url(login : String) -> String {
+  let encoded = StringBuilder()
+  let hex = b"0123456789ABCDEF"
+  for byte in @utf8.encode(login) {
+    let n = byte.to_int()
+    if (n >= 'a' && n <= 'z') ||
+      (n >= 'A' && n <= 'Z') ||
+      (n >= '0' && n <= '9') ||
+      n == '-' ||
+      n == '_' ||
+      n == '.' ||
+      n == '!' ||
+      n == '~' ||
+      n == '*' ||
+      n == '\'' ||
+      n == '(' ||
+      n == ')' {
+      encoded.write_char(n.unsafe_to_char())
+    } else {
+      encoded.write_char('%')
+      encoded.write_char(hex[n >> 4].to_int().unsafe_to_char())
+      encoded.write_char(hex[n & 15].to_int().unsafe_to_char())
+    }
+  }
+  "https://github.com/" + encoded.to_string() + ".png?size=64"
+}
 
 ///|
-extern "js" fn comment_relative_time(created_at : String) -> String =
-  #| value => {
-  #|   const time = Date.parse(value);
-  #|   if (!Number.isFinite(time)) return 'Unknown time';
-  #|   const elapsed = (Date.now() - time) / 1000;
-  #|   if (Math.abs(elapsed) < 60) return 'just now';
-  #|   const units = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]];
-  #|   const [unit, seconds] = units.find(([, seconds]) => Math.abs(elapsed) >= seconds);
-  #|   const count = Math.floor(Math.abs(elapsed) / seconds);
-  #|   const label = count + ' ' + unit + (count === 1 ? '' : 's');
-  #|   return elapsed < 0 ? 'in ' + label : label + ' ago';
-  #| }
+fn comment_relative_time(created_at : String) -> String {
+  let time = @browser.date_parse(created_at)
+  if !@browser.finite(time) {
+    return "Unknown time"
+  }
+  relative_time((@browser.date_now() - time) / 1000.0)
+}
 
 ///|
-extern "js" fn comment_full_time(created_at : String) -> String =
-  #| value => {
-  #|   const time = Date.parse(value);
-  #|   return Number.isFinite(time) ? new Date(time).toUTCString() : 'Unknown time';
-  #| }
+fn relative_time(elapsed : Double) -> String {
+  let absolute = elapsed.abs()
+  if absolute < 60.0 {
+    return "just now"
+  }
+  let units = [
+    ("year", 31536000.0),
+    ("month", 2592000.0),
+    ("day", 86400.0),
+    ("hour", 3600.0),
+    ("minute", 60.0),
+  ]
+  for (unit, seconds) in units {
+    if absolute >= seconds {
+      let count = (absolute / seconds).floor().to_int64()
+      let label = "\{count} \{unit}" + (if count == 1L { "" } else { "s" })
+      return if elapsed < 0.0 { "in " + label } else { label + " ago" }
+    }
+  }
+  "just now"
+}
+
+///|
+fn comment_full_time(created_at : String) -> String {
+  let time = @browser.date_parse(created_at)
+  if @browser.finite(time) {
+    @browser.date_utc(time)
+  } else {
+    "Unknown time"
+  }
+}
 
 ///|
 fn comment_body_view(

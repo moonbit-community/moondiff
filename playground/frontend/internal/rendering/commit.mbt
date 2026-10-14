@@ -8,6 +8,8 @@ priv struct PendingNavigation {
 
 ///|
 priv struct Coordinator {
+  layout : LayoutState
+  editor : EditorState
   mut scheduler : &@cmd.Scheduler?
   mut early_commands : Array[@rabbita.Cmd]
   mut generation : Int32
@@ -23,6 +25,8 @@ priv struct Coordinator {
 ///|
 fn Coordinator::new() -> Coordinator {
   {
+    layout: LayoutState::new(),
+    editor: EditorState::new(),
     scheduler: None,
     early_commands: [],
     generation: 0,
@@ -46,6 +50,7 @@ fn Coordinator::begin_update(
 ) -> Int32 {
   if self.generation != generation {
     self.generation = generation
+    @application.clear_navigation_landings()
     self.navigation = None
     self.pending.clear()
   }
@@ -204,7 +209,7 @@ fn Coordinator::after_update(
       for action in actions {
         self.wait_for(generation, action)
       }
-      after_layout(() => self.finish_update(generation, revision))
+      self.layout.after(() => self.finish_update(generation, revision))
     }),
   )
 }

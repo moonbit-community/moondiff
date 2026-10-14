@@ -23,7 +23,6 @@ fn Coordinator::forward(
 
 ///|
 pub fn start(id : String) -> Unit {
-  initialize_layout()
   let coordinator = Coordinator::new()
   @rabbita.new(() => {
     let (model, raw) = @rabbita.create_state_with_init(
@@ -47,7 +46,7 @@ pub fn start(id : String) -> Unit {
       update=(before, event, raw) => {
         guard event.message is Some(msg) else { return (before, @rabbita.none) }
         event.message = None
-        capture_editor()
+        coordinator.editor.capture()
         let transition = @application.update(
           before.0,
           msg,
@@ -61,7 +60,7 @@ pub fn start(id : String) -> Unit {
         } else {
           ""
         }
-        active_draft(
+        coordinator.editor.activate(
           draft_id,
           transition.model.review.draft_visible(),
           generation,

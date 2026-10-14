@@ -3,7 +3,7 @@ import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs
 import { checkToolbar } from "./toolbar.mjs";
 import { clickLineCommentButton } from "./comment-actions.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
-import { settleRegions } from "../../tests/render-probe.mjs";
+import { settleRegions, installRenderProbe } from "../../tests/render-probe.mjs";
 import { expect, test } from "@playwright/test";
 
 const head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -2013,6 +2013,7 @@ for (const kind of ["overall", "reply", "inline", "collapsed"]) {
 }
 
 test("draft remount restores selection without taking toolbar focus and cleans up cancelled drafts", async ({ page }) => {
+  await installRenderProbe(page);
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
@@ -2037,7 +2038,7 @@ test("draft remount restores selection without taking toolbar focus and cleans u
   await expect(editor).not.toBeFocused();
   expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([3, 12, "backward"]);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => globalThis.__moondiffEditorInteraction.records.size)).toBe(0);
+  await expect.poll(() => page.evaluate(() => globalThis.__moondiffMetrics.editor.records)).toBe(0);
   await openNewLineComment(page, 2);
   await expect(editor).toBeFocused();
   expect(await editor.getAttribute("data-draft-id")).not.toBe(draftId);

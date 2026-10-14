@@ -16,6 +16,8 @@ import {
 // Values
 pub fn diff_notice(ArrayView[@model.FallbackReason], Bool) -> DiffNotice?
 
+pub fn dispose_file_tree_resize() -> Unit
+
 pub fn region_view(RegionInput, @cmd.Emit[@application.Msg], FileDerivation) -> @html.Html
 
 pub fn semantic_section_fragment(@model.DiffSection) -> @model.DiffFragment

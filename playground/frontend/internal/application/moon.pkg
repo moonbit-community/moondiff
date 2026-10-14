@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/string",
   "moonbit-community/moondiff-playground/internal/browser",
   "moonbit-community/moondiff-playground/internal/identity",
   "moonbitlang/core/json",

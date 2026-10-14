@@ -1,91 +1,175 @@
 ///|
-// Capture at the business event boundary, before the browser can normalize a
-// blurred selection in a later frame. Inspect only the registered editor node.
-extern "js" fn capture_editor() -> Unit =
-  #| () => {
-  #|   const state = globalThis.__moondiffEditorInteraction;
-  #|   const saved = state?.records.get(state.active);
-  #|   const el = saved?.node;
-  #|   // A region may remove the old editor before its destination commits.
-  #|   // Background responses in that gap must preserve the entire interaction.
-  #|   if (!state?.visible || !el?.isConnected) return;
-  #|   if (document.activeElement !== el) state.focusIntent = false;
-  #|   Object.assign(saved, {
-  #|     start: el.selectionStart, end: el.selectionEnd, direction: el.selectionDirection,
-  #|     top: el.scrollTop });
-  #| }
+priv struct EditorRecord {
+  host : String
+  node : @dom.Element
+  mut start : Int32
+  mut end : Int32
+  mut direction : String
+  mut top : Double
+}
 
 ///|
-extern "js" fn restore_editor(host : String, id : String) -> Unit =
-  #| (host, id) => {
-  #|   const state = globalThis.__moondiffEditorInteraction;
-  #|   if (!state?.visible || !id || id !== state.active) return;
-  #|   const records = state.records;
-  #|   const el = document.getElementById(host)?.querySelector('textarea[data-draft-id]');
-  #|   if (el?.isConnected && el.dataset.draftId === id) {
-  #|     const saved = records.get(id);
-  #|     // Register before focus() so our focusin listener recognizes this node.
-  #|     const record = { host, node: el };
-  #|     records.set(id, record);
-  #|     if (state.focusIntent && saved?.node !== el) el.focus({ preventScroll: true });
-  #|     if (saved && saved.node !== el) {
-  #|       el.setSelectionRange(saved.start, saved.end, saved.direction);
-  #|       el.scrollTop = saved.top;
-  #|     }
-  #|     Object.assign(record, { start: el.selectionStart, end: el.selectionEnd,
-  #|       direction: el.selectionDirection, top: el.scrollTop });
-  #|   }
-  #| }
+fn EditorRecord::capture(self : EditorRecord) -> Unit {
+  self.start = @browser.selection_start(self.node)
+  self.end = @browser.selection_end(self.node)
+  self.direction = @browser.selection_direction(self.node)
+  self.top = self.node.get_scroll_top()
+}
 
 ///|
-extern "js" fn dispose_editor(host : String) -> Unit =
-  #| host => {
-  #|   const state = globalThis.__moondiffEditorInteraction;
-  #|   if (!state) return;
-  #|   for (const [key, record] of state.records) {
-  #|     if (record.host !== host) continue;
-  #|     state.records.delete(key);
-  #|     if (key === state.active) {
-  #|       state.focusIntent = false;
-  #|       state.stopListening?.();
-  #|       state.stopListening = null;
-  #|     }
-  #|   }
-  #| }
+priv struct EditorState {
+  records : Map[String, EditorRecord]
+  mut active : String
+  mut visible : Bool
+  mut generation : Int32
+  mut focus_intent : Bool
+  mut stop_listening : (() -> Unit)?
+}
 
 ///|
-extern "js" fn active_draft(
+fn EditorState::new() -> EditorState {
+  let state : EditorState = {
+    records: {},
+    active: "",
+    visible: false,
+    generation: 0,
+    focus_intent: false,
+    stop_listening: None,
+  }
+  state.publish()
+  state
+}
+
+///|
+fn EditorState::publish(self : EditorState) -> Unit {
+  @metrics.state("editor", "records", self.records.length())
+  @metrics.state("editor", "active", self.active)
+  @metrics.state("editor", "listening", self.stop_listening is Some(_))
+}
+
+///|
+fn EditorState::stop(self : EditorState) -> Unit {
+  self.focus_intent = false
+  if self.stop_listening is Some(stop) {
+    self.stop_listening = None
+    stop()
+  }
+}
+
+///|
+// Capture at the event boundary. A detached source editor must retain its snapshot.
+fn EditorState::capture(self : EditorState) -> Unit {
+  guard self.visible &&
+    self.records.get(self.active) is Some(saved) &&
+    saved.node.get_is_connected() else {
+    return
+  }
+  let focused = @dom.document()
+    .get_active_element()
+    .map(active => @browser.same(active, saved.node))
+    .unwrap_or(false)
+  if !focused {
+    self.focus_intent = false
+  }
+  saved.capture()
+}
+
+///|
+fn EditorState::restore(self : EditorState, host : String, id : String) -> Unit {
+  guard self.visible &&
+    !id.is_empty() &&
+    id == self.active &&
+    @browser.element(host) is Some(root) &&
+    root.query_selector("textarea[data-draft-id]") is Some(el) &&
+    el.get_is_connected() &&
+    el.get_attribute("data-draft-id") == Some(id) else {
+    return
+  }
+  let saved = self.records.get(id)
+  let record : EditorRecord = {
+    host,
+    node: el,
+    start: 0,
+    end: 0,
+    direction: "none",
+    top: 0.0,
+  }
+  // Register before focus(), so focusin identifies the replacement correctly.
+  self.records[id] = record
+  let replaced = saved
+    .map(saved => !@browser.same(saved.node, el))
+    .unwrap_or(true)
+  if self.focus_intent && replaced {
+    @browser.focus(el)
+  }
+  if saved is Some(saved) && replaced {
+    @browser.select_range(el, saved.start, saved.end, saved.direction)
+    el.set_scroll_top(saved.top)
+  }
+  record.capture()
+  self.publish()
+}
+
+///|
+fn EditorState::dispose(self : EditorState, host : String) -> Unit {
+  let keys = self.records
+    .iter()
+    .filter(entry => entry.1.host == host)
+    .map(entry => entry.0)
+    .collect()
+  for key in keys {
+    self.records.remove(key)
+    if key == self.active {
+      self.stop()
+    }
+  }
+  self.publish()
+}
+
+///|
+fn EditorState::activate(
+  self : EditorState,
   id : String,
   visible : Bool,
   generation : Int32,
-) -> Unit =
-  #| (id, visible, generation) => {
-  #|   const state = globalThis.__moondiffEditorInteraction ??= {
-  #|     records: new Map(), active: '', visible: false, generation,
-  #|     focusIntent: false, stopListening: null,
-  #|   };
-  #|   if (id !== state.active || generation !== state.generation) {
-  #|     state.records.clear();
-  #|     state.focusIntent = id !== state.active && !!id && visible;
-  #|   }
-  #|   state.active = id;
-  #|   state.generation = generation;
-  #|   state.visible = !!id && visible;
-  #|   // Authentication can hide a retained draft. Keep its selection, but do
-  #|   // not revive the previous focus intent when the editor becomes visible.
-  #|   if (!state.visible) {
-  #|     state.focusIntent = false;
-  #|     state.stopListening?.();
-  #|     state.stopListening = null;
-  #|   } else if (!state.stopListening) {
-  #|     const interact = event => {
-  #|       state.focusIntent = event.target === state.records.get(state.active)?.node;
-  #|     };
-  #|     document.addEventListener('focusin', interact, true);
-  #|     document.addEventListener('pointerdown', interact, true);
-  #|     state.stopListening = () => {
-  #|       document.removeEventListener('focusin', interact, true);
-  #|       document.removeEventListener('pointerdown', interact, true);
-  #|     };
-  #|   }
-  #| }
+) -> Unit {
+  if id != self.active || generation != self.generation {
+    self.records.clear()
+    self.focus_intent = id != self.active && !id.is_empty() && visible
+  }
+  self.active = id
+  self.generation = generation
+  self.visible = !id.is_empty() && visible
+  // Hiding a retained draft must not revive an earlier focus intent.
+  if !self.visible {
+    self.stop()
+  } else if self.stop_listening is None {
+    let interact : @dom.Listener = event => {
+      self.focus_intent = match
+        (event.target().to_element(), self.records.get(self.active)) {
+        (Some(target), Some(record)) => @browser.same(target, record.node)
+        _ => false
+      }
+    }
+    let document = @dom.document()
+    document.add_event_listener_with_options("focusin", interact, capture=true)
+    document.add_event_listener_with_options(
+      "pointerdown",
+      interact,
+      capture=true,
+    )
+    self.stop_listening = Some(() => {
+      document.remove_event_listener_with_options(
+        "focusin",
+        interact,
+        capture=true,
+      )
+      document.remove_event_listener_with_options(
+        "pointerdown",
+        interact,
+        capture=true,
+      )
+    })
+  }
+  self.publish()
+}

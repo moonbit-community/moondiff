@@ -1,4 +1,6 @@
 import {
+  "moonbit-community/rabbita/dom",
+  "moonbit-community/moondiff-playground/internal/browser",
   "moonbit-community/moondiff-playground/internal/application",
   "moonbit-community/moondiff-playground/internal/view",
   "moonbit-community/moondiff-playground/internal/identity",

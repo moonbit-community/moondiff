@@ -67,7 +67,10 @@ fn lifetime_loader(
         dispose()
       }
       mount.dispose_layout = None
-      dispose_editor(mount.host)
+      coordinator.editor.dispose(mount.host)
+      if mount.region is FileTree {
+        @view.dispose_file_tree_resize()
+      }
       remove_host(mount.host)
       mount.app = None
       mount.scheduler = None
@@ -139,15 +142,17 @@ fn Coordinator::committed(
     return
   }
   if mount.dispose_layout is None {
-    mount.dispose_layout = Some(observe_layout(mount.host, mount.region.key()))
+    mount.dispose_layout = Some(
+      self.layout.observe(mount.host, mount.region.key()),
+    )
   }
   // Restore interaction in the same commit, before another input event can
   // change the new editor. Only geometry-dependent actions wait for layout.
   if mount.input is Some(input) {
-    restore_editor(mount.host, input.draft_id())
+    self.editor.restore(mount.host, input.draft_id())
   }
-  invalidate_layout(mount.host)
-  after_layout(() => self.finish_region(mount, ticket))
+  self.layout.invalidate(mount.host)
+  self.layout.after(() => self.finish_region(mount, ticket))
 }
 
 ///|
@@ -272,22 +277,31 @@ fn region_component(
 }
 
 ///|
-extern "js" fn host_connected(id : String) -> Bool = "id => !!document.getElementById(id)?.isConnected"
+fn host_connected(id : String) -> Bool {
+  @browser.element(id).map(el => el.get_is_connected()).unwrap_or(false)
+}
 
 ///|
-extern "js" fn connect_paint_scheduler(id : String) -> Unit =
-  #| id => document.getElementById(id + '-scheduler').dispatchEvent(new MouseEvent('click'))
+fn connect_paint_scheduler(id : String) -> Unit {
+  @browser.element(id + "-scheduler")
+  .unwrap()
+  .dispatch_event(@browser.mouse_click())
+}
 
 ///|
-extern "js" fn remove_host(id : String) -> Unit = "id => document.getElementById(id + '-root')?.remove()"
+fn remove_host(id : String) -> Unit {
+  if @browser.element(id + "-root") is Some(root) {
+    @browser.remove(root)
+  }
+}
 
 ///|
-extern "js" fn create_mount_root(id : String) -> Unit =
-  #| id => {
-  #|   const root = document.createElement('div');
-  #|   root.id = id + '-root'; root.className = 'render-region';
-  #|   document.getElementById(id).appendChild(root);
-  #| }
+fn create_mount_root(id : String) -> Unit {
+  let root = @dom.document().create_element("div")
+  root.set_attribute("id", id + "-root")
+  root.set_attribute("class", "render-region")
+  @browser.element(id).unwrap().append_child(root.as_node())
+}
 
 ///|
 fn Mount::finish(self : Mount, ticket : CommitTicket) -> Array[@rabbita.Cmd] {
