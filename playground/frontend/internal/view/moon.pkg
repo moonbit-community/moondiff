@@ -1,4 +1,6 @@
 import {
+  "moonbitlang/core/encoding/utf8",
+  "moonbit-community/moondiff-playground/internal/browser",
   "moonbit-community/moondiff-playground/internal/identity",
   "moonbit-community/moondiff-playground/internal/metrics",
   "moonbit-community/moondiff-playground-protocol" @protocol,

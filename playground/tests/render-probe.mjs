@@ -5,6 +5,11 @@ export function instrumentRenderProbe(source) {
     source = source.replace(pattern, match => { matches++; return `${match}\n${typeof code === 'function' ? code(match) : code}\n`; });
     if (matches !== 1) throw new Error(`Render probe expected one ${pattern}, found ${matches}`);
   };
+  // Every test using settleRegions needs the scalar layout snapshot, even when
+  // it does not install the full performance probe. Initialize before the
+  // coordinator starts; this hook exists only in the temporary E2E bundle.
+  inject(/function \w+rendering5start\(id\) \{/, `
+    globalThis.__moondiffMetrics ??= { files: {}, active: {} };`);
   // A test may hold a region's next paint while the shell and network proceed.
   // Keep the hook in the temporary bundle, alongside the existing render probe.
   // BrowserHost replaced Sandbox; retain the mount ID for regional barriers.
@@ -70,14 +75,14 @@ export async function settleRegions(page, timeout = 5_000) {
     let animationFrame = 0;
     let finished = false;
     const snapshot = () => {
-      const layout = globalThis.__moondiffRegionLayout;
+      const layout = globalThis.__moondiffMetrics?.layout;
       const pending = globalThis.__moondiffPendingPaints;
       return {
         pendingPaints: pending?.size ?? 0,
         pendingMounts: pending ? [...pending].map(sandbox => sandbox.mount) : [],
         layoutFrame: layout?.frame ?? 0,
-        layoutDirty: layout?.dirty?.size ?? 0,
-        layoutCallbacks: layout?.callbacks?.length ?? 0,
+        layoutDirty: layout?.dirty ?? 0,
+        layoutCallbacks: layout?.callbacks ?? 0,
       };
     };
     const done = value => {

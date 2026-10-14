@@ -6,6 +6,8 @@ pub fn active(String, Int) -> Unit
 
 pub fn count(String, String) -> Unit
 
+pub fn[T] state(String, String, T) -> Unit
+
 // Errors
 
 // Types and methods

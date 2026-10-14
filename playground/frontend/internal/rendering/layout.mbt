@@ -1,123 +1,224 @@
 ///|
-// One shared frame batches all region measurements before writing any offsets.
-extern "js" fn initialize_layout() -> Unit =
-  #| () => {
-  #|   globalThis.__moondiffRegionLayout ??= {
-  #|     dirty: new Set(), records: new Map(), callbacks: [], frame: 0,
-  #|     schedule() {
-  #|       if (this.frame) return;
-  #|       this.frame = requestAnimationFrame(() => {
-  #|         this.frame = 0;
-  #|         const reads = [];
-  #|         for (const record of this.dirty) {
-  #|           if (record.alive && record.host.isConnected) {
-  #|             reads.push([record, record.read()]);
-  #|           }
-  #|         }
-  #|         this.dirty.clear();
-  #|         for (const [record, heights] of reads) record.write(heights);
-  #|         const callbacks = this.callbacks.splice(0);
-  #|         for (const callback of callbacks) callback();
-  #|       });
-  #|     }
-  #|   };
-  #| }
+priv struct LayoutRecord {
+  host : @dom.Element
+  mut alive : Bool
+  prepare : () -> Unit
+  read : () -> Array[Double]
+  write : (Array[Double]) -> Unit
+}
 
 ///|
-extern "js" fn observe_layout(host : String, region : String) -> () -> Unit =
-  #| (hostId, region) => {
-  #|   const state = globalThis.__moondiffRegionLayout;
-  #|   const host = document.getElementById(hostId);
-  #|   const main = host.closest('.change-main') ?? document.querySelector('.change-main');
-  #|   const elements = [];
-  #|   let prepare = () => {};
-  #|   let read = () => elements.map(el => el.getBoundingClientRect().height);
-  #|   let write = () => {};
-  #|   if (region.startsWith('file:')) {
-  #|     const file = host.querySelector('.file-card');
-  #|     const heading = file?.querySelector('.file-heading');
-  #|     if (heading) {
-  #|       elements.push(heading, file);
-  #|       prepare = () => { file.removeAttribute('data-render-contained'); };
-  #|       read = () => {
-  #|         const style = getComputedStyle(file);
-  #|         // Intrinsic block-size substitutes the content box, not borders or padding.
-  #|         const edges = ['borderTopWidth', 'borderBottomWidth', 'paddingTop', 'paddingBottom']
-  #|           .reduce((height, property) => height + (parseFloat(style[property]) || 0), 0);
-  #|         return [heading.getBoundingClientRect().height, Math.max(0, file.getBoundingClientRect().height - edges)];
-  #|       };
-  #|       write = heights => {
-  #|         file.style.setProperty('--file-heading-inset', `${heights[0]}px`);
-  #|         if (Number.isFinite(heights[1]) && heights[1] > 0) {
-  #|           file.style.setProperty('--file-intrinsic-block-size', `${heights[1]}px`);
-  #|           file.setAttribute('data-render-contained', 'true');
-  #|         }
-  #|         if (main) main.__moondiffChangeLanding = null;
-  #|       };
-  #|     }
-  #|   } else if (region === 'toolbar') {
-  #|     const toolbar = host.querySelector('.hero-workspace');
-  #|     if (toolbar) {
-  #|       const workspace = host.closest('.workspace');
-  #|       elements.push(toolbar);
-  #|       write = heights => { workspace.style.setProperty('--toolbar-inset', `${heights[0]}px`); };
-  #|     }
-  #|   } else if (region === 'navigation' && main) {
-  #|     const title = host.closest('.change-titlebar');
-  #|     elements.push(title, main);
-  #|     write = heights => {
-  #|       main.style.setProperty('--change-title-height', `${heights[0]}px`);
-  #|       main.__moondiffChangeLanding = null;
-  #|     };
-  #|   }
-  #|   const record = { alive: true, host, elements, prepare, read, write };
-  #|   const onResize = () => { if (main) main.__moondiffChangeLanding = null; state.dirty.add(record); state.schedule(); };
-  #|   const onScroll = () => {
-  #|     const landing = main?.__moondiffChangeLanding;
-  #|     if (landing && Math.abs(window.scrollY - landing.scrollY) > 1) main.__moondiffChangeLanding = null;
-  #|   };
-  #|   if (region === 'navigation') {
-  #|     window.addEventListener('resize', onResize);
-  #|     window.addEventListener('scroll', onScroll, { passive: true });
-  #|   }
-  #|   const observer = elements.length ? new ResizeObserver(() => { state.dirty.add(record); state.schedule(); }) : null;
-  #|   for (const element of elements) observer.observe(element);
-  #|   if (observer) {
-  #|     state.dirty.add(record); state.schedule();
-  #|     if (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.active.observers = (globalThis.__moondiffMetrics.active.observers ?? 0) + 1;
-  #|   }
-  #|   state.records.set(hostId, record);
-  #|   return () => {
-  #|     record.alive = false;
-  #|     observer?.disconnect();
-  #|     if (region === 'navigation') {
-  #|       window.removeEventListener('resize', onResize);
-  #|       window.removeEventListener('scroll', onScroll);
-  #|     }
-  #|     if (region === 'toolbar') host.closest('.workspace')?.style.removeProperty('--toolbar-inset');
-  #|     state.dirty.delete(record); state.records.delete(hostId);
-  #|     if (observer && globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.active.observers--;
-  #|     if (main) main.__moondiffChangeLanding = null;
-  #|   };
-  #| }
+priv struct LayoutState {
+  dirty : Map[String, LayoutRecord]
+  records : Map[String, LayoutRecord]
+  mut callbacks : Array[() -> Unit]
+  mut frame : Double
+}
 
 ///|
-// ResizeObserver may deliver after a frame's callbacks. Explicitly include the
-// just-committed region in the next read/write batch before acknowledging it.
-extern "js" fn invalidate_layout(host : String) -> Unit =
-  #| host => {
-  #|   const state = globalThis.__moondiffRegionLayout;
-  #|   const record = state.records.get(host);
-  #|   if (record) {
-  #|     record.prepare();
-  #|     state.dirty.add(record);
-  #|   }
-  #| }
+fn LayoutState::new() -> LayoutState {
+  let state : LayoutState = {
+    dirty: {},
+    records: {},
+    callbacks: [],
+    frame: 0.0,
+  }
+  state.publish()
+  state
+}
 
 ///|
-extern "js" fn after_layout(callback : () -> Unit) -> Unit =
-  #| callback => {
-  #|   const state = globalThis.__moondiffRegionLayout;
-  #|   state.callbacks.push(callback);
-  #|   state.schedule();
-  #| }
+fn LayoutState::publish(self : LayoutState) -> Unit {
+  @metrics.state("layout", "frame", self.frame)
+  @metrics.state("layout", "dirty", self.dirty.length())
+  @metrics.state("layout", "callbacks", self.callbacks.length())
+  @metrics.state("layout", "records", self.records.length())
+}
+
+///|
+// One shared frame reads all dirty geometry, then writes offsets, then runs callbacks.
+fn LayoutState::schedule(self : LayoutState) -> Unit {
+  if self.frame != 0.0 {
+    self.publish()
+    return
+  }
+  self.frame = @dom.window().request_animation_frame(_ => {
+    self.frame = 0.0
+    let reads : Array[(LayoutRecord, Array[Double])] = []
+    for _, record in self.dirty {
+      if record.alive && record.host.get_is_connected() {
+        reads.push((record, (record.read)()))
+      }
+    }
+    self.dirty.clear()
+    for (record, heights) in reads {
+      (record.write)(heights)
+    }
+    let callbacks = self.callbacks
+    self.callbacks = []
+    self.publish()
+    for callback in callbacks {
+      callback()
+    }
+    self.publish()
+  })
+  self.publish()
+}
+
+///|
+fn clear_landing(main : @dom.Element?) -> Unit {
+  if main is Some(main) {
+    @application.clear_navigation_landing(main)
+  }
+}
+
+///|
+fn LayoutState::observe(
+  self : LayoutState,
+  host_id : String,
+  region : String,
+) -> () -> Unit {
+  let host = @browser.element(host_id).unwrap()
+  let main = match host.closest(".change-main") {
+    Some(main) => Some(main)
+    None => @dom.document().query_selector(".change-main").to_option()
+  }
+  let elements : Array[@dom.Element] = []
+  let mut prepare : () -> Unit = () => ()
+  let mut read : () -> Array[Double] = () => {
+    elements.map(el => el.get_bounding_client_rect().get_height())
+  }
+  let mut write : (Array[Double]) -> Unit = _ => ()
+  if region.has_prefix("file:") {
+    if host.query_selector(".file-card") is Some(file) &&
+      file.query_selector(".file-heading") is Some(heading) {
+      elements.push(heading)
+      elements.push(file)
+      prepare = () => file.remove_attribute("data-render-contained")
+      read = () => {
+        let style = @dom.window().get_computed_style(file)
+        let mut edges = 0.0
+        // Intrinsic block-size substitutes content, not border or padding.
+        for
+          property in [
+            "border-top-width", "border-bottom-width", "padding-top", "padding-bottom",
+          ] {
+          let number = @browser.parse_float(style[property])
+          if !number.is_nan() {
+            edges += number
+          }
+        }
+        [
+          heading.get_bounding_client_rect().get_height(),
+          0.0.max(file.get_bounding_client_rect().get_height() - edges),
+        ]
+      }
+      write = heights => {
+        @browser.style(file).set_property(
+          "--file-heading-inset",
+          "\{heights[0]}px",
+        )
+        if @browser.finite(heights[1]) && heights[1] > 0.0 {
+          @browser.style(file).set_property(
+            "--file-intrinsic-block-size",
+            "\{heights[1]}px",
+          )
+          file.set_attribute("data-render-contained", "true")
+        }
+        clear_landing(main)
+      }
+    }
+  } else if region == "toolbar" {
+    if host.query_selector(".hero-workspace") is Some(toolbar) {
+      let workspace = host.closest(".workspace").unwrap()
+      elements.push(toolbar)
+      write = heights => {
+        @browser.style(workspace).set_property(
+          "--toolbar-inset",
+          "\{heights[0]}px",
+        )
+      }
+    }
+  } else if region == "navigation" && main is Some(main) {
+    let title = host.closest(".change-titlebar").unwrap()
+    elements.push(title)
+    elements.push(main)
+    write = heights => {
+      @browser.style(main).set_property(
+        "--change-title-height",
+        "\{heights[0]}px",
+      )
+      @application.clear_navigation_landing(main)
+    }
+  }
+  let record : LayoutRecord = { host, alive: true, prepare, read, write, }
+  let on_resize : @dom.Listener = _ => {
+    clear_landing(main)
+    self.dirty[host_id] = record
+    self.schedule()
+  }
+  let on_scroll : @dom.Listener = _ => {
+    if main is Some(main) {
+      @application.navigation_scrolled(main)
+    }
+  }
+  if region == "navigation" {
+    @dom.window().add_event_listener("resize", on_resize)
+    @dom.window().add_event_listener_with_options(
+      "scroll",
+      on_scroll,
+      passive=true,
+    )
+  }
+  let observer = if elements.is_empty() {
+    None
+  } else {
+    let observer = @dom.ResizeObserver::new((_, _) => {
+      self.dirty[host_id] = record
+      self.schedule()
+    })
+    for element in elements {
+      observer.observe(element)
+    }
+    self.dirty[host_id] = record
+    self.schedule()
+    @metrics.active("observers", 1)
+    Some(observer)
+  }
+  self.records[host_id] = record
+  self.publish()
+  () => {
+    record.alive = false
+    if observer is Some(observer) {
+      observer.disconnect()
+      @metrics.active("observers", -1)
+    }
+    if region == "navigation" {
+      @dom.window().remove_event_listener("resize", on_resize)
+      @dom.window().remove_event_listener("scroll", on_scroll)
+    }
+    if region == "toolbar" && host.closest(".workspace") is Some(workspace) {
+      ignore(@browser.style(workspace).remove_property("--toolbar-inset"))
+    }
+    self.dirty.remove(host_id)
+    self.records.remove(host_id)
+    clear_landing(main)
+    self.publish()
+  }
+}
+
+///|
+// Include a committed region before acknowledging it, independent of observer delivery.
+fn LayoutState::invalidate(self : LayoutState, host : String) -> Unit {
+  if self.records.get(host) is Some(record) {
+    (record.prepare)()
+    self.dirty[host] = record
+    self.publish()
+  }
+}
+
+///|
+fn LayoutState::after(self : LayoutState, callback : () -> Unit) -> Unit {
+  self.callbacks.push(callback)
+  self.schedule()
+}

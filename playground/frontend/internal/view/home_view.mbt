@@ -11,12 +11,14 @@ fn home_link(path : String, label : String, class : String) -> @rabbita.Html {
 }
 
 ///|
-extern "js" fn home_date(value : String) -> String =
-  #| value => {
-  #|   const date = new Date(value);
-  #|   if (!Number.isFinite(date.getTime())) return value;
-  #|   return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
-  #| }
+fn home_date(value : String) -> String {
+  let time = @browser.date_parse(value)
+  if @browser.finite(time) {
+    @browser.date_local(time)
+  } else {
+    value
+  }
+}
 
 ///|
 fn home_time(value : String) -> @rabbita.Html {
@@ -91,21 +93,26 @@ fn home_tab(
 }
 
 ///|
-extern "js" fn home_tab_key(event : @dom.KeyboardEvent) -> Unit =
-  #| event => {
-  #|   const tabs = Array.from(event.currentTarget.querySelectorAll('[role="tab"]'));
-  #|   const index = tabs.indexOf(event.target);
-  #|   if (index < 0) return;
-  #|   let next;
-  #|   if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
-  #|   else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
-  #|   else if (event.key === 'Home') next = 0;
-  #|   else if (event.key === 'End') next = tabs.length - 1;
-  #|   else return;
-  #|   event.preventDefault();
-  #|   tabs[next].focus({ preventScroll: true });
-  #|   tabs[next].click();
-  #| }
+fn home_tab_key(event : @dom.KeyboardEvent) -> Unit {
+  guard @browser.current_element(event.current_target()) is Some(parent) else {
+    return
+  }
+  let tabs = parent.query_selector_all("[role=\"tab\"]").iter().collect()
+  guard event.target().to_element() is Some(target) else { return }
+  guard tabs.search_by(tab => @browser.same(tab, target)) is Some(index) else {
+    return
+  }
+  let next = match event.key() {
+    "ArrowRight" => (index + 1) % tabs.length()
+    "ArrowLeft" => (index + tabs.length() - 1) % tabs.length()
+    "Home" => 0
+    "End" => tabs.length() - 1
+    _ => return
+  }
+  event.prevent_default()
+  @browser.focus(tabs[next])
+  @browser.click(tabs[next])
+}
 
 ///|
 fn home_group(

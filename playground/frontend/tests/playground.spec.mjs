@@ -1171,10 +1171,13 @@ test("desktop file tree resizes live, persists across changes, and resets on ref
   await expect(divider).toHaveCSS("touch-action", "none");
   expect(await fileTreeWidth(page)).toBe(240);
 
+  await divider.evaluate(element => {
+    element.addEventListener('pointerdown', event => { window.fileTreePointerId = event.pointerId; }, { once: true });
+  });
   await moveFileTreeDivider(page, 440);
   expect(await fileTreeWidth(page)).toBe(440);
   await divider.evaluate(element => {
-    const pointerId = element.__moondiffFileTreeResize.pointerId;
+    const pointerId = window.fileTreePointerId;
     element.dispatchEvent(new PointerEvent("pointercancel", {
       bubbles: true,
       isPrimary: true,
