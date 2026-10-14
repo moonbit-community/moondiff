@@ -85,7 +85,7 @@ jobs:
       - name: Run extension tests
         run: npm run test:extension
 
-      - name: Run Playwright integration tests
+      - name: Run browser component and integration tests
         working-directory: playground
         run: npm run test:e2e
 

@@ -128,6 +128,7 @@ fn receipt_test_file() -> FileState {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "published inline reviews retain the Posting editor until verified, including fallback placements" {
   let (published, comment) = receipt_test_publish_inline(
     receipt_test_session([]),
@@ -196,6 +197,7 @@ test "published inline reviews retain the Posting editor until verified, includi
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "a synchronizing root preserves its editor and all orphaned replies until confirmation" {
   let (published, root) = receipt_test_publish_inline(
     receipt_test_session([]),
@@ -255,6 +257,7 @@ test "a synchronizing root preserves its editor and all orphaned replies until c
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "published replies retain the thread editor and fall back if the root disappears" {
   let root = receipt_test_comment(20, "root")
   let existing = receipt_test_comment(21, "existing reply", reply_to=root.id)

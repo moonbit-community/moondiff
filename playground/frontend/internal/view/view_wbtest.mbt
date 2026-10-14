@@ -375,6 +375,7 @@ test "semantic section titles format declaration contexts" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "test file notices follow diff results and preserve source load states" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let render = fn(file : FileState) {
@@ -431,6 +432,7 @@ test "test file notices follow diff results and preserve source load states" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "AST structural-empty view preserves section fallback notices" {
   let fragment : @mbtdiff.DiffFragment = {
     document: { hunks: [], },
@@ -494,6 +496,7 @@ test "AST structural-empty view preserves section fallback notices" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "AST structural-empty view without fallback keeps its original DOM" {
   let document : @mbtdiff.DiffDocument = Whole({
     document: { hunks: [], },
@@ -534,6 +537,7 @@ test "AST structural-empty view without fallback keeps its original DOM" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "same-line declarations retain every modified inserted and deleted section" {
   let before = "let first = 11; let second = 22"
   let after = "let first = 33; let second = 44"

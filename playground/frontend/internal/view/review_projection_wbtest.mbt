@@ -212,6 +212,7 @@ test "projection chooses the first visible occurrence independently of rendering
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "projection source identity does not depend on hunk headings" {
   let file = {
     ..fixture_file("a.txt", "modified"),
@@ -258,6 +259,7 @@ test "projection source identity does not depend on hunk headings" {
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "projection omits collapsed filtered and structural-placeholder documents" {
   let api = {
     ..fixture_file("a.mbt", "modified"),
@@ -342,6 +344,7 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "source rows precede both sides of discussion and the selected editor" {
   let file = {
     ..fixture_file("a.txt", "modified"),

@@ -1,5 +1,6 @@
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "only nonempty change blocks mark their first actual source row in either layout" {
   let old : @model.DiffLine = {
     index: 0,
@@ -81,6 +82,7 @@ test "only nonempty change blocks mark their first actual source row in either l
 
 ///|
 #warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "section headings leave navigation in the change title bar" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let hunk = projection_document_fixture().hunks[0]
