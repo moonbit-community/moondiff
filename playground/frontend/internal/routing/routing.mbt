@@ -92,10 +92,22 @@ pub fn reference_from_playground_url(
 }
 
 ///|
-pub extern "js" fn browser_current_url() -> String = "() => globalThis.window?.location?.href || 'http://localhost'"
+pub fn browser_current_url() -> String {
+  if @browser.has_window() {
+    @dom.window().current_url()
+  } else {
+    "http://localhost"
+  }
+}
 
 ///|
-extern "js" fn browser_base_url() -> String = "() => globalThis.window?.location ? window.location.origin : 'http://localhost'"
+fn browser_base_url() -> String {
+  if @browser.has_window() {
+    @dom.window().origin()
+  } else {
+    "http://localhost"
+  }
+}
 
 ///|
 pub fn playground_share_url(reference : CommitRef) -> String {
