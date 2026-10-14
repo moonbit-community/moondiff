@@ -1,6 +1,7 @@
 ///|
-extern "js" fn home_now() -> String =
-  #| () => new Date().toISOString()
+fn home_now() -> String {
+  @browser.date_iso_now()
+}
 
 ///|
 fn[T] home_pending(page : HomePage[T]) -> Bool {

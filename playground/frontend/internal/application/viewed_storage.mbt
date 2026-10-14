@@ -35,48 +35,66 @@ fn ViewedRecord::key(self : ViewedRecord) -> String {
 }
 
 ///|
-extern "js" fn viewed_storage_put(key : String, value : String) -> Bool =
-  #| (key, value) => {
-  #|   try {
-  #|     if (sessionStorage.getItem(key) !== null) return false;
-  #|     sessionStorage.setItem(key, value);
-  #|     return sessionStorage.getItem(key) === value;
-  #|   } catch { return false; }
-  #| }
+fn viewed_storage_put(key : String, value : String) -> Bool {
+  try {
+    if @browser.storage_get(key) is Some(_) {
+      return false
+    }
+    @browser.storage_set(key, value)
+    @browser.storage_get(key) == Some(value)
+  } catch {
+    _ => false
+  }
+}
 
 ///|
-extern "js" fn viewed_storage_read(
-  ok : (String) -> Unit,
-  failed : () -> Unit,
-) -> Unit =
-  #| (ok, failed) => {
-  #|   try {
-  #|     const records = [];
-  #|     for (let i = 0; i < sessionStorage.length; i++) {
-  #|       const key = sessionStorage.key(i);
-  #|       if (key?.startsWith('moondiff.viewed.pending.v1:')) {
-  #|         const record = JSON.parse(sessionStorage.getItem(key));
-  #|         const expected = 'moondiff.viewed.pending.v1:' + JSON.stringify([
-  #|           record.user_id, record.owner.toLowerCase(), record.repo.toLowerCase(), record.number, record.path
-  #|         ]);
-  #|         if (key !== expected) throw new Error('Invalid Viewed record');
-  #|         records.push(record);
-  #|       }
-  #|     }
-  #|     ok(JSON.stringify(records));
-  #|   } catch { failed(); }
-  #| }
+fn viewed_storage_read(ok : (String) -> Unit, failed : () -> Unit) -> Unit {
+  try {
+    let records : Array[ViewedRecord] = []
+    for i = 0; i < @browser.storage_length(); i = i + 1 {
+      if @browser.storage_key(i) is Some(key) &&
+        key.has_prefix("moondiff.viewed.pending.v1:") {
+        let record : ViewedRecord = @json.from_json(
+          @json.parse(@browser.storage_get(key).unwrap_or("null")),
+        )
+        guard key == record.key() else {
+          failed()
+          return
+        }
+        records.push(record)
+      }
+    }
+    ok(Json(records).stringify())
+  } catch {
+    _ => failed()
+  }
+}
 
 ///|
-extern "js" fn viewed_storage_remove(key : String, id : String) -> Bool =
-  #| (key, id) => {
-  #|   try {
-  #|     const value = sessionStorage.getItem(key);
-  #|     if (value === null || JSON.parse(value).id !== id) return true;
-  #|     sessionStorage.removeItem(key);
-  #|     return sessionStorage.getItem(key) === null;
-  #|   } catch { return false; }
-  #| }
+priv suberror InvalidStoredViewedRecord
+
+///|
+fn viewed_storage_matches(value : String, id : String) -> Bool raise {
+  let record = @json.parse(value)
+  if record is Null {
+    raise InvalidStoredViewedRecord
+  }
+  record is Object(fields) && fields.get("id") == Some(Json::string(id))
+}
+
+///|
+fn viewed_storage_remove(key : String, id : String) -> Bool {
+  try {
+    guard @browser.storage_get(key) is Some(value) else { return true }
+    if !viewed_storage_matches(value, id) {
+      return true
+    }
+    @browser.storage_remove(key)
+    @browser.storage_get(key) is None
+  } catch {
+    _ => false
+  }
+}
 
 ///|
 fn viewed_restore_request(

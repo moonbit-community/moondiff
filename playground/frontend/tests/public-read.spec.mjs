@@ -144,3 +144,53 @@ test('browser-blocked public response stays visible and never falls back to the 
   await expect(page.locator('.error').first()).toContainText('network or CORS policy');
   expect(rpc).toEqual([]);
 });
+
+for (const source of [false, true]) test(`public ${source ? 'source' : 'metadata'} enforces its byte limit across stream chunks and cancels the reader`, async ({ page }) => {
+  const { rpc } = await install(page);
+  await page.addInitScript(({ source, commit }) => {
+    const original = window.fetch;
+    window.publicStreamCancelled = 0;
+    window.fetch = (input, options) => {
+      const url = String(input);
+      const matches = source ? url.includes('/contents/') : new URL(url, location.href).pathname.endsWith(`/commits/${commit}`);
+      if (!url.startsWith('https://api.github.com/') || !matches) return original(input, options);
+      const limit = source ? 1_048_576 : 8_388_608;
+      let chunks = 0;
+      return Promise.resolve(new Response(new ReadableStream({
+        pull(controller) {
+          controller.enqueue(new Uint8Array(chunks++ < 2 ? limit / 2 : 1).fill(120));
+        },
+        cancel() { window.publicStreamCancelled++; },
+      }), { status: 200, headers: { 'Content-Type': 'text/plain' } }));
+    };
+  }, { source, commit });
+  await page.goto(source ? '/example/project/pull/42' : `/example/project/commit/${commit}`);
+  const error = source ? page.locator('.file-card').first() : page.locator('.error').first();
+  await expect(error).toContainText(source ? 'larger than 1 MiB' : '8 MiB');
+  await expect.poll(() => page.evaluate(() => window.publicStreamCancelled)).toBeGreaterThan(0);
+  expect(rpc).toEqual([]);
+});
+
+test('public request deadline aborts the fetch and reports timeout without backend fallback', async ({ page }) => {
+  const { rpc } = await install(page);
+  await page.clock.install();
+  await page.addInitScript(commit => {
+    const original = window.fetch;
+    window.publicDeadlineStarted = false;
+    window.publicDeadlineAborted = false;
+    window.fetch = (input, options) => {
+      if (!new URL(String(input), location.href).pathname.endsWith(`/commits/${commit}`)) return original(input, options);
+      window.publicDeadlineStarted = true;
+      return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => {
+        window.publicDeadlineAborted = true;
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true }));
+    };
+  }, commit);
+  await page.goto(`/example/project/commit/${commit}`);
+  await expect.poll(() => page.evaluate(() => window.publicDeadlineStarted)).toBe(true);
+  await page.clock.fastForward(30_001);
+  await expect(page.locator('.error').first()).toContainText('did not respond within 30 seconds');
+  expect(await page.evaluate(() => window.publicDeadlineAborted)).toBe(true);
+  expect(rpc).toEqual([]);
+});

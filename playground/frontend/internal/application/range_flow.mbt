@@ -565,5 +565,6 @@ fn update_range(
 }
 
 ///|
-extern "js" fn copy_range_link(url : String) -> Unit =
-  #| url => { navigator.clipboard?.writeText?.(new URL(url, location.href).href)?.catch(() => {}); }
+fn copy_range_link(url : String) -> Unit {
+  @browser.copy_text(@browser.resolve_url(url), _ => ())
+}

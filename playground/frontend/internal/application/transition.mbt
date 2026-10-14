@@ -137,9 +137,13 @@ fn scroll_file(id : String, focus : Bool) -> @rabbita.Cmd {
 }
 
 ///|
-extern "js" fn scroll_file_now(id : String, focus : Bool) -> Unit =
-  #| (id, focus) => {
-  #|   const file = document.getElementById(id);
-  #|   file?.scrollIntoView({ block: 'start', behavior: 'instant' });
-  #|   if (focus) file?.querySelector('.file-toggle')?.focus({ preventScroll: true });
-  #| }
+fn scroll_file_now(id : String, focus : Bool) -> Unit {
+  if @browser.element(id) is Some(file) {
+    file.scroll_into_view_with_options(block="start", behavior="instant")
+    if focus {
+      if file.query_selector(".file-toggle") is Some(toggle) {
+        @browser.focus(toggle)
+      }
+    }
+  }
+}
