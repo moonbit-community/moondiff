@@ -230,7 +230,7 @@ fn fallback_pairs(document : HunkDocument) -> Array[(DiffLine, DiffLine)] {
 
 ///|
 fn fallback_line_is_refined(line : DiffLine) -> Bool {
-  line.segments.any(segment => segment.kind is Changed)
+  line.intraline is Computed
 }
 
 ///|

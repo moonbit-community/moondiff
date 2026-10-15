@@ -49,6 +49,7 @@ pub(all) struct DiffHunk {
 pub(all) struct DiffLine {
   index : Int
   segments : ArrayView[DiffSegment]
+  intraline : IntralineStatus
 } derive(Eq)
 pub fn DiffLine::text(Self) -> String
 
@@ -110,6 +111,11 @@ pub(all) enum IgnoreReason {
   TestFile
   FilteredContent
 } derive(Eq, @debug.Debug)
+
+pub(all) enum IntralineStatus {
+  NotComputed
+  Computed
+} derive(Eq)
 
 pub(all) struct LineRange {
   start : Int

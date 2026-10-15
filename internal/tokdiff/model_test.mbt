@@ -32,6 +32,8 @@ test "public IR retains hunk ranges, block boundaries, and source text" {
   assert_eq(new_line.index, 1)
   assert_eq(old_line.text(), "  let old = 1")
   assert_eq(new_line.text(), "    let new = 1")
+  assert_true(old_line.intraline is Computed)
+  assert_true(new_line.intraline is Computed)
   assert_true(old_line.segments.any(segment => segment.kind is Changed))
   assert_true(new_line.segments.any(segment => segment.kind is Changed))
 }
@@ -50,6 +52,8 @@ test "public IR distinguishes blank inserted lines from a missing old side" {
   assert_eq((first.index, first.text()), (0, "x"))
   assert_eq((blank.index, blank.text()), (1, ""))
   assert_eq(blank.segments.length(), 0)
+  assert_true(first.intraline is NotComputed)
+  assert_true(blank.intraline is NotComputed)
 }
 
 ///|
@@ -69,6 +73,8 @@ test "plain line diff refines only equal-width replacements" {
   assert_true(new_line.segments.any(segment => segment.kind is Changed))
   assert_eq(old_line.text(), "alpha old omega")
   assert_eq(new_line.text(), "alpha new omega")
+  assert_true(old_line.intraline is Computed)
+  assert_true(new_line.intraline is Computed)
 
   let unequal = @linediff.line_diff(
     old=["old one", "old two"],
@@ -81,11 +87,15 @@ test "plain line diff refines only equal-width replacements" {
   for row in unequal_rows {
     match row {
       Paired(old_line, new_line) => {
+        assert_true(old_line.intraline is NotComputed)
+        assert_true(new_line.intraline is NotComputed)
         assert_true(old_line.segments.all(segment => segment.kind is Unchanged))
         assert_true(new_line.segments.all(segment => segment.kind is Unchanged))
       }
-      OldOnly(line) | NewOnly(line) =>
+      OldOnly(line) | NewOnly(line) => {
+        assert_true(line.intraline is NotComputed)
         assert_true(line.segments.all(segment => segment.kind is Unchanged))
+      }
     }
   }
 }
@@ -135,6 +145,8 @@ test "HunkDocument rebase updates ranges context and changed indexes" {
   }
   assert_eq((before.old_index, before.new_index), (10, 20))
   assert_eq((old_line.index, new_line.index), (11, 21))
+  assert_true(old_line.intraline is Computed)
+  assert_true(new_line.intraline is Computed)
   assert_eq((after.old_index, after.new_index), (12, 22))
 
   let insertion = @linediff.line_diff(old=[], new=["new"], context=0).rebase(
@@ -147,4 +159,44 @@ test "HunkDocument rebase updates ranges context and changed indexes" {
     fail("expected one inserted line")
   }
   assert_eq(inserted.index, 12)
+  assert_true(inserted.intraline is NotComputed)
+}
+
+///|
+test "lexical pure insertions and deletions have no intraline comparison" {
+  let source = ["let value = 1", "", " \t "]
+  for (old, new) in [([], source), (source, [])] {
+    let document = @tokdiff.diff(old~, new~, context=0)
+    guard document.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
+      fail("expected a pure insertion or deletion")
+    }
+    assert_eq(rows.length(), source.length())
+    for index, row in rows {
+      let line = match row {
+        OldOnly(line) | NewOnly(line) => line
+        Paired(_, _) => fail("expected only one side")
+      }
+      assert_eq(line.text(), source[index])
+      assert_true(line.intraline is NotComputed)
+      assert_false(line.segments.any(segment => segment.kind is Changed))
+    }
+  }
+}
+
+///|
+test "computed token results can have no changes on one or both sides" {
+  for
+    (old, new) in [
+      ("fn sample() { count }", "fn sample() { count + tax }"),
+      ("fn sample() { f( x) }", "fn sample() { f(x) }"),
+    ] {
+    let document = @tokdiff.diff(old=[old], new=[new], context=0)
+    guard document.hunks
+      is [{ blocks: [ChangeBlock([Paired(old_line, new_line)])], .. }] else {
+      fail("expected one refined replacement")
+    }
+    assert_true(old_line.intraline is Computed)
+    assert_true(new_line.intraline is Computed)
+    assert_false(old_line.segments.any(segment => segment.kind is Changed))
+  }
 }

@@ -2,10 +2,12 @@
 test "projection preserves adjacent change block boundaries and source anchors across hunks" {
   let old : @model.DiffLine = {
     index: 2,
+    intraline: Computed,
     segments: [{ kind: Changed, text: "old", }],
   }
   let new : @model.DiffLine = {
     index: 3,
+    intraline: Computed,
     segments: [{ kind: Changed, text: "new", }],
   }
   let hunk : @model.DiffHunk = {

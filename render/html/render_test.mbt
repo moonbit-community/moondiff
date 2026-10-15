@@ -2,6 +2,7 @@
 fn renderer_fixture() -> @model.HunkDocument {
   let old_line : @model.DiffLine = {
     index: 1,
+    intraline: Computed,
     segments: [
       { kind: Changed, text: "<old>", },
       { kind: Ignored, text: " // old", },
@@ -9,6 +10,7 @@ fn renderer_fixture() -> @model.HunkDocument {
   }
   let new_line : @model.DiffLine = {
     index: 1,
+    intraline: Computed,
     segments: [
       { kind: Changed, text: "&new", },
       { kind: Ignored, text: " // new", },
@@ -16,10 +18,12 @@ fn renderer_fixture() -> @model.HunkDocument {
   }
   let old_ignored : @model.DiffLine = {
     index: 2,
+    intraline: Computed,
     segments: [{ kind: Ignored, text: "// old docs", }],
   }
   let new_ignored : @model.DiffLine = {
     index: 2,
+    intraline: Computed,
     segments: [{ kind: Ignored, text: "// new docs", }],
   }
   {

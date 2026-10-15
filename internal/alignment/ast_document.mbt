@@ -161,7 +161,7 @@ fn ast_diff_line(
   ranges : NovelRangeMap,
 ) -> @model.DiffLine {
   let segments = ast_line_segments_impl(text, ranges.get(index))
-  { index, segments: segments[:], }
+  { index, segments: segments[:], intraline: Computed, }
 }
 
 ///|

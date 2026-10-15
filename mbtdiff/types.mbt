@@ -80,6 +80,9 @@ pub type DiffRow = @model.DiffRow
 pub type DiffLine = @model.DiffLine
 
 ///|
+pub type IntralineStatus = @model.IntralineStatus
+
+///|
 pub type DiffSegment = @model.DiffSegment
 
 ///|

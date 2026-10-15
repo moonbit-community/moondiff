@@ -12,6 +12,10 @@ pub type DiffLine = @model.DiffLine
 
 ///|
 /// Compatibility alias for the renderer-neutral model type.
+pub type IntralineStatus = @model.IntralineStatus
+
+///|
+/// Compatibility alias for the renderer-neutral model type.
 pub type ContextLine = @model.ContextLine
 
 ///|
@@ -118,13 +122,14 @@ fn fallback_pair_segments(
   new_text : String,
   refine_words : Bool,
   budget : @worddiff.RefinementBudget,
-) -> (Array[DiffSegment], Array[DiffSegment]) {
+) -> (Array[DiffSegment], Array[DiffSegment], IntralineStatus) {
   if refine_words {
-    if @worddiff.refine_line(old_text, new_text, budget~) is Some(segments) {
-      return segments
+    if @worddiff.refine_line(old_text, new_text, budget~)
+      is Some((old_segments, new_segments)) {
+      return (old_segments, new_segments, Computed)
     }
   }
-  (plain_segments(old_text), plain_segments(new_text))
+  (plain_segments(old_text), plain_segments(new_text), NotComputed)
 }
 
 ///|
@@ -195,13 +200,17 @@ fn projected_line_segments(
 }
 
 ///|
-fn make_diff_line(index : Int32, segments : Array[DiffSegment]) -> DiffLine {
-  { index, segments: segments[:], }
+fn make_diff_line(
+  index : Int32,
+  segments : Array[DiffSegment],
+  intraline~ : IntralineStatus = Computed,
+) -> DiffLine {
+  { index, segments: segments[:], intraline, }
 }
 
 ///|
 fn make_plain_diff_line(index : Int32, text : String) -> DiffLine {
-  make_diff_line(index, plain_segments(text))
+  make_diff_line(index, plain_segments(text), intraline=NotComputed)
 }
 
 ///|
@@ -219,10 +228,26 @@ fn semantic_change_rows(
   let equal_width = old_lines.length() == new_lines.length()
   if alignment_tokens(old_lines, new_lines, line => line.text) is Some(tokens) {
     let changes = window_changes(tokens.olds, tokens.news)
+    // Whitespace-only replacements are neutral. Beside code changes, only a
+    // window comparison can establish that unpaired text is unchanged.
+    let whitespace_only = tokens.olds.all(line => {
+        line.all(diff_token_text_is_whitespace)
+      }) &&
+      tokens.news.all(line => line.all(diff_token_text_is_whitespace))
+    let unpaired_intraline : IntralineStatus = if changes is Some(_) ||
+      whitespace_only {
+      Computed
+    } else {
+      NotComputed
+    }
     for pair in align(tokens.olds, tokens.news) {
       match pair {
         (Some(old_index), Some(new_index)) => {
-          let (old_segments, new_segments) = if changes is Some(window) {
+          let (old_segments, new_segments, intraline) : (
+            Array[DiffSegment],
+            Array[DiffSegment],
+            IntralineStatus,
+          ) = if changes is Some(window) {
             (
               projected_line_segments(
                 tokens.olds[old_index],
@@ -232,6 +257,7 @@ fn semantic_change_rows(
                 tokens.news[new_index],
                 window.new_changed[new_index],
               ),
+              Computed,
             )
           } else if !traceback_cells_within_limit(
               tokens.olds[old_index].length(),
@@ -244,14 +270,15 @@ fn semantic_change_rows(
               budget,
             )
           } else {
-            pair_row_segments(
+            let (old_segments, new_segments) = pair_row_segments(
               pair_ops(tokens.olds[old_index], tokens.news[new_index]),
             )
+            (old_segments, new_segments, Computed)
           }
           rows.push(
             Paired(
-              make_diff_line(old_start + old_index, old_segments),
-              make_diff_line(new_start + new_index, new_segments),
+              make_diff_line(old_start + old_index, old_segments, intraline~),
+              make_diff_line(new_start + new_index, new_segments, intraline~),
             ),
           )
         }
@@ -264,7 +291,15 @@ fn semantic_change_rows(
           } else {
             full_line_segments(tokens.olds[old_index])
           }
-          rows.push(OldOnly(make_diff_line(old_start + old_index, segments)))
+          rows.push(
+            OldOnly(
+              make_diff_line(
+                old_start + old_index,
+                segments,
+                intraline=unpaired_intraline,
+              ),
+            ),
+          )
         }
         (None, Some(new_index)) => {
           let segments = if changes is Some(window) {
@@ -275,14 +310,22 @@ fn semantic_change_rows(
           } else {
             full_line_segments(tokens.news[new_index])
           }
-          rows.push(NewOnly(make_diff_line(new_start + new_index, segments)))
+          rows.push(
+            NewOnly(
+              make_diff_line(
+                new_start + new_index,
+                segments,
+                intraline=unpaired_intraline,
+              ),
+            ),
+          )
         }
         (None, None) => ()
       }
     }
   } else if equal_width {
     for offset in 0..<old_lines.length() {
-      let (old_segments, new_segments) = fallback_pair_segments(
+      let (old_segments, new_segments, intraline) = fallback_pair_segments(
         old_lines[offset].text,
         new_lines[offset].text,
         true,
@@ -290,8 +333,8 @@ fn semantic_change_rows(
       )
       rows.push(
         Paired(
-          make_diff_line(old_start + offset, old_segments),
-          make_diff_line(new_start + offset, new_segments),
+          make_diff_line(old_start + offset, old_segments, intraline~),
+          make_diff_line(new_start + offset, new_segments, intraline~),
         ),
       )
     }

@@ -67,3 +67,59 @@ test "sliced views validate global line numbers before remapping" {
   assert_mapped(view.map_span(test_span(2, 1, 7)), 1, 1, 7)
   assert_true(view.map_span(test_span(1, 1, 2)) is OutOfBounds)
 }
+
+///|
+test "restoring excluded text and source indexes preserves intraline status" {
+  let old_source = "// old heading\nlet old = 1 // old explanation"
+  let new_source = "// new heading\n\nlet new = 2 // new explanation"
+  let old = @diff_ignore.SourceView::from_source(
+    old_source,
+    ignore_comments=true,
+  )
+  let new = @diff_ignore.SourceView::from_source(
+    new_source,
+    ignore_comments=true,
+  )
+  for intraline in [@model.NotComputed, Computed] {
+    let document : @model.HunkDocument = {
+      hunks: [
+        {
+          old_start: 0,
+          old_len: 1,
+          new_start: 0,
+          new_len: 1,
+          blocks: [
+            ChangeBlock([
+              Paired(
+                {
+                  index: 0,
+                  segments: [{ kind: Unchanged, text: old.lines()[0], }],
+                  intraline,
+                },
+                {
+                  index: 0,
+                  segments: [{ kind: Unchanged, text: new.lines()[0], }],
+                  intraline,
+                },
+              ),
+            ]),
+          ],
+        },
+      ],
+    }
+    let restored = @diff_ignore.restore_document(document, old~, new~)
+    let changes = restored.hunks[0].blocks.filter(block => {
+      block is ChangeBlock(_)
+    })
+    guard changes is [ChangeBlock([Paired(old_line, new_line)])] else {
+      fail("expected a restored code change beside excluded headings")
+    }
+    assert_eq((old_line.index, new_line.index), (1, 2))
+    assert_eq(old_line.text(), "let old = 1 // old explanation")
+    assert_eq(new_line.text(), "let new = 2 // new explanation")
+    assert_true(old_line.intraline == intraline)
+    assert_true(new_line.intraline == intraline)
+    assert_true(old_line.segments.any(segment => segment.kind is Ignored))
+    assert_true(new_line.segments.any(segment => segment.kind is Ignored))
+  }
+}

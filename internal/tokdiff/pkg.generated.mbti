@@ -49,4 +49,6 @@ pub using @model {type DiffSegmentKind}
 
 pub using @model {type HunkDocument}
 
+pub using @model {type IntralineStatus}
+
 // Traits

@@ -71,6 +71,10 @@ fn traverse_hunk_document(document : @mbtdiff.HunkDocument) -> Int32 {
             }
             for line in lines {
               let _ : @mbtdiff.DiffLine = line
+              let intraline : @mbtdiff.IntralineStatus = line.intraline
+              match intraline {
+                NotComputed | Computed => ()
+              }
               let _ = (line.index, line.text())
               let _ : ArrayView[@mbtdiff.DiffSegment] = line.segments
               for segment in line.segments {
