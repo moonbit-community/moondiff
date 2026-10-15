@@ -14,6 +14,8 @@ pub(all) struct ReviewRow {
   new_text : String?
   old_segments : ArrayView[@model.DiffSegment]?
   new_segments : ArrayView[@model.DiffSegment]?
+  old_intraline : @model.IntralineStatus?
+  new_intraline : @model.IntralineStatus?
   kind : ReviewRowKind
   change_block_start : Bool
   old_anchor : ReviewAnchor?
@@ -70,6 +72,8 @@ fn make_review_row(
   new_text : String?,
   old_segments : ArrayView[@model.DiffSegment]?,
   new_segments : ArrayView[@model.DiffSegment]?,
+  old_intraline : @model.IntralineStatus?,
+  new_intraline : @model.IntralineStatus?,
   kind : ReviewRowKind,
   context : Bool,
   change_block_start~ : Bool = false,
@@ -91,6 +95,8 @@ fn make_review_row(
     new_text,
     old_segments,
     new_segments,
+    old_intraline,
+    new_intraline,
     kind,
     change_block_start,
     old_anchor,
@@ -124,6 +130,8 @@ pub fn project_review_rows(
                 Some(line.text),
                 Some(plain_review_segments(line.text)),
                 Some(plain_review_segments(line.text)),
+                Some(Computed),
+                Some(Computed),
                 ContextRow,
                 true,
               ),
@@ -149,6 +157,8 @@ pub fn project_review_rows(
                     Some(new.text()),
                     Some(old.segments),
                     Some(new.segments),
+                    Some(old.intraline),
+                    Some(new.intraline),
                     kind,
                     false,
                     change_block_start=kind is ChangeRow && index == 0,
@@ -165,6 +175,8 @@ pub fn project_review_rows(
                     Some(old.text()),
                     None,
                     Some(old.segments),
+                    None,
+                    Some(old.intraline),
                     None,
                     kind,
                     false,
@@ -183,6 +195,8 @@ pub fn project_review_rows(
                     Some(new.text()),
                     None,
                     Some(new.segments),
+                    None,
+                    Some(new.intraline),
                     kind,
                     false,
                     change_block_start=kind is ChangeRow && index == 0,

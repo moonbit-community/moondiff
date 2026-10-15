@@ -53,7 +53,13 @@ fn review_gutter(
   class_name : String,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
+  neutral~ : Bool = false,
 ) -> @rabbita.Html {
+  let class_name = if neutral {
+    "\{class_name} diff-neutral"
+  } else {
+    class_name
+  }
   @html.td(class="line-number review-gutter \{class_name}", [
     @html.span(
       class="line-number-value",
@@ -73,6 +79,20 @@ fn review_gutter(
       @html.nothing
     },
   ])
+}
+
+///|
+// A missing refinement is not evidence of unchanged tokens. Decide from the
+// calculation result before building markup, including for empty source lines.
+fn review_side_is_neutral(
+  kind : @review.ReviewRowKind,
+  intraline : @model.IntralineStatus?,
+  segments : ArrayView[@model.DiffSegment]?,
+) -> Bool {
+  kind is ChangeRow &&
+  intraline is Some(Computed) &&
+  segments is Some(segments) &&
+  !segments.any(segment => segment.kind is Changed && !segment.text.is_empty())
 }
 
 ///|
@@ -132,6 +152,16 @@ fn split_review_line(
   highlights~ : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> Array[(String, @rabbita.Html)] {
   let (old_class, new_class) = review_row_classes(row)
+  let old_neutral = review_side_is_neutral(
+    row.kind,
+    row.old_intraline,
+    row.old_segments,
+  )
+  let new_neutral = review_side_is_neutral(
+    row.kind,
+    row.new_intraline,
+    row.new_segments,
+  )
   let columns = if single_side is Some(_) { 2 } else { 4 }
   let cards = inline_cards(
     discussions,
@@ -151,11 +181,12 @@ fn split_review_line(
         "old-line-number",
         review,
         emit,
+        neutral=old_neutral,
       ),
     )
     cells.push(
       @html.td(
-        class=old_class,
+        class=if old_neutral { "\{old_class} diff-neutral" } else { old_class },
         review_segment_nodes(
           row.old_text,
           row.old_segments,
@@ -175,11 +206,12 @@ fn split_review_line(
         "new-line-number",
         review,
         emit,
+        neutral=new_neutral,
       ),
     )
     cells.push(
       @html.td(
-        class=new_class,
+        class=if new_neutral { "\{new_class} diff-neutral" } else { new_class },
         review_segment_nodes(
           row.new_text,
           row.new_segments,
@@ -234,6 +266,7 @@ fn unified_source_line(
   site~ : String = "",
   change_block? : Int32,
   syntax~ : ArrayView[@highlight.HighlightSpan] = [],
+  neutral~ : Bool = false,
 ) -> Array[(String, @rabbita.Html)] {
   let cards = inline_cards(discussions, file_index, old_line, new_line, 3, site)
   let items : Array[(String, @rabbita.Html)] = [
@@ -259,6 +292,7 @@ fn unified_source_line(
             "old-line-number",
             review,
             emit,
+            neutral~,
           ),
           review_gutter(
             file_index,
@@ -271,9 +305,14 @@ fn unified_source_line(
             "new-line-number",
             review,
             emit,
+            neutral~,
           ),
           @html.td(
-            class=class_name,
+            class=if neutral {
+              "\{class_name} diff-neutral"
+            } else {
+              class_name
+            },
             review_segment_nodes(
               text,
               segments,
@@ -407,6 +446,11 @@ fn unified_review_line(
             site~,
             syntax=old_syntax,
             change_block?,
+            neutral=review_side_is_neutral(
+              row.kind,
+              row.old_intraline,
+              row.old_segments,
+            ),
           ).iter(),
         )
       }
@@ -428,6 +472,11 @@ fn unified_review_line(
             site~,
             syntax=new_syntax,
             change_block?=if row.old_line is None { change_block } else { None },
+            neutral=review_side_is_neutral(
+              row.kind,
+              row.new_intraline,
+              row.new_segments,
+            ),
           ).iter(),
         )
       }

@@ -66,3 +66,40 @@ test "projection preserves adjacent change block boundaries and source anchors a
     assert_eq(starts.length(), 6)
   }
 }
+
+///|
+test "projection keeps each side's refinement even for identical blank segments" {
+  let refined : @model.DiffLine = {
+    index: 0,
+    segments: [],
+    intraline: Computed,
+  }
+  let plain : @model.DiffLine = { ..refined, intraline: NotComputed, }
+  let document : @model.HunkDocument = {
+    hunks: [
+      {
+        old_start: 0,
+        old_len: 2,
+        new_start: 0,
+        new_len: 2,
+        blocks: [
+          ChangeBlock([Paired(refined, plain), OldOnly(refined), NewOnly(plain)]),
+        ],
+      },
+    ],
+  }
+  let rows = project_review_rows(
+    0,
+    "target.mbt",
+    document,
+    parse_canonical_patch("target.mbt", None),
+  )
+  assert_true(
+    rows.map(row => (row.old_intraline, row.new_intraline)) ==
+    [
+      (Some(Computed), Some(NotComputed)),
+      (Some(Computed), None),
+      (None, Some(NotComputed)),
+    ],
+  )
+}

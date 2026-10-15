@@ -2027,6 +2027,12 @@ button.file-tree-row.selected {
   background: var(--add);
 }
 
+/* Only a completed intraline comparison can establish a neutral Token side.
+   Keep line-level changes when refinement was skipped or exceeded its budget. */
+.file-card[data-diff-algorithm="token"] .diff-scroll td.diff-neutral:is(.del, .add, .line-number) {
+  background: var(--surface);
+}
+
 .diff-scroll b.wd {
   border-radius: 0.12rem;
   background: var(--del-strong);
