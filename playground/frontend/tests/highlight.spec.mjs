@@ -354,6 +354,7 @@ async function expectOriginalLines(container, layout, old, current, checkpoint) 
 
 const colors = {
   light: {
+    context: "rgb(255, 255, 255)",
     keyword: "rgb(0, 0, 255)", control: "rgb(175, 0, 219)", function: "rgb(121, 94, 38)",
     type: "rgb(38, 127, 153)", variable: "rgb(0, 16, 128)", number: "rgb(9, 134, 88)",
     string: "rgb(163, 21, 21)", escape: "rgb(238, 0, 0)", comment: "rgb(0, 128, 0)",
@@ -361,6 +362,7 @@ const colors = {
     add: "rgb(233, 248, 241)", del: "rgb(255, 240, 239)", wa: "rgb(185, 235, 213)", wd: "rgb(255, 201, 197)",
   },
   dark: {
+    context: "rgb(23, 23, 23)",
     keyword: "rgb(86, 156, 214)", control: "rgb(197, 134, 192)", function: "rgb(220, 220, 170)",
     type: "rgb(78, 201, 176)", variable: "rgb(156, 220, 254)", number: "rgb(181, 206, 168)",
     string: "rgb(206, 145, 120)", escape: "rgb(215, 186, 125)", comment: "rgb(106, 153, 85)",
@@ -368,6 +370,156 @@ const colors = {
     add: "rgb(16, 41, 31)", del: "rgb(50, 26, 27)", wa: "rgb(25, 95, 69)", wd: "rgb(106, 44, 45)",
   },
 };
+
+const compactCall = "fn sample() {\n  compute(alpha, beta)\n}";
+const expandedCall = "fn sample() {\n  compute(\n    alpha,\n    beta,\n    gamma < limit,\n  )\n}";
+const keepDeclaration = "fn keep() { 1 }";
+const extraDeclaration = "fn extra() {\n\n  2\n}";
+const unrefinedPrefix = "let values = [" + "0,".repeat(9_000);
+const tokenBackgroundSources = [
+  { filename: "both.mbt", old: "fn sample() { 1 }", new: "fn sample() { 2 }",
+    strong: [[true], [true]], tinted: [[true], [true]] },
+  { filename: "only-add.mbt", old: "fn sample() { count }", new: "fn sample() { count + tax }",
+    strong: [[false], [true]], tinted: [[false], [true]] },
+  { filename: "only-del.mbt", old: "fn sample() { count + tax }", new: "fn sample() { count }",
+    strong: [[true], [false]], tinted: [[true], [false]] },
+  { filename: "spacing.mbt", old: "fn sample() { f( x) }", new: "fn sample() { f(x) }",
+    strong: [[false], [false]], tinted: [[false], [false]] },
+  { filename: "reflow.mbt", old: "fn sample() {\n  call(alpha, beta, gamma)\n}",
+    new: "fn sample() {\n  call(\n    alpha, beta,\n    gamma)\n}",
+    strong: [[false], [false, false, false]], tinted: [[false], [false, false, false]] },
+  { filename: "blank.mbt", old: "fn sample() {\n\n  1\n}", new: "fn sample() {\n \t \n  1\n}",
+    strong: [[false], [false]], tinted: [[false], [false]] },
+  // Pure additions/deletions retain their backgrounds without inline markup.
+  { filename: "added.mbt", status: "added", old: "", new: "fn sample() {\n\n \t \n  1\n}",
+    strong: [[], [false, false, false, false, false]], tinted: [[], [true, true, true, true, true]] },
+  { filename: "deleted.mbt", status: "removed", old: "fn sample() {\n\n \t \n  1\n}", new: "",
+    strong: [[false, false, false, false, false], []], tinted: [[true, true, true, true, true], []] },
+  { filename: "reflow-add.mbt", old: compactCall, new: expandedCall,
+    strong: [[false], [false, false, true, true, false]], tinted: [[false], [false, false, true, true, false]] },
+  { filename: "reflow-del.mbt", old: expandedCall, new: compactCall,
+    strong: [[false, false, true, true, false], [false]], tinted: [[false, false, true, true, false], [false]] },
+  { filename: "declaration-add.mbt", old: keepDeclaration, new: keepDeclaration + "\n" + extraDeclaration,
+    strong: [[], [false, false, false, false]], tinted: [[], [true, true, true, true]] },
+  { filename: "declaration-del.mbt", old: keepDeclaration + "\n" + extraDeclaration, new: keepDeclaration,
+    strong: [[false, false, false, false], []], tinted: [[true, true, true, true], []] },
+  { filename: "line-add.mbt", old: "fn sample() {\n  before()\n  after()\n}",
+    new: "fn sample() {\n  before()\n  fresh()\n\n  after()\n}",
+    strong: [[], [false, false]], tinted: [[], [true, true]] },
+  { filename: "line-del.mbt", old: "fn sample() {\n  before()\n  fresh()\n\n  after()\n}",
+    new: "fn sample() {\n  before()\n  after()\n}",
+    strong: [[false, false], []], tinted: [[true, true], []] },
+  { filename: "unrefined.mbt", old: unrefinedPrefix + "0]", new: unrefinedPrefix + "1]",
+    strong: [[false], [false]], tinted: [[true], [true]] },
+];
+
+const replacementBlankSources = [
+  { filename: "replacement-blank-add.mbt", old: "fn sample() {\n  old()\n}",
+    new: "fn sample() {\n  new()\n\n}",
+    strong: [[true], [true, false]] },
+  { filename: "replacement-blank-del.mbt", old: "fn sample() {\n  old()\n\n}",
+    new: "fn sample() {\n  new()\n}",
+    strong: [[true, false], [true]] },
+  { filename: "replacement-space-add.mbt", old: "fn sample() {\n  old()\n}",
+    new: "fn sample() {\n  new()\n \t \n}",
+    strong: [[true], [true, false]] },
+  { filename: "replacement-space-del.mbt", old: "fn sample() {\n  old()\n \t \n}",
+    new: "fn sample() {\n  new()\n}",
+    strong: [[true, false], [true]] },
+];
+
+async function expectLineBackground(cell, background, layout) {
+  await expect(cell).toHaveCSS("background-color", background);
+  const row = cell.locator("..");
+  const gutters = layout === "Split"
+    ? cell.locator("xpath=preceding-sibling::td[1]")
+    : row.locator("td.line-number");
+  for (const gutter of await gutters.all()) {
+    await expect(gutter).toHaveCSS("background-color", background);
+  }
+}
+
+for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]) {
+  test(`${layout} ${theme}: Token backgrounds distinguish reflow from pure and unrefined changes`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    const requests = await installSources(page, tokenBackgroundSources);
+    await page.goto(path);
+    await page.getByRole("button", { name: "Token", exact: true }).click();
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).uncheck();
+    const palette = colors[theme];
+    for (const [index, source] of tokenBackgroundSources.entries()) {
+      const file = page.locator(`#moondiff-file-${index}`);
+      await ensureFileExpanded(file);
+      await expect(file).toHaveAttribute("data-diff-algorithm", "token");
+      await expectOriginalLines(file, layout, source.old, source.new);
+      for (const [sideIndex, side] of ["del", "add"].entries()) {
+        const cells = file.locator(`td.${side}`);
+        await expect(cells).toHaveCount(source.strong[sideIndex].length);
+        for (const [line, strong] of source.strong[sideIndex].entries()) {
+          const cell = cells.nth(line);
+          await expect(cell.locator("b.wd:not(:empty), b.wa:not(:empty)")).toHaveCount(strong ? 1 : 0);
+          await expectLineBackground(cell, source.tinted[sideIndex][line] ? palette[side] : palette.context, layout);
+          const gutter = cell.locator("..").locator(`td.${layout === "Unified" || sideIndex === 0 ? "old" : "new"}-line-number`);
+          await expect(gutter).not.toHaveCSS("box-shadow", "none");
+          if (layout === "Unified") await expect(cell.locator(".diff-prefix")).toHaveText(side === "del" ? "-" : "+");
+        }
+      }
+    }
+    // Empty inline markers must not cause either the source or gutter to tint.
+    const plain = page.locator("#moondiff-file-3 td.del");
+    await plain.evaluate(cell => {
+      const marker = document.createElement("b");
+      marker.className = "wd";
+      cell.append(marker);
+    });
+    await expectLineBackground(plain, palette.context, layout);
+    // This large fixture exercises lexical refinement limits; collapse it
+    // before checking algorithm switches on the small background fixtures.
+    await page.getByRole("button", { name: "Collapse unrefined.mbt", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Expand unrefined.mbt", exact: true })).toBeVisible();
+    // Switch the same loaded sources through Tree and back to exercise regional
+    // updates and prove the background override is scoped to Token mode.
+    const count = requests.length;
+    for (const algorithm of ["Tree", "Token"]) {
+      await page.getByRole("button", { name: algorithm, exact: true }).click();
+      for (const index of [1, 6, 7]) {
+        const file = page.locator(`#moondiff-file-${index}`);
+        await expect(file).toHaveAttribute("data-diff-algorithm", algorithm.toLowerCase());
+        for (const [sideIndex, side] of ["del", "add"].entries()) {
+          for (const [line, tinted] of tokenBackgroundSources[index].tinted[sideIndex].entries()) {
+            await expectLineBackground(file.locator(`td.${side}`).nth(line),
+              algorithm === "Tree" || tinted ? palette[side] : palette.context, layout);
+          }
+        }
+      }
+    }
+    expect(requests).toHaveLength(count);
+  });
+
+  test(`${layout} ${theme}: Token replacement blank additions and deletions retain backgrounds`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await installSources(page, replacementBlankSources);
+    await page.goto(path);
+    await page.getByRole("button", { name: "Token", exact: true }).click();
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).uncheck();
+    for (const [index, source] of replacementBlankSources.entries()) {
+      const file = page.locator(`#moondiff-file-${index}`);
+      await ensureFileExpanded(file);
+      await expectOriginalLines(file, layout, source.old, source.new);
+      for (const [sideIndex, side] of ["del", "add"].entries()) {
+        const cells = file.locator(`td.${side}`);
+        await expect(cells).toHaveCount(source.strong[sideIndex].length);
+        for (const [line, strong] of source.strong[sideIndex].entries()) {
+          const cell = cells.nth(line);
+          await expect(cell.locator("b.wd:not(:empty), b.wa:not(:empty)")).toHaveCount(strong ? 1 : 0);
+          await expectLineBackground(cell, colors[theme][side], layout);
+        }
+      }
+    }
+  });
+}
 
 for (const rate of [1, 6]) for (const algorithm of ["Token", "Tree"]) {
   test(`line snapshots wait for regional layout commits: ${algorithm}, ${rate}x CPU`, async ({ page }) => {
@@ -412,7 +564,7 @@ for (const rate of [1, 6]) for (const algorithm of ["Token", "Tree"]) {
 }
 
 for (const layout of ["Split", "Unified"]) {
-  test(`${layout}: C long generated lines fall back without losing text or diff backgrounds`, async ({ page }, info) => {
+  test(`${layout}: C long generated lines retain change backgrounds when refinement is unavailable`, async ({ page }, info) => {
     const declaration = `const unsigned char data[] = {${Array(100_000).fill("0").join(",")}};`;
     const old = ["#include <stdint.h>", declaration, "int main(void) { return 0; } // 中文😀"].join("\r\n");
     const current = old.replace("0};", "1};");
@@ -437,8 +589,9 @@ for (const layout of ["Split", "Unified"]) {
     for (const side of ["del", "add"]) {
       const cell = file.locator(`td.${side}`).filter({ hasText: "const unsigned char data[] =" });
       await expect(cell).toHaveCount(1);
+      await expect(cell.locator("b.wd, b.wa")).toHaveCount(0);
       await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
-      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+      await expectLineBackground(cell, colors.light[side], layout);
     }
     await expect(file.locator("td.ctx .syntax-control").first()).toHaveCSS("color", colors.light.control);
     await expect(file.locator("td.ctx .syntax-type").first()).toHaveCSS("color", colors.light.type);
@@ -779,7 +932,7 @@ for (const layout of ["Split", "Unified"]) {
       const cell = file.locator(`td.${side}`).filter({ hasText: "values: [" });
       await expect(cell).toHaveCount(1);
       await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
-      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+      await expectLineBackground(cell, colors.light[side], layout);
     }
     await expect(file.locator('.syntax-string').filter({ hasText: /^# still string"$/ }).first()).toHaveCSS("color", colors.light.string);
     await expect(file.locator(".syntax-comment")).toHaveCount(0);
@@ -841,7 +994,10 @@ for (const layout of ["Split", "Unified"]) {
           for (const [side, kind] of [["del", oldKind], ["add", newKind]]) {
             if (kind) {
               await expect(file.locator(`td.${side} .syntax-${kind}`).first()).toHaveCSS("color", palette[kind]);
-              await expect(file.locator(`td.${side}`).first()).toHaveCSS("background-color", palette[side]);
+              const cell = file.locator(`td.${side}`).first();
+              const wholeFile = source.status === "added" || source.status === "removed";
+              if (wholeFile) await expect(cell.locator("b.wd, b.wa")).toHaveCount(0);
+              await expectLineBackground(cell, palette[side], layout);
             } else {
               await expect(file.locator(`td.${side} [class^=syntax-]`)).toHaveCount(0);
             }
@@ -944,7 +1100,7 @@ for (const layout of ["Split", "Unified"]) {
       const cell = file.locator(`td.${side}`).filter({ hasText: "[x](http" });
       await expect(cell).toHaveCount(1);
       await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
-      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+      await expectLineBackground(cell, colors.light[side], layout);
     }
     await expect(file.locator(".syntax-control").filter({ hasText: /^#$/ }).first()).toBeVisible();
     await expect(file.locator(".syntax-boolean").first()).toBeVisible();
@@ -1028,7 +1184,7 @@ for (const layout of ["Split", "Unified"]) {
       const cell = file.locator(`td.${side}`).filter({ hasText: prefix });
       await expect(cell).toHaveCount(1);
       await expect(cell.locator("[class^=syntax-]")).toHaveCount(0);
-      await expect(cell).toHaveCSS("background-color", colors.light[side]);
+      await expectLineBackground(cell, colors.light[side], layout);
     }
     await expect(file.locator(".syntax-function").filter({ hasText: /^echo$/ }).first()).toBeVisible();
     await expect(file.locator(".syntax-variable").filter({ hasText: /^HOME$/ }).first()).toBeVisible();
