@@ -45,6 +45,8 @@ pub(all) struct ReviewRow {
   new_text : String?
   old_segments : ArrayView[@model.DiffSegment]?
   new_segments : ArrayView[@model.DiffSegment]?
+  old_intraline : @model.IntralineStatus?
+  new_intraline : @model.IntralineStatus?
   kind : ReviewRowKind
   change_block_start : Bool
   old_anchor : ReviewAnchor?

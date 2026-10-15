@@ -936,6 +936,14 @@ fn file_card(
     attrs=@html.Attrs::build()
       .data_set("file-path", file.file.filename)
       .data_set("file-index", index.to_string())
+      .data_set(
+        "diff-algorithm",
+        if algorithm is LexicalAlgorithm {
+          "token"
+        } else {
+          "tree"
+        },
+      )
       .data_set("navigation-generation", generation.to_string())
       .data_set("navigation-enabled", navigation_enabled.to_string()),
     [
