@@ -2,6 +2,7 @@
 test "public document model owns pure document methods" {
   let line : @model.DiffLine = {
     index: 2,
+    intraline: Computed,
     segments: [
       { kind: Unchanged, text: "let value = ", },
       { kind: Changed, text: "new", },
@@ -43,6 +44,34 @@ test "public document model owns pure document methods" {
   }
   assert_eq(rebased_line.index, 22)
   assert_eq(rebased_line.text(), line.text())
+  assert_true(rebased_line.intraline == line.intraline)
+}
+
+///|
+test "rebasing a plain blank change retains its unavailable intraline result" {
+  let line : @model.DiffLine = {
+    index: 0,
+    segments: [],
+    intraline: NotComputed,
+  }
+  let document : @model.HunkDocument = {
+    hunks: [
+      {
+        old_start: 0,
+        old_len: 0,
+        new_start: 0,
+        new_len: 1,
+        blocks: [ChangeBlock([NewOnly(line)])],
+      },
+    ],
+  }
+  guard document.rebase(10, 20).hunks
+    is [{ blocks: [ChangeBlock([NewOnly(rebased)])], .. }] else {
+    fail("expected a rebased blank insertion")
+  }
+  assert_eq(rebased.index, 20)
+  assert_eq(rebased.text(), "")
+  assert_true(rebased.intraline is NotComputed)
 }
 
 ///|

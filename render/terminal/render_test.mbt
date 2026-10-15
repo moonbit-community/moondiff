@@ -18,6 +18,7 @@ test "RenderOptions retains only display controls" {
 test "render_document highlights changes and keeps ignored text neutral" {
   let old_line : @model.DiffLine = {
     index: 1,
+    intraline: Computed,
     segments: [
       { kind: Unchanged, text: "let value = ", },
       { kind: Changed, text: "1", },
@@ -26,6 +27,7 @@ test "render_document highlights changes and keeps ignored text neutral" {
   }
   let new_line : @model.DiffLine = {
     index: 1,
+    intraline: Computed,
     segments: [
       { kind: Unchanged, text: "let value = ", },
       { kind: Changed, text: "2", },
@@ -34,10 +36,12 @@ test "render_document highlights changes and keeps ignored text neutral" {
   }
   let old_comment : @model.DiffLine = {
     index: 2,
+    intraline: Computed,
     segments: [{ kind: Ignored, text: "// old docs", }],
   }
   let new_comment : @model.DiffLine = {
     index: 2,
+    intraline: Computed,
     segments: [{ kind: Ignored, text: "// new docs", }],
   }
   let document : @model.HunkDocument = {

@@ -42,6 +42,11 @@ pub extend DiffLine with Eq::{not_equal, equal}
 ///|
 #deprecated
 #doc(hidden)
+pub extend IntralineStatus with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
 pub extend DiffRow with Eq::{not_equal, equal}
 
 ///|

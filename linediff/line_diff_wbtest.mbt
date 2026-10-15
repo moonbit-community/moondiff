@@ -21,7 +21,7 @@ fn paired_rows(
 
 ///|
 fn line_is_refined(line : @model.DiffLine) -> Bool {
-  line.segments.any(segment => segment.kind is Changed)
+  line.intraline is Computed
 }
 
 ///|

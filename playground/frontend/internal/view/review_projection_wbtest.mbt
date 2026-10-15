@@ -27,10 +27,18 @@ fn projection_document_fixture() -> @model.HunkDocument {
         new_len: 1,
         blocks: [
           ChangeBlock([
-            Paired({ index: 0, segments: [{ kind: Changed, text: "old", }], }, {
-              index: 0,
-              segments: [{ kind: Changed, text: "new", }],
-            }),
+            Paired(
+              {
+                index: 0,
+                intraline: Computed,
+                segments: [{ kind: Changed, text: "old", }],
+              },
+              {
+                index: 0,
+                intraline: Computed,
+                segments: [{ kind: Changed, text: "new", }],
+              },
+            ),
           ]),
         ],
       },

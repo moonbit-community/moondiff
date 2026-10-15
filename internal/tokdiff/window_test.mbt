@@ -3,6 +3,21 @@ test "pure cross-line reflow keeps row colors without strong token markup" {
   let old = ["call(alpha, beta, gamma)"]
   let new = ["call(", "  alpha, beta,", "  gamma)"]
   let document = @tokdiff.diff(old~, new~, context=0)
+  for hunk in document.hunks {
+    for block in hunk.blocks {
+      guard block is ChangeBlock(rows) else { continue }
+      for row in rows {
+        let lines = match row {
+          Paired(old_line, new_line) => [old_line, new_line]
+          OldOnly(line) | NewOnly(line) => [line]
+        }
+        for line in lines {
+          assert_true(line.intraline is Computed)
+          assert_false(line.segments.any(segment => segment.kind is Changed))
+        }
+      }
+    }
+  }
   let split = @render_html.render_side_by_side(document)
   let unified = @render_html.render_unified(document)
   assert_true(split.contains("class=\"del\""))
@@ -38,6 +53,50 @@ test "expanded reflow highlights inserted tokens on unpaired lines" {
   )
   assert_false(split.contains("<b class=\"wd\">"))
   assert_false(unified.contains("<b class=\"wd\">"))
+}
+
+///|
+test "reflow mixed with additions or deletions retains per-side computed results" {
+  let compact = ["compute(alpha, beta)"]
+  let expanded = ["compute(", "  alpha,", "  beta,", "  gamma < limit,", ")"]
+  for (old, new) in [(compact, expanded), (expanded, compact)] {
+    let document = @tokdiff.diff(old~, new~, context=0)
+    let old_changes : Array[String] = []
+    let new_changes : Array[String] = []
+    for hunk in document.hunks {
+      for block in hunk.blocks {
+        guard block is ChangeBlock(rows) else { continue }
+        for row in rows {
+          let (old_line, new_line) = match row {
+            Paired(old_line, new_line) => (Some(old_line), Some(new_line))
+            OldOnly(line) => (Some(line), None)
+            NewOnly(line) => (None, Some(line))
+          }
+          for
+            (line, changes) in [
+              (old_line, old_changes),
+              (new_line, new_changes),
+            ] {
+            guard line is Some(line) else { continue }
+            assert_true(line.intraline is Computed)
+            let changed = line.segments
+              .filter(segment => segment.kind is Changed)
+              .map(segment => segment.text)
+              .join("")
+            changes.push(changed)
+          }
+        }
+      }
+    }
+    let expected = ["", "", ",", "gamma < limit,", ""]
+    if old == compact {
+      assert_eq(old_changes, [""])
+      assert_eq(new_changes, expected)
+    } else {
+      assert_eq(old_changes, expected)
+      assert_eq(new_changes, [""])
+    }
+  }
 }
 
 ///|
@@ -86,6 +145,80 @@ test "rejected multi-line window strongly highlights unpaired lines" {
       "<td class=\"empty\"></td><td class=\"add\">\{new_unpaired}</td>",
     ),
   )
+}
+
+///|
+test "unpaired blank changes beside replacements have no completed comparison" {
+  for blank in ["", " \t "] {
+    for
+      (old, new) in [
+        (["  old()"], ["  new()", blank]),
+        (["  old()", blank], ["  new()"]),
+      ] {
+      for line_cleanup in [false, true] {
+        let document = @tokdiff.diff(old~, new~, context=0, line_cleanup~)
+        guard document.hunks is [{ blocks: [ChangeBlock(rows)], .. }] else {
+          fail("expected a replacement beside an unpaired blank line")
+        }
+        assert_eq(rows.length(), 2)
+        let mut unpaired = 0
+        for row in rows {
+          match row {
+            Paired(old_line, new_line) => {
+              assert_true(old_line.intraline is Computed)
+              assert_true(new_line.intraline is Computed)
+              assert_true(
+                old_line.segments.any(segment => segment.kind is Changed),
+              )
+              assert_true(
+                new_line.segments.any(segment => segment.kind is Changed),
+              )
+            }
+            OldOnly(line) | NewOnly(line) => {
+              assert_eq(line.index, 1)
+              assert_eq(line.text(), blank)
+              assert_true(line.intraline is NotComputed)
+              assert_false(
+                line.segments.any(segment => segment.kind is Changed),
+              )
+              unpaired += 1
+            }
+          }
+        }
+        assert_eq(unpaired, 1)
+      }
+    }
+  }
+}
+
+///|
+test "whitespace-only replacements retain completed neutral results" {
+  for
+    (old, new) in [
+      ([""], [" \t "]),
+      ([" \t "], [""]),
+      ([" ", "  "], ["\t", " \t ", "   "]),
+    ] {
+    let document = @tokdiff.diff(old~, new~, context=0)
+    let mut changed_lines = 0
+    for hunk in document.hunks {
+      for block in hunk.blocks {
+        guard block is ChangeBlock(rows) else { continue }
+        for row in rows {
+          let lines = match row {
+            Paired(old_line, new_line) => [old_line, new_line]
+            OldOnly(line) | NewOnly(line) => [line]
+          }
+          for line in lines {
+            assert_true(line.intraline is Computed)
+            assert_false(line.segments.any(segment => segment.kind is Changed))
+            changed_lines += 1
+          }
+        }
+      }
+    }
+    assert_true(changed_lines > 0)
+  }
 }
 
 ///|

@@ -340,7 +340,7 @@ fn mark_plain_line_changed(line : @model.DiffLine) -> @model.DiffLine {
   if line.segments.is_empty() {
     line
   } else {
-    { index: line.index, segments: [{ kind: Changed, text: line.text(), }], }
+    { ..line, segments: [{ kind: Changed, text: line.text(), }], }
   }
 }
 

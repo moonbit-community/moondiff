@@ -4,10 +4,12 @@
 test "only nonempty change blocks mark their first actual source row in either layout" {
   let old : @model.DiffLine = {
     index: 0,
+    intraline: Computed,
     segments: [{ kind: Changed, text: "old", }],
   }
   let new : @model.DiffLine = {
     index: 0,
+    intraline: Computed,
     segments: [{ kind: Changed, text: "new", }],
   }
   let blocks : Array[@model.DiffBlock] = [

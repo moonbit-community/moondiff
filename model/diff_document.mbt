@@ -1,5 +1,6 @@
 ///|
-/// Whether one source segment is unchanged or belongs to an intraline change.
+/// One source segment's intraline change annotation. `DiffLine.intraline`
+/// distinguishes verified unchanged text from plain, unrefined text.
 /// Renderers decide how to present `Changed`; the calculation layer never
 /// assigns markup, colors, or terminal styles.
 pub(all) enum DiffSegmentKind {
@@ -18,12 +19,26 @@ pub(all) struct DiffSegment {
 } derive(Eq)
 
 ///|
+/// Whether a line's intraline segments were calculated. Without a completed
+/// calculation, the absence of `Changed` segments says nothing about whether
+/// the line changed. Plain insertions/deletions and rejected optional refinement
+/// retain their line-level changes with `NotComputed`.
+pub(all) enum IntralineStatus {
+  /// No completed intraline result; preserve the containing block's changes.
+  NotComputed
+  /// Segments report a completed token, word, or structural calculation.
+  Computed
+} derive(Eq)
+
+///|
 /// One changed source line. `index` is zero-based in its original input.
 /// `segments` is a zero-copy read-only view whose backing storage is never
-/// mutated after the line is published.
+/// mutated after the line is published. Only `Computed` intraline results can
+/// establish that this side has no changed segments, including across reflow.
 pub(all) struct DiffLine {
   index : Int32
   segments : ArrayView[DiffSegment]
+  intraline : IntralineStatus
 } derive(Eq)
 
 ///|
@@ -89,7 +104,7 @@ pub(all) struct HunkDocument {
 
 ///|
 fn DiffLine::rebase_index(self : DiffLine, offset : Int32) -> DiffLine {
-  { index: self.index + offset, segments: self.segments, }
+  { ..self, index: self.index + offset, }
 }
 
 ///|

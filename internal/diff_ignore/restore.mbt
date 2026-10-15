@@ -23,7 +23,7 @@ fn ignored_source_line(index : Int32, text : String) -> @model.DiffLine {
   } else {
     [{ kind: Ignored, text, }]
   }
-  { index, segments: segments[:], }
+  { index, segments: segments[:], intraline: NotComputed, }
 }
 
 ///|
@@ -33,7 +33,7 @@ fn unchanged_visible_line(index : Int32, text : String) -> @model.DiffLine {
   } else {
     [{ kind: Unchanged, text, }]
   }
-  { index, segments: segments[:], }
+  { index, segments: segments[:], intraline: Computed, }
 }
 
 ///|
@@ -63,7 +63,7 @@ fn restore_visible_line(
     }
     push_segment(segments, kind, ch.to_string())
   }
-  { index: source_index, segments: segments[:], }
+  { ..line, index: source_index, segments: segments[:], }
 }
 
 ///|

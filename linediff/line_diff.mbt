@@ -5,8 +5,9 @@ const LINE_DIFF_CUTOFF : Int32 = 4_096
 fn make_diff_line(
   index : Int32,
   segments : Array[@model.DiffSegment],
+  intraline~ : @model.IntralineStatus = Computed,
 ) -> @model.DiffLine {
-  { index, segments: segments[:], }
+  { index, segments: segments[:], intraline, }
 }
 
 ///|
@@ -16,7 +17,7 @@ fn make_plain_diff_line(index : Int32, text : String) -> @model.DiffLine {
   } else {
     [{ kind: Unchanged, text, }]
   }
-  make_diff_line(index, segments)
+  make_diff_line(index, segments, intraline=NotComputed)
 }
 
 ///|

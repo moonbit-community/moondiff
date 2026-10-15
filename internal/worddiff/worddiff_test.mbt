@@ -1,6 +1,6 @@
 ///|
 fn reconstructed_line(segments : Array[@model.DiffSegment]) -> @model.DiffLine {
-  { index: 0, segments: segments[:], }
+  { index: 0, segments: segments[:], intraline: Computed, }
 }
 
 ///|
