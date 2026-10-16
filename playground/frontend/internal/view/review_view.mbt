@@ -254,7 +254,8 @@ fn unified_source_line(
   file_index : Int32,
   old_line : Int32?,
   new_line : Int32?,
-  anchor : ReviewAnchor?,
+  old_anchor : ReviewAnchor?,
+  new_anchor : ReviewAnchor?,
   class_name : String,
   text : String?,
   segments : ArrayView[@model.DiffSegment]?,
@@ -267,28 +268,29 @@ fn unified_source_line(
   change_block? : Int32,
   syntax~ : ArrayView[@highlight.HighlightSpan] = [],
   neutral~ : Bool = false,
+  paired_neutral~ : Bool = false,
 ) -> Array[(String, @rabbita.Html)] {
   let cards = inline_cards(discussions, file_index, old_line, new_line, 3, site)
+  let classes : Array[String] = []
+  if paired_neutral {
+    classes.push("diff-neutral-pair")
+  }
+  if !cards.is_empty() ||
+    inline_draft_for_anchor(review, old_anchor) is Some(_) ||
+    inline_draft_for_anchor(review, new_anchor) is Some(_) {
+    classes.push("comment-target")
+  }
   let items : Array[(String, @rabbita.Html)] = [
     (
       source_row_key("unified", file_index, old_line, new_line),
       @html.tr(
         attrs=change_block_start_attrs(change_block),
-        class=if cards.is_empty() &&
-          inline_draft_for_anchor(review, anchor) is None {
-          ""
-        } else {
-          "comment-target"
-        },
+        class=classes.join(" "),
         [
           review_gutter(
             file_index,
             old_line,
-            if anchor.map(a => a.side is Left).unwrap_or(false) {
-              anchor
-            } else {
-              None
-            },
+            old_anchor,
             "old-line-number",
             review,
             emit,
@@ -297,11 +299,7 @@ fn unified_source_line(
           review_gutter(
             file_index,
             new_line,
-            if anchor.map(a => a.side is Right).unwrap_or(false) {
-              anchor
-            } else {
-              None
-            },
+            new_anchor,
             "new-line-number",
             review,
             emit,
@@ -326,9 +324,11 @@ fn unified_source_line(
     ),
   ]
   items.push_iter(cards.iter())
-  if inline_draft_for_anchor(review, anchor) is Some(_) &&
-    projected_editor(discussions, anchor, file_index, site) {
-    items.push(inline_editor_row(review, anchor, 3, emit))
+  for anchor in [old_anchor, new_anchor] {
+    if inline_draft_for_anchor(review, anchor) is Some(_) &&
+      projected_editor(discussions, anchor, file_index, site) {
+      items.push(inline_editor_row(review, anchor, 3, emit))
+    }
   }
   items
 }
@@ -351,6 +351,7 @@ fn unified_review_line(
         row.file_index,
         row.old_line,
         row.new_line,
+        None,
         row.new_anchor,
         "ctx",
         row.new_text,
@@ -370,6 +371,7 @@ fn unified_review_line(
           row.file_index,
           row.old_line,
           row.new_line,
+          None,
           row.new_anchor,
           "ctx ignored",
           row.new_text,
@@ -389,6 +391,7 @@ fn unified_review_line(
           row.old_line,
           None,
           row.old_anchor,
+          None,
           "ctx ignored",
           row.old_text,
           row.old_segments,
@@ -410,6 +413,7 @@ fn unified_review_line(
             row.file_index,
             None,
             row.new_line,
+            None,
             row.new_anchor,
             "ctx ignored",
             row.new_text,
@@ -427,6 +431,40 @@ fn unified_review_line(
         items
       }
     ChangeRow => {
+      let old_neutral = review_side_is_neutral(
+        row.kind,
+        row.old_intraline,
+        row.old_segments,
+      )
+      let new_neutral = review_side_is_neutral(
+        row.kind,
+        row.new_intraline,
+        row.new_segments,
+      )
+      if row.old_line is Some(_) &&
+        row.new_line is Some(_) &&
+        old_neutral &&
+        new_neutral {
+        return unified_source_line(
+          row.file_index,
+          row.old_line,
+          row.new_line,
+          row.old_anchor,
+          row.new_anchor,
+          "ctx",
+          row.new_text,
+          row.new_segments,
+          "wa",
+          "",
+          review,
+          emit,
+          discussions~,
+          site~,
+          change_block?,
+          syntax=new_syntax,
+          paired_neutral=true,
+        )
+      }
       let items : Array[(String, @rabbita.Html)] = []
       if row.old_line is Some(_) {
         items.push_iter(
@@ -435,6 +473,7 @@ fn unified_review_line(
             row.old_line,
             None,
             row.old_anchor,
+            None,
             "del",
             row.old_text,
             row.old_segments,
@@ -446,11 +485,7 @@ fn unified_review_line(
             site~,
             syntax=old_syntax,
             change_block?,
-            neutral=review_side_is_neutral(
-              row.kind,
-              row.old_intraline,
-              row.old_segments,
-            ),
+            neutral=old_neutral,
           ).iter(),
         )
       }
@@ -460,6 +495,7 @@ fn unified_review_line(
             row.file_index,
             None,
             row.new_line,
+            None,
             row.new_anchor,
             "add",
             row.new_text,
@@ -472,11 +508,7 @@ fn unified_review_line(
             site~,
             syntax=new_syntax,
             change_block?=if row.old_line is None { change_block } else { None },
-            neutral=review_side_is_neutral(
-              row.kind,
-              row.new_intraline,
-              row.new_segments,
-            ),
+            neutral=new_neutral,
           ).iter(),
         )
       }

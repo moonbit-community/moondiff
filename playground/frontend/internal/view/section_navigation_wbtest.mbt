@@ -12,10 +12,20 @@ test "only nonempty change blocks mark their first actual source row in either l
     intraline: Computed,
     segments: [{ kind: Changed, text: "new", }],
   }
+  let old_neutral : @model.DiffLine = {
+    ..old,
+    segments: [{ kind: Unchanged, text: " same", }],
+  }
+  let new_neutral : @model.DiffLine = {
+    ..new,
+    segments: [{ kind: Unchanged, text: "same", }],
+  }
   let blocks : Array[@model.DiffBlock] = [
     ContextBlock([{ old_index: 0, new_index: 0, text: "context", }]),
     ChangeBlock([]),
     ChangeBlock([Paired(old, new), Paired(old, new)]),
+    ChangeBlock([Paired(old_neutral, new_neutral), Paired(old, new)]),
+    ChangeBlock([Paired(old, new), Paired(old_neutral, new_neutral)]),
     ChangeBlock([OldOnly(old), OldOnly(old)]),
     ChangeBlock([NewOnly(new), NewOnly(new)]),
     IgnoredBlock([Paired(old, old)]),
@@ -69,7 +79,7 @@ test "only nonempty change blocks mark their first actual source row in either l
               assert_false(row.contains("hunk-header"))
               assert_true(row.contains("line-number"))
               if selected is [ChangeBlock([Paired(_, _), ..])] {
-                // Unified paired changes only mark the deletion row.
+                // Unified pairs mark their first displayed source row.
                 assert_true(row.contains("old"))
               }
             }
