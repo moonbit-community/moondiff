@@ -1468,6 +1468,71 @@ test("declaration reordering preserves absolute comment lines across algorithms 
   }
 });
 
+for (const algorithm of ["Token", "Tree"]) {
+  test(`Unified ${algorithm} neutral pairs retain both comment anchors, threads and drafts across layouts`, async ({ page }) => {
+    const oldLines = ["fn alpha() {", "  call( x) // before", "", "  1", "}", "fn beta() { 0 }"];
+    const newLines = ["fn beta() { 2 }", "fn alpha() {", "  call(x) // after", " \t ", "  2", "}"];
+    await installApi(page, pullTarget(), {
+      authenticated: true,
+      oldSource: oldLines.join("\n"), newSource: newLines.join("\n"),
+      patch: "@@ -1,6 +1,6 @@\n" + oldLines.map(line => "-" + line).concat(newLines.map(line => "+" + line)).join("\n"),
+    });
+    await page.addInitScript(() => {
+      const root = window.__fake.reviewComments[0];
+      window.__fake.reviewComments = [
+        { ...root, side: "LEFT", line: 2, position: 2, body: "Old neutral location" },
+        { ...root, id: "45", side: "RIGHT", line: 3, position: 9, body: "New neutral location" },
+      ];
+    });
+    await page.goto(reviewPath());
+    await page.getByRole("button", { name: algorithm, exact: true }).click();
+    await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).check();
+    await page.getByRole("button", { name: "Unified", exact: true }).click();
+    const file = page.locator("#moondiff-file-0");
+    const merged = file.locator("tr.diff-neutral-pair").filter({ hasText: "call(x)" });
+    await expect(merged).toHaveCount(1);
+    await expect(merged.locator("td.ctx")).toHaveText(newLines[2]);
+    await expect(merged.locator(".diff-prefix")).toHaveCount(0);
+    await expect(merged.locator(".old-line-number .line-number-value")).toHaveText("2");
+    await expect(merged.locator(".new-line-number .line-number-value")).toHaveText("3");
+    await expect(merged).toHaveAttribute("data-change-block-start", /\d+/);
+    const marker = await merged.getAttribute("data-change-block-start");
+    for (const body of ["Old neutral location", "New neutral location"]) {
+      const thread = file.locator(".inline-discussion-row").filter({ hasText: body });
+      await expect(thread).toHaveCount(1);
+      await expect.poll(() => thread.evaluate(row => {
+        let source = row.previousElementSibling;
+        while (source?.classList.contains("inline-discussion-row")) source = source.previousElementSibling;
+        return source.classList.contains("diff-neutral-pair");
+      })).toBe(true);
+    }
+    for (const [side, line] of [["old", 2], ["new", 3]]) {
+      await clickLineCommentButton(merged.locator(`.${side}-line-number`).getByRole("button", {
+        name: `Comment on line ${line}`, exact: true,
+      }));
+      const editor = file.locator(".inline-comment-editor-row textarea");
+      const draft = `Draft on ${side} neutral line`;
+      await expect(editor).toBeFocused();
+      await editor.fill(draft);
+      const draftId = await editor.getAttribute("data-draft-id");
+      for (const layout of ["Split", "Unified"]) {
+        await page.getByRole("button", { name: layout, exact: true }).click();
+        await expect(file.locator(`table.${layout.toLowerCase()}`).first()).toBeVisible();
+        await expect(editor).toHaveValue(draft);
+        await expect(editor).toHaveAttribute("data-draft-id", draftId);
+        const row = file.locator(".inline-comment-editor-row");
+        await expect(row.locator(".comment-location")).toHaveText(`src/main.mbt · ${side === "old" ? "Old" : "New"} · ${line}`);
+        for (const body of ["Old neutral location", "New neutral location"]) {
+          await expect(file.locator(".inline-discussion-row").filter({ hasText: body })).toHaveCount(1);
+        }
+      }
+      await file.locator(".inline-comment-editor-row").getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(editor).toHaveCount(0);
+      await expect(merged).toHaveAttribute("data-change-block-start", marker);
+    }
+  });
+}
+
 test("comments without a matching file stay in the overall discussion", async ({ page }) => {
   await installApi(page, commitTarget());
   await page.addInitScript(() => {

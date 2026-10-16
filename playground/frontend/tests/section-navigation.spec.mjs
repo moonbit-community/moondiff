@@ -114,6 +114,24 @@ async function expectNoMovement(page, action) {
 }
 
 for (const algorithm of ["Token", "Tree"]) {
+  test(`Unified ${algorithm} navigation visits merged neutral pairs`, async ({ page }) => {
+    const sections = await loadNavigation(page, {
+      layout: "Unified", algorithm, single: true, trailingFile: false,
+      extraFiles: [{ filename: "neutral.mbt", old: "fn neutral() {\n  f( x)\n  1\n}", new: "fn neutral() {\n  f(x)\n  2\n}" }],
+    });
+    const neutral = page.locator("#moondiff-file-1 .semantic-section");
+    await expect(neutral.locator("tr.diff-neutral-pair[data-change-block-start]")).toHaveCount(1);
+    await expect(neutral.locator("tr.diff-neutral-pair .diff-prefix")).toHaveCount(0);
+    await button(page, -1).click();
+    await expectLanding(neutral, 0);
+    await button(page, 1).click();
+    await expectLanding(sections.first(), 0);
+    await button(page, 1).click();
+    await expectLanding(neutral, 0);
+  });
+}
+
+for (const algorithm of ["Token", "Tree"]) {
   for (const layout of ["Split", "Unified"]) {
     for (const width of [1440, 420]) {
       test(`${algorithm} ${layout} ${width}px: first Next lands on a leading added declaration`, async ({ page }) => {

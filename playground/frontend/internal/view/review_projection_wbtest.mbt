@@ -368,17 +368,36 @@ test "source rows precede both sides of discussion and the selected editor" {
   )
   let (session, _) = @comments.update(session, Identity(true, Some("me")))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  for mode in [@change.Split, Unified] {
+  for
+    (mode, neutral) in [
+      (@change.Split, false),
+      (Unified, false),
+      (Split, true),
+      (Unified, true),
+    ] {
+    let old : @model.DiffLine = {
+      index: 0,
+      intraline: Computed,
+      segments: [{ kind: Unchanged, text: " old", }],
+    }
+    let new : @model.DiffLine = {
+      ..old,
+      segments: [{ kind: Unchanged, text: "new", }],
+    }
+    let document = if neutral {
+      @model.HunkDocument::{
+        hunks: [
+          {
+            ..projection_document_fixture().hunks[0],
+            blocks: [ChangeBlock([Paired(old, new)])],
+          },
+        ],
+      }
+    } else {
+      projection_document_fixture()
+    }
     let projection = ReviewProjection::{ lines: Map([]), editors: Map([]), }
-    project_document(
-      projection,
-      file,
-      0,
-      projection_document_fixture(),
-      mode,
-      0,
-      0,
-    )
+    project_document(projection, file, 0, document, mode, 0, 0)
     let discussions = { ..empty_discussions(), projection, }
     for (id, side) in [(1L, @review.Left), (2L, Right), (3L, Right)] {
       let anchor = ReviewAnchor::{
@@ -412,23 +431,43 @@ test "source rows precede both sides of discussion and the selected editor" {
       let html = safe_review_diff(
         file,
         0,
-        projection_document_fixture(),
+        document,
         mode,
         session.read_view(path="a.txt"),
         emit,
         discussions~,
       )
       let rendered = render_test_html(() => html)
-      let old_code = rendered.find("old</b>").unwrap()
-      let new_code = rendered.find("new</b>").unwrap()
+      let old_code = rendered.find(
+        if neutral {
+          " old</span>"
+        } else {
+          "old</b>"
+        },
+      )
+      let new_code = rendered
+        .find(if neutral { "new</span>" } else { "new</b>" })
+        .unwrap()
       let left = rendered.find("Comment 1").unwrap()
       let right = rendered.find("Comment 2").unwrap()
       let second = rendered.find("Comment 3").unwrap()
       let editor = rendered.find("inline-comment-editor-row").unwrap()
-      assert_true(old_code < left)
+      if mode is Unified && neutral {
+        assert_true(old_code is None)
+        assert_true(new_code < left && left < right)
+        assert_true(
+          rendered.contains("class=\"diff-neutral-pair comment-target\""),
+        )
+        assert_eq(
+          rendered.split("class=\"line-comment-button\"").count() - 1,
+          2,
+        )
+      } else {
+        assert_true(old_code.unwrap() < left)
+      }
       assert_true(new_code < right && right < second)
       assert_true(
-        if mode is Split || side is Right {
+        if mode is Split || side is Right || neutral {
           second < editor
         } else {
           left < editor && editor < new_code

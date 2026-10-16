@@ -330,7 +330,8 @@ async function expectOriginalLines(container, layout, old, current, checkpoint) 
             }
             const clone = cell.cloneNode(true);
             clone.querySelector(".diff-prefix")?.remove();
-            snapshot.rows.push({ side, number, text: clone.textContent });
+            const pairedNeutral = table.classList.contains("unified") && row.classList.contains("diff-neutral-pair");
+            snapshot.rows.push({ side, number, text: clone.textContent, pairedNeutral });
           }
         }
       }
@@ -345,7 +346,10 @@ async function expectOriginalLines(container, layout, old, current, checkpoint) 
     for (const row of snapshot.rows) {
       const label = `${layout} ${row.side} line ${row.number}`;
       expect(Number.isInteger(row.number) && row.number > 0 && row.number <= sources[row.side].length, label).toBe(true);
-      expect(row.text, label).toBe(sources[row.side][row.number - 1]);
+      // A merged pair retains the old gutter but displays only the new source.
+      if (!row.pairedNeutral || row.side === "new") {
+        expect(row.text, label).toBe(sources[row.side][row.number - 1]);
+      }
     }
     rows = snapshot.rows;
   }).toPass({ timeout: 5_000, intervals: [50, 100, 250] });
@@ -360,6 +364,7 @@ const colors = {
     string: "rgb(163, 21, 21)", escape: "rgb(238, 0, 0)", comment: "rgb(0, 128, 0)",
     operator: "rgb(0, 0, 0)", interpolation: "rgb(0, 0, 0)", "attribute-parameter": "rgb(128, 0, 0)",
     add: "rgb(233, 248, 241)", del: "rgb(255, 240, 239)", wa: "rgb(185, 235, 213)", wd: "rgb(255, 201, 197)",
+    oldLine: "rgb(237, 48, 71)", newLine: "rgb(24, 164, 108)",
   },
   dark: {
     context: "rgb(23, 23, 23)",
@@ -368,6 +373,7 @@ const colors = {
     string: "rgb(206, 145, 120)", escape: "rgb(215, 186, 125)", comment: "rgb(106, 153, 85)",
     operator: "rgb(212, 212, 212)", interpolation: "rgb(86, 156, 214)", "attribute-parameter": "rgb(86, 156, 214)",
     add: "rgb(16, 41, 31)", del: "rgb(50, 26, 27)", wa: "rgb(25, 95, 69)", wd: "rgb(106, 44, 45)",
+    oldLine: "rgb(255, 119, 116)", newLine: "rgb(54, 212, 154)",
   },
 };
 
@@ -454,20 +460,28 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
       await expect(file).toHaveAttribute("data-diff-algorithm", "token");
       await expectOriginalLines(file, layout, source.old, source.new);
       for (const [sideIndex, side] of ["del", "add"].entries()) {
-        const cells = file.locator(`td.${side}`);
+        const cells = file.locator(`td.${side}, tr.diff-neutral-pair > td.ctx`);
         await expect(cells).toHaveCount(source.strong[sideIndex].length);
         for (const [line, strong] of source.strong[sideIndex].entries()) {
           const cell = cells.nth(line);
           await expect(cell.locator("b.wd:not(:empty), b.wa:not(:empty)")).toHaveCount(strong ? 1 : 0);
           await expectLineBackground(cell, source.tinted[sideIndex][line] ? palette[side] : palette.context, layout);
-          const gutter = cell.locator("..").locator(`td.${layout === "Unified" || sideIndex === 0 ? "old" : "new"}-line-number`);
-          await expect(gutter).not.toHaveCSS("box-shadow", "none");
-          if (layout === "Unified") await expect(cell.locator(".diff-prefix")).toHaveText(side === "del" ? "-" : "+");
+          const pairedNeutral = await cell.locator("..").evaluate(row => row.classList.contains("diff-neutral-pair"));
+          const gutterSide = sideIndex === 0 || (layout === "Unified" && !pairedNeutral) ? "old" : "new";
+          const gutter = cell.locator("..").locator(`td.${gutterSide}-line-number`);
+          if (pairedNeutral) {
+            await expect(gutter).toHaveCSS("box-shadow", "none");
+            await expect(gutter).toHaveCSS("color", sideIndex === 0 ? palette.oldLine : palette.newLine);
+            await expect(cell.locator(".diff-prefix")).toHaveCount(0);
+          } else {
+            await expect(gutter).not.toHaveCSS("box-shadow", "none");
+            if (layout === "Unified") await expect(cell.locator(".diff-prefix")).toHaveText(side === "del" ? "-" : "+");
+          }
         }
       }
     }
     // Empty inline markers must not cause either the source or gutter to tint.
-    const plain = page.locator("#moondiff-file-3 td.del");
+    const plain = page.locator("#moondiff-file-3 td.del, #moondiff-file-3 tr.diff-neutral-pair > td.ctx");
     await plain.evaluate(cell => {
       const marker = document.createElement("b");
       marker.className = "wd";
