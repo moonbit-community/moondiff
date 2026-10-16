@@ -34,8 +34,7 @@ pub fn region_view(
       ])
     Navigation(input) => change_controls(input, emit)
     ViewedSummary(input) => viewed_progress_input(input, emit)
-    Discussion(input) =>
-      comments_overview(input.is_pull, input.review, input.auth, emit)
+    Discussion(input) => comments_overview(input, emit)
     PullMergeStatus(input) => pull_merge_status_view(input, emit)
     RangePanel(input) => range_panel_view(input, emit)
     File(input) => {

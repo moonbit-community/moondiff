@@ -2111,6 +2111,88 @@ button.file-tree-row.selected {
   pointer-events: auto;
 }
 
+.review-gutter:has(.line-comment-sign-in):is(:hover, :focus-within) {
+  z-index: 1;
+}
+
+.line-comment-sign-in {
+  position: absolute;
+  left: calc(100% + 0.3rem);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0 0.35rem;
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 2px 5px var(--focus);
+  font: 500 0.7rem/1rem -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.review-gutter:hover .line-comment-sign-in,
+.line-comment-button:focus-visible .line-comment-sign-in {
+  visibility: visible;
+}
+
+html:has(.sign-in-dialog[open]) {
+  overflow: hidden;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.sign-in-dialog {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: min(28rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 1rem 3rem var(--focus);
+}
+
+.sign-in-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.sign-in-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.sign-in-dialog-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+button.sign-in-dialog-close {
+  flex: none;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sign-in-dialog .device-auth {
+  min-width: 0;
+}
+
 .review-gutter:hover .line-number-value,
 .review-gutter:focus-within .line-number-value {
   opacity: 0;

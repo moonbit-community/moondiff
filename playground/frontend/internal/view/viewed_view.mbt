@@ -10,12 +10,16 @@ fn viewed_control(
   let syncing = file is Some({ pending: Some(_), .. })
   let confirming = file is Some({ pending: Some({ confirming: true, .. }), .. })
   let dismissed = file is Some({ state: Some(Dismissed), .. })
-  let disabled = !(model.auth is SignedIn(..)) ||
-    !model.viewed.ready ||
-    !model.viewed.storage_ready ||
-    syncing ||
-    model.viewed.stale ||
-    model.review.snapshot_stale
+  let requires_sign_in = is_pull && !(model.auth is SignedIn(..))
+  let disabled = !requires_sign_in &&
+    (
+      !(model.auth is SignedIn(..)) ||
+      !model.viewed.ready ||
+      !model.viewed.storage_ready ||
+      syncing ||
+      model.viewed.stale ||
+      model.review.snapshot_stale
+    )
   let title = if !(model.auth is SignedIn(..)) {
     "Sign in to sync Viewed files with GitHub"
   } else if model.viewed.stale || model.review.snapshot_stale {
@@ -33,6 +37,7 @@ fn viewed_control(
   }
   {
     is_pull,
+    requires_sign_in,
     generation: model.generation,
     index,
     path,
@@ -75,7 +80,20 @@ fn viewed_checkbox_input(
             .aria_label("Viewed \{input.path}")
             .on_click(event => {
               event.stop_propagation()
-              emit(Viewed(Toggle(input.generation, input.index)))
+              if input.requires_sign_in {
+                event.prevent_default()
+                emit(
+                  Ui(
+                    OpenSignIn(
+                      input.generation,
+                      Viewed(input.index),
+                      @browser.current_element(event.current_target()),
+                    ),
+                  ),
+                )
+              } else {
+                emit(Viewed(Toggle(input.generation, input.index)))
+              }
             }),
         ),
         @html.span("Viewed"),

@@ -45,6 +45,7 @@ fn region_model() -> Model {
     file_tree: test_file_tree_state(),
     auth: Anonymous(None),
     auth_revision: 0,
+    sign_in_dialog: @application.SignInDialog::new(),
     restore_pending: false,
     last_authenticated_user_id: None,
     home: @application.HomeState::new(),
@@ -193,6 +194,25 @@ test "file inputs ignore another file, tree controls and draft text outside thei
   assert_false(test_file_input(opened, 0) == test_file_input(typed, 0))
   let layout = @application.update(initial, Ui(SelectView(Unified)), emit).model
   assert_false(other == test_file_input(layout, 1))
+}
+
+///|
+test "sign-in dialog changes invalidate only Discussion" {
+  let model = pull_region_model()
+  let projection = RegionProjection::new()
+  let before = projection.inputs(model)
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let opened = @application.update(
+      model,
+      Ui(OpenSignIn(model.generation, Comment(0), None)),
+      emit,
+    ).model
+  let after = projection.inputs(opened)
+  assert_eq(before.length(), after.length())
+  for index in 0..<before.length() {
+    assert_true(before[index].0 == after[index].0)
+    assert_eq(before[index].1 != after[index].1, before[index].0 is Discussion)
+  }
 }
 
 ///|
