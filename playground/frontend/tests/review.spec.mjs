@@ -992,8 +992,10 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
     await openNewLineComment(page, 2);
     await page.locator(".inline-comment-editor-row textarea").fill(`Comment for ${target.kind}`);
     await page.locator(".inline-comment-editor-row").getByRole("button", { name: "Post comment" }).click();
-    const call = await page.evaluate(() => window.__fake.calls.find(entry => entry.op === "github.commit.comment.create"));
-    expect(call.args).toMatchObject({ owner: "upstream", repo: "project", sha: commitSha, path: "src/main.mbt", position: 3 });
+    await expect.poll(() => page.evaluate(() => window.__fake.calls
+      .find(entry => entry.op === "github.commit.comment.create")?.args))
+      .toMatchObject({ owner: "upstream", repo: "project", sha: commitSha, path: "src/main.mbt", position: 3 });
+    await expect(page.getByText(`Comment for ${target.kind}`, { exact: true })).toBeVisible();
     if (target.kind === "pull_commit") {
       const metadataCall = await page.evaluate(() => window.__fake.calls.find(entry => entry.op === "github.commit.get"));
       expect(metadataCall.args).toMatchObject({ owner: "contributor", repo: "project-fork" });
