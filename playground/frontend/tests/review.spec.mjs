@@ -3,8 +3,10 @@ import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs
 import { checkToolbar } from "./toolbar.mjs";
 import { clickLineCommentButton } from "./comment-actions.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
+import { navigate } from "./rendering-fixture.mjs";
 import { settleRegions, installRenderProbe } from "../../tests/render-probe.mjs";
 import { expect, test } from "@playwright/test";
+import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
 
 const head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const changedHead = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -580,7 +582,301 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.locator(".diff-scroll [innerhtml]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
-  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+  await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
+});
+
+async function expectNoAnonymousWrites(page) {
+  await expect(page.locator('.comment-editor')).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Viewed src/main.mbt', exact: true })).not.toBeChecked();
+  expect(await page.evaluate(() => window.__fake.calls.filter(call =>
+    call.op.startsWith('auth.device.') || call.op.endsWith('.create') ||
+    call.op === 'github.pull.file.viewed.set'))).toEqual([]);
+  expect(new URL(page.url()).pathname).toBe(reviewPath());
+  expect(new URL(page.url()).hash).toBe('');
+  expect(page.context().pages()).toHaveLength(1);
+}
+
+for (const layout of ['Split', 'Unified']) for (const width of [1280, 320]) for (const colorScheme of ['light', 'dark']) {
+  test(`anonymous PR comment hints and sign-in dialog, ${layout}/${width}px/${colorScheme}`, async ({ page }, testInfo) => {
+    await installApi(page);
+    await page.emulateMedia({ colorScheme });
+    await page.setViewportSize({ width, height: 650 });
+    await page.goto(reviewPath());
+    await page.getByRole('button', { name: layout, exact: true }).click();
+    await expect(page.locator(`table.${layout.toLowerCase()}.review-diff`)).toBeVisible();
+    for (const side of ['old', 'new']) {
+      const gutter = page.locator(`#moondiff-file-0 .review-gutter.${side}-line-number`)
+        .filter({ has: page.locator('.line-number-value', { hasText: /^2$/ }) });
+      const button = gutter.getByRole('button', { name: 'Comment on line 2', exact: true });
+      const hint = gutter.locator('.line-comment-sign-in');
+      await page.mouse.move(0, 0);
+      await expect(hint).toBeHidden();
+      const rowGeometry = element => ({ height: element.closest('tr').getBoundingClientRect().height,
+        widths: [...element.closest('tr').children].map(cell => cell.getBoundingClientRect().width) });
+      const before = await gutter.evaluate(rowGeometry);
+      await gutter.hover();
+      await expect(button).toHaveCSS('opacity', '1');
+      await expect(hint).toHaveText('Sign in to comment');
+      await expect(hint).toBeVisible();
+      await expect(hint).toHaveCSS('white-space', 'nowrap');
+      const bounds = await hint.boundingBox();
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+      expect(await gutter.evaluate(rowGeometry)).toEqual(before);
+      await page.mouse.move(0, 0);
+      await expect(hint).toBeHidden();
+      await page.keyboard.press('Tab');
+      await button.focus();
+      await expect(button).toHaveCSS('opacity', '1');
+      await expect(hint).toBeVisible();
+      const position = await pagePosition(page);
+      await page.keyboard.press(side === 'old' ? 'Enter' : 'Space');
+      await expectSignInDialog(page, 'Sign in to comment');
+      await expectPagePosition(page, position);
+      await expect(page.locator('.discussion-auth')).toBeHidden();
+      await expectNoAnonymousWrites(page);
+      await page.mouse.move(5, 5);
+      await page.mouse.wheel(0, 400);
+      await expectPagePosition(page, position);
+      const controls = signInDialog(page).locator('button, a[href]');
+      await controls.last().focus();
+      await page.keyboard.press('Tab');
+      await expect(controls.first()).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(controls.last()).toBeFocused();
+      expect(await page.evaluate(() => document.activeElement.closest('dialog') !== null)).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`sign-in-${side}.png`) });
+      await closeSignInDialog(page, side === 'old' ? 'escape' : 'backdrop');
+      await expect(button).toBeFocused();
+      await expectPagePosition(page, position);
+      await clickLineCommentButton(button);
+      await expectSignInDialog(page, 'Sign in to comment');
+      await expectNoAnonymousWrites(page);
+      await closeSignInDialog(page);
+      await expect(button).toBeFocused();
+      await expectPagePosition(page, position);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+test('PR sign-in dialog commits independently of unrelated file paints', async ({ page }) => {
+  await installApi(page);
+  await page.goto(reviewPath());
+  await expect(newLineCommentButton(page, 2)).toBeAttached();
+  await settleRegions(page);
+  const barrier = await holdRegionFrames(page, ['file:src/main.mbt']);
+  try {
+    await page.getByRole('button', { name: 'Unified', exact: true }).click();
+    await barrier.blocked();
+    await newLineCommentButton(page, 2).evaluate(button => button.click());
+    await expectSignInDialog(page, 'Sign in to comment');
+    await closeSignInDialog(page);
+  } finally { await barrier.release(); }
+});
+
+for (const alreadyOpen of [false, true]) {
+  test(`PR switch discards ${alreadyOpen ? 'open dialog and old focus' : 'delayed dialog open'}`, async ({ page }) => {
+    await installApi(page);
+    await page.goto(reviewPath());
+    const button = newLineCommentButton(page, 2);
+    await button.focus();
+    await settleRegions(page);
+    if (alreadyOpen) {
+      await page.keyboard.press('Enter');
+      await expectSignInDialog(page, 'Sign in to comment');
+    }
+    await button.evaluate(button => {
+      window.oldEntryFocus = [];
+      button.addEventListener('focus', () => oldEntryFocus.push('focus'));
+    });
+    const barrier = await holdRegionFrames(page, ['discussion']);
+    try {
+      if (!alreadyOpen) {
+        await button.evaluate(button => button.click());
+        await barrier.blocked();
+        await expect(signInDialog(page)).toBeHidden();
+      }
+      await navigate(page, '/upstream/project/pull/18');
+      await expect(page.locator('.file-card')).toHaveAttribute('data-navigation-generation', '2');
+    } finally { await barrier.release(); }
+    await settleRegions(page);
+    await expect(signInDialog(page)).toBeHidden();
+    expect(await page.evaluate(() => oldEntryFocus)).toEqual([]);
+    await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden');
+  });
+}
+
+test('rapid close and reopen rejects old Discussion callbacks', async ({ page }) => {
+  await installApi(page);
+  await page.goto(reviewPath());
+  await newLineCommentButton(page, 2).focus();
+  await page.keyboard.press('Enter');
+  await expectSignInDialog(page, 'Sign in to comment');
+  await settleRegions(page);
+  const barrier = await holdRegionFrames(page, ['discussion']);
+  try {
+    await signInDialog(page).getByRole('button', { name: 'Close sign-in dialog' }).click();
+    await barrier.blocked();
+    await page.locator('.viewed-control input').evaluate(input => input.click());
+  } finally { await barrier.release(); }
+  await expect(signInDialog(page)).toBeVisible();
+  await expect(signInDialog(page)).toHaveAccessibleName('Sign in to track viewed files');
+  await closeSignInDialog(page);
+  await expect(page.locator('.viewed-control input')).toBeFocused();
+  await settleRegions(page);
+  await expect(signInDialog(page)).toBeHidden();
+  await expectNoAnonymousWrites(page);
+});
+
+test('PR dialog uses current auth after a delayed commit and continues sign-in while closed', async ({ page }) => {
+  await installApi(page);
+  await page.goto(reviewPath());
+  await expect(newLineCommentButton(page, 2)).toBeAttached();
+  await settleRegions(page);
+  await page.evaluate(() => { window.__fake.delayNextDevicePoll = true; });
+  const barrier = await holdRegionFrames(page, ['discussion']);
+  try {
+    await page.getByRole('button', { name: 'Sign in with GitHub', exact: true }).click();
+    await barrier.blocked();
+    await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDevicePoll)).toBe('function');
+    await page.getByRole('checkbox', { name: 'Viewed src/main.mbt', exact: true }).click();
+    await expect(signInDialog(page)).toBeHidden();
+  } finally { await barrier.release(); }
+  try {
+    await expectSignInDialog(page, 'Sign in to track viewed files', true);
+    await expect(signInDialog(page).locator('.device-code')).toHaveText('ABCD-EFGH');
+    const node = await signInDialog(page).elementHandle();
+    await closeSignInDialog(page, 'escape');
+    await newLineCommentButton(page, 2).focus();
+    const position = await pagePosition(page);
+    await page.keyboard.press('Enter');
+    await expectSignInDialog(page, 'Sign in to comment', true);
+    expect(await signInDialog(page).evaluate((dialog, original) => dialog === original, node)).toBe(true);
+    await expectPagePosition(page, position);
+    await closeSignInDialog(page);
+    expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === 'auth.device.start'))).toHaveLength(1);
+    expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === 'auth.device.cancel'))).toHaveLength(0);
+  } finally {
+    await page.evaluate(() => window.__fake.releaseDevicePoll());
+  }
+  await waitForSignedInComments(page);
+  await expect(signInDialog(page)).toBeHidden();
+  await expect(page.locator('.comment-editor')).toHaveCount(0);
+  await expect(page.locator('.viewed-control input')).not.toBeChecked();
+  expect(await page.evaluate(() => window.__fake.calls.filter(call =>
+    call.op.endsWith('.create') || call.op === 'github.pull.file.viewed.set'))).toEqual([]);
+});
+
+test('PR dialog displays sign-in failure, retry, start progress and explicit cancellation in place', async ({ page }) => {
+  await installApi(page);
+  await page.route('**/api/auth/device/start', handler => handler.fulfill({ status: 403,
+    json: { $tag: 'Failure', error: { status: 403, code: 'sign_in_denied', message: 'Sign-in denied.' } } }), { times: 1 });
+  await page.goto(reviewPath());
+  await newLineCommentButton(page, 2).focus();
+  const position = await pagePosition(page);
+  await page.keyboard.press('Enter');
+  await expectSignInDialog(page, 'Sign in to comment');
+  await signInDialog(page).getByRole('button', { name: 'Sign in with GitHub' }).click();
+  await expect(signInDialog(page)).toContainText('Sign-in denied.');
+  await expect(signInDialog(page).getByRole('button', { name: 'Try sign-in' })).toBeFocused();
+  let start;
+  const starting = new Promise(resolve => { start = resolve; });
+  await page.route('**/api/auth/device/start', async handler => { await starting; await handler.fallback(); }, { times: 1 });
+  await page.evaluate(() => { window.__fake.delayNextDevicePoll = true; });
+  try {
+    await signInDialog(page).getByRole('button', { name: 'Try sign-in' }).click();
+    await expect(signInDialog(page)).toContainText('Starting GitHub sign-in…');
+    await expectSignInDialog(page, 'Sign in to comment', true);
+  } finally { start(); }
+  await expect(signInDialog(page).locator('.device-code')).toHaveText('ABCD-EFGH');
+  await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDevicePoll)).toBe('function');
+  let cancel;
+  const cancelling = new Promise(resolve => { cancel = resolve; });
+  await page.route('**/api/auth/device/cancel', async handler => { await cancelling; await handler.fallback(); }, { times: 1 });
+  try {
+    await signInDialog(page).getByRole('button', { name: 'Cancel sign-in', exact: true }).click();
+    await expect(signInDialog(page)).toContainText('Cancelling GitHub sign-in…');
+    await expectSignInDialog(page, 'Sign in to comment', true);
+  } finally { cancel(); }
+  await expect(signInDialog(page).getByRole('button', { name: 'Sign in with GitHub' })).toBeFocused();
+  expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === 'auth.device.cancel'))).toHaveLength(1);
+  await expectPagePosition(page, position);
+  await closeSignInDialog(page);
+  await expect(newLineCommentButton(page, 2)).toBeFocused();
+  await page.evaluate(() => window.__fake.releaseDevicePoll());
+});
+
+test('long sign-in failures scroll inside the dialog on a short narrow screen', async ({ page }) => {
+  await installApi(page);
+  await page.setViewportSize({ width: 320, height: 360 });
+  await page.route('**/api/auth/device/start', handler => handler.fulfill({ status: 403,
+    json: { $tag: 'Failure', error: { status: 403, code: 'sign_in_denied',
+      message: 'Sign-in denied. '.repeat(100) } } }));
+  await page.goto(reviewPath());
+  const entry = newLineCommentButton(page, 2);
+  await entry.focus();
+  await page.keyboard.press('Enter');
+  await expectSignInDialog(page, 'Sign in to comment');
+  const position = await pagePosition(page);
+  await signInDialog(page).getByRole('button', { name: 'Sign in with GitHub' }).click();
+  await expect(signInDialog(page).getByRole('button', { name: 'Try sign-in' })).toBeFocused();
+  const size = await signInDialog(page).evaluate(dialog => ({
+    height: dialog.getBoundingClientRect().height, width: dialog.getBoundingClientRect().width,
+    scrollHeight: dialog.scrollHeight, clientHeight: dialog.clientHeight,
+    scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth,
+  }));
+  expect(size.height).toBeLessThanOrEqual(328);
+  expect(size.width).toBeLessThanOrEqual(288);
+  expect(size.scrollHeight).toBeGreaterThan(size.clientHeight);
+  expect(size.scrollWidth).toBe(size.clientWidth);
+  const retry = signInDialog(page).getByRole('button', { name: 'Try sign-in' });
+  await expect(retry).toBeInViewport();
+  await page.keyboard.press('Tab');
+  await expect(signInDialog(page).getByRole('button', { name: 'Close sign-in dialog' })).toBeFocused();
+  await expect(signInDialog(page).getByRole('button', { name: 'Close sign-in dialog' })).toBeInViewport();
+  await page.keyboard.press('Shift+Tab');
+  await expect(retry).toBeFocused();
+  await expect(retry).toBeInViewport();
+  await expectPagePosition(page, position);
+  await closeSignInDialog(page, 'escape');
+  await expect(entry).toBeFocused();
+  await expectPagePosition(page, position);
+});
+
+test('PR sign-in success closes the dialog without scrolling, a draft or a Viewed write', async ({ page }) => {
+  await installApi(page);
+  await page.goto(reviewPath());
+  const entry = newLineCommentButton(page, 2);
+  await expect(entry).toBeAttached();
+  await settleRegions(page);
+  await entry.focus();
+  const position = await pagePosition(page);
+  await page.keyboard.press('Enter');
+  await expectSignInDialog(page, 'Sign in to comment');
+  await signInDialog(page).getByRole('button', { name: 'Sign in with GitHub' }).click();
+  await waitForSignedInComments(page);
+  await expect(signInDialog(page)).toBeHidden();
+  await expect(entry).toBeFocused();
+  await expectPagePosition(page, position);
+  await expect(page.locator('.comment-editor')).toHaveCount(0);
+  await expect(page.locator('.viewed-control input')).not.toBeChecked();
+  expect(await page.evaluate(() => window.__fake.calls.filter(call =>
+    call.op.endsWith('.create') || call.op === 'github.pull.file.viewed.set'))).toEqual([]);
+});
+
+test('closing the PR dialog focuses its file button when the original line disappeared', async ({ page }) => {
+  await installApi(page);
+  await page.goto(reviewPath());
+  await newLineCommentButton(page, 2).focus();
+  await page.keyboard.press('Enter');
+  await expectSignInDialog(page, 'Sign in to comment');
+  await page.locator('#moondiff-file-0 .file-toggle').evaluate(button => button.click());
+  await expect(newLineCommentButton(page, 2)).toHaveCount(0);
+  const position = await pagePosition(page);
+  await closeSignInDialog(page);
+  await expect(page.locator('#moondiff-file-0 .file-toggle')).toBeFocused();
+  await expectPagePosition(page, position);
 });
 
 test("shared file tree uses a wide sidebar and a narrow bottom drawer", async ({ page }) => {
@@ -682,7 +978,7 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
   await expect(page.locator("table.split.review-diff")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
-  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+  await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
   await signInAndWaitForComments(page);
 
   const lineCommentButton = newLineCommentButton(page, 2);
@@ -742,7 +1038,7 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
   await expect(page.locator("table.unified.review-diff")).toBeVisible();
 });
 
-test("expired credentials during comment refresh offer sign-in and hide authoring", async ({ page }) => {
+test("expired credentials during comment refresh offer sign-in and preserve comment entry points", async ({ page }) => {
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
@@ -757,7 +1053,10 @@ test("expired credentials during comment refresh offer sign-in and hide authorin
   await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
-  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+  await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
+  await clickLineCommentButton(newLineCommentButton(page, 2));
+  await expectSignInDialog(page, 'Sign in to comment');
+  expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === 'auth.device.start'))).toHaveLength(0);
 
   await page.getByRole("button", { name: "Try sign-in" }).click();
   await waitForSignedInComments(page);
@@ -836,7 +1135,7 @@ test("expired credentials during comment submission preserve the draft for retry
   await expect(page.locator(".comment-editor textarea")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
-  await expect(page.locator(".line-comment-button")).toHaveCount(0);
+  await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
 
   await page.getByRole("button", { name: "Try sign-in" }).click();
   await waitForSignedInComments(page);
