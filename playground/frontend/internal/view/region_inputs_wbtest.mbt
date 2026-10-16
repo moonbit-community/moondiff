@@ -197,6 +197,25 @@ test "file inputs ignore another file, tree controls and draft text outside thei
 }
 
 ///|
+test "sign-in dialog changes invalidate only Discussion" {
+  let model = pull_region_model()
+  let projection = RegionProjection::new()
+  let before = projection.inputs(model)
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let opened = @application.update(
+      model,
+      Ui(OpenSignIn(model.generation, Comment(0), None)),
+      emit,
+    ).model
+  let after = projection.inputs(opened)
+  assert_eq(before.length(), after.length())
+  for index in 0..<before.length() {
+    assert_true(before[index].0 == after[index].0)
+    assert_eq(before[index].1 != after[index].1, before[index].0 is Discussion)
+  }
+}
+
+///|
 test "merge status changes invalidate only the independent merge region" {
   assert_false(
     RegionProjection::new()
