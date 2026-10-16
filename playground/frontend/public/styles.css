@@ -2035,10 +2035,10 @@ button.file-tree-row.selected {
   color: var(--green);
 }
 
-/* Only a completed intraline comparison can establish a neutral Token side.
+/* Only a completed intraline comparison can establish a neutral Token or Tree side.
    Keep line-level changes when refinement was skipped or exceeded its budget. */
-.file-card[data-diff-algorithm="token"] .diff-scroll td.diff-neutral:is(.del, .add, .line-number) {
-  background: var(--surface);
+.file-card:is([data-diff-algorithm="token"], [data-diff-algorithm="tree"]) .diff-scroll td.diff-neutral:is(.del, .add, .line-number) {
+  background-color: var(--surface);
 }
 
 .diff-scroll b.wd {

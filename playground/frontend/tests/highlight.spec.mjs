@@ -434,6 +434,24 @@ const replacementBlankSources = [
     strong: [[true, false], [true]] },
 ];
 
+const unrefinedFallback = "fn broken( {\n" + unrefinedPrefix;
+const treeBackgroundSources = [
+  ...[0, 1, 2, 8, 9].map(index => tokenBackgroundSources[index]),
+  // AST comparisons complete even on blank lines in added/deleted files.
+  { ...tokenBackgroundSources[6],
+    strong: [[], [true, false, false, true, true]], tinted: [[], [true, false, false, true, true]] },
+  { ...tokenBackgroundSources[7],
+    strong: [[true, false, false, true, true], []], tinted: [[true, false, false, true, true], []] },
+  ...replacementBlankSources.map(source => ({ ...source, tinted: source.strong })),
+  { filename: "reorder.mbt", old: "fn alpha() {\n  call( x)\n\n  count\n}\nfn beta() { 0 }",
+    new: "fn beta() { 1 }\nfn alpha() {\n  call(x)\n \t \n  count + tax\n}",
+    strong: [[true, false, false, false], [true, false, false, true]],
+    tinted: [[true, false, false, false], [true, false, false, true]] },
+  // A parse fallback with an oversized line leaves intraline work uncomputed.
+  { filename: "unrefined-fallback.mbt", old: unrefinedFallback + "0]", new: unrefinedFallback + "1]",
+    strong: [[false], [false]], tinted: [[true], [true]] },
+];
+
 async function expectLineBackground(cell, background, layout) {
   await expect(cell).toHaveCSS("background-color", background);
   const row = cell.locator("..");
@@ -445,8 +463,31 @@ async function expectLineBackground(cell, background, layout) {
   }
 }
 
+async function expectChangeBackgrounds(file, layout, source, palette) {
+  for (const [sideIndex, side] of ["del", "add"].entries()) {
+    const cells = file.locator(`td.${side}, tr.diff-neutral-pair > td.ctx`);
+    await expect(cells).toHaveCount(source.strong[sideIndex].length);
+    for (const [line, strong] of source.strong[sideIndex].entries()) {
+      const cell = cells.nth(line);
+      await expect(cell.locator("b.wd:not(:empty), b.wa:not(:empty)")).toHaveCount(strong ? 1 : 0);
+      await expectLineBackground(cell, source.tinted[sideIndex][line] ? palette[side] : palette.context, layout);
+      const pairedNeutral = await cell.locator("..").evaluate(row => row.classList.contains("diff-neutral-pair"));
+      const gutterSide = sideIndex === 0 || (layout === "Unified" && !pairedNeutral) ? "old" : "new";
+      const gutter = cell.locator("..").locator(`td.${gutterSide}-line-number`);
+      await expect(gutter).toHaveCSS("color", sideIndex === 0 ? palette.oldLine : palette.newLine);
+      if (pairedNeutral) {
+        await expect(gutter).toHaveCSS("box-shadow", "none");
+        await expect(cell.locator(".diff-prefix")).toHaveCount(0);
+      } else {
+        await expect(gutter).not.toHaveCSS("box-shadow", "none");
+        if (layout === "Unified") await expect(cell.locator(".diff-prefix")).toHaveText(side === "del" ? "-" : "+");
+      }
+    }
+  }
+}
+
 for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]) {
-  test(`${layout} ${theme}: Token backgrounds distinguish reflow from pure and unrefined changes`, async ({ page }) => {
+  test(`${layout} ${theme}: Token and Tree backgrounds distinguish neutral sides from changes`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme });
     const requests = await installSources(page, tokenBackgroundSources);
     await page.goto(path);
@@ -459,26 +500,7 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
       await ensureFileExpanded(file);
       await expect(file).toHaveAttribute("data-diff-algorithm", "token");
       await expectOriginalLines(file, layout, source.old, source.new);
-      for (const [sideIndex, side] of ["del", "add"].entries()) {
-        const cells = file.locator(`td.${side}, tr.diff-neutral-pair > td.ctx`);
-        await expect(cells).toHaveCount(source.strong[sideIndex].length);
-        for (const [line, strong] of source.strong[sideIndex].entries()) {
-          const cell = cells.nth(line);
-          await expect(cell.locator("b.wd:not(:empty), b.wa:not(:empty)")).toHaveCount(strong ? 1 : 0);
-          await expectLineBackground(cell, source.tinted[sideIndex][line] ? palette[side] : palette.context, layout);
-          const pairedNeutral = await cell.locator("..").evaluate(row => row.classList.contains("diff-neutral-pair"));
-          const gutterSide = sideIndex === 0 || (layout === "Unified" && !pairedNeutral) ? "old" : "new";
-          const gutter = cell.locator("..").locator(`td.${gutterSide}-line-number`);
-          if (pairedNeutral) {
-            await expect(gutter).toHaveCSS("box-shadow", "none");
-            await expect(gutter).toHaveCSS("color", sideIndex === 0 ? palette.oldLine : palette.newLine);
-            await expect(cell.locator(".diff-prefix")).toHaveCount(0);
-          } else {
-            await expect(gutter).not.toHaveCSS("box-shadow", "none");
-            if (layout === "Unified") await expect(cell.locator(".diff-prefix")).toHaveText(side === "del" ? "-" : "+");
-          }
-        }
-      }
+      await expectChangeBackgrounds(file, layout, source, palette);
     }
     // Empty inline markers must not cause either the source or gutter to tint.
     const plain = page.locator("#moondiff-file-3 td.del, #moondiff-file-3 tr.diff-neutral-pair > td.ctx");
@@ -493,22 +515,48 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
     await page.getByRole("button", { name: "Collapse unrefined.mbt", exact: true }).click();
     await expect(page.getByRole("button", { name: "Expand unrefined.mbt", exact: true })).toBeVisible();
     // Switch the same loaded sources through Tree and back to exercise regional
-    // updates and prove the background override is scoped to Token mode.
+    // updates. Both algorithms preserve tint only on sides with actual changes.
     const count = requests.length;
     for (const algorithm of ["Tree", "Token"]) {
       await page.getByRole("button", { name: algorithm, exact: true }).click();
-      for (const index of [1, 6, 7]) {
+      for (const index of [0, 1, 2]) {
         const file = page.locator(`#moondiff-file-${index}`);
         await expect(file).toHaveAttribute("data-diff-algorithm", algorithm.toLowerCase());
-        for (const [sideIndex, side] of ["del", "add"].entries()) {
-          for (const [line, tinted] of tokenBackgroundSources[index].tinted[sideIndex].entries()) {
-            await expectLineBackground(file.locator(`td.${side}`).nth(line),
-              algorithm === "Tree" || tinted ? palette[side] : palette.context, layout);
-          }
-        }
+        await expectChangeBackgrounds(file, layout, tokenBackgroundSources[index], palette);
       }
     }
     expect(requests).toHaveLength(count);
+  });
+
+  test(`${layout} ${theme}: Tree backgrounds handle blanks, reflow, reorder and uncomputed fallbacks`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await installSources(page, treeBackgroundSources);
+    await page.goto(path);
+    await page.getByRole("button", { name: "Tree", exact: true }).click();
+    await page.getByRole("button", { name: layout, exact: true }).click();
+    await page.getByRole("checkbox", { name: "Ignore comments", exact: true }).uncheck();
+    const palette = colors[theme];
+    for (const [index, source] of treeBackgroundSources.entries()) {
+      const file = page.locator(`#moondiff-file-${index}`);
+      await ensureFileExpanded(file);
+      await expect(file).toHaveAttribute("data-diff-algorithm", "tree");
+      await expectOriginalLines(file, layout, source.old, source.new);
+      await expectChangeBackgrounds(file, layout, source, palette);
+      if (source.filename === "unrefined-fallback.mbt") {
+        await expect(file.locator(".diff-notice").first()).toContainText("Lexical fallback");
+        await expect(file.locator("td.diff-neutral")).toHaveCount(0);
+      }
+      if (source.filename === "reorder.mbt" && layout === "Unified") {
+        const pairs = file.locator("tr.diff-neutral-pair");
+        await expect(pairs).toHaveCount(2);
+        await expect(pairs.first().locator(".old-line-number .line-number-value")).toHaveText("2");
+        await expect(pairs.first().locator(".new-line-number .line-number-value")).toHaveText("3");
+        await expect(pairs.first().locator(".syntax-function")).toHaveCSS("color", palette.function);
+      }
+    }
+    const neutral = page.locator("#moondiff-file-1 td.del.diff-neutral");
+    await expect(neutral.locator(".syntax-keyword").first()).toHaveCSS("color", palette.keyword);
+    await expect(neutral.locator(".syntax-variable").first()).toHaveCSS("color", palette.variable);
   });
 
   test(`${layout} ${theme}: Token replacement blank additions and deletions retain backgrounds`, async ({ page }) => {
