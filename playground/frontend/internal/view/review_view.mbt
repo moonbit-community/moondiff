@@ -55,6 +55,8 @@ fn review_gutter(
   emit : @rabbita.Emit[Msg],
   neutral~ : Bool = false,
 ) -> @rabbita.Html {
+  let requires_sign_in = review.permissions.is_pull &&
+    !review.permissions.can_comment
   let class_name = if neutral {
     "\{class_name} diff-neutral"
   } else {
@@ -65,15 +67,47 @@ fn review_gutter(
       class="line-number-value",
       number.map(value => value.to_string()).unwrap_or(""),
     ),
-    if review.permissions.can_comment && anchor is Some(anchor) {
+    if (review.permissions.can_comment || requires_sign_in) &&
+      anchor is Some(anchor) {
+      let attrs = @html.Attrs::build().aria_label(
+        "Comment on line \{anchor.line}",
+      )
       @html.button(
         type_="button",
         class="line-comment-button",
-        disabled=!review.allowed(OpenDraft(InlineDraft(file_index, anchor))),
-        title="Comment on line \{anchor.line}",
-        attrs=@html.Attrs::build().aria_label("Comment on line \{anchor.line}"),
-        on_click=emit(Review(OpenInlineDraft(file_index, anchor))),
-        "+",
+        disabled=!requires_sign_in &&
+          !review.allowed(OpenDraft(InlineDraft(file_index, anchor))),
+        attrs=if requires_sign_in {
+          attrs
+          .aria_description("Sign in to comment")
+          .on_click(event => {
+            emit(
+              Ui(
+                OpenSignIn(
+                  review.generation,
+                  Comment(file_index),
+                  @browser.current_element(event.current_target()),
+                ),
+              ),
+            )
+          })
+        } else {
+          attrs
+          .title("Comment on line \{anchor.line}")
+          .on_click(_ => emit(Review(OpenInlineDraft(file_index, anchor))))
+        },
+        [
+          @html.text("+"),
+          if requires_sign_in {
+            @html.span(
+              class="line-comment-sign-in",
+              attrs=@html.Attrs::build().aria_hidden("true"),
+              "Sign in to comment",
+            )
+          } else {
+            @html.nothing
+          },
+        ],
       )
     } else {
       @html.nothing
@@ -733,7 +767,7 @@ fn auth_controls(
         @html.button(
           type_="button",
           disabled=false,
-          class="comment-submit",
+          class="comment-submit review-sign-in-button",
           on_click=emit(Auth(StartSignIn)),
           "Sign in with GitHub",
         ),
@@ -830,7 +864,7 @@ fn auth_controls(
         @html.button(
           type_="button",
           disabled=false,
-          class="secondary",
+          class="secondary review-sign-in-button",
           on_click=emit(Auth(StartSignIn)),
           "Try sign-in",
         ),
@@ -840,11 +874,12 @@ fn auth_controls(
 
 ///|
 fn comments_overview(
-  is_pull : Bool,
-  review : @comments.ReadView,
-  auth : @application.AuthStatus,
+  input : DiscussionInput,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
+  let is_pull = input.is_pull
+  let review = input.review
+  let auth = input.auth
   let refresh = @html.button(
     type_="button",
     class="secondary refresh-comments",
@@ -870,7 +905,21 @@ fn comments_overview(
         @html.p(class="section-label", "GitHub discussion"),
         @html.h2("Comments"),
       ]),
-      @html.div([auth_controls(auth, emit), refresh]),
+      @html.div([
+        @html.div(
+          class="discussion-auth",
+          style=if input.sign_in_dialog.entry is Some(_) {
+            ["visibility: hidden"]
+          } else {
+            []
+          },
+          attrs=@html.Attrs::build().inert(
+            input.sign_in_dialog.entry is Some(_),
+          ),
+          auth_controls(auth, emit),
+        ),
+        refresh,
+      ]),
     ]),
     if review.snapshot_stale {
       @html.div(class="snapshot-stale", [
@@ -940,6 +989,11 @@ fn comments_overview(
           @html.nothing
         },
       ])
+    } else {
+      @html.nothing
+    },
+    if is_pull {
+      sign_in_dialog_view(input, emit)
     } else {
       @html.nothing
     },

@@ -53,6 +53,7 @@ pub fn start(id : String) -> Unit {
           coordinator.forward(raw),
         )
         let generation = transition.model.generation
+        @application.prepare_sign_in_dialog(transition.model, msg)
         // Landing/loading models can still retain the previous route's review.
         // Check the session's generation: a reload can retain an older draft ID.
         let draft_id = if transition.model.review.generation() == generation {

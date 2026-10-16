@@ -128,9 +128,11 @@ pub(all) struct NavigationInput {
 
 ///|
 pub(all) struct DiscussionInput {
+  generation : Int32
   is_pull : Bool
   review : @comments.ReadView
   auth : @application.AuthStatus
+  sign_in_dialog : @application.SignInDialog
 } derive(Eq)
 
 ///|
@@ -377,9 +379,11 @@ pub fn RegionProjection::inputs(
       (
         Discussion,
         Discussion({
+          generation: model.generation,
           is_pull,
           review: model.review.read_view(paths~, group~),
           auth: model.auth,
+          sign_in_dialog: model.sign_in_dialog,
         }),
       ),
     )
@@ -409,6 +413,7 @@ fn home_shell(model : Model) -> Bool {
 ///|
 pub(all) struct ViewedControl {
   is_pull : Bool
+  requires_sign_in : Bool
   generation : Int32
   index : Int32
   path : String
