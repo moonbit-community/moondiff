@@ -103,3 +103,11 @@ pub extend ViewedState with Eq::{not_equal, equal}
 #deprecated
 #doc(hidden)
 pub extend RangeState with Eq::{not_equal, equal}
+
+///|
+#deprecated
+pub extend SignInEntry with Eq::{not_equal, equal}
+
+///|
+#deprecated
+pub extend SignInDialog with Eq::{not_equal, equal}

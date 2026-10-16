@@ -5,6 +5,8 @@ pub(all) enum UiMsg {
   RetryRoute
   RouteChanged(@url.Url)
   SelectView(ViewMode)
+  OpenSignIn(Int32, SignInEntry, @dom.Element?)
+  CloseSignIn(Int32, Int32)
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
   FileTreeViewportChanged(Int32)
@@ -68,6 +70,36 @@ fn update_ui(
   let (next, command) = match msg {
     InputChanged(value) => ({ ..model, input: value, }, @rabbita.none)
     SelectView(view_mode) => ({ ..model, view_mode, }, @rabbita.none)
+    OpenSignIn(generation, entry, _) => {
+      guard generation == model.generation &&
+        !(model.auth is SignedIn(..)) &&
+        model.phase is Showing(view) &&
+        view.reference.target is PullRequest(_) &&
+        view.files.get(entry.file_index()) is Some(_) else {
+        return (model, @rabbita.none)
+      }
+      (
+        {
+          ..model,
+          sign_in_dialog: {
+            revision: model.sign_in_dialog.revision + 1,
+            entry: Some(entry),
+          },
+        },
+        @rabbita.none,
+      )
+    }
+    CloseSignIn(generation, revision) => {
+      guard generation == model.generation &&
+        revision == model.sign_in_dialog.revision &&
+        model.sign_in_dialog.entry is Some(_) else {
+        return (model, @rabbita.none)
+      }
+      (
+        { ..model, sign_in_dialog: { revision: revision + 1, entry: None, }, },
+        @rabbita.none,
+      )
+    }
     ToggleFileTreeDrawer => {
       let drawer_open = !model.file_tree.drawer_open
       (

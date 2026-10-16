@@ -38,9 +38,11 @@ pub(all) struct DiffNotice {
 }
 
 pub(all) struct DiscussionInput {
+  generation : Int
   is_pull : Bool
   review : @comments.ReadView
   auth : @application.AuthStatus
+  sign_in_dialog : @application.SignInDialog
 } derive(Eq)
 
 pub(all) struct DisplayOptions {
@@ -162,6 +164,7 @@ pub(all) struct TreeMetadata {
 
 pub(all) struct ViewedControl {
   is_pull : Bool
+  requires_sign_in : Bool
   generation : Int
   index : Int
   path : String

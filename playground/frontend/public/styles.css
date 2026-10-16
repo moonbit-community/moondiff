@@ -2111,6 +2111,164 @@ button.file-tree-row.selected {
   pointer-events: auto;
 }
 
+.review-gutter:has(.line-comment-sign-in):is(:hover, :focus-within) {
+  z-index: 1;
+}
+
+.line-comment-sign-in {
+  position: absolute;
+  left: calc(100% + 0.3rem);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0 0.35rem;
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 2px 5px var(--focus);
+  font: 500 0.7rem/1rem -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.review-gutter:hover .line-comment-sign-in,
+.line-comment-button:focus-visible .line-comment-sign-in {
+  visibility: visible;
+}
+
+html:has(.sign-in-dialog[open]) {
+  min-height: var(--sign-in-page-height);
+  overflow: hidden;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.sign-in-dialog {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: min(24rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 1rem 3rem var(--focus);
+}
+
+.sign-in-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.sign-in-dialog-heading {
+  padding-right: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sign-in-dialog-heading h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.sign-in-dialog-description {
+  margin: 0 0 1.5rem;
+  color: var(--muted-strong);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+button.sign-in-dialog-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  min-height: 2rem;
+  border-color: transparent;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+button.sign-in-dialog-close:hover {
+  border-color: var(--border);
+  color: var(--foreground);
+  background: var(--surface-subtle);
+}
+
+.sign-in-dialog .auth-controls {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 1rem;
+  min-width: 0;
+  color: var(--muted-strong);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.sign-in-dialog .auth-controls > button,
+.sign-in-dialog .device-open {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+}
+
+.sign-in-dialog .auth-controls > a {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.sign-in-dialog .device-code-actions {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.sign-in-dialog .device-code {
+  box-sizing: border-box;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface-subtle);
+  text-align: center;
+}
+
+.sign-in-dialog .device-progress,
+.sign-in-dialog .auth-status {
+  color: var(--muted-strong);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.sign-in-dialog .auth-controls.error {
+  color: var(--red);
+}
+
+@media (max-width: 480px) {
+  .sign-in-dialog {
+    padding: 1.5rem;
+  }
+}
+
 .review-gutter:hover .line-number-value,
 .review-gutter:focus-within .line-number-value {
   opacity: 0;
