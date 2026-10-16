@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
+import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
 
 const base = '1'.repeat(40), head = 'a'.repeat(40), merge = '2'.repeat(40);
 const path = '/alice/repo/pull/42';
@@ -268,7 +269,7 @@ test('a stale read cannot overwrite a newer write or another account', async ({ 
 
 test('anonymous PR exposes sign-in and restores Viewed after login; commits do not show it', async ({ page }) => {
   const state = await install(page, { authenticated: false, states: { alice: { 'src/a.txt': 'Viewed' } } });
-  await page.goto(path); await expect(box(page)).toBeDisabled();
+  await page.goto(path); await expect(box(page)).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Sign in to sync Viewed' })).toBeVisible();
   expect(calls(state, 'github.pull.viewed.get')).toHaveLength(0);
   state.authenticated = true; await refresh(page);
@@ -279,6 +280,67 @@ test('anonymous PR exposes sign-in and restores Viewed after login; commits do n
     await expect(page.locator('.viewed-control')).toHaveCount(0);
     await expect(page.locator('.viewed-progress')).toHaveCount(0);
   }
+});
+
+for (const width of [1280, 390]) {
+  test(`anonymous Viewed checkbox, label and keyboard open a sign-in dialog without toggling at ${width}px`, async ({ page }) => {
+    const state = await install(page, { authenticated: false });
+    await page.setViewportSize({ width, height: 650 });
+    await page.goto(path);
+    await expect(box(page)).toBeEnabled();
+    const initialClass = await card(page).getAttribute('class');
+    for (const activate of [
+      () => box(page).click(),
+      () => card(page).locator('.viewed-label > span').first().click(),
+      async () => { await box(page).focus(); await page.keyboard.press('Space'); },
+    ]) {
+      await box(page).scrollIntoViewIfNeeded();
+      const position = await pagePosition(page);
+      const records = await pendingRecords(page);
+      await activate();
+      await expectSignInDialog(page, 'Sign in to track viewed files');
+      await expectPagePosition(page, position);
+      await expect(box(page)).not.toBeChecked();
+      await expect(card(page)).toHaveClass(initialClass);
+      expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(0);
+      expect(calls(state, 'github.pull.viewed.get')).toHaveLength(0);
+      expect(new URL(page.url()).pathname).toBe(path);
+      expect(new URL(page.url()).hash).toBe('');
+      expect(await pendingRecords(page)).toEqual(records);
+      await closeSignInDialog(page);
+      await expect(box(page)).toBeFocused();
+      await expectPagePosition(page, position);
+    }
+    state.authenticated = true;
+    await refresh(page);
+    await expect(page.getByText('0 / 3 files viewed', { exact: true })).toBeVisible();
+    await expect(box(page)).not.toBeChecked();
+    expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(0);
+  });
+}
+
+test('anonymous PR entry points focus the dialog status during a session check', async ({ page }) => {
+  const state = await install(page, { authenticated: false });
+  await page.goto(path);
+  await expect(box(page)).toBeEnabled();
+  await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
+  await expect(card(page).locator('.line-comment-button').first()).toBeAttached();
+  const pending = gate(); state.authGate = pending;
+  try {
+    await page.evaluate(() => { dispatchEvent(new Event('pagehide')); dispatchEvent(new Event('pageshow')); });
+    await expect(page.locator('.discussion-auth')).toHaveText('Checking GitHub session…');
+    await box(page).click();
+    await expectSignInDialog(page, 'Sign in to track viewed files', true);
+    await expect(box(page)).not.toBeChecked();
+    await closeSignInDialog(page);
+    const button = card(page).locator('.new-line-number .line-comment-button').first();
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expectSignInDialog(page, 'Sign in to comment', true);
+  } finally { pending.resolve(); }
+  await expect(signInDialog(page).locator('.review-sign-in-button')).toBeFocused();
+  await closeSignInDialog(page);
+  expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(0);
 });
 
 test('manual refresh and page restoration retain an expanded viewed file and its inline draft', async ({ page }) => {
@@ -627,7 +689,11 @@ test('reload restores pending changes by path after reordering and isolates logi
   state.files = [files[2], files[1], files[0]];
   state.authenticated = false;
   await page.reload();
-  await expect(box(page)).toBeDisabled();
+  await expect(box(page)).toBeEnabled();
+  await box(page).click();
+  await expectSignInDialog(page, 'Sign in to track viewed files');
+  await closeSignInDialog(page);
+  await expect(box(page)).not.toBeChecked();
   expect(await pendingRecords(page)).toEqual([record]);
   state.authenticated = true; state.user = 'bob';
   await refresh(page);
