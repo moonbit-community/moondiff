@@ -57,6 +57,7 @@ pub(all) struct Model {
   file_tree : FileTreeState
   auth : AuthStatus
   auth_revision : Int32
+  sign_in_dialog : SignInDialog
   restore_pending : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState
@@ -80,6 +81,7 @@ fn initial_model() -> Model {
     file_tree: initial_file_tree_state(),
     auth: AuthChecking,
     auth_revision: 0,
+    sign_in_dialog: SignInDialog::new(),
     restore_pending: false,
     last_authenticated_user_id: None,
     viewed: empty_viewed_state(0),

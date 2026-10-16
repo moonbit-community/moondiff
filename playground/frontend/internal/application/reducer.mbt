@@ -29,6 +29,7 @@ pub fn update(
   let (next, viewed_command) = reconcile_viewed(model, next, msg, emit)
   let (next, home_command) = reconcile_home(model, next, msg, emit)
   let (next, pull_merge_command) = reconcile_pull_merge(model, next, msg, emit)
+  let next = reconcile_sign_in_dialog(model, next)
   {
     model: next,
     command: @rabbita.batch([

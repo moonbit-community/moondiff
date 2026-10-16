@@ -35,11 +35,15 @@ pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cm
 
 pub fn navigation_scrolled(@dom.Element) -> Unit
 
+pub fn prepare_sign_in_dialog(Model, Msg) -> Unit
+
 pub fn range_commit_after(RangeState, String, String) -> Bool
 
 pub fn range_pull_history_unsupported(RangeState) -> Bool
 
 pub fn range_pull_selector_ready(RangeState) -> Bool
+
+pub fn trap_sign_in_focus(@dom.KeyboardEvent) -> Unit
 
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> Transition
 
@@ -172,6 +176,7 @@ pub(all) struct Model {
   file_tree : FileTreeState
   auth : AuthStatus
   auth_revision : Int
+  sign_in_dialog : SignInDialog
   restore_pending : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState
@@ -308,6 +313,26 @@ pub(all) enum ReviewMsg {
   ReviewReplyCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
 }
 
+pub(all) struct SignInDialog {
+  revision : Int
+  entry : SignInEntry?
+} derive(Eq)
+#deprecated
+pub fn SignInDialog::equal(Self, Self) -> Bool
+pub fn SignInDialog::new() -> Self
+#deprecated
+pub fn SignInDialog::not_equal(Self, Self) -> Bool
+
+pub(all) enum SignInEntry {
+  Comment(Int)
+  Viewed(Int)
+} derive(Eq)
+#deprecated
+pub fn SignInEntry::equal(Self, Self) -> Bool
+pub fn SignInEntry::file_index(Self) -> Int
+#deprecated
+pub fn SignInEntry::not_equal(Self, Self) -> Bool
+
 pub(all) struct Transition {
   model : Model
   command : @cmd.Cmd
@@ -320,6 +345,8 @@ pub(all) enum UiMsg {
   RetryRoute
   RouteChanged(@url.Url)
   SelectView(@change.ViewMode)
+  OpenSignIn(Int, SignInEntry, @dom.Element?)
+  CloseSignIn(Int, Int)
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
   FileTreeViewportChanged(Int)

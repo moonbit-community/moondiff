@@ -45,6 +45,7 @@ fn region_model() -> Model {
     file_tree: test_file_tree_state(),
     auth: Anonymous(None),
     auth_revision: 0,
+    sign_in_dialog: @application.SignInDialog::new(),
     restore_pending: false,
     last_authenticated_user_id: None,
     home: @application.HomeState::new(),

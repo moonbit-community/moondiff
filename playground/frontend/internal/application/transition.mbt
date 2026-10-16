@@ -65,6 +65,18 @@ fn ui_after_commit(
   emit : @rabbita.Emit[Msg],
 ) -> Array[AfterCommit] {
   let actions : Array[AfterCommit] = []
+  if before.generation == next.generation &&
+    (
+      before.sign_in_dialog != next.sign_in_dialog ||
+      (next.sign_in_dialog.entry is Some(_) && before.auth != next.auth)
+    ) {
+    actions.push({
+      target: Discussion,
+      scope: Region,
+      command: commit_sign_in_dialog(next.generation, next.sign_in_dialog),
+      navigation: Cancel,
+    })
+  }
   fn focus(target : Region, selector : String) {
     actions.push({
       target,
