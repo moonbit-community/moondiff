@@ -8,13 +8,13 @@ pub fn render(String, String, String, String, options? : Options) -> String
 
 // Types and methods
 pub struct Options {
-  context_lines : Int
-  graph_limit : UInt
+  context_lines : Int32
+  graph_limit : UInt32
   use_color : Bool
   ignore_comments : Bool
   ignore_tests : Bool
 }
-pub fn Options::new(context_lines? : Int, graph_limit? : UInt, use_color? : Bool, ignore_comments? : Bool, ignore_tests? : Bool) -> Self
+pub fn Options::new(context_lines? : Int32, graph_limit? : UInt32, use_color? : Bool, ignore_comments? : Bool, ignore_tests? : Bool) -> Self
 pub impl Default for Options
 
 // Type aliases

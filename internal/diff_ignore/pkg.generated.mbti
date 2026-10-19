@@ -29,15 +29,15 @@ pub struct SourceView {
   source_lines : Array[String]
   line_views : Array[SourceLineView]
   lines : Array[String]
-  source_indices : Array[Int]
-  visible_indices : Array[Int]
-  source_line_offset : Int
+  source_indices : Array[Int32]
+  visible_indices : Array[Int32]
+  source_line_offset : Int32
 }
 pub fn SourceView::from_lines(ArrayView[String], ignore_comments? : Bool) -> Self
 pub fn SourceView::from_source(String, ignored_ranges? : ArrayView[@basic.Location], ignore_comments? : Bool) -> Self
 pub fn SourceView::lines(Self) -> ArrayView[String]
 pub fn SourceView::map_span(Self, @span.SingleLineSpan) -> SpanMapping
-pub fn SourceView::slice(Self, Int, Int) -> Self
+pub fn SourceView::slice(Self, Int32, Int32) -> Self
 
 pub(all) enum SpanMapping {
   Mapped(@span.SingleLineSpan)

@@ -17,8 +17,8 @@ pub(all) enum ComputationStage {
 } derive(Eq, @debug.Debug)
 
 pub(all) struct ContextLine {
-  old_index : Int
-  new_index : Int
+  old_index : Int32
+  new_index : Int32
   text : String
 } derive(Eq)
 
@@ -39,15 +39,15 @@ pub(all) struct DiffFragment {
 } derive(Eq)
 
 pub(all) struct DiffHunk {
-  old_start : Int
-  old_len : Int
-  new_start : Int
-  new_len : Int
+  old_start : Int32
+  old_len : Int32
+  new_start : Int32
+  new_len : Int32
   blocks : ArrayView[DiffBlock]
 } derive(Eq)
 
 pub(all) struct DiffLine {
-  index : Int
+  index : Int32
   segments : ArrayView[DiffSegment]
   intraline : IntralineStatus
 } derive(Eq)
@@ -98,14 +98,14 @@ pub(all) enum DiffStatus {
 pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
-  GraphLimitExceeded(limit~ : UInt)
-  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt)
+  GraphLimitExceeded(limit~ : UInt32)
+  ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt32)
 } derive(Eq, @debug.Debug)
 
 pub(all) struct HunkDocument {
   hunks : ArrayView[DiffHunk]
 } derive(Eq)
-pub fn HunkDocument::rebase(Self, Int, Int) -> Self
+pub fn HunkDocument::rebase(Self, Int32, Int32) -> Self
 
 pub(all) enum IgnoreReason {
   TestFile
@@ -118,14 +118,14 @@ pub(all) enum IntralineStatus {
 } derive(Eq)
 
 pub(all) struct LineRange {
-  start : Int
-  len : Int
+  start : Int32
+  len : Int32
 } derive(Eq, @debug.Debug)
 
 pub(all) struct TopLevelDiff {
   sections : ArrayView[DiffSection]
-  old_order : ArrayView[Int]
-  new_order : ArrayView[Int]
+  old_order : ArrayView[Int32]
+  new_order : ArrayView[Int32]
   reordered : Bool
 } derive(Eq)
 

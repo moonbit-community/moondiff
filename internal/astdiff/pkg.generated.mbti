@@ -11,18 +11,18 @@ import {
 // Values
 pub fn fix_all_sliders(ArrayView[@syntax.Syntax], @syntax.ChangeMap) -> Unit
 
-pub fn mark_syntax_roots_with_budget(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt, @computation.ScopeBudget) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded
+pub fn mark_syntax_roots_with_budget(ArrayView[@syntax.Syntax], ArrayView[@syntax.Syntax], @syntax.ChangeMap, UInt32, @computation.ScopeBudget) -> GraphLimitResult[Unit] raise @computation.ScopeLimitExceeded
 
-pub fn shortest_path_with_budget(Vertex, Int, Int, @computation.ScopeBudget) -> GraphLimitResult[Array[(Edge, Vertex)]] raise @computation.ScopeLimitExceeded
+pub fn shortest_path_with_budget(Vertex, Int32, Int32, @computation.ScopeBudget) -> GraphLimitResult[Array[(Edge, Vertex)]] raise @computation.ScopeLimitExceeded
 
 // Errors
 
 // Types and methods
 pub enum Edge {
-  UnchangedNode(depth_difference~ : UInt, probably_punctuation~ : Bool)
-  EnterUnchangedDelimiter(depth_difference~ : UInt)
-  ReplacedComment(levenshtein_pct~ : UInt)
-  ReplacedString(levenshtein_pct~ : UInt)
+  UnchangedNode(depth_difference~ : UInt32, probably_punctuation~ : Bool)
+  EnterUnchangedDelimiter(depth_difference~ : UInt32)
+  ReplacedComment(levenshtein_pct~ : UInt32)
+  ReplacedString(levenshtein_pct~ : UInt32)
   NovelAtomLHS
   NovelAtomRHS
   EnterNovelDelimiterLHS
@@ -45,16 +45,16 @@ pub fn[T] Stack::new() -> Self[T]
 pub fn[T] Stack::peek(Self[T]) -> T?
 pub fn[T] Stack::pop(Self[T]) -> Self[T]?
 pub fn[T] Stack::push(Self[T], T) -> Self[T]
-pub fn[T] Stack::size(Self[T]) -> UInt
+pub fn[T] Stack::size(Self[T]) -> UInt32
 
 pub struct Vertex {
   neighbours : @ref.Ref[Array[(Edge, Vertex)]?]
-  predecessor : @ref.Ref[(UInt, Vertex)?]
+  predecessor : @ref.Ref[(UInt32, Vertex)?]
   lhs_syntax : @syntax.Syntax?
   rhs_syntax : @syntax.Syntax?
   parents : Stack[EnteredDelimiter]
-  lhs_parent_id : UInt?
-  rhs_parent_id : UInt?
+  lhs_parent_id : UInt32?
+  rhs_parent_id : UInt32?
 }
 pub fn Vertex::new(lhs~ : @syntax.Syntax?, rhs~ : @syntax.Syntax?) -> Self
 pub impl Eq for Vertex

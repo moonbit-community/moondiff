@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub async fn read_bounded(&@io.Reader, Int, source? : Bool) -> Bytes
+pub async fn read_bounded(&@io.Reader, Int32, source? : Bool) -> Bytes
 
 // Errors
 

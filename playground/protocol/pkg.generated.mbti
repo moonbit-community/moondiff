@@ -93,8 +93,8 @@ pub(all) struct ApiCommitComment {
   created_at : String
   user : ApiCommentUser?
   path : String?
-  position : Int?
-  line : Int?
+  position : Int32?
+  line : Int32?
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiCommitInfo {
@@ -118,12 +118,12 @@ pub(all) struct ApiDeviceFlow {
   user_code : String
   verification_uri : String
   expires_at : Double
-  retry_after : Int
+  retry_after : Int32
   message : String
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiError {
-  status : Int
+  status : Int32
   code : String
   message : String
 } derive(Eq, ToJson, @json.FromJson)
@@ -132,9 +132,9 @@ pub(all) struct ApiFile {
   filename : String
   previous_filename : String?
   status : String
-  additions : Int
-  deletions : Int
-  changes : Int
+  additions : Int32
+  deletions : Int32
+  changes : Int32
   patch : String?
 } derive(Eq, ToJson, @json.FromJson)
 
@@ -166,10 +166,10 @@ pub(all) struct ApiPull {
   html_url : String
   base : ApiPullBranch
   head : ApiPullBranch
-  additions : Int
-  deletions : Int
-  changed_files : Int
-  commits : Int?
+  additions : Int32
+  deletions : Int32
+  changed_files : Int32
+  commits : Int32?
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiPullBranch {
@@ -179,7 +179,7 @@ pub(all) struct ApiPullBranch {
 
 pub(all) struct ApiPullCommits {
   items : Array[ApiCommitSummary]
-  total_count : Int
+  total_count : Int32
   next_cursor : String?
   base_sha : String
   head_sha : String
@@ -230,7 +230,7 @@ pub(all) struct ApiRangeCommit {
 pub(all) struct ApiRangeCompare {
   base_commit : ApiRangeCommit
   merge_base_commit : ApiParent
-  total_commits : Int
+  total_commits : Int32
   commits : Array[ApiRangeCommit]
   files : Array[ApiFile]?
 } derive(Eq, ToJson, @json.FromJson)
@@ -246,30 +246,30 @@ pub(all) struct ApiReviewComment {
   created_at : String
   user : ApiCommentUser?
   path : String
-  line : Int?
-  original_line : Int?
+  line : Int32?
+  original_line : Int32?
   side : CommentSide?
-  position : Int?
+  position : Int32?
   commit_id : String
   in_reply_to_id : Int64?
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiSource {
   base64 : String
-  size : Int
+  size : Int32
   content_type : String
 } derive(Eq, ToJson, @json.FromJson)
 pub fn ApiSource::decode(Self) -> Bytes raise
 
 pub(all) struct ApiStats {
-  additions : Int
-  deletions : Int
-  total : Int
+  additions : Int32
+  deletions : Int32
+  total : Int32
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiViewerPulls {
   items : Array[ApiPullSummary]
-  total_count : Int
+  total_count : Int32
   next_cursor : String?
   incomplete : String?
 } derive(Eq, ToJson, @json.FromJson)
@@ -303,7 +303,7 @@ pub(all) struct CommitCommentCreate {
   repo : String
   sha : String
   path : String
-  position : Int
+  position : Int32
   body : String
 } derive(Eq, ToJson, @json.FromJson)
 
@@ -311,7 +311,7 @@ pub(all) struct CommitGet {
   owner : String
   repo : String
   sha : String
-  page : Int
+  page : Int32
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct CompareGet {
@@ -403,7 +403,7 @@ pub(all) struct PullCommitPageGet {
   owner : String
   repo : String
   number : String
-  page : Int
+  page : Int32
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct PullCommitsGet {
@@ -427,7 +427,7 @@ pub(all) struct PullFiles {
   owner : String
   repo : String
   number : String
-  page : Int
+  page : Int32
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct PullGet {
@@ -463,7 +463,7 @@ pub(all) struct RangeCompareGet {
   repo : String
   base : String
   head : String
-  page : Int
+  page : Int32
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ResolveShaGet {
@@ -483,7 +483,7 @@ pub(all) struct ReviewCommentCreate {
   number : String
   commit_id : String
   path : String
-  line : Int
+  line : Int32
   side : CommentSide
   body : String
 } derive(Eq, ToJson, @json.FromJson)
@@ -497,7 +497,7 @@ pub(all) struct ReviewReplyCreate {
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct RpcRequest {
-  v : Int
+  v : Int32
   request : GitHubRequest
 } derive(Eq, ToJson, @json.FromJson)
 

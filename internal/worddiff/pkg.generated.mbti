@@ -10,17 +10,17 @@ import {
 // Values
 pub fn refine_line(String, String, budget? : RefinementBudget) -> (Array[@model.DiffSegment], Array[@model.DiffSegment])?
 
-pub fn replacement_ranges(@diff.Edit, @diff.Edit) -> ((Int, Int), (Int, Int))?
+pub fn replacement_ranges(@diff.Edit, @diff.Edit) -> ((Int32, Int32), (Int32, Int32))?
 
 // Errors
 
 // Types and methods
 pub struct RefinementBudget {
-  line_character_limit : UInt
-  remaining_characters : @ref.Ref[UInt]
-  remaining_tokens : @ref.Ref[UInt]
+  line_character_limit : UInt32
+  remaining_characters : @ref.Ref[UInt32]
+  remaining_tokens : @ref.Ref[UInt32]
 }
-pub fn RefinementBudget::new(line_character_limit? : UInt, character_limit? : UInt, token_limit? : UInt) -> Self
+pub fn RefinementBudget::new(line_character_limit? : UInt32, character_limit? : UInt32, token_limit? : UInt32) -> Self
 
 // Type aliases
 

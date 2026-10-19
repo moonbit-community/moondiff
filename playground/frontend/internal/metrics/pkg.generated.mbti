@@ -2,7 +2,7 @@
 package "moonbit-community/moondiff-playground/internal/metrics"
 
 // Values
-pub fn active(String, Int) -> Unit
+pub fn active(String, Int32) -> Unit
 
 pub fn count(String, String) -> Unit
 

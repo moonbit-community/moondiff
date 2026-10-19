@@ -28,11 +28,11 @@ pub fn normalize(Json) -> Json
 
 pub fn optional_string(Json, String) -> String
 
-pub fn positive_int(Json, String, Int) -> Int raise
+pub fn positive_int(Json, String, Int32) -> Int32 raise
 
 pub fn resolved_sha(String, String) -> String raise
 
-pub fn rpc_error(Error) -> (Int, Json)
+pub fn rpc_error(Error) -> (Int32, Json)
 
 pub fn string(Json, String) -> String raise
 
@@ -48,7 +48,7 @@ pub fn valid_sha(String) -> Bool
 
 // Errors
 pub(all) suberror RpcError {
-  RpcError(Int, String, String)
+  RpcError(Int32, String, String)
 }
 
 // Types and methods

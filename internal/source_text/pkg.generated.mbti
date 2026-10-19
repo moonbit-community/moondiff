@@ -2,7 +2,7 @@
 package "moonbit-community/moondiff/internal/source_text"
 
 // Values
-pub fn line_ranges(String) -> Array[(Int, Int)]
+pub fn line_ranges(String) -> Array[(Int32, Int32)]
 
 pub fn split_lines(String) -> Array[String]
 

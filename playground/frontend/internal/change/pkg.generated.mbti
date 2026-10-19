@@ -30,9 +30,9 @@ pub fn ignored_change_subject(Bool, Bool) -> String
 
 pub fn initial_side(String?, Bool) -> SideLoad
 
-pub fn set_file_state(ChangeView, Int, FileState) -> ChangeView
+pub fn set_file_state(ChangeView, Int32, FileState) -> ChangeView
 
-pub fn source_requests_for_file(ChangeView, Int) -> Array[(SourceSide, @github.SourceLocation)]
+pub fn source_requests_for_file(ChangeView, Int32) -> Array[(SourceSide, @github.SourceLocation)]
 
 // Errors
 
@@ -57,7 +57,7 @@ pub(all) struct ChangeView {
   message : String
   html_url : String
   stats : @moondiff-playground-protocol.ApiStats
-  total_files : Int
+  total_files : Int32
   files : Array[FileState]
 } derive(Eq)
 
