@@ -71,7 +71,7 @@ pub(all) struct Session {
 
 pub(all) struct ViewedCoordinator {
   mutex : @async.Mutex
-  mut users : Int
+  mut users : Int32
 }
 
 // Type aliases

@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn add_span(Array[HighlightSpan], Int, Int, Int, HighlightKind) -> Unit
+pub fn add_span(Array[HighlightSpan], Int32, Int32, Int32, HighlightKind) -> Unit
 
 // Errors
 
@@ -38,8 +38,8 @@ pub(all) enum HighlightKind {
 } derive(Eq, @debug.Debug)
 
 pub(all) struct HighlightSpan {
-  start : Int
-  end : Int
+  start : Int32
+  end : Int32
   kind : HighlightKind
 } derive(Eq, @debug.Debug)
 
@@ -47,7 +47,7 @@ pub struct SourceHighlights {
   lines : Array[Array[HighlightSpan]]
 } derive(Eq)
 pub fn SourceHighlights::from_spans(String, ArrayView[HighlightSpan]) -> Self
-pub fn SourceHighlights::line(Self, Int) -> ArrayView[HighlightSpan]
+pub fn SourceHighlights::line(Self, Int32) -> ArrayView[HighlightSpan]
 
 // Type aliases
 

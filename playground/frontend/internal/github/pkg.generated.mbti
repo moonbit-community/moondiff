@@ -6,11 +6,11 @@ import {
 }
 
 // Values
-pub const MAX_PULL_FILES : Int = 3_000
+pub const MAX_PULL_FILES : Int32 = 3_000
 
-pub const MAX_SOURCE_BYTES : Int = 1_048_576
+pub const MAX_SOURCE_BYTES : Int32 = 1_048_576
 
-pub const MAX_SOURCE_LINES : Int = 20_000
+pub const MAX_SOURCE_LINES : Int32 = 20_000
 
 pub const PULL_FILE_LIMIT_ERROR : String = "This pull request changes more than GitHub's 3,000-file API limit, so its complete diff cannot be loaded."
 
@@ -62,9 +62,9 @@ pub fn repository_commit_revisions(RepositoryRef, String, String?) -> (Revision?
 
 pub fn same_pull_snapshot(@moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiPull) -> Bool
 
-pub fn should_fetch_next_page(Int, Int) -> Bool
+pub fn should_fetch_next_page(Int32, Int32) -> Bool
 
-pub fn should_fetch_next_pull_page(Int, Int, Int, Int?) -> Bool
+pub fn should_fetch_next_pull_page(Int32, Int32, Int32, Int32?) -> Bool
 
 pub fn source_pair(CommitRef, String, String?, @moondiff-playground-protocol.ApiFile) -> SourcePair
 

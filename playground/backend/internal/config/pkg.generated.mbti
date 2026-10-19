@@ -24,7 +24,7 @@ pub(all) struct Config {
   api_url : String
   oauth_url : String
   secure : Bool
-  anonymous_session_limit : Int
+  anonymous_session_limit : Int32
 }
 pub fn Config::load() -> Self raise
 

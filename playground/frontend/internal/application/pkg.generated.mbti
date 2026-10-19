@@ -25,13 +25,13 @@ pub fn clear_navigation_landing(@dom.Element) -> Unit
 
 pub fn clear_navigation_landings() -> Unit
 
-pub fn file_dom_id(Int) -> String
+pub fn file_dom_id(Int32) -> String
 
-pub fn file_navigation_enabled(Model, Int) -> Bool
+pub fn file_navigation_enabled(Model, Int32) -> Bool
 
 pub fn home_pull_key(@moondiff-playground-protocol.ApiPullSummary) -> String
 
-pub fn navigate_section_change(@dom.MouseEvent, Int, Int, @cmd.Emit[Msg]) -> @cmd.Cmd
+pub fn navigate_section_change(@dom.MouseEvent, Int32, Int32, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn navigation_scrolled(@dom.Element) -> Unit
 
@@ -58,17 +58,17 @@ pub(all) struct AfterCommit {
 }
 
 pub(all) enum AuthMsg {
-  AuthStatusLoaded(Int, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
-  ReactivationAuthStatusLoaded(Int, Int, @github.CommitRef?, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
+  AuthStatusLoaded(Int32, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
+  ReactivationAuthStatusLoaded(Int32, Int32, @github.CommitRef?, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
   StartSignIn
   RestoreAuth
-  DeviceUpdated(Int, String, Bool, Result[@moondiff-playground-protocol.DeviceResponse, Error])
+  DeviceUpdated(Int32, String, Bool, Result[@moondiff-playground-protocol.DeviceResponse, Error])
   CancelSignIn
-  DeviceCancelFinished(Int, String, Result[@moondiff-playground-protocol.DeviceResponse, Error])
+  DeviceCancelFinished(Int32, String, Result[@moondiff-playground-protocol.DeviceResponse, Error])
   CopyDeviceCode
-  DeviceCodeCopied(Int, String, Bool)
+  DeviceCodeCopied(Int32, String, Bool)
   Logout
-  AuthLogoutFinished(Int, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
+  AuthLogoutFinished(Int32, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
 }
 
 pub(all) enum AuthStatus {
@@ -91,8 +91,8 @@ pub(all) struct FileTreeState {
   search_query : String
   selected_statuses : Array[String]
   collapsed_directories : Array[String]
-  selected_file_index : Int?
-  preferred_width : Int
+  selected_file_index : Int32?
+  preferred_width : Int32
 } derive(Eq)
 
 pub(all) struct HomeCommits {
@@ -100,7 +100,7 @@ pub(all) struct HomeCommits {
   expanded : Bool
   page : HomePage[@moondiff-playground-protocol.ApiCommitSummary]
   snapshot : (String, String)?
-  restarts : Int
+  restarts : Int32
 } derive(Eq)
 
 pub(all) enum HomeLoad {
@@ -117,13 +117,13 @@ pub(all) enum HomeMsg {
   LoadPulls(@moondiff-playground-protocol.ViewerPullKind)
   ToggleCommits(@moondiff-playground-protocol.ApiPullSummary)
   LoadCommits(String)
-  PullsLoaded(Int, Int, Int, @moondiff-playground-protocol.ViewerPullKind, Result[@moondiff-playground-protocol.ApiViewerPulls, Error])
-  CommitsLoaded(Int, Int, Int, String, Result[@moondiff-playground-protocol.ApiPullCommits, Error])
+  PullsLoaded(Int32, Int32, Int32, @moondiff-playground-protocol.ViewerPullKind, Result[@moondiff-playground-protocol.ApiViewerPulls, Error])
+  CommitsLoaded(Int32, Int32, Int32, String, Result[@moondiff-playground-protocol.ApiPullCommits, Error])
 }
 
 pub(all) struct HomePage[T] {
   items : Array[T]
-  total : Int?
+  total : Int32?
   cursor : String?
   load : HomeLoad
   refresh : HomeRefresh[T]?
@@ -132,15 +132,15 @@ pub(all) struct HomePage[T] {
 
 pub(all) struct HomeRefresh[T] {
   items : Array[T]
-  total : Int?
+  total : Int32?
   cursor : String?
-  target : Int
-  cursor_restarts : Int
+  target : Int32
+  cursor_restarts : Int32
 } derive(Eq)
 
 pub(all) struct HomeState {
   user : String?
-  epoch : Int
+  epoch : Int32
   tab : @moondiff-playground-protocol.ViewerPullKind
   reviews : HomePage[@moondiff-playground-protocol.ApiPullSummary]
   authored : HomePage[@moondiff-playground-protocol.ApiPullSummary]
@@ -150,23 +150,23 @@ pub fn HomeState::busy(Self) -> Bool
 pub fn HomeState::new() -> Self
 
 pub(all) enum LoadMsg {
-  CommitPageLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommit, Error])
-  ToggleFile(Int, Int)
-  ToggleSection(Int, Int, String)
-  NavigateChange(Int, Int, String, Int, Int)
-  OpenFile(Int, Int)
-  RetryFile(Int, Int)
-  SourceLoaded(Int, Int, @change.SourceSide, Result[(String, Bytes), Error])
-  PullMetadataLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
-  PullCompareLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCompare, Error])
-  PullFilesPageLoaded(Int, Int, Int, Result[Array[@moondiff-playground-protocol.ApiFile], Error])
-  PullValidationLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
-  PullCommitMetadataLoaded(Int, Result[@moondiff-playground-protocol.ApiPull, Error])
+  CommitPageLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiCommit, Error])
+  ToggleFile(Int32, Int32)
+  ToggleSection(Int32, Int32, String)
+  NavigateChange(Int32, Int32, String, Int32, Int32)
+  OpenFile(Int32, Int32)
+  RetryFile(Int32, Int32)
+  SourceLoaded(Int32, Int32, @change.SourceSide, Result[(String, Bytes), Error])
+  PullMetadataLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiPull, Error])
+  PullCompareLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiCompare, Error])
+  PullFilesPageLoaded(Int32, Int32, Int32, Result[Array[@moondiff-playground-protocol.ApiFile], Error])
+  PullValidationLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiPull, Error])
+  PullCommitMetadataLoaded(Int32, Result[@moondiff-playground-protocol.ApiPull, Error])
 }
 
 pub(all) struct Model {
   input : String
-  generation : Int
+  generation : Int32
   view_mode : @change.ViewMode
   diff_algorithm : @change.DiffAlgorithm
   ignore_comments : Bool
@@ -175,7 +175,7 @@ pub(all) struct Model {
   route : @github.CommitRef?
   file_tree : FileTreeState
   auth : AuthStatus
-  auth_revision : Int
+  auth_revision : Int32
   sign_in_dialog : SignInDialog
   restore_pending : Bool
   last_authenticated_user_id : String?
@@ -204,16 +204,16 @@ pub(all) enum NavigationPolicy {
 
 pub(all) enum Phase {
   Idle
-  LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int, first~ : @moondiff-playground-protocol.ApiCommit?, files~ : Array[@moondiff-playground-protocol.ApiFile])
-  LoadingPullMetadata(reference~ : @github.CommitRef, attempt~ : Int)
+  LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int32, first~ : @moondiff-playground-protocol.ApiCommit?, files~ : Array[@moondiff-playground-protocol.ApiFile])
+  LoadingPullMetadata(reference~ : @github.CommitRef, attempt~ : Int32)
   LoadingPullCommitMetadata(reference~ : @github.CommitRef)
   LoadingRangePullMetadata(reference~ : @github.CommitRef)
   LoadingRangePullCompare(reference~ : @github.CommitRef)
   LoadingRange(reference~ : @github.CommitRef)
-  LoadingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare?, page~ : Int, files~ : Array[@moondiff-playground-protocol.ApiFile])
-  ValidatingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare, files~ : Array[@moondiff-playground-protocol.ApiFile])
-  LoadingPullSelectorCompare(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull)
-  ValidatingPullSelector(reference~ : @github.CommitRef, attempt~ : Int, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare)
+  LoadingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int32, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare?, page~ : Int32, files~ : Array[@moondiff-playground-protocol.ApiFile])
+  ValidatingPullSnapshot(reference~ : @github.CommitRef, attempt~ : Int32, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare, files~ : Array[@moondiff-playground-protocol.ApiFile])
+  LoadingPullSelectorCompare(reference~ : @github.CommitRef, attempt~ : Int32, metadata~ : @moondiff-playground-protocol.ApiPull)
+  ValidatingPullSelector(reference~ : @github.CommitRef, attempt~ : Int32, metadata~ : @moondiff-playground-protocol.ApiPull, compare~ : @moondiff-playground-protocol.ApiCompare)
   LoadFailed(String)
   Showing(@change.ChangeView)
   ShowingPullSelector(@moondiff-playground-protocol.ApiPull)
@@ -221,20 +221,20 @@ pub(all) enum Phase {
 
 pub(all) enum PullMergeMsg {
   Refresh
-  Poll(Int, Int, Int)
-  StatusLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPullMergeStatus, Error])
+  Poll(Int32, Int32, Int32)
+  StatusLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiPullMergeStatus, Error])
   Submit
-  MergeFinished(Int, Int, Result[@moondiff-playground-protocol.ApiPullMergeResult, Error])
+  MergeFinished(Int32, Int32, Result[@moondiff-playground-protocol.ApiPullMergeResult, Error])
 }
 
 pub(all) struct PullMergeState {
-  epoch : Int
-  serial : Int
+  epoch : Int32
+  serial : Int32
   status : @moondiff-playground-protocol.ApiPullMergeStatus?
   loading : Bool
   submitting : Bool
   error : String?
-  retry : Int
+  retry : Int32
   poll_scheduled : Bool
   stale : Bool
 } derive(Eq)
@@ -246,12 +246,12 @@ pub(all) enum RangeMsg {
   ToggleCommits
   LoadMore
   CopyLink
-  RangePullLoaded(Int, Result[@moondiff-playground-protocol.ApiPull, Error])
-  RangePullCompareLoaded(Int, Result[@moondiff-playground-protocol.ApiCompare, Error])
-  RangeShaResolved(Int, Bool, Bool, Result[String, Error])
-  RangePageLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiRangeCompare, Error])
-  RangePullCommitPageLoaded(Int, Int, Result[Array[@moondiff-playground-protocol.ApiRangeCommit], Error])
-  RangePullCommitPageValidated(Int, Int, Array[@moondiff-playground-protocol.ApiRangeCommit], Result[@moondiff-playground-protocol.ApiPull, Error])
+  RangePullLoaded(Int32, Result[@moondiff-playground-protocol.ApiPull, Error])
+  RangePullCompareLoaded(Int32, Result[@moondiff-playground-protocol.ApiCompare, Error])
+  RangeShaResolved(Int32, Bool, Bool, Result[String, Error])
+  RangePageLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiRangeCompare, Error])
+  RangePullCommitPageLoaded(Int32, Int32, Result[Array[@moondiff-playground-protocol.ApiRangeCommit], Error])
+  RangePullCommitPageValidated(Int32, Int32, Array[@moondiff-playground-protocol.ApiRangeCommit], Result[@moondiff-playground-protocol.ApiPull, Error])
 }
 
 pub(all) struct RangeState {
@@ -261,9 +261,9 @@ pub(all) struct RangeState {
   head_sha : String
   commits : Array[@moondiff-playground-protocol.ApiRangeCommit]
   linear_commits : Array[@moondiff-playground-protocol.ApiRangeCommit]?
-  total_commits : Int
-  loading_page : Int?
-  next_page : Int?
+  total_commits : Int32
+  loading_page : Int32?
+  next_page : Int32?
   error : String?
   expanded : Bool
   comparison : @moondiff-playground-protocol.ApiRangeCompare?
@@ -291,30 +291,30 @@ pub(all) enum ReviewMsg {
   Domain(@comments.Event)
   RefreshComments
   LoadLatestSnapshot
-  BeginCommentsRefresh(Int, @github.CommitRef)
-  CommentsMetadataLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
-  CommentsValidated(Int, Int, Result[@moondiff-playground-protocol.ApiPull, Error])
+  BeginCommentsRefresh(Int32, @github.CommitRef)
+  CommentsMetadataLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiPull, Error])
+  CommentsValidated(Int32, Int32, Result[@moondiff-playground-protocol.ApiPull, Error])
   AskDelete(@comments.CommentId)
   CancelDelete
   ConfirmCommentDelete(@comments.CommentId)
-  CommentDeleted(Int, Int, @comments.CommentId, Result[@moondiff-playground-protocol.DeleteResult, Error])
-  CommentsLoaded(Int, Int, Result[@moondiff-playground-protocol.ApiCommentBundle, Error])
+  CommentDeleted(Int32, Int32, @comments.CommentId, Result[@moondiff-playground-protocol.DeleteResult, Error])
+  CommentsLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
-  OpenInlineDraft(Int, @review.ReviewAnchor)
+  OpenInlineDraft(Int32, @review.ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
   CancelDraft
   SubmitDraft
-  CommentHeadChecked(Int, Int, @review.ReviewAnchor, Result[@moondiff-playground-protocol.ApiPull, Error])
-  IssueCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiIssueComment, Error])
-  ReviewCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
-  CommitCommentCreated(Int, Int, Result[@moondiff-playground-protocol.ApiCommitComment, Error])
-  ReviewReplyCreated(Int, Int, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
+  CommentHeadChecked(Int32, Int32, @review.ReviewAnchor, Result[@moondiff-playground-protocol.ApiPull, Error])
+  IssueCommentCreated(Int32, Int32, Result[@moondiff-playground-protocol.ApiIssueComment, Error])
+  ReviewCommentCreated(Int32, Int32, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
+  CommitCommentCreated(Int32, Int32, Result[@moondiff-playground-protocol.ApiCommitComment, Error])
+  ReviewReplyCreated(Int32, Int32, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
 }
 
 pub(all) struct SignInDialog {
-  revision : Int
+  revision : Int32
   entry : SignInEntry?
 } derive(Eq)
 #deprecated
@@ -324,12 +324,12 @@ pub fn SignInDialog::new() -> Self
 pub fn SignInDialog::not_equal(Self, Self) -> Bool
 
 pub(all) enum SignInEntry {
-  Comment(Int)
-  Viewed(Int)
+  Comment(Int32)
+  Viewed(Int32)
 } derive(Eq)
 #deprecated
 pub fn SignInEntry::equal(Self, Self) -> Bool
-pub fn SignInEntry::file_index(Self) -> Int
+pub fn SignInEntry::file_index(Self) -> Int32
 #deprecated
 pub fn SignInEntry::not_equal(Self, Self) -> Bool
 
@@ -345,12 +345,12 @@ pub(all) enum UiMsg {
   RetryRoute
   RouteChanged(@url.Url)
   SelectView(@change.ViewMode)
-  OpenSignIn(Int, SignInEntry, @dom.Element?)
-  CloseSignIn(Int, Int)
+  OpenSignIn(Int32, SignInEntry, @dom.Element?)
+  CloseSignIn(Int32, Int32)
   ToggleFileTreeDrawer
   CloseFileTreeDrawer
-  FileTreeViewportChanged(Int)
-  FileTreeWidthChanged(Int)
+  FileTreeViewportChanged(Int32)
+  FileTreeWidthChanged(Int32)
   ToggleFileTreeSearch
   FileTreeSearchChanged(String)
   ToggleFileTreeStatus(String)
@@ -365,18 +365,18 @@ pub(all) struct ViewedFile {
   pending : ViewedPending?
   error : String?
   touched : Bool
-  expansion_revision : Int
+  expansion_revision : Int32
 } derive(Eq)
 
 pub(all) enum ViewedMsg {
-  Toggle(Int, Int)
+  Toggle(Int32, Int32)
   Refresh
-  Restored(Int, Int, Result[Array[ViewedRecord], String])
-  Stored(Int, Int, ViewedRecord, Bool)
-  StorageFailed(Int)
-  Check(Int, Int, Int)
-  Loaded(Int, Int, Result[@moondiff-playground-protocol.ApiPullViewed, Error])
-  Saved(Int, Int, String, Result[@moondiff-playground-protocol.ApiFileViewedResult, Error])
+  Restored(Int32, Int32, Result[Array[ViewedRecord], String])
+  Stored(Int32, Int32, ViewedRecord, Bool)
+  StorageFailed(Int32)
+  Check(Int32, Int32, Int32)
+  Loaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiPullViewed, Error])
+  Saved(Int32, Int32, String, Result[@moondiff-playground-protocol.ApiFileViewedResult, Error])
 }
 
 pub(all) struct ViewedPending {
@@ -384,7 +384,7 @@ pub(all) struct ViewedPending {
   stored : Bool
   before : @moondiff-playground-protocol.FileViewedState
   expanded : Bool
-  expansion_revision : Int
+  expansion_revision : Int32
   confirming : Bool
 } derive(Eq)
 
@@ -402,9 +402,9 @@ pub(all) struct ViewedRecord {
 
 pub(all) struct ViewedState {
   user_id : String?
-  epoch : Int
-  serial : Int
-  read_serial : Int
+  epoch : Int32
+  serial : Int32
+  read_serial : Int32
   files : Array[ViewedFile]
   loading : Bool
   ready : Bool
@@ -412,7 +412,7 @@ pub(all) struct ViewedState {
   error : String?
   stale : Bool
   storage_ready : Bool
-  retry : Int
+  retry : Int32
   poll_scheduled : Bool
 } derive(Eq)
 pub fn ViewedState::new() -> Self

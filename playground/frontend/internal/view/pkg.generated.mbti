@@ -22,7 +22,7 @@ pub fn region_view(RegionInput, @cmd.Emit[@application.Msg], FileDerivation) -> 
 
 pub fn semantic_section_fragment(@model.DiffSection) -> @model.DiffFragment
 
-pub fn semantic_section_title(Int, @model.DiffSection) -> String
+pub fn semantic_section_title(Int32, @model.DiffSection) -> String
 
 pub fn shell_input(@application.Model) -> ShellInput
 
@@ -38,7 +38,7 @@ pub(all) struct DiffNotice {
 }
 
 pub(all) struct DiscussionInput {
-  generation : Int
+  generation : Int32
   is_pull : Bool
   review : @comments.ReadView
   auth : @application.AuthStatus
@@ -59,8 +59,8 @@ pub fn FileDerivation::new() -> Self
 
 pub(all) struct FileInput {
   file : @change.FileState
-  generation : Int
-  index : Int
+  generation : Int32
+  index : Int32
   display : DisplayOptions
   review : @comments.ReadView
   viewed : ViewedControl
@@ -76,7 +76,7 @@ pub(all) struct MountHost {
 } derive(Eq)
 
 pub(all) struct NavigationInput {
-  generation : Int
+  generation : Int32
   enabled : Bool
 } derive(Eq)
 
@@ -90,7 +90,7 @@ pub(all) struct RangePanelInput {
   reference : @github.CommitRef
   state : @application.RangeState
   stats : @moondiff-playground-protocol.ApiStats
-  file_count : Int
+  file_count : Int32
 } derive(Eq)
 
 pub(all) enum RegionInput {
@@ -115,13 +115,13 @@ pub fn RegionProjection::new() -> Self
 
 pub(all) struct ShellInput {
   home : Bool
-  generation : Int
+  generation : Int32
   landing : Bool
   showing : Bool
   selector_only : Bool
   message : String
   drawer_open : Bool
-  preferred_width : Int
+  preferred_width : Int32
   display : DisplayOptions
   range_limit : Bool
 } derive(Eq)
@@ -137,7 +137,7 @@ pub(all) struct ToolbarInput {
   landing : Bool
   drawer_open : Bool
   auth : @application.AuthStatus
-  file_count : Int?
+  file_count : Int32?
   diff_algorithm : @change.DiffAlgorithm
   view_mode : @change.ViewMode
   ignore_comments : Bool
@@ -150,7 +150,7 @@ pub struct TreeData {
 pub impl Eq for TreeData
 
 pub(all) struct TreeInput {
-  generation : Int
+  generation : Int32
   tree : TreeData
   state : @application.FileTreeState
   viewed : Array[Bool]
@@ -165,8 +165,8 @@ pub(all) struct TreeMetadata {
 pub(all) struct ViewedControl {
   is_pull : Bool
   requires_sign_in : Bool
-  generation : Int
-  index : Int
+  generation : Int32
+  index : Int32
   path : String
   checked : Bool
   syncing : Bool
@@ -180,8 +180,8 @@ pub(all) struct ViewedControl {
 
 pub(all) struct ViewedSummaryInput {
   is_pull : Bool
-  total : Int
-  count : Int
+  total : Int32
+  count : Int32
   pending : Bool
   auth : @application.AuthStatus
   ready : Bool

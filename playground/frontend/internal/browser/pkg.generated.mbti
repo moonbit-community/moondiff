@@ -58,21 +58,21 @@ pub fn resolve_url(String) -> String
 
 pub fn same(@dom.Element, @dom.Element) -> Bool
 
-pub fn select_range(@dom.Element, Int, Int, String) -> Unit
+pub fn select_range(@dom.Element, Int32, Int32, String) -> Unit
 
 pub fn selection_direction(@dom.Element) -> String
 
-pub fn selection_end(@dom.Element) -> Int
+pub fn selection_end(@dom.Element) -> Int32
 
-pub fn selection_start(@dom.Element) -> Int
+pub fn selection_start(@dom.Element) -> Int32
 
 pub fn[T] set_property(@dom.Element, String, T) -> Unit
 
 pub fn storage_get(String) -> String? raise
 
-pub fn storage_key(Int) -> String? raise
+pub fn storage_key(Int32) -> String? raise
 
-pub fn storage_length() -> Int raise
+pub fn storage_length() -> Int32 raise
 
 pub fn storage_remove(String) -> Unit raise
 
@@ -103,7 +103,7 @@ pub fn Response::has_header(Self, String) -> Bool
 pub fn Response::header(Self, String) -> @js.Nullable[String]
 pub fn Response::ok(Self) -> Bool
 pub fn Response::reader(Self) -> Reader
-pub fn Response::status(Self) -> Int
+pub fn Response::status(Self) -> Int32
 pub fn Response::text(Self) -> @js_async.Promise[String]
 
 // Type aliases

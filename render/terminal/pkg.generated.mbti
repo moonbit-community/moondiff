@@ -13,10 +13,10 @@ pub fn render_document(String, String, @model.HunkDocument, options? : RenderOpt
 // Types and methods
 pub struct RenderOptions {
   use_color : Bool
-  old_max_line : Int?
-  new_max_line : Int?
+  old_max_line : Int32?
+  new_max_line : Int32?
 }
-pub fn RenderOptions::new(use_color? : Bool, old_max_line? : Int, new_max_line? : Int) -> Self
+pub fn RenderOptions::new(use_color? : Bool, old_max_line? : Int32, new_max_line? : Int32) -> Self
 pub impl Default for RenderOptions
 
 // Type aliases

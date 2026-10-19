@@ -2,7 +2,7 @@
 package "moonbit-community/moondiff/internal/render"
 
 // Values
-pub fn hunk_header(Int, Int, Int, Int) -> String
+pub fn hunk_header(Int32, Int32, Int32, Int32) -> String
 
 // Errors
 

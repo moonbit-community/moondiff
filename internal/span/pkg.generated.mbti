@@ -13,19 +13,19 @@ import {
 // Types and methods
 pub struct LineWidths {
   contents : Array[Char]
-  lines : Array[(Int, Int)]
+  lines : Array[(Int32, Int32)]
 }
 #alias("_[_]")
-pub fn LineWidths::at(Self, Int) -> ArrayView[Char]
+pub fn LineWidths::at(Self, Int32) -> ArrayView[Char]
 pub fn LineWidths::from_str(StringView) -> Self
-pub fn LineWidths::get_line_width(Self, Int) -> Int
+pub fn LineWidths::get_line_width(Self, Int32) -> Int32
 pub fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]
 pub impl @debug.Debug for LineWidths
 
 pub(all) struct SingleLineSpan {
-  line : Int
-  start_col : Int
-  end_col : Int
+  line : Int32
+  start_col : Int32
+  end_col : Int32
 } derive(@debug.Debug)
 
 // Type aliases
