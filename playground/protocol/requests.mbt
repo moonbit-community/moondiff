@@ -133,6 +133,7 @@ pub(all) enum GitHubRequest {
   PullCommitsGet(PullCommitsGet)
   CommitGet(CommitGet)
   PullGet(PullGet)
+  PullSnapshotGet(PullGet)
   PullMergeStatusGet(PullMergeStatusGet)
   PullRebaseMerge(PullRebaseMerge)
   PullViewedGet(PullViewedGet)

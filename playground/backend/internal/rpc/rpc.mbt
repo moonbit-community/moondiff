@@ -19,6 +19,7 @@ pub async fn dispatch(
           @github.github_json(app, session, request.public_path().unwrap()),
         ),
       )
+    PullSnapshotGet(p) => PullSnapshot(pull_snapshot(app, session, p))
     PullMergeStatusGet(p) =>
       PullMergeStatus(@merge.pull_merge_status(app, session, p))
     PullRebaseMerge(p) =>
