@@ -14,13 +14,33 @@ fn[T] Client::rpc_network(
       return
     }
   }
+  let authenticated = self.authenticated
+  let change_read = request
+    is (ContentGet(_)
+    | CommitGet(_)
+    | PullGet(_)
+    | PullSnapshotGet(_)
+    | CompareGet(_)
+    | PullFiles(_)
+    | RangeCompareGet(_)
+    | PullCommitPageGet(_)
+    | ResolveShaGet(_))
+  let completed = fn(result : Result[T, Error]) {
+    done(
+      if change_read {
+        self.request_result(result, authenticated)
+      } else {
+        result
+      },
+    )
+  }
   if !self.authenticated &&
     (request.public_path() is Some(_) || request is CommentsList(_)) {
     self.public_rpc(
       request,
       generation,
       result => {
-        done(
+        completed(
           match result {
             Err(error) => Err(error)
             Ok(value) =>
@@ -39,7 +59,7 @@ fn[T] Client::rpc_network(
     "/api/rpc",
     request.encode().stringify(),
     result => {
-      done(
+      completed(
         match result {
           Err(error) => Err(error)
           Ok(value) =>
@@ -202,15 +222,24 @@ pub fn get_content(
   args : @protocol.ContentGet,
   generation : Int32,
   emit : @rabbita.Emit[Result[@protocol.ApiSource, Error]],
+  priority~ : Bool = false,
 ) -> @rabbita.Cmd {
-  rpc_command(
-    ContentGet(args),
-    generation,
-    value => {
-      guard value is Content(data) else {
-        raise invalid_response("Unexpected RPC result kind.")
-      }
-      data
+  command(
+    done => {
+      client.read(
+        ContentGet(args),
+        generation,
+        result => {
+          done(
+            match result {
+              Ok(Content(data)) => Ok(data)
+              Err(error) => Err(error)
+              _ => Err(invalid_response("Unexpected RPC result kind."))
+            },
+          )
+        },
+        priority~,
+      )
     },
     emit,
   )
@@ -373,6 +402,7 @@ pub fn source_request(
   location : SourceLocation,
   generation : Int32,
   emit : @rabbita.Emit[Result[(String, Bytes), Error]],
+  priority~ : Bool = false,
 ) -> @rabbita.Cmd {
   get_content(
     {
@@ -393,5 +423,6 @@ pub fn source_request(
         },
       )
     },
+    priority~,
   )
 }
