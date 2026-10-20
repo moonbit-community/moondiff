@@ -4,7 +4,17 @@ package "moonbit-community/moondiff-playground/internal/metrics"
 // Values
 pub fn active(String, Int32) -> Unit
 
+pub fn begin(String) -> Unit
+
+pub fn cache_outcome(Bool) -> Unit
+
 pub fn count(String, String) -> Unit
+
+pub fn counter(String, Int32) -> Unit
+
+pub fn finish(String) -> Unit
+
+pub fn pending(String) -> Bool
 
 pub fn[T] state(String, String, T) -> Unit
 
