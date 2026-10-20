@@ -366,8 +366,12 @@ there is no v1 compatibility layer, and the SQLite data format is unchanged.
 The browser's public reads and backend share REST path construction and response
 validation. Public requests omit `X-GitHub-Api-Version` and follow GitHub's
 [default API version](https://docs.github.com/en/rest/about-the-rest-api/api-versions).
-Only data addressed by a full immutable SHA is kept in a bounded memory cache;
-concurrent identical requests share one fetch. The
+Immutable SHA source and complete PR snapshots share a 32 MiB session-memory
+LRU. Cached PR pages paint immediately while fresh metadata confirms write
+permission; the two most recent parsed pages also retain diff/highlight results.
+Signed-in cold reads use the bounded `PullSnapshotGet` aggregate; see
+[snapshot loading](frontend/internal/github_client/README.md). Concurrent identical
+requests share one fetch. The
 [contract check](../.github/workflows/public-github-contract.yml) runs on pushes
 to `main`. It checks public response shapes and CORS without an API version
 header, and reports GitHub rate limits as indeterminate.

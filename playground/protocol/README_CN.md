@@ -36,6 +36,7 @@ RPC 请求使用 `{"v":2,"request":GitHubRequest}` 格式。例如：
 | --- | --- | --- |
 | `CommitGet` | `sha`、`page` | `Commit(ApiCommit)` |
 | `PullGet` | `number` | `Pull(ApiPull)` |
+| `PullSnapshotGet` | `number` | `PullSnapshot(ApiPullSnapshotResult)` |
 | `ViewerPullsGet` | `kind`、可选 `cursor`；无需 `owner`、`repo` | `ViewerPulls(ApiViewerPulls)` |
 | `PullCommitsGet` | `number`、可选 `cursor` | `PullCommits(ApiPullCommits)` |
 | `PullViewedGet` | `number` | `PullViewed(ApiPullViewed)` |
@@ -69,6 +70,12 @@ GitHub 只在第一页返回文件，最多 300 个；第一页达到 300 个文
 
 PR 区间选择器对不超过 250 个提交的 PR 使用 `PullCommitPageGet`，每页 100 个，并在每页后复核 PR 的 base、head、仓库和提交数。超过 250 个提交或数量缺失时，使用固定 SHA 的 compare 分页。`ResolveShaGet` 使用 GitHub 的 SHA 媒体类型，仅接受与输入前缀匹配的完整 SHA，再进行分享区间的比较。
 PR 提交列表完整加载后，选择器只支持从 merge base 到 PR head 的单父提交链；分叉或合并历史仍可查看完整 PR diff。
+
+`PullSnapshotGet` 是登录后可用的只读操作。返回 `Complete(ApiPullSnapshot)`，
+包含 metadata、comparison、files 和版本签名；超过 300 个文件或编码响应超过
+8 MiB 时返回 `MetadataOnly(ApiPull)`，前端继续使用原有分页流程。比较与文件
+分页最多并行两个上游读取，完成后独立复核 metadata，版本漂移最多重建一次。
+全进程 64 MiB LRU 按会话和认证代次隔离，缓存命中仍需复核 metadata。
 
 ## 登录后首页
 
