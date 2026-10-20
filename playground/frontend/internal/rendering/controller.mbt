@@ -72,6 +72,10 @@ pub fn start(id : String) -> Unit {
           transition.after_commit,
         )
         coordinator.configure_range(transition.model)
+        coordinator.configure_progressive(
+          transition.model,
+          coordinator.forward(raw),
+        )
         // Region actions bind to tickets after the central projection; page
         // navigation has already replaced the previous intent in begin_update.
         let after = coordinator.after_update(

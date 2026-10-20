@@ -54,6 +54,8 @@ pub fn history_replace(String, String) -> Unit
 
 pub fn history_state() -> String
 
+pub fn intersection_observer((FixedArray[@dom.IntersectionObserverEntry], @dom.IntersectionObserver) -> Unit, String) -> @dom.IntersectionObserver
+
 pub fn manual_scroll_restoration() -> Unit
 
 pub fn mouse_click() -> @dom.Event
