@@ -44,6 +44,18 @@ pub fn has_focus() -> Bool
 
 pub fn has_window() -> Bool
 
+pub fn history_entry_id() -> String
+
+pub fn history_go(Int32) -> Unit
+
+pub fn history_push(String, String) -> Unit
+
+pub fn history_replace(String, String) -> Unit
+
+pub fn history_state() -> String
+
+pub fn manual_scroll_restoration() -> Unit
+
 pub fn mouse_click() -> @dom.Event
 
 pub fn parse_float(String) -> Double
@@ -57,6 +69,12 @@ pub fn remove(@dom.Element) -> Unit
 pub fn resolve_url(String) -> String
 
 pub fn same(@dom.Element, @dom.Element) -> Bool
+
+pub fn scroll_to(Double, Double) -> Unit
+
+pub fn scroll_x() -> Double
+
+pub fn scroll_y() -> Double
 
 pub fn select_range(@dom.Element, Int32, Int32, String) -> Unit
 
