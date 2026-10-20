@@ -28,6 +28,7 @@ priv struct Mount {
   mut paint_scheduler : &@cmd.Scheduler?
   waiting : Array[Waiting]
   mut dispose_layout : (() -> Unit)?
+  mut dispose_range_link : (() -> Unit)?
 }
 
 ///|
@@ -138,6 +139,9 @@ fn Coordinator::committed(
   mount : Mount,
   ticket : CommitTicket,
 ) -> Unit {
+  // A superseded paint can still write its old href. Reconcile even when its
+  // commit ticket is no longer current.
+  self.sync_range_link(mount)
   guard self.generation == ticket.generation && mount.accepts(ticket) else {
     return
   }
@@ -180,6 +184,7 @@ fn region_component(
     paint_scheduler: None,
     waiting: [],
     dispose_layout: None,
+    dispose_range_link: None,
   }
   coordinator.mounts[region] = mount
   @metrics.active("mounts", 1)
@@ -266,6 +271,7 @@ fn region_component(
           } else if mount.app is Some(app) && host_connected(mount.host) {
             mount.mounted = true
             create_mount_root(mount.host)
+            coordinator.install_range_link(mount)
             app.mount(mount.host + "-root")
             connect_paint_scheduler(mount.host)
           }
@@ -323,6 +329,10 @@ fn Mount::finish(self : Mount, ticket : CommitTicket) -> Array[@rabbita.Cmd] {
 ///|
 fn Mount::invalidate(self : Mount) -> Array[@rabbita.Cmd] {
   self.alive = false
+  if self.dispose_range_link is Some(dispose) {
+    dispose()
+  }
+  self.dispose_range_link = None
   self.input = None
   self.cache = None
   let durable = self.waiting.filter_map(item => {

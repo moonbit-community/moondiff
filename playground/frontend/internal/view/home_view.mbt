@@ -1,16 +1,4 @@
 ///|
-fn home_link(path : String, label : String, class : String) -> @rabbita.Html {
-  @html.a(
-    escape=true,
-    href=path,
-    target=Blank,
-    rel="noopener noreferrer",
-    class~,
-    label,
-  )
-}
-
-///|
 fn home_date(value : String) -> String {
   let time = @browser.date_parse(value)
   if @browser.finite(time) {

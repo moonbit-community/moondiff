@@ -16,6 +16,7 @@ fn test_mount() -> Mount {
     paint_scheduler: None,
     waiting: [],
     dispose_layout: None,
+    dispose_range_link: None,
   }
 }
 

@@ -99,9 +99,37 @@ fn pull_linear_chain(
 pub fn range_pull_selector_ready(state : RangeState) -> Bool {
   state.linear_commits is Some(commits) &&
   !commits.is_empty() &&
+  commits.length() == state.total_commits &&
+  state.commits.length() == state.total_commits &&
   state.loading_page is None &&
   state.next_page is None &&
   state.error is None
+}
+
+///|
+// The view, SPA activation and native hyperlink projection share this target.
+pub fn range_selected_path(
+  reference : CommitRef,
+  state : RangeState,
+) -> String? {
+  guard reference.target is PullRequest(number) &&
+    range_pull_selector_ready(state) &&
+    range_full_sha(state.from_sha) &&
+    range_full_sha(state.to_sha) &&
+    range_commit_after(state, state.from_sha, state.to_sha) else {
+    return None
+  }
+  Some(
+    @routing.playground_route(
+      @github.pull_range_reference(
+        reference.owner,
+        reference.repo,
+        number,
+        state.from_sha,
+        state.to_sha,
+      ),
+    ),
+  )
 }
 
 ///|

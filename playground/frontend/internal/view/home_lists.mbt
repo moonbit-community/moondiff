@@ -71,10 +71,11 @@ fn home_commit_view(
   for item in value.page.items {
     let sha = item.sha[:Int32::min(7, item.sha.length())].to_owned()
     items[item.sha] = @html.li(class="home-commit", [
-      home_link(
+      internal_link(
         "/\{p.owner}/\{p.repo}/pull/\{p.number}/commits/\{item.sha}",
         "\{sha}  \{item.message}",
-        "home-commit-link",
+        emit,
+        class="home-commit-link",
       ),
       @html.div(class="home-meta", [
         @html.span(home_author(item.author)),
@@ -121,10 +122,16 @@ fn home_pull_view(
   @html.li(class="home-pull", [
     @html.div(class="home-pull-heading", [
       @html.div(class="home-pull-info", [
-        home_link(
+        internal_link(
           "/\{pull.owner}/\{pull.repo}/pull/\{pull.number}",
           pull.title,
-          "home-title-link",
+          emit,
+          class="home-title-link",
+          prefetch=Some({
+            owner: pull.owner,
+            repo: pull.repo,
+            number: pull.number,
+          }),
         ),
         @html.div(class="home-meta", [
           @html.span(

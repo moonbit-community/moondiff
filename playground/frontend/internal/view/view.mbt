@@ -155,7 +155,9 @@ fn hero_view(
       class="hero hero-workspace",
       attrs=@html.Attrs::build().inert(model.drawer_open),
       [
-        @html.div(class="hero-copy", brand_view()),
+        @html.div(class="hero-copy", [
+          internal_link("/", brand_view(), emit, class="workspace-home"),
+        ]),
         @html.div(class="hero-controls", [
           @html.a(
             escape=true,

@@ -1,7 +1,8 @@
 ///|
 pub(all) enum RangeMsg {
-  FromSelected(String)
-  ToSelected(String)
+  FromSelected(Int32, String)
+  ToSelected(Int32, String)
+  OpenSelected(Int32)
   ToggleCommits
   LoadMore
   CopyLink
@@ -334,27 +335,28 @@ fn update_range(
     return (model, @rabbita.none)
   }
   match msg {
-    FromSelected(value) => {
-      guard reference.target is PullRequest(_) &&
-        range_pull_selector_ready(state) &&
-        range_commit_after(state, value, state.to_sha) else {
+    FromSelected(generation, value) => {
+      let selected = { ..state, from_sha: value, }
+      guard generation == model.generation &&
+        range_selected_path(reference, selected) is Some(_) else {
         return (model, @rabbita.none)
       }
-      (
-        { ..model, range: Some({ ..state, from_sha: value, error: None, }), },
-        @rabbita.none,
-      )
+      ({ ..model, range: Some(selected), }, @rabbita.none)
     }
-    ToSelected(value) => {
-      guard reference.target is PullRequest(_) &&
-        range_pull_selector_ready(state) &&
-        range_commit_after(state, state.from_sha, value) else {
+    ToSelected(generation, value) => {
+      let selected = { ..state, to_sha: value, }
+      guard generation == model.generation &&
+        range_selected_path(reference, selected) is Some(_) else {
         return (model, @rabbita.none)
       }
-      (
-        { ..model, range: Some({ ..state, to_sha: value, error: None, }), },
-        @rabbita.none,
-      )
+      ({ ..model, range: Some(selected), }, @rabbita.none)
+    }
+    OpenSelected(generation) => {
+      guard generation == model.generation &&
+        range_selected_path(reference, state) is Some(path) else {
+        return (model, @rabbita.none)
+      }
+      request_navigation(model, Path(path), emit)
     }
     ToggleCommits =>
       (

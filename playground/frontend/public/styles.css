@@ -581,6 +581,11 @@ button.compact {
   grid-area: brand;
 }
 
+.workspace-home {
+  display: block;
+  text-decoration: none;
+}
+
 .hero-workspace .hero-controls {
   grid-area: form;
 }
