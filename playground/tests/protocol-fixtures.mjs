@@ -8,6 +8,7 @@ const operations = {
   'github.pull.merge.status': ['PullMergeStatusGet', 'PullMergeStatus'],
   'github.pull.rebase.merge': ['PullRebaseMerge', 'PullMergeResult'],
   'github.pull.get': ['PullGet', 'Pull'],
+  'github.pull.snapshot.get': ['PullSnapshotGet', 'PullSnapshot'],
   'github.compare.get': ['CompareGet', 'Compare'],
   'github.range.compare.get': ['RangeCompareGet', 'RangeCompare'],
   'github.pull.commit.page.get': ['PullCommitPageGet', 'PullCommitPage'],
@@ -49,6 +50,7 @@ export function fixtureRequest(envelope) {
   if (op === 'github.review.comment.create') args.side = args.side.$tag.toUpperCase();
   return { op, args };
 }
+
 const pick = (value, keys) => Object.fromEntries(keys.split(' ').filter(k => value[k] != null).map(k => [k, value[k]]));
 const file = v => pick(v, 'filename previous_filename status additions deletions changes patch');
 const comment = (v, kind) => {
@@ -78,6 +80,7 @@ export function modeledValue(kind, value) {
     case 'Comments': return { issue_comments: value.issue_comments.map(v => comment(v, 'IssueComment')), review_comments: value.review_comments.map(v => comment(v, 'ReviewComment')), commit_comments: value.commit_comments.map(v => comment(v, 'CommitComment')) };
     case 'IssueComment': case 'ReviewComment': case 'CommitComment': return comment(value, kind);
     case 'PullViewed': case 'FileViewed': case 'ViewerPulls': case 'PullCommits': case 'PullMergeStatus': case 'PullMergeResult': return value;
+    case 'PullSnapshot': return value;
     case 'Deleted': return pick(value, 'deleted');
     default: throw new Error(`Unknown result ${kind}`);
   }
