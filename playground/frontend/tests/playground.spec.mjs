@@ -1568,9 +1568,11 @@ test("a PR metadata 403 keeps actionable rate-limit guidance", async ({ page }) 
 
   await page.goto(`/example/project/pull/${pullNumber}`);
 
-  await expect(page.locator(".empty-state.error")).toContainText(
-    "GitHub API rate limit exceeded. Sign in or try again after the reset time.",
+  await expect(page.locator(".empty-state.rate-limit")).toContainText(
+    "GitHub is limiting anonymous requests. Sign in to continue.",
   );
+  await expect(page.locator(".rate-limit").getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
   expect(metadataRequests).toHaveLength(1);
   const fetchCalls = await page.evaluate(() => window.__moondiffFetchCalls);
   expectRevalidatingRequests(
@@ -2014,7 +2016,7 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
 
   await page.getByRole("button", { name: "Tree" }).click();
   const astUnifiedHeaders = structuralCard.locator(".hunk-header");
-  expect(await astUnifiedHeaders.count()).toBeGreaterThan(0);
+  await expect(astUnifiedHeaders).not.toHaveCount(0);
   expect(
     (await astUnifiedHeaders.allTextContents()).every(text => text.endsWith("fn structural() {")),
   ).toBe(true);
@@ -2025,16 +2027,16 @@ test("complete Lexical sections hide only hunk headings in both review layouts",
   const readmeCard = page.locator(".file-card").filter({ hasText: "README.md" });
   await readmeCard.getByRole("button", { name: "Expand" }).click();
   await expect(readmeCard.locator("table.unified")).toBeVisible();
-  expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  await expect(readmeCard.locator(".hunk-header")).not.toHaveCount(0);
 
   await page.getByRole("button", { name: "Split" }).click();
   await expect(structuralCard.locator("table.split")).toBeVisible();
   const astSplitHeaders = structuralCard.locator(".hunk-header");
-  expect(await astSplitHeaders.count()).toBeGreaterThan(0);
+  await expect(astSplitHeaders).not.toHaveCount(0);
   expect(
     (await astSplitHeaders.allTextContents()).every(text => text.endsWith("fn structural() {")),
   ).toBe(true);
-  expect(await readmeCard.locator(".hunk-header").count()).toBeGreaterThan(0);
+  await expect(readmeCard.locator(".hunk-header")).not.toHaveCount(0);
 });
 
 test("MoonBit toplevel sections fold independently with mouse and keyboard", async ({ page }) => {

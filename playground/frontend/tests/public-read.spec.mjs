@@ -141,11 +141,11 @@ test('public oversized, rate-limited and network reads show errors without backe
   });
   for (const [revision, message] of [
     ['1'.repeat(40), /8 MiB/],
-    ['2'.repeat(40), /rate limit/i],
+    ['2'.repeat(40), /GitHub is limiting anonymous requests/],
     ['3'.repeat(40), /network or CORS policy/i],
   ]) {
     await page.goto(`/example/project/commit/${revision}`);
-    await expect(page.locator('.error').first()).toContainText(message);
+    await expect(page.locator(revision === '2'.repeat(40) ? '.rate-limit' : '.error').first()).toContainText(message);
   }
   expect(rpc).toEqual([]);
 });
