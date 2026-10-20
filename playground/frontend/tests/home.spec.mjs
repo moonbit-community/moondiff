@@ -38,7 +38,7 @@ test('signed-in invalid routes keep the input visible while typing a valid GitHu
   await expect(page.getByText('Loaded PR', { exact: true })).toBeVisible();
 });
 
-test('commit expansion is lazy and cached while PR and fork commit links open in new tabs', async ({ page }) => {
+test('commit expansion is lazy and cached while PR and fork commit links navigate in the same document', async ({ page }) => {
   const state = await setup(page);
   await page.goto('/');
   await selectTab(page, 'ReviewRequested');
@@ -55,8 +55,7 @@ test('commit expansion is lazy and cached while PR and fork commit links open in
   expect(state.calls.filter(c => c.kind === 'PullCommitsGet')).toHaveLength(2);
   const link = one.getByRole('link', { name: /Commit 1/ });
   await expect(link).toHaveAttribute('href', `/upstream/repo/pull/1/commits/${'1'.padStart(40, '0')}`);
-  await expect(link).toHaveAttribute('target', '_blank');
-  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(link).not.toHaveAttribute('target', '_blank');
   // Observe after application bubbling handlers, then prevent only the test's
   // modifier/auxiliary clicks from performing their native navigation.
   await link.evaluate(el => {
@@ -101,24 +100,22 @@ test('commit expansion is lazy and cached while PR and fork commit links open in
   const homepageUrl = page.url();
   const prLink = one.getByRole('link', { name: 'Pull request 1', exact: true });
   await expect(prLink).toHaveAttribute('href', '/upstream/repo/pull/1');
-  await expect(prLink).toHaveAttribute('target', '_blank');
-  await expect(prLink).toHaveAttribute('rel', 'noopener noreferrer');
-  const [pr] = await Promise.all([page.waitForEvent('popup'), prLink.click()]);
-  await expect(pr).toHaveURL(/\/upstream\/repo\/pull\/1$/);
-  await expect(pr.getByText('Loaded PR', { exact: true })).toBeVisible();
-  await expect(pr.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
-  expect(await pr.evaluate(() => window.opener)).toBeNull();
-  await pr.close();
-  const [commit] = await Promise.all([page.waitForEvent('popup'), link.click()]);
-  await expect(commit).toHaveURL(/\/upstream\/repo\/pull\/1\/commits\/0+1$/);
-  await expect(commit.getByText('Loaded commit', { exact: true })).toBeVisible();
-  await expect(commit.locator('.hero-workspace').getByRole('button', { name: 'Account: alice' })).toBeVisible();
-  expect(await commit.evaluate(() => window.opener)).toBeNull();
+  await expect(prLink).not.toHaveAttribute('target', '_blank');
+  await prLink.click();
+  await expect(page).toHaveURL(/\/upstream\/repo\/pull\/1$/);
+  await expect(page.getByText('Loaded PR', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.dashboardDocumentId)).toBe(documentId);
+  await page.goBack();
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/\/upstream\/repo\/pull\/1\/commits\/0+1$/);
+  await expect(page.getByText('Loaded commit', { exact: true })).toBeVisible();
   expect(state.calls.some(c => c.kind === 'CommitGet' && c.args.owner === 'fork')).toBe(true);
-  await commit.close();
-  const [keyboardCommit] = await Promise.all([page.waitForEvent('popup'), link.press('Enter')]);
-  await expect(keyboardCommit.getByText('Loaded commit', { exact: true })).toBeVisible();
-  await keyboardCommit.close();
+  await page.goBack();
+  await expect(link).toBeVisible();
+  await link.press('Enter');
+  await expect(page.getByText('Loaded commit', { exact: true })).toBeVisible();
+  await page.goBack();
   await expect(page).toHaveURL(homepageUrl);
   expect(await page.evaluate(() => window.dashboardDocumentId)).toBe(documentId);
   await expect(one.getByRole('link', { name: /Commit 1/ })).toBeVisible();

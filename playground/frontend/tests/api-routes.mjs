@@ -1,4 +1,4 @@
-import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 // Reuse GitHub fixtures through the public same-origin RPC contract.
 export function fixtureURL({ request }) {
   const a = request['0'];
@@ -40,6 +40,7 @@ export async function routeGithub(page, kind, handler, options) {
     });
   });
   await page.route('**/api/rpc', async route => {
+    route = metadataFallbackRoute(route);
     const message = fixtureRequest(route.request().postDataJSON());
     const url = fixtureURL(route.request().postDataJSON());
     const matches = kind === 'content' ? message.op === 'github.content.get' : Boolean(url) && message.op !== 'github.content.get';
@@ -71,6 +72,7 @@ export async function anonymousApi(page) {
     return route.fallback();
   });
   await page.route('**/api/rpc', route => {
+    route = metadataFallbackRoute(route);
     const { op, args } = fixtureRequest(route.request().postDataJSON());
     if (op === 'github.comments.list') return route.fulfill({ json: successFixture(op, { issue_comments: [], review_comments: [], commit_comments: [] }) });
     if (op === 'github.pull.merge.status') return route.fulfill({ json: successFixture(op, {

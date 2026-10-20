@@ -1,4 +1,4 @@
-import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs';
 import { checkToolbar } from "./toolbar.mjs";
 import { clickLineCommentButton } from "./comment-actions.mjs";
@@ -227,9 +227,13 @@ async function installApi(page, target = pullTarget(), options = {}) {
         return { ...authStatus(), attempt_id: args.attempt_id };
       }
       if (op === "auth.device.poll") {
+        const flow = state.device;
         if (state.delayNextDevicePoll) {
           state.delayNextDevicePoll = false;
           await new Promise(resolve => { state.releaseDevicePoll = resolve; });
+        }
+        if (!state.device || state.device.id !== args.authorization_id) {
+          return { ...authStatus(), device_flow: { ...flow, phase: 'cancelled' }, authorization_id: args.authorization_id };
         }
         state.authenticated = true;
         const device_flow = { ...state.device, phase: 'completed' };
@@ -435,6 +439,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
     }
   });
   await page.route('**/api/**', async route => {
+    route = metadataFallbackRoute(route);
     const path = new URL(route.request().url()).pathname;
     const message = path.startsWith('/api/auth/device/') ? { op: 'auth.device.' + path.split('/').at(-1), args: route.request().postDataJSON() } : path === '/api/auth/status' ? { op: 'auth.status' } : path === '/api/auth/logout' ? { op: 'auth.logout' } : fixtureRequest(route.request().postDataJSON());
     const payload = await page.evaluate(async message => {
@@ -1084,83 +1089,100 @@ test("expired credentials during comment refresh offer sign-in and preserve comm
   await expect(page.locator(".line-comment-button").first()).toBeAttached();
 });
 
-for (const kind of ["overall", "inline"]) {
-  test(`${kind} draft survives re-login without taking file search focus`, async ({ page }) => {
+for (const kind of ["overall", "inline", "reply"]) {
+  test(`${kind} expired draft stays editable through reauthorization without taking file search focus`, async ({ page }) => {
     await installApi(page, pullTarget(), { authenticated: true });
     await page.goto(reviewPath());
     await waitForSignedInComments(page);
-    if (kind === "overall") {
-      await page.getByRole("button", { name: "Add overall comment" }).click();
-    } else {
-      await openNewLineComment(page, 2);
-    }
+    if (kind === "overall") await page.getByRole("button", { name: "Add overall comment" }).click();
+    else if (kind === "inline") await openNewLineComment(page, 2);
+    else await page.getByRole("button", { name: "Reply" }).first().click();
     const editor = page.locator(".comment-editor textarea");
-    await expect(editor).toBeFocused();
-    const body = "Keep this draft through re-login\n" + "Keep the scroll position\n".repeat(30);
-    await editor.fill(body);
-    const draftId = await editor.getAttribute("data-draft-id");
-    const interaction = el => [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
-    const saved = await editor.evaluate(el => {
-      el.setSelectionRange(3, 12, "backward");
-      el.scrollTop = 48;
-      return [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
-    });
-    expect(saved[3]).toBeGreaterThan(0);
-
-    // A background refresh expires the session while the draft still has focus.
+    await editor.fill("Keep this draft through re-login");
+    const id = await editor.getAttribute('data-draft-id');
     await page.evaluate(() => {
       window.__fake.authenticationFailureOps.push("github.comments.list");
       window.__fake.delayNextDevicePoll = true;
     });
     await reactivatePage(page);
     await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
-    await expect(editor).toHaveCount(0);
+    await expect(editor).toHaveAttribute('data-draft-id', id);
+    await expect(editor).toBeEnabled();
+    await editor.fill('Edited while expired');
+    await editor.evaluate(element => element.select());
+    expect(await editor.evaluate(element => element.value.slice(element.selectionStart, element.selectionEnd))).toBe('Edited while expired');
+    await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+    await expect(page.locator('.comment-editor')).toContainText('Sign in with GitHub before posting');
     await page.getByRole("button", { name: "Try sign-in" }).click();
     await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDevicePoll)).toBe("function");
-
-    // Keep login pending until the user is typing in a different control.
+    await editor.fill('Edited during sign-in');
     await page.getByRole("button", { name: "Search files", exact: true }).click();
     const search = page.getByRole("searchbox", { name: "Search changed files" });
     await search.fill("main");
-    await expect(search).toBeFocused();
-    await expect(editor).toHaveCount(0);
     await page.evaluate(() => window.__fake.releaseDevicePoll());
     await waitForSignedInComments(page);
-    await expect(editor).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    await expect(editor).toHaveValue('Edited during sign-in');
+    await expect(editor).toHaveAttribute('data-draft-id', id);
     await expect(search).toBeFocused();
     await page.keyboard.type(".mbt");
     await expect(search).toHaveValue("main.mbt");
-    await expect(search).toBeFocused();
-    await expect(editor).toHaveAttribute("data-draft-id", draftId);
-    await expect(editor).toHaveValue(body);
-    await expect.poll(() => editor.evaluate(interaction)).toEqual(saved);
+    expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(0);
   });
 }
 
-test("expired credentials during comment submission preserve the draft for retry", async ({ page }) => {
+test("expired credentials during comment submission retain the draft for manual retry", async ({ page }) => {
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
-
   await page.getByRole("button", { name: "Add overall comment" }).click();
-  await page.locator(".comment-editor textarea").fill("Keep this draft");
-  await page.evaluate(() => {
-    window.__fake.authenticationFailureOps.push("github.issue.comment.create");
-  });
+  const editor = page.locator('.comment-editor textarea');
+  await editor.fill("Keep this draft");
+  await page.evaluate(() => { window.__fake.authenticationFailureOps.push("github.issue.comment.create"); });
   await page.getByRole("button", { name: "Post comment" }).click();
-
   await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
-  await expect(page.getByRole("button", { name: "Try sign-in" })).toBeVisible();
-  await expect(page.locator(".comment-editor textarea")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
-  await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
-
+  await expect(editor).toHaveValue('Keep this draft');
+  await expect(editor).toBeEnabled();
+  await editor.fill('Edited retry');
   await page.getByRole("button", { name: "Try sign-in" }).click();
   await waitForSignedInComments(page);
-  await expect(page.locator(".comment-editor textarea")).toHaveValue("Keep this draft");
+  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(editor).toHaveValue('Edited retry');
+  expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(1);
   await page.getByRole("button", { name: "Post comment" }).click();
-  await expect(page.getByText("Keep this draft", { exact: true })).toBeVisible();
+  await expect(page.getByText("Edited retry", { exact: true })).toBeVisible();
+});
+
+test('same-account recovery keeps the draft locked until snapshot validation finishes', async ({ page }) => {
+  await installApi(page, pullTarget(), { authenticated: true });
+  await page.goto(reviewPath());
+  await waitForSignedInComments(page);
+  await openNewLineComment(page, 2);
+  const editor = page.locator('.comment-editor textarea');
+  await editor.fill('Original anchor');
+  await page.evaluate(() => window.__fake.authenticationFailureOps.push('github.comments.list'));
+  await reactivatePage(page);
+  await expect(page.locator('.auth-controls.error')).toContainText('GitHub session expired');
+  let release, held = 0;
+  const validation = new Promise(resolve => { release = resolve; });
+  await page.route('**/api/rpc', async route => {
+    route = metadataFallbackRoute(route);
+    const message = fixtureRequest(route.request().postDataJSON());
+    if (message.op !== 'github.pull.get') return route.fallback();
+    const value = await page.evaluate(message => window.__dispatch(message), message);
+    held++;
+    await validation;
+    await route.fulfill({ json: successFixture(message.op, value) }).catch(() => {});
+  });
+  await page.getByRole('button', { name: 'Try sign-in' }).click();
+  await expect(page.getByRole('button', { name: 'Account: tester' })).toBeVisible();
+  await expect.poll(() => held).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+  await editor.fill('Edited during snapshot validation');
+  release();
+  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(editor).toHaveValue('Edited during snapshot validation');
+  expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(0);
 });
 
 test("private PR prompts for GitHub App access and retries after login", async ({ page }) => {
@@ -1298,6 +1320,47 @@ test("PR head race preserves the draft until manually loading the snapshot", asy
 });
 
 for (const target of [commitTarget(), pullCommitTarget()]) {
+  test(`${target.kind} can post a new comment after same-account reauthorization`, async ({ page }) => {
+    await installApi(page, target, { authenticated: true });
+    let holdSources = true, releaseSources;
+    const sources = new Promise(resolve => { releaseSources = resolve; });
+    const sourceRequests = [];
+    await page.route('**/api/rpc', async route => {
+      route = metadataFallbackRoute(route);
+      const request = fixtureRequest(route.request().postDataJSON());
+      if (request.op === 'github.content.get') {
+        sourceRequests.push(request.args);
+        if (holdSources) await sources;
+      }
+      await route.fallback().catch(() => {});
+    });
+    await page.goto(reviewPath(target));
+    await waitForSignedInComments(page);
+    await expect(page.locator('.file-card')).toContainText('src/main.mbt');
+    await expect.poll(() => sourceRequests.length).toBe(2);
+    const commitReads = () => page.evaluate(() => window.__fake.calls.filter(call => call.op === 'github.commit.get').length);
+    const before = await commitReads();
+    await page.evaluate(() => { window.__fake.authenticationFailureOps.push('github.comments.list'); });
+    await reactivatePage(page);
+    await expect(page.locator('.auth-controls.error')).toContainText('GitHub session expired');
+    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    holdSources = false;
+    await page.getByRole('button', { name: 'Try sign-in' }).click();
+    await waitForSignedInComments(page);
+    await expect.poll(() => sourceRequests.length).toBe(4);
+    releaseSources();
+    await expect(page.locator('table.split.review-diff')).toBeVisible();
+    await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);
+    await openNewLineComment(page, 2);
+    const body = `New ${target.kind} comment after sign-in`;
+    await page.locator('.comment-editor textarea').fill(body);
+    await expect(page.getByRole('button', { name: 'Post comment', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+    await expect(page.getByText(body, { exact: true })).toBeVisible();
+    expect(await commitReads()).toBe(before);
+    expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === 'github.commit.comment.create').length)).toBe(1);
+  });
+
   test(`${target.kind} posts canonical position comments to the URL repository`, async ({ page }) => {
     await installApi(page, target, { authenticated: true });
     await page.goto(reviewPath(target));
@@ -1888,7 +1951,8 @@ test("expired credentials during deletion keep the card and offer sign-in", asyn
   await requestCommentDeletion(card);
   await page.evaluate(() => window.__fake.authenticationFailureOps.push("github.issue.comment.delete"));
   await card.getByRole("button", { name: "Confirm delete" }).click();
-  await expect(card.locator(".comment-error")).toContainText("Your GitHub session expired");
+  await expect(card.locator(".comment-error")).toContainText("请求已中断");
+  await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
   await expect(page.getByRole("button", { name: "Try sign-in", exact: true })).toBeVisible();
   await expect(card.locator(".comment-delete")).toHaveCount(0);
   await expect(card).toBeVisible();
@@ -2584,8 +2648,10 @@ async function holdNextResponse(page, predicate) {
   const completed = new Promise(resolve => { finished = resolve; });
   let held = false;
   await page.route('**/api/**', async route => {
+    if (held) return route.fallback();
+    route = metadataFallbackRoute(route);
     const message = route.request().method() === 'GET' ? { op: 'auth.status' } : fixtureRequest(route.request().postDataJSON());
-    if (held || !predicate(message)) return route.fallback();
+    if (!predicate(message)) return route.fallback();
     held = true;
     const value = await page.evaluate(message => window.__dispatch(message), message);
     entered(); await gate;
@@ -2593,6 +2659,83 @@ async function holdNextResponse(page, predicate) {
     finished();
   });
   return { started, completed, release };
+}
+
+for (const kind of ['overall', 'inline', 'reply']) {
+  test(`session expiry releases an interrupted ${kind} write and ignores its late response`, async ({ page }) => {
+    await installApi(page, pullTarget(), { authenticated: true });
+    await page.goto(reviewPath());
+    await waitForSignedInComments(page);
+    if (kind === 'overall') await page.getByRole('button', { name: 'Add overall comment' }).click();
+    else if (kind === 'inline') await openNewLineComment(page, 2);
+    else await page.getByRole('button', { name: 'Reply' }).first().click();
+    const editor = page.locator('.comment-editor textarea');
+    await editor.fill('Uncertain submitted body');
+    const write = await holdNextResponse(page, message => message.op.endsWith('.create'));
+    await page.getByRole('button', { name: 'Post comment' }).click();
+    await write.started;
+    await page.evaluate(() => window.__fake.authenticationFailureOps.push('github.comments.list'));
+    await reactivatePage(page);
+    await expect(page.locator('.auth-controls.error')).toContainText('GitHub session expired');
+    await expect(editor).toBeEnabled();
+    await editor.fill('New text after expiry');
+    write.release();
+    await write.completed;
+    await expect(editor).toHaveValue('New text after expiry');
+    await page.getByRole('button', { name: 'Try sign-in' }).click();
+    await waitForSignedInComments(page);
+    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    await expect(editor).toHaveValue('New text after expiry');
+    expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(1);
+  });
+}
+
+for (const boundary of ['logout', 'account switch']) {
+  test(`expiry and cancelled sign-in preserve route drafts until ${boundary}`, async ({ page }) => {
+    await installApi(page, pullTarget(), { authenticated: true });
+    await page.goto(reviewPath());
+    await waitForSignedInComments(page);
+    await page.getByRole('button', { name: 'Add overall comment' }).click();
+    await page.locator('.comment-editor textarea').fill('Route seventeen');
+    await navigate(page, '/upstream/project/pull/18');
+    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await waitForSignedInComments(page);
+    await page.getByRole('button', { name: 'Add overall comment' }).click();
+    await page.locator('.comment-editor textarea').fill('Route eighteen');
+    await page.evaluate(() => {
+      window.__fake.authenticationFailureOps.push('github.comments.list');
+      window.__fake.delayNextDevicePoll = true;
+    });
+    await reactivatePage(page);
+    await page.getByRole('button', { name: 'Try sign-in' }).click();
+    await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDevicePoll)).toBe('function');
+    await page.getByRole('button', { name: 'Cancel sign-in' }).first().click();
+    await expect(page.getByRole('button', { name: 'Sign in with GitHub', exact: true }).first()).toBeVisible();
+    await page.evaluate(() => window.__fake.releaseDevicePoll());
+    await expect(page.locator('.comment-editor textarea')).toHaveValue('Route eighteen');
+    await navigate(page, reviewPath());
+    await expect(page.locator('.comment-editor textarea')).toHaveValue('Route seventeen');
+    await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+    // A later verified status completes recovery without reusing the cancelled poll.
+    await page.evaluate(() => {
+      window.__fake.device = null;
+      window.__fake.authenticated = true;
+    });
+    await reactivatePage(page);
+    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    if (boundary === 'logout') {
+      await page.getByRole('button', { name: 'Account: tester' }).click();
+      await page.getByRole('menuitem', { name: 'Sign out' }).click();
+    } else {
+      await page.evaluate(() => { window.__fake.login = 'another-user'; });
+      await reactivatePage(page);
+      await expect(page.getByRole('button', { name: 'Account: another-user' })).toBeVisible();
+    }
+    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await navigate(page, '/upstream/project/pull/18');
+    await expect(page.getByText('Fork PR', { exact: true })).toBeVisible();
+    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+  });
 }
 
 for (const collapsed of [false, true]) {

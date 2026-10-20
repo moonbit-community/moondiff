@@ -51,6 +51,33 @@ export function fixtureRequest(envelope) {
   return { op, args };
 }
 
+// Legacy GitHub-shaped browser fixtures exercise the paginated fallback. New
+// aggregate tests intercept the real PullSnapshotGet wire request directly.
+export function metadataFallbackRoute(route) {
+  const request = route.request();
+  let envelope;
+  try { envelope = request.postDataJSON(); } catch { return route; }
+  if (envelope?.request?.$tag !== 'PullSnapshotGet') return route;
+  const legacyRequest = new Proxy(request, { get(target, key) {
+    if (key === 'postDataJSON') return () => ({ ...envelope, request: { ...envelope.request, $tag: 'PullGet' } });
+    const value = Reflect.get(target, key, target);
+    return typeof value === 'function' ? value.bind(target) : value;
+  } });
+  return new Proxy(route, { get(target, key) {
+    if (key === 'request') return () => legacyRequest;
+    if (key === 'fulfill') return options => {
+      let json = options.json;
+      if (!json && typeof options.body === 'string') { try { json = JSON.parse(options.body); } catch {} }
+      if (json?.$tag === 'Success' && json.value?.$tag === 'Pull') {
+        const { body, ...rest } = options;
+        return target.fulfill({ ...rest, json: successFixture('github.pull.snapshot.get', { $tag: 'MetadataOnly', '0': json.value['0'] }) });
+      }
+      return target.fulfill(options);
+    };
+    const value = Reflect.get(target, key, target);
+    return typeof value === 'function' ? value.bind(target) : value;
+  } });
+}
 const pick = (value, keys) => Object.fromEntries(keys.split(' ').filter(k => value[k] != null).map(k => [k, value[k]]));
 const file = v => pick(v, 'filename previous_filename status additions deletions changes patch');
 const comment = (v, kind) => {

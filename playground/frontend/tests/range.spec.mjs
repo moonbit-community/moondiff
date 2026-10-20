@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { settleRegions } from '../../tests/render-probe.mjs';
+import { holdRegionFrames } from './dom-timing.mjs';
 
 const base = 'a'.repeat(40);
 const middle = 'b'.repeat(40);
@@ -47,6 +48,7 @@ async function publicFixture(page, makeCompare = () => comparison()) {
     json: { $tag: 'Success', value: { authenticated: false } },
   }));
   await page.route('**/api/rpc', route => {
+    route = metadataFallbackRoute(route);
     calls.push({ transport: 'rpc', tag: route.request().postDataJSON().request.$tag });
     return route.fulfill({ status: 401, json: { $tag: 'Failure', error: {
       status: 401, code: 'authentication_required', message: 'Sign in',
@@ -86,7 +88,7 @@ async function publicFixture(page, makeCompare = () => comparison()) {
   return calls;
 }
 
-async function privateFixture(page, { rangeResponse = null, pullData = pull, compareResponse = null, commitPage = null, resolveSha = null } = {}) {
+async function privateFixture(page, { rangeResponse = null, pullData = pull, compareResponse = null, commitPage = null, resolveSha = null, issueCreate = null } = {}) {
   const calls = [];
   let pullReads = 0;
   await page.context().route('**/api/auth/status', route => route.fulfill({
@@ -97,10 +99,13 @@ async function privateFixture(page, { rangeResponse = null, pullData = pull, com
     return route.abort();
   });
   await page.context().route('**/api/rpc', async route => {
+    route = metadataFallbackRoute(route);
     const { op, args } = fixtureRequest(route.request().postDataJSON());
     calls.push({ transport: 'rpc', op, args });
     let value;
     switch (op) {
+      case 'github.viewer.pulls.get': value = { items: [], total_count: 0 }; break;
+      case 'github.issue.comment.create': value = await issueCreate(args); break;
       case 'github.pull.get': value = typeof pullData === 'function' ? pullData(++pullReads) : pullData; break;
       case 'github.compare.get': value = compareResponse
         ? compareResponse(args) : { merge_base_commit: { sha: base } }; break;
@@ -135,6 +140,256 @@ async function restorePage(page) {
     dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
     dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
     dispatchEvent(new Event('focus'));
+  });
+}
+
+for (const selection of ['From', 'To', 'successive selections']) {
+  for (const activation of ['click', 'Enter']) {
+    test(`PR interval uses ${selection} before a held paint on ${activation}`, async ({ page }) => {
+      await privateFixture(page, {
+        pullData: { ...pull, commits: 3 },
+        commitPage: () => [commit(middle, base), commit(unrelated, middle), commit(head, unrelated)],
+        rangeResponse: args => comparison(args.base, args.head, { count: 1 }),
+      });
+      await page.goto('/upstream/project/pull/17');
+      const from = page.locator('.range-selector select').first();
+      const to = page.locator('.range-selector select').nth(1);
+      await expect(from).toBeEnabled();
+      await settleRegions(page);
+      const barrier = await holdRegionFrames(page, ['range-panel']);
+      let start = base;
+      let end = head;
+      if (selection === 'From') {
+        await from.selectOption(middle);
+        start = middle;
+      } else if (selection === 'To') {
+        await to.selectOption(middle);
+        end = middle;
+      } else {
+        await from.selectOption(middle);
+        await to.selectOption(unrelated);
+        await from.selectOption(base);
+        await to.selectOption(middle);
+        end = middle;
+      }
+      const link = page.locator('.range-apply');
+      if (activation === 'click') await link.click();
+      else await link.press('Enter');
+      await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${start}..${end}`);
+      await barrier.release();
+      await expect(page.locator('.range-review')).toBeVisible();
+    });
+  }
+}
+
+test('PR interval native activations refresh the accepted target before a held paint', async ({ page }) => {
+  await privateFixture(page);
+  await page.goto('/upstream/project/pull/17');
+  await expect(page.locator('.range-selector select').first()).toBeEnabled();
+  await settleRegions(page);
+  const barrier = await holdRegionFrames(page, ['range-panel']);
+  await page.locator('.range-selector select').nth(1).selectOption(middle);
+  const expected = `/upstream/project/pull/17/compare/${base}..${middle}`;
+  // Read once, without waiting for a paint or retrying the assertion.
+  expect(await page.locator('.range-apply').getAttribute('href')).toBe(expected);
+  await barrier.blocked();
+  const observations = await page.locator('.range-apply').evaluate((link, stale) => {
+    const child = document.createElement('span');
+    link.append(child);
+    const cases = [
+      ['pointerdown', PointerEvent, { button: 0, ctrlKey: true }],
+      ['click', MouseEvent, { button: 0, ctrlKey: true }],
+      ['click', MouseEvent, { button: 0, metaKey: true }],
+      ['click', MouseEvent, { button: 0, shiftKey: true }],
+      ['click', MouseEvent, { button: 0, altKey: true }],
+      ['auxclick', MouseEvent, { button: 1 }],
+      ['contextmenu', MouseEvent, { button: 2 }],
+      ['keydown', KeyboardEvent, { key: 'Enter' }],
+      ['dragstart', DragEvent, {}],
+    ];
+    const observations = cases.map(([type, EventType, options]) => {
+      // Emulate a superseded regional paint overwriting the attribute. Each
+      // capture listener must repair it before the browser's default action.
+      link.setAttribute('href', stale);
+      let result;
+      document.addEventListener(type, event => {
+        result = { type, href: link.getAttribute('href'), prevented: event.defaultPrevented };
+        event.preventDefault(); // Only the test suppresses the native action.
+      }, { once: true });
+      child.dispatchEvent(new EventType(type, { bubbles: true, cancelable: true, ...options }));
+      return result;
+    });
+    child.remove();
+    return observations;
+  }, `/upstream/project/pull/17/compare/${base}..${head}`);
+  expect(observations).toEqual([
+    'pointerdown', 'click', 'click', 'click', 'click', 'auxclick', 'contextmenu', 'keydown', 'dragstart',
+  ].map(type => ({ type, href: expected, prevented: false })));
+  await barrier.release();
+  await settleRegions(page);
+  expect(await page.locator('.range-apply').getAttribute('href')).toBe(expected);
+});
+
+for (const activation of ['ControlOrMeta', 'middle']) {
+  test(`PR interval ${activation} opens the current selection in a new page before paint`, async ({ page }) => {
+    await privateFixture(page, {
+      rangeResponse: args => comparison(args.base, args.head, { count: 1 }),
+    });
+    await page.goto('/upstream/project/pull/17');
+    await expect(page.locator('.range-selector select').first()).toBeEnabled();
+    await settleRegions(page);
+    const barrier = await holdRegionFrames(page, ['range-panel']);
+    await page.locator('.range-selector select').nth(1).selectOption(middle);
+    const popupPromise = page.context().waitForEvent('page');
+    await page.locator('.range-apply').click(activation === 'middle'
+      ? { button: 'middle' } : { modifiers: ['ControlOrMeta'] });
+    const popup = await popupPromise;
+    await expect(popup).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+    await expect(popup.locator('.range-review')).toBeVisible();
+    await expect(page).toHaveURL('/upstream/project/pull/17');
+    await popup.close();
+    await barrier.release();
+    await settleRegions(page);
+    expect(await page.locator('.range-apply').getAttribute('href'))
+      .toBe(`/upstream/project/pull/17/compare/${base}..${middle}`);
+  });
+}
+
+test('PR interval history retires links and listeners and restores accepted selections', async ({ page }) => {
+  await page.addInitScript(() => {
+    const events = new Set(['pointerdown', 'click', 'auxclick', 'contextmenu', 'keydown', 'dragstart']);
+    const originalAdd = EventTarget.prototype.addEventListener;
+    const originalRemove = EventTarget.prototype.removeEventListener;
+    const active = new Map();
+    const capture = options => options === true || options?.capture;
+    const tracked = (target, type, options) => target instanceof Element
+      && /^render-region-\d+-root$/.test(target.id) && events.has(type) && capture(options);
+    EventTarget.prototype.addEventListener = function (type, listener, options) {
+      if (tracked(this, type, options)) {
+        if (!active.has(this)) active.set(this, new Map());
+        const listeners = active.get(this);
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type).add(listener);
+      }
+      return originalAdd.call(this, type, listener, options);
+    };
+    EventTarget.prototype.removeEventListener = function (type, listener, options) {
+      if (tracked(this, type, options)) {
+        const listeners = active.get(this);
+        listeners?.get(type)?.delete(listener);
+        if (listeners && [...listeners.values()].every(set => !set.size)) active.delete(this);
+      }
+      return originalRemove.call(this, type, listener, options);
+    };
+    window.rangeListenerCounts = () => [...active.values()]
+      .map(events => [...events.values()].reduce((sum, set) => sum + set.size, 0));
+  });
+  await privateFixture(page, {
+    rangeResponse: args => comparison(args.base, args.head, { count: 1 }),
+  });
+  await page.goto('/upstream/project/pull/17');
+  const from = page.locator('.range-selector select').first();
+  const to = page.locator('.range-selector select').nth(1);
+  await expect(from).toBeEnabled();
+  await settleRegions(page);
+  for (let visit = 0; visit < 3; visit++) {
+    expect(await page.evaluate(() => rangeListenerCounts())).toEqual([6]);
+    const oldLink = await page.locator('.range-apply').elementHandle();
+    const oldFrom = await from.elementHandle();
+    const oldTo = await to.elementHandle();
+    const barrier = await holdRegionFrames(page, ['range-panel']);
+    await to.selectOption(middle);
+    await page.locator('.range-apply').click();
+    await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+    await barrier.release();
+    await settleRegions(page);
+    expect(await oldLink.getAttribute('href')).toBeNull();
+    expect(await page.evaluate(() => rangeListenerCounts())).toEqual([]);
+    await page.goBack();
+    await expect(to).toHaveValue(middle);
+    await to.selectOption(head);
+    await from.selectOption(middle);
+    await settleRegions(page);
+    // Retained DOM callbacks still carry the old generation, including on a PR
+    // whose new selector accepts these otherwise valid options.
+    await oldFrom.evaluate((select, value) => {
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }, base);
+    await oldTo.evaluate((select, value) => {
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }, middle);
+    await oldLink.evaluate(link => link.click());
+    await settleRegions(page);
+    await expect(page).toHaveURL('/upstream/project/pull/17');
+    expect(await from.inputValue()).toBe(middle);
+    expect(await to.inputValue()).toBe(head);
+    expect(await page.locator('.range-apply').getAttribute('href'))
+      .toBe(`/upstream/project/pull/17/compare/${middle}..${head}`);
+    expect(await page.evaluate(() => rangeListenerCounts())).toEqual([6]);
+    await page.goForward();
+    await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+    await page.goBack();
+    await expect(from).toHaveValue(middle);
+    await expect(to).toHaveValue(head);
+    await from.selectOption(base);
+    await settleRegions(page);
+    await oldLink.dispose();
+    await oldFrom.dispose();
+    await oldTo.dispose();
+  }
+  await page.locator('.workspace-home').click();
+  await settleRegions(page);
+  expect(await page.evaluate(() => rangeListenerCounts())).toEqual([]);
+});
+
+for (const outcome of ['success', 'failure']) {
+  test(`PR interval navigation during comment submission uses the clicked selection on ${outcome}`, async ({ page }) => {
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    let posted;
+    const started = new Promise(resolve => { posted = resolve; });
+    await privateFixture(page, {
+      rangeResponse: args => comparison(args.base, args.head, { count: 1 }),
+      issueCreate: async args => {
+        posted();
+        await pending;
+        return outcome === 'failure'
+          ? { error: { status: 422, code: 'github_http_422', message: 'Comment failed' } }
+          : { id: '42', body: args.body, html_url: 'https://github.com/comment/42',
+            created_at: '2026-08-18T09:00:00Z', user: { login: 'reviewer' } };
+      },
+    });
+    await page.goto('/upstream/project/pull/17');
+    await expect(page.locator('.range-selector select').first()).toBeEnabled();
+    await page.locator('.add-overall-comment').click();
+    const editor = page.locator('.comment-editor textarea');
+    await editor.fill('Keep the clicked interval');
+    await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+    await started;
+    await settleRegions(page);
+    const barrier = await holdRegionFrames(page, ['range-panel']);
+    const to = page.locator('.range-selector select').nth(1);
+    await to.selectOption(middle);
+    await page.locator('.range-apply').click();
+    // A selection after the click must not rewrite the pending destination.
+    await to.selectOption(head);
+    expect(new URL(page.url()).pathname).toBe('/upstream/project/pull/17');
+    release();
+    if (outcome === 'success') {
+      await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+      await barrier.release();
+      await expect(page.locator('.range-review')).toBeVisible();
+    } else {
+      await expect(editor).toBeEnabled();
+      await expect(editor).toHaveValue('Keep the clicked interval');
+      await barrier.release();
+      await settleRegions(page);
+      expect(new URL(page.url()).pathname).toBe('/upstream/project/pull/17');
+      expect(await page.locator('.range-apply').getAttribute('href'))
+        .toBe(`/upstream/project/pull/17/compare/${base}..${head}`);
+    }
   });
 }
 
@@ -209,7 +464,7 @@ test('shared interval waits for its final commit before replacing a short URL', 
   } finally { release(); }
 });
 
-test('fork PR selector opens a fixed interval in a new tab and keeps PR comments available', async ({ page }) => {
+test('fork PR selector visits a fixed interval and returns to PR comments', async ({ page }) => {
   const calls = await privateFixture(page);
   await page.goto('/upstream/project/pull/17');
   await expect(page.locator('.file-card')).toHaveCount(1);
@@ -224,16 +479,9 @@ test('fork PR selector opens a fixed interval in a new tab and keeps PR comments
   expect(await page.evaluate(() => document.querySelector('.file-card') === window.originalCard)).toBe(true);
   const viewInterval = page.locator('.range-apply');
   await expect(viewInterval).toHaveAttribute('href', `/upstream/project/pull/17/compare/${base}..${middle}`);
-  await expect(viewInterval).toHaveAttribute('target', '_blank');
-  await expect(viewInterval).toHaveAttribute('rel', 'noopener noreferrer');
-  const [intervalPage] = await Promise.all([
-    page.context().waitForEvent('page'),
-    viewInterval.click(),
-  ]);
-  await expect(page).toHaveURL('/upstream/project/pull/17');
-  await expect(page.locator('.add-overall-comment')).toBeVisible();
-  await settleRegions(page);
-  expect(await page.evaluate(() => document.querySelector('.file-card') === window.originalCard)).toBe(true);
+  await expect(viewInterval).toHaveAttribute('target', '_self');
+  await viewInterval.click();
+  const intervalPage = page;
   await expect(intervalPage).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
   await expect(intervalPage.locator('.range-review')).toContainText('1 commit');
   await expect(intervalPage.locator('.range-title-commit')).toHaveText(['Change bbbbbbb', 'Change bbbbbbb']);
@@ -252,10 +500,15 @@ test('fork PR selector opens a fixed interval in a new tab and keeps PR comments
   const sources = calls.filter(c => c.op === 'github.content.get').map(c => [c.args.owner, c.args.repo, c.args.ref]);
   expect(sources).toContainEqual(['upstream', 'project', base]);
   expect(sources).toContainEqual(['fork', 'project', middle]);
-  await intervalPage.reload();
-  await expect(intervalPage.locator('.range-review')).toContainText('1 commit');
+  await page.goBack();
   await expect(page).toHaveURL('/upstream/project/pull/17');
   await expect(page.locator('.add-overall-comment')).toBeVisible();
+  await expect(page.locator('.range-selector select').nth(1)).toHaveValue(middle);
+  await page.goForward();
+  await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+  await page.reload();
+  await expect(page.locator('.range-review')).toContainText('1 commit');
+
 });
 
 test('retrying a failed fork PR interval preserves its route and fork source', async ({ page }) => {
@@ -292,14 +545,13 @@ test('over-limit fork PR skips full file pages and opens a smaller interval', as
   expect(calls.filter(c => c.op === 'github.comments.list' || c.op === 'github.pull.viewed.get' || c.op === 'github.pull.merge.status')).toHaveLength(0);
   await page.locator('.range-selector select').nth(1).selectOption(middle);
   await expect(page.locator('.range-apply')).toHaveAttribute('href', `/upstream/project/pull/17/compare/${base}..${middle}`);
-  const [interval] = await Promise.all([
-    page.context().waitForEvent('page'),
-    page.locator('.range-apply').click(),
-  ]);
+  await page.locator('.range-apply').click();
+  const interval = page;
   await expect(interval.locator('.range-review')).toContainText('1 commit');
   await expect(interval.locator('.file-card')).toContainText('fn new');
   expect(calls.filter(c => c.op === 'github.content.get').map(c => [c.args.owner, c.args.repo, c.args.ref]))
     .toContainEqual(['fork', 'project', middle]);
+  await page.goBack();
   await expect(page).toHaveURL('/upstream/project/pull/17');
   await expect(page.locator('.file-card')).toHaveCount(0);
 });
@@ -535,26 +787,20 @@ test('PR From includes the selected first or last commit without changing shared
   await expect(from.locator('option')).toHaveCount(2);
   await expect(from.locator(`option[value="${base}"]`)).toContainText('Middle commit');
   await to.selectOption(middle);
-  const [firstInterval] = await Promise.all([
-    page.context().waitForEvent('page'),
-    page.locator('.range-apply').click(),
-  ]);
+  await page.locator('.range-apply').click();
+  await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
+  await expect(page.locator('.range-summary')).toContainText('1 commit');
+  await page.goBack();
   await expect(page).toHaveURL('/upstream/project/pull/17');
-  await expect(firstInterval).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
-  await expect(firstInterval.locator('.range-summary')).toContainText('1 commit');
-  await firstInterval.close();
+  await expect(to).toHaveValue(middle);
   await to.selectOption(head);
   await expect(from.locator(`option[value="${middle}"]`)).toContainText('Final commit');
   await from.selectOption(middle);
   await expect(to).toHaveValue(head);
   await expect(to.locator('option')).toHaveCount(1);
-  const [lastInterval] = await Promise.all([
-    page.context().waitForEvent('page'),
-    page.locator('.range-apply').click(),
-  ]);
-  await expect(page).toHaveURL('/upstream/project/pull/17');
-  await expect(lastInterval).toHaveURL(`/upstream/project/pull/17/compare/${middle}..${head}`);
-  await expect(lastInterval.locator('.range-summary')).toContainText('1 commit');
+  await page.locator('.range-apply').click();
+  await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${middle}..${head}`);
+  await expect(page.locator('.range-summary')).toContainText('1 commit');
 });
 
 test('PR commit choices use dedicated pages without rebuilding the diff', async ({ page }) => {
