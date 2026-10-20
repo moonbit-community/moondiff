@@ -973,3 +973,35 @@ pub extend ResolveShaGet with Eq::{not_equal, equal}
 #deprecated
 #doc(hidden)
 pub extend ResolveShaGet with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiPullSnapshot with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiPullSnapshot with @moonbitlang/core/json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiPullSnapshot with ToJson::{to_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiPullSnapshotResult with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiPullSnapshotResult with @moonbitlang/core/json.FromJson::{
+  from_json,
+}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend ApiPullSnapshotResult with ToJson::{to_json}
