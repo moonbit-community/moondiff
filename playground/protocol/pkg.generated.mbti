@@ -6,6 +6,10 @@ import {
 }
 
 // Values
+pub const SNAPSHOT_BYTE_LIMIT : Int32 = 8388608
+
+pub const SNAPSHOT_FILE_LIMIT : Int32 = 300
+
 pub fn comment_for_protocol(Json) -> Json raise
 
 pub fn[T : @json.FromJson + ToJson] decode(Json) -> T raise
@@ -19,6 +23,10 @@ pub fn github_id(Json) -> String raise
 pub fn normalize_github(Json) -> Json
 
 pub fn resolved_sha(String, String) -> String raise
+
+pub fn same_pull_snapshot(ApiPull, ApiPull) -> Bool
+
+pub fn snapshot_signature(ApiPull, ApiCompare) -> String
 
 pub fn valid_attempt_id(String) -> Bool
 
@@ -203,6 +211,18 @@ pub(all) struct ApiPullMergeStatus {
   ci_summary : ApiCiState?
   ci_checks : Array[ApiCiCheck]
   ci_warnings : Array[String]
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) struct ApiPullSnapshot {
+  metadata : ApiPull
+  comparison : ApiCompare
+  files : Array[ApiFile]
+  signature : String
+} derive(Eq, ToJson, @json.FromJson)
+
+pub(all) enum ApiPullSnapshotResult {
+  Complete(ApiPullSnapshot)
+  MetadataOnly(ApiPull)
 } derive(Eq, ToJson, @json.FromJson)
 
 pub(all) struct ApiPullSummary {
