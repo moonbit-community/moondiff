@@ -35,11 +35,23 @@ transport errors before delivering response events. RPC operations and JSON
 arguments live in `comment_requests`; the external GitHub protocol is unchanged.
 
 Route changes, confirmed sign-out and account switches use the application
-load/reset path with a new generation. Same-account credential recovery retains
-an editing draft, including its ID and snapshot; a draft bound to a different
-snapshot cannot be posted. Do not add a second reset path or directly construct
+load/reset path with a new generation. Same-account identity checks retain an
+editing draft, including its ID and snapshot. Expiration, reauthorization and
+cancelled sign-in retain active and route drafts in the page session under the
+last verified user ID. Editors remain visible and editable; submission requires
+the same verified account and a confirmed snapshot. Interrupted writes use
+`RecoverInterrupted` to retire their callbacks without repeating the mutation.
+Explicit logout and confirmed account switches clear these drafts. A draft bound to a
+different snapshot cannot be posted. Do not directly construct
 comment state in application code. Integration fixtures also establish state by
 sending events.
+
+SPA navigation exports only draft data, receipts and deletion tombstones through
+`export_navigation`. `RestoreNavigation` assigns a new draft identity in the
+current generation and resolves inline targets by exact path. Published review
+receipts restore without an editor and never block navigation or repeat a write.
+`SnapshotFreshnessChanged` supplies the application's version/identity permission
+gate to both reducer permissions and read projections.
 
 For a new asynchronous operation, allocate a fresh number when starting the
 request, capture generation and number in its response constructor, and consume

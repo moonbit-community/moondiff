@@ -155,6 +155,14 @@ fn comment_editor(
       } else {
         @html.nothing
       },
+      if !review.permissions.can_comment {
+        @html.p(
+          class="comment-notice",
+          "Sign in with GitHub before posting. Your draft stays editable.",
+        )
+      } else {
+        @html.nothing
+      },
       @html.div(class="comment-editor-actions", [
         @html.button(
           type_="button",

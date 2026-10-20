@@ -98,3 +98,7 @@ pub extend Snapshot with Eq::{not_equal, equal}
 #deprecated
 #doc(hidden)
 pub extend SubmissionPhase with Eq::{not_equal, equal}
+
+///|
+#deprecated
+pub extend NavigationReview with Eq::{equal, not_equal}
