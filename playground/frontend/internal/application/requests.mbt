@@ -43,6 +43,10 @@ fn commands_for_change(
   generation : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
+  if view.reference.target is PullRequest(_) {
+    // PR reads are admitted incrementally by the page scheduler.
+    return @rabbita.none
+  }
   let commands : Array[@rabbita.Cmd] = []
   let first = view.files.search_by(file => file.expanded)
   for index, file in view.files {

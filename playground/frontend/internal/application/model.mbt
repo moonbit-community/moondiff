@@ -49,6 +49,8 @@ pub(all) struct Model {
   input : String
   access : SnapshotAccess
   page_visible : Bool
+  pull_sources : PullSourceState?
+  source_pause : @github_client.RateLimitReason?
   navigation : NavigationState
   generation : Int32
   view_mode : ViewMode
@@ -78,6 +80,8 @@ fn initial_model() -> Model {
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 0,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,

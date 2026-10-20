@@ -111,29 +111,50 @@ fn prepare_snapshot_replacement(
   }
   (
     next,
-    @rabbita.batch(
-      requests.map(request => {
-        let (side, location) = request
-        @github_client.source_request(
-          location,
-          model.generation,
-          result => {
-            emit(
-              Load(
-                ReplacementSourceLoaded(
-                  model.generation,
-                  snapshot.signature,
-                  index,
-                  side,
-                  result,
-                ),
-              ),
-            )
-          },
-          priority=true,
-        )
-      }),
-    ),
+    @rabbita.batch([
+      if model.source_pause == Some(AnonymousRequests) &&
+        model.auth is SignedIn(..) {
+        @github_client.resume_anonymous_sources(model.generation)
+      } else {
+        @rabbita.none
+      },
+      @rabbita.batch(
+        requests.map(request => {
+          let (side, location) = request
+          replacement_source_request(
+            location,
+            model.generation,
+            snapshot.signature,
+            index,
+            side,
+            emit,
+          )
+        }),
+      ),
+    ]),
+  )
+}
+
+///|
+fn replacement_source_request(
+  location : SourceLocation,
+  generation : Int32,
+  signature : String,
+  index : Int32,
+  side : SourceSide,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  @github_client.source_request(
+    location,
+    generation,
+    result => {
+      emit(
+        Load(
+          ReplacementSourceLoaded(generation, signature, index, side, result),
+        ),
+      )
+    },
+    priority=true,
   )
 }
 
@@ -153,8 +174,32 @@ fn receive_replacement_source(
     prepared.view.files.get(index) is Some(file) else {
     return (model, @rabbita.none)
   }
+  if result is Err(@github_client.RateLimited(AnonymousRequests)) &&
+    model.auth is SignedIn(..) {
+    return (
+      model,
+      @rabbita.batch(
+        source_requests_for_file(prepared.view, index)
+        .filter(request => request.0 == side)
+        .map(request => {
+          replacement_source_request(
+            request.1,
+            generation,
+            signature,
+            index,
+            side,
+            emit,
+          )
+        }),
+      ),
+    )
+  }
   if result is Err(error) &&
     @github_client.http_error_code(error) != Some("source_too_large") {
+    let model = match @github_client.rate_limit_reason(error) {
+      Some(reason) => pause_source_loading(model, reason)
+      None => model
+    }
     return (
       {
         ..model,

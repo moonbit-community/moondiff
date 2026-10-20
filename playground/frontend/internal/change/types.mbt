@@ -20,6 +20,7 @@ pub(all) enum SourceSide {
 pub(all) enum SideLoad {
   NotRequested
   Loading
+  Paused
   Ready(Array[String])
   CannotRender(String, Bool)
   LoadFailed(String)
@@ -80,6 +81,7 @@ pub(all) struct FileState {
   file : ApiFile
   diff_mode : FileDiffMode
   expanded : Bool
+  manually_collapsed : Bool
   collapsed_sections : Array[String]
   old_side : SideLoad
   new_side : SideLoad

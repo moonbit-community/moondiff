@@ -73,6 +73,9 @@ fn ui_after_commit(
   emit : @rabbita.Emit[Msg],
 ) -> Array[AfterCommit] {
   let actions : Array[AfterCommit] = []
+  if paused_reading_position(before, next) is Some(action) {
+    actions.push(action)
+  }
   if @metrics.pending("click_to_diff") &&
     next.phase is Showing(view) &&
     view.files

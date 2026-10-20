@@ -10,6 +10,7 @@ pub(all) enum LoadMsg {
   )
   CommitPageLoaded(Int32, Int32, Result[ApiCommit, Error])
   ToggleFile(Int32, Int32)
+  AutoExpandFile(Int32, String)
   ToggleSection(Int32, Int32, String)
   NavigateChange(Int32, Int32, String, Int32, Int32)
   OpenFile(Int32, Int32)
@@ -45,11 +46,7 @@ fn update_load(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(metadata) =>
           start_pull_snapshot(model, reference, attempt, metadata, emit)
       }
@@ -62,11 +59,7 @@ fn update_load(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(pull) => {
           let repository = branch_repository(
             pull.head,
@@ -93,11 +86,7 @@ fn update_load(
           metadata~
         ) if attempt == expected_attempt =>
           match result {
-            Err(error) =>
-              (
-                with_phase(model, LoadFailed(error_message(error, true))),
-                @rabbita.none,
-              )
+            Err(error) => (load_failure(model, error), @rabbita.none)
             Ok(compare) =>
               (
                 with_phase(
@@ -121,11 +110,7 @@ fn update_load(
           files~
         ) if attempt == expected_attempt =>
           match result {
-            Err(error) =>
-              (
-                with_phase(model, LoadFailed(error_message(error, true))),
-                @rabbita.none,
-              )
+            Err(error) => (load_failure(model, error), @rabbita.none)
             Ok(compare) =>
               continue_pull_snapshot(
                 model,
@@ -160,11 +145,7 @@ fn update_load(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(response) => {
           let accumulated = merge_file_pages(files, response)
           if should_fetch_next_pull_page(
@@ -207,11 +188,7 @@ fn update_load(
           compare~
         ) if attempt == expected_attempt =>
           match result {
-            Err(error) =>
-              (
-                with_phase(model, LoadFailed(error_message(error, true))),
-                @rabbita.none,
-              )
+            Err(error) => (load_failure(model, error), @rabbita.none)
             Ok(verified) =>
               validate_or_retry_pull_selector(
                 model, reference, attempt, metadata, compare, verified, emit,
@@ -225,11 +202,7 @@ fn update_load(
           files~
         ) if attempt == expected_attempt =>
           match result {
-            Err(error) =>
-              (
-                with_phase(model, LoadFailed(error_message(error, true))),
-                @rabbita.none,
-              )
+            Err(error) => (load_failure(model, error), @rabbita.none)
             Ok(verified) =>
               validate_or_retry_pull_snapshot(
                 model, reference, attempt, metadata, compare, files, verified, emit,
@@ -248,11 +221,7 @@ fn update_load(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(response) => {
           let accumulated = merge_file_pages(files, response.files)
           let first_commit = first.unwrap_or(response)
@@ -300,7 +269,11 @@ fn update_load(
         return (model, @rabbita.none)
       }
       if file.expanded {
-        let changed = @change.FileState::{ ..file, expanded: false, }
+        let changed = @change.FileState::{
+          ..file,
+          expanded: false,
+          manually_collapsed: true,
+        }
         (
           with_phase(model, Showing(set_file_state(view, index, changed))),
           @rabbita.none,
@@ -308,6 +281,16 @@ fn update_load(
       } else {
         expand_file(model, view, generation, index, file, emit)
       }
+    }
+    AutoExpandFile(generation, path) => {
+      guard generation == model.generation &&
+        auto_expand_allowed(model) &&
+        model.phase is Showing(view) &&
+        view.files.search_by(file => file.file.filename == path) is Some(index) &&
+        auto_expand_candidate(model, index) else {
+        return (model, @rabbita.none)
+      }
+      expand_file(model, view, generation, index, view.files[index], emit)
     }
     ToggleSection(generation, index, key) => {
       if generation != model.generation {
@@ -342,6 +325,10 @@ fn update_load(
         file_navigation_enabled(model, index) else {
         return (model, @rabbita.none)
       }
+      let model = {
+        ..model,
+        navigation: { ..model.navigation, restore_position: false, },
+      }
       if !file.collapsed_sections.contains(key) {
         return (model, @rabbita.none)
       }
@@ -365,7 +352,7 @@ fn update_load(
       }
       let selected = select_file(model, index)
       let (opened, load_command) = if file.expanded {
-        (selected, @rabbita.none)
+        (promote_pull_file(selected, index), @rabbita.none)
       } else {
         expand_file(selected, view, generation, index, file, emit)
       }
@@ -381,7 +368,7 @@ fn update_load(
       )
     }
     RetryFile(generation, index) => {
-      if generation != model.generation {
+      if generation != model.generation || model.source_pause is Some(_) {
         return (model, @rabbita.none)
       }
       guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
@@ -395,18 +382,22 @@ fn update_load(
       let commands : Array[@rabbita.Cmd] = []
       let old_side = if file.old_side is LoadFailed(_) &&
         pair.old_location is Some(location) {
-        commands.push(
-          source_load_request(location, generation, index, Old, emit),
-        )
+        if !(view.reference.target is PullRequest(_)) {
+          commands.push(
+            source_load_request(location, generation, index, Old, emit),
+          )
+        }
         @change.Loading
       } else {
         file.old_side
       }
       let new_side = if file.new_side is LoadFailed(_) &&
         pair.new_location is Some(location) {
-        commands.push(
-          source_load_request(location, generation, index, New, emit),
-        )
+        if !(view.reference.target is PullRequest(_)) {
+          commands.push(
+            source_load_request(location, generation, index, New, emit),
+          )
+        }
         @change.Loading
       } else {
         file.new_side
@@ -414,12 +405,16 @@ fn update_load(
       let changed = @change.FileState::{
         ..file,
         expanded: true,
+        manually_collapsed: false,
         old_side,
         new_side,
         diff_cache: DiffCache::empty(),
       }
       (
-        with_phase(model, Showing(set_file_state(view, index, changed))),
+        with_phase(
+          promote_pull_file(model, index),
+          Showing(set_file_state(view, index, changed)),
+        ),
         @rabbita.batch(commands),
       )
     }
@@ -430,7 +425,33 @@ fn update_load(
       guard model.phase is Showing(view) && view.files.get(index) is Some(file) else {
         return (model, @rabbita.none)
       }
-      let loaded = side_from_result(result)
+      // Shared waiters may complete twice; only an unfinished side can change.
+      if !(file_side(file, side) is (Loading | Paused)) {
+        return (model, @rabbita.none)
+      }
+      let reason = match result {
+        Err(error) => @github_client.rate_limit_reason(error)
+        _ => None
+      }
+      let late_anonymous = reason == Some(AnonymousRequests) &&
+        model.auth is SignedIn(..) &&
+        model.source_pause is None
+      let loaded : SideLoad = if reason is Some(_) {
+        if late_anonymous {
+          Loading
+        } else {
+          Paused
+        }
+      } else {
+        side_from_result(result)
+      }
+      let model = {
+        ..model,
+        pull_sources: model.pull_sources.map(state => {
+          ..state,
+          pending: state.pending.filter(entry => entry != (index, side)),
+        }),
+      }
       let changed = match side {
         Old =>
           @change.FileState::{
@@ -454,7 +475,28 @@ fn update_load(
         model,
         Showing(set_file_state(view, index, changed)),
       )
-      (changed_model, @rabbita.none)
+      let changed_model = match reason {
+        Some(reason) => pause_source_loading(changed_model, reason)
+        None => changed_model
+      }
+      let changed_model = if late_anonymous {
+        promote_pull_file(changed_model, index)
+      } else {
+        changed_model
+      }
+      let command = if late_anonymous &&
+        !(view.reference.target is PullRequest(_)) {
+        @rabbita.batch(
+          source_requests_for_file(view, index)
+          .filter(request => request.0 == side)
+          .map(request => {
+            source_load_request(request.1, generation, index, side, emit)
+          }),
+        )
+      } else {
+        @rabbita.none
+      }
+      (changed_model, command)
     }
   }
 }

@@ -24,7 +24,7 @@ pub(all) struct PagePosition {
 pub(all) struct RouteMemory {
   review : @comments.NavigationReview
   snapshot : @comments.Snapshot?
-  files : Array[(String, Bool, Array[String])]
+  files : Array[(String, Bool, Array[String], Bool)]
   tree : FileTreeState
   range : (String, String, Bool)?
   mode : ViewMode
@@ -159,7 +159,12 @@ fn save_route_memory(model : Model) -> Model {
     files: match model.phase {
       Showing(view) =>
         view.files.map(file => {
-          (file.file.filename, file.expanded, file.collapsed_sections.copy())
+          (
+            file.file.filename,
+            file.expanded,
+            file.collapsed_sections.copy(),
+            file.manually_collapsed,
+          )
         })
       _ => []
     },
@@ -508,9 +513,14 @@ fn restore_route_preferences(model : Model) -> (Model, Array[String]) {
       let files = view.files.map(file => {
         match
           saved.files.iter().find_first(item => item.0 == file.file.filename) {
-          Some((path, expanded, collapsed)) => {
+          Some((path, expanded, collapsed, manually_collapsed)) => {
             restored.push(path)
-            { ..file, expanded, collapsed_sections: collapsed, }
+            {
+              ..file,
+              expanded,
+              collapsed_sections: collapsed,
+              manually_collapsed,
+            }
           }
           None => file
         }
@@ -550,6 +560,13 @@ fn restore_route_preferences(model : Model) -> (Model, Array[String]) {
 fn page_layout_ready(model : Model) -> Bool {
   match model.phase {
     Showing(view) =>
+      (
+        !(view.reference.target is PullRequest(_)) ||
+        (
+          !(model.access.freshness is Checking) &&
+          !model.access.identity_checking
+        )
+      ) &&
       !model.range
       .map(state => state.expanded && state.loading_page is Some(_))
       .unwrap_or(false) &&
@@ -579,9 +596,18 @@ fn restore_history_position(
             .query_selector_all(focus_candidates)
             .iter()
             .collect()
-          let target = position.focus_index.bind(index => candidates.get(index))
+          let indexed = position.focus_index.bind(index => candidates.get(index))
+          let target = match indexed {
+            Some(target) if focus_label(target) == position.focus_label =>
+              Some(target)
+            _ if !position.focus_label.is_empty() =>
+              candidates
+              .iter()
+              .find_first(target => focus_label(target) == position.focus_label)
+            _ => None
+          }
           let found = match target {
-            Some(target) if focus_label(target) == position.focus_label => {
+            Some(target) => {
               guard !restoration.cancelled else { return }
               @browser.focus(target)
               true

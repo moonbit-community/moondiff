@@ -157,6 +157,7 @@ pub(all) enum StatusInput {
   Empty
   Loading(String)
   Failed(String, @application.AuthStatus)
+  RateLimited(@github_client.RateLimitReason, @application.AuthStatus)
 } derive(Eq)
 
 ///|
@@ -373,6 +374,9 @@ pub fn RegionProjection::inputs(
 
 ///|
 fn status_input(model : Model) -> StatusInput {
+  if model.source_pause is Some(reason) {
+    return RateLimited(reason, model.auth)
+  }
   if model.phase is Showing(_) || model.phase is ShowingPullSelector(_) {
     return match model.access.freshness {
       Checking => Loading("Checking the current PR version…")

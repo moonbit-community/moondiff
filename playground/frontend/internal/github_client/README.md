@@ -48,6 +48,15 @@ Source concurrency is four, prioritizing the first displayed file, replacement
 targets and explicitly selected files over queued default expansions. The default
 number of expanded files remains twenty.
 
+Rate limits pause both source schedulers and settle queued reads as paused,
+without timers or a rate-limit retry button. In-flight successes remain readable.
+Anonymous visitors are offered the existing GitHub sign-in flow; successful
+sign-in resumes missing sources after PR version validation (or immediately for
+fixed revisions). A changed PR uses the guarded snapshot replacement flow.
+Authenticated limits ask the visitor to refresh later. Scroll, file selection,
+and visibility changes cannot bypass a pause. Rate-limit results retain their
+dispatch identity so late anonymous responses cannot pause signed-in loading.
+
 After the homepage commits, a 250 ms timer selects at most five distinct PRs from
 the current tab. At most two get a complete snapshot and first-file source pair;
 the rest get metadata only. Snapshots of up to 300 files include PR #123-sized

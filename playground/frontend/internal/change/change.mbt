@@ -57,6 +57,7 @@ pub fn finish_change(
       file,
       diff_mode,
       expanded,
+      manually_collapsed: false,
       collapsed_sections: [],
       old_side: initial_side(pair.old_url, expanded),
       new_side: initial_side(pair.new_url, expanded),

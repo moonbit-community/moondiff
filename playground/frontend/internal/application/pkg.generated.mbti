@@ -22,6 +22,10 @@ pub fn app_subscriptions(Model, @cmd.Emit[Msg]) -> @sub.Sub
 
 pub fn auth_status_from_api(@moondiff-playground-protocol.ApiAuthStatus) -> AuthStatus
 
+pub fn auto_expand_allowed(Model) -> Bool
+
+pub fn auto_expand_candidate(Model, Int32) -> Bool
+
 pub fn clear_navigation_landing(@dom.Element) -> Unit
 
 pub fn clear_navigation_landings() -> Unit
@@ -185,6 +189,7 @@ pub(all) enum LoadMsg {
   ReplacementSourceLoaded(Int32, String, Int32, @change.SourceSide, Result[(String, Bytes), Error])
   CommitPageLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiCommit, Error])
   ToggleFile(Int32, Int32)
+  AutoExpandFile(Int32, String)
   ToggleSection(Int32, Int32, String)
   NavigateChange(Int32, Int32, String, Int32, Int32)
   OpenFile(Int32, Int32)
@@ -201,6 +206,8 @@ pub(all) struct Model {
   input : String
   access : SnapshotAccess
   page_visible : Bool
+  pull_sources : PullSourceState?
+  source_pause : @github_client.RateLimitReason?
   navigation : NavigationState
   generation : Int32
   view_mode : @change.ViewMode
@@ -311,6 +318,13 @@ pub(all) struct PullMergeState {
 } derive(Eq)
 pub fn PullMergeState::new() -> Self
 
+pub(all) struct PullSourceState {
+  generation : Int32
+  pending : Array[(Int32, @change.SourceSide)]
+  urgent : Array[Int32]
+  cursor : Int32
+} derive(Eq)
+
 pub(all) enum RangeMsg {
   FromSelected(Int32, String)
   ToSelected(Int32, String)
@@ -404,7 +418,7 @@ pub fn RouteDestination::not_equal(Self, Self) -> Bool
 pub(all) struct RouteMemory {
   review : @comments.NavigationReview
   snapshot : @comments.Snapshot?
-  files : Array[(String, Bool, Array[String])]
+  files : Array[(String, Bool, Array[String], Bool)]
   tree : FileTreeState
   range : (String, String, Bool)?
   mode : @change.ViewMode

@@ -29,6 +29,8 @@ test "stale commit responses are discarded by generation" {
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 2,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -66,6 +68,8 @@ fn pull_test_model(
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -529,6 +533,8 @@ fn diff_test_model(view : ChangeView) -> Model {
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 9,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -559,6 +565,7 @@ fn ready_test_file(
     file,
     diff_mode: file_diff_mode(file),
     expanded,
+    manually_collapsed: false,
     collapsed_sections: [],
     old_side: Ready(old),
     new_side: Ready(new),
@@ -893,7 +900,10 @@ test "ignore comments has independent algorithm caches" {
   }
   assert_true(fragment.document.hunks.is_empty())
 
-  let view = set_file_state(diff_test_view([file]), 0, cached)
+  let view = set_file_state(diff_test_view([file]), 0, {
+    ..cached,
+    new_side: Loading,
+  })
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (toggled, _) = update_ui(
     diff_test_model(view),
@@ -1000,7 +1010,10 @@ test "new source invalidates every MoonBit filter cache" {
   for key in all_moonbit_cache_keys() {
     assert_true(cached.diff_cache.get(key) is Some(_))
   }
-  let view = set_file_state(diff_test_view([file]), 0, cached)
+  let view = set_file_state(diff_test_view([file]), 0, {
+    ..cached,
+    new_side: Loading,
+  })
   let model = {
     ..diff_test_model(view),
     diff_algorithm: AstAlgorithm,
@@ -1203,6 +1216,8 @@ fn review_test_model(auth : AuthStatus) -> Model {
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 5,
     phase: Showing(view),
     route: Some(view.reference),
@@ -1393,6 +1408,8 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 5,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -1559,6 +1576,8 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 5,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -1774,6 +1793,8 @@ fn auth_test_model(
     navigation: NavigationState::new(),
     access: SnapshotAccess::new(),
     page_visible: true,
+    pull_sources: None,
+    source_pause: None,
     generation: 5,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,

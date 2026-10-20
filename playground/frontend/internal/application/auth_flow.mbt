@@ -31,6 +31,10 @@ fn apply_auth_status(
   }
   let (next, command) = if transition is AuthIdentityBoundary {
     reload_after_auth_identity_boundary(next, emit)
+  } else if model.source_pause == Some(AnonymousRequests) &&
+    next.auth is SignedIn(..) &&
+    !(model.auth is SignedIn(..)) {
+    recover_anonymous_limit(next, emit)
   } else if (
       next.restore_pending &&
       (next.auth is SignedIn(..) || next.auth is Anonymous(_))
@@ -64,6 +68,11 @@ fn finish_sign_in(
   let (next, command, transition) = apply_auth_status(
     model, status, false, emit,
   )
+  if model.source_pause == Some(AnonymousRequests) &&
+    next.auth is SignedIn(..) &&
+    (model.phase is Showing(_) || model.phase is ShowingPullSelector(_)) {
+    return (next, command)
+  }
   if model.restore_pending ||
     (model.recovering_session && next.auth is SignedIn(..)) ||
     transition is AuthIdentityBoundary ||
@@ -73,7 +82,10 @@ fn finish_sign_in(
   }
   guard next.route is Some(reference) else { return (next, command) }
   if restart {
-    return begin_sign_in_change_reload(next, reference, transition, emit)
+    let (loading, load_command) = begin_sign_in_change_reload(
+      next, reference, transition, emit,
+    )
+    return (loading, @rabbita.batch([command, load_command]))
   }
   if (next.phase is Showing(_) || next.phase is ShowingPullSelector(_)) &&
     (

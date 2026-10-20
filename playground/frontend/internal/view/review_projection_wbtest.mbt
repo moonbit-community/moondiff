@@ -111,6 +111,8 @@ test "same-line projection uses the first expanded matched inserted or deleted s
           }
           let model = Model::{
             page_visible: true,
+            pull_sources: None,
+            source_pause: None,
             home: @application.HomeState::new(),
             viewed: @application.ViewedState::new(),
             input: "",
@@ -314,6 +316,8 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
     let view = { ..base_view, files: [file], }
     let model = Model::{
       page_visible: true,
+      pull_sources: None,
+      source_pause: None,
       home: @application.HomeState::new(),
       viewed: @application.ViewedState::new(),
       input: "",

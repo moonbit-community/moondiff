@@ -17,25 +17,37 @@ fn expand_file(
   let changed = @change.FileState::{
     ..file,
     expanded: true,
+    manually_collapsed: false,
     old_side: if file.old_side is NotRequested {
-      initial_side(pair.old_url, true)
+      if model.source_pause is Some(_) {
+        Paused
+      } else {
+        initial_side(pair.old_url, true)
+      }
     } else {
       file.old_side
     },
     new_side: if file.new_side is NotRequested {
-      initial_side(pair.new_url, true)
+      if model.source_pause is Some(_) {
+        Paused
+      } else {
+        initial_side(pair.new_url, true)
+      }
     } else {
       file.new_side
     },
   }
-  let command = if first_load {
+  let command = if model.source_pause is Some(_) ||
+    view.reference.target is PullRequest(_) {
+    @rabbita.none
+  } else if first_load {
     @rabbita.batch(commands_for_file(view, generation, index, emit))
   } else {
     @rabbita.none
   }
   (
     with_phase(
-      model,
+      promote_pull_file(model, index),
       Showing(
         set_file_state(
           view,
@@ -57,6 +69,7 @@ fn expand_file(
 fn select_file(model : Model, index : Int32) -> Model {
   {
     ..model,
+    navigation: { ..model.navigation, restore_position: false, },
     file_tree: {
       ..model.file_tree,
       drawer_open: false,

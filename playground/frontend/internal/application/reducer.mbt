@@ -61,6 +61,8 @@ pub fn update(
   let (next, pull_merge_command) = reconcile_pull_merge(model, next, msg, emit)
   let next = reconcile_sign_in_dialog(model, next)
   let next = synchronize_snapshot_permission(next)
+  let next = pause_waiting_sources(next)
+  let (next, sources_command) = reconcile_pull_sources(next, emit)
   let next = synchronize_history_restoration(model, next)
   {
     model: next,
@@ -71,6 +73,7 @@ pub fn update(
       home_command,
       pull_merge_command,
       navigation_command,
+      sources_command,
       leave_home_prefetch(model, next),
     ]),
     after_commit: ui_after_commit(model, next, msg, emit),
