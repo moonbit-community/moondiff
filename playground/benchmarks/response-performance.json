@@ -1,0 +1,907 @@
+{
+  "model": "25ms browser + 25ms upstream stages; eight interleaved rounds; two MoonBit files, 24 declarations each; repeat after five minutes",
+  "summary": {
+    "current": {
+      "cold": {
+        "p50": 463.2999999523163,
+        "p95": 503.40000009536743,
+        "meanRequests": 10,
+        "meanResponseBytes": 10325.5,
+        "cacheHitRate": 0
+      },
+      "repeat": {
+        "p50": 101.70000004768372,
+        "p95": 145.60000002384186,
+        "meanRequests": 6,
+        "meanResponseBytes": 1886,
+        "cacheHitRate": 0.5
+      },
+      "history": {
+        "p50": 87.79999995231628,
+        "p95": 109.79999995231628,
+        "meanRequests": 6,
+        "meanResponseBytes": 1886,
+        "cacheHitRate": 0.6666666666666666
+      }
+    },
+    "baseline": {
+      "cold": {
+        "p50": 559.5,
+        "p95": 625.2000000476837,
+        "meanRequests": 13,
+        "meanResponseBytes": 10696,
+        "cacheHitRate": 0
+      },
+      "repeat": {
+        "p50": 373.10000002384186,
+        "p95": 413.5,
+        "meanRequests": 9,
+        "meanResponseBytes": 6368,
+        "cacheHitRate": 0
+      },
+      "history": {
+        "p50": 94.10000002384186,
+        "p95": 140,
+        "meanRequests": 6,
+        "meanResponseBytes": 1886,
+        "cacheHitRate": 0.3333333333333333
+      }
+    }
+  },
+  "samples": {
+    "current": [
+      {
+        "cold": {
+          "ms": 400,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 115.19999992847443,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 99.10000002384186,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 466.3000000715256,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 102.39999997615814,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 80.19999992847443,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 444.7000000476837,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 95.39999997615814,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 88.79999995231628,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 374.3000000715256,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 101.70000004768372,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 75.10000002384186,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 463.2999999523163,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 93.70000004768372,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 109.79999995231628,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 480.7999999523163,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 105.70000004768372,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 91.60000002384186,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 497.7000000476837,
+          "requests": 10,
+          "responseBytes": 10469,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 145.60000002384186,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 83.29999995231628,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 503.40000009536743,
+          "requests": 10,
+          "responseBytes": 10305,
+          "snapshotRpcs": 1,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 88.20000004768372,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.5,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "history": {
+          "ms": 87.79999995231628,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.6666666666666666,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        }
+      }
+    ],
+    "baseline": [
+      {
+        "cold": {
+          "ms": 625.2000000476837,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 413.5,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 104.90000009536743,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 559.5,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 373.10000002384186,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 110,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 577.2999999523163,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 345.7999999523163,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 86.30000007152557,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 515.2000000476837,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 396.6999999284744,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 109.70000004768372,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 569.5,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 390.89999997615814,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 140,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 539.6000000238419,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 387.7000000476837,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 94.10000002384186,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 551.6000000238419,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 356,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 87.69999992847443,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      },
+      {
+        "cold": {
+          "ms": 592.6000000238419,
+          "requests": 13,
+          "responseBytes": 10696,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 1,
+              "highlight": 1
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 1,
+              "highlight": 1
+            }
+          }
+        },
+        "repeat": {
+          "ms": 353.7999999523163,
+          "requests": 9,
+          "responseBytes": 6368,
+          "snapshotRpcs": 2,
+          "cacheHitRate": 0,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 2,
+              "highlight": 2
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 2,
+              "highlight": 2
+            }
+          }
+        },
+        "history": {
+          "ms": 91.30000007152557,
+          "requests": 6,
+          "responseBytes": 1886,
+          "snapshotRpcs": 0,
+          "cacheHitRate": 0.3333333333333333,
+          "files": {
+            "src/primary.mbt": {
+              "diff": 3,
+              "highlight": 3
+            },
+            "src/unrelated-1.mbt": {
+              "diff": 3,
+              "highlight": 3
+            }
+          }
+        }
+      }
+    ]
+  },
+  "baseline_commit": "bf9b82b",
+  "captured_on": "2026-10-20"
+}
