@@ -4,6 +4,7 @@ import {
   "moonbit-community/moondiff-playground/internal/browser",
   "moonbit-community/moondiff-playground/internal/identity",
   "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
   "moonbit-community/moondiff-playground-protocol" @protocol,
   "moonbit-community/moondiff-playground/internal/comment_requests",
   "moonbit-community/moondiff-playground/internal/change",
@@ -18,9 +19,5 @@ import {
   "moonbit-community/rabbita/sub",
   "moonbit-community/rabbita/url",
 }
-
-import {
-  "moonbitlang/core/encoding/utf8",
-} for "wbtest"
 
 supported_targets = "js"

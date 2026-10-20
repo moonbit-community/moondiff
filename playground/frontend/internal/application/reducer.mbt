@@ -37,6 +37,7 @@ pub fn update(
       navigation: {
         ..next.navigation,
         routes: {},
+        pages: [],
         positions: {},
         pending: None,
       },

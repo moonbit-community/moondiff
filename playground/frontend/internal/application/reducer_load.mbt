@@ -358,7 +358,16 @@ fn update_load(
       } else {
         expand_file(selected, view, generation, index, file, emit)
       }
-      (opened, load_command)
+      (
+        opened,
+        @rabbita.batch([
+          load_command,
+          @github_client.prioritize_sources(
+            source_requests_for_file(view, index).map(request => request.1),
+            generation,
+          ),
+        ]),
+      )
     }
     RetryFile(generation, index) => {
       if generation != model.generation {

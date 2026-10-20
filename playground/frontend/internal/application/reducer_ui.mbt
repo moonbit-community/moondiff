@@ -367,6 +367,10 @@ fn update_ui(
           (
             {
               ..model,
+              navigation: {
+                ..model.navigation,
+                pages: retained_pages(model.navigation.pages, None),
+              },
               input: "",
               generation: model.generation + 1,
               restore_pending: false,

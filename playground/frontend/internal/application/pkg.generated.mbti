@@ -244,6 +244,7 @@ pub(all) struct NavigationState {
   restoration : HistoryRestoration?
   positions : Map[String, PagePosition]
   routes : Map[String, RouteMemory]
+  pages : Array[ReadyPage]
 } derive(Eq)
 #deprecated
 pub fn NavigationState::equal(Self, Self) -> Bool
@@ -333,6 +334,13 @@ pub(all) struct RangeState {
   too_many_files : Bool
 } derive(Eq)
 
+pub(all) struct ReadyPage {
+  user : String?
+  version : String
+  view : @change.ChangeView
+  range : RangeState?
+} derive(Eq)
+
 pub(all) enum Region {
   Home
   Shell
@@ -393,6 +401,7 @@ pub(all) struct RouteMemory {
   algorithm : @change.DiffAlgorithm
   ignore_comments : Bool
   ignore_tests : Bool
+  draft_view : @change.ChangeView?
 } derive(Eq)
 #deprecated
 pub fn RouteMemory::equal(Self, Self) -> Bool
