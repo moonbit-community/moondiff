@@ -229,10 +229,53 @@ test "prefetch includes renamed MoonBit sources and absent sides but excludes ot
   }
   assert_true(next.pull_sources.unwrap().pending.is_empty())
   guard next.phase is Showing(done) else { fail("done") }
-  assert_true(done.files[1].old_side is Ready([]))
-  assert_true(done.files[2].new_side is Ready([]))
+  assert_eq(done.files[0].file.filename, "pkg.generated.mbti")
+  assert_true(done.files[2].old_side is Ready([]))
+  assert_true(done.files[3].new_side is Ready([]))
   assert_true(done.files[5].old_side is NotRequested)
   assert_true(done.files[5].new_side is NotRequested)
+}
+
+///|
+test "PR admits every interface before sources and continues while an interface remains in flight" {
+  let model = source_prefetch_model(count=0)
+  guard model.phase is Showing(empty) else { fail("view") }
+  let files = [fixture_file("src/main.mbt", "modified")]
+  for index in 0..<25 {
+    files.push(fixture_file("pkg\{index}/pkg.generated.mbti", "modified"))
+  }
+  let view = finish_change(
+    empty.reference,
+    empty.old_revision,
+    empty.new_revision,
+    "",
+    "",
+    empty.stats,
+    files,
+    expand_all_interfaces=true,
+  )
+  let mut next = pump_source_fixture(with_phase(model, Showing(view)))
+  assert_true(
+    next.pull_sources.unwrap().pending ==
+    [(0, Old), (0, New), (1, Old), (1, New)],
+  )
+  for _ in 0..<50 {
+    let pending = next.pull_sources.unwrap().pending
+    assert_eq(pending.length(), 4)
+    assert_true(pending.contains((0, Old)))
+    if pending.contains((25, Old)) {
+      break
+    }
+    next = finish_source_fixture(next, pending[1])
+  }
+  assert_true(next.pull_sources.unwrap().pending.contains((25, Old)))
+  guard next.phase is Showing(loaded) else { fail("view") }
+  for file in loaded.files[:25] {
+    assert_true(file.expanded)
+    assert_false(file.old_side is NotRequested)
+    assert_false(file.new_side is NotRequested)
+  }
+  assert_false(loaded.files[25].expanded)
 }
 
 ///|

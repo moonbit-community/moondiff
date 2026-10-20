@@ -280,6 +280,7 @@ fn range_page_loaded(
       accepted.pull,
       accepted.pull_merge_base,
       files,
+      expand_all_interfaces=model.auth is SignedIn(..),
     )
     let shown = ensure_expanded_file_documents(
       view,

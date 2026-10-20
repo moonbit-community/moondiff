@@ -43,6 +43,41 @@ test "select MoonBit diff only when either path ends with lowercase mbt" {
 }
 
 ///|
+test "generated interfaces match exact basenames at any depth and either rename path" {
+  for
+    path in [
+      "pkg.generated.mbti", "src/pkg.generated.mbti", "a/b/pkg.generated.mbti",
+    ] {
+    for status in ["added", "modified", "removed"] {
+      assert_true(is_interface_file(fixture_file(path, status)))
+    }
+    assert_true(
+      is_interface_file(
+        fixture_file(path, "renamed", previous_filename="old.txt"),
+      ),
+    )
+    assert_true(
+      is_interface_file(
+        fixture_file("new.txt", "renamed", previous_filename=path),
+      ),
+    )
+    assert_true(is_moonbit_file(path))
+  }
+  for
+    path in [
+      "types.mbti", "prefixpkg.generated.mbti", "src/pkg.generated.mbti.bak", "src/pkg.generated.mbti/other",
+      "PKG.GENERATED.MBTI",
+    ] {
+    assert_false(is_interface_file(fixture_file(path, "modified")))
+    assert_false(
+      is_interface_file(
+        fixture_file("other.txt", "renamed", previous_filename=path),
+      ),
+    )
+  }
+}
+
+///|
 test "raw content URLs percent-encode each path byte" {
   let reference = commit_reference("moonbit-community", "moondiff", "abcdef1")
   assert_eq(

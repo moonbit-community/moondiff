@@ -16,13 +16,13 @@ pub fn ensure_expanded_file_documents(ChangeView, DiffAlgorithm, ignore_comments
 
 pub fn ensure_file_document(FileState, DiffAlgorithm, ignore_comments? : Bool, ignore_tests? : Bool) -> FileState
 
-pub fn finish_change(@github.CommitRef, @github.Revision?, @github.Revision, String, String, @moondiff-playground-protocol.ApiStats, Array[@moondiff-playground-protocol.ApiFile]) -> ChangeView
+pub fn finish_change(@github.CommitRef, @github.Revision?, @github.Revision, String, String, @moondiff-playground-protocol.ApiStats, Array[@moondiff-playground-protocol.ApiFile], expand_all_interfaces? : Bool) -> ChangeView
 
-pub fn finish_commit(@github.CommitRef, @github.RepositoryRef, @moondiff-playground-protocol.ApiCommit, Array[@moondiff-playground-protocol.ApiFile]) -> ChangeView
+pub fn finish_commit(@github.CommitRef, @github.RepositoryRef, @moondiff-playground-protocol.ApiCommit, Array[@moondiff-playground-protocol.ApiFile], expand_all_interfaces? : Bool) -> ChangeView
 
-pub fn finish_pull(@github.CommitRef, @moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiCompare, Array[@moondiff-playground-protocol.ApiFile]) -> Result[ChangeView, String]
+pub fn finish_pull(@github.CommitRef, @moondiff-playground-protocol.ApiPull, @moondiff-playground-protocol.ApiCompare, Array[@moondiff-playground-protocol.ApiFile], expand_all_interfaces? : Bool) -> Result[ChangeView, String]
 
-pub fn finish_range(@github.CommitRef, String, String, @moondiff-playground-protocol.ApiPull?, String?, Array[@moondiff-playground-protocol.ApiFile]) -> ChangeView
+pub fn finish_range(@github.CommitRef, String, String, @moondiff-playground-protocol.ApiPull?, String?, Array[@moondiff-playground-protocol.ApiFile], expand_all_interfaces? : Bool) -> ChangeView
 
 pub fn has_navigable_changes(FileState, DiffAlgorithm, ignore_comments~ : Bool, ignore_tests~ : Bool) -> Bool
 

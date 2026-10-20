@@ -36,7 +36,14 @@ fn show_pull(
   files : Array[ApiFile],
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
-  match finish_pull(reference, pull, compare, files) {
+  match
+    finish_pull(
+      reference,
+      pull,
+      compare,
+      files,
+      expand_all_interfaces=model.auth is SignedIn(..),
+    ) {
     Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
     Ok(view) => show_pull_view(model, view, pull, emit)
   }

@@ -1,7 +1,7 @@
 ///|
 // The current PR owns validated SideLoad values, independently of the shared
-// transport cache. Only four sides are admitted at a time, including the first
-// twenty expanded files. Historical page retention keeps its existing budget.
+// transport cache. Only four sides are admitted at a time, including all
+// expanded interface files. Historical page retention keeps its existing budget.
 pub(all) struct PullSourceState {
   generation : Int32
   pending : Array[(Int32, SourceSide)]

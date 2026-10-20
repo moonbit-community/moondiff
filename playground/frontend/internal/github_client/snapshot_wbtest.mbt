@@ -235,6 +235,62 @@ test "prefetch is serial and first source pairs use merge base, fork and exact r
 }
 
 ///|
+test "first source prefetch prefers the first interface and preserves absent and renamed sides" {
+  for
+    interface in [
+      { ..snapshot_file(1), filename: "pkg.generated.mbti", status: "added", },
+      {
+        ..snapshot_file(1),
+        filename: "nested/pkg.generated.mbti",
+        status: "removed",
+      },
+      {
+        ..snapshot_file(1),
+        filename: "nested/pkg.generated.mbti",
+        previous_filename: Some("old.txt"),
+      },
+      {
+        ..snapshot_file(1),
+        filename: "new.txt",
+        previous_filename: Some("old/pkg.generated.mbti"),
+      },
+    ] {
+    let snapshot : PullSnapshot = {
+      metadata: snapshot_pull(count=3),
+      comparison: snapshot_comparison(),
+      files: [
+        snapshot_file(0),
+        interface,
+        { ..snapshot_file(2), filename: "later/pkg.generated.mbti", },
+      ],
+      signature: "fixture",
+    }
+    let sources = first_source_args(snapshot_args(), snapshot)
+    assert_eq(
+      sources.length(),
+      if interface.status == "added" || interface.status == "removed" {
+        1
+      } else {
+        2
+      },
+    )
+    if interface.status != "added" {
+      assert_eq(
+        sources[0].path,
+        interface.previous_filename.unwrap_or(interface.filename),
+      )
+      assert_eq(sources[0].owner, "upstream")
+      assert_eq(sources[0].revision, "c".repeat(40))
+    }
+    if interface.status != "removed" {
+      assert_eq(sources.last().unwrap().path, interface.filename)
+      assert_eq(sources.last().unwrap().owner, "fork")
+      assert_eq(sources.last().unwrap().revision, "b".repeat(40))
+    }
+  }
+}
+
+///|
 test "retention, freshness hints, LRU and total payload budget are independent" {
   let w = Workspace::new()
   w.checking = false

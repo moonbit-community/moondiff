@@ -145,11 +145,38 @@ test('prefetch selects only the current tab first five, keeps one background req
   expect(Object.keys(metrics.files || {})).toHaveLength(0);
   await selectTab(page, 'ReviewRequested');
   await expect.poll(() => kindCalls(state, 'PullFiles').length).toBe(4);
-  expect([...new Set(kindCalls(state, 'PullGet').map(call => call.args.number))]).toEqual(['1', '2', '3', '4', '5', '8', '9', '10']);
+  await expect.poll(() => [...new Set(kindCalls(state, 'PullGet').map(call => call.args.number))]).toEqual(['1', '2', '3', '4', '5', '8', '9', '10']);
   await page.getByRole('button', { name: 'Refresh lists', exact: true }).click();
   await expect.poll(() => kindCalls(state, 'ViewerPullsGet').length).toBe(4);
   await page.waitForTimeout(350);
   expect(kindCalls(state, 'PullFiles')).toHaveLength(4);
+});
+
+test('homepage prefetch warms the first interface before earlier source files', async ({ page }) => {
+  const interfaceFile = { ...file, filename: 'archive/interface.txt', previous_filename: 'old/pkg.generated.mbti' };
+  const state = await fixture(page, async ({ route, kind, args }) => {
+    let json;
+    if (kind === 'PullGet') json = successFixture('github.pull.get', {
+      title: `Ready PR ${args.number}`, html_url: `https://github.com/upstream/repo/pull/${args.number}`,
+      base: { sha: base, repo: { full_name: 'upstream/repo' } },
+      head: { sha: head, repo: { full_name: 'fork/repo' } },
+      additions: 3, deletions: 3, changed_files: 3, commits: 0,
+    });
+    else if (kind === 'PullFiles') json = successFixture('github.pull.files', [
+      file, interfaceFile, { ...file, filename: 'pkg.generated.mbti', previous_filename: undefined },
+    ]);
+    else return false;
+    await route.fulfill({ json });
+    return true;
+  });
+  await page.goto('/');
+  await expect.poll(() => kindCalls(state, 'PullGet').length).toBe(7);
+  await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(2);
+  expect(kindCalls(state, 'ContentGet').map(call => call.args)).toEqual([
+    { owner: 'upstream', repo: 'repo', revision: mergeBase, path: 'old/pkg.generated.mbti' },
+    { owner: 'fork', repo: 'repo', revision: head, path: 'archive/interface.txt' },
+  ]);
+  await expect(page.locator('.file-card')).toHaveCount(0);
 });
 
 test('opening an in-progress prefetch reuses its metadata chain and cancels the remaining background work', async ({ page }) => {

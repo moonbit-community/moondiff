@@ -32,6 +32,8 @@ pub fn file_diff_mode(@moondiff-playground-protocol.ApiFile) -> FileDiffMode
 
 pub fn first_parent(@moondiff-playground-protocol.ApiCommit) -> String?
 
+pub fn is_interface_file(@moondiff-playground-protocol.ApiFile) -> Bool
+
 pub fn is_moonbit_file(String) -> Bool
 
 pub fn merge_file_pages(ArrayView[@moondiff-playground-protocol.ApiFile], ArrayView[@moondiff-playground-protocol.ApiFile]) -> Array[@moondiff-playground-protocol.ApiFile]
