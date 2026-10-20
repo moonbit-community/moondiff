@@ -15,6 +15,78 @@ invalid links lose their `href`, and selector unmounts remove the listeners.
 `range.spec.mjs` freezes selector paints to exercise these paths, real new tabs,
 history restoration, old DOM callbacks and comment submission outcomes.
 
+PR overviews continuously prefetch all recognized MoonBit source sides after the
+file list loads for signed-in readers. Anonymous readers load only initially
+expanded files and files opened manually or while scrolling. The application admits
+at most four sides through the existing shared source transport, prioritizing the
+initial twenty expanded files and explicit demand. Later sides are validated and
+retained in the current `ChangeView` without computing diffs or highlights. The
+shared cache remains limited to 32 MiB and historical parsed pages to 4 MiB.
+An individual failure does not interrupt the remaining PR. A rate limit pauses
+both source schedulers, including manual demand, with no source retry button or
+timer. In-flight successes remain readable. Anonymous sign-in resumes missing
+sources after PR snapshot validation; authenticated limits ask for a later page
+refresh. Changing auth controls and removing the limit notice preserve the loaded
+file's reading anchor after regional layout commits. Hidden pages and identity checks pause new automatic reads. Generation
+changes retire the old requests and reject their results.
+
+The coordinator owns one IntersectionObserver for eligible collapsed PR cards,
+with a bottom margin equal to the current viewport height. After scrolling, the
+shared layout batch remeasures current positions and expands at most two cards in
+the viewport or the next screen. It waits for all regional commits and repeats
+after geometry changes. Initial loading keeps the existing twenty-file expansion
+limit. Viewed files and manual collapse preferences are excluded; those preferences
+are saved with the page version. Navigation, history restoration and comment
+editing pause automatic expansion. Automatic actions preserve focus and the
+reading anchor, and carry the page generation and file path instead of toggling
+state. After navigation, fresh wheel, touch, pointer or scrolling-key input
+re-enables expansion, so delayed native history/focus scroll events cannot move
+the restored page. PR history restoration also waits for snapshot checking to settle,
+resolves shifted focus indices by stable labels and temporarily suppresses native
+scroll anchoring across status-notice removal. The original anchoring style is
+restored on new scrolling input or disposal. User input cancels pending automatic
+history restoration through a shared token bound to the generation and history
+entry. Both the queued render action and its focus/scroll command recheck this
+token. Private scheduler bridge clicks do not count as user interaction.
+Explicit navigation supersedes a pending history position and remains available
+after cancellation. Commit and interval source loading retains its existing behavior.
+
+`pull-progressive.spec.mjs` exercises forty-file PRs, source priority/coalescing,
+visibility, failures, local expansion with source networking blocked, navigation,
+history, editor focus and observer cleanup. `pull_sources_wbtest.mbt` covers the
+application scheduler and resource validation. The large-PR case in
+`rendering.stress.mjs` downloads over 32 MiB, then opens both evicted shared-cache
+entries and distant files from current-page sources. Its
+`pull-prefetch-performance.json` attachment records first-screen and scroll
+expansion timings, long tasks, source concurrency and cumulative JS heap samples.
+
+One local Chromium run of the 60-file fixture (38.15 MiB of source, with roughly
+0.5 MiB comment lines in each later side) measured 1.03 s to the first twenty
+files and 1.82 s from scrolling until the automatic expansion batches settled.
+It recorded 18 long tasks, the longest at 784 ms. JS heap samples were 45.6 MiB
+at the first screen, 923.6 MiB after all source arrived, 844.8 MiB after local
+expansion, and 10.2 MiB after leaving and collecting garbage. The samples before
+GC include transient decoding and validation allocations. All retired file-state
+WeakRefs were collected, and opening retained sources made no new source request
+or shared-cache lookup despite 72 cache evictions. These are single-run pressure
+measurements, not timing guarantees: retaining a complete large PR and computing
+its diffs synchronously still carries substantial memory and main-thread costs.
+
+Verification for PR prefetch and progressive expansion:
+
+- Frontend JS tests: 765 passed. `moon test --target all`: wasm 342, wasm-gc 319,
+  JS 765 and native 342 passed. Formatting, interface generation and the JS
+  warning-denying check completed.
+- The eight new browser cases passed in the full suite; the navigation/history
+  case also passed ten consecutive repeats, including delayed scroll notifications.
+- The full browser run passed 532 cases. The existing comment-menu layout case
+  and unconfirmed Viewed/Load latest case failed during that run; each passed
+  three isolated single-worker repeats afterwards. The separate pressure suite
+  was running concurrently with that full run. No test timeouts were increased.
+- All nine pressure cases passed against the final implementation. The large-PR
+  case also independently verified cache evictions, local expansion, observer
+  disposal and collection of every retired file-state WeakRef.
+
 | Region | Invalidating inputs |
 | --- | --- |
 | Shell | generation, phase, file identities, drawer, width, layout signature |

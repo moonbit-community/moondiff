@@ -26,18 +26,27 @@ async function fixtureValue(state, op, args) {
   switch (op) {
     case 'github.viewer.pulls.get': value = { items: [], total_count: 0 }; break;
     case 'github.commit.get': value = { sha: args.sha, html_url: `https://github.com/example/regions/commit/${args.sha}`, commit: { message: f.message }, parents: [{ sha: f.base }], stats: { additions: 1, deletions: 1, total: 2 }, files: f.files }; break;
-    case 'github.pull.get': value = { title: f.message, html_url: 'https://github.com/example/regions/pull/1', base: { sha: f.base, repo: { full_name: 'example/regions' } }, head: { sha: f.sha, repo: { full_name: 'example/regions' } }, additions: 1, deletions: 1, changed_files: f.files.length, commits: 0 }; break;
-    case 'github.compare.get': value = { merge_base_commit: { sha: f.base } }; break;
+    case 'github.pull.get': if (state.metadataGate) await state.metadataGate.promise; value = { title: f.message, html_url: 'https://github.com/example/regions/pull/1', base: { sha: f.base, repo: { full_name: 'example/regions' } }, head: { sha: f.sha, repo: { full_name: 'example/regions' } }, additions: 1, deletions: 1, changed_files: f.files.length, commits: 0 }; break;
+    case 'github.range.compare.get':
+    case 'github.compare.get': value = { base_commit: { sha: f.base, commit: { message: 'Base' }, parents: [] },
+      merge_base_commit: { sha: f.base }, total_commits: 1,
+      commits: [{ sha: f.sha, commit: { message: f.message }, parents: [{ sha: f.base }] }], files: f.files }; break;
     case 'github.pull.files': value = f.files; break;
     case 'github.content.get': {
-      const pending = state.contentGate;
-      if (pending && args.path === pending.path && args.ref === f.sha) {
-        state.contentGate = null;
-        await pending.promise;
-      }
-      const text = f.sources[`${args.ref}:${args.path}`];
-      if (text === undefined) throw new Error(`Missing fixture source ${args.ref}:${args.path}`);
-      value = { base64: Buffer.from(text).toString('base64'), size: Buffer.byteLength(text) };
+      state.activeSources = (state.activeSources ?? 0) + 1;
+      state.maxActiveSources = Math.max(state.maxActiveSources ?? 0, state.activeSources);
+      try {
+        if (state.sourceGate) await state.sourceGate(args, state);
+        failure = state.sourceFailure?.(args, state);
+        const pending = state.contentGate;
+        if (pending && args.path === pending.path && args.ref === f.sha) {
+          state.contentGate = null;
+          await pending.promise;
+        }
+        const text = f.sources[`${args.ref}:${args.path}`];
+        if (text === undefined) throw new Error(`Missing fixture source ${args.ref}:${args.path}`);
+        value = { base64: Buffer.from(text).toString('base64'), size: Buffer.byteLength(text) };
+      } finally { state.activeSources--; }
       break;
     }
     case 'github.comments.list': value = { issue_comments: [], review_comments: state.comments ?? [], commit_comments: [] }; break;
@@ -88,9 +97,11 @@ export async function installRenderingFixture(page, fixture, options = {}) {
     } else {
       throw new Error(`Unhandled rendering fixture GitHub URL ${url}`);
     }
-    const { value } = await fixtureValue(state, op, args);
+    const { value, failure } = await fixtureValue(state, op, args);
     const headers = { 'Access-Control-Allow-Origin': '*' };
-    if (op === 'github.content.get') {
+    if (failure) {
+      await route.fulfill({ status: failure.status, json: { message: failure.detail }, headers }).catch(() => {});
+    } else if (op === 'github.content.get') {
       await route.fulfill({ body: Buffer.from(value.base64, 'base64'), contentType: 'text/plain', headers }).catch(() => {});
     } else {
       await route.fulfill({ json: commentKind ? value[commentKind] : value, headers }).catch(() => {});

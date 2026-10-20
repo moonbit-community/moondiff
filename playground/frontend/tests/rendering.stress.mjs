@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { installRenderProbe, renderCounts, settleRegions, toggleCommit, toggleDetailsPaint } from '../../tests/render-probe.mjs';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
@@ -134,4 +134,82 @@ test('file containment keeps CI disclosure input-to-paint responsive', async ({ 
     body: JSON.stringify({ containedMedian, visibleMedian, samples, containment }, null, 2),
   });
   expect(containedMedian).toBeLessThan(visibleMedian * 0.8);
+});
+
+test('large PR retains more than 32 MiB of prefetched source and expands without network', async ({ page }, info) => {
+  test.setTimeout(150_000);
+  const fixture = syntheticFixture({ files: 60, declarations: 2 });
+  for (const file of fixture.files.slice(20)) {
+    for (const sha of [fixture.base, fixture.sha]) {
+      fixture.sources[`${sha}:${file.filename}`] += `\n// ${'padding '.repeat(62_500)}\n`;
+    }
+  }
+  const sourceBytes = Object.values(fixture.sources).reduce((sum, text) => sum + Buffer.byteLength(text), 0);
+  expect(sourceBytes).toBeGreaterThan(32 * 1024 * 1024);
+  await installRenderProbe(page);
+  const state = await installRenderingFixture(page, fixture, { authenticated: true });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Performance.enable');
+  const memory = async label => {
+    const { metrics } = await cdp.send('Performance.getMetrics');
+    return { label, usedJSHeap: metrics.find(metric => metric.name === 'JSHeapUsedSize')?.value,
+      totalJSHeap: metrics.find(metric => metric.name === 'JSHeapTotalSize')?.value };
+  };
+  const samples = [await memory('before navigation')];
+  const started = performance.now();
+  await page.goto('/example/regions/pull/1');
+  await expect(page.locator('.file-card.expanded')).toHaveCount(20);
+  await expect(page.locator('.loading-inline')).toHaveCount(0, { timeout: 30_000 });
+  const firstScreenMs = performance.now() - started;
+  samples.push(await memory('first screen'));
+  const calls = () => state.calls.filter(call => call.op === 'github.content.get');
+  await expect.poll(() => calls().length, { timeout: 90_000 }).toBe(120);
+  await expect.poll(() => state.activeSources, { timeout: 90_000 }).toBe(0);
+  await expect.poll(() => page.evaluate(() => __moondiffMetrics.pull_sources?.pending), { timeout: 30_000 }).toBe(0);
+  await settleRegions(page);
+  samples.push(await memory('all source retained'));
+  const prefetched = await renderCounts(page);
+  expect(prefetched.counters.prefetch_evictions).toBeGreaterThan(0);
+  expect(prefetched.prefetch.cache_bytes).toBeLessThanOrEqual(32 * 1024 * 1024);
+  for (const file of fixture.files.slice(20)) {
+    expect(prefetched.files[file.filename]?.diff ?? 0).toBe(0);
+    expect(prefetched.files[file.filename]?.highlight ?? 0).toBe(0);
+  }
+  state.sourceFailure = () => ({ status: 500, code: 'offline', detail: 'No source network after prefetch' });
+  const scrollStarted = performance.now();
+  await card(page, 20).evaluate(element => {
+    window.dispatchEvent(new WheelEvent('wheel', { deltaY: 1 }));
+    window.scrollTo({ top: window.scrollY + element.getBoundingClientRect().top - 160, behavior: 'instant' });
+  });
+  await expect(card(page, 20)).toHaveClass('file-card expanded');
+  await settleRegions(page, 30_000);
+  const scrollExpandMs = performance.now() - scrollStarted;
+  await card(page, 59).locator('.file-toggle').evaluate(button => button.click());
+  await expect(card(page, 59)).toHaveClass('file-card expanded');
+  await expect(card(page, 59).locator('.loading-inline')).toHaveCount(0);
+  await settleRegions(page, 30_000);
+  samples.push(await memory('after local expansion'));
+  const expanded = await renderCounts(page);
+  expect(calls()).toHaveLength(120);
+  expect(expanded.counters.source_cache_hits ?? 0).toBe(prefetched.counters.source_cache_hits ?? 0);
+  expect(state.maxActiveSources).toBeLessThanOrEqual(4);
+  expect(expanded.files[fixture.files[20].filename].diff).toBeGreaterThan(0);
+  await page.evaluate(() => {
+    window.retiredPRSources = __moondiffMetrics.sources.slice();
+    __moondiffMetrics.sources.length = 0;
+  });
+  await page.evaluate(() => { history.pushState(null, '', '/'); dispatchEvent(new PopStateEvent('popstate')); });
+  await expect(page.locator('.file-card')).toHaveCount(0);
+  await settleRegions(page);
+  expect((await renderCounts(page)).progressive.targets).toBe(0);
+  await cdp.send('HeapProfiler.collectGarbage');
+  expect(await page.evaluate(() => retiredPRSources.filter(ref => ref.deref()).length)).toBe(0);
+  samples.push(await memory('after leaving and GC'));
+  const report = info.outputPath('pull-prefetch-performance.json');
+  writeFileSync(report, JSON.stringify({
+    sourceBytes, firstScreenMs, scrollExpandMs, longTasks: expanded.longTasks,
+    memory: samples, maxSourceConcurrency: state.maxActiveSources,
+    prefetchCounters: prefetched.counters, expandedCounters: expanded.counters,
+  }, null, 2));
+  await info.attach('pull-prefetch-performance.json', { contentType: 'application/json', path: report });
 });
