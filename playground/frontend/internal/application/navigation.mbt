@@ -31,6 +31,7 @@ pub(all) struct RouteMemory {
   algorithm : DiffAlgorithm
   ignore_comments : Bool
   ignore_tests : Bool
+  draft_view : ChangeView?
 } derive(Eq)
 
 ///|
@@ -43,6 +44,17 @@ pub(all) struct NavigationState {
   restoration : HistoryRestoration?
   positions : Map[String, PagePosition]
   routes : Map[String, RouteMemory]
+  pages : Array[ReadyPage]
+} derive(Eq)
+
+///|
+// Only domain data is retained. Renderers, editors and requests own their own
+// lifetimes and must never enter this cache.
+pub(all) struct ReadyPage {
+  user : String?
+  version : String
+  view : ChangeView
+  range : RangeState?
 } derive(Eq)
 
 ///|
@@ -56,6 +68,7 @@ pub fn NavigationState::new() -> NavigationState {
     restoration: None,
     positions: {},
     routes: {},
+    pages: [],
   }
 }
 
@@ -158,11 +171,119 @@ fn save_route_memory(model : Model) -> Model {
     algorithm: model.diff_algorithm,
     ignore_comments: model.ignore_comments,
     ignore_tests: model.ignore_tests,
+    // A draft must remain reviewable at its original version even if its parsed
+    // page is too large or has been evicted. Retain only the immutable metadata.
+    draft_view: match model.phase {
+      Showing(view) if model.review.draft() is Some(_) =>
+        Some(lightweight_page(view))
+      _ => None
+    },
   }
   routes[route_version_key(reference, memory_snapshot(model))] = routes[route_key(
       reference,
     )]
-  { ..model, navigation: { ..model.navigation, routes, }, }
+  let pages = match model.phase {
+    Showing(view) if retain_page(view) => {
+      let pages = model.navigation.pages.filter(page => {
+        page.view.reference != reference
+      })
+      pages.push({
+        user: model.last_authenticated_user_id,
+        version: route_version_key(reference, memory_snapshot(model)),
+        view,
+        range: model.range,
+      })
+      // During navigation this may include the outgoing current page. The
+      // destination is removed before limiting the two non-current pages.
+      if pages.length() > 3 {
+        pages[1:].to_owned()
+      } else {
+        pages
+      }
+    }
+    _ => model.navigation.pages.filter(page => page.view.reference != reference)
+  }
+  { ..model, navigation: { ..model.navigation, routes, pages, }, }
+}
+
+///|
+fn retain_page(view : ChangeView) -> Bool {
+  let mut bytes = 0
+  for file in view.files {
+    for side in [file.old_side, file.new_side] {
+      if side is Ready(lines) {
+        bytes += Int32::max(0, lines.length() - 1)
+        for line in lines {
+          bytes += @utf8.encode(line).length()
+          if bytes > 4 * 1048576 {
+            return false
+          }
+        }
+      }
+    }
+  }
+  true
+}
+
+///|
+fn ready_page(model : Model, reference : CommitRef) -> ReadyPage? {
+  let ready = model.navigation.pages
+    .iter()
+    .find_first(page => {
+      page.user == model.last_authenticated_user_id &&
+      page.view.reference == reference &&
+      model.navigation.routes
+      .get(route_key(reference))
+      .map(saved => page.version == route_version_key(reference, saved.snapshot))
+      .unwrap_or(false)
+    })
+  match ready {
+    Some(_) => ready
+    None =>
+      model.navigation.routes
+      .get(route_key(reference))
+      .bind(saved => {
+        saved.draft_view.map(view => {
+          user: model.last_authenticated_user_id,
+          version: route_version_key(reference, saved.snapshot),
+          view,
+          range: None,
+        })
+      })
+  }
+}
+
+///|
+fn lightweight_page(view : ChangeView) -> ChangeView {
+  {
+    ..view,
+    files: view.files.map(file => {
+      let pair = source_pair_for_revisions(
+        view.old_revision,
+        view.new_revision,
+        file.file,
+      )
+      {
+        ..file,
+        old_side: initial_side(pair.old_url, file.expanded),
+        new_side: initial_side(pair.new_url, file.expanded),
+        diff_cache: DiffCache::empty(),
+      }
+    }),
+  }
+}
+
+///|
+fn retained_pages(
+  pages : Array[ReadyPage],
+  current : CommitRef?,
+) -> Array[ReadyPage] {
+  let others = pages.filter(page => Some(page.view.reference) != current)
+  if others.length() > 2 {
+    others[others.length() - 2:].to_owned()
+  } else {
+    others
+  }
 }
 
 ///|

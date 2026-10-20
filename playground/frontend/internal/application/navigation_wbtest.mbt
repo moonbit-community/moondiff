@@ -313,6 +313,10 @@ test "layout interactions are scoped to exact versions paths and accounts" {
       {
         ..snapshot,
         files: snapshot.files.map(file => { ..file, filename: "different.mbt", }),
+        metadata: {
+          ..snapshot.metadata,
+          head: { ..snapshot.metadata.head, sha: "d".repeat(40), },
+        },
       }
     } else {
       {

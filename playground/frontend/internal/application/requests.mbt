@@ -5,10 +5,14 @@ fn source_load_request(
   index : Int32,
   side : SourceSide,
   emit : @rabbita.Emit[Msg],
+  priority~ : Bool = true,
 ) -> @rabbita.Cmd {
-  @github_client.source_request(location, generation, result => {
-    emit(Load(SourceLoaded(generation, index, side, result)))
-  })
+  @github_client.source_request(
+    location,
+    generation,
+    result => emit(Load(SourceLoaded(generation, index, side, result))),
+    priority~,
+  )
 }
 
 ///|
@@ -17,10 +21,19 @@ fn commands_for_file(
   generation : Int32,
   index : Int32,
   emit : @rabbita.Emit[Msg],
+  priority~ : Bool = true,
 ) -> Array[@rabbita.Cmd] {
-  source_requests_for_file(view, index).map(request => {
+  source_requests_for_file(view, index)
+  .filter(request => {
+    let side = match request.0 {
+      Old => view.files[index].old_side
+      New => view.files[index].new_side
+    }
+    side is Loading || side is NotRequested
+  })
+  .map(request => {
     let (side, location) = request
-    source_load_request(location, generation, index, side, emit)
+    source_load_request(location, generation, index, side, emit, priority~)
   })
 }
 
@@ -31,9 +44,17 @@ fn commands_for_change(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
   let commands : Array[@rabbita.Cmd] = []
+  let first = view.files.search_by(file => file.expanded)
   for index, file in view.files {
     if file.expanded {
-      for command in commands_for_file(view, generation, index, emit) {
+      for
+        command in commands_for_file(
+          view,
+          generation,
+          index,
+          emit,
+          priority=Some(index) == first,
+        ) {
         commands.push(command)
       }
     }

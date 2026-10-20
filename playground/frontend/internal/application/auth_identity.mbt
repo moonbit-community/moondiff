@@ -74,6 +74,7 @@ fn reload_after_auth_identity_boundary(
       navigation: {
         ..model.navigation,
         routes: {},
+        pages: [],
         positions: {},
         pending: None,
       },

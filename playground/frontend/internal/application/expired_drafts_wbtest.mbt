@@ -115,6 +115,7 @@ test "expiry retains route drafts but logout and a different immutable user clea
     ] {
     assert_true(cleared.review.draft() is None)
     assert_true(cleared.navigation.routes.is_empty())
+    assert_true(cleared.navigation.pages.is_empty())
   }
 }
 

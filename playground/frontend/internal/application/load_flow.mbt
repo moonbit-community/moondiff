@@ -38,31 +38,40 @@ fn show_pull(
 ) -> (Model, @rabbita.Cmd) {
   match finish_pull(reference, pull, compare, files) {
     Err(message) => (with_phase(model, LoadFailed(message)), @rabbita.none)
-    Ok(view) => {
-      let base = view.old_revision.map(r => r.sha).unwrap_or(pull.base.sha)
-      let range = pull_range_state(pull, base)
-      let shown = ensure_expanded_file_documents(
-        view,
-        model.diff_algorithm,
-        ignore_comments=model.ignore_comments,
-        ignore_tests=model.ignore_tests,
-      )
-      let ready = with_phase({ ..model, range: Some(range), }, Showing(shown))
-      let (next, commit_command) = if auto_load_pull_commits(pull) {
-        update_range(ready, LoadMore, emit)
-      } else {
-        (ready, @rabbita.none)
-      }
-      (
-        next,
-        @rabbita.batch([
-          commands_for_change(view, model.generation, emit),
-          comments_request(reference, model.generation, emit),
-          commit_command,
-        ]),
-      )
-    }
+    Ok(view) => show_pull_view(model, view, pull, emit)
   }
+}
+
+///|
+fn show_pull_view(
+  model : Model,
+  view : ChangeView,
+  pull : ApiPull,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  let reference = view.reference
+  let base = view.old_revision.map(r => r.sha).unwrap_or(pull.base.sha)
+  let range = pull_range_state(pull, base)
+  let shown = ensure_expanded_file_documents(
+    view,
+    model.diff_algorithm,
+    ignore_comments=model.ignore_comments,
+    ignore_tests=model.ignore_tests,
+  )
+  let ready = with_phase({ ..model, range: Some(range), }, Showing(shown))
+  let (next, commit_command) = if auto_load_pull_commits(pull) {
+    update_range(ready, LoadMore, emit)
+  } else {
+    (ready, @rabbita.none)
+  }
+  (
+    next,
+    @rabbita.batch([
+      commands_for_change(shown, model.generation, emit),
+      comments_request(reference, model.generation, emit),
+      commit_command,
+    ]),
+  )
 }
 
 ///|
@@ -225,6 +234,9 @@ fn begin_change_load(
   emit : @rabbita.Emit[Msg],
   preserve_draft~ : Bool = false,
 ) -> (Model, @rabbita.Cmd) {
+  // Look up before saving the outgoing page: inserting it can evict the oldest
+  // non-current entry, which may be the destination of this navigation.
+  let cached_page = ready_page(model, reference)
   let model = save_route_memory(model)
   let model = {
     ..model,
@@ -294,26 +306,43 @@ fn begin_change_load(
         Identity(model.auth is SignedIn(..) && range is None, login)
       },
     ).0
-  (
-    {
-      ..model,
-      input: canonical_github_url(reference),
-      access: {
-        ..model.access,
-        freshness: if reference.target is PullRequest(_) {
-          Checking
-        } else {
-          Confirmed
-        },
+  let next = {
+    ..model,
+    input: canonical_github_url(reference),
+    access: {
+      ..model.access,
+      freshness: if reference.target is PullRequest(_) {
+        Checking
+      } else {
+        Confirmed
       },
-      generation,
-      restore_pending: false,
-      phase,
-      route: Some(reference),
-      range,
-      file_tree: reset_file_tree_state(model.file_tree),
-      review,
     },
+    generation,
+    restore_pending: false,
+    phase,
+    route: Some(reference),
+    range,
+    file_tree: reset_file_tree_state(model.file_tree),
+    review,
+    navigation: {
+      ..model.navigation,
+      pages: retained_pages(model.navigation.pages, Some(reference)),
+    },
+  }
+  if cached_page is Some(page) {
+    @metrics.counter("page_cache_hits", 1)
+    let ready = with_phase({ ..next, range: page.range, }, Showing(page.view))
+    let (ready, restored_sources) = restore_page_requests(ready, emit)
+    return (
+      ready,
+      @rabbita.batch([
+        @github_client.cancel_before(generation),
+        restored_sources,
+      ]),
+    )
+  }
+  (
+    next,
     if range is Some(_) {
       @rabbita.batch([@github_client.cancel_before(generation), command])
     } else if !(reference.target is PullRequest(_)) {
