@@ -190,6 +190,31 @@ test "source concurrency is four and priority files overtake queued default expa
 }
 
 ///|
+test "stable hover or focus promotes only an eligible candidate after 100ms" {
+  let (client, n) = snapshot_harness()
+  client.prefetch_home(
+    Array::makei(5, i => {
+      pull: snapshot_args(number=(i + 1).to_string()),
+      updated_at: "v1",
+    }),
+    0,
+  )
+  n.tick()
+  client.prefetch_intent(Some(snapshot_args(number="4")), true)
+  assert_eq(n.timers[1].ms, 100)
+  assert_eq(client.workspace.candidates[1].pull.number, "2")
+  n.tick()
+  assert_eq(client.workspace.candidates[1].pull.number, "4")
+  drive_prefetch_fixture(n, 100)
+  let comparisons = n.calls.filter(call => call.request() is CompareGet(_))
+  assert_eq(comparisons.length(), 2)
+  let pulls = n.calls.filter(call => call.request() is PullGet(_))
+  assert_true(pulls[2].request() is PullGet({ number: "4", .. }))
+  client.prefetch_intent(Some(snapshot_args(number="9")), true)
+  assert_eq(n.timer_count(), 0)
+}
+
+///|
 test "metadata-only candidates revalidate after thirty seconds in a later home visit" {
   let (client, n) = snapshot_harness()
   let candidates = [{ pull: snapshot_args(), updated_at: "v1", }]
