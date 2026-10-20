@@ -10,6 +10,7 @@ priv struct PendingNavigation {
 priv struct Coordinator {
   layout : LayoutState
   editor : EditorState
+  progressive : ProgressiveState
   mut scheduler : &@cmd.Scheduler?
   mut early_commands : Array[@rabbita.Cmd]
   mut generation : Int32
@@ -28,6 +29,7 @@ fn Coordinator::new() -> Coordinator {
   {
     layout: LayoutState::new(),
     editor: EditorState::new(),
+    progressive: ProgressiveState::new(),
     scheduler: None,
     early_commands: [],
     generation: 0,
@@ -56,10 +58,16 @@ fn Coordinator::begin_update(
     @application.clear_navigation_landings()
     self.navigation = None
     self.pending.clear()
+    self.progressive.dispose()
   }
   self.revision += 1
   for action in actions {
     if action.scope is (PageLayout | HistoryLayout(_)) {
+      if action.target is Navigation {
+        // Prevent disappearing status notices from adjusting the restored PR
+        // position after its explicit scroll command has completed.
+        self.progressive.hold_anchoring()
+      }
       self.navigation_sequence += 1
       let mount_instance = match self.mounts.get(action.target) {
         Some(mount) if mount.alive && mount.generation == generation =>
@@ -83,6 +91,7 @@ fn Coordinator::discard_cancelled_history(self : Coordinator) -> Unit {
     is Some({ action: { scope: HistoryLayout(token), .. }, .. }) &&
     token.cancelled {
     self.navigation = None
+    self.progressive.release_anchoring()
   }
 }
 
@@ -108,6 +117,7 @@ fn Coordinator::finish_update(
     }
   }
   self.flush_navigation()
+  self.schedule_progressive()
 }
 
 ///|
@@ -134,6 +144,7 @@ fn Coordinator::finish_region(
     self.run(command)
   }
   self.flush_navigation()
+  self.schedule_progressive()
 }
 
 ///|
@@ -202,7 +213,12 @@ fn Coordinator::flush_navigation(self : Coordinator) -> Unit {
       once(() => {
         // Recheck at command execution too; a newer event or unmount wins.
         if self.take_navigation(sequence) is Some(command) {
+          self.progressive.suppressed = true
+          self.progressive.scrolled = false
+          self.progressive.navigation_locked = true
+          self.progressive.anchor = None
           self.run(command)
+          self.layout.after(() => self.progressive.suppressed = false)
         }
       }),
     ),
