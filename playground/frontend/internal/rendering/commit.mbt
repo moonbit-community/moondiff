@@ -20,6 +20,7 @@ priv struct Coordinator {
   pending : Map[@application.Region, CommitTicket]
   mut navigation_sequence : Int32
   mut navigation : PendingNavigation?
+  mut range_target : (Int32, String?)
 }
 
 ///|
@@ -37,6 +38,7 @@ fn Coordinator::new() -> Coordinator {
     pending: {},
     navigation_sequence: 0,
     navigation: None,
+    range_target: (0, None),
   }
 }
 

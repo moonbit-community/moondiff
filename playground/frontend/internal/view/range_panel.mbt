@@ -140,13 +140,8 @@ fn pull_range_selector(
 ) -> @rabbita.Html {
   let state = input.state
   let selector_ready = @application.range_pull_selector_ready(state)
-  guard input.reference.target is PullRequest(number) else {
-    return @html.nothing
-  }
-  let can_view = selector_ready &&
-    @application.range_commit_after(state, state.from_sha, state.to_sha) &&
-    @github.valid_sha(state.from_sha) &&
-    @github.valid_sha(state.to_sha)
+  guard input.reference.target is PullRequest(_) else { return @html.nothing }
+  let path = @application.range_selected_path(input.reference, state)
   @html.section(class="range-panel range-selector", [
     @html.div(class="range-panel-heading", [
       @html.div([
@@ -166,7 +161,9 @@ fn pull_range_selector(
         @html.span("From"),
         @html.select(
           disabled=!selector_ready,
-          on_change=value => emit(@application.Msg::Range(FromSelected(value))),
+          on_change=value => {
+            emit(@application.Msg::Range(FromSelected(input.generation, value)))
+          },
           range_from_options(state),
         ),
       ]),
@@ -174,25 +171,19 @@ fn pull_range_selector(
         @html.span("To"),
         @html.select(
           disabled=!selector_ready,
-          on_change=value => emit(@application.Msg::Range(ToSelected(value))),
+          on_change=value => {
+            emit(@application.Msg::Range(ToSelected(input.generation, value)))
+          },
           range_to_options(state),
         ),
       ]),
-      if can_view {
-        let target = @github.pull_range_reference(
-          input.reference.owner,
-          input.reference.repo,
-          number,
-          state.from_sha,
-          state.to_sha,
-        )
-        @html.a(
-          escape=true,
-          href=@routing.playground_route(target),
-          target=Blank,
-          rel="noopener noreferrer",
-          class="secondary range-apply",
+      if path is Some(path) {
+        internal_link(
+          path,
           "View interval",
+          emit,
+          class="secondary range-apply",
+          activate=Range(OpenSelected(input.generation)),
         )
       } else {
         @html.button(

@@ -30,6 +30,7 @@ pub fn start(id : String) -> Unit {
         let (model, command) = @application.app_init(coordinator.forward(raw))
         let generation = model.generation
         let revision = coordinator.begin_update(generation, [])
+        coordinator.configure_range(model)
         (
           Snapshot(model),
           @cmd.custom_cmd(scheduler => {
@@ -70,6 +71,7 @@ pub fn start(id : String) -> Unit {
           generation,
           transition.after_commit,
         )
+        coordinator.configure_range(transition.model)
         // Region actions bind to tickets after the central projection; page
         // navigation has already replaced the previous intent in begin_update.
         let after = coordinator.after_update(

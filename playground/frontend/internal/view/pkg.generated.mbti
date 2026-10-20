@@ -88,6 +88,7 @@ pub(all) struct PullMergeInput {
 } derive(Eq)
 
 pub(all) struct RangePanelInput {
+  generation : Int32
   reference : @github.CommitRef
   state : @application.RangeState
   stats : @moondiff-playground-protocol.ApiStats

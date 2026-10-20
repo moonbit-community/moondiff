@@ -4,6 +4,17 @@ The application reducer owns the only business model. Rendering inputs are
 read-only projections; region state contains only a render revision and lifecycle
 information. Rabbita 0.16.5 is used through its public API, without dependency edits.
 
+PR interval links use the application’s shared target validation. Plain clicks
+and Enter carry the page generation and resolve the accepted selection in the
+reducer; deferred navigation retains the destination computed at activation.
+The coordinator keeps only a `(generation, href?)` projection and synchronizes
+the mounted selector link at every model update, after regional paints, and in
+capture listeners before native link interactions. Valid modified clicks,
+middle clicks, context menus and drags retain browser defaults. Retired or
+invalid links lose their `href`, and selector unmounts remove the listeners.
+`range.spec.mjs` freezes selector paints to exercise these paths, real new tabs,
+history restoration, old DOM callbacks and comment submission outcomes.
+
 | Region | Invalidating inputs |
 | --- | --- |
 | Shell | generation, phase, file identities, drawer, width, layout signature |

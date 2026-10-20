@@ -1,5 +1,6 @@
 ///|
 pub(all) enum HomeMsg {
+  PrefetchIntent(@protocol.PullGet?, Bool)
   VisibilityChanged(Bool)
   Refresh
   SelectTab(@protocol.ViewerPullKind)
@@ -170,6 +171,15 @@ fn update_home(
   }
   guard home_active(model) else { return (model, @rabbita.none) }
   match msg {
+    PrefetchIntent(pull, focused) =>
+      (
+        model,
+        if prefetch_eligible(model) {
+          @github_client.prefetch_intent(pull, focused)
+        } else {
+          @rabbita.none
+        },
+      )
     VisibilityChanged(_) => (model, @rabbita.none)
     Refresh => {
       guard !model.home.busy() else { return (model, @rabbita.none) }

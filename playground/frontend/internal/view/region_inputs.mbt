@@ -145,6 +145,7 @@ pub(all) struct PullMergeInput {
 
 ///|
 pub(all) struct RangePanelInput {
+  generation : Int32
   reference : @github.CommitRef
   state : @application.RangeState
   stats : @protocol.ApiStats
@@ -244,6 +245,7 @@ pub fn RegionProjection::inputs(
       (
         RangePanel,
         RangePanel({
+          generation: model.generation,
           reference,
           state,
           stats: @github.pull_stats(pull),
@@ -288,6 +290,7 @@ pub fn RegionProjection::inputs(
       (
         RangePanel,
         RangePanel({
+          generation: model.generation,
           reference: view.reference,
           state,
           stats: view.stats,

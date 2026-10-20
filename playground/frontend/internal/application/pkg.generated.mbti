@@ -44,6 +44,8 @@ pub fn range_pull_history_unsupported(RangeState) -> Bool
 
 pub fn range_pull_selector_ready(RangeState) -> Bool
 
+pub fn range_selected_path(@github.CommitRef, RangeState) -> String?
+
 pub fn snapshot_confirmed(Model) -> Bool
 
 pub fn trap_sign_in_focus(@dom.KeyboardEvent) -> Unit
@@ -139,6 +141,7 @@ pub(all) enum HomeLoad {
 } derive(Eq)
 
 pub(all) enum HomeMsg {
+  PrefetchIntent(@moondiff-playground-protocol.PullGet?, Bool)
   VisibilityChanged(Bool)
   Refresh
   SelectTab(@moondiff-playground-protocol.ViewerPullKind)
@@ -309,8 +312,9 @@ pub(all) struct PullMergeState {
 pub fn PullMergeState::new() -> Self
 
 pub(all) enum RangeMsg {
-  FromSelected(String)
-  ToSelected(String)
+  FromSelected(Int32, String)
+  ToSelected(Int32, String)
+  OpenSelected(Int32)
   ToggleCommits
   LoadMore
   CopyLink
