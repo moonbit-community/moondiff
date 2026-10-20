@@ -1,4 +1,4 @@
-import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 
 export function syntheticFixture({ files = 5, declarations = 24 } = {}) {
   const sha = 'a'.repeat(40), base = 'b'.repeat(40), sources = {};
@@ -97,6 +97,7 @@ export async function installRenderingFixture(page, fixture, options = {}) {
     }
   });
   await page.route('**/api/**', async route => {
+    route = metadataFallbackRoute(route);
     if (new URL(route.request().url()).pathname === '/api/auth/status') {
       await route.fulfill({ json: successFixture('auth.status', { authenticated: state.authenticated, csrf_token: 'fixture',
         ...(state.authenticated ? { login: 'reviewer', user_id: '1' } : {}) }) });

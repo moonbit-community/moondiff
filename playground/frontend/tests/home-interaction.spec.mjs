@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { pull, commits, success, failure, gate, setup, reviews, authored, row, selectTab, noLanding } from './home-fixture.mjs';
 
-test('tabs support keyboard selection, cache both groups and retain the selected tab when opening a PR in a new tab', async ({ page }) => {
+test('tabs support keyboard selection, cache both groups and retain the selected tab after visiting a PR and returning', async ({ page }) => {
   const state = await setup(page);
   await page.goto('/');
   const reviewTab = page.getByRole('tab', { name: 'Review requests 2', exact: true });
@@ -22,14 +22,13 @@ test('tabs support keyboard selection, cache both groups and retain the selected
     await expect(selected).toBeFocused();
     await expect(selected).toHaveAttribute('aria-selected', 'true');
   }
-  const popupReady = page.waitForEvent('popup');
+  const documentId = await page.evaluate(() => window.dashboardDocumentId);
   await row(page, 'Pull request 3').getByRole('link', { name: 'Pull request 3', exact: true }).press('Enter');
-  const popup = await popupReady;
-  await expect(popup).toHaveURL(/\/upstream\/repo\/pull\/3$/);
-  await expect(popup.getByText('Loaded PR', { exact: true })).toBeVisible();
-  await popup.close();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(authoredTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/\/upstream\/repo\/pull\/3$/);
+  await expect(page.getByText('Loaded PR', { exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('tab', { name: /^Pull requests authored by me/ })).toHaveAttribute('aria-selected', 'true');
+  expect(await page.evaluate(() => window.dashboardDocumentId)).toBe(documentId);
   await selectTab(page, 'ReviewRequested');
   await expect(one.getByRole('link', { name: /Commit 1/ })).toBeVisible();
   expect(state.calls.filter(c => c.kind === 'ViewerPullsGet')).toHaveLength(2);

@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
+import { settleRegions } from '../../tests/render-probe.mjs';
 
 const base = '1'.repeat(40), head = 'a'.repeat(40), merge = '2'.repeat(40);
 const path = '/alice/repo/pull/42';
@@ -65,6 +66,7 @@ async function install(page, options = {}) {
       : { json: value, headers }).catch(() => {});
   });
   await page.route('**/api/**', async route => {
+    route = metadataFallbackRoute(route);
     const request = route.request();
     if (new URL(request.url()).pathname === '/api/auth/status') {
       state.calls.push({ op: 'auth.status' });
@@ -75,7 +77,8 @@ async function install(page, options = {}) {
     const { op, args } = fixtureRequest(request.postDataJSON());
     state.calls.push({ op, args });
     let value, failure;
-    if (op === 'github.pull.get') value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length, commits: 0 };
+    if (op === 'github.viewer.pulls.get') value = { items: [], total_count: 0 };
+    else if (op === 'github.pull.get') value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length, commits: 0 };
     else if (op === 'github.compare.get') value = { merge_base_commit: { sha: merge } };
     else if (op === 'github.pull.files') value = state.files;
     else if (op === 'github.commit.get') value = { sha: args.sha, html_url: `https://github.com/alice/repo/commit/${args.sha}`, commit: { message: 'Commit fixture' }, parents: [{ sha: base }], stats: { additions: 3, deletions: 3, total: 6 }, files };
@@ -388,6 +391,43 @@ async function installMbt(page, options = {}) {
     ...options,
   });
 }
+
+for (const anonymous of [false, true]) test(`SPA restores user layout before delayed Viewed sync${anonymous ? ' and first sign-in' : ''}`, async ({ page }) => {
+  const state = await installMbt(page, { authenticated: !anonymous });
+  await page.goto(path);
+  if (anonymous) {
+    await expect(card(page).locator('.diff-scroll table')).toBeVisible();
+    await card(page, 1).locator('.file-toggle').click();
+  } else {
+    await expect(mbtBox(page)).toBeChecked();
+    await card(page).locator('.file-toggle').click();
+  }
+  await expect(card(page)).toHaveClass(/expanded/);
+  await expect(card(page, 1)).not.toHaveClass(/expanded/);
+  await settleRegions(page);
+  const position = await page.evaluate(() => {
+    document.querySelector('#moondiff-file-0 .file-toggle').focus({ preventScroll: true });
+    scrollTo(0, 50);
+    return scrollY;
+  });
+  const waiting = gate(); state.readGate = waiting;
+  await page.locator('a.workspace-home').evaluate(link => link.click());
+  await expect(page).toHaveURL(/\/$/);
+  await page.goBack();
+  await expect(card(page)).toHaveClass(/expanded/);
+  await expect(card(page, 1)).not.toHaveClass(/expanded/);
+  await settleRegions(page);
+  await expect(card(page).locator('.file-toggle')).toBeFocused();
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(position);
+  if (anonymous) { state.authenticated = true; await refresh(page); }
+  await expect(page.getByText('Loading Viewed status…', { exact: true })).toBeVisible();
+  waiting.resolve();
+  await expect(mbtBox(page)).toBeChecked();
+  await expect(page.getByText('Loading Viewed status…', { exact: true })).toHaveCount(0);
+  await expect(card(page)).toHaveClass(/expanded/);
+  await expect(card(page, 1)).not.toHaveClass(/expanded/);
+  expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(0);
+});
 async function openMbtDraft(page, kind) {
   if (kind === 'reply') {
     await card(page).getByRole('button', { name: 'Reply', exact: true }).click();

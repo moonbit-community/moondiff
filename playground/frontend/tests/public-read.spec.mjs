@@ -80,6 +80,35 @@ test('anonymous commit and PR data use six direct GitHub read categories without
   expect(rpc).toEqual([]);
 });
 
+test('public PRs finish loading while every identity status request returns 503', async ({ page }) => {
+  const { requests, rpc } = await install(page);
+  await page.route(`${repository}/contents/**`, route => route.fulfill({
+    body: new URL(route.request().url()).searchParams.get('ref') === merge ? 'fn old() {}\n' : 'fn fresh() {}\n',
+    contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' },
+  }));
+  let statusRequests = 0;
+  await page.route('**/api/auth/status', route => {
+    statusRequests++;
+    return route.fulfill({ status: 503, json: { $tag: 'Failure', error: {
+      status: 503, code: 'unavailable', message: 'Identity check unavailable',
+    } } });
+  });
+  await page.goto('/example/project/pull/42');
+  await expect(page.getByText('Public read fixture', { exact: true })).toBeVisible();
+  await expect(page.locator('.diff-scroll table')).toContainText('fresh');
+  expect(statusRequests).toBe(1);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
+    dispatchEvent(new Event('blur'));
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => true });
+    dispatchEvent(new Event('focus'));
+  });
+  await expect.poll(() => statusRequests).toBe(2);
+  await expect(page.locator('.diff-scroll table')).toContainText('fresh');
+  expect(requests.some(request => new URL(request.url()).pathname.endsWith('/pulls/42/files'))).toBe(true);
+  expect(rpc).toEqual([]);
+});
+
 test('public comments retain large numeric IDs and read a second page', async ({ page }) => {
   const firstPage = Array.from({ length: 100 }, (_, index) => ({
     id: index + 1, body: `Page one ${index}`, html_url: 'https://github.com/comment/1',

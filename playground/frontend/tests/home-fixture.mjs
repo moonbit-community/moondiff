@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { successFixture } from '../../tests/protocol-fixtures.mjs';
+import { successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 
 const base = 'a'.repeat(40), head = 'b'.repeat(40);
 const pull = (number, overrides = {}) => ({ owner: 'upstream', repo: 'repo', number: String(number), title: `Pull request ${number}`, author: 'alice', updated_at: '2026-09-01T12:00:00Z', draft: false, ...overrides });
@@ -23,6 +23,7 @@ async function setup(page, handler) {
   });
   await page.context().route('**/api/auth/logout', async route => { state.user = null; await route.fulfill({ json: { $tag: 'Success', value: null } }); });
   await page.context().route('**/api/rpc', async route => {
+    route = metadataFallbackRoute(route);
     const { request } = route.request().postDataJSON();
     const kind = request.$tag, args = request['0']; state.calls.push({ kind, args });
     if (handler && await handler({ route, kind, args, state })) return;

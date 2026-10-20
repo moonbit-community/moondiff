@@ -2,7 +2,12 @@ import { expect } from "@playwright/test";
 
 export async function checkToolbar(page) {
   const hero = page.locator(".hero-workspace");
-  await expect(hero.locator("input:not([type=checkbox]), form, a:not(.workspace-url), .submit-arrow, .copy-button, .view-toggle")).toHaveCount(0);
+  await expect(hero.locator("input:not([type=checkbox]), form, a:not(.workspace-url):not(.workspace-home), .submit-arrow, .copy-button, .view-toggle")).toHaveCount(0);
+  const home = hero.getByRole('link', { name: /Moondiff/ });
+  await expect(home).toHaveAttribute('href', '/');
+  await expect(home.locator('.brand-mark')).toBeVisible();
+  await expect(home.getByText('Moondiff', { exact: true })).toBeVisible();
+  await expect(hero.getByRole('link', { name: 'Home', exact: true })).toHaveCount(0);
   const url = hero.locator(".workspace-url");
   await expect(url).toBeVisible();
   await expect(url).toHaveAttribute("title", await url.textContent());
