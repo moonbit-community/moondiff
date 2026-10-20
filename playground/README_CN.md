@@ -326,7 +326,10 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 浏览器公开读取与后端共用 REST 路径构造和响应校验。公开请求不发送
 `X-GitHub-Api-Version`，使用 GitHub 的
 [默认 API 版本](https://docs.github.com/en/rest/about-the-rest-api/api-versions)。
-仅完整 SHA 指向的不变数据进入有界内存缓存；相同并发请求共用一次读取。
+固定 SHA 源码和完整 PR 快照共用 32 MiB 会话内存 LRU。缓存页面可立即显示，
+后台独立复核 metadata 后才允许写入；最近两个已解析页面还会复用 diff／高亮。
+登录后的冷读取使用有界的 `PullSnapshotGet` 聚合接口，详见
+[快照加载说明](frontend/internal/github_client/README.md)。相同并发请求共用一次读取。
 [契约检查](../.github/workflows/public-github-contract.yml) 在提交推送到 `main` 时运行，
 在未指定 API 版本的情况下检查公开响应结构和 CORS；遇到 GitHub 限流时报告“无法判定”。
 

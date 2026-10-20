@@ -39,6 +39,7 @@ A successful response to that request has a typed `RpcValue` payload:
 | --- | --- | --- |
 | `CommitGet` | `sha`, `page` | `Commit(ApiCommit)` |
 | `PullGet` | `number` | `Pull(ApiPull)` |
+| `PullSnapshotGet` | `number` | `PullSnapshot(ApiPullSnapshotResult)` |
 | `ViewerPullsGet` | `kind`, optional `cursor`; no `owner` or `repo` | `ViewerPulls(ApiViewerPulls)` |
 | `PullCommitsGet` | `number`, optional `cursor` | `PullCommits(ApiPullCommits)` |
 | `PullViewedGet` | `number` | `PullViewed(ApiPullViewed)` |
@@ -83,6 +84,14 @@ SHA matching the requested prefix before a shared interval is compared.
 The PR selector enables intervals only when the complete commit list forms a
 single-parent chain from merge base to PR head. The full PR diff remains
 available for branched or merged histories.
+
+`PullSnapshotGet` is a read-only signed-in operation. It returns
+`Complete(ApiPullSnapshot)` with metadata, comparison, files and a version
+signature, or `MetadataOnly(ApiPull)` for more than 300 files or an encoded
+response above 8 MiB. The frontend continues with existing file pagination.
+Comparison and file pages overlap with at most two upstream reads, followed by
+an independent metadata validation and at most one rebuild. A process-wide
+64 MiB LRU is isolated by session and auth epoch; hits still verify metadata.
 
 ## Signed-in homepage
 
