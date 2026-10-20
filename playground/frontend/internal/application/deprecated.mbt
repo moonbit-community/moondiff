@@ -154,3 +154,8 @@ pub extend SnapshotAccess with Eq::{equal, not_equal}
 #deprecated
 #doc(hidden)
 pub extend ReadyPage with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend PreparedSnapshot with Eq::{not_equal, equal}

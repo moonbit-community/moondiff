@@ -308,7 +308,14 @@ fn update_ui(
               (model, @rabbita.none)
             } else {
               (
-                { ..model, access: { ..model.access, freshness: Checking, }, },
+                {
+                  ..model,
+                  access: {
+                    ..model.access,
+                    freshness: Checking,
+                    preparing: None,
+                  },
+                },
                 shared_snapshot_request(
                   reference,
                   model.generation,

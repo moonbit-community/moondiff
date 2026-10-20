@@ -9,16 +9,31 @@ pub(all) enum SnapshotFreshness {
 pub(all) struct SnapshotAccess {
   freshness : SnapshotFreshness
   identity_checking : Bool
+  preparing : PreparedSnapshot?
+  reload_requested : Bool
+} derive(Eq)
+
+///|
+pub(all) struct PreparedSnapshot {
+  snapshot : @github_client.PullSnapshot
+  view : ChangeView
 } derive(Eq)
 
 ///|
 pub fn SnapshotAccess::new() -> SnapshotAccess {
-  { freshness: Confirmed, identity_checking: false, }
+  {
+    freshness: Confirmed,
+    identity_checking: false,
+    preparing: None,
+    reload_requested: false,
+  }
 }
 
 ///|
 pub fn snapshot_confirmed(model : Model) -> Bool {
-  model.access.freshness is Confirmed && !model.access.identity_checking
+  model.access.freshness is Confirmed &&
+  !model.access.identity_checking &&
+  model.access.preparing is None
 }
 
 ///|
@@ -74,7 +89,11 @@ fn receive_shared_snapshot(
         (
           {
             ..model,
-            access: { ..model.access, freshness: Unavailable(message), },
+            access: {
+              ..model.access,
+              freshness: Unavailable(message),
+              preparing: None,
+            },
           },
           @rabbita.none,
         )
@@ -88,6 +107,7 @@ fn receive_shared_snapshot(
         ..model,
         access: {
           ..model.access,
+          preparing: None,
           freshness: if result.confirmed {
             Confirmed
           } else {
@@ -104,6 +124,23 @@ fn receive_shared_snapshot(
         }) &&
         view.old_revision.map(old => old.sha) ==
         Some(snapshot.comparison.merge_base_commit.sha) {
+        if result.confirmed && model.access.reload_requested {
+          if snapshot_replacement_blocked(model) {
+            return retain_previous_snapshot(model)
+          }
+          return install_snapshot(
+            next,
+            snapshot,
+            Some({
+              ..view,
+              message: snapshot.metadata.title,
+              html_url: snapshot.metadata.html_url,
+              stats: @github.pull_stats(snapshot.metadata),
+              pull_snapshot: Some(snapshot.metadata),
+            }),
+            emit,
+          )
+        }
         return (
           with_phase(
             {
@@ -129,6 +166,12 @@ fn receive_shared_snapshot(
         @github.same_pull_snapshot(pull, snapshot.metadata) &&
         model.range is Some(state) &&
         state.pull_merge_base == Some(snapshot.comparison.merge_base_commit.sha) {
+        if result.confirmed && model.access.reload_requested {
+          if snapshot_replacement_blocked(model) {
+            return retain_previous_snapshot(model)
+          }
+          return install_snapshot(next, snapshot, None, emit)
+        }
         return (
           with_phase(
             {
@@ -142,46 +185,85 @@ fn receive_shared_snapshot(
       }
       let replacing = model.phase is Showing(_) ||
         model.phase is ShowingPullSelector(_)
-      let next = if replacing {
-        let saved = save_route_memory(next)
-        let generation = saved.generation + 1
-        let reset = comment_session_context(initial_review_state(), {
-          generation,
-          route: Some(reference),
-          snapshot: None,
-          enabled: true,
-        })
-        let login = match saved.auth {
-          SignedIn(login~, ..) => login
-          _ => None
+      if replacing {
+        // A retained version can paint, but cannot replace a different shown
+        // version until its independent metadata confirmation has completed.
+        if !result.confirmed {
+          return (model, @rabbita.none)
         }
-        let review = @comments.update(
-            reset,
-            if saved.access.identity_checking {
-              IdentityChecking
-            } else {
-              Identity(saved.auth is SignedIn(..), login)
-            },
-          ).0
-        {
-          ..saved,
-          generation,
-          review,
-          range: None,
-          file_tree: reset_file_tree_state(saved.file_tree),
-          navigation: {
-            ..saved.navigation,
-            restore_data: true,
-            restore_position: true,
-          },
-        }
-      } else {
-        next
+        return prepare_snapshot_replacement(model, snapshot, emit)
       }
-      let (shown, command) = if snapshot.metadata.changed_files >
-        @github.MAX_PULL_FILES {
-        show_pull_selector(next, snapshot.metadata, snapshot.comparison, emit)
+      install_snapshot(next, snapshot, None, emit)
+    }
+  }
+}
+
+///|
+fn install_snapshot(
+  model : Model,
+  snapshot : @github_client.PullSnapshot,
+  prepared : ChangeView?,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  guard model.route is Some(reference) else { return (model, @rabbita.none) }
+  let replacing = model.phase is Showing(_) ||
+    model.phase is ShowingPullSelector(_)
+  let next = {
+    ..model,
+    access: {
+      ..model.access,
+      freshness: if replacing {
+        Confirmed
       } else {
+        model.access.freshness
+      },
+      preparing: None,
+      reload_requested: false,
+    },
+  }
+  let next = if replacing {
+    let saved = save_route_memory(next)
+    let generation = saved.generation + 1
+    let reset = comment_session_context(initial_review_state(), {
+      generation,
+      route: Some(reference),
+      snapshot: None,
+      enabled: true,
+    })
+    let login = match saved.auth {
+      SignedIn(login~, ..) => login
+      _ => None
+    }
+    let review = @comments.update(
+        reset,
+        if saved.access.identity_checking {
+          IdentityChecking
+        } else {
+          Identity(saved.auth is SignedIn(..), login)
+        },
+      ).0
+    {
+      ..saved,
+      generation,
+      review,
+      range: None,
+      file_tree: reset_file_tree_state(saved.file_tree),
+      navigation: {
+        ..saved.navigation,
+        restore_data: true,
+        restore_position: true,
+      },
+    }
+  } else {
+    next
+  }
+  let (shown, command) = if snapshot.metadata.changed_files >
+    @github.MAX_PULL_FILES {
+    show_pull_selector(next, snapshot.metadata, snapshot.comparison, emit)
+  } else {
+    match prepared {
+      Some(view) => show_pull_view(next, view, snapshot.metadata, emit)
+      None =>
         show_pull(
           next,
           reference,
@@ -190,18 +272,14 @@ fn receive_shared_snapshot(
           snapshot.files,
           emit,
         )
-      }
-      (
-        shown,
-        if replacing {
-          @rabbita.batch([
-            @github_client.cancel_before(shown.generation),
-            command,
-          ])
-        } else {
-          command
-        },
-      )
     }
   }
+  (
+    shown,
+    if replacing {
+      @rabbita.batch([@github_client.cancel_before(shown.generation), command])
+    } else {
+      command
+    },
+  )
 }

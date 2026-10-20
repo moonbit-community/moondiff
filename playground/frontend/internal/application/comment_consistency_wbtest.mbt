@@ -356,8 +356,9 @@ test "stale snapshot blocks only line authoring and manual load waits for drafts
   let (blocked, _) = update_review(deleting, LoadLatestSnapshot, emit)
   assert_true(blocked == deleting)
   let (loaded, _) = update_review(model, LoadLatestSnapshot, emit)
-  assert_eq(loaded.generation, model.generation + 1)
-  assert_true(loaded.phase is LoadingPullMetadata(..))
+  assert_eq(loaded.generation, model.generation)
+  assert_true(loaded.phase == model.phase)
+  assert_true(loaded.access.freshness is Checking)
 }
 
 ///|

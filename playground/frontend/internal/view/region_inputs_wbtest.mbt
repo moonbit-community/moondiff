@@ -135,6 +135,8 @@ test "shown discussions own authentication errors while large selectors retain t
     auth: AuthFailed("Session expired"),
     access: {
       freshness: Unavailable("Session expired"),
+      preparing: None,
+      reload_requested: false,
       identity_checking: false,
     },
   }
