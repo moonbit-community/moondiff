@@ -137,6 +137,7 @@ pub(all) struct DiscussionInput {
 
 ///|
 pub(all) struct PullMergeInput {
+  write_enabled : Bool
   state : @application.PullMergeState
   auth : @application.AuthStatus
   snapshot_stale : Bool
@@ -232,6 +233,7 @@ pub fn RegionProjection::inputs(
   }
   let inputs : Array[(@application.Region, RegionInput)] = [
     (Toolbar, Toolbar(toolbar_input(model))),
+    (Status, Status(status_input(model))),
   ]
   if model.phase is ShowingPullSelector(pull) &&
     model.route is Some(reference) &&
@@ -254,44 +256,6 @@ pub fn RegionProjection::inputs(
   guard model.phase is Showing(view) else {
     self.tree = None
     self.overall = None
-    let status : StatusInput = match model.phase {
-      Idle =>
-        if model.route is Some(_) {
-          Loading("Checking GitHub session…")
-        } else {
-          Empty
-        }
-      LoadFailed(message) => Failed(message, model.auth)
-      LoadingCommit(page~, ..) =>
-        Loading(
-          "Loading commit metadata (page \{page}, up to 100 files per page)…",
-        )
-      LoadingPullMetadata(..) => Loading("Loading pull request metadata…")
-      LoadingPullCommitMetadata(..) =>
-        Loading("Loading pull request commit metadata…")
-      LoadingRangePullMetadata(..) =>
-        Loading("Loading pull request context for this commit interval…")
-      LoadingRangePullCompare(..) =>
-        Loading("Finding the pull request merge base…")
-      LoadingRange(..) => Loading("Loading commit interval…")
-      LoadingPullSnapshot(page~, ..) =>
-        Loading(
-          if page > 0 {
-            "Loading pinned comparison and changed files (page \{page})…"
-          } else {
-            "Finishing the pinned comparison…"
-          },
-        )
-      ValidatingPullSnapshot(..) =>
-        Loading("Checking that the pull request stayed unchanged…")
-      LoadingPullSelectorCompare(..) =>
-        Loading("Finding the pull request merge base…")
-      ValidatingPullSelector(..) =>
-        Loading("Checking that the pull request stayed unchanged…")
-      ShowingPullSelector(_) => Empty
-      Showing(_) => Empty
-    }
-    inputs.push((Status, Status(status)))
     return inputs
   }
   let metadata = view.files.map(f => TreeMetadata::{
@@ -396,11 +360,66 @@ pub fn RegionProjection::inputs(
           state: model.pull_merge,
           auth: model.auth,
           snapshot_stale: model.review.snapshot_stale,
+          write_enabled: @application.writes_allowed(model),
         }),
       ),
     )
   }
   inputs
+}
+
+///|
+fn status_input(model : Model) -> StatusInput {
+  if model.phase is Showing(_) || model.phase is ShowingPullSelector(_) {
+    return match model.access.freshness {
+      Checking => Loading("Checking the current PR version…")
+      Unavailable(message) =>
+        if model.auth is AuthFailed(_) && model.phase is Showing(_) {
+          // The discussion already owns the session error and sign-in action.
+          Empty
+        } else {
+          Failed(message, model.auth)
+        }
+      Confirmed => Empty
+    }
+  }
+  match model.phase {
+    Idle =>
+      if model.route is Some(_) {
+        Loading("Checking GitHub session…")
+      } else {
+        Empty
+      }
+    LoadFailed(message) => Failed(message, model.auth)
+    LoadingCommit(page~, ..) =>
+      Loading(
+        "Loading commit metadata (page \{page}, up to 100 files per page)…",
+      )
+    LoadingPullMetadata(..) => Loading("Loading pull request metadata…")
+    LoadingPullCommitMetadata(..) =>
+      Loading("Loading pull request commit metadata…")
+    LoadingRangePullMetadata(..) =>
+      Loading("Loading pull request context for this commit interval…")
+    LoadingRangePullCompare(..) =>
+      Loading("Finding the pull request merge base…")
+    LoadingRange(..) => Loading("Loading commit interval…")
+    LoadingPullSnapshot(page~, ..) =>
+      Loading(
+        if page > 0 {
+          "Loading pinned comparison and changed files (page \{page})…"
+        } else {
+          "Finishing the pinned comparison…"
+        },
+      )
+    ValidatingPullSnapshot(..) =>
+      Loading("Checking that the pull request stayed unchanged…")
+    LoadingPullSelectorCompare(..) =>
+      Loading("Finding the pull request merge base…")
+    ValidatingPullSelector(..) =>
+      Loading("Checking that the pull request stayed unchanged…")
+    ShowingPullSelector(_) => Empty
+    Showing(_) => Empty
+  }
 }
 
 ///|

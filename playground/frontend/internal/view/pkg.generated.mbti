@@ -81,6 +81,7 @@ pub(all) struct NavigationInput {
 } derive(Eq)
 
 pub(all) struct PullMergeInput {
+  write_enabled : Bool
   state : @application.PullMergeState
   auth : @application.AuthStatus
   snapshot_stale : Bool

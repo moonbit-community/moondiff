@@ -17,7 +17,11 @@ fn page_activity_sub_loader(
   let mut tagger = next_tagger
   let mut active = page_is_active()
   let mut restoring = false
+  @github_client.observe_auth_failure(() => {
+    scheduler.add(tagger(Auth(SessionInvalidated)))
+  })
   let listener : @dom.Listener = _ => {
+    scheduler.add(tagger(Home(VisibilityChanged(!@dom.document().hidden()))))
     let next_active = page_is_active()
     if !active && next_active {
       if restoring {
@@ -44,6 +48,7 @@ fn page_activity_sub_loader(
   document.add_event_listener("visibilitychange", listener)
   Some({
     unload: _ => {
+      @github_client.observe_auth_failure(() => ())
       @github_client.dispose()
       window
       ..remove_event_listener("focus", listener)

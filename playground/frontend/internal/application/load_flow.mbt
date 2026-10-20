@@ -225,6 +225,11 @@ fn begin_change_load(
   emit : @rabbita.Emit[Msg],
   preserve_draft~ : Bool = false,
 ) -> (Model, @rabbita.Cmd) {
+  let model = save_route_memory(model)
+  let model = {
+    ..model,
+    navigation: { ..model.navigation, restore_data: true, },
+  }
   let generation = model.generation + 1
   let range = range_reference_parts(reference).map(pair => {
     let (base, head) = pair
@@ -241,7 +246,7 @@ fn begin_change_load(
     PullRequest(_) =>
       (
         LoadingPullMetadata(reference~, attempt=0),
-        pull_metadata_request(reference, generation, 0, emit),
+        shared_snapshot_request(reference, generation, emit),
       )
     PullCommit(_, _) =>
       (
@@ -293,6 +298,14 @@ fn begin_change_load(
     {
       ..model,
       input: canonical_github_url(reference),
+      access: {
+        ..model.access,
+        freshness: if reference.target is PullRequest(_) {
+          Checking
+        } else {
+          Confirmed
+        },
+      },
       generation,
       restore_pending: false,
       phase,
@@ -310,7 +323,7 @@ fn begin_change_load(
         comments_request(reference, generation, emit),
       ])
     } else {
-      @rabbita.batch([@github_client.cancel_before(generation), command])
+      command
     },
   )
 }

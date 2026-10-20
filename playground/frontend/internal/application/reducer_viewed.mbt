@@ -102,7 +102,23 @@ fn update_viewed(
         !pending.confirming else {
         return (model, @rabbita.none)
       }
-      if !ok || model.viewed.stale || model.review.snapshot_stale {
+      if ok &&
+        !snapshot_confirmed(model) &&
+        model.auth is SignedIn(..) &&
+        !model.viewed.stale &&
+        !model.review.snapshot_stale {
+        return (
+          with_viewed_file(model, index, {
+            ..file,
+            pending: Some({ ..pending, deferred: true, }),
+          }),
+          @rabbita.none,
+        )
+      }
+      if !ok ||
+        !writes_allowed(model) ||
+        model.viewed.stale ||
+        model.review.snapshot_stale {
         let (next, rollback) = rollback_viewed(
           model,
           index,
@@ -123,11 +139,12 @@ fn update_viewed(
       }
       let next = with_viewed_file(model, index, {
         ..file,
-        pending: Some({ ..pending, stored: true, }),
+        pending: Some({ ..pending, stored: true, deferred: false, }),
       })
       (next, viewed_write_request(next, index, record, emit))
     }
     Toggle(generation, index) => {
+      guard writes_allowed(model) else { return (model, @rabbita.none) }
       guard generation == model.generation &&
         !model.viewed.stale &&
         !model.review.snapshot_stale &&
@@ -174,6 +191,7 @@ fn update_viewed(
           pending: Some({
             record,
             stored: false,
+            deferred: false,
             before,
             expanded: view.files[index].expanded,
             expansion_revision: file.expansion_revision,

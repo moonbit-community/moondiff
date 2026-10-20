@@ -302,7 +302,7 @@ fn range_page_loaded(
     let navigation = if canonical == reference {
       @rabbita.none
     } else {
-      @nav.replace_url(playground_share_url(canonical))
+      replace_route(playground_share_url(canonical), emit)
     }
     return (
       next,
@@ -510,7 +510,7 @@ fn update_range(
         Ok(items) =>
           (
             model,
-            @github_client.get_pull(
+            @github_client.get_pull_fresh(
               { owner: reference.owner, repo: reference.repo, number, },
               generation,
               verified => {

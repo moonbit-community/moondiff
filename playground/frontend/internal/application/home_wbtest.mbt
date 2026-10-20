@@ -160,7 +160,12 @@ test "signed-in invalid routes keep the error while correcting input" {
     assert_true(model.route is None)
     assert_true(model.home == invalid.home)
   }
-  let submitted = home_step(model, Ui(Submit))
+  let requested = home_step(model, Ui(Submit))
+  assert_true(requested.route == model.route)
+  let submitted = home_step(
+    requested,
+    Ui(RouteChanged(@url.parse("https://playground.test/upstream/repo/pull/1"))),
+  )
   assert_true(
     submitted.route == Some(@github.pull_reference("upstream", "repo", "1")),
   )

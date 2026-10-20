@@ -22,6 +22,34 @@ fn page_navigation(target : @application.Region) -> @application.AfterCommit {
 }
 
 ///|
+test "user interaction cancels queued history but explicit navigation still runs" {
+  let coordinator = Coordinator::new()
+  let target = settled_mount(coordinator, Navigation, 1)
+  let token : @application.HistoryRestoration = {
+    generation: 0,
+    entry: "history-entry",
+    cancelled: false,
+  }
+  let action = { ..page_navigation(Navigation), scope: HistoryLayout(token), }
+  let revision = coordinator.begin_update(0, [action])
+  let sequence = coordinator.navigation_sequence
+  coordinator.region_changed(target)
+  coordinator.finish_update(0, revision)
+  token.cancelled = true
+  let revision = coordinator.begin_update(0, [])
+  assert_true(coordinator.navigation is None)
+  coordinator.finish_update(0, revision)
+  coordinator.finish_region(target, target.ticket())
+  assert_true(coordinator.take_navigation(sequence) is None)
+  assert_true(coordinator.navigation is None)
+  let revision = coordinator.begin_update(0, [page_navigation(Navigation)])
+  coordinator.finish_update(0, revision)
+  assert_true(
+    coordinator.take_navigation(coordinator.navigation_sequence) is Some(_),
+  )
+}
+
+///|
 test "page navigation waits for central projection and every scheduled region in either order" {
   for target_first in [true, false] {
     let coordinator = Coordinator::new()

@@ -75,7 +75,14 @@ fn update_review(
         return (model, @rabbita.none)
       }
       return (
-        model,
+        if model.auth is SignedIn(..) {
+          with_review(
+            { ..model, access: { ..model.access, identity_checking: true, }, },
+            @comments.update(model.review, IdentityChecking).0,
+          )
+        } else {
+          model
+        },
         reactivation_auth_status_request(
           model.route,
           model.generation,

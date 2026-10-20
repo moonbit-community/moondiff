@@ -206,6 +206,7 @@ fn restore_viewed_records(
           pending: Some({
             record,
             stored: true,
+            deferred: false,
             before: record.target(),
             expanded: file.expanded,
             expansion_revision: old.expansion_revision,

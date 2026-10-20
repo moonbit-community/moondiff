@@ -48,6 +48,7 @@ fn Coordinator::begin_update(
   generation : Int32,
   actions : Array[@application.AfterCommit],
 ) -> Int32 {
+  self.discard_cancelled_history()
   if self.generation != generation {
     self.generation = generation
     @application.clear_navigation_landings()
@@ -56,7 +57,7 @@ fn Coordinator::begin_update(
   }
   self.revision += 1
   for action in actions {
-    if action.scope is PageLayout {
+    if action.scope is (PageLayout | HistoryLayout(_)) {
       self.navigation_sequence += 1
       let mount_instance = match self.mounts.get(action.target) {
         Some(mount) if mount.alive && mount.generation == generation =>
@@ -72,6 +73,15 @@ fn Coordinator::begin_update(
     }
   }
   self.revision
+}
+
+///|
+fn Coordinator::discard_cancelled_history(self : Coordinator) -> Unit {
+  if self.navigation
+    is Some({ action: { scope: HistoryLayout(token), .. }, .. }) &&
+    token.cancelled {
+    self.navigation = None
+  }
 }
 
 ///|
@@ -156,6 +166,7 @@ fn Coordinator::take_navigation(
   self : Coordinator,
   sequence : Int32,
 ) -> @rabbita.Cmd? {
+  self.discard_cancelled_history()
   guard self.navigation is Some(navigation) &&
     navigation.sequence == sequence &&
     navigation.generation == self.generation &&

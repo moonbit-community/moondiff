@@ -122,6 +122,7 @@ pub fn shell_view(
     class=if input.landing { "shell landing" } else { "shell workspace" },
     [
       host(Toolbar),
+      host(Status),
       if input.selector_only {
         @html.section(class="results selector-only", [host(RangePanel)])
       } else if input.showing {
@@ -168,7 +169,7 @@ pub fn shell_view(
           ),
         ])
       } else {
-        host(Status)
+        @html.nothing
       },
       @html.footer([
         @html.span("Built with Moondiff · "),

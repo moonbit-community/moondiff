@@ -1,0 +1,207 @@
+///|
+pub(all) enum SnapshotFreshness {
+  Confirmed
+  Checking
+  Unavailable(String)
+} derive(Eq)
+
+///|
+pub(all) struct SnapshotAccess {
+  freshness : SnapshotFreshness
+  identity_checking : Bool
+} derive(Eq)
+
+///|
+pub fn SnapshotAccess::new() -> SnapshotAccess {
+  { freshness: Confirmed, identity_checking: false, }
+}
+
+///|
+pub fn snapshot_confirmed(model : Model) -> Bool {
+  model.access.freshness is Confirmed && !model.access.identity_checking
+}
+
+///|
+pub fn writes_allowed(model : Model) -> Bool {
+  snapshot_confirmed(model) && model.auth is SignedIn(..)
+}
+
+///|
+fn synchronize_snapshot_permission(model : Model) -> Model {
+  let review = @comments.update(
+      model.review,
+      SnapshotFreshnessChanged(snapshot_confirmed(model)),
+    ).0
+  if @identity.same(review, model.review) {
+    model
+  } else {
+    with_review(model, review)
+  }
+}
+
+///|
+fn shared_snapshot_request(
+  reference : CommitRef,
+  generation : Int32,
+  emit : @rabbita.Emit[Msg],
+  revalidate~ : Bool = false,
+) -> @rabbita.Cmd {
+  guard reference.target is PullRequest(number) else { return @rabbita.none }
+  @github_client.load_pull_snapshot(
+    { owner: reference.owner, repo: reference.repo, number, },
+    generation,
+    result => emit(Load(SharedSnapshotLoaded(generation, result))),
+    revalidate~,
+  )
+}
+
+///|
+fn receive_shared_snapshot(
+  model : Model,
+  generation : Int32,
+  result : Result[@github_client.SnapshotResult, Error],
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  guard generation == model.generation &&
+    model.route is Some(reference) &&
+    reference.target is PullRequest(_) else {
+    return (model, @rabbita.none)
+  }
+  match result {
+    Err(error) => {
+      let message = error_message(error, true)
+      if model.phase is Showing(_) || model.phase is ShowingPullSelector(_) {
+        (
+          {
+            ..model,
+            access: { ..model.access, freshness: Unavailable(message), },
+          },
+          @rabbita.none,
+        )
+      } else {
+        (with_phase(model, LoadFailed(message)), @rabbita.none)
+      }
+    }
+    Ok(result) => {
+      let snapshot = result.snapshot
+      let next = {
+        ..model,
+        access: {
+          ..model.access,
+          freshness: if result.confirmed {
+            Confirmed
+          } else {
+            Checking
+          },
+        },
+      }
+      if model.phase is Showing(view) &&
+        comment_context(model).snapshot is Some(current) &&
+        current.same_version({
+          reference,
+          sha: snapshot.metadata.head.sha,
+          pull_snapshot: Some(snapshot.metadata),
+        }) &&
+        view.old_revision.map(old => old.sha) ==
+        Some(snapshot.comparison.merge_base_commit.sha) {
+        return (
+          with_phase(
+            {
+              ..next,
+              range: next.range.map(state => {
+                ..state,
+                pull: Some(snapshot.metadata),
+              }),
+            },
+            Showing({
+              ..view,
+              message: snapshot.metadata.title,
+              html_url: snapshot.metadata.html_url,
+              stats: @github.pull_stats(snapshot.metadata),
+              pull_snapshot: Some(snapshot.metadata),
+            }),
+          ),
+          @rabbita.none,
+        )
+      }
+      // Keep the generation that owns validation and the current commit choices.
+      if model.phase is ShowingPullSelector(pull) &&
+        @github.same_pull_snapshot(pull, snapshot.metadata) &&
+        model.range is Some(state) &&
+        state.pull_merge_base == Some(snapshot.comparison.merge_base_commit.sha) {
+        return (
+          with_phase(
+            {
+              ..next,
+              range: Some({ ..state, pull: Some(snapshot.metadata), }),
+            },
+            ShowingPullSelector(snapshot.metadata),
+          ),
+          @rabbita.none,
+        )
+      }
+      let replacing = model.phase is Showing(_) ||
+        model.phase is ShowingPullSelector(_)
+      let next = if replacing {
+        let saved = save_route_memory(next)
+        let generation = saved.generation + 1
+        let reset = comment_session_context(initial_review_state(), {
+          generation,
+          route: Some(reference),
+          snapshot: None,
+          enabled: true,
+        })
+        let login = match saved.auth {
+          SignedIn(login~, ..) => login
+          _ => None
+        }
+        let review = @comments.update(
+            reset,
+            if saved.access.identity_checking {
+              IdentityChecking
+            } else {
+              Identity(saved.auth is SignedIn(..), login)
+            },
+          ).0
+        {
+          ..saved,
+          generation,
+          review,
+          range: None,
+          file_tree: reset_file_tree_state(saved.file_tree),
+          navigation: {
+            ..saved.navigation,
+            restore_data: true,
+            restore_position: true,
+          },
+        }
+      } else {
+        next
+      }
+      let (shown, command) = if snapshot.metadata.changed_files >
+        @github.MAX_PULL_FILES {
+        show_pull_selector(next, snapshot.metadata, snapshot.comparison, emit)
+      } else {
+        show_pull(
+          next,
+          reference,
+          snapshot.metadata,
+          snapshot.comparison,
+          snapshot.files,
+          emit,
+        )
+      }
+      (
+        shown,
+        if replacing {
+          @rabbita.batch([
+            @github_client.cancel_before(shown.generation),
+            command,
+          ])
+        } else {
+          command
+        },
+      )
+    }
+  }
+}
