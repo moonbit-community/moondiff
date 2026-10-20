@@ -10,6 +10,7 @@ test "all requests roundtrip and classify writes" {
   let requests : Array[@protocol.GitHubRequest] = [
     CommitGet({ owner: "alice", repo: "repo", sha: "123abcd", page: 1, }),
     PullGet({ owner: "alice", repo: "repo", number: "42", }),
+    PullSnapshotGet({ owner: "alice", repo: "repo", number: "42", }),
     PullMergeStatusGet({
       owner: "alice",
       repo: "repo",

@@ -137,7 +137,7 @@ pub fn GitHubRequest::is_write(self : GitHubRequest) -> Bool {
   match self {
     ViewerPullsGet(_) | PullCommitsGet(_) => false
     CommitGet(_) => false
-    PullGet(_) => false
+    PullGet(_) | PullSnapshotGet(_) => false
     PullMergeStatusGet(_) => false
     PullRebaseMerge(_) => true
     PullViewedGet(_) => false
@@ -166,7 +166,7 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
     }
     PullCommitsGet(p) => (p.owner, p.repo)
     CommitGet(p) => (p.owner, p.repo)
-    PullGet(p) => (p.owner, p.repo)
+    PullGet(p) | PullSnapshotGet(p) => (p.owner, p.repo)
     PullMergeStatusGet(p) => (p.owner, p.repo)
     PullRebaseMerge(p) => (p.owner, p.repo)
     PullViewedGet(p) => (p.owner, p.repo)
@@ -205,7 +205,7 @@ pub fn GitHubRequest::validate(self : GitHubRequest) -> Unit raise {
         "Invalid page.",
       )
     }
-    PullGet(p) => check_number(p.number)
+    PullGet(p) | PullSnapshotGet(p) => check_number(p.number)
     PullMergeStatusGet(p) => {
       check_pull_number(p.number)
       check_sha(p.expected_base_sha)
