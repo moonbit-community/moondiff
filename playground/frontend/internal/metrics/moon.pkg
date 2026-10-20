@@ -1,5 +1,6 @@
 import {
   "moonbit-community/rabbita/js",
+  "moonbit-community/moondiff-playground/internal/browser",
 }
 
 supported_targets = "js"
