@@ -6,6 +6,9 @@ fn restore_page_requests(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   let next = { ..model, restore_pending: false, }
+  if next.source_pause is Some(_) {
+    return (pause_waiting_sources(next), @rabbita.none)
+  }
   guard next.route is Some(reference) else { return (next, @rabbita.none) }
   let (next, snapshot_command) = if reference.target is PullRequest(_) &&
     (next.phase is Showing(_) || next.phase is ShowingPullSelector(_)) &&
@@ -35,6 +38,48 @@ fn restore_page_requests(
             next.generation,
             emit,
           ),
+        )
+      }
+      if reference.target is PullRequest(_) {
+        let sources = match next.pull_sources {
+          Some(state) if state.generation == next.generation => {
+            // Resume only admitted reads, including manually collapsed files
+            // behind the cursor. Keeping their slots also preserves a stopped
+            // snapshot's rate-limit policy and the four-side admission bound.
+            for (index, side) in state.pending {
+              for
+                (requested_side, location) in source_requests_for_file(
+                  view, index,
+                ) {
+                if side == requested_side &&
+                  file_side(view.files[index], side) is Loading {
+                  commands.push(
+                    source_load_request(
+                      location,
+                      next.generation,
+                      index,
+                      side,
+                      emit,
+                    ),
+                  )
+                }
+              }
+            }
+            state
+          }
+          _ => {
+            let urgent = []
+            for index, file in view.files {
+              if file.old_side is Loading || file.new_side is Loading {
+                urgent.push(index)
+              }
+            }
+            { ..PullSourceState::new(next.generation), urgent, }
+          }
+        }
+        return (
+          { ..next, pull_sources: Some(sources), },
+          @rabbita.batch(commands),
         )
       }
       for index, file in view.files {

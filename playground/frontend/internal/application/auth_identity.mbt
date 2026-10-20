@@ -65,6 +65,7 @@ fn reload_after_auth_identity_boundary(
     {
       ..model,
       restore_pending: false,
+      source_pause: None,
       recovering_session: false,
       last_authenticated_user_id: match model.auth {
         SignedIn(user_id~, ..) => user_id

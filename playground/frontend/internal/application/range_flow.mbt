@@ -393,11 +393,7 @@ fn update_range(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(pull) => {
           let next = with_phase(
             { ..model, range: Some({ ..state, pull: Some(pull), }), },
@@ -425,11 +421,7 @@ fn update_range(
         return (model, @rabbita.none)
       }
       match result {
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(compare) => {
           let next = with_phase(
             {
@@ -476,16 +468,9 @@ fn update_range(
               )
             }
           }
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+          (load_failure(model, error), @rabbita.none)
         }
-        Err(error) =>
-          (
-            with_phase(model, LoadFailed(error_message(error, true))),
-            @rabbita.none,
-          )
+        Err(error) => (load_failure(model, error), @rabbita.none)
         Ok(sha) => {
           let updated = if is_base {
             { ..state, base_sha: sha, }

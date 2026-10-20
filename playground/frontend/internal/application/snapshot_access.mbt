@@ -84,6 +84,10 @@ fn receive_shared_snapshot(
   }
   match result {
     Err(error) => {
+      let model = match @github_client.rate_limit_reason(error) {
+        Some(reason) => pause_source_loading(model, reason)
+        None => model
+      }
       let message = error_message(error, true)
       if model.phase is Showing(_) || model.phase is ShowingPullSelector(_) {
         (
@@ -141,25 +145,27 @@ fn receive_shared_snapshot(
             emit,
           )
         }
-        return (
-          with_phase(
-            {
-              ..next,
-              range: next.range.map(state => {
-                ..state,
-                pull: Some(snapshot.metadata),
-              }),
-            },
-            Showing({
-              ..view,
-              message: snapshot.metadata.title,
-              html_url: snapshot.metadata.html_url,
-              stats: @github.pull_stats(snapshot.metadata),
-              pull_snapshot: Some(snapshot.metadata),
+        let shown = with_phase(
+          {
+            ..next,
+            range: next.range.map(state => {
+              ..state,
+              pull: Some(snapshot.metadata),
             }),
-          ),
-          @rabbita.none,
+          },
+          Showing({
+            ..view,
+            message: snapshot.metadata.title,
+            html_url: snapshot.metadata.html_url,
+            stats: @github.pull_stats(snapshot.metadata),
+            pull_snapshot: Some(snapshot.metadata),
+          }),
         )
+        return if result.confirmed {
+          resume_source_loading(shown, emit)
+        } else {
+          (shown, @rabbita.none)
+        }
       }
       // Keep the generation that owns validation and the current commit choices.
       if model.phase is ShowingPullSelector(pull) &&
@@ -172,16 +178,15 @@ fn receive_shared_snapshot(
           }
           return install_snapshot(next, snapshot, None, emit)
         }
-        return (
-          with_phase(
-            {
-              ..next,
-              range: Some({ ..state, pull: Some(snapshot.metadata), }),
-            },
-            ShowingPullSelector(snapshot.metadata),
-          ),
-          @rabbita.none,
+        let shown = with_phase(
+          { ..next, range: Some({ ..state, pull: Some(snapshot.metadata), }), },
+          ShowingPullSelector(snapshot.metadata),
         )
+        return if result.confirmed {
+          resume_source_loading(shown, emit)
+        } else {
+          (shown, @rabbita.none)
+        }
       }
       let replacing = model.phase is Showing(_) ||
         model.phase is ShowingPullSelector(_)
@@ -210,6 +215,13 @@ fn install_snapshot(
     model.phase is ShowingPullSelector(_)
   let next = {
     ..model,
+    source_pause: if replacing &&
+      model.auth is SignedIn(..) &&
+      model.source_pause == Some(AnonymousRequests) {
+      None
+    } else {
+      model.source_pause
+    },
     access: {
       ..model.access,
       freshness: if replacing {
@@ -277,7 +289,11 @@ fn install_snapshot(
   (
     shown,
     if replacing {
-      @rabbita.batch([@github_client.cancel_before(shown.generation), command])
+      @rabbita.batch([
+        @github_client.cancel_before(shown.generation),
+        @github_client.resume_anonymous_sources(shown.generation),
+        command,
+      ])
     } else {
       command
     },

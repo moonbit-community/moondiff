@@ -794,6 +794,9 @@ fn file_diff_view(
   emit : @rabbita.Emit[Msg],
   discussions~ : InlineDiscussions = empty_discussions(),
 ) -> @rabbita.Html {
+  if file.old_side is Paused || file.new_side is Paused {
+    return @html.p(class="file-message paused", "File loading is paused.")
+  }
   let problem = if source_problem(file.old_side) is Some(message) {
     Some(message)
   } else {

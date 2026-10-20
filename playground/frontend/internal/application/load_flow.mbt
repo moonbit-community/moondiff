@@ -58,7 +58,14 @@ fn show_pull_view(
     ignore_comments=model.ignore_comments,
     ignore_tests=model.ignore_tests,
   )
-  let ready = with_phase({ ..model, range: Some(range), }, Showing(shown))
+  let ready = with_phase(
+    {
+      ..model,
+      range: Some(range),
+      pull_sources: Some(PullSourceState::new(model.generation)),
+    },
+    Showing(shown),
+  )
   let (next, commit_command) = if auto_load_pull_commits(pull) {
     update_range(ready, LoadMore, emit)
   } else {
@@ -320,6 +327,7 @@ fn begin_change_load(
       },
     },
     generation,
+    pull_sources: None,
     restore_pending: false,
     phase,
     route: Some(reference),

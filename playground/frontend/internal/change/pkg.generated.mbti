@@ -79,6 +79,7 @@ pub(all) struct FileState {
   file : @moondiff-playground-protocol.ApiFile
   diff_mode : @github.FileDiffMode
   expanded : Bool
+  manually_collapsed : Bool
   collapsed_sections : Array[String]
   old_side : SideLoad
   new_side : SideLoad
@@ -88,6 +89,7 @@ pub(all) struct FileState {
 pub(all) enum SideLoad {
   NotRequested
   Loading
+  Paused
   Ready(Array[String])
   CannotRender(String, Bool)
   LoadFailed(String)

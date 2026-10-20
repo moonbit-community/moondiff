@@ -15,6 +15,19 @@ pub fn region_view(
             @html.span(class="spinner", ""),
             @html.span(message),
           ])
+        RateLimited(reason, auth) =>
+          @html.div(
+            class="empty-state rate-limit",
+            attrs=@html.Attrs::build().role("status"),
+            [
+              @html.p(reason.message()),
+              if reason is AnonymousRequests {
+                auth_controls(auth, emit, show_install=false)
+              } else {
+                @html.nothing
+              },
+            ],
+          )
         Failed(message, auth) =>
           @html.div(class="empty-state error", [
             @html.p(message),
