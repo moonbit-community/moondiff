@@ -28,6 +28,14 @@ pub fn same_draft_target(left : DraftKind, right : DraftKind) -> Bool {
 
 ///|
 pub fn permission(review : Session, action : Action) -> Permission {
+  if action is Submit && !review_can_comment(review) {
+    return Denied("Sign in with GitHub before posting a comment.")
+  }
+  if action is (Submit | Delete(_)) && !review.snapshot_confirmed {
+    return Denied(
+      "Checking the current PR version and account. Please wait before writing.",
+    )
+  }
   match action {
     LoadSnapshot => {
       if !review.snapshot_stale {
@@ -86,7 +94,9 @@ pub fn permission(review : Session, action : Action) -> Permission {
       }
       if draft.kind is InlineDraft(_, _) &&
         draft.snapshot is Some(snapshot) &&
-        review.context.snapshot != Some(snapshot) {
+        !review.context.snapshot
+        .map(current => snapshot.same_version(current))
+        .unwrap_or(false) {
         return Denied(
           "PR updated. Copy or cancel your draft before loading the latest snapshot.",
         )

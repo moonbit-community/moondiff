@@ -1,5 +1,7 @@
 ///|
 pub(all) enum Event {
+  SnapshotFreshnessChanged(Bool)
+  RestoreNavigation(NavigationReview, Array[String])
   SnapshotChanged
   ContextChanged(Context)
   Reset(Bool, Bool)
@@ -31,6 +33,17 @@ pub(all) enum Event {
 ///|
 fn update_review(model : Model, msg : Event) -> (Model, Effects) {
   match msg {
+    SnapshotFreshnessChanged(confirmed) =>
+      (
+        if model.review.snapshot_confirmed == confirmed {
+          model
+        } else {
+          with_review(model, { ..model.review, snapshot_confirmed: confirmed, })
+        },
+        [],
+      )
+    RestoreNavigation(saved, paths) =>
+      (with_review(model, restore_navigation(model.review, saved, paths)), [])
     SnapshotChanged => (mark_snapshot_stale(model), [])
     ContextChanged(_) => (model, [])
     RecoverInterrupted =>

@@ -37,6 +37,18 @@ pub(all) struct Snapshot {
 } derive(Eq)
 
 ///|
+/// Compare code and anchor identity while allowing display metadata to change.
+pub fn Snapshot::same_version(self : Snapshot, other : Snapshot) -> Bool {
+  self.reference == other.reference &&
+  self.sha == other.sha &&
+  (match (self.pull_snapshot, other.pull_snapshot) {
+    (Some(left), Some(right)) => same_pull_snapshot(left, right)
+    (None, None) => true
+    _ => false
+  })
+}
+
+///|
 pub(all) struct Context {
   generation : Int32
   route : CommitRef?
@@ -50,7 +62,7 @@ pub fn update(session : Session, event : Event) -> (Session, Array[Effect]) {
     let stale = if session.draft()
       is Some({ kind: InlineDraft(_, _), snapshot: Some(snapshot), .. }) &&
       context.snapshot is Some(current) &&
-      snapshot != current {
+      !snapshot.same_version(current) {
       true
     } else {
       session.snapshot_stale

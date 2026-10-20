@@ -54,6 +54,7 @@ pub struct Session {
   refresh_id : Int32
   priv refresh : CommentRefresh
   refresh_error : String?
+  snapshot_confirmed : Bool
   snapshot_stale : Bool
   submission_id : Int32
   notice : String?
@@ -82,6 +83,7 @@ pub fn Session::new(enabled~ : Bool = false) -> Session {
     refresh_id: 0,
     refresh: RefreshIdle,
     refresh_error: None,
+    snapshot_confirmed: true,
     snapshot_stale: false,
     submission_id: 0,
     notice: None,
@@ -250,7 +252,8 @@ pub fn DraftId::key(self : DraftId) -> String {
 }
 
 ///|
-// An identity check disables writes, but should not unmount an existing editor.
+// Local drafts remain editable while account access is unavailable. The
+// application clears them at an explicit logout or confirmed identity boundary.
 pub fn Session::draft_visible(self : Session) -> Bool {
-  self.can_comment || self.identity_checking
+  self.can_comment || self.identity_checking || self.draft() is Some(_)
 }

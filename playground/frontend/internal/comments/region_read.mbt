@@ -111,7 +111,15 @@ pub fn Session::draft_path(self : Session) -> String? {
       if self.submission() is Some(SyncingReview(_)) {
         self.draft_target_path()
       } else {
-        self.index.owners.get(ReviewComment(id).key())
+        match self.index.owners.get(ReviewComment(id).key()) {
+          Some(path) => Some(path)
+          None =>
+            if self.comments is CommentsReady(_) {
+              None
+            } else {
+              self.draft_target_path()
+            }
+        }
       }
     _ => None
   }
@@ -128,6 +136,7 @@ pub(all) enum ReadStatus {
 ///|
 /// Permission changes are independent of the draft body and comment collection.
 pub struct PermissionSummary {
+  fresh : Bool
   can_comment : Bool
   visible : Bool
   login : String?
@@ -143,6 +152,7 @@ pub struct PermissionSummary {
 pub fn Session::permission_summary(self : Session) -> PermissionSummary {
   {
     can_comment: self.can_comment,
+    fresh: self.snapshot_confirmed,
     visible: self.draft_visible(),
     login: self.login,
     stale: self.snapshot_stale,
@@ -301,7 +311,9 @@ pub fn ReadView::comment_key(self : ReadView, id : CommentId) -> String {
 
 ///|
 pub fn ReadView::can_delete(self : ReadView, id : CommentId) -> Bool {
-  guard self.permissions.can_comment && self.login is Some(login) else {
+  guard self.permissions.can_comment &&
+    self.permissions.fresh &&
+    self.login is Some(login) else {
     return false
   }
   match id {

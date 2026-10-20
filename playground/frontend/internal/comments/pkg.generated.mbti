@@ -125,6 +125,8 @@ pub(all) enum Effect {
 }
 
 pub(all) enum Event {
+  SnapshotFreshnessChanged(Bool)
+  RestoreNavigation(NavigationReview, Array[String])
   SnapshotChanged
   ContextChanged(Context)
   Reset(Bool, Bool)
@@ -158,6 +160,14 @@ pub(all) struct Failure {
   code : String?
 } derive(Eq)
 
+pub struct NavigationReview {
+  // private fields
+} derive(Eq)
+#deprecated
+pub fn NavigationReview::equal(Self, Self) -> Bool
+#deprecated
+pub fn NavigationReview::not_equal(Self, Self) -> Bool
+
 pub(all) struct PendingReviewReceipt {
   id : Int64
   url : String
@@ -182,6 +192,7 @@ pub(all) enum Permission {
 pub fn Permission::allowed(Self) -> Bool
 
 pub struct PermissionSummary {
+  fresh : Bool
   can_comment : Bool
   visible : Bool
   login : String?
@@ -235,6 +246,7 @@ pub struct Session {
   verified_snapshot : Snapshot?
   refresh_id : Int32
   refresh_error : String?
+  snapshot_confirmed : Bool
   snapshot_stale : Bool
   submission_id : Int32
   notice : String?
@@ -246,12 +258,14 @@ pub struct Session {
   deletion : CommentDeletion?
   // private fields
 } derive(Eq)
+pub fn Session::blocks_navigation(Self) -> Bool
 pub fn Session::comment_key(Self, CommentId) -> String
 pub fn Session::comment_version(Self) -> Int32
 pub fn Session::comments(Self) -> CommentsStatus
 pub fn Session::draft(Self) -> CommentDraft?
 pub fn Session::draft_path(Self) -> String?
 pub fn Session::draft_visible(Self) -> Bool
+pub fn Session::export_navigation(Self) -> NavigationReview
 pub fn Session::file_comments(Self, String) -> CommentGroup
 pub fn Session::generation(Self) -> Int32
 pub fn Session::new(enabled? : Bool) -> Self
@@ -266,6 +280,7 @@ pub(all) struct Snapshot {
   sha : String
   pull_snapshot : @moondiff-playground-protocol.ApiPull?
 } derive(Eq)
+pub fn Snapshot::same_version(Self, Self) -> Bool
 
 pub(all) enum SubmissionPhase {
   CheckingHead

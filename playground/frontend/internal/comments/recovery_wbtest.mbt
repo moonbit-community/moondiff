@@ -140,6 +140,6 @@ test "identity checks keep local drafts visible without permitting a submission"
   assert_true(signed_in.draft_visible())
   assert_true(permission(signed_in, Submit).allowed())
   let signed_out = update(edited, Identity(false, None)).0
-  assert_false(signed_out.draft_visible())
+  assert_true(signed_out.draft_visible())
   assert_false(permission(signed_out, Submit).allowed())
 }
