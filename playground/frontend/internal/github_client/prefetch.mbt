@@ -263,3 +263,51 @@ pub fn prefetch_home(
 pub fn stop_prefetch() -> @rabbita.Cmd {
   @cmd.custom_cmd(_ => client.stop_prefetch())
 }
+
+///|
+fn Client::prefetch_intent(
+  self : Client,
+  args : @protocol.PullGet?,
+  focused : Bool,
+) -> Unit {
+  let w = self.workspace
+  (w.cancel_intent)()
+  w.cancel_intent = () => ()
+  guard focused && w.home && args is Some(args) else { return }
+  let key = pull_key(args)
+  guard w.candidates.any(candidate => pull_key(candidate.pull) == key) else {
+    return
+  }
+  let epoch = w.epoch
+  let round = w.round
+  w.cancel_intent = (self.transport.delay)(100, () => {
+    guard w.home &&
+      w.epoch == epoch &&
+      w.round == round &&
+      (self.transport.visible)() else {
+      return
+    }
+    if w.candidates.search_by(candidate => pull_key(candidate.pull) == key)
+      is Some(index) &&
+      index >= w.index {
+      let candidate = w.candidates[index]
+      let reordered = w.candidates[:w.index].to_owned()
+      reordered.push(candidate)
+      for i in w.index..<w.candidates.length() {
+        if i != index {
+          reordered.push(w.candidates[i])
+        }
+      }
+      w.candidates = reordered
+    }
+    self.pump_prefetch()
+  })
+}
+
+///|
+pub fn prefetch_intent(
+  args : @protocol.PullGet?,
+  focused : Bool,
+) -> @rabbita.Cmd {
+  @cmd.custom_cmd(_ => client.prefetch_intent(args, focused))
+}

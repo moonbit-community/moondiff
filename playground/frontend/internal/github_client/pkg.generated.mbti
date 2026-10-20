@@ -66,6 +66,8 @@ pub fn observe_auth_failure(() -> Unit) -> Unit
 
 pub fn prefetch_home(Array[PrefetchCandidate], Int32) -> @cmd.Cmd
 
+pub fn prefetch_intent(@moondiff-playground-protocol.PullGet?, Bool) -> @cmd.Cmd
+
 pub fn prioritize_sources(Array[@github.SourceLocation], Int32) -> @cmd.Cmd
 
 pub fn rate_limit_reason(Error) -> RateLimitReason?
