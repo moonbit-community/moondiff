@@ -1,5 +1,9 @@
 ///|
-let client : Client = Client::new({ send: browser_send, delay: browser_delay, })
+let client : Client = Client::new({
+  send: browser_send,
+  delay: browser_delay,
+  visible: () => !@browser.has_window() || !@dom.document().hidden(),
+})
 
 ///|
 fn browser_send(

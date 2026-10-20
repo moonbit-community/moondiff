@@ -6,6 +6,7 @@ priv struct TestCall {
   body : String
   receive : (Result[(Int32, String), String]) -> Unit
   mut aborted : Bool
+  mut answered : Bool
 }
 
 ///|
@@ -17,16 +18,26 @@ priv struct TestTimer {
 
 ///|
 priv struct Network {
+  mut visible : Bool
   calls : Array[TestCall]
   timers : Array[TestTimer]
 }
 
 ///|
 fn harness() -> (Client, Network) {
-  let network : Network = { calls: [], timers: [], }
+  let network : Network = { calls: [], timers: [], visible: true, }
   let transport : Transport = {
+    visible: () => network.visible,
     send: (path, meth, csrf, body, receive) => {
-      let call : TestCall = { path, meth, csrf, body, receive, aborted: false, }
+      let call : TestCall = {
+        path,
+        meth,
+        csrf,
+        body,
+        receive,
+        aborted: false,
+        answered: false,
+      }
       network.calls.push(call)
       () => call.aborted = true
     },
@@ -41,6 +52,7 @@ fn harness() -> (Client, Network) {
 
 ///|
 fn[T : ToJson] TestCall::reply(self : TestCall, value : T) -> Unit {
+  self.answered = true
   let response : @protocol.Response[T] = Success(value~)
   (self.receive)(Ok((200, ToJson::to_json(response).stringify())))
 }

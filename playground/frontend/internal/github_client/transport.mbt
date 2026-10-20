@@ -3,6 +3,7 @@ priv suberror Cancelled
 
 ///|
 priv struct Transport {
+  visible : () -> Bool
   send : (
     String,
     String,
@@ -52,6 +53,7 @@ priv struct PublicCacheEntry {
 
 ///|
 priv struct Client {
+  workspace : Workspace
   transport : Transport
   mut csrf : String
   mut authenticated : Bool
@@ -72,6 +74,7 @@ priv struct Client {
 fn Client::new(transport : Transport) -> Client {
   {
     transport,
+    workspace: Workspace::new(),
     csrf: "",
     authenticated: false,
     auth_revision: 0,
@@ -106,6 +109,16 @@ fn Client::cancel_before(self : Client, generation : Int32) -> Unit {
   self.generation = Int32::max(self.generation, generation)
   self.cancel_pending(p => p.generation > 0 && p.generation < self.generation)
   self.cancel_public(false)
+  self.cancel_reads(owner => owner > 0 && owner < self.generation)
+  let tasks = self.workspace.tasks.values().collect()
+  for task in tasks {
+    task.waiters = task.waiters.filter(waiter => {
+      waiter.generation >= self.generation
+    })
+    if !task.background && task.waiters.is_empty() {
+      self.cancel_snapshot(task)
+    }
+  }
 }
 
 ///|
@@ -133,6 +146,7 @@ fn Client::invalidate_auth(self : Client, all : Bool) -> Unit {
 
 ///|
 fn Client::dispose(self : Client) -> Unit {
+  self.stop_prefetch()
   self.invalidate_auth(true)
   self.device_id = None
 }
@@ -143,6 +157,7 @@ fn Client::adopt_status(
   status : @protocol.ApiAuthStatus,
   from_poll : Bool,
 ) -> Unit {
+  self.workspace_identity(status)
   self.csrf = status.csrf_token.unwrap_or("")
   self.authenticated = status.authenticated
   let next = match status.device_flow {
@@ -153,6 +168,15 @@ fn Client::adopt_status(
     self.stop_poll()
   }
   self.device_id = next
+  // Release work only after every credential and device field is current.
+  self.workspace.checking = false
+  self.workspace.identity_error = None
+  let deferred = self.workspace.deferred
+  self.workspace.deferred = []
+  for work in deferred {
+    (work.resolve)()
+  }
+  self.pump_prefetch()
 }
 
 ///|
@@ -170,6 +194,7 @@ fn[T : FromJson + ToJson] Client::send(
   auth~ : Bool = false,
   status~ : Bool = false,
   poll~ : Bool = false,
+  background~ : Bool = false,
 ) -> Unit {
   self.cancel_before(generation)
   if generation > 0 && generation < self.generation {
@@ -192,6 +217,14 @@ fn[T : FromJson + ToJson] Client::send(
     cancelled: () => completed(Err(Cancelled)),
   }
   self.pending[id] = request
+  @metrics.counter(
+    if background {
+      "prefetch_requests"
+    } else {
+      "foreground_requests"
+    },
+    1,
+  )
   let cancel = (self.transport.send)(
     path,
     if status {
@@ -217,6 +250,14 @@ fn[T : FromJson + ToJson] Client::send(
           Err(HttpRequestError(status=0, code="network_error", detail~))
         Ok((http_status, text)) =>
           try {
+            @metrics.counter(
+              if background {
+                "prefetch_bytes"
+              } else {
+                "foreground_bytes"
+              },
+              @utf8.encode(text).length(),
+            )
             let response : @protocol.Response[T] = @protocol.decode(
               @json.parse(text),
             )
@@ -248,6 +289,12 @@ fn[T : FromJson + ToJson] Client::send(
               )
           }
       }
+      if result is Err(HttpRequestError(status=401, ..)) && self.authenticated {
+        self.authenticated = false
+        self.clear_workspace()
+        self.workspace.user = None
+        (self.workspace.invalidated)()
+      }
       completed(result)
     },
   )
@@ -260,12 +307,25 @@ fn Client::status(
   completed : (Result[@protocol.ApiAuthStatus, Error]) -> Unit,
   poll~ : Bool = false,
 ) -> Unit {
+  self.workspace.checking = true
   self.send(
     "/api/auth/status",
     "",
     result => {
-      if result is Ok(status) {
-        self.adopt_status(status, poll)
+      match result {
+        Ok(status) => self.adopt_status(status, poll)
+        Err(Cancelled) => ()
+        Err(error) => {
+          self.workspace.checking = false
+          // Keep the failure for private snapshots that are still loading.
+          self.workspace.identity_error = Some(error)
+          self.stop_prefetch()
+          let deferred = self.workspace.deferred
+          self.workspace.deferred = []
+          for work in deferred {
+            (work.reject)(error)
+          }
+        }
       }
       completed(result)
     },

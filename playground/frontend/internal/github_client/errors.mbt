@@ -32,3 +32,12 @@ impl Show for GitHubRequestError with fn output(self, logger) {
     GitHubRequestError(detail) => logger.write_string(detail)
   }
 }
+
+///|
+fn rate_limited(error : Error) -> Bool {
+  match error {
+    HttpRequestError(status=429, ..)
+    | HttpRequestError(code="rate_limit", ..) => true
+    _ => false
+  }
+}

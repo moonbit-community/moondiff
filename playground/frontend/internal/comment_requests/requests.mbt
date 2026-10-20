@@ -25,7 +25,7 @@ pub fn comment_head_request(
   generation : Int32,
   emit : @rabbita.Emit[Result[ApiPull, Error]],
 ) -> @rabbita.Cmd {
-  @github_client.get_pull(
+  @github_client.get_pull_fresh(
     {
       owner: reference_repository(reference).owner,
       repo: reference_repository(reference).repo,

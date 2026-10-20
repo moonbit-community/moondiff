@@ -46,6 +46,8 @@ pub fn get_pull_commits(@moondiff-playground-protocol.PullCommitsGet, Int32, @cm
 
 pub fn get_pull_files(@moondiff-playground-protocol.PullFiles, Int32, @cmd.Emit[Result[Array[@moondiff-playground-protocol.ApiFile], Error]]) -> @cmd.Cmd
 
+pub fn get_pull_fresh(@moondiff-playground-protocol.PullGet, Int32, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPull, Error]]) -> @cmd.Cmd
+
 pub fn get_pull_merge_status(@moondiff-playground-protocol.PullMergeStatusGet, Int32, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullMergeStatus, Error]]) -> @cmd.Cmd
 
 pub fn get_pull_viewed(@moondiff-playground-protocol.PullViewedGet, Int32, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullViewed, Error]]) -> @cmd.Cmd
@@ -58,6 +60,12 @@ pub fn http_error_code(Error) -> String?
 
 pub fn list_comments(@moondiff-playground-protocol.CommentsList, Int32, @cmd.Emit[Result[@moondiff-playground-protocol.ApiCommentBundle, Error]]) -> @cmd.Cmd
 
+pub fn load_pull_snapshot(@moondiff-playground-protocol.PullGet, Int32, @cmd.Emit[Result[SnapshotResult, Error]], revalidate? : Bool) -> @cmd.Cmd
+
+pub fn observe_auth_failure(() -> Unit) -> Unit
+
+pub fn prefetch_home(Array[PrefetchCandidate], Int32) -> @cmd.Cmd
+
 pub fn rebase_merge_pull(@moondiff-playground-protocol.PullRebaseMerge, Int32, @cmd.Emit[Result[@moondiff-playground-protocol.ApiPullMergeResult, Error]]) -> @cmd.Cmd
 
 pub fn resolve_sha(@moondiff-playground-protocol.ResolveShaGet, Int32, @cmd.Emit[Result[String, Error]]) -> @cmd.Cmd
@@ -65,6 +73,8 @@ pub fn resolve_sha(@moondiff-playground-protocol.ResolveShaGet, Int32, @cmd.Emit
 pub fn set_file_viewed(@moondiff-playground-protocol.PullFileViewedSet, Int32, @cmd.Emit[Result[@moondiff-playground-protocol.ApiFileViewedResult, Error]]) -> @cmd.Cmd
 
 pub fn source_request(@github.SourceLocation, Int32, @cmd.Emit[Result[(String, Bytes), Error]]) -> @cmd.Cmd
+
+pub fn stop_prefetch() -> @cmd.Cmd
 
 // Errors
 pub(all) suberror GitHubRequestError {
@@ -83,6 +93,17 @@ pub(all) enum DeviceAction {
   Cancel
 }
 
+pub(all) struct PrefetchCandidate {
+  pull : @moondiff-playground-protocol.PullGet
+  updated_at : String
+} derive(Eq)
+
+pub(all) struct SnapshotResult {
+  snapshot : @moondiff-playground-protocol.ApiPullSnapshot
+  confirmed : Bool
+} derive(Eq)
+
 // Type aliases
+pub using @moondiff-playground-protocol {type ApiPullSnapshot as PullSnapshot}
 
 // Traits

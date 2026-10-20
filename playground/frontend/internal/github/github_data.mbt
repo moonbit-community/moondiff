@@ -35,6 +35,18 @@ pub fn file_diff_mode(file : ApiFile) -> FileDiffMode {
 }
 
 ///|
+pub fn is_moonbit_file(path : String) -> Bool {
+  path.has_suffix(".mbt") ||
+  path.has_suffix(".mbtx") ||
+  path == "pkg.generated.mbti" ||
+  path.has_suffix("/pkg.generated.mbti") ||
+  path == "moon.mod" ||
+  path.has_suffix("/moon.mod") ||
+  path == "moon.pkg" ||
+  path.has_suffix("/moon.pkg")
+}
+
+///|
 pub fn merge_file_pages(
   accumulated : ArrayView[ApiFile],
   page : ArrayView[ApiFile],
