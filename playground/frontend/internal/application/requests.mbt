@@ -57,7 +57,7 @@ fn commands_for_change(
           generation,
           index,
           emit,
-          priority=Some(index) == first,
+          priority=@github.is_interface_file(file.file) || Some(index) == first,
         ) {
         commands.push(command)
       }

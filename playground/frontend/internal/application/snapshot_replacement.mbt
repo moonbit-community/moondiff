@@ -50,6 +50,7 @@ fn prepare_snapshot_replacement(
       snapshot.metadata,
       snapshot.comparison,
       snapshot.files,
+      expand_all_interfaces=model.auth is SignedIn(..),
     ) {
     Ok(view) => view
     Err(message) =>

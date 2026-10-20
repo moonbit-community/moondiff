@@ -19,9 +19,12 @@ PR overviews continuously prefetch all recognized MoonBit source sides after the
 file list loads for signed-in readers. Anonymous readers load only initially
 expanded files and files opened manually or while scrolling. The application admits
 at most four sides through the existing shared source transport, prioritizing the
-initial twenty expanded files and explicit demand. Later sides are validated and
-retained in the current `ChangeView` without computing diffs or highlights. The
-shared cache remains limited to 32 MiB and historical parsed pages to 4 MiB.
+initially expanded files and explicit demand. Changed `pkg.generated.mbti` files
+lead the list, including those matching a rename's previous path. Anonymous
+visits expand at most twenty files in total. Signed-in visits expand every
+interface; other MoonBit files use the remaining slots in the twenty-file budget. Later sides are validated and retained in the current `ChangeView` without
+computing diffs or highlights. The shared cache remains limited to 32 MiB and
+historical parsed pages to 4 MiB.
 An individual failure does not interrupt the remaining PR. A rate limit pauses
 both source schedulers, including manual demand, with no source retry button or
 timer. In-flight successes remain readable. Anonymous sign-in resumes missing
@@ -34,10 +37,9 @@ The coordinator owns one IntersectionObserver for eligible collapsed PR cards,
 with a bottom margin equal to the current viewport height. After scrolling, the
 shared layout batch remeasures current positions and expands at most two cards in
 the viewport or the next screen. It waits for all regional commits and repeats
-after geometry changes. Initial loading keeps the existing twenty-file expansion
-limit. Viewed files and manual collapse preferences are excluded; those preferences
-are saved with the page version. Navigation, history restoration and comment
-editing pause automatic expansion. Automatic actions preserve focus and the
+after geometry changes. Viewed files and manual collapse preferences are excluded;
+those preferences are saved with the page version. Navigation, history restoration
+and comment editing pause automatic expansion. Automatic actions preserve focus and the
 reading anchor, and carry the page generation and file path instead of toggling
 state. After navigation, fresh wheel, touch, pointer or scrolling-key input
 re-enables expansion, so delayed native history/focus scroll events cannot move
@@ -49,7 +51,8 @@ history restoration through a shared token bound to the generation and history
 entry. Both the queued render action and its focus/scroll command recheck this
 token. Private scheduler bridge clicks do not count as user interaction.
 Explicit navigation supersedes a pending history position and remains available
-after cancellation. Commit and interval source loading retains its existing behavior.
+after cancellation. Commits and intervals use the same interface ordering and
+default expansions through the shared source queue.
 
 `pull-progressive.spec.mjs` exercises forty-file PRs, source priority/coalescing,
 visibility, failures, local expansion with source networking blocked, navigation,

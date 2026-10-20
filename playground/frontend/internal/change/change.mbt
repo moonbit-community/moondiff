@@ -41,14 +41,22 @@ pub fn finish_change(
   html_url : String,
   stats : ApiStats,
   all_files : Array[ApiFile],
+  expand_all_interfaces~ : Bool = false,
 ) -> ChangeView {
+  let files = all_files.filter(@github.is_interface_file)
+  for file in all_files {
+    if !@github.is_interface_file(file) {
+      files.push(file)
+    }
+  }
   let states : Array[FileState] = []
   let mut auto_load_count = 0
-  for file in all_files {
+  for file in files {
     let diff_mode = file_diff_mode(file)
     let auto_load = is_moonbit_file(file.filename) ||
       file.previous_filename.map(is_moonbit_file).unwrap_or(false)
-    let expanded = auto_load && auto_load_count < 20
+    let expanded = (expand_all_interfaces && @github.is_interface_file(file)) ||
+      (auto_load && auto_load_count < 20)
     if auto_load {
       auto_load_count += 1
     }
@@ -85,6 +93,7 @@ pub fn finish_commit(
   repository : RepositoryRef,
   first : ApiCommit,
   all_files : Array[ApiFile],
+  expand_all_interfaces~ : Bool = false,
 ) -> ChangeView {
   let (old_revision, new_revision) = repository_commit_revisions(
     repository,
@@ -99,6 +108,7 @@ pub fn finish_commit(
     first.html_url,
     first.stats,
     all_files,
+    expand_all_interfaces~,
   )
 }
 
@@ -108,6 +118,7 @@ pub fn finish_pull(
   pull : ApiPull,
   compare : ApiCompare,
   all_files : Array[ApiFile],
+  expand_all_interfaces~ : Bool = false,
 ) -> Result[ChangeView, String] {
   match validate_pull_files(pull, all_files) {
     Err(message) => Err(message)
@@ -123,6 +134,7 @@ pub fn finish_pull(
         pull.html_url,
         pull_stats(pull),
         all_files,
+        expand_all_interfaces~,
       )
       Ok({ ..view, pull_snapshot: Some(pull), })
     }
@@ -137,6 +149,7 @@ pub fn finish_range(
   pull : ApiPull?,
   pull_merge_base : String?,
   files : Array[ApiFile],
+  expand_all_interfaces~ : Bool = false,
 ) -> ChangeView {
   let (old_revision, new_revision) = range_revisions(
     reference, base, head, pull, pull_merge_base,
@@ -155,6 +168,7 @@ pub fn finish_range(
     "https://github.com/\{reference.owner}/\{reference.repo}/compare/\{base}...\{head}",
     { additions, deletions, total: additions + deletions, },
     files,
+    expand_all_interfaces~,
   )
 }
 

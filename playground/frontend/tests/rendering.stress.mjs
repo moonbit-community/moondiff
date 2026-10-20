@@ -29,18 +29,22 @@ for (const [name, fixture] of [
       await installRenderProbe(page);
       await installRenderingFixture(page, fixture);
       await page.goto(route(fixture)); await loaded(page, fixture);
+      const local = fixture.files[0].filename;
+      const localCard = page.locator(`.file-card[data-file-path="${local}"]`);
+      await expect(localCard).toHaveCount(1);
+      const localId = await localCard.getAttribute('id');
+      expect(localId).toBeTruthy();
       const session = await page.context().newCDPSession(page);
       await session.send('Emulation.setCPUThrottlingRate', { rate });
       const before = await renderCounts(page);
       const durations = [];
       for (let i = 0; i < 4; i++) {
-        durations.push(await toggleCommit(page));
-        await expect(card(page, 0)).toHaveClass(i % 2 ? 'file-card expanded' : 'file-card');
+        durations.push(await toggleCommit(page, localId));
+        await expect(localCard).toHaveClass(i % 2 ? 'file-card expanded' : 'file-card');
         await settleRegions(page);
       }
       const after = await renderCounts(page);
-      unchanged(before, after, fixture.files.slice(1).map(f => f.filename));
-      const local = fixture.files[0].filename;
+      unchanged(before, after, fixture.files.filter(f => f.filename !== local).map(f => f.filename));
       expect(after.files[local].view - before.files[local].view).toBe(4);
       expect(after.files[local].diff).toBe(before.files[local].diff);
       expect(after.files[local].highlight).toBe(before.files[local].highlight);

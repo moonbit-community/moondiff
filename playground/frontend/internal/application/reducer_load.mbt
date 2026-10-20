@@ -241,7 +241,11 @@ fn update_load(
             )
           } else {
             let view = finish_commit(
-              reference, repository, first_commit, accumulated,
+              reference,
+              repository,
+              first_commit,
+              accumulated,
+              expand_all_interfaces=model.auth is SignedIn(..),
             )
             (
               with_phase(

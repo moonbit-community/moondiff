@@ -20,23 +20,14 @@ fn fixture_file(
 }
 
 ///|
-test "all files remain listed but only the first twenty MoonBit files auto-load" {
+test "without interfaces the first twenty MoonBit files auto-load in original order" {
   let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
   let files : Array[ApiFile] = []
   files.push(fixture_file("README.md", "added"))
   files.push(fixture_file("moon.mod", "added"))
   files.push(fixture_file("src/moon.pkg", "added"))
-  files.push(fixture_file("pkg.generated.mbti", "added"))
-  files.push(fixture_file("src/pkg.generated.mbti", "added"))
   files.push(fixture_file("build.mbtx", "added"))
   files.push(fixture_file("scripts/build.mbtx", "added"))
-  files.push(
-    fixture_file(
-      "src/interface.txt",
-      "renamed",
-      previous_filename="src/pkg.generated.mbti",
-    ),
-  )
   files.push(
     fixture_file(
       "scripts/build.txt",
@@ -74,14 +65,14 @@ test "all files remain listed but only the first twenty MoonBit files auto-load"
   )
   assert_false(view.files[0].expanded)
   assert_true(view.files[0].new_side is NotRequested)
-  for state in view.files[1:9] {
+  for state in view.files[1:6] {
     assert_true(state.diff_mode is LineDiff)
     assert_true(state.expanded)
     assert_true(state.old_side is Ready([]))
     assert_true(state.new_side is Loading)
   }
-  let mut auto_load_index = 8
-  for state in view.files[9:] {
+  let mut auto_load_index = 5
+  for state in view.files[6:] {
     match state.diff_mode {
       MoonBitDiff => {
         if auto_load_index < 20 {
@@ -100,7 +91,150 @@ test "all files remain listed but only the first twenty MoonBit files auto-load"
       }
     }
   }
-  assert_eq(auto_load_index, 29)
+  assert_eq(auto_load_index, 26)
+}
+
+///|
+test "interfaces from either rename path lead a stable global partition" {
+  let files = [
+    fixture_file("README.md", "modified"),
+    fixture_file("z/main.mbt", "modified"),
+    fixture_file("z/deep/pkg.generated.mbti", "modified"),
+    fixture_file("moon.pkg", "modified"),
+    fixture_file("pkg.generated.mbti", "added"),
+    fixture_file("a/tail.mbtx", "modified"),
+    fixture_file(
+      "archive/interface.txt",
+      "renamed",
+      previous_filename="old/pkg.generated.mbti",
+    ),
+    fixture_file("deleted/pkg.generated.mbti", "removed"),
+    fixture_file(
+      "new/pkg.generated.mbti",
+      "renamed",
+      previous_filename="old/interface.txt",
+    ),
+  ]
+  let original = files.map(file => file.filename)
+  let reference = commit_reference("example", "repo", "a".repeat(40))
+  let repository = reference_repository(reference)
+  let view = finish_change(
+    reference,
+    Some({ repository, sha: "b".repeat(40), }),
+    { repository, sha: "a".repeat(40), },
+    "",
+    "",
+    { additions: 0, deletions: 0, total: 0, },
+    files,
+  )
+  assert_eq(view.total_files, files.length())
+  assert_eq(files.map(file => file.filename), original)
+  assert_eq(view.files.map(state => state.file.filename), [
+    "z/deep/pkg.generated.mbti", "pkg.generated.mbti", "archive/interface.txt", "deleted/pkg.generated.mbti",
+    "new/pkg.generated.mbti", "README.md", "z/main.mbt", "moon.pkg", "a/tail.mbtx",
+  ])
+  for state in view.files[:5] {
+    assert_true(state.expanded)
+    assert_true(state.diff_mode is LineDiff)
+  }
+  assert_true(view.files[1].old_side is Ready([]))
+  assert_true(view.files[1].new_side is Loading)
+  assert_true(view.files[3].old_side is Loading)
+  assert_true(view.files[3].new_side is Ready([]))
+  let renamed = source_requests_for_file(view, 2)
+  assert_eq(renamed.map(request => request.1.path), [
+    "old/pkg.generated.mbti", "archive/interface.txt",
+  ])
+  let renamed = source_requests_for_file(view, 4)
+  assert_eq(renamed.map(request => request.1.path), [
+    "old/interface.txt", "new/pkg.generated.mbti",
+  ])
+}
+
+///|
+test "interface expansion uses twenty anonymous slots and an explicit signed-in policy" {
+  let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let reference = commit_reference("example", "root", fixture.sha)
+  for count in [0, 1, 19, 20, 21, 35] {
+    for expand_all_interfaces in [false, true] {
+      let files = Array::makei(25, index => {
+        fixture_file("src/file\{index}.mbt", "added")
+      })
+      for index in 0..<count {
+        files.push(fixture_file("pkg\{index}/pkg.generated.mbti", "added"))
+      }
+      let view = finish_commit(
+        reference,
+        reference_repository(reference),
+        fixture,
+        files,
+        expand_all_interfaces~,
+      )
+      for index, state in view.files {
+        let expanded = (expand_all_interfaces && index < count) || index < 20
+        assert_eq(state.expanded, expanded, msg=state.file.filename)
+        assert_true(state.old_side is Ready([]))
+        assert_eq(state.new_side is Loading, expanded)
+        assert_eq(state.new_side is NotRequested, !expanded)
+      }
+      assert_eq(
+        view.files.filter(state => state.expanded).length(),
+        if expand_all_interfaces {
+          Int32::max(20, count)
+        } else {
+          20
+        },
+      )
+    }
+  }
+}
+
+///|
+test "anonymous mixed interface changes use at most forty initial source sides" {
+  let reference = commit_reference("example", "root", "a".repeat(40))
+  for count in [19, 20, 21, 35] {
+    let files = Array::makei(count, index => {
+      fixture_file("pkg\{index}/pkg.generated.mbti", "modified")
+    })
+    for status in ["added", "removed", "renamed", "modified"] {
+      let files = files.map(file => {
+        ..file,
+        status,
+        previous_filename: if status == "renamed" {
+          Some("old/" + file.filename)
+        } else {
+          None
+        },
+      })
+      let view = finish_change(
+        reference,
+        Some({
+          repository: reference_repository(reference),
+          sha: "b".repeat(40),
+        }),
+        { repository: reference_repository(reference), sha: "a".repeat(40), },
+        "",
+        "",
+        { additions: 1, deletions: 1, total: 2, },
+        files,
+      )
+      assert_eq(
+        view.files.filter(file => file.expanded).length(),
+        Int32::min(20, count),
+      )
+      let mut sides = 0
+      for index, file in view.files {
+        if file.expanded {
+          sides += source_requests_for_file(view, index).length()
+        }
+      }
+      assert_eq(
+        sides,
+        Int32::min(20, count) *
+        (if status == "added" || status == "removed" { 1 } else { 2 }),
+      )
+    }
+  }
 }
 
 ///|

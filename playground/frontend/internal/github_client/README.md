@@ -44,9 +44,14 @@ Foreground visits attach and promote before releasing homepage subscriptions,
 including starting a pending file chain alongside an in-flight comparison.
 Task IDs and session epochs own background results; route generations own page
 results. Fixed-SHA content keys include the actual repository and exact path.
-Source concurrency is four, prioritizing the first displayed file, replacement
-targets and explicitly selected files over queued default expansions. The default
-number of expanded files remains twenty.
+Source concurrency is four, prioritizing changed `pkg.generated.mbti` files,
+the first displayed file, replacement targets and explicitly selected files over
+queued default expansions. Interfaces lead the diff list in their original order,
+including renames matching either path. Anonymous initial expansion shares a
+twenty-file budget between interfaces and other MoonBit files, requesting at most
+forty source sides. Confirmed signed-in visits expand every interface; other
+MoonBit files use the remaining slots. Restored and manually changed folding is
+preserved when signing in.
 
 Rate limits pause both source schedulers and settle queued reads as paused,
 without timers or a rate-limit retry button. In-flight successes remain readable.
@@ -61,9 +66,10 @@ After the homepage commits, a 250 ms timer selects at most five distinct PRs fro
 the current tab. At most two get a complete snapshot and first-file source pair;
 the rest get metadata only. Snapshots of up to 300 files include PR #123-sized
 changes. Each completed snapshot immediately warms its source pair before the
-next candidate, honoring merge-base, fork and renamed paths. A stable hover or
-keyboard focus of 100 ms moves an eligible candidate forward within the same
-budget. Metadata acquired within thirty seconds can start pinned compare/files
+next candidate, choosing the first changed interface when present and honoring
+merge-base, fork and renamed paths. A stable hover or keyboard focus of 100 ms
+moves an eligible candidate forward within the same budget. Metadata acquired
+within thirty seconds can start pinned compare/files
 directly; the final independent PR validation still runs.
 
 Background upstream concurrency is one. Only a visible, authenticated homepage

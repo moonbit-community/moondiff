@@ -35,11 +35,21 @@ pub fn file_diff_mode(file : ApiFile) -> FileDiffMode {
 }
 
 ///|
+fn is_interface_path(path : String) -> Bool {
+  path == "pkg.generated.mbti" || path.has_suffix("/pkg.generated.mbti")
+}
+
+///|
+pub fn is_interface_file(file : ApiFile) -> Bool {
+  is_interface_path(file.filename) ||
+  file.previous_filename.map(is_interface_path).unwrap_or(false)
+}
+
+///|
 pub fn is_moonbit_file(path : String) -> Bool {
   path.has_suffix(".mbt") ||
   path.has_suffix(".mbtx") ||
-  path == "pkg.generated.mbti" ||
-  path.has_suffix("/pkg.generated.mbti") ||
+  is_interface_path(path) ||
   path == "moon.mod" ||
   path.has_suffix("/moon.mod") ||
   path == "moon.pkg" ||
