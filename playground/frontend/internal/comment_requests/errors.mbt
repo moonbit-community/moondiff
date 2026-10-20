@@ -1,5 +1,8 @@
 ///|
 pub fn error_message(error : Error, api : Bool) -> String {
+  if @github_client.rate_limit_reason(error) is Some(reason) {
+    return reason.message()
+  }
   let detail = error.to_string()
   let lower = detail.to_lower()
   if api {

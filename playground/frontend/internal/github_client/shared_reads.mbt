@@ -28,6 +28,7 @@ fn Client::cancel_reads(self : Client, owner : (Int32) -> Bool) -> Unit {
       (waiter.done)(Err(Cancelled))
     }
   }
+  self.pump_sources()
 }
 
 ///|
@@ -38,6 +39,7 @@ fn Client::read(
   done : (Result[@protocol.RpcValue, Error]) -> Unit,
   fresh~ : Bool = false,
   background~ : Bool = false,
+  priority~ : Bool = false,
 ) -> Unit {
   self.cancel_before(Int32::max(0, owner))
   if owner > 0 && owner < self.generation {
@@ -54,6 +56,10 @@ fn Client::read(
     done(Ok(Content(source)))
     return
   }
+  if request is ContentGet(_) && w.source_pause is Some(reason) {
+    done(Err(RateLimited(reason)))
+    return
+  }
   w.serial += 1
   let key = if fresh {
     "\{w.epoch}:verify:\{w.serial}:\{encoded}"
@@ -63,16 +69,95 @@ fn Client::read(
   let waiter = { owner, done, }
   if w.reads.get(key) is Some(pending) {
     pending.waiters.push(waiter)
+    pending.priority = pending.priority || priority
     @metrics.counter("shared_read_joins", 1)
     return
   }
-  let epoch = w.epoch
   let pending : SharedRead = {
     wire_owner: -w.serial,
     active: true,
     waiters: [waiter],
+    started: false,
+    priority,
+    request,
+    fresh,
+    background,
   }
   w.reads[key] = pending
+  if request is ContentGet(_) {
+    self.pump_sources()
+  } else {
+    self.start_read(key, pending)
+  }
+}
+
+///|
+fn Client::pump_sources(self : Client) -> Unit {
+  guard self.workspace.source_pause is None else { return }
+  let reads = self.workspace.reads.values().collect()
+  let mut active = reads
+    .iter()
+    .filter(read => read.active && read.started && read.request is ContentGet(_))
+    .count()
+  let queued = reads.filter(read => {
+    read.active && !read.started && read.request is ContentGet(_)
+  })
+  // Priority files can overtake queued default expansions, retaining active reads.
+  for priority in [true, false] {
+    for pending in queued {
+      if active >= 4 {
+        return
+      }
+      if pending.priority != priority {
+        continue
+      }
+      if self.workspace.reads
+        .iter()
+        .find_first(entry => entry.1.wire_owner == pending.wire_owner)
+        is Some((key, _)) {
+        active += 1
+        self.start_read(key, pending)
+      }
+    }
+  }
+}
+
+///|
+pub fn prioritize_sources(
+  locations : Array[SourceLocation],
+  generation : Int32,
+) -> @rabbita.Cmd {
+  @cmd.custom_cmd(_ => {
+    guard generation >= client.generation else { return }
+    for location in locations {
+      let request = @protocol.GitHubRequest::ContentGet({
+        owner: location.repository.owner,
+        repo: location.repository.repo,
+        path: location.path,
+        revision: location.revision,
+      })
+      for _, pending in client.workspace.reads {
+        if pending.request == request {
+          pending.priority = true
+        }
+      }
+    }
+    client.pump_sources()
+  })
+}
+
+///|
+fn Client::start_read(
+  self : Client,
+  key : String,
+  pending : SharedRead,
+) -> Unit {
+  guard pending.active && !pending.started else { return }
+  pending.started = true
+  let w = self.workspace
+  let epoch = w.epoch
+  let request = pending.request
+  let encoded = request.encode().stringify()
   self.rpc_network(
     request,
     pending.wire_owner,
@@ -100,9 +185,10 @@ fn Client::read(
           (waiter.done)(result)
         }
       }
+      self.pump_sources()
     },
-    background~,
-    fresh~,
+    background=pending.background,
+    fresh=pending.fresh,
   )
 }
 

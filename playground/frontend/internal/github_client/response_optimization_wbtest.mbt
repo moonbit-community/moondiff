@@ -154,6 +154,42 @@ test "foreground compare and file pages overlap and independent validation waits
 }
 
 ///|
+test "source concurrency is four and priority files overtake queued default expansions" {
+  let (client, n) = snapshot_harness()
+  for i in 0..<8 {
+    client.read(
+      ContentGet({
+        owner: "upstream",
+        repo: "repo",
+        path: "file\{i}.mbt",
+        revision: "a".repeat(40),
+      }),
+      1,
+      _ => (),
+      priority=i == 7,
+    )
+  }
+  assert_eq(n.calls.length(), 4)
+  n.calls[0].reply(
+    @protocol.RpcValue::Content({
+      size: 3,
+      base64: "b2xk",
+      content_type: "text/plain",
+    }),
+  )
+  assert_eq(n.calls.length(), 5)
+  assert_true(n.last().request() is ContentGet({ path: "file7.mbt", .. }))
+  assert_eq(
+    client.workspace.reads.values().filter(read => read.started).count(),
+    4,
+  )
+  client.cancel_before(2)
+  assert_true(client.workspace.reads.is_empty())
+  assert_eq(n.calls.length(), 5)
+  assert_true(n.calls[1:].iter().all(call => call.aborted))
+}
+
+///|
 test "metadata-only candidates revalidate after thirty seconds in a later home visit" {
   let (client, n) = snapshot_harness()
   let candidates = [{ pull: snapshot_args(), updated_at: "v1", }]

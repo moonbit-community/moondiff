@@ -40,6 +40,11 @@ priv struct SharedRead {
   wire_owner : Int32
   mut active : Bool
   mut waiters : Array[ReadWaiter]
+  mut started : Bool
+  mut priority : Bool
+  request : @protocol.GitHubRequest
+  fresh : Bool
+  background : Bool
 }
 
 ///|
@@ -79,6 +84,7 @@ priv struct Workspace {
   mut epoch : Int32
   mut checking : Bool
   mut identity_error : Error?
+  mut source_pause : RateLimitReason?
   mut serial : Int32
   reads : Map[String, SharedRead]
   tasks : Map[String, SnapshotTask]
@@ -111,6 +117,7 @@ fn Workspace::new() -> Workspace {
     epoch: 0,
     checking: true,
     identity_error: None,
+    source_pause: None,
     serial: 0,
     reads: {},
     tasks: {},
@@ -240,6 +247,7 @@ fn metadata_key(args : @protocol.PullGet) -> String {
 ///|
 fn Client::clear_workspace(self : Client) -> Unit {
   let w = self.workspace
+  w.source_pause = None
   w.epoch += 1
   w.home = false
   w.prefetch_ready = false
