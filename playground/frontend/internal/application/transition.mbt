@@ -40,6 +40,7 @@ pub(all) enum NavigationPolicy {
 pub(all) enum CommitScope {
   Region
   PageLayout
+  HistoryLayout(HistoryRestoration)
 } derive(Eq)
 
 ///|
@@ -58,6 +59,13 @@ pub(all) struct Transition {
 }
 
 ///|
+// Keep this callback outside ui_after_commit so JavaScript does not share its
+// captured Model scope. Consumed scheduler entries can retain the callback.
+fn finish_click_to_diff(_ : &@cmd.Scheduler) -> Unit {
+  @metrics.finish("click_to_diff")
+}
+
+///|
 fn ui_after_commit(
   before : Model,
   next : Model,
@@ -65,6 +73,50 @@ fn ui_after_commit(
   emit : @rabbita.Emit[Msg],
 ) -> Array[AfterCommit] {
   let actions : Array[AfterCommit] = []
+  if @metrics.pending("click_to_diff") &&
+    next.phase is Showing(view) &&
+    view.files
+    .iter()
+    .find_first(file => {
+      file.expanded &&
+      @change.cached_file_document(
+        file,
+        next.diff_algorithm,
+        ignore_comments=next.ignore_comments,
+        ignore_tests=next.ignore_tests,
+      )
+      is Some(_)
+    })
+    is Some(file) {
+    actions.push({
+      target: File(file.file.filename),
+      scope: Region,
+      navigation: Cancel,
+      command: @cmd.custom_cmd(finish_click_to_diff),
+    })
+  }
+  if prefetch_after_commit(before, next) is Some(action) {
+    actions.push(action)
+  }
+  if next.navigation.restore_position &&
+    next.navigation.restoration is Some(restoration) &&
+    !restoration.cancelled &&
+    page_layout_ready(next) {
+    actions.push({
+      target: if next.phase is Showing(_) {
+        Navigation
+      } else if next.phase is ShowingPullSelector(_) {
+        RangePanel
+      } else if next.phase is Idle && next.auth is SignedIn(..) {
+        Home
+      } else {
+        Status
+      },
+      scope: HistoryLayout(restoration),
+      command: restore_history_position(next, restoration, emit),
+      navigation: Cancel,
+    })
+  }
   if before.generation == next.generation &&
     (
       before.sign_in_dialog != next.sign_in_dialog ||

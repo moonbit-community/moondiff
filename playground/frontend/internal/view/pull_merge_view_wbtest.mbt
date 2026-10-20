@@ -74,6 +74,7 @@ test "merge card renders GitHub-style CI summary warnings and safe job links" {
     },
     auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
     snapshot_stale: false,
+    write_enabled: true,
   })
   assert_true(
     rendered.contains("Some checks were not successful"),
@@ -120,6 +121,7 @@ test "merge card distinguishes stale draft conflict unknown and merged states" {
       state: state(status),
       auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
       snapshot_stale: false,
+      write_enabled: true,
     }
   }
   let anonymous = render_pull_merge({ ..input(base), auth: Anonymous(None), })

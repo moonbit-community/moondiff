@@ -35,6 +35,9 @@ fn region_model() -> Model {
   let review = @comments.update(session, Identity(true, Some("me"))).0
   {
     input: "",
+    navigation: @application.NavigationState::new(),
+    access: @application.SnapshotAccess::new(),
+    page_visible: true,
     generation: 1,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -47,6 +50,7 @@ fn region_model() -> Model {
     auth_revision: 0,
     sign_in_dialog: @application.SignInDialog::new(),
     restore_pending: false,
+    recovering_session: false,
     last_authenticated_user_id: None,
     home: @application.HomeState::new(),
     viewed: @application.ViewedState::new(),
@@ -84,6 +88,66 @@ fn pull_region_model() -> Model {
     route: Some(reference),
     phase: Showing({ ..view, reference, pull_snapshot: Some(pull), sha: head, }),
   }
+}
+
+///|
+test "every non-home phase projects exactly one fixed Status region including validation failures" {
+  let model = pull_region_model()
+  let reference = model.route.unwrap()
+  let pull = match model.phase {
+    Showing(view) => view.pull_snapshot.unwrap()
+    _ => abort("pull")
+  }
+  let phases : Array[@application.Phase] = [
+    Idle,
+    LoadingPullMetadata(reference~, attempt=0),
+    LoadFailed("Failed to load"),
+    ShowingPullSelector(pull),
+    model.phase,
+  ]
+  for phase in phases {
+    for
+      freshness in [
+        @application.SnapshotFreshness::Confirmed,
+        Checking,
+        Unavailable("Validation unavailable"),
+      ] {
+      let next = { ..model, phase, access: { ..model.access, freshness, }, }
+      let inputs = RegionProjection::new().inputs(next)
+      assert_eq(inputs.filter(pair => pair.0 is Status).length(), 1)
+      assert_true(inputs[0].0 is Toolbar)
+      assert_true(inputs[1].0 is Status)
+      if phase is LoadFailed(_) {
+        assert_true(inputs[1].1 is Status(Failed("Failed to load", _)))
+      }
+      if (phase is Showing(_) || phase is ShowingPullSelector(_)) &&
+        freshness is Confirmed {
+        assert_true(inputs[1].1 is Status(Empty))
+      }
+    }
+  }
+}
+
+///|
+test "shown discussions own authentication errors while large selectors retain their status action" {
+  let model = {
+    ..pull_region_model(),
+    auth: AuthFailed("Session expired"),
+    access: {
+      freshness: Unavailable("Session expired"),
+      identity_checking: false,
+    },
+  }
+  let inputs = RegionProjection::new().inputs(model)
+  assert_true(inputs[1].1 is Status(Empty))
+  guard model.phase is Showing({ pull_snapshot: Some(pull), .. }) else {
+    fail("pull")
+  }
+  let selector = { ..model, phase: ShowingPullSelector(pull), }
+  let selector_inputs = RegionProjection::new().inputs(selector)
+  assert_true(
+    selector_inputs[1].1 is Status(Failed("Session expired", AuthFailed(_))),
+  )
 }
 
 ///|
@@ -129,6 +193,9 @@ test "root session check and invalid routes keep their existing layouts" {
   let root = {
     ..region_model(),
     input: "",
+    navigation: @application.NavigationState::new(),
+    access: @application.SnapshotAccess::new(),
+    page_visible: true,
     generation: 0,
     phase: Idle,
     route: None,

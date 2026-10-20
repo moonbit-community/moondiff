@@ -13,7 +13,7 @@ fn viewed_control(
   let requires_sign_in = is_pull && !(model.auth is SignedIn(..))
   let disabled = !requires_sign_in &&
     (
-      !(model.auth is SignedIn(..)) ||
+      !@application.writes_allowed(model) ||
       !model.viewed.ready ||
       !model.viewed.storage_ready ||
       syncing ||

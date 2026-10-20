@@ -1,6 +1,10 @@
 ///|
 pub fn app_init(emit : @rabbita.Emit[Msg]) -> (Model, @rabbita.Cmd) {
-  let model = initial_model()
+  let model = {
+    ..initial_model(),
+    navigation: initialize_navigation(),
+    page_visible: !@browser.has_window() || !@dom.document().hidden(),
+  }
   let next = match reference_from_playground_url(browser_current_url()) {
     Ok(Some(reference)) =>
       {
@@ -19,6 +23,7 @@ pub fn app_subscriptions(model : Model, emit : @rabbita.Emit[Msg]) -> @sub.Sub {
   let base = @sub.batch([
     @sub.on_url_changed(url => emit(Ui(RouteChanged(url)))),
     page_reactivation_subscription(emit),
+    history_interaction_subscription(model, emit),
   ])
   if model.file_tree.drawer_open {
     @sub.batch([

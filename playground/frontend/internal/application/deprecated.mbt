@@ -111,3 +111,41 @@ pub extend SignInEntry with Eq::{not_equal, equal}
 ///|
 #deprecated
 pub extend SignInDialog with Eq::{not_equal, equal}
+
+///|
+#deprecated
+pub extend HistoryEntry with Eq::{equal, not_equal}
+
+///|
+#deprecated
+pub extend RouteDestination with Eq::{equal, not_equal}
+
+///|
+#deprecated
+pub extend PagePosition with Eq::{equal, not_equal}
+
+///|
+#deprecated
+pub extend RouteMemory with Eq::{equal, not_equal}
+
+///|
+#deprecated
+pub extend NavigationState with Eq::{equal, not_equal}
+
+///|
+#deprecated
+pub extend HistoryEntry with ToJson::{to_json}
+
+///|
+#deprecated
+pub extend HistoryEntry with @json.FromJson::{from_json}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend SnapshotFreshness with Eq::{equal, not_equal}
+
+///|
+#deprecated
+#doc(hidden)
+pub extend SnapshotAccess with Eq::{equal, not_equal}

@@ -301,7 +301,9 @@ fn pull_merge_action_view(
   @html.button(
     type_="button",
     class="rebase-merge-button",
-    disabled=input.state.loading || input.state.submitting,
+    disabled=input.state.loading ||
+      input.state.submitting ||
+      !input.write_enabled,
     on_click=emit(PullMerge(Submit)),
     if input.state.submitting {
       "Rebasing and merging…"

@@ -1,5 +1,6 @@
 ///|
 pub(all) struct ViewedPending {
+  deferred : Bool
   record : ViewedRecord
   stored : Bool
   before : @protocol.FileViewedState
@@ -80,7 +81,9 @@ fn viewed_draft_file(model : Model) -> Int32? {
   guard model.phase is Showing(view) &&
     model.review.draft() is Some(draft) &&
     draft.id.generation == model.generation &&
-    draft.snapshot == comment_context(model).snapshot else {
+    draft.snapshot is Some(snapshot) &&
+    comment_context(model).snapshot is Some(current) &&
+    snapshot.same_version(current) else {
     return None
   }
   let path = match draft.kind {
@@ -277,11 +280,20 @@ fn reconcile_viewed(
       }
     }
     let reset = { ..model, viewed: state, }
-    return if viewed_scope(reset) is Some(_) {
+    let (next, command) = if viewed_scope(reset) is Some(_) {
       begin_viewed_refresh(reset, emit)
     } else {
       (reset, @rabbita.none)
     }
+    let commands = [command]
+    for file in old.viewed.files {
+      if file.pending is Some(pending) && pending.deferred {
+        // Persistence completed, but no mutation was sent while identity was
+        // being checked. Do not leave an uncertain operation on navigation.
+        commands.push(viewed_forget(next, pending.record, emit))
+      }
+    }
+    return (next, @rabbita.batch(commands))
   }
   let model = match msg {
     Load(ToggleFile(generation, index))
@@ -301,6 +313,19 @@ fn reconcile_viewed(
         model
       }
     _ => model
+  }
+  if writes_allowed(model) && !writes_allowed(old) {
+    let commands = []
+    for index, file in model.viewed.files {
+      if file.pending is Some(pending) && pending.deferred {
+        commands.push(
+          emit(Viewed(Stored(model.viewed.epoch, index, pending.record, true))),
+        )
+      }
+    }
+    if !commands.is_empty() {
+      return (model, @rabbita.batch(commands))
+    }
   }
   match msg {
     Review(RefreshComments) => begin_viewed_refresh(model, emit)

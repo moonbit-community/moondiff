@@ -34,8 +34,11 @@ fn auth_identity_transition(
           }
       }
     Anonymous(_) =>
-      if model.last_authenticated_user_id is Some(_) ||
-        model.auth is SignedIn(..) {
+      if !model.recovering_session &&
+        (
+          model.last_authenticated_user_id is Some(_) ||
+          model.auth is SignedIn(..)
+        ) {
         AuthIdentityBoundary
       } else {
         AuthIdentityUnchanged
@@ -59,7 +62,22 @@ fn reload_after_auth_identity_boundary(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   let cleared = with_review(
-    { ..model, restore_pending: false, },
+    {
+      ..model,
+      restore_pending: false,
+      recovering_session: false,
+      last_authenticated_user_id: match model.auth {
+        SignedIn(user_id~, ..) => user_id
+        _ => None
+      },
+      phase: Idle,
+      navigation: {
+        ..model.navigation,
+        routes: {},
+        positions: {},
+        pending: None,
+      },
+    },
     @comments.update(model.review, Reset(true, false)).0,
   )
   match cleared.route {

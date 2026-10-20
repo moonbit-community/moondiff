@@ -1,5 +1,6 @@
 ///|
 pub(all) enum HomeMsg {
+  VisibilityChanged(Bool)
   Refresh
   SelectTab(@protocol.ViewerPullKind)
   LoadPulls(@protocol.ViewerPullKind)
@@ -164,8 +165,12 @@ fn update_home(
   msg : HomeMsg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
+  if msg is VisibilityChanged(visible) {
+    return ({ ..model, page_visible: visible, }, @rabbita.none)
+  }
   guard home_active(model) else { return (model, @rabbita.none) }
   match msg {
+    VisibilityChanged(_) => (model, @rabbita.none)
     Refresh => {
       guard !model.home.busy() else { return (model, @rabbita.none) }
       let next = {

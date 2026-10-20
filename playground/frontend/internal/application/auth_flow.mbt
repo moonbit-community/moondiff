@@ -7,6 +7,23 @@ fn apply_auth_status(
 ) -> (Model, @rabbita.Cmd, AuthIdentityTransition) {
   let auth = auth_status_from_api(status)
   let (next, detected) = review_state_with_auth_identity(model, auth)
+  // A recovery may have visited and validated a public route while anonymous.
+  // Recheck a mutable PR with the recovered identity before enabling writes.
+  let next = if model.recovering_session &&
+    next.auth is SignedIn(..) &&
+    next.route
+    .map(reference => reference.target is PullRequest(_))
+    .unwrap_or(false) &&
+    (next.phase is Showing(_) || next.phase is ShowingPullSelector(_)) {
+    { ..next, access: { ..next.access, freshness: Checking, }, }
+  } else if (next.auth is SignedIn(..) || next.auth is Anonymous(_)) &&
+    next.phase is Showing(view) &&
+    !(view.reference.target is PullRequest(_)) {
+    // Fixed revisions only need their account identity to be confirmed again.
+    { ..next, access: { ..next.access, freshness: Confirmed, }, }
+  } else {
+    next
+  }
   let transition = if force_identity_boundary {
     AuthIdentityBoundary
   } else {
@@ -14,8 +31,11 @@ fn apply_auth_status(
   }
   let (next, command) = if transition is AuthIdentityBoundary {
     reload_after_auth_identity_boundary(next, emit)
-  } else if next.restore_pending &&
-    (next.auth is SignedIn(..) || next.auth is Anonymous(_)) {
+  } else if (
+      next.restore_pending &&
+      (next.auth is SignedIn(..) || next.auth is Anonymous(_))
+    ) ||
+    (model.recovering_session && next.auth is SignedIn(..)) {
     restore_page_requests(next, emit)
   } else {
     (next, @rabbita.none)
@@ -45,6 +65,7 @@ fn finish_sign_in(
     model, status, false, emit,
   )
   if model.restore_pending ||
+    (model.recovering_session && next.auth is SignedIn(..)) ||
     transition is AuthIdentityBoundary ||
     next.auth is Authorizing(_, _) ||
     next.auth is AuthFailed(_) {
@@ -53,6 +74,19 @@ fn finish_sign_in(
   guard next.route is Some(reference) else { return (next, command) }
   if restart {
     return begin_sign_in_change_reload(next, reference, transition, emit)
+  }
+  if (next.phase is Showing(_) || next.phase is ShowingPullSelector(_)) &&
+    (
+      model.access.freshness is Unavailable(_) ||
+      (
+        reference.target is PullRequest(_) &&
+        model.access.freshness is Checking &&
+        !(model.auth is SignedIn(..)) &&
+        next.auth is SignedIn(..)
+      )
+    ) {
+    let (ready, resume_command) = restore_page_requests(next, emit)
+    return (ready, @rabbita.batch([command, resume_command]))
   }
   if next.phase is ShowingPullSelector(_) {
     return (next, command)

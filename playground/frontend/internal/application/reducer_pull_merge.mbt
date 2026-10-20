@@ -106,6 +106,7 @@ fn update_pull_merge(
       }
     }
     Submit => {
+      guard writes_allowed(model) else { return (model, @rabbita.none) }
       guard !model.pull_merge.loading &&
         !model.pull_merge.submitting &&
         !model.pull_merge.stale &&
@@ -246,7 +247,6 @@ fn reconcile_pull_merge(
         pull_merge: {
           ..model.pull_merge,
           loading: false,
-          submitting: false,
           poll_scheduled: false,
           stale: true,
         },

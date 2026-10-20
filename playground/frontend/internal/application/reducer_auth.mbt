@@ -1,5 +1,6 @@
 ///|
 pub(all) enum AuthMsg {
+  SessionInvalidated
   AuthStatusLoaded(Int32, Result[ApiAuthStatus, Error])
   ReactivationAuthStatusLoaded(
     Int32,
@@ -25,6 +26,28 @@ fn update_auth(
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
   match msg {
+    SessionInvalidated => {
+      let message = "Your GitHub session expired. Sign in again."
+      let failed = with_auth(model, AuthFailed(message))
+      (
+        {
+          ..failed,
+          auth_revision: failed.auth_revision + 1,
+          access: { ..failed.access, freshness: Unavailable(message), },
+          phase: if model.route is None && model.phase is Idle {
+            Idle
+          } else if model.phase is Showing(_) ||
+            model.phase is ShowingPullSelector(_) {
+            model.phase
+          } else {
+            LoadFailed(message)
+          },
+          navigation: { ..model.navigation, pending: None, },
+          review: @comments.update(failed.review, RecoverInterrupted).0,
+        },
+        @rabbita.none,
+      )
+    }
     AuthStatusLoaded(revision, result) => {
       guard revision == model.auth_revision else {
         return (model, @rabbita.none)
@@ -53,6 +76,7 @@ fn update_auth(
       guard revision == model.auth_revision &&
         (
           auth_device_id(model.auth) is Some(_) ||
+          model.access.identity_checking ||
           (generation == model.generation && model.route == reference)
         ) &&
         !(model.auth is DeviceCancelling(_, _)) else {

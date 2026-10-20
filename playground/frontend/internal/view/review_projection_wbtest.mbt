@@ -110,9 +110,12 @@ test "same-line projection uses the first expanded matched inserted or deleted s
             files: [{ ..file, collapsed_sections: collapsed, }],
           }
           let model = Model::{
+            page_visible: true,
             home: @application.HomeState::new(),
             viewed: @application.ViewedState::new(),
             input: "",
+            navigation: @application.NavigationState::new(),
+            access: @application.SnapshotAccess::new(),
             generation: 1,
             view_mode: mode,
             diff_algorithm: algorithm,
@@ -125,6 +128,7 @@ test "same-line projection uses the first expanded matched inserted or deleted s
             auth_revision: 0,
             sign_in_dialog: @application.SignInDialog::new(),
             restore_pending: false,
+            recovering_session: false,
             last_authenticated_user_id: None,
             pull_merge: @application.PullMergeState::new(),
             review: @comments.Session::new(),
@@ -309,9 +313,12 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
     }
     let view = { ..base_view, files: [file], }
     let model = Model::{
+      page_visible: true,
       home: @application.HomeState::new(),
       viewed: @application.ViewedState::new(),
       input: "",
+      navigation: @application.NavigationState::new(),
+      access: @application.SnapshotAccess::new(),
       generation: 1,
       view_mode: Split,
       diff_algorithm: algorithm,
@@ -324,6 +331,7 @@ test "projection omits collapsed filtered and structural-placeholder documents" 
       auth_revision: 0,
       sign_in_dialog: @application.SignInDialog::new(),
       restore_pending: false,
+      recovering_session: false,
       last_authenticated_user_id: None,
       pull_merge: @application.PullMergeState::new(),
       review: @comments.Session::new(),

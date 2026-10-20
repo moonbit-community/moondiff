@@ -47,6 +47,9 @@ pub(all) enum Phase {
 ///|
 pub(all) struct Model {
   input : String
+  access : SnapshotAccess
+  page_visible : Bool
+  navigation : NavigationState
   generation : Int32
   view_mode : ViewMode
   diff_algorithm : DiffAlgorithm
@@ -59,6 +62,7 @@ pub(all) struct Model {
   auth_revision : Int32
   sign_in_dialog : SignInDialog
   restore_pending : Bool
+  recovering_session : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState
   home : HomeState
@@ -71,6 +75,9 @@ pub(all) struct Model {
 fn initial_model() -> Model {
   {
     input: "",
+    navigation: NavigationState::new(),
+    access: SnapshotAccess::new(),
+    page_visible: true,
     generation: 0,
     view_mode: Split,
     diff_algorithm: LexicalAlgorithm,
@@ -83,6 +90,7 @@ fn initial_model() -> Model {
     auth_revision: 0,
     sign_in_dialog: SignInDialog::new(),
     restore_pending: false,
+    recovering_session: false,
     last_authenticated_user_id: None,
     viewed: empty_viewed_state(0),
     home: empty_home_state(0),

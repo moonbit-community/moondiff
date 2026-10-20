@@ -39,28 +39,6 @@ fn pull_commit_metadata_request(
 }
 
 ///|
-fn pull_metadata_request(
-  reference : CommitRef,
-  generation : Int32,
-  attempt : Int32,
-  emit : @rabbita.Emit[Msg],
-) -> @rabbita.Cmd {
-  let number = match reference.target {
-    PullRequest(number) => number
-    _ => ""
-  }
-  @github_client.get_pull(
-    {
-      owner: reference_repository(reference).owner,
-      repo: reference_repository(reference).repo,
-      number,
-    },
-    generation,
-    result => emit(Load(PullMetadataLoaded(generation, attempt, result))),
-  )
-}
-
-///|
 fn pull_compare_request(
   reference : CommitRef,
   base_sha : String,
@@ -116,7 +94,7 @@ fn pull_validation_request(
     PullRequest(number) => number
     _ => ""
   }
-  @github_client.get_pull(
+  @github_client.get_pull_fresh(
     {
       owner: reference_repository(reference).owner,
       repo: reference_repository(reference).repo,

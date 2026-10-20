@@ -1,5 +1,7 @@
 ///|
 pub(all) enum UiMsg {
+  Navigate(String)
+  PositionRestored(Int32, String)
   InputChanged(String)
   Submit
   RetryRoute
@@ -26,6 +28,69 @@ fn update_ui(
   msg : UiMsg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
+  if msg is Navigate(path) {
+    return request_navigation(model, Path(path), emit)
+  }
+  if msg is PositionRestored(generation, entry) {
+    return (
+      if generation == model.generation && entry == model.navigation.entry.id {
+        {
+          ..model,
+          navigation: { ..model.navigation, restore_position: false, },
+        }
+      } else {
+        model
+      },
+      @rabbita.none,
+    )
+  }
+  let model = if msg is RouteChanged(_) {
+    let entry = read_history_entry().unwrap_or(model.navigation.entry)
+    if model.navigation.rollback {
+      return (
+        {
+          ..model,
+          navigation: {
+            ..model.navigation,
+            rollback: entry.id != model.navigation.entry.id,
+          },
+        },
+        @rabbita.none,
+      )
+    }
+    if entry.id != model.navigation.entry.id {
+      if navigation_blocked(model) {
+        return (
+          {
+            ..model,
+            navigation: {
+              ..model.navigation,
+              pending: Some(History(entry)),
+              rollback: true,
+            },
+          },
+          history_go(model.navigation.entry.sequence - entry.sequence),
+        )
+      }
+      if model.navigation.positions.contains(entry.id) {
+        @metrics.begin("back_restore")
+      }
+      let saved = save_navigation_page(model)
+      {
+        ..saved,
+        navigation: {
+          ..saved.navigation,
+          entry,
+          restore_position: true,
+          restore_data: true,
+        },
+      }
+    } else {
+      model
+    }
+  } else {
+    model
+  }
   // Navigation may arrive while the initial session request is still pending.
   // Keep generation zero so its response starts only the latest selected route.
   if model.generation == 0 &&
@@ -68,6 +133,7 @@ fn update_ui(
     }
   }
   let (next, command) = match msg {
+    Navigate(_) | PositionRestored(_, _) => (model, @rabbita.none)
     InputChanged(value) => ({ ..model, input: value, }, @rabbita.none)
     SelectView(view_mode) => ({ ..model, view_mode, }, @rabbita.none)
     OpenSignIn(generation, entry, _) => {
@@ -235,7 +301,25 @@ fn update_ui(
     }
     RetryRoute =>
       match model.route {
-        Some(reference) => begin_change_load(model, reference, emit)
+        Some(reference) =>
+          if reference.target is PullRequest(_) &&
+            (model.phase is Showing(_) || model.phase is ShowingPullSelector(_)) {
+            if model.access.freshness is Checking {
+              (model, @rabbita.none)
+            } else {
+              (
+                { ..model, access: { ..model.access, freshness: Checking, }, },
+                shared_snapshot_request(
+                  reference,
+                  model.generation,
+                  emit,
+                  revalidate=true,
+                ),
+              )
+            }
+          } else {
+            begin_change_load(model, reference, emit)
+          }
         None => return update_ui(model, Submit, emit)
       }
     Submit =>
@@ -252,27 +336,16 @@ fn update_ui(
             },
             @rabbita.none,
           )
-        Ok(reference) => {
-          if model.generation == 0 && model.auth is AuthChecking {
-            return (
-              {
-                ..model,
-                route: Some(reference),
-                restore_pending: false,
-                input: canonical_github_url(reference),
-              },
-              @nav.push_url(playground_share_url(reference)),
+        Ok(reference) =>
+          if model.route == Some(reference) {
+            begin_change_load(model, reference, emit)
+          } else {
+            request_navigation(
+              model,
+              Path(@routing.playground_route(reference)),
+              emit,
             )
           }
-          let already_at_route = model.route == Some(reference)
-          let (next, request) = begin_change_load(model, reference, emit)
-          let navigation = if already_at_route {
-            @rabbita.none
-          } else {
-            @nav.push_url(playground_share_url(reference))
-          }
-          (next, @rabbita.batch([navigation, request]))
-        }
       }
     RouteChanged(url) =>
       match reference_from_playground_url(url.to_string()) {
@@ -298,6 +371,7 @@ fn update_ui(
               generation: model.generation + 1,
               restore_pending: false,
               phase: Idle,
+              review: initial_review_state(),
               route: None,
               range: None,
               file_tree: reset_file_tree_state(model.file_tree),
@@ -316,7 +390,7 @@ fn update_ui(
     // Navigation invalidates the scoped restoration query. Resolve the session
     // again so the new route cannot remain stuck in AuthChecking.
     (
-      next,
+      { ..next, access: { ..next.access, identity_checking: false, }, },
       @rabbita.batch([command, auth_status_request(next.auth_revision, emit)]),
     )
   } else {

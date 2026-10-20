@@ -6,6 +6,7 @@ import {
   "moonbit-community/moondiff-playground/internal/change",
   "moonbit-community/moondiff-playground/internal/comments",
   "moonbit-community/moondiff-playground/internal/github",
+  "moonbit-community/moondiff-playground/internal/github_client",
   "moonbit-community/moondiff-playground/internal/review",
   "moonbit-community/rabbita/cmd",
   "moonbit-community/rabbita/dom",
@@ -43,9 +44,13 @@ pub fn range_pull_history_unsupported(RangeState) -> Bool
 
 pub fn range_pull_selector_ready(RangeState) -> Bool
 
+pub fn snapshot_confirmed(Model) -> Bool
+
 pub fn trap_sign_in_focus(@dom.KeyboardEvent) -> Unit
 
 pub fn update(Model, Msg, @cmd.Emit[Msg]) -> Transition
+
+pub fn writes_allowed(Model) -> Bool
 
 // Errors
 
@@ -58,6 +63,7 @@ pub(all) struct AfterCommit {
 }
 
 pub(all) enum AuthMsg {
+  SessionInvalidated
   AuthStatusLoaded(Int32, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
   ReactivationAuthStatusLoaded(Int32, Int32, @github.CommitRef?, Result[@moondiff-playground-protocol.ApiAuthStatus, Error])
   StartSignIn
@@ -83,6 +89,7 @@ pub(all) enum AuthStatus {
 pub(all) enum CommitScope {
   Region
   PageLayout
+  HistoryLayout(HistoryRestoration)
 } derive(Eq)
 
 pub(all) struct FileTreeState {
@@ -93,6 +100,26 @@ pub(all) struct FileTreeState {
   collapsed_directories : Array[String]
   selected_file_index : Int32?
   preferred_width : Int32
+} derive(Eq)
+
+pub(all) struct HistoryEntry {
+  id : String
+  sequence : Int32
+  path : String
+} derive(Eq, ToJson, @json.FromJson)
+#deprecated
+pub fn HistoryEntry::equal(Self, Self) -> Bool
+#deprecated
+pub fn HistoryEntry::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+#deprecated
+pub fn HistoryEntry::not_equal(Self, Self) -> Bool
+#deprecated
+pub fn HistoryEntry::to_json(Self) -> Json
+
+pub(all) struct HistoryRestoration {
+  generation : Int32
+  entry : String
+  mut cancelled : Bool
 } derive(Eq)
 
 pub(all) struct HomeCommits {
@@ -112,6 +139,7 @@ pub(all) enum HomeLoad {
 } derive(Eq)
 
 pub(all) enum HomeMsg {
+  VisibilityChanged(Bool)
   Refresh
   SelectTab(@moondiff-playground-protocol.ViewerPullKind)
   LoadPulls(@moondiff-playground-protocol.ViewerPullKind)
@@ -150,6 +178,7 @@ pub fn HomeState::busy(Self) -> Bool
 pub fn HomeState::new() -> Self
 
 pub(all) enum LoadMsg {
+  SharedSnapshotLoaded(Int32, Result[@github_client.SnapshotResult, Error])
   CommitPageLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiCommit, Error])
   ToggleFile(Int32, Int32)
   ToggleSection(Int32, Int32, String)
@@ -166,6 +195,9 @@ pub(all) enum LoadMsg {
 
 pub(all) struct Model {
   input : String
+  access : SnapshotAccess
+  page_visible : Bool
+  navigation : NavigationState
   generation : Int32
   view_mode : @change.ViewMode
   diff_algorithm : @change.DiffAlgorithm
@@ -178,6 +210,7 @@ pub(all) struct Model {
   auth_revision : Int32
   sign_in_dialog : SignInDialog
   restore_pending : Bool
+  recovering_session : Bool
   last_authenticated_user_id : String?
   viewed : ViewedState
   home : HomeState
@@ -201,6 +234,34 @@ pub(all) enum NavigationPolicy {
   Cancel
   Continue
 } derive(Eq)
+
+pub(all) struct NavigationState {
+  entry : HistoryEntry
+  pending : RouteDestination?
+  rollback : Bool
+  restore_data : Bool
+  restore_position : Bool
+  restoration : HistoryRestoration?
+  positions : Map[String, PagePosition]
+  routes : Map[String, RouteMemory]
+} derive(Eq)
+#deprecated
+pub fn NavigationState::equal(Self, Self) -> Bool
+pub fn NavigationState::new() -> Self
+#deprecated
+pub fn NavigationState::not_equal(Self, Self) -> Bool
+
+pub(all) struct PagePosition {
+  x : Double
+  y : Double
+  sidebar : Double
+  focus_index : Int32?
+  focus_label : String
+} derive(Eq)
+#deprecated
+pub fn PagePosition::equal(Self, Self) -> Bool
+#deprecated
+pub fn PagePosition::not_equal(Self, Self) -> Bool
 
 pub(all) enum Phase {
   Idle
@@ -313,6 +374,31 @@ pub(all) enum ReviewMsg {
   ReviewReplyCreated(Int32, Int32, Result[@moondiff-playground-protocol.ApiReviewComment, Error])
 }
 
+pub(all) enum RouteDestination {
+  Path(String)
+  History(HistoryEntry)
+} derive(Eq)
+#deprecated
+pub fn RouteDestination::equal(Self, Self) -> Bool
+#deprecated
+pub fn RouteDestination::not_equal(Self, Self) -> Bool
+
+pub(all) struct RouteMemory {
+  review : @comments.NavigationReview
+  snapshot : @comments.Snapshot?
+  files : Array[(String, Bool, Array[String])]
+  tree : FileTreeState
+  range : (String, String, Bool)?
+  mode : @change.ViewMode
+  algorithm : @change.DiffAlgorithm
+  ignore_comments : Bool
+  ignore_tests : Bool
+} derive(Eq)
+#deprecated
+pub fn RouteMemory::equal(Self, Self) -> Bool
+#deprecated
+pub fn RouteMemory::not_equal(Self, Self) -> Bool
+
 pub(all) struct SignInDialog {
   revision : Int32
   entry : SignInEntry?
@@ -333,6 +419,18 @@ pub fn SignInEntry::file_index(Self) -> Int32
 #deprecated
 pub fn SignInEntry::not_equal(Self, Self) -> Bool
 
+pub(all) struct SnapshotAccess {
+  freshness : SnapshotFreshness
+  identity_checking : Bool
+} derive(Eq)
+pub fn SnapshotAccess::new() -> Self
+
+pub(all) enum SnapshotFreshness {
+  Confirmed
+  Checking
+  Unavailable(String)
+} derive(Eq)
+
 pub(all) struct Transition {
   model : Model
   command : @cmd.Cmd
@@ -340,6 +438,8 @@ pub(all) struct Transition {
 }
 
 pub(all) enum UiMsg {
+  Navigate(String)
+  PositionRestored(Int32, String)
   InputChanged(String)
   Submit
   RetryRoute
@@ -380,6 +480,7 @@ pub(all) enum ViewedMsg {
 }
 
 pub(all) struct ViewedPending {
+  deferred : Bool
   record : ViewedRecord
   stored : Bool
   before : @moondiff-playground-protocol.FileViewedState

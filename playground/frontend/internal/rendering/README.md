@@ -27,7 +27,8 @@ Disposal invalidates callbacks, releases waiting UI actions and observers, remov
 the host, and drops derived inputs/caches. Pending durable Viewed operations retain
 their existing reducer ownership rules.
 
-After-commit actions name a target region, a wait scope (`Region` or `PageLayout`),
+After-commit actions name a target region, a wait scope (`Region`, `PageLayout`,
+or cancellable `HistoryLayout`),
 and a navigation policy. Ordinary focus and Viewed persistence use `Region`;
 Viewed operations still complete their ownership cleanup across navigation.
 `OpenFile` and `NavigateChange` use `PageLayout`. Opening a file scrolls and, when
