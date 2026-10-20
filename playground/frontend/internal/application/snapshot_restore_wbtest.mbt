@@ -446,8 +446,10 @@ test "semantic versions reject changed repositories SHAs file counts commit coun
       ),
     ),
   )
-  assert_true(replaced.generation > edited.generation)
+  assert_eq(replaced.generation, edited.generation)
+  assert_true(replaced.phase == edited.phase)
+  assert_true(replaced.access.freshness is Unavailable(_))
   assert_true(replaced.review.draft().unwrap().snapshot == Some(original))
   assert_false(@comments.permission(replaced.review, Submit).allowed())
-  assert_true(viewed_draft_file(replaced) is None)
+  assert_true(viewed_draft_file(replaced) == Some(0))
 }

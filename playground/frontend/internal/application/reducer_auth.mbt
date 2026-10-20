@@ -33,7 +33,11 @@ fn update_auth(
         {
           ..failed,
           auth_revision: failed.auth_revision + 1,
-          access: { ..failed.access, freshness: Unavailable(message), },
+          access: {
+            ..failed.access,
+            freshness: Unavailable(message),
+            preparing: None,
+          },
           phase: if model.route is None && model.phase is Idle {
             Idle
           } else if model.phase is Showing(_) ||

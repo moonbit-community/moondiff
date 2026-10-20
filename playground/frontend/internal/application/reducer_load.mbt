@@ -1,6 +1,13 @@
 ///|
 pub(all) enum LoadMsg {
   SharedSnapshotLoaded(Int32, Result[@github_client.SnapshotResult, Error])
+  ReplacementSourceLoaded(
+    Int32,
+    String,
+    Int32,
+    SourceSide,
+    Result[(String, Bytes), Error]
+  )
   CommitPageLoaded(Int32, Int32, Result[ApiCommit, Error])
   ToggleFile(Int32, Int32)
   ToggleSection(Int32, Int32, String)
@@ -24,6 +31,10 @@ fn update_load(
   match msg {
     SharedSnapshotLoaded(generation, result) =>
       receive_shared_snapshot(model, generation, result, emit)
+    ReplacementSourceLoaded(generation, signature, index, side, result) =>
+      receive_replacement_source(
+        model, generation, signature, index, side, result, emit,
+      )
     PullMetadataLoaded(generation, attempt, result) => {
       if generation != model.generation {
         return (model, @rabbita.none)

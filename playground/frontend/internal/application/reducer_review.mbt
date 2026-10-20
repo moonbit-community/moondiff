@@ -66,6 +66,29 @@ fn update_review(
         model.route is Some(reference) else {
         return (model, @rabbita.none)
       }
+      if reference.target is PullRequest(_) &&
+        (model.phase is Showing(_) || model.phase is ShowingPullSelector(_)) {
+        if model.access.freshness is Checking {
+          return (model, @rabbita.none)
+        }
+        return (
+          {
+            ..model,
+            access: {
+              ..model.access,
+              freshness: Checking,
+              preparing: None,
+              reload_requested: true,
+            },
+          },
+          shared_snapshot_request(
+            reference,
+            model.generation,
+            emit,
+            revalidate=true,
+          ),
+        )
+      }
       return begin_change_load(model, reference, emit)
     }
     PageReactivated => {

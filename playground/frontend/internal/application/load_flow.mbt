@@ -311,6 +311,8 @@ fn begin_change_load(
     input: canonical_github_url(reference),
     access: {
       ..model.access,
+      preparing: None,
+      reload_requested: false,
       freshness: if reference.target is PullRequest(_) {
         Checking
       } else {

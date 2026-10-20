@@ -90,7 +90,12 @@ test "snapshot freshness and identity checks gate comments, deletion, Viewed and
   )
   let unverified = {
     ..editing,
-    access: { freshness: Checking, identity_checking: false, },
+    access: {
+      freshness: Checking,
+      identity_checking: false,
+      preparing: None,
+      reload_requested: false,
+    },
   }
   let denied = home_step(unverified, Review(SubmitDraft))
   assert_true(denied.review.submission() is None)
@@ -101,7 +106,12 @@ test "snapshot freshness and identity checks gate comments, deletion, Viewed and
   assert_false(writes_allowed(denied))
   let identity = {
     ..editing,
-    access: { freshness: Confirmed, identity_checking: true, },
+    access: {
+      freshness: Confirmed,
+      identity_checking: true,
+      preparing: None,
+      reload_requested: false,
+    },
   }
   assert_false(writes_allowed(identity))
   let confirmed = home_step(
@@ -336,6 +346,7 @@ test "layout interactions are scoped to exact versions paths and accounts" {
         ),
       ),
     )
+    let restored = finish_preparing_fixture(restored)
     assert_false(restored.viewed.files[0].touched)
     assert_eq(restored.viewed.files[0].expansion_revision, 0)
   }

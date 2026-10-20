@@ -179,6 +179,7 @@ pub fn HomeState::new() -> Self
 
 pub(all) enum LoadMsg {
   SharedSnapshotLoaded(Int32, Result[@github_client.SnapshotResult, Error])
+  ReplacementSourceLoaded(Int32, String, Int32, @change.SourceSide, Result[(String, Bytes), Error])
   CommitPageLoaded(Int32, Int32, Result[@moondiff-playground-protocol.ApiCommit, Error])
   ToggleFile(Int32, Int32)
   ToggleSection(Int32, Int32, String)
@@ -279,6 +280,11 @@ pub(all) enum Phase {
   LoadFailed(String)
   Showing(@change.ChangeView)
   ShowingPullSelector(@moondiff-playground-protocol.ApiPull)
+} derive(Eq)
+
+pub(all) struct PreparedSnapshot {
+  snapshot : @moondiff-playground-protocol.ApiPullSnapshot
+  view : @change.ChangeView
 } derive(Eq)
 
 pub(all) enum PullMergeMsg {
@@ -431,6 +437,8 @@ pub fn SignInEntry::not_equal(Self, Self) -> Bool
 pub(all) struct SnapshotAccess {
   freshness : SnapshotFreshness
   identity_checking : Bool
+  preparing : PreparedSnapshot?
+  reload_requested : Bool
 } derive(Eq)
 pub fn SnapshotAccess::new() -> Self
 
