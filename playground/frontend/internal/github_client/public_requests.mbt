@@ -130,11 +130,12 @@ fn Client::cache_public(
   value : @protocol.RpcValue,
 ) -> Unit {
   let bytes = @utf8.encode(ToJson::to_json(value).stringify()).length()
-  if bytes > 4 * 1048576 {
+  if bytes > 4 * 1048576 || bytes + self.workspace.bytes > CACHE_BUDGET {
     return
   }
   while self.public_cache.length() >= 8 ||
-        self.public_cache_bytes + bytes > 16 * 1048576 {
+        self.public_cache_bytes + bytes > 16 * 1048576 ||
+        self.public_cache_bytes + self.workspace.bytes + bytes > CACHE_BUDGET {
     let old = self.public_cache[0]
     self.public_cache_bytes -= old.bytes
     self.public_cache = self.public_cache[1:].to_owned()
@@ -160,7 +161,7 @@ fn Client::finish_public(
     self.cache_public(key, value)
   }
   for waiter in pending.waiters {
-    if waiter.generation == 0 || waiter.generation >= self.generation {
+    if waiter.generation <= 0 || waiter.generation >= self.generation {
       (waiter.done)(result)
     } else {
       (waiter.done)(Err(Cancelled))
@@ -316,14 +317,21 @@ fn Client::public_rpc(
   request : @protocol.GitHubRequest,
   generation : Int32,
   done : (Result[@protocol.RpcValue, Error]) -> Unit,
+  fresh~ : Bool = false,
 ) -> Unit {
   self.cancel_before(generation)
   if generation > 0 && generation < self.generation {
     done(Err(Cancelled))
     return
   }
-  let key = request.encode().stringify()
-  if immutable_public_request(request) {
+  let encoded = request.encode().stringify()
+  let key = if fresh {
+    self.sequence += 1
+    "verify:\{self.sequence}:\{encoded}"
+  } else {
+    encoded
+  }
+  if !fresh && immutable_public_request(request) {
     for entry in self.public_cache {
       if entry.key == key {
         done(Ok(entry.value))
@@ -345,4 +353,18 @@ fn Client::public_rpc(
   self.perform_public(request, pending, result => {
     self.finish_public(key, request, pending, result)
   })
+}
+
+///|
+fn Client::cancel_public_owner(self : Client, owner : Int32) -> Unit {
+  let entries = self.public_pending.iter().collect()
+  for (key, pending) in entries {
+    let remaining = pending.waiters.filter(waiter => waiter.generation != owner)
+    pending.waiters = remaining
+    if remaining.is_empty() && pending.active {
+      pending.active = false
+      self.public_pending.remove(key)
+      (pending.abort)()
+    }
+  }
 }

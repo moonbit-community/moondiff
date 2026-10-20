@@ -189,6 +189,9 @@ fn Client::device(
   match action {
     Poll | Retry => self.schedule_poll(action, id, delay, completed)
     Start => {
+      if self.authenticated || self.workspace.user is Some(_) {
+        self.clear_workspace()
+      }
       self.invalidate_auth(false)
       self.start(id, completed)
     }
@@ -240,6 +243,7 @@ fn Client::logout(
   self : Client,
   completed : (Result[@protocol.ApiAuthStatus, Error]) -> Unit,
 ) -> Unit {
+  self.clear_workspace()
   self.invalidate_auth(true)
   let revision = self.auth_revision
   let send_logout = () => {

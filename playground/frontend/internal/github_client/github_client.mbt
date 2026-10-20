@@ -1,10 +1,12 @@
 ///|
-fn[T] Client::rpc(
+fn[T] Client::rpc_network(
   self : Client,
   request : @protocol.GitHubRequest,
   generation : Int32,
   select : (@protocol.RpcValue) -> T raise,
   done : (Result[T, Error]) -> Unit,
+  background~ : Bool = false,
+  fresh~ : Bool = false,
 ) -> Unit {
   request.validate() catch {
     error => {
@@ -14,18 +16,23 @@ fn[T] Client::rpc(
   }
   if !self.authenticated &&
     (request.public_path() is Some(_) || request is CommentsList(_)) {
-    self.public_rpc(request, generation, result => {
-      done(
-        match result {
-          Err(error) => Err(error)
-          Ok(value) =>
-            Ok(select(value)) catch {
-              _ =>
-                Err(invalid_response("Unexpected public GitHub result kind."))
-            }
-        },
-      )
-    })
+    self.public_rpc(
+      request,
+      generation,
+      result => {
+        done(
+          match result {
+            Err(error) => Err(error)
+            Ok(value) =>
+              Ok(select(value)) catch {
+                _ =>
+                  Err(invalid_response("Unexpected public GitHub result kind."))
+              }
+          },
+        )
+      },
+      fresh~,
+    )
     return
   }
   self.send(
@@ -43,6 +50,7 @@ fn[T] Client::rpc(
       )
     },
     generation~,
+    background~,
   )
 }
 
