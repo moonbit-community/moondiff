@@ -463,27 +463,63 @@ async function expectLineBackground(cell, background, layout) {
   }
 }
 
-async function expectChangeBackgrounds(file, layout, source, palette) {
-  for (const [sideIndex, side] of ["del", "add"].entries()) {
-    const cells = file.locator(`td.${side}, tr.diff-neutral-pair > td.ctx`);
-    await expect(cells).toHaveCount(source.strong[sideIndex].length);
-    for (const [line, strong] of source.strong[sideIndex].entries()) {
-      const cell = cells.nth(line);
-      await expect(cell.locator("b.wd:not(:empty), b.wa:not(:empty)")).toHaveCount(strong ? 1 : 0);
-      await expectLineBackground(cell, source.tinted[sideIndex][line] ? palette[side] : palette.context, layout);
-      const pairedNeutral = await cell.locator("..").evaluate(row => row.classList.contains("diff-neutral-pair"));
-      const gutterSide = sideIndex === 0 || (layout === "Unified" && !pairedNeutral) ? "old" : "new";
-      const gutter = cell.locator("..").locator(`td.${gutterSide}-line-number`);
-      await expect(gutter).toHaveCSS("color", sideIndex === 0 ? palette.oldLine : palette.newLine);
-      if (pairedNeutral) {
-        await expect(gutter).toHaveCSS("box-shadow", "none");
-        await expect(cell.locator(".diff-prefix")).toHaveCount(0);
-      } else {
-        await expect(gutter).not.toHaveCSS("box-shadow", "none");
-        if (layout === "Unified") await expect(cell.locator(".diff-prefix")).toHaveText(side === "del" ? "-" : "+");
-      }
+async function expectChangeBackgrounds(file, layout, source, palette, algorithm, checkpoint) {
+  let attempts = 0;
+  await expect(async () => {
+    // Read every row's styles in one browser call. Hundreds of independent CSS
+    // assertions exhaust the test budget under parallel load and can straddle
+    // regional commits. Re-resolve the file and retry the whole snapshot instead.
+    const snapshot = await file.evaluate((file, layout) => ({
+      connected: file.isConnected,
+      algorithm: file.dataset.diffAlgorithm,
+      layouts: [...file.querySelectorAll("table.review-diff")].map(table =>
+        [...table.classList].filter(name => ["split", "unified"].includes(name)).join(" ")),
+      sides: ["del", "add"].map((side, sideIndex) =>
+        [...file.querySelectorAll(`td.${side}, tr.diff-neutral-pair > td.ctx`)].map(cell => {
+          const row = cell.parentElement;
+          const pairedNeutral = row.classList.contains("diff-neutral-pair");
+          const gutters = layout === "Split"
+            ? [cell.previousElementSibling].filter(gutter => gutter?.matches("td.line-number"))
+            : [...row.querySelectorAll("td.line-number")];
+          const gutterSide = sideIndex === 0 || (layout === "Unified" && !pairedNeutral) ? "old" : "new";
+          const lineStyles = [...row.querySelectorAll(`td.${gutterSide}-line-number`)]
+            .map(gutter => getComputedStyle(gutter));
+          return {
+            pairedNeutral,
+            strong: cell.querySelectorAll("b.wd:not(:empty), b.wa:not(:empty)").length,
+            backgrounds: [cell, ...gutters].map(element => getComputedStyle(element).backgroundColor),
+            lineColors: lineStyles.map(style => style.color),
+            sideShadows: lineStyles.map(style => style.boxShadow !== "none"),
+            prefixes: pairedNeutral || layout === "Unified"
+              ? [...cell.querySelectorAll(".diff-prefix")].map(prefix => prefix.textContent.trim()) : null,
+          };
+        })),
+    }), layout, { timeout: 1_000 });
+    // A retry proves a held commit was rejected, even when its colors match.
+    if (++attempts > 1) checkpoint?.reach();
+    expect(snapshot.connected, `${source.filename} was detached`).toBe(true);
+    expect(snapshot.algorithm, `${source.filename} algorithm commit`).toBe(algorithm);
+    expect(snapshot.layouts, `${source.filename} missing diff tables`).not.toEqual([]);
+    expect(snapshot.layouts, `${source.filename} layout commit`).toEqual(snapshot.layouts.map(() => layout.toLowerCase()));
+    for (const [sideIndex, side] of ["del", "add"].entries()) {
+      const rows = snapshot.sides[sideIndex];
+      expect(rows, `${source.filename} ${side} line count`).toHaveLength(source.strong[sideIndex].length);
+      expect(rows, `${source.filename} ${layout} ${algorithm} ${side} backgrounds`).toEqual(
+        source.strong[sideIndex].map((strong, line) => {
+          const pairedNeutral = rows[line].pairedNeutral;
+          const background = source.tinted[sideIndex][line] ? palette[side] : palette.context;
+          return {
+            pairedNeutral,
+            strong: strong ? 1 : 0,
+            backgrounds: Array(layout === "Split" ? 2 : 3).fill(background),
+            lineColors: [sideIndex === 0 ? palette.oldLine : palette.newLine],
+            sideShadows: [!pairedNeutral],
+            prefixes: pairedNeutral ? [] : layout === "Unified" ? [side === "del" ? "-" : "+"] : null,
+          };
+        }),
+      );
     }
-  }
+  }).toPass({ timeout: 5_000, intervals: [50, 100, 250] });
 }
 
 for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]) {
@@ -500,7 +536,7 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
       await ensureFileExpanded(file);
       await expect(file).toHaveAttribute("data-diff-algorithm", "token");
       await expectOriginalLines(file, layout, source.old, source.new);
-      await expectChangeBackgrounds(file, layout, source, palette);
+      await expectChangeBackgrounds(file, layout, source, palette, "token");
     }
     // Empty inline markers must not cause either the source or gutter to tint.
     const plain = page.locator("#moondiff-file-3 td.del, #moondiff-file-3 tr.diff-neutral-pair > td.ctx");
@@ -522,7 +558,7 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
       for (const index of [0, 1, 2]) {
         const file = page.locator(`#moondiff-file-${index}`);
         await expect(file).toHaveAttribute("data-diff-algorithm", algorithm.toLowerCase());
-        await expectChangeBackgrounds(file, layout, tokenBackgroundSources[index], palette);
+        await expectChangeBackgrounds(file, layout, tokenBackgroundSources[index], palette, algorithm.toLowerCase());
       }
     }
     expect(requests).toHaveLength(count);
@@ -541,7 +577,7 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
       await ensureFileExpanded(file);
       await expect(file).toHaveAttribute("data-diff-algorithm", "tree");
       await expectOriginalLines(file, layout, source.old, source.new);
-      await expectChangeBackgrounds(file, layout, source, palette);
+      await expectChangeBackgrounds(file, layout, source, palette, "tree");
       if (source.filename === "unrefined-fallback.mbt") {
         await expect(file.locator(".diff-notice").first()).toContainText("Lexical fallback");
         await expect(file.locator("td.diff-neutral")).toHaveCount(0);
@@ -582,6 +618,47 @@ for (const layout of ["Split", "Unified"]) for (const theme of ["light", "dark"]
     }
   });
 }
+
+test("background snapshots wait for regional layout and algorithm commits", async ({ page }) => {
+  // Both algorithms give this fixture identical styles. A stale snapshot must
+  // still wait for the requested algorithm, as well as the requested layout.
+  const source = tokenBackgroundSources[0];
+  await page.emulateMedia({ colorScheme: "light" });
+  await installSources(page, [source]);
+  await page.goto(path);
+  await page.getByRole("button", { name: "Token", exact: true }).click();
+  const file = page.locator("#moondiff-file-0");
+  await ensureFileExpanded(file);
+  await expectChangeBackgrounds(file, "Split", source, colors.light, "token");
+  await settleRegions(page);
+  const session = await page.context().newCDPSession(page);
+  await session.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+  try {
+    for (const [toggle, algorithm, layout] of [
+      ["Tree", "tree", "Split"], ["Unified", "tree", "Unified"],
+      ["Token", "token", "Unified"], ["Split", "token", "Split"],
+    ]) {
+      const barrier = await holdRegionFrames(page, [`file:${source.filename}`]);
+      let read;
+      try {
+        await page.getByRole("button", { name: toggle, exact: true }).click();
+        await barrier.blocked();
+        const checkpoint = operationCheckpoint(`backgrounds must wait for ${algorithm} ${layout}`);
+        read = checkpoint.track(expectChangeBackgrounds(file, layout, source, colors.light, algorithm, checkpoint));
+        await Promise.race([
+          checkpoint.expectPending(),
+          read.then(() => { throw new Error("Background assertion accepted a held regional commit"); }),
+        ]);
+      } finally {
+        await barrier.release();
+        if (read) await read;
+      }
+      await settleRegions(page);
+    }
+  } finally {
+    await session.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  }
+});
 
 for (const rate of [1, 6]) for (const algorithm of ["Token", "Tree"]) {
   test(`line snapshots wait for regional layout commits: ${algorithm}, ${rate}x CPU`, async ({ page }) => {
