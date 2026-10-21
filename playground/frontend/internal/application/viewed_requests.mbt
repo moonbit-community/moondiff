@@ -6,7 +6,7 @@ fn begin_viewed_refresh(
 ) -> (Model, @rabbita.Cmd) {
   guard viewed_scope(model) is Some(_) &&
     !model.viewed.stale &&
-    !model.review.snapshot_stale &&
+    (!model.review.snapshot_stale || viewed_confirming(model.viewed)) &&
     model.phase is Showing(view) &&
     view.reference.target is PullRequest(number) else {
     return (model, @rabbita.none)
@@ -69,7 +69,6 @@ fn schedule_viewed_check(
   guard viewed_scope(model) is Some(_) &&
     viewed_confirming(model.viewed) &&
     !model.viewed.stale &&
-    !model.review.snapshot_stale &&
     !model.viewed.loading &&
     !model.viewed.poll_scheduled &&
     model.viewed.retry < delays.length() else {

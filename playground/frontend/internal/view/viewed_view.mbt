@@ -124,18 +124,21 @@ fn viewed_summary_input(
   total : Int32,
   model : Model,
 ) -> ViewedSummaryInput {
+  let pending = model.viewed.files.any(f => {
+    f.pending is Some({ confirming: true, .. })
+  })
   {
     is_pull,
     total,
     count: model.viewed.files.filter(f => f.state is Some(Viewed)).length(),
-    pending: model.viewed.files.any(f => {
-      f.pending is Some({ confirming: true, .. })
-    }),
+    pending,
     auth: model.auth,
     ready: model.viewed.ready,
     loading: model.viewed.loading,
     error: model.viewed.error,
     stale: model.viewed.stale || model.review.snapshot_stale,
+    can_refresh: !model.viewed.stale &&
+    (!model.review.snapshot_stale || pending),
     poll_scheduled: model.viewed.poll_scheduled,
   }
 }
@@ -205,7 +208,7 @@ fn viewed_progress_input(
         } else {
           @html.nothing
         },
-        if input.pending && !input.stale {
+        if input.pending && input.can_refresh {
           @html.div(class="viewed-confirmation", [
             @html.span(
               if input.loading || input.poll_scheduled {
@@ -225,7 +228,7 @@ fn viewed_progress_input(
         } else {
           @html.nothing
         },
-        if input.error is Some(message) && !input.stale {
+        if input.error is Some(message) && input.can_refresh {
           @html.div(
             class="viewed-error",
             attrs=@html.Attrs::build().role("alert"),

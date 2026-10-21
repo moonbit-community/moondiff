@@ -68,26 +68,18 @@ fn update_review(
       }
       if reference.target is PullRequest(_) &&
         (model.phase is Showing(_) || model.phase is ShowingPullSelector(_)) {
-        if model.access.freshness is Checking {
+        if model.access.freshness is Checking || model.access.waiting_for_viewed {
           return (model, @rabbita.none)
         }
-        return (
-          {
-            ..model,
-            access: {
-              ..model.access,
-              freshness: Checking,
-              preparing: None,
-              reload_requested: true,
-            },
-          },
-          shared_snapshot_request(
-            reference,
-            model.generation,
+        if viewed_confirming(model.viewed) &&
+          !model.viewed.stale &&
+          !snapshot_replacement_has_other_blockers(model) {
+          return begin_viewed_refresh(
+            { ..model, access: { ..model.access, waiting_for_viewed: true, }, },
             emit,
-            revalidate=true,
-          ),
-        )
+          )
+        }
+        return request_latest_snapshot(model, reference, emit)
       }
       return begin_change_load(model, reference, emit)
     }

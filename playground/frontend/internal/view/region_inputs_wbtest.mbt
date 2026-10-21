@@ -139,6 +139,7 @@ test "shown discussions own authentication errors while large selectors retain t
       freshness: Unavailable("Session expired"),
       preparing: None,
       reload_requested: false,
+      waiting_for_viewed: false,
       identity_checking: false,
     },
   }

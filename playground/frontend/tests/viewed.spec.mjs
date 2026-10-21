@@ -78,7 +78,11 @@ async function install(page, options = {}) {
     state.calls.push({ op, args });
     let value, failure;
     if (op === 'github.viewer.pulls.get') value = { items: [], total_count: 0 };
-    else if (op === 'github.pull.get') value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length, commits: 0 };
+    else if (op === 'github.pull.get') {
+      value = { title: state.title ?? 'Viewed fixture', html_url: 'https://github.com/alice/repo/pull/42', base: { sha: state.base, repo: { full_name: 'alice/repo' } }, head: { sha: state.head, repo: { full_name: 'alice/repo' } }, additions: state.files.length, deletions: state.files.length, changed_files: state.files.length, commits: 0 };
+      const pending = state.metadataGate; state.metadataGate = null;
+      if (pending) await pending.promise;
+    }
     else if (op === 'github.compare.get') value = { merge_base_commit: { sha: merge } };
     else if (op === 'github.pull.files') value = state.files;
     else if (op === 'github.commit.get') value = { sha: args.sha, html_url: `https://github.com/alice/repo/commit/${args.sha}`, commit: { message: 'Commit fixture' }, parents: [{ sha: base }], stats: { additions: 3, deletions: 3, total: 6 }, files };
@@ -88,7 +92,11 @@ async function install(page, options = {}) {
       failure = state.contentFailure; state.contentFailure = null;
     }
     else if (op === 'github.comments.list') value = { issue_comments: [], review_comments: state.reviewComments, commit_comments: [] };
-    else if (op === 'github.pull.merge.status') value = { base_sha: state.base, head_sha: state.head, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_checks: [], ci_warnings: [] };
+    else if (op === 'github.pull.merge.status') {
+      value = { base_sha: state.base, head_sha: state.head, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_checks: [], ci_warnings: [] };
+      const pending = state.mergeGate; state.mergeGate = null;
+      if (pending) await pending.promise;
+    }
     else if (op === 'github.review.comment.create' || op === 'github.review.reply.create') {
       value = {
         id: '22', body: args.body, html_url: 'https://github.com/comment/22', created_at: '2026-09-11T09:00:00Z',
@@ -98,7 +106,8 @@ async function install(page, options = {}) {
       state.reviewComments.push(value);
     }
     else if (op === 'github.pull.viewed.get') {
-      value = { base_sha: state.base, head_sha: state.head, files: state.files.map(file => ({ path: file.filename, state: { $tag: states()[file.filename] || 'Unviewed' } })) };
+      const version = state.readVersion ?? { base_sha: state.base, head_sha: state.head }; state.readVersion = null;
+      value = { ...version, files: state.files.map(file => ({ path: file.filename, state: { $tag: states()[file.filename] || 'Unviewed' } })) };
       failure = state.readFailure; state.readFailure = null;
       const pending = state.readGate; state.readGate = null;
       if (pending) await pending.promise;
@@ -602,6 +611,9 @@ const pendingRecords = page => page.evaluate(() => Object.keys(sessionStorage)
   .map(key => JSON.parse(sessionStorage.getItem(key))));
 const waitingForConfirmation = page => expect(card(page).getByText('Waiting for GitHub confirmation', { exact: true })).toBeVisible();
 const readFinished = page => expect(page.locator('.viewed-refreshing')).toHaveCount(0);
+// Count snapshot-loader requests, including cached snapshots revalidated through
+// PullGet rather than the aggregate PullSnapshotGet endpoint.
+const snapshotLoads = page => page.evaluate(() => globalThis.__moondiffMetrics.prefetch?.visits ?? 0);
 async function controlViewedTimers(page) {
   // Control only the retry delays. Rabbita's animation-frame rendering and
   // transport callbacks keep running, so UI assertions also observe real renders.
@@ -753,27 +765,147 @@ test('reload restores pending changes by path after reordering and isolates logi
   expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
 });
 
-test('Load latest retains an unconfirmed operation without restoring its old expansion', async ({ page }) => {
+async function holdUpdatedChecks(page, state) {
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Reload merge status', exact: true })).toBeEnabled();
+  const viewed = gate(), merge = gate(), metadata = gate();
+  const readCount = calls(state, 'github.pull.viewed.get').length;
+  const mergeCount = calls(state, 'github.pull.merge.status').length;
+  const metadataCount = calls(state, 'github.pull.get').length;
+  // Comments also validate metadata on reactivation. Hold that independent
+  // source of staleness so each ordered case proves which reducer ran first.
+  state.readGate = viewed; state.mergeGate = merge; state.metadataGate = metadata;
+  state.head = 'b'.repeat(40);
+  state.title = 'Latest Viewed fixture';
+  await refresh(page);
+  await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(readCount + 1);
+  await expect.poll(() => calls(state, 'github.pull.merge.status').length).toBe(mergeCount + 1);
+  await expect.poll(() => calls(state, 'github.pull.get').length).toBe(metadataCount + 1);
+  return { viewed, merge, metadata };
+}
+
+for (const first of ['Merge', 'Viewed']) {
+  test(`Load latest retains an unconfirmed operation without restoring its old expansion: ${first} first`, async ({ page }) => {
+    await controlViewedTimers(page);
+    const state = await installMbt(page);
+    await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+    state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
+    await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
+    await card(page).getByRole('button', { name: 'Collapse src/main.mbt', exact: true }).click();
+    const [record] = await pendingRecords(page);
+    const held = await holdUpdatedChecks(page, state);
+    try {
+      held[first === 'Merge' ? 'merge' : 'viewed'].resolve();
+      await expect(page.getByRole('button', { name: 'Load latest', exact: true })).toBeVisible();
+      // The UI proves the first response has been reduced before releasing the second.
+      if (first === 'Merge') await expect(page.getByRole('button', { name: 'Recheck Viewed', exact: true })).toBeDisabled();
+      else await expect(page.getByRole('button', { name: 'Recheck Viewed', exact: true })).toHaveCount(0);
+      held[first === 'Merge' ? 'viewed' : 'merge'].resolve();
+      await readFinished(page);
+      const snapshots = await snapshotLoads(page);
+      await page.getByRole('button', { name: 'Load latest', exact: true }).click();
+      await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
+      await waitingForConfirmation(page); await readFinished(page);
+      expect(await snapshotLoads(page)).toBe(snapshots + 1);
+      await expect(mbtBox(page)).toBeDisabled(); await expect(mbtBox(page)).not.toBeChecked();
+      await expect(card(page)).toHaveClass(/expanded/);
+      expect(await pendingRecords(page)).toEqual([record]);
+      state.states.alice[mbtFiles[0].filename] = 'Unviewed';
+      await page.getByRole('button', { name: 'Recheck Viewed', exact: true }).click();
+      await expect(mbtBox(page)).toBeEnabled();
+      await expect(mbtBox(page)).not.toBeChecked();
+      expect(state.states.alice[mbtFiles[0].filename]).toBe('Unviewed');
+      expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
+    } finally { held.merge.resolve(); held.viewed.resolve(); held.metadata.resolve(); }
+  });
+}
+
+test('one early Load latest click waits for Viewed confirmation and then replaces once', async ({ page }) => {
+  await controlViewedTimers(page);
   const state = await installMbt(page);
   await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
   state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
   await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
   await card(page).getByRole('button', { name: 'Collapse src/main.mbt', exact: true }).click();
   const [record] = await pendingRecords(page);
-  state.head = 'b'.repeat(40);
-  await refresh(page);
-  await page.getByRole('button', { name: 'Load latest', exact: true }).click();
-  await waitingForConfirmation(page); await readFinished(page);
-  await expect(mbtBox(page)).toBeDisabled(); await expect(mbtBox(page)).not.toBeChecked();
-  await expect(card(page)).toHaveClass(/expanded/);
-  expect(await pendingRecords(page)).toEqual([record]);
-  state.states.alice[mbtFiles[0].filename] = 'Unviewed';
-  await page.getByRole('button', { name: 'Recheck Viewed', exact: true }).click();
-  await expect(mbtBox(page)).toBeEnabled();
-  await expect(mbtBox(page)).not.toBeChecked();
-  expect(state.states.alice[mbtFiles[0].filename]).toBe('Unviewed');
-  expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
+  const held = await holdUpdatedChecks(page, state);
+  try {
+    held.merge.resolve();
+    const latest = page.getByRole('button', { name: 'Load latest', exact: true });
+    await expect(latest).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Recheck Viewed', exact: true })).toBeDisabled();
+    const snapshots = await snapshotLoads(page);
+    const reads = calls(state, 'github.pull.viewed.get').length;
+    await latest.click(); await settleRegions(page);
+    await expect(page.getByText('Viewed fixture', { exact: true })).toBeVisible();
+    await expect(card(page)).not.toHaveClass(/expanded/);
+    expect(await pendingRecords(page)).toEqual([record]);
+    expect(await snapshotLoads(page)).toBe(snapshots);
+    expect(calls(state, 'github.pull.viewed.get')).toHaveLength(reads);
+    held.viewed.resolve();
+    await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
+    await waitingForConfirmation(page); await readFinished(page);
+    await expect(card(page)).toHaveClass(/expanded/);
+    expect(await pendingRecords(page)).toEqual([record]);
+    expect(await snapshotLoads(page)).toBe(snapshots + 1);
+    expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
+  } finally { held.merge.resolve(); held.viewed.resolve(); held.metadata.resolve(); }
 });
+
+for (const response of ['old value', 'temporary failure', 'rate limit']) {
+  test(`waiting Load latest survives Viewed ${response} and resumes after recheck`, async ({ page }) => {
+    await controlViewedTimers(page);
+    const state = await installMbt(page);
+    await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+    state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
+    await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
+    const [record] = await pendingRecords(page);
+    state.readVersion = { base_sha: base, head_sha: head };
+    if (response !== 'old value') state.readFailure = response === 'rate limit'
+      ? { status: 429, code: 'rate_limit', message: 'Wait before confirming Viewed' }
+      : { status: 503, code: 'unavailable', message: 'Confirmation temporarily unavailable' };
+    const held = await holdUpdatedChecks(page, state);
+    try {
+      held.merge.resolve();
+      await page.getByRole('button', { name: 'Load latest', exact: true }).click();
+      const snapshots = await snapshotLoads(page);
+      held.viewed.resolve(); await readFinished(page);
+      const recheck = page.getByRole('button', { name: 'Recheck Viewed', exact: true });
+      await expect(recheck).toBeEnabled();
+      await expect(page.getByText('Viewed fixture', { exact: true })).toBeVisible();
+      await expect(mbtBox(page)).toBeDisabled(); await expect(mbtBox(page)).not.toBeChecked();
+      await expect(mbtBox(page, 1)).toBeDisabled();
+      expect(await pendingRecords(page)).toEqual([record]);
+      expect(await snapshotLoads(page)).toBe(snapshots);
+      if (response !== 'old value') await expect(page.locator('.viewed-error')).toContainText(
+        response === 'rate limit' ? 'GitHub API rate limit exceeded' : 'Confirmation temporarily unavailable',
+      );
+      const reads = calls(state, 'github.pull.viewed.get').length;
+      if (response === 'rate limit') {
+        await advanceViewed(page, 120000);
+        expect(calls(state, 'github.pull.viewed.get')).toHaveLength(reads);
+        await expect(page.getByText(/^Confirmation is paused/)).toBeVisible();
+      } else {
+        state.readVersion = { base_sha: base, head_sha: head };
+        await waitForViewedTimer(page, 2000); await advanceViewed(page, 2000);
+        await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(reads + 1);
+        await readFinished(page);
+        await waitForViewedTimer(page, 4000);
+        expect(await pendingRecords(page)).toEqual([record]);
+        expect(await snapshotLoads(page)).toBe(snapshots);
+      }
+      await recheck.click();
+      await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
+      await waitingForConfirmation(page); await readFinished(page);
+      expect(await snapshotLoads(page)).toBe(snapshots + 1);
+      expect(await pendingRecords(page)).toEqual([record]);
+      state.states.alice[mbtFiles[0].filename] = 'Unviewed';
+      await recheck.click(); await expect(mbtBox(page)).toBeEnabled();
+      expect(await pendingRecords(page)).toHaveLength(0);
+      expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
+    } finally { held.merge.resolve(); held.viewed.resolve(); held.metadata.resolve(); }
+  });
+}
 
 test('session storage failure sends no mutation and preserves draft selection and expansion', async ({ page }) => {
   const state = await installMbt(page);

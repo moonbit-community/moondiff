@@ -11,6 +11,7 @@ pub(all) struct SnapshotAccess {
   identity_checking : Bool
   preparing : PreparedSnapshot?
   reload_requested : Bool
+  waiting_for_viewed : Bool
 } derive(Eq)
 
 ///|
@@ -26,6 +27,7 @@ pub fn SnapshotAccess::new() -> SnapshotAccess {
     identity_checking: false,
     preparing: None,
     reload_requested: false,
+    waiting_for_viewed: false,
   }
 }
 
@@ -68,6 +70,45 @@ fn shared_snapshot_request(
     result => emit(Load(SharedSnapshotLoaded(generation, result))),
     revalidate~,
   )
+}
+
+///|
+fn request_latest_snapshot(
+  model : Model,
+  reference : CommitRef,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  (
+    {
+      ..model,
+      access: {
+        ..model.access,
+        freshness: Checking,
+        preparing: None,
+        reload_requested: true,
+        waiting_for_viewed: false,
+      },
+    },
+    shared_snapshot_request(reference, model.generation, emit, revalidate=true),
+  )
+}
+
+///|
+fn resume_waiting_snapshot(
+  model : Model,
+  emit : @rabbita.Emit[Msg],
+) -> (Model, @rabbita.Cmd) {
+  guard model.access.waiting_for_viewed &&
+    !snapshot_replacement_blocked(model) &&
+    @comments.permission(model.review, LoadSnapshot).allowed() &&
+    model.route is Some(reference) &&
+    reference.target is PullRequest(_) &&
+    model.phase is Showing(_) else {
+    return (model, @rabbita.none)
+  }
+  // Consume the intent before issuing the request, so later reads cannot
+  // start another replacement while this one is being prepared.
+  request_latest_snapshot(model, reference, emit)
 }
 
 ///|
@@ -231,6 +272,7 @@ fn install_snapshot(
       },
       preparing: None,
       reload_requested: false,
+      waiting_for_viewed: false,
     },
   }
   let next = if replacing {
