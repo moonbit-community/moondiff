@@ -8,6 +8,7 @@ import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
 import { minifyFrontend } from '../../scripts/minify.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 import { ensureFileExpanded } from './file-actions.mjs';
+import { settleRegions } from '../../tests/render-probe.mjs';
 
 const test = baseTest.extend({
   backend: async ({ page }, use) => {
@@ -188,6 +189,38 @@ test('a snapshot change during restored write uses Load latest', async ({ page, 
   await expect(box(page)).toBeEnabled();
   await expect(box(page)).not.toBeChecked();
   expect(backend.state.forScope().get(backend.state.files[0])).toBe('UNVIEWED');
+});
+
+test('early Load latest waits for the real Viewed coordinator before replacing the snapshot', async ({ page, backend }) => {
+  await page.addInitScript(() => { globalThis.__moondiffMetrics = { files: {}, active: {} }; });
+  await open(page, backend); await expect(box(page)).toBeEnabled();
+  const hold = backend.state.holdWrite(backend.state.files[0]);
+  await expectViewedWrite(backend, backend.state.files[0], true, () => box(page).check());
+  await hold.entered.promise;
+  backend.state.head = 'b'.repeat(40);
+  backend.state.title = 'Latest coordinated Viewed fixture';
+  await restore(page);
+  await expect.poll(() => reads(backend).length).toBe(2);
+  await expect.poll(() => backend.failed.filter(r => r.postData()?.includes('PullFileViewedSet')).length).toBe(1);
+  const latest = page.getByRole('button', { name: 'Load latest', exact: true });
+  await expect(latest).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Recheck Viewed', exact: true })).toBeDisabled();
+  const snapshots = () => page.evaluate(() => globalThis.__moondiffMetrics.prefetch?.visits ?? 0);
+  const before = await snapshots();
+  await latest.click(); await settleRegions(page);
+  await expect(page.getByText('Viewed integration fixture', { exact: true })).toBeVisible();
+  await expect(box(page)).toBeDisabled();
+  // The GitHub read has not started: only the production coordinator holds it
+  // behind the abandoned POST and its still-running upstream mutation.
+  expect(backend.state.reads).toHaveLength(1);
+  expect(await snapshots()).toBe(before);
+  expect(writes(backend)).toHaveLength(1);
+  hold.release.resolve();
+  await expect(page.getByText('Latest coordinated Viewed fixture', { exact: true })).toBeVisible();
+  await expect(box(page)).toBeEnabled(); await expect(box(page)).toBeChecked();
+  expect(await snapshots()).toBe(before + 1);
+  expect(writes(backend)).toHaveLength(1);
+  expect(backend.state.mutations).toHaveLength(1);
 });
 
 test('special and ordinary filenames support source, inline comments and Viewed together', async ({ page, backend }) => {

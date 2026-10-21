@@ -279,7 +279,16 @@ fn reconcile_viewed(
         },
       }
     }
-    let reset = { ..model, viewed: state, }
+    let reset = {
+      ..model,
+      viewed: state,
+      access: {
+        ..model.access,
+        waiting_for_viewed: model.access.waiting_for_viewed &&
+        same_page &&
+        !identity_boundary,
+      },
+    }
     let (next, command) = if viewed_scope(reset) is Some(_) {
       begin_viewed_refresh(reset, emit)
     } else {

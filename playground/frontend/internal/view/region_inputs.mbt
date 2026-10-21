@@ -464,5 +464,6 @@ pub(all) struct ViewedSummaryInput {
   loading : Bool
   error : String?
   stale : Bool
+  can_refresh : Bool
   poll_scheduled : Bool
 } derive(Eq)

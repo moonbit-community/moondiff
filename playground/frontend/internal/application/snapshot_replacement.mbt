@@ -1,15 +1,19 @@
 ///|
 fn snapshot_replacement_blocked(model : Model) -> Bool {
+  snapshot_replacement_has_other_blockers(model) ||
+  // Only a Viewed response that passed the backend coordinator can release an
+  // unresolved confirmation when a different PR version is about to replace it.
+  (viewed_confirming(model.viewed) && !model.viewed.stale)
+}
+
+///|
+fn snapshot_replacement_has_other_blockers(model : Model) -> Bool {
   (
     model.review.draft() is Some(_) &&
     !(model.review.submission() is Some(SyncingReview(_)))
   ) ||
   navigation_blocked(model) ||
-  // A stale Viewed response has already passed the backend write coordinator.
-  // Its retained confirmation record must survive restoration, but cannot keep
-  // Load latest blocked after the upstream mutation has finished.
   viewed_writing(model.viewed) ||
-  (viewed_confirming(model.viewed) && !model.viewed.stale) ||
   model.access.identity_checking ||
   model.auth is AuthFailed(_)
 }

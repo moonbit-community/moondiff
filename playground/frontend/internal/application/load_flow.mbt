@@ -327,6 +327,7 @@ fn begin_change_load(
       ..model.access,
       preparing: None,
       reload_requested: false,
+      waiting_for_viewed: false,
       freshness: if reference.target is PullRequest(_) {
         Checking
       } else {

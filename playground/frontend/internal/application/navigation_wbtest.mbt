@@ -95,6 +95,7 @@ test "snapshot freshness and identity checks gate comments, deletion, Viewed and
       identity_checking: false,
       preparing: None,
       reload_requested: false,
+      waiting_for_viewed: false,
     },
   }
   let denied = home_step(unverified, Review(SubmitDraft))
@@ -111,6 +112,7 @@ test "snapshot freshness and identity checks gate comments, deletion, Viewed and
       identity_checking: true,
       preparing: None,
       reload_requested: false,
+      waiting_for_viewed: false,
     },
   }
   assert_false(writes_allowed(identity))

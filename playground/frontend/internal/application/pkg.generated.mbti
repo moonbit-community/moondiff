@@ -457,6 +457,7 @@ pub(all) struct SnapshotAccess {
   identity_checking : Bool
   preparing : PreparedSnapshot?
   reload_requested : Bool
+  waiting_for_viewed : Bool
 } derive(Eq)
 pub fn SnapshotAccess::new() -> Self
 
