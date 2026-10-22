@@ -1,0 +1,13 @@
+import {
+  "moonbit-community/moondiff-review-web-protocol" @protocol,
+  "moonbit-community/moondiff-review-web-server/internal/protocol" @common,
+  "moonbit-community/moondiff-review-web-server/internal/crypto",
+  "moonbit-community/moondiff-review-web-server/internal/github",
+  "moonbit-community/moondiff-review-web-server/internal/storage",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/time",
+}
+
+supported_targets = "native+wasm"

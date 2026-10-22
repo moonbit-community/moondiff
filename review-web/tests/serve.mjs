@@ -1,0 +1,37 @@
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildServer, startServer, repository } from '../backend/tests/server-fixture.mjs';
+import { instrumentRenderProbe } from './render-probe.mjs';
+import { e2ePort } from './e2e-config.mjs';
+import { minifyFrontend } from '../scripts/minify.mjs';
+import { writeStaticAssets } from '../scripts/static-assets.mjs';
+const assets = mkdtempSync(join(tmpdir(), 'moondiff-e2e-assets-'));
+buildServer();
+const build = spawnSync('moon', ['build', 'review-web/frontend/main', '--target', 'js', '--release'], { cwd: repository, stdio: 'inherit' });
+if (build.status !== 0) process.exit(build.status || 1);
+// Probe injection matches MoonBit names, so it must precede minification.
+const source = readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8');
+writeStaticAssets(join(repository, 'review-web/frontend/public'), assets, minifyFrontend(instrumentRenderProbe(source)));
+const fixture = await startServer((request, response) => {
+  if (request.path.startsWith('/search/issues?')) {
+    response.end(JSON.stringify({ items: [], total_count: 0, incomplete_results: false }));
+    return true;
+  }
+  if (request.path.startsWith('/repos/fixture/repo/')) {
+    const path = new URL(request.path, 'http://localhost').pathname;
+    if (path.endsWith('/comments')) response.end('[]');
+    else if (path.includes('/contents/')) response.end('pub fn hello() { 42 }\n');
+    else {
+      const sha = path.split('/').at(-1);
+      response.end(JSON.stringify({ sha, html_url: `https://github.com/fixture/repo/commit/${sha}`, commit: { message: 'Fixture root commit' }, parents: [], stats: { additions: 1, deletions: 0, total: 1 }, files: [{ filename: 'hello.mbt', status: 'added', additions: 1, deletions: 0, changes: 1, patch: '@@ -0,0 +1 @@\n+pub fn hello() { 42 }' }] }));
+    }
+    return true;
+  }
+}, { staticDir: assets, port: e2ePort, env: { MOONDIFF_ANONYMOUS_SESSION_LIMIT: '100000' }, onExit(code, signal, output) {
+  if (code !== 0 && signal !== 'SIGTERM') console.error(`Moondiff Review server exited (${code}, ${signal}):\n${output}`);
+} });
+async function shutdown() { await fixture.close(); rmSync(assets, { recursive: true, force: true }); process.exit(0); }
+for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(signal, shutdown);
+console.log(`Moondiff Review Wasm E2E server: ${fixture.base}`);

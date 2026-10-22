@@ -3,7 +3,7 @@
 This desktop Firefox 140+ extension adds a black **Open in Moondiff** button to
 GitHub commit and pull-request pages. A trusted mouse or keyboard activation
 opens the corresponding canonical path in a configured self-hosted
-[Moondiff playground](../../playground/README.md). The extension contains no
+[Moondiff Review](../../review-web/README.md). The extension contains no
 review UI, GitHub API client, OAuth flow, credentials, or telemetry.
 
 ## Build and temporarily install
@@ -12,12 +12,12 @@ Install the locked development dependencies, then build from the repository
 root:
 
 ```sh
-npm --prefix playground ci
-MOONDIFF_PLAYGROUND_URL=https://diff.example npm run build:extension:firefox
+npm --prefix review-web ci
+MOONDIFF_REVIEW_URL=https://diff.example npm run build:extension:firefox
 ```
 
 Development builds also accept a loopback URL such as
-`MOONDIFF_PLAYGROUND_URL=http://localhost:4173`. Subpaths, query strings,
+`MOONDIFF_REVIEW_URL=http://localhost:4173`. Subpaths, query strings,
 fragments, credentials, and nonlocal HTTP are rejected.
 
 To load the unpacked build in desktop Firefox:
@@ -26,9 +26,9 @@ To load the unpacked build in desktop Firefox:
 2. Select **Load Temporary Add-on…**.
 3. Select `extension/firefox/dist/manifest.json`.
 4. Open a GitHub PR or commit page and verify that navigation alone does not
-   open a playground tab.
+   open a review app tab.
 5. Activate **Open in Moondiff** with the mouse and keyboard, and verify that it
-   opens the matching path at the configured playground.
+   opens the matching path at the configured review app.
 
 Temporary add-ons are removed when Firefox exits. The build uses a Manifest V3
 event page whose classic scripts load in this order: `config.js`, `target.js`,
@@ -37,7 +37,7 @@ and `background.js`. Runtime code uses Firefox's native `browser.*` Promise API.
 ## Build the AMO ZIP
 
 ```sh
-MOONDIFF_PLAYGROUND_URL=https://diff.example npm run package:extension:firefox
+MOONDIFF_REVIEW_URL=https://diff.example npm run package:extension:firefox
 ```
 
 Packaging rebuilds in AMO mode, rejects loopback HTTP, runs
@@ -63,12 +63,12 @@ Firefox requires Mozilla signing.
 The manifest declares required `browsingActivity` data collection. Only after a
 user activates the button, the extension sends the repository owner/name and
 either a pull-request number or commit SHA as part of the URL opened at the
-configured playground. This is needed to select the requested change.
+configured review app. This is needed to select the requested change.
 
 The extension does not transmit GitHub page content, authentication data,
 cookies, comments, drafts, telemetry, click statistics, or general browsing
 history. It only runs its content script on `https://github.com/*`; permissions
-are limited to `storage` and the configured playground origin. See Mozilla's
+are limited to `storage` and the configured review app origin. See Mozilla's
 [built-in data consent categories](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/).
 
 ## Navigation and tab reuse
@@ -89,9 +89,9 @@ deletes credential keys used by older extension versions.
 ## Tests
 
 ```sh
-cd playground && npx playwright install firefox && cd ..
+cd review-web && npx playwright install firefox && cd ..
 npm run test:extension:firefox
-MOONDIFF_PLAYGROUND_URL=https://diff.example npm run lint:extension:firefox
+MOONDIFF_REVIEW_URL=https://diff.example npm run lint:extension:firefox
 ```
 
 Node tests cover URL parsing, message validation and Promise responses,

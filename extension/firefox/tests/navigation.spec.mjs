@@ -1,4 +1,4 @@
-import { expect, test } from "../../../playground/node_modules/@playwright/test/index.mjs";
+import { expect, test } from "../../../review-web/node_modules/@playwright/test/index.mjs";
 import { resolve } from "node:path";
 
 const github = "https://github.com/acme/widgets";
@@ -117,9 +117,9 @@ test("Firefox requires trusted mouse or keyboard input and allows retry after fa
   expect(await page.evaluate(() => openRequests.length)).toBe(2);
   await button.press("Space");
   expect(await page.evaluate(() => openRequests)).toEqual([
-    { v: 1, op: "playground.open", args: { route: "/acme/widgets/pull/42" } },
-    { v: 1, op: "playground.open", args: { route: "/acme/widgets/pull/42" } },
-    { v: 1, op: "playground.open", args: { route: "/acme/widgets/pull/43" } },
+    { v: 1, op: "review.open", args: { route: "/acme/widgets/pull/42" } },
+    { v: 1, op: "review.open", args: { route: "/acme/widgets/pull/42" } },
+    { v: 1, op: "review.open", args: { route: "/acme/widgets/pull/43" } },
   ]);
   await page.evaluate(() => completeOpen({
     ok: true,

@@ -2,14 +2,14 @@
 
 ## High Priority
 
-- [x] Refactor playground rendering to update individual file cards independently.
-  - Affected areas: `playground/frontend/main/main.mbt`,
-    `playground/frontend/internal/application/`,
-    `playground/frontend/internal/rendering/`,
-    `playground/frontend/internal/view/view.mbt`,
-    `playground/frontend/internal/view/review_projection.mbt`,
-    `playground/frontend/internal/view/inline_discussions.mbt`, and
-    `playground/frontend/tests/`.
+- [x] Refactor review app rendering to update individual file cards independently.
+  - Affected areas: `review-web/frontend/main/main.mbt`,
+    `review-web/frontend/internal/application/`,
+    `review-web/frontend/internal/rendering/`,
+    `review-web/frontend/internal/view/view.mbt`,
+    `review-web/frontend/internal/view/review_projection.mbt`,
+    `review-web/frontend/internal/view/inline_discussions.mbt`, and
+    `review-web/frontend/tests/`.
   - Reproduction: load [parser PR #183, commit 836b5e03](https://github.com/moonbitlang/parser/pull/183/changes/836b5e037954fee5e8b233aca8e3587621842875)
     in Token mode, keep Ignore tests enabled, then collapse and expand
     `test/manual_test/parser_sync_regression_test.mbt` after loading finishes.
@@ -58,15 +58,15 @@
     repeated navigation, and collection of retired DOM/source snapshots.
     The complete browser suite passes all 282 tests; `moon test --target all`
     passes on wasm, wasm-gc, JS and native. See the
-    [rendering boundary and performance notes](playground/frontend/internal/rendering/README.md)
+    [rendering boundary and performance notes](review-web/frontend/internal/rendering/README.md)
     for the normal/6x CPU comparison and the repeatable benchmark command.
 
 - [ ] Reduce homepage startup cost with a static shell and lazy-loaded computation code.
   - Source: page-load performance analysis (2026-10-08), item 3.
-  - Affected areas: `playground/frontend/public/index.html`,
-    `playground/frontend/main/`, `playground/scripts/build.mjs`,
-    `playground/frontend/internal/change/`, and
-    `playground/frontend/internal/highlight/`.
+  - Affected areas: `review-web/frontend/public/index.html`,
+    `review-web/frontend/main/`, `review-web/scripts/build.mjs`,
+    `review-web/frontend/internal/change/`, and
+    `review-web/frontend/internal/highlight/`.
   - [ ] Show a static loading shell while the startup script downloads and executes.
   - [ ] Define loading boundaries that keep the diff engine, parser, lexer,
     and language highlighters out of the homepage's initial bundle; load them
@@ -78,11 +78,11 @@
 
 - [ ] Reduce serial initialization and GitHub connection setup costs.
   - Source: page-load performance analysis (2026-10-08), item 4.
-  - Affected areas: `playground/frontend/internal/application/lifecycle.mbt`,
-    `playground/frontend/internal/application/load_flow.mbt`,
-    `playground/frontend/internal/application/home_state.mbt`,
-    `playground/backend/internal/github/github.mbt`, and
-    `playground/backend/internal/home/home.mbt`.
+  - Affected areas: `review-web/frontend/internal/application/lifecycle.mbt`,
+    `review-web/frontend/internal/application/load_flow.mbt`,
+    `review-web/frontend/internal/application/home_state.mbt`,
+    `review-web/backend/internal/github/github.mbt`, and
+    `review-web/backend/internal/home/home.mbt`.
   - [ ] Start the auth-status request from a lightweight bootstrap before the
     main bundle finishes loading; fetch private data only after identity is confirmed.
   - [ ] Evaluate server-side aggregation of PR initialization requests to reduce
@@ -98,10 +98,10 @@
 
 - [ ] Prioritize and bound source-content loading, and reuse cached results.
   - Source: page-load performance analysis (2026-10-08), item 5.
-  - Affected areas: `playground/frontend/internal/change/change.mbt`,
-    `playground/frontend/internal/application/requests.mbt`,
-    `playground/frontend/internal/github_client/public_requests.mbt`, and
-    `playground/frontend/internal/application/home_state.mbt`.
+  - Affected areas: `review-web/frontend/internal/change/change.mbt`,
+    `review-web/frontend/internal/application/requests.mbt`,
+    `review-web/frontend/internal/github_client/public_requests.mbt`, and
+    `review-web/frontend/internal/application/home_state.mbt`.
   - [ ] Prioritize viewport-visible files and navigation targets, and limit
     concurrent old/new source-content requests from automatically expanded files.
   - [ ] Extend the existing bounded anonymous-content cache to reuse content
@@ -128,9 +128,9 @@
 ## Medium Priority
 
 - [ ] Keep changed-file navigation responsive at the supported 3,000-file limit.
-  - Affected areas: `playground/frontend/internal/view/file_tree.mbt`,
-    `playground/frontend/internal/view/view.mbt`, and
-    `playground/frontend/tests/playground.spec.mjs`.
+  - Affected areas: `review-web/frontend/internal/view/file_tree.mbt`,
+    `review-web/frontend/internal/view/view.mbt`, and
+    `review-web/frontend/tests/review-web.spec.mjs`.
   - The current worst-case probe renders 9,001 tree rows, 3,000 file cards,
     and roughly 66,000 DOM elements; entering a 13-character search takes
     about 2.5 seconds in headless Chromium.
@@ -164,9 +164,9 @@
 
 - [ ] Known issue: documentation-example syntax highlighting can overflow the lexer stack.
   - **Status: Intentionally deferred; no current plan to fix.**
-  - Affected areas: `playground/frontend/internal/highlight/moonbit/docs.mbt`,
-    `playground/frontend/internal/highlight/moonbit/classify.mbt`, and
-    `playground/frontend/internal/change/diff_cache.mbt`.
+  - Affected areas: `review-web/frontend/internal/highlight/moonbit/docs.mbt`,
+    `review-web/frontend/internal/highlight/moonbit/classify.mbt`, and
+    `review-web/frontend/internal/change/diff_cache.mbt`.
   - Reproduced with a MoonBit fenced code example inside `///` comments whose
     string interpolation contains an array of about 4,000 string literals
     (approximately 16 KB for the complete source file).

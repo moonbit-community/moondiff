@@ -1,0 +1,11 @@
+import {
+  "moonbit-community/moondiff-review-web-protocol" @protocol,
+  "moonbit-community/rabbita/url",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonbitlang/core/json",
+} for "wbtest"
+
+supported_targets = "js"

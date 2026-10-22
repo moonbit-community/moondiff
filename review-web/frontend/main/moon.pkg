@@ -1,0 +1,7 @@
+import {
+  "moonbit-community/moondiff-review-web/internal/rendering",
+}
+
+supported_targets = "js"
+
+pkgtype(kind: "executable")

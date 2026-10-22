@@ -1,0 +1,443 @@
+# Moondiff Review
+
+[English](README.md) | 简体中文
+
+## 本地开发
+
+安装 Node.js 22 和 MoonBit 工具链。
+
+在仓库根目录执行：
+
+```sh
+moon update
+cd review-web
+npm ci
+```
+
+后续命令均在 `review-web/` 目录中执行。
+
+### 运行时配置
+
+创建 `.env` 文件，写入以下内容。填写
+[GitHub App 配置](#github-app-配置)，并使用下方命令生成需要持久保存的密钥，
+替换密钥占位值。
+
+```sh
+# npm run dev 会自动加载 .env。使用 npm start 或直接运行服务端前，
+# 需先将这些变量导出到环境中；服务端本身不会自动加载 .env。
+# 除标记为“必填”的变量外，下方给出的值均为默认值。
+# 相对路径以进程工作目录为基准（npm start 和 npm run dev 使用 review-web/）；
+# 也可以使用绝对路径。
+
+# 后端 HTTP 服务监听的 IP 地址和 TCP 端口，不包含 URL 协议前缀。
+# 127.0.0.1 仅接受本机回环连接。Docker 中默认为 0.0.0.0:4173
+# （所有 IPv4 接口），以便通过发布的端口访问服务。
+MOONDIFF_LISTEN=127.0.0.1:4173
+
+# 浏览器访问服务时使用的源地址（协议、主机名和可选端口），用于校验登录、
+# 退出登录和写操作请求的 Origin，并决定是否启用 Cookie 的 Secure 属性。
+# 必须与浏览器的源地址完全一致，包括非默认端口；
+# localhost 与 127.0.0.1 属于不同的源。不能包含子路径、查询参数或片段。
+# 生产环境必须使用 HTTPS；仅 localhost、127.0.0.1 和 [::1] 可以使用 HTTP。
+# 代理请求头不会覆盖此配置。
+# 例如：https://diff.example.com 可以通过反向代理处理 HTTPS，
+# 再将 HTTP 请求转发到 MOONDIFF_LISTEN=127.0.0.1:4173。
+MOONDIFF_PUBLIC_URL=http://localhost:4173
+
+# 后端提供的前端 HTML、JavaScript 等构建产物所在目录。
+# 由 npm run build 创建，启动前必须存在。Docker 中默认为 /app/static。
+MOONDIFF_STATIC_DIR=dist/static
+
+# SQLite 文件，保存会话、加密的 GitHub 凭据和待完成的设备登录状态。
+# 文件不存在时会自动创建；需提前创建父目录，并确保运行服务的用户有写入权限。
+# 使用持久存储保存该文件，每个数据库只能由一个服务进程使用。
+# Docker 中默认为 /var/lib/moondiff/moondiff.sqlite3。
+MOONDIFF_DATABASE=moondiff.sqlite3
+
+# 未过期且尚未登录 GitHub 的会话数量上限。达到上限时创建会话返回 JSON 429。
+# 默认 512，可设为 1–100000。
+MOONDIFF_ANONYMOUS_SESSION_LIMIT=512
+
+# 必填，本地开发也需要：对恰好 64 个随机字节进行 Base64 编码得到的密钥。
+# 用于加密已保存的 GitHub 令牌和设备凭据，并校验其完整性。
+# 只需生成一次：openssl rand -base64 64 | tr -d '\n'
+# 妥善保密，单独备份，并始终为同一数据库使用相同的密钥。
+# 使用不同密钥打开已有数据库会导致启动失败。密钥丢失或更换后，
+# 需要使用全新的数据库，用户也需要重新登录。
+MOONDIFF_TOKEN_KEY=replace-with-base64-encoded-64-random-bytes
+
+# 必填，本地开发也需要：GitHub App 设置中的 Client ID。
+# 用于发起和轮询设备授权，以及刷新用户访问令牌。
+# 复制 Client ID 字段；数字形式的 App ID 是另一个标识符。
+MOONDIFF_GITHUB_CLIENT_ID=replace-with-github-app-client-id
+
+# 必填，本地开发也需要：与上述 Client ID 对应的同一个 App 的安装链接。
+# Moondiff Review 会展示此链接，方便用户授予 App 访问仓库的权限。
+# 必须以 https://github.com/apps/ 开头。
+MOONDIFF_GITHUB_INSTALL_URL=https://github.com/apps/your-app/installations/new
+```
+
+数据库备份与恢复方法见[会话与备份](#会话与备份)。
+
+构建并启动开发服务：
+
+```sh
+npm run dev
+```
+
+打开 `http://localhost:4173`，或配置的 `MOONDIFF_PUBLIC_URL` 地址。该配置必须与浏览器的源地址一致。
+`npm run dev` 会加载 `review-web/.env`，保留已导出的环境变量，构建一次并启动服务，
+不会监听文件变化。按 Ctrl+C 停止。也可以在仓库根目录执行
+`node review-web/scripts/dev.mjs`。如果已导出所有必填配置，可以不创建 `.env`。
+
+## GitHub App 配置
+
+在 GitHub App 设置中启用 **Device Flow**（设备授权流程）。后端使用 Client ID
+获取和刷新用户访问令牌，无需客户端密钥或网页授权回调。协议详情见 GitHub 的
+[设备授权协议](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token-for-a-github-app)
+和[令牌刷新协议](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens#refreshing-a-user-access-token-with-a-refresh-token)。
+
+配置仓库权限：Contents 读写、Pull requests 读写、Checks 只读、Commit statuses 只读，
+以及 GitHub 要求的 Metadata 权限。
+Contents 写权限用于[删除提交评论](https://docs.github.com/en/rest/commits/comments#delete-a-commit-comment)和 rebase 合并；
+Pull requests 写权限也用于
+[PR 讨论区评论](https://docs.github.com/en/rest/issues/comments#create-an-issue-comment)。
+Checks 与 Commit statuses 让合并卡片同时展示两类 GitHub CI 结果；任一读取失败时，
+卡片会明确提示结果不完整。App 配置增加权限后，已有安装必须在 GitHub 中重新授权并接受新权限。
+将 App 安装到用户需要审阅的仓库。
+访问私有仓库和执行写操作还需要登录用户自身具有相应权限。
+此流程不使用 App 私钥或安装访问令牌。
+
+公开仓库支持匿名读取。浏览器直接向 `api.github.com` 读取提交、PR、比较、
+文件列表、指定版本的源码和评论，不发送 Cookie 或令牌。这些请求使用访客 IP 的
+[GitHub 匿名限额，每小时 60 次](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)。
+登录后的读取仍由后端完成，以支持私有仓库。浏览器遇到 CORS、网络或限额错误时
+会显示错误，不会改走后端匿名代理。
+
+登录时，Moondiff Review 页面会显示验证码。点击 **Copy code and open GitHub**，
+验证码会被复制，并在新窗口中打开 GitHub 授权页面；完成设备授权后，Moondiff Review 会自动更新登录状态。
+刷新页面后会恢复尚未过期的验证码。开始新一轮登录前，先取消当前登录。
+
+## Docker
+
+安装 Docker 和 Compose v2 插件。随附的 [compose.yaml](compose.yaml) 使用
+`ghcr.io/moonbit-community/moondiff-review-web:latest` 镜像，
+使用该镜像无需在本机安装 Node.js 或 MoonBit。
+
+按照[运行时配置](#运行时配置)创建 `review-web/.env`，填写 GitHub App 配置和持久保存的密钥。
+本地访问时保留 `MOONDIFF_PUBLIC_URL=http://localhost:4173`；生产环境中，
+将其设置为对外提供服务的 HTTPS 源地址，并参考 [Nginx 示例](deploy/nginx.conf)
+在 Docker 宿主机上配置 Nginx。
+
+以下 Compose 命令均在 `review-web/` 目录中执行：
+
+```sh
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+Compose 通过 `env_file` 加载 `.env`，无需在 Shell 中导出变量。
+`compose.yaml` 的 `environment` 会将 `MOONDIFF_LISTEN`、`MOONDIFF_STATIC_DIR`
+和 `MOONDIFF_DATABASE` 分别覆盖为 `0.0.0.0:4173`、`/app/static`
+和 `/var/lib/moondiff/moondiff.sqlite3`，避免沿用 `.env` 中用于本地开发的值。
+
+端口映射 `127.0.0.1:4173:4173` 将服务发布到 Docker 宿主机的回环地址，
+宿主机上的 Nginx 将请求转发到 `http://127.0.0.1:4173`。
+容器内应保持 `MOONDIFF_LISTEN=0.0.0.0:4173`，让后端能够接收 Docker
+转发到容器网卡的连接。若在容器内改为监听 `127.0.0.1`，这些连接将无法到达后端。
+容器内的监听地址与宿主机的端口绑定地址作用于不同的网络环境。
+
+本地访问时，在 Docker 宿主机上打开 `http://localhost:4173`；
+生产环境中，访问配置的 HTTPS 源地址。镜像的健康检查会在配置的监听端口上请求 `/healthz`。
+查看服务日志：
+
+```sh
+docker compose logs --follow moondiff
+```
+
+更新已发布的镜像时，再次执行 `docker compose pull` 和 `docker compose up -d`。
+Compose 会替换容器并保留命名卷。`unless-stopped` 重启策略会在 Docker 重启后
+恢复服务，手动停止的服务除外。使用 `docker compose down` 停止并移除服务；
+保留数据库时不要添加 `--volumes`。
+
+`moondiff-data` 卷挂载到 `/var/lib/moondiff`。Compose 会给卷的实际名称添加项目名前缀，
+通常为 `review-web_moondiff-data`；更新时需保持项目名不变。每个数据库只能供一个容器使用，
+重启后也需保持 `MOONDIFF_TOKEN_KEY` 不变。备份与恢复方法见[会话与备份](#会话与备份)。
+如果改用绑定挂载，请确保 UID/GID 为 `10001:10001` 的用户对挂载目录有写入权限。
+
+如果部署原先位于 `playground/`，升级时将已有的 `.env` 移到 `review-web/`，
+保留原来的 `MOONDIFF_TOKEN_KEY`。在该文件中设置 `COMPOSE_PROJECT_NAME=playground`，
+或沿用此前自定义的项目名，再从新目录运行 Compose。这样会继续使用原有容器和数据库卷；
+旧默认项目名对应的卷为 `playground_moondiff-data`。
+
+如需在本地构建镜像，在仓库根目录执行，以便构建过程能够访问所有 `moon.work` 成员：
+
+```sh
+docker build -f review-web/Dockerfile -t moondiff-review-web:local .
+```
+
+然后将 `review-web/compose.yaml` 中的 `services.moondiff.image` 改为
+`moondiff-review-web:local`，并在仓库根目录执行：
+
+```sh
+docker compose -f review-web/compose.yaml up -d --pull never
+```
+
+构建阶段会安装 Node.js 22、锁文件指定的 npm 开发依赖（包括 esbuild）和最新的 MoonBit 工具链，
+与现有 CI 配置保持一致。
+如需指定 MoonBit 版本，传入 `--build-arg MOONBIT_VERSION=<version>`，
+版本值需使用 MoonBit 官方安装器支持的格式。运行时镜像包含 `moonrun`、受信任的 CA 证书、
+Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
+`.env`、本地数据库、依赖和构建产物均被排除在构建上下文之外。
+
+`review-web-image` GitHub Actions 工作流会在每次拉取请求和推送到 `main` 时
+构建 `linux/amd64` 镜像，并检查容器健康状态、静态资源、变更详情直达链接和认证状态接口。
+在 `main` 上通过这些检查后，工作流使用具有 `packages: write` 权限的 `GITHUB_TOKEN`，
+发布 `ghcr.io/<owner>/<repository>-review-web:latest` 和 `:sha-<full-commit-sha>` 镜像。
+也可以手动运行工作流；只有在 `main` 上运行时才会发布镜像。
+如需固定版本或使用 fork 发布的镜像，将 `compose.yaml` 中的 `services.moondiff.image`
+改为对应的 GHCR 镜像标签。
+
+### 静态资源压缩与缓存
+
+`npm run build` 会使用 esbuild 压缩 MoonBit release JavaScript，再写入
+`dist/static/index.<sha256>.js`，并输出原始、minify 后和 gzip level 5 后的体积。
+本地开发和 Docker 构建都使用这一步骤；本地构建前需在 `review-web/` 目录执行 `npm ci`。
+
+构建根据最终 JS/CSS 内容生成 `index.<sha256>.js`、`styles.<sha256>.css`，
+并更新 `index.html` 中的引用。哈希资源使用
+`Cache-Control: public, max-age=31536000, immutable`，内容不变时跨构建保持同一 URL。
+HTML 使用 `no-cache` 和内容 ETag：GET/HEAD 携带匹配的 `If-None-Match` 时返回无正文的 304，
+发布新版本后下次访问即可获取新入口。其他固定名称的静态文件也通过 ETag 重新验证；
+API 响应继续使用 `no-store`。
+
+部署时应一起更新 HTML 和其引用的哈希资源。滚动发布期间应保留旧哈希资源，
+以便刚取得旧 HTML 的页面仍能完成加载。代理/CDN 应保留后端的缓存头与 ETag，
+不要把不可变缓存策略应用到 HTML、API 路径或固定名称资源。
+
+[Nginx 配置](deploy/nginx.conf) 为 JavaScript、CSS 和 SVG 启用 gzip level 5，
+同时保留 Nginx 默认压缩的 HTML 类型。配置包含后端实际使用的 `text/javascript`，
+并设置 `Vary: Accept-Encoding`。传输压缩由 Nginx 完成，直接请求后端 4173 端口仍返回未压缩内容。
+更新应用镜像不会更新宿主机上的 Nginx 配置。
+
+将示例中的 gzip 设置加入正在使用的 HTTPS server 配置，然后在部署主机检查并重载 Nginx：
+
+```sh
+sudo nginx -t && sudo nginx -s reload
+```
+
+将下方地址替换为实际 HTTPS 源地址。以下 GET 请求通过 Nginx 检查两种资源，
+并输出响应头和传输字节数；`--compressed` 会先解压 gzip 响应再保存，用于内容比较。
+
+```sh
+MOONDIFF_ORIGIN=https://diff.example
+MOONDIFF_CHECK_DIR=$(mktemp -d)
+curl --fail --silent --show-error --compressed \
+  -o "$MOONDIFF_CHECK_DIR/index.html" "$MOONDIFF_ORIGIN/"
+for asset in $(sed -nE 's@.*"/((index|styles)\.[0-9a-f]{64}\.(js|css))".*@\1@p' "$MOONDIFF_CHECK_DIR/index.html"); do
+  curl --fail --silent --show-error --compressed -H 'Accept-Encoding: gzip' \
+    -D - -w 'gzip transfer: %{size_download} bytes\n' \
+    -o "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_ORIGIN/$asset"
+  curl --fail --silent --show-error -H 'Accept-Encoding: identity' \
+    -D - -w 'identity transfer: %{size_download} bytes\n' \
+    -o "$MOONDIFF_CHECK_DIR/$asset.identity" "$MOONDIFF_ORIGIN/$asset"
+  curl --fail --silent --show-error -H 'Accept-Encoding: gzip;q=0' \
+    -D - -o "$MOONDIFF_CHECK_DIR/$asset.q0" "$MOONDIFF_ORIGIN/$asset"
+  cmp "$MOONDIFF_CHECK_DIR/$asset.decoded" "$MOONDIFF_CHECK_DIR/$asset.identity"
+  cmp "$MOONDIFF_CHECK_DIR/$asset.q0" "$MOONDIFF_CHECK_DIR/$asset.identity"
+done
+rm -r "$MOONDIFF_CHECK_DIR"
+```
+
+gzip 响应应包含 `Content-Encoding: gzip`，`Vary` 中应包含 `Accept-Encoding`，
+且传输体积应更小。identity 和 `gzip;q=0` 响应不应包含 `Content-Encoding`，两次内容比较都应成功。
+复测首屏时，使用冷缓存、10 Mbps 带宽、100 ms 延迟以及相同的匿名登录状态响应，
+记录实际 FCP，不将先前实验的耗时设为硬性门槛。
+
+## 会话与备份
+
+仅在开始登录时创建未登录会话，有效期 20 分钟。发起新的设备授权时，会话期限会
+延长至该授权固定的 15 分钟期限再加 5 分钟宽限期。复用活动授权时，只会将较短的
+会话补足至同一个固定期限；重复的 start 请求不会持续向后滑动期限。成功登录会在
+同一数据库事务中将有效期延长至 30 天。升级后首次启动时，旧版闲置匿名会话会被
+删除，仍在授权的旧会话有效期会收紧至 20 分钟。退出登录会结束当前 Moondiff Review
+会话，不会卸载 GitHub App，也不会撤销其他 GitHub 会话。
+
+备份时需**同时保存数据库和原始加密密钥**，并将密钥单独存放在受保护的密钥存储中。
+仅复制运行中的主数据库文件并不安全，尤其是已有的 WAL 数据库。
+使用 SQLite 的在线备份命令，并将数据库路径调整为 `MOONDIFF_DATABASE` 配置的值：
+
+```sh
+sqlite3 /var/lib/moondiff/moondiff.sqlite3 '.backup /secure-backups/moondiff.sqlite3'
+```
+
+也可以先停止服务，执行
+`sqlite3 /var/lib/moondiff/moondiff.sqlite3 'PRAGMA wal_checkpoint(TRUNCATE);'`
+完成 WAL 检查点操作，再复制数据库并重启服务。恢复时，先停止服务，
+恢复数据库及其对应的密钥，设置文件所有者和权限，再启动一个实例并检查 `/healthz`。
+旧备份中的刷新令牌可能已被 GitHub 轮换，因此用户可能需要重新登录。
+密钥丢失或主动更换后，需要使用全新的数据库并让用户重新登录；
+当前版本不提供原地轮换密钥的命令。
+
+## HTTP 接口约定
+
+| 方法 / 路径 | 响应 / 用途 |
+| --- | --- |
+| `GET /api/auth/status` | `{$tag:"Success",value:{authenticated,user_id?,login?,install_url?,csrf_token?,device_flow?}}`；恢复有效会话，无会话时只返回匿名状态，不写数据库或设置 Cookie |
+| `POST /api/auth/session` | 空 JSON 对象 `{}`；复用有效会话或创建 20 分钟登录会话，返回状态与 CSRF 令牌，新建时另设置 Cookie |
+| `POST /api/auth/device/start` | `{attempt_id}` 创建或复用会话中正在进行的授权；返回 `{request_id,status}` |
+| `POST /api/auth/device/poll` | `{authorization_id}` 在到达轮询时间后推进授权；返回 `{request_id,status}` |
+| `POST /api/auth/device/cancel` | `{authorization_id}` 取消授权并返回当前会话状态；返回 `{request_id,status}` |
+| `POST /api/auth/logout` | 使会话失效并返回 `Success(value=null)`；要求提供 Origin 和 X-CSRF-Token |
+| `POST /api/rpc` | 所有操作均要求已登录会话；`{v:2,request:GitHubRequest}` → `{$tag:"Success",value:RpcValue}` 或 `{$tag:"Failure",error:{status,code,message}}` |
+| `GET /healthz` | 服务就绪时返回 `ok` |
+
+`POST /api/auth/session` 要求精确匹配配置的 Origin 和
+`Content-Type: application/json`；无效请求不会创建会话。创建前在 SQLite 事务中
+清理过期记录并检查 `MOONDIFF_ANONYMOUS_SESSION_LIMIT`，满额时返回错误码
+`session_limit` 的 JSON 429。生产 [Nginx 示例](deploy/nginx.conf) 另按连接 IP
+对会话创建与设备授权开始限速，每分钟 2 次、突发 10 次。
+
+三个设备授权 POST 接口都要求会话 Cookie、与配置一致的 Origin、
+`X-CSRF-Token` 和 `Content-Type: application/json`；请求包含额外字段时会被拒绝。
+发起登录时使用的标识符由浏览器生成，长度为 16–128 个字符，
+可包含字母、数字、`-` 或 `_`，例如随机 UUID。
+start、poll 和 cancel 都返回 `{$tag:"Success",value:{request_id,status}}`，其中 `request_id` 回传请求标识符。退出登录返回空成功值，客户端随后重新查询状态。
+
+`device_flow` 包含 `id`、`phase`、`user_code`、`verification_uri`、
+`expires_at`、`retry_after` 和 `message`。过期时间是以秒为单位的数字形式 Unix 时间戳，
+重试延迟也是秒数。阶段包括 `Starting`、`Pending`、`Verifying`、`Completed`、
+`Cancelled`、`Expired`、`Denied` 和 `Failed`。客户端使用服务端返回的实际授权 `id` 进行轮询；
+复用已有授权时，它可能与新登录请求的 attempt ID 不同。
+取消接口也接受最初的 attempt ID，因此在发起登录的响应尚未返回时也能取消。
+
+浏览器只会收到用户验证码和允许列表中的验证 URL，设备凭据和 GitHub 令牌始终加密保存在服务端。
+用户自行打开验证页面，Moondiff Review 页面通过轮询获取结果，无需登录回调。
+服务端的计时状态在页面刷新和服务重启后仍然保留，遵守 GitHub 的最小轮询间隔，
+并在每次 `slow_down` 后至少增加 5 秒间隔。
+临时网络故障、服务端错误或频率限制会保留当前授权，并按退避策略重试。
+验证码被拒绝、无效或过期后需要重新发起登录。每次登录尝试最多持续 15 分钟。
+旧的 `/auth/login` 和 `/auth/callback` 路径返回 404。
+
+RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md)，由前后端通过 `@protocol` 引用。
+13 种请求由 `GitHubRequest` 枚举表达，成功结果由 `RpcValue` 枚举表达。
+认证阶段、评论目标和评论侧别也采用显式标签枚举，例如 `{"$tag":"Pending"}`。
+源码响应包含 `{base64,size,content_type}`；评论 ID 使用十进制字符串，确保 64 位精度不丢失。
+请求先解码，再与重新编码的 JSON 比较，拒绝额外字段、小数截断和越界值，随后检查参数约束。
+后端只发送已建模字段；无效上游数据返回 `invalid_github_response`，客户端收到错误结果种类时返回 `invalid_server_response`。
+前后端须同步升级至 v2；不提供 v1 兼容层，SQLite 数据格式保持不变。
+
+浏览器公开读取与后端共用 REST 路径构造和响应校验。公开请求不发送
+`X-GitHub-Api-Version`，使用 GitHub 的
+[默认 API 版本](https://docs.github.com/en/rest/about-the-rest-api/api-versions)。
+固定 SHA 源码和完整 PR 快照共用 32 MiB 会话内存 LRU。缓存页面可立即显示，
+后台独立复核 metadata 后才允许写入；最近两个已解析页面还会复用 diff／高亮。
+登录后的冷读取使用有界的 `PullSnapshotGet` 聚合接口，详见
+[快照加载说明](frontend/internal/github_client/README.md)。相同并发请求共用一次读取。
+[契约检查](../.github/workflows/public-github-contract.yml) 在提交推送到 `main` 时运行，
+在未指定 API 版本的情况下检查公开响应结构和 CORS；遇到 GitHub 限流时报告“无法判定”。
+
+源码响应每侧最多 1 MiB，上游 JSON 响应最多 8 MiB，RPC 请求体最多 128 KiB，
+评论最多读取 100 页，每页 100 条。
+错误码会区分 `authentication_required`、`permission_denied`、`rate_limit`、
+`not_found_or_not_installed`、`invalid_comment_anchor`、`source_too_large` 和 `pagination_limit`。
+未知操作和额外参数会被拒绝。用户只能删除自己的评论。
+写操作要求 Origin 与配置一致，并在 `X-CSRF-Token` 中携带会话 CSRF 令牌。
+
+`GET`/`HEAD` 提供静态资源，并在 `/`、`/owner/repo/commit/sha`、
+`/owner/repo/pull/number` 和 `/owner/repo/pull/number/commits/sha` 提供应用入口。
+未知路径返回 404。旧的 `/#/…` 路由会在应用中显示链接无效错误，不会自动转换。
+
+## 迁移与验证
+
+1. 部署 Wasm 模块、兼容的 `moonrun`、静态目录、持久化数据库路径、密钥和 App 配置。
+   验证 HTTPS、`/healthz` 和变更详情直达链接。
+2. 构建轻量的跳转扩展，将 `MOONDIFF_REVIEW_URL` 设置为该服务的源地址；
+   详见 [Chrome 与 Firefox 扩展说明](../extension/README.md)。
+3. 扩展升级时会清除已有凭据。每个用户都需要重新登录，
+   不会导入浏览器中的令牌或旧审阅页面状态。
+4. Pages 发布工作流已移除。切换部署时，在 Settings → Pages 中关闭仓库旧的 GitHub Pages 站点，
+   如有自定义域名配置，也需删除。仓库中的这项变更不会自动下线已部署的 Pages 站点。
+   替换旧的 hash 分享链接。
+
+切换前运行[检查与测试](#检查与测试)。生产环境的授权和安装流程还需使用实际 App 进行冒烟测试。
+
+## 检查与测试
+
+DOM 视图夹具保留为 MoonBit 白盒测试，通过
+`#skip("browser DOM: npm run test:views")` 标记，不在普通 Node 测试运行器中执行。
+浏览器运行器复用已有的 Playwright，以 `moon test --build-only --include-skipped` 编译，
+发现这些标记用例后，在独立的 Chromium 页面中执行未经修改的测试产物。
+
+在 `review-web/` 目录执行以下命令，从模块根目录检查并测试所有前端包
+（包括 `internal/`），并运行后端检查：
+
+```sh
+moon -C frontend check --target js --deny-warn
+moon -C frontend test --target js
+moon -C backend check --deny-warn
+
+# 测试辅助代码会设置 MOONDIFF_TEST_MODE=1，启用上游地址覆盖（默认关闭）。
+# MOONDIFF_TEST_GITHUB_URL 替换 GitHub API 请求使用的 https://api.github.com。
+# MOONDIFF_TEST_OAUTH_URL 替换设备授权和令牌请求使用的 https://github.com。
+# 测试模式下必须提供这两个 URL，且它们和 MOONDIFF_PUBLIC_URL 都必须使用回环主机地址。
+# 仅当 MOONDIFF_TEST_MODE=1 时才会使用这些上游地址覆盖配置。
+# 常规开发和生产环境中，请勿设置上述三个测试变量。
+npm run test:server
+```
+
+`test:server` 会运行 MoonBit 测试、后端集成测试和浏览器 HTTP 传输测试。
+修改 MoonBit 代码后，运行 `moon fmt` 和 `moon info --target all`，
+并检查生成的接口文件是否发生变化。
+
+运行浏览器测试：
+
+```sh
+npm ci
+npx playwright install chromium firefox
+npm run test:e2e
+```
+
+`test:views` 单独运行组件夹具，不启动后端；`test:e2e` 会先运行这批组件测试，再运行页面集成测试。
+仓库根目录对应的命令为 `npm run test:views` 和 `npm run test:review-web`。
+
+如果缺少系统库，使用 `npx playwright install --with-deps chromium firefox` 安装；
+使用 `npm run test:e2e:ui` 启动交互式测试界面。Moondiff Review 测试使用 Chromium，
+下方的跳转扩展测试还会使用 Firefox。测试会自行在 4173 端口启动 Wasm 服务，
+因此请先停止本地开发服务。测试使用临时 SQLite 数据库和本地 GitHub/OAuth 模拟服务，
+无需真实的 GitHub 凭据。前端回归测试会模拟同源 API。
+
+浏览器测试使用正式构建的 minify 配置，需要渲染探针时先注入再压缩。
+发布产物检查会拒绝包含测试探针的脚本，并限制 `index.js` 不超过 2,500,000 字节，
+gzip level 5 后不超过 500,000 字节。
+
+渲染压力测试单独使用 `npm run test:e2e:stress` 运行；在仓库根目录则使用
+`npm run test:review-web:stress`。该命令以单 worker 运行 6 项夹具/CPU 组合，
+并保留性能数据附件。`npm run test:e2e` 及交互式测试界面只选择 `*.spec.mjs`；
+压力测试使用 `*.stress.mjs` 和独立的 Playwright 配置。
+`check` 工作流通过独立 job 运行压力测试并上传结果（包括性能附件）；主 job
+会构建发布产物并运行 `test:artifacts`，同时保留常规测试套件。
+
+验证跳转扩展和发布产物：
+
+```sh
+npm run test:extension
+npm run build
+npm --prefix .. run test:artifacts
+```
+
+`test:extension` 会先运行 Chrome 单元测试和 Chromium 集成测试，再运行 Firefox
+单元测试及 Firefox 内容脚本测试。浏览器专用的构建、测试和打包命令使用
+`:chrome` 或 `:firefox` 后缀；Firefox 还提供 `lint:extension:firefox`。
+打包及临时加载方法见[扩展入口说明](../extension/README.md)。
+
+也可以在仓库根目录依次运行 `npm run test:server`、`npm run test:review-web`、
+`npm run test:extension` 和 `npm run build && npm run test:artifacts`，执行上述测试套件和产物检查。
+实现层面的测试用例见[回归测试覆盖范围](backend/INTERNAL_CN.md#回归测试)。
+
+## 开发参考
+
+- [前端包](frontend/)
+- [后端认证、加密、存储和请求处理实现](backend/INTERNAL_CN.md)
+- [Chrome 与 Firefox 跳转扩展开发](../extension/README.md)

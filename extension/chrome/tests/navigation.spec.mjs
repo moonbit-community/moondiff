@@ -1,4 +1,4 @@
-import { test, expect, chromium } from '../../../playground/node_modules/@playwright/test/index.mjs';
+import { test, expect, chromium } from '../../../review-web/node_modules/@playwright/test/index.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -19,7 +19,7 @@ async function navigate(page, path) {
 }
 
 test('the black button opens current GitHub changes only on click and safely reuses tabs', async () => {
-  buildExtension({ env: { MOONDIFF_PLAYGROUND_URL: origin }, log: { write() {} } });
+  buildExtension({ env: { MOONDIFF_REVIEW_URL: origin }, log: { write() {} } });
   const profile = await mkdtemp(join(tmpdir(), 'moondiff-extension-'));
   let context;
   try {
@@ -28,7 +28,7 @@ test('the black button opens current GitHub changes only on click and safely reu
       args: [`--disable-extensions-except=${outputRoot}`, `--load-extension=${outputRoot}`],
     });
     await context.route('https://github.com/**', route => route.fulfill({ contentType: 'text/html', body: githubHTML }));
-    await context.route(`${origin}/**`, route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Playground fixture</title><textarea aria-label="Draft"></textarea>' }));
+    await context.route(`${origin}/**`, route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Moondiff Review fixture</title><textarea aria-label="Draft"></textarea>' }));
     const source = await context.newPage();
     const button = buttonOn(source);
     const targets = () => context.pages().filter(p => p.url().startsWith(origin));
@@ -183,9 +183,9 @@ test('content script requires trusted clicks, blocks repeated pending opens and 
   expect(await page.evaluate(() => openRequests.length)).toBe(2);
   await button.press('Space');
   expect(await page.evaluate(() => openRequests)).toEqual([
-    { v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/42' } },
-    { v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/42' } },
-    { v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/43' } },
+    { v: 1, op: 'review.open', args: { route: '/acme/widgets/pull/42' } },
+    { v: 1, op: 'review.open', args: { route: '/acme/widgets/pull/42' } },
+    { v: 1, op: 'review.open', args: { route: '/acme/widgets/pull/43' } },
   ]);
   await page.evaluate(() => completeOpen({ ok: true, value: { tabId: 1, reused: false } }));
   await expect(button).toBeEnabled();

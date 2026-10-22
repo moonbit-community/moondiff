@@ -1,0 +1,289 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-review-web/internal/comments"
+
+import {
+  "moonbit-community/moondiff-review-web-protocol",
+  "moonbit-community/moondiff-review-web/internal/github",
+  "moonbit-community/moondiff-review-web/internal/review",
+}
+
+// Values
+pub fn author_label(@moondiff-review-web-protocol.ApiCommentUser?) -> String
+
+pub fn can_delete_comment(Session, CommentId) -> Bool
+
+pub fn draft_blocks_deletion(Session, CommentId) -> Bool
+
+pub fn file_commit_discussions(CommentGroup, Int32?, @review.CanonicalPatch) -> Array[CommitDiscussion]
+
+pub fn file_threads(CommentGroup, Int32?, @review.CanonicalPatch) -> Array[ReviewThread]
+
+pub fn permission(Session, Action) -> Permission
+
+pub fn review_can_comment(Session) -> Bool
+
+pub fn same_draft_target(DraftKind, DraftKind) -> Bool
+
+pub fn update(Session, Event) -> (Session, Array[Effect])
+
+pub fn valid_reply_target(Session, Int64) -> Bool
+
+pub fn without_deleted(@moondiff-review-web-protocol.ApiCommentBundle, Array[CommentId]) -> @moondiff-review-web-protocol.ApiCommentBundle
+
+// Errors
+
+// Types and methods
+pub(all) enum Action {
+  OpenDraft(DraftKind)
+  Submit
+  Delete(CommentId)
+  LoadSnapshot
+} derive(Eq)
+
+pub(all) enum CommentDeletion {
+  ConfirmDelete(CommentId)
+  Deleting(CommentId)
+  DeleteFailed(CommentId, String)
+} derive(Eq)
+
+pub(all) struct CommentDraft {
+  snapshot : Snapshot?
+  id : DraftId
+  kind : DraftKind
+  body : String
+  submitting : Bool
+  error : String?
+} derive(Eq)
+
+pub struct CommentGroup {
+  issue_comments : ReadOnlyArray[@moondiff-review-web-protocol.ApiIssueComment]
+  review_comments : ReadOnlyArray[@moondiff-review-web-protocol.ApiReviewComment]
+  commit_comments : ReadOnlyArray[@moondiff-review-web-protocol.ApiCommitComment]
+}
+pub impl Eq for CommentGroup
+
+pub(all) enum CommentId {
+  IssueComment(Int64)
+  ReviewComment(Int64)
+  CommitComment(Int64)
+} derive(Eq)
+pub fn CommentId::key(Self) -> String
+
+pub(all) enum CommentRefresh {
+  RefreshIdle
+  RefreshMetadata
+  RefreshList(@moondiff-review-web-protocol.ApiPull?)
+  RefreshValidation(@moondiff-review-web-protocol.ApiPull, @moondiff-review-web-protocol.ApiCommentBundle)
+} derive(Eq)
+
+pub(all) enum CommentsStatus {
+  CommentsDisabled
+  CommentsLoading
+  CommentsReady(@moondiff-review-web-protocol.ApiCommentBundle)
+  CommentsFailed(String)
+} derive(Eq)
+
+pub(all) struct CommitDiscussion {
+  comment : @moondiff-review-web-protocol.ApiCommitComment
+  file_index : Int32?
+  outdated : Bool
+}
+
+pub(all) struct Context {
+  generation : Int32
+  route : @github.CommitRef?
+  snapshot : Snapshot?
+  enabled : Bool
+} derive(Eq)
+
+pub(all) struct DraftId {
+  generation : Int32
+  sequence : Int32
+} derive(Eq)
+pub fn DraftId::key(Self) -> String
+
+pub(all) enum DraftKind {
+  OverallDraft
+  InlineDraft(Int32, @review.ReviewAnchor)
+  ReplyDraft(Int64)
+} derive(Eq)
+
+pub(all) enum Effect {
+  CommentsRequest(@github.CommitRef, Int32, (Result[@moondiff-review-web-protocol.ApiCommentBundle, Failure]) -> Event)
+  CommentHeadRequest(@github.CommitRef, String, Int32, (Result[@moondiff-review-web-protocol.ApiPull, Failure]) -> Event)
+  CreateIssueCommentRequest(@github.CommitRef, String, String, Int32, (Result[@moondiff-review-web-protocol.ApiIssueComment, Failure]) -> Event)
+  CreateReviewCommentRequest(@github.CommitRef, String, String, @review.ReviewAnchor, String, Int32, (Result[@moondiff-review-web-protocol.ApiReviewComment, Failure]) -> Event)
+  CreateCommitCommentRequest(@github.CommitRef, String, @review.ReviewAnchor, String, Int32, (Result[@moondiff-review-web-protocol.ApiCommitComment, Failure]) -> Event)
+  CreateReviewReplyRequest(@github.CommitRef, String, Int64, String, Int32, (Result[@moondiff-review-web-protocol.ApiReviewComment, Failure]) -> Event)
+  DeleteCommentRequest(@github.CommitRef, CommentId, Int32, (Result[@moondiff-review-web-protocol.DeleteResult, Failure]) -> Event)
+  Dispatch(Event)
+}
+
+pub(all) enum Event {
+  SnapshotFreshnessChanged(Bool)
+  RestoreNavigation(NavigationReview, Array[String])
+  SnapshotChanged
+  ContextChanged(Context)
+  Reset(Bool, Bool)
+  Identity(Bool, String?)
+  IdentityChecking
+  RecoverInterrupted
+  RefreshComments
+  BeginCommentsRefresh(Int32, @github.CommitRef)
+  CommentsMetadataLoaded(Int32, Int32, Result[@moondiff-review-web-protocol.ApiPull, Failure])
+  CommentsValidated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiPull, Failure])
+  AskDelete(CommentId)
+  CancelDelete
+  ConfirmCommentDelete(CommentId)
+  CommentDeleted(Int32, Int32, CommentId, Result[@moondiff-review-web-protocol.DeleteResult, Failure])
+  CommentsLoaded(Int32, Int32, Result[@moondiff-review-web-protocol.ApiCommentBundle, Failure])
+  OpenOverallDraft
+  OpenInlineDraft(Int32, @review.ReviewAnchor)
+  OpenReplyDraft(Int64)
+  DraftBodyChanged(String)
+  CancelDraft
+  SubmitDraft
+  CommentHeadChecked(Int32, Int32, @review.ReviewAnchor, Result[@moondiff-review-web-protocol.ApiPull, Failure])
+  IssueCommentCreated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiIssueComment, Failure])
+  ReviewCommentCreated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiReviewComment, Failure])
+  CommitCommentCreated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiCommitComment, Failure])
+  ReviewReplyCreated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiReviewComment, Failure])
+}
+
+pub(all) struct Failure {
+  message : String
+  code : String?
+} derive(Eq)
+
+pub struct NavigationReview {
+  // private fields
+} derive(Eq)
+#deprecated
+pub fn NavigationReview::equal(Self, Self) -> Bool
+#deprecated
+pub fn NavigationReview::not_equal(Self, Self) -> Bool
+
+pub(all) struct PendingReviewReceipt {
+  id : Int64
+  url : String
+  kind : DraftKind
+  path : String
+  generation : Int32
+  status : PendingReviewStatus
+} derive(Eq)
+pub fn PendingReviewReceipt::key(Self) -> String
+
+pub(all) enum PendingReviewStatus {
+  ReceiptSyncing
+  ReceiptWaiting
+  ReceiptSyncFailed
+  ReceiptPrChanged
+} derive(Eq)
+
+pub(all) enum Permission {
+  Allowed
+  Denied(String)
+} derive(Eq)
+pub fn Permission::allowed(Self) -> Bool
+
+pub struct PermissionSummary {
+  fresh : Bool
+  can_comment : Bool
+  visible : Bool
+  login : String?
+  stale : Bool
+  target : DraftKind?
+  posting : Bool
+  deleting : Bool
+  has_snapshot : Bool
+  is_pull : Bool
+} derive(Eq)
+
+pub(all) enum ReadStatus {
+  Disabled
+  Loading
+  Ready
+  Failed(String)
+} derive(Eq)
+
+pub struct ReadView {
+  permissions : PermissionSummary
+  group : CommentGroup
+  pending_review_receipts : ReadOnlyArray[PendingReviewReceipt]
+  generation : Int32
+  snapshot_stale : Bool
+  login : String?
+  deletion : CommentDeletion?
+  status : ReadStatus
+  refresh_busy : Bool
+  refresh_error : String?
+  notice : String?
+  published_url : String?
+  // private fields
+} derive(Eq)
+pub fn ReadView::allowed(Self, Action) -> Bool
+pub fn ReadView::can_delete(Self, CommentId) -> Bool
+pub fn ReadView::comment_key(Self, CommentId) -> String
+pub fn ReadView::draft(Self) -> CommentDraft?
+pub fn ReadView::draft_blocks_deletion(Self, CommentId) -> Bool
+pub fn ReadView::draft_visible(Self) -> Bool
+pub fn ReadView::valid_reply_target(Self, Int64) -> Bool
+
+pub(all) struct ReviewThread {
+  id : CommentId
+  root : @moondiff-review-web-protocol.ApiReviewComment
+  replies : Array[@moondiff-review-web-protocol.ApiReviewComment]
+  file_index : Int32?
+  outdated : Bool
+}
+
+pub struct Session {
+  verified_snapshot : Snapshot?
+  refresh_id : Int32
+  refresh_error : String?
+  snapshot_confirmed : Bool
+  snapshot_stale : Bool
+  submission_id : Int32
+  notice : String?
+  published_url : String?
+  can_comment : Bool
+  login : String?
+  authentication_error : String?
+  deletion_id : Int32
+  deletion : CommentDeletion?
+  // private fields
+} derive(Eq)
+pub fn Session::blocks_navigation(Self) -> Bool
+pub fn Session::comment_version(Self) -> Int32
+pub fn Session::comments(Self) -> CommentsStatus
+pub fn Session::draft(Self) -> CommentDraft?
+pub fn Session::draft_path(Self) -> String?
+pub fn Session::draft_visible(Self) -> Bool
+pub fn Session::export_navigation(Self) -> NavigationReview
+pub fn Session::file_comments(Self, String) -> CommentGroup
+pub fn Session::generation(Self) -> Int32
+pub fn Session::new(enabled? : Bool) -> Self
+pub fn Session::overall_comments(Self, ArrayView[String]) -> CommentGroup
+pub fn Session::permission_summary(Self) -> PermissionSummary
+pub fn Session::read_view(Self, path? : String, paths? : ArrayView[String], group? : CommentGroup) -> ReadView
+pub fn Session::submission(Self) -> SubmissionPhase?
+
+pub(all) struct Snapshot {
+  reference : @github.CommitRef
+  sha : String
+  pull_snapshot : @moondiff-review-web-protocol.ApiPull?
+} derive(Eq)
+pub fn Snapshot::same_version(Self, Self) -> Bool
+
+pub(all) enum SubmissionPhase {
+  CheckingHead
+  PostingIssue
+  PostingReview
+  PostingCommit
+  PostingReply
+  SyncingReview(Int64)
+} derive(Eq)
+
+// Type aliases
+
+// Traits

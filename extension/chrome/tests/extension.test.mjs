@@ -28,11 +28,11 @@ function harness(previous) {
       onRemoved: event(), onUpdated: event(),
     },
   };
-  const context = vm.createContext({ URL, chrome, MoondiffConfig: { playgroundUrl: 'https://diff.example/' } });
+  const context = vm.createContext({ URL, chrome, MoondiffConfig: { reviewUrl: 'https://diff.example/' } });
   vm.runInContext(source('target.js'), context);
   vm.runInContext(source('service-worker.js'), context);
   const sender = (url, id = 7) => ({ frameId: 0, url, tab: { id, windowId: 1 } });
-  const open = (url, id) => context.MoondiffWorker.open({ v: 1, op: 'playground.open', args: { route: context.MoondiffTarget.targetPath(context.MoondiffTarget.parseGitHubTarget(url)) } }, sender(url, id));
+  const open = (url, id) => context.MoondiffWorker.open({ v: 1, op: 'review.open', args: { route: context.MoondiffTarget.targetPath(context.MoondiffTarget.parseGitHubTarget(url)) } }, sender(url, id));
   return { context, session, local, tabs, chrome, open, sender, created, updated };
 }
 const pr = 'https://github.com/Acme/Widgets/pull/42';
@@ -90,19 +90,19 @@ test('tab update cleanup preserves mappings for same path query and comment chan
 test('untrusted frames, mismatched targets, and old RPCs are rejected; upgrade deletes credentials', async () => {
   const h = harness(); await h.context.MoondiffWorker.initialize(); assert.equal(h.local.values.github_refresh_token, undefined);
   for (const sender of [{ ...h.sender(pr), frameId: 1 }, h.sender('https://evil.example/')]) {
-    await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/42' } }, sender));
+    await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'review.open', args: { route: '/acme/widgets/pull/42' } }, sender));
   }
   await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'github.commit.get', args: {} }, h.sender(pr)));
-  await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/99' } }, h.sender(pr)));
+  await assert.rejects(h.context.MoondiffWorker.open({ v: 1, op: 'review.open', args: { route: '/acme/widgets/pull/99' } }, h.sender(pr)));
   assert.equal(h.created.length, 0);
 });
 
 test('build validates root deployment URL and emits only redirect assets and minimal permissions', () => {
-  assert.equal(readBuildConfig({ MOONDIFF_PLAYGROUND_URL: 'http://localhost:4173/' }).playgroundUrl, 'http://localhost:4173/');
-  for (const url of ['http://example.com/', 'https://diff.example/sub/', 'https://diff.example/?x=1', 'https://user:pass@diff.example/', 'https://diff.example/#x']) assert.throws(() => readBuildConfig({ MOONDIFF_PLAYGROUND_URL: url }));
-  assert.throws(() => readBuildConfig({ MOONDIFF_PLAYGROUND_URL: 'http://localhost:4173/' }, 'webstore'));
+  assert.equal(readBuildConfig({ MOONDIFF_REVIEW_URL: 'http://localhost:4173/' }).reviewUrl, 'http://localhost:4173/');
+  for (const url of ['http://example.com/', 'https://diff.example/sub/', 'https://diff.example/?x=1', 'https://user:pass@diff.example/', 'https://diff.example/#x']) assert.throws(() => readBuildConfig({ MOONDIFF_REVIEW_URL: url }));
+  assert.throws(() => readBuildConfig({ MOONDIFF_REVIEW_URL: 'http://localhost:4173/' }, 'webstore'));
   assert.throws(() => readBuildConfig({}));
-  buildExtension({ env: { MOONDIFF_PLAYGROUND_URL: 'https://diff.example/' }, mode: 'webstore', log: { write() {} } });
+  buildExtension({ env: { MOONDIFF_REVIEW_URL: 'https://diff.example/' }, mode: 'webstore', log: { write() {} } });
   const manifest = JSON.parse(readFileSync(resolve(outputRoot, 'manifest.json')));
   assert.deepEqual(manifest.permissions, ['storage']); assert.deepEqual(manifest.host_permissions, ['https://diff.example/*']);
   assert(!readdirSync(outputRoot).some(name => /review|index\.js|styles/.test(name)));
@@ -111,7 +111,7 @@ test('build validates root deployment URL and emits only redirect assets and min
 
 test('SPA uses the current tab URL while validating the original sending document origin', async () => {
   const h = harness();
-  const message = { v: 1, op: 'playground.open', args: { route: '/acme/widgets/pull/42' } };
+  const message = { v: 1, op: 'review.open', args: { route: '/acme/widgets/pull/42' } };
   const sender = h.sender('https://github.com/acme/widgets'); sender.tab.url = pr;
   assert.equal((await h.context.MoondiffWorker.open(message, sender)).reused, false);
   await assert.rejects(h.context.MoondiffWorker.open(message, { ...sender, url: 'https://evil.example' }));

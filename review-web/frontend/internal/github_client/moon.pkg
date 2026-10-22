@@ -1,0 +1,16 @@
+import {
+  "moonbit-community/moondiff-review-web/internal/metrics",
+  "moonbit-community/rabbita/js",
+  "moonbit-community/rabbita/dom",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/buffer",
+  "moonbit-community/moondiff-review-web/internal/browser",
+  "moonbit-community/moondiff-review-web-protocol" @protocol,
+  "moonbit-community/moondiff-review-web/internal/github",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/cmd",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+}
+
+supported_targets = "js"

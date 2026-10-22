@@ -1,8 +1,0 @@
-import {
-  "moonbit-community/rabbita/dom",
-  "moonbit-community/moondiff-playground/internal/browser",
-  "moonbit-community/moondiff-playground/internal/github",
-  "moonbit-community/rabbita/url",
-}
-
-supported_targets = "js"

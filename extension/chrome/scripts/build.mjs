@@ -19,15 +19,15 @@ export const outputRoot = join(extensionRoot, "dist");
 
 export function readBuildConfig(env = process.env, mode = "development") {
   if (!["development", "webstore"].includes(mode)) throw new Error(`Unknown build mode: ${mode}`);
-  const value = env.MOONDIFF_PLAYGROUND_URL;
-  if (!value) throw new Error("Missing MOONDIFF_PLAYGROUND_URL.");
+  const value = env.MOONDIFF_REVIEW_URL;
+  if (!value) throw new Error("Missing MOONDIFF_REVIEW_URL.");
   const url = new URL(value);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash ||
       !(url.protocol === "https:" || mode === "development" && loopback && url.protocol === "http:")) {
-    throw new Error("MOONDIFF_PLAYGROUND_URL must be an HTTPS root URL; development also allows loopback HTTP.");
+    throw new Error("MOONDIFF_REVIEW_URL must be an HTTPS root URL; development also allows loopback HTTP.");
   }
-  return { playgroundUrl: url.origin + "/" };
+  return { reviewUrl: url.origin + "/" };
 }
 
 function crc32(buffer) {
@@ -122,11 +122,11 @@ function manifest(config) {
   return {
     manifest_version: 3,
     name: "Moondiff",
-    description: "Open GitHub changes in your Moondiff playground with the Open in Moondiff button.",
+    description: "Open GitHub changes in Moondiff Review with the Open in Moondiff button.",
     version: extensionVersion,
     minimum_chrome_version: "116",
     permissions: ["storage"],
-    host_permissions: [new URL(config.playgroundUrl).origin + "/*"],
+    host_permissions: [new URL(config.reviewUrl).origin + "/*"],
     background: { service_worker: "service-worker.js" },
     content_scripts: [{
       // GitHub can SPA-navigate into a PR or commit without creating a new document,
@@ -156,7 +156,7 @@ export function buildExtension({ env = process.env, log = process.stdout, mode =
     }
     writeFileSync(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest(buildConfig), null, 2)}\n`);
     writeFileSync(join(stagingRoot, "config.js"), `globalThis.MoondiffConfig = Object.freeze(${JSON.stringify({
-      playgroundUrl: buildConfig.playgroundUrl,
+      reviewUrl: buildConfig.reviewUrl,
     })});\n`);
     rmSync(outputRoot, { recursive: true, force: true });
     renameSync(stagingRoot, outputRoot);

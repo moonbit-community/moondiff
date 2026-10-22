@@ -84,7 +84,7 @@ function harness(previous) {
   const context = vm.createContext({
     URL,
     browser,
-    MoondiffConfig: { playgroundUrl: "https://diff.example/" },
+    MoondiffConfig: { reviewUrl: "https://diff.example/" },
   });
   vm.runInContext(source("target.js"), context);
   vm.runInContext(source("background.js"), context);
@@ -95,7 +95,7 @@ function harness(previous) {
   });
   const message = url => ({
     v: 1,
-    op: "playground.open",
+    op: "review.open",
     args: {
       route: context.MoondiffTarget.targetPath(
         context.MoondiffTarget.parseGitHubTarget(url),
@@ -226,7 +226,7 @@ test("invalid messages and senders are rejected and legacy credentials are remov
   assert.deepEqual(h.local.values, {});
   assert.equal(h.session.values.github_access_token, undefined);
 
-  const valid = { v: 1, op: "playground.open", args: { route: "/acme/widgets/pull/42" } };
+  const valid = { v: 1, op: "review.open", args: { route: "/acme/widgets/pull/42" } };
   for (const sender of [
     { ...h.sender(pr), frameId: 1 },
     h.sender("https://evil.example/"),
@@ -251,7 +251,7 @@ test("invalid messages and senders are rejected and legacy credentials are remov
 
 test("SPA messages use the current tab URL and retain the GitHub document origin", async () => {
   const h = harness();
-  const message = { v: 1, op: "playground.open", args: { route: "/acme/widgets/pull/42" } };
+  const message = { v: 1, op: "review.open", args: { route: "/acme/widgets/pull/42" } };
   const sender = h.sender("https://github.com/acme/widgets");
   sender.tab.url = pr;
   assert.equal((await h.context.MoondiffBackground.open(message, sender)).reused, false);
@@ -275,7 +275,7 @@ test("runtime messages return native Promise responses for success and failure",
   });
 
   const rejected = h.browser.runtime.onMessage.fire(
-    { v: 1, op: "playground.open", args: { route: "/acme/widgets/pull/99" } },
+    { v: 1, op: "review.open", args: { route: "/acme/widgets/pull/99" } },
     h.sender(pr),
   )[0];
   assert.equal(typeof rejected?.then, "function");
@@ -290,7 +290,7 @@ test("runtime messages return native Promise responses for success and failure",
 
 test("build emits the Firefox 140 AMO manifest with minimal permissions", () => {
   assert.equal(
-    readBuildConfig({ MOONDIFF_PLAYGROUND_URL: "http://localhost:4173/" }).playgroundUrl,
+    readBuildConfig({ MOONDIFF_REVIEW_URL: "http://localhost:4173/" }).reviewUrl,
     "http://localhost:4173/",
   );
   for (const url of [
@@ -300,20 +300,20 @@ test("build emits the Firefox 140 AMO manifest with minimal permissions", () => 
     "https://user:pass@diff.example/",
     "https://diff.example/#x",
   ]) {
-    assert.throws(() => readBuildConfig({ MOONDIFF_PLAYGROUND_URL: url }));
+    assert.throws(() => readBuildConfig({ MOONDIFF_REVIEW_URL: url }));
   }
   assert.throws(() => readBuildConfig(
-    { MOONDIFF_PLAYGROUND_URL: "http://localhost:4173/" },
+    { MOONDIFF_REVIEW_URL: "http://localhost:4173/" },
     "amo",
   ));
   assert.throws(() => readBuildConfig({}));
   assert.throws(() => readBuildConfig(
-    { MOONDIFF_PLAYGROUND_URL: "https://diff.example/" },
+    { MOONDIFF_REVIEW_URL: "https://diff.example/" },
     "webstore",
   ));
 
   buildExtension({
-    env: { MOONDIFF_PLAYGROUND_URL: "https://diff.example/" },
+    env: { MOONDIFF_REVIEW_URL: "https://diff.example/" },
     mode: "amo",
     log: { write() {} },
   });
@@ -346,7 +346,7 @@ test("build emits the Firefox 140 AMO manifest with minimal permissions", () => 
 
 test("AMO packaging lints first and writes the versioned Firefox ZIP", async () => {
   const { destination } = await packageExtension({
-    env: { MOONDIFF_PLAYGROUND_URL: "https://diff.example/" },
+    env: { MOONDIFF_REVIEW_URL: "https://diff.example/" },
     log: { write() {} },
   });
   assert.equal(basename(destination), `moondiff-firefox-${extensionVersion}.zip`);

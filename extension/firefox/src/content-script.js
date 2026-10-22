@@ -26,7 +26,7 @@
     try {
       await browser.runtime.sendMessage({
         v: 1,
-        op: "playground.open",
+        op: "review.open",
         args: { route },
       });
     } catch {

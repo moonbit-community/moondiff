@@ -1,0 +1,8 @@
+import {
+  "moonbit-community/rabbita/dom",
+  "moonbit-community/moondiff-review-web/internal/browser",
+  "moonbit-community/moondiff-review-web/internal/github",
+  "moonbit-community/rabbita/url",
+}
+
+supported_targets = "js"

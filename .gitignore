@@ -3,10 +3,10 @@ target
 .mooncakes/
 .DS_Store
 .moonagent/
-playground/dist/
-playground/node_modules/
-playground/playwright-report/
-playground/test-results/
+review-web/dist/
+review-web/node_modules/
+review-web/playwright-report/
+review-web/test-results/
 extension/chrome/dist/
 extension/chrome/artifacts/
 extension/chrome/.dist-*/
@@ -15,7 +15,7 @@ extension/firefox/artifacts/
 extension/firefox/.dist-*/
 playwright-report/
 test-results/
-playground/.dist-*/
+review-web/.dist-*/
 .env
 *.sqlite3
 *.sqlite3-*

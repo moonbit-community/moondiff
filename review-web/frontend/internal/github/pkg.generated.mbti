@@ -1,0 +1,127 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-review-web/internal/github"
+
+import {
+  "moonbit-community/moondiff-review-web-protocol",
+}
+
+// Values
+pub const MAX_PULL_FILES : Int32 = 3_000
+
+pub const MAX_SOURCE_BYTES : Int32 = 1_048_576
+
+pub const MAX_SOURCE_LINES : Int32 = 20_000
+
+pub const PULL_FILE_LIMIT_ERROR : String = "This pull request changes more than GitHub's 3,000-file API limit, so its complete diff cannot be loaded."
+
+pub fn branch_repository(@moondiff-review-web-protocol.ApiPullBranch, RepositoryRef) -> RepositoryRef
+
+pub fn check_source(Bytes) -> CheckedSource
+
+pub fn commit_reference(String, String, String) -> CommitRef
+
+pub fn file_diff_mode(@moondiff-review-web-protocol.ApiFile) -> FileDiffMode
+
+pub fn first_parent(@moondiff-review-web-protocol.ApiCommit) -> String?
+
+pub fn is_interface_file(@moondiff-review-web-protocol.ApiFile) -> Bool
+
+pub fn is_moonbit_file(String) -> Bool
+
+pub fn merge_file_pages(ArrayView[@moondiff-review-web-protocol.ApiFile], ArrayView[@moondiff-review-web-protocol.ApiFile]) -> Array[@moondiff-review-web-protocol.ApiFile]
+
+pub fn parse_change_url(String) -> Result[CommitRef, String]
+
+pub fn pull_commit_reference(String, String, String, String) -> CommitRef
+
+pub fn pull_merge_base(@moondiff-review-web-protocol.ApiCompare) -> String
+
+pub fn pull_range_reference(String, String, String, String, String) -> CommitRef
+
+pub fn pull_reference(String, String, String) -> CommitRef
+
+pub fn pull_revisions(CommitRef, @moondiff-review-web-protocol.ApiPull, @moondiff-review-web-protocol.ApiCompare) -> (Revision?, Revision)
+
+pub fn pull_stats(@moondiff-review-web-protocol.ApiPull) -> @moondiff-review-web-protocol.ApiStats
+
+pub fn range_endpoints(String) -> (String, String)?
+
+pub fn range_reference(String, String, String, String) -> CommitRef
+
+pub fn range_revisions(CommitRef, String, String, @moondiff-review-web-protocol.ApiPull?, String?) -> (Revision, Revision)
+
+pub fn reference_repository(CommitRef) -> RepositoryRef
+
+pub fn repository_commit_revisions(RepositoryRef, String, String?) -> (Revision?, Revision)
+
+pub fn same_pull_snapshot(@moondiff-review-web-protocol.ApiPull, @moondiff-review-web-protocol.ApiPull) -> Bool
+
+pub fn should_fetch_next_page(Int32, Int32) -> Bool
+
+pub fn should_fetch_next_pull_page(Int32, Int32, Int32, Int32?) -> Bool
+
+pub fn source_pair_for_revisions(Revision?, Revision, @moondiff-review-web-protocol.ApiFile) -> SourcePair
+
+pub fn valid_owner(String) -> Bool
+
+pub fn valid_pull_number(String) -> Bool
+
+pub fn valid_repo(String) -> Bool
+
+pub fn valid_sha(String) -> Bool
+
+pub fn validate_pull_files(@moondiff-review-web-protocol.ApiPull, ArrayView[@moondiff-review-web-protocol.ApiFile]) -> Result[Unit, String]
+
+// Errors
+
+// Types and methods
+pub(all) enum ChangeTarget {
+  Commit(String)
+  PullRequest(String)
+  PullCommit(String, String)
+  Range(String, String)
+  PullRange(String, String, String)
+} derive(Eq)
+
+pub(all) enum CheckedSource {
+  Renderable(Array[String])
+  Rejected(String, Bool)
+}
+
+pub(all) struct CommitRef {
+  owner : String
+  repo : String
+  target : ChangeTarget
+} derive(Eq)
+
+pub(all) enum FileDiffMode {
+  MoonBitDiff
+  LineDiff
+} derive(Eq)
+
+pub(all) struct RepositoryRef {
+  owner : String
+  repo : String
+} derive(Eq)
+
+pub(all) struct Revision {
+  repository : RepositoryRef
+  sha : String
+} derive(Eq)
+
+pub(all) struct SourceLocation {
+  repository : RepositoryRef
+  revision : String
+  path : String
+}
+
+pub(all) struct SourcePair {
+  old_url : String?
+  new_url : String?
+  old_location : SourceLocation?
+  new_location : SourceLocation?
+}
+
+// Type aliases
+
+// Traits

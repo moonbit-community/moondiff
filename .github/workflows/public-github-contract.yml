@@ -15,4 +15,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node playground/scripts/check-github-api-contract.mjs
+      - run: node review-web/scripts/check-github-api-contract.mjs

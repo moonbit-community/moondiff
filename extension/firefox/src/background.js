@@ -13,7 +13,7 @@
   }
 
   function targetURL(route) {
-    return new URL(route, MoondiffConfig.playgroundUrl).href;
+    return new URL(route, MoondiffConfig.reviewUrl).href;
   }
 
   function stillAtTarget(tab, url) {
@@ -42,7 +42,7 @@
       sender.tab.id < 0 ||
       !route ||
       message?.v !== 1 ||
-      message.op !== "playground.open" ||
+      message.op !== "review.open" ||
       message.args?.route !== route ||
       Object.keys(message).sort().join(",") !== "args,op,v" ||
       Object.keys(message.args).join(",") !== "route"

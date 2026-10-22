@@ -1,0 +1,201 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-review-web/internal/view"
+
+import {
+  "moonbit-community/moondiff-review-web-protocol",
+  "moonbit-community/moondiff-review-web/internal/application",
+  "moonbit-community/moondiff-review-web/internal/change",
+  "moonbit-community/moondiff-review-web/internal/comments",
+  "moonbit-community/moondiff-review-web/internal/github",
+  "moonbit-community/moondiff-review-web/internal/github_client",
+  "moonbit-community/moondiff/model",
+  "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/html",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn diff_notice(ArrayView[@model.FallbackReason], Bool) -> DiffNotice?
+
+pub fn dispose_file_tree_resize() -> Unit
+
+pub fn region_view(RegionInput, @cmd.Emit[@application.Msg], FileDerivation) -> @html.Html
+
+pub fn semantic_section_fragment(@model.DiffSection) -> @model.DiffFragment
+
+pub fn semantic_section_title(Int32, @model.DiffSection) -> String
+
+pub fn shell_input(@application.Model) -> ShellInput
+
+pub fn shell_view(ShellInput, Array[MountHost]) -> @html.Html
+
+// Errors
+
+// Types and methods
+pub(all) struct DiffNotice {
+  class_name : String
+  label : String
+  message : String
+}
+
+pub(all) struct DiscussionInput {
+  generation : Int32
+  is_pull : Bool
+  review : @comments.ReadView
+  auth : @application.AuthStatus
+  sign_in_dialog : @application.SignInDialog
+} derive(Eq)
+
+pub(all) struct DisplayOptions {
+  mode : @change.ViewMode
+  algorithm : @change.DiffAlgorithm
+  ignore_comments : Bool
+  ignore_tests : Bool
+} derive(Eq)
+
+pub struct FileDerivation {
+  // private fields
+}
+pub fn FileDerivation::new() -> Self
+
+pub(all) struct FileInput {
+  file : @change.FileState
+  generation : Int32
+  index : Int32
+  display : DisplayOptions
+  review : @comments.ReadView
+  viewed : ViewedControl
+  navigation_enabled : Bool
+}
+pub impl Eq for FileInput
+
+type FileTreeRow derive(Eq, @debug.Debug)
+
+pub(all) struct MountHost {
+  region : @application.Region
+  id : String
+} derive(Eq)
+
+pub(all) struct NavigationInput {
+  generation : Int32
+  enabled : Bool
+} derive(Eq)
+
+pub(all) struct PullMergeInput {
+  write_enabled : Bool
+  state : @application.PullMergeState
+  auth : @application.AuthStatus
+  snapshot_stale : Bool
+} derive(Eq)
+
+pub(all) struct RangePanelInput {
+  generation : Int32
+  reference : @github.CommitRef
+  state : @application.RangeState
+  stats : @moondiff-review-web-protocol.ApiStats
+  file_count : Int32
+} derive(Eq)
+
+pub(all) enum RegionInput {
+  Home(@application.AuthStatus, @application.HomeState)
+  Toolbar(ToolbarInput)
+  Status(StatusInput)
+  FileTree(TreeInput)
+  Navigation(NavigationInput)
+  ViewedSummary(ViewedSummaryInput)
+  Discussion(DiscussionInput)
+  PullMergeStatus(PullMergeInput)
+  RangePanel(RangePanelInput)
+  File(FileInput)
+} derive(Eq)
+pub fn RegionInput::draft_id(Self) -> String
+
+pub struct RegionProjection {
+  // private fields
+}
+pub fn RegionProjection::inputs(Self, @application.Model) -> Array[(@application.Region, RegionInput)]
+pub fn RegionProjection::new() -> Self
+
+pub(all) struct ShellInput {
+  home : Bool
+  generation : Int32
+  landing : Bool
+  showing : Bool
+  selector_only : Bool
+  message : String
+  drawer_open : Bool
+  preferred_width : Int32
+  display : DisplayOptions
+  range_limit : Bool
+} derive(Eq)
+
+pub(all) enum StatusInput {
+  Empty
+  Loading(String)
+  Failed(String, @application.AuthStatus)
+  RateLimited(@github_client.RateLimitReason, @application.AuthStatus)
+} derive(Eq)
+
+pub(all) struct ToolbarInput {
+  input : String
+  landing : Bool
+  drawer_open : Bool
+  auth : @application.AuthStatus
+  file_count : Int32?
+  diff_algorithm : @change.DiffAlgorithm
+  view_mode : @change.ViewMode
+  ignore_comments : Bool
+  ignore_tests : Bool
+} derive(Eq)
+
+pub struct TreeData {
+  // private fields
+}
+pub impl Eq for TreeData
+
+pub(all) struct TreeInput {
+  generation : Int32
+  tree : TreeData
+  state : @application.FileTreeState
+  viewed : Array[Bool]
+} derive(Eq)
+
+pub(all) struct TreeMetadata {
+  path : String
+  previous_filename : String?
+  status : String
+} derive(Eq)
+
+pub(all) struct ViewedControl {
+  is_pull : Bool
+  requires_sign_in : Bool
+  generation : Int32
+  index : Int32
+  path : String
+  checked : Bool
+  syncing : Bool
+  confirming : Bool
+  dismissed : Bool
+  disabled : Bool
+  title : String
+  error : String?
+  retry_disabled : Bool
+} derive(Eq)
+
+pub(all) struct ViewedSummaryInput {
+  is_pull : Bool
+  total : Int32
+  count : Int32
+  pending : Bool
+  auth : @application.AuthStatus
+  ready : Bool
+  loading : Bool
+  error : String?
+  stale : Bool
+  can_refresh : Bool
+  poll_scheduled : Bool
+} derive(Eq)
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,13 @@
+import {
+  "moonbit-community/moondiff-review-web-protocol" @protocol,
+  "moonbit-community/moondiff-review-web-server/internal/protocol" @common,
+  "moonbit-community/moondiff-review-web-server/internal/github",
+  "moonbit-community/moondiff-review-web-server/internal/storage",
+}
+
+import {
+  "moonbit-community/sqlite3",
+  "moonbitlang/async",
+} for "wbtest"
+
+supported_targets = "native+wasm"
