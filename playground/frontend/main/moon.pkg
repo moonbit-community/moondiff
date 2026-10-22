@@ -1,7 +1,0 @@
-import {
-  "moonbit-community/moondiff-playground/internal/rendering",
-}
-
-supported_targets = "js"
-
-pkgtype(kind: "executable")

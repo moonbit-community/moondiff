@@ -1,0 +1,8 @@
+import {
+  "moonbit-community/moondiff-review-web-server/internal/server",
+  "moonbitlang/async",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native+wasm"

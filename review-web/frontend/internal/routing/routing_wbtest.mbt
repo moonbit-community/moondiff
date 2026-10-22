@@ -1,0 +1,183 @@
+///|
+test "parse supported GitHub commit and pull request URL forms" {
+  guard parse_change_url(
+      "https://github.com/moonbit-community/moondiff/commit/aBcDeF1?diff=split#files",
+    )
+    is Ok(commit) else {
+    fail("expected commit URL to parse")
+  }
+  assert_eq(commit.owner, "moonbit-community")
+  assert_eq(commit.repo, "moondiff")
+  assert_true(commit.target is Commit("aBcDeF1"))
+
+  guard parse_change_url(
+      "https://github.com/moonbitlang/core/pull/42/changes/0123456789abcdef",
+    )
+    is Ok(pr) else {
+    fail("expected PR changes URL to parse")
+  }
+  assert_eq(pr.owner, "moonbitlang")
+  assert_eq(pr.repo, "core")
+  assert_true(pr.target is PullCommit("42", "0123456789abcdef"))
+  assert_eq(
+    canonical_github_url(pr),
+    "https://github.com/moonbitlang/core/pull/42/commits/0123456789abcdef",
+  )
+
+  for
+    url in [
+      "https://github.com/moonbitlang/core/pull/4082", "https://github.com/moonbitlang/core/pull/4082/files?diff=split#discussion_r1",
+    ] {
+    guard parse_change_url(url) is Ok(reference) else {
+      fail("expected pull request URL to parse: \{url}")
+    }
+    assert_eq(reference.owner, "moonbitlang")
+    assert_eq(reference.repo, "core")
+    assert_true(reference.target is PullRequest("4082"))
+  }
+}
+
+///|
+test "shared review app routes round-trip to canonical GitHub commit URLs" {
+  let reference = commit_reference("moonbit-community", "moondiff", "aBcDeF1")
+  assert_eq(
+    review_route(reference),
+    "/moonbit-community/moondiff/commit/aBcDeF1",
+  )
+  assert_eq(
+    canonical_github_url(reference),
+    "https://github.com/moonbit-community/moondiff/commit/aBcDeF1",
+  )
+  guard reference_from_review_url(
+      "https://example.test/moonbit-community/moondiff/commit/aBcDeF1",
+    )
+    is Ok(Some(parsed)) else {
+    fail("expected the shared route to parse")
+  }
+  assert_true(parsed == reference)
+  let pull = pull_reference("moonbitlang", "core", "4082")
+  assert_eq(review_route(pull), "/moonbitlang/core/pull/4082")
+  assert_eq(
+    canonical_github_url(pull),
+    "https://github.com/moonbitlang/core/pull/4082",
+  )
+  guard reference_from_review_url(
+      "https://example.test/moonbitlang/core/pull/4082",
+    )
+    is Ok(Some(parsed_pull)) else {
+    fail("expected the shared pull request route to parse")
+  }
+  assert_true(parsed_pull == pull)
+  assert_true(reference_from_review_url("https://example.com/") is Ok(None))
+  assert_true(
+    reference_from_review_url(
+      "https://example.com/moonbit-community/moondiff/pull/0",
+    )
+    is Err(_),
+  )
+  assert_true(
+    reference_from_review_url(
+      "https://example.com/moonbit-community/moondiff/pull/017",
+    )
+    is Err(_),
+  )
+  assert_true(
+    reference_from_review_url(
+      "https://example.com/bad owner/moondiff/commit/abcdef1",
+    )
+    is Err(_),
+  )
+}
+
+///|
+test "reject unsupported or malformed URLs" {
+  for
+    url in [
+      "http://github.com/a/b/commit/abcdef1", "https://git.example.com/a/b/commit/abcdef1",
+      "https://github.example.com/a/b/commit/abcdef1", "https://github.com/a/b/compare/abcdef1...abcdef2",
+      "https://github.com/-bad/b/commit/abcdef1", "https://github.com/a/bad%2Frepo/commit/abcdef1",
+      "https://github.com/a/b/commit/abcdef", "https://github.com/a/b/pull/nope/changes/abcdef1",
+      "https://github.com/a/b/pull/0/changes/abcdef1", "https://github.com/a/b/pull/nope",
+      "https://github.com/a/b/pull/0/files", "https://github.com/a/b/pull/017", "https://github.com:443/a/b/commit/abcdef1",
+    ] {
+    assert_true(parse_change_url(url) is Err(_), msg=url)
+  }
+}
+
+///|
+test "PR commit URL and ordinary routes preserve pull context" {
+  for
+    url in [
+      "https://github.com/acme/widgets/pull/17/commits/abcdef1", "https://github.com/acme/widgets/pull/17/changes/abcdef1",
+    ] {
+    guard parse_change_url(url) is Ok(reference) else {
+      fail("expected PR commit URL to parse")
+    }
+    assert_true(reference.target is PullCommit("17", "abcdef1"))
+    assert_eq(review_route(reference), "/acme/widgets/pull/17/commits/abcdef1")
+    guard reference_from_review_url(
+        "https://example.test\{review_route(reference)}",
+      )
+      is Ok(Some(roundtrip)) else {
+      fail("expected PR commit route to round-trip")
+    }
+    assert_true(roundtrip == reference)
+  }
+  for
+    url in [
+      "https://github.com/acme/widgets/pull/17", "https://github.com/acme/widgets/pull/17/files",
+      "https://github.com/acme/widgets/pull/17/commits",
+    ] {
+    guard parse_change_url(url) is Ok(reference) else {
+      fail("expected PR URL to parse")
+    }
+    assert_true(reference.target is PullRequest("17"))
+  }
+}
+
+///|
+test "old hash links are invalid" {
+  assert_true(
+    reference_from_review_url("https://example.com/#/a/b/pull/42") is Err(_),
+  )
+  assert_true(reference_from_route(Some("#/a/b/pull/42")) is Err(_))
+}
+
+///|
+test "two-dot SHA intervals round-trip with and without pull context" {
+  let base = "a".repeat(40)
+  let head = "b".repeat(40)
+  let generic = range_reference("alice", "repo", base, head)
+  let pull = pull_range_reference("alice", "repo", "17", base, head)
+  for reference in [generic, pull] {
+    guard reference_from_review_url(
+        "https://example.test\{review_route(reference)}",
+      )
+      is Ok(Some(parsed)) else {
+      fail("expected interval route to round-trip")
+    }
+    assert_true(parsed == reference)
+    assert_eq(
+      canonical_github_url(reference),
+      "https://github.com/alice/repo/compare/\{base}..\{head}",
+    )
+  }
+  guard parse_change_url(
+      "https://github.com/alice/repo/compare/abcdef1..1234567",
+    )
+    is Ok(short) else {
+    fail("expected two-dot GitHub compare link")
+  }
+  assert_true(short.target is Range("abcdef1", "1234567"))
+  assert_true(
+    reference_from_route(Some("/alice/repo/pull/17/compare/abcdef1..1234567"))
+    is Ok(Some(_)),
+  )
+  for
+    value in [
+      "https://github.com/alice/repo/compare/abcdef1...1234567", "https://github.com/alice/repo/compare/main..1234567",
+      "https://github.com/alice/repo/compare/abcdef1..v1",
+    ] {
+    assert_true(parse_change_url(value) is Err(_))
+  }
+}

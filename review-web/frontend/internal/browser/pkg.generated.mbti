@@ -1,0 +1,129 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-review-web/internal/browser"
+
+import {
+  "moonbit-community/rabbita/dom",
+  "moonbit-community/rabbita/js",
+  "moonbitlang/async/js_async",
+}
+
+// Values
+pub fn chunk_bytes(@js.Value) -> Bytes
+
+pub fn click(@dom.Element) -> Unit
+
+pub fn copy_text(String, (Bool) -> Unit) -> Unit
+
+pub fn current_element(@js.Nullable[@dom.EventTarget]) -> @dom.Element?
+
+pub fn date_iso_now() -> String
+
+pub fn date_local(Double) -> String
+
+pub fn date_now() -> Double
+
+pub fn date_parse(String) -> Double
+
+pub fn date_utc(Double) -> String
+
+pub fn element(String) -> @dom.Element?
+
+pub fn error_message(@js.Value) -> String
+
+pub fn[T] event_property(@dom.Event, String) -> T
+
+pub fn fetch(String, @js.Value) -> @js_async.Promise[Response]
+
+pub fn finite(Double) -> Bool
+
+pub fn focus(@dom.Element) -> Unit
+
+pub fn has_focus() -> Bool
+
+pub fn has_window() -> Bool
+
+pub fn history_entry_id() -> String
+
+pub fn history_go(Int32) -> Unit
+
+pub fn history_push(String, String) -> Unit
+
+pub fn history_replace(String, String) -> Unit
+
+pub fn history_state() -> String
+
+pub fn intersection_observer((FixedArray[@dom.IntersectionObserverEntry], @dom.IntersectionObserver) -> Unit, String) -> @dom.IntersectionObserver
+
+pub fn manual_scroll_restoration() -> Unit
+
+pub fn mouse_click() -> @dom.Event
+
+pub fn parse_float(String) -> Double
+
+pub fn[T] property(@dom.Element, String) -> T
+
+pub fn random_uuid() -> String
+
+pub fn remove(@dom.Element) -> Unit
+
+pub fn resolve_url(String) -> String
+
+pub fn same(@dom.Element, @dom.Element) -> Bool
+
+pub fn scroll_to(Double, Double) -> Unit
+
+pub fn scroll_x() -> Double
+
+pub fn scroll_y() -> Double
+
+pub fn select_range(@dom.Element, Int32, Int32, String) -> Unit
+
+pub fn selection_direction(@dom.Element) -> String
+
+pub fn selection_end(@dom.Element) -> Int32
+
+pub fn selection_start(@dom.Element) -> Int32
+
+pub fn[T] set_property(@dom.Element, String, T) -> Unit
+
+pub fn storage_get(String) -> String? raise
+
+pub fn storage_key(Int32) -> String? raise
+
+pub fn storage_length() -> Int32 raise
+
+pub fn storage_remove(String) -> Unit raise
+
+pub fn storage_set(String, String) -> Unit raise
+
+pub fn style(@dom.Element) -> @dom.CSSStyleDeclaration
+
+pub fn[T] subscribe(@js_async.Promise[T], (T) -> Unit, (@js.Value) -> Unit) -> Unit
+
+// Errors
+
+// Types and methods
+#external
+pub type AbortController
+pub fn AbortController::abort(Self) -> Unit
+pub fn AbortController::aborted(Self) -> Bool
+pub fn AbortController::new() -> Self
+pub fn AbortController::signal(Self) -> @js.Value
+
+#external
+pub type Reader
+pub fn Reader::cancel(Self) -> @js_async.Promise[Unit]
+pub fn Reader::read(Self) -> @js_async.Promise[@js.Value]
+
+#external
+pub type Response
+pub fn Response::has_header(Self, String) -> Bool
+pub fn Response::header(Self, String) -> @js.Nullable[String]
+pub fn Response::ok(Self) -> Bool
+pub fn Response::reader(Self) -> Reader
+pub fn Response::status(Self) -> Int32
+pub fn Response::text(Self) -> @js_async.Promise[String]
+
+// Type aliases
+
+// Traits

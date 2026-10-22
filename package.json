@@ -3,23 +3,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm --prefix playground run build",
-    "test:playground": "npm --prefix playground run test:e2e",
-    "test:views": "npm --prefix playground run test:views",
-    "test:playground:stress": "npm --prefix playground run test:e2e:stress --",
+    "build": "npm --prefix review-web run build",
+    "test:review-web": "npm --prefix review-web run test:e2e",
+    "test:views": "npm --prefix review-web run test:views",
+    "test:review-web:stress": "npm --prefix review-web run test:e2e:stress --",
     "build:extension": "npm run build:extension:chrome && npm run build:extension:firefox",
     "build:extension:chrome": "node extension/chrome/scripts/build.mjs",
     "build:extension:firefox": "node extension/firefox/scripts/build.mjs",
     "test:extension": "npm run test:extension:chrome && npm run test:extension:firefox",
-    "test:extension:chrome": "node --test extension/chrome/tests/*.test.mjs && playground/node_modules/.bin/playwright test --config extension/chrome/playwright.config.mjs",
-    "test:extension:firefox": "node --test extension/firefox/tests/*.test.mjs && playground/node_modules/.bin/playwright test --config extension/firefox/playwright.config.mjs",
+    "test:extension:chrome": "node --test extension/chrome/tests/*.test.mjs && review-web/node_modules/.bin/playwright test --config extension/chrome/playwright.config.mjs",
+    "test:extension:firefox": "node --test extension/firefox/tests/*.test.mjs && review-web/node_modules/.bin/playwright test --config extension/firefox/playwright.config.mjs",
     "lint:extension:firefox": "node extension/firefox/scripts/lint.mjs",
     "package:extension": "npm run package:extension:chrome && npm run package:extension:firefox",
     "package:extension:chrome": "node extension/chrome/scripts/package.mjs",
     "package:extension:firefox": "node extension/firefox/scripts/package.mjs",
-    "start": "npm --prefix playground start",
-    "dev": "npm --prefix playground run dev",
-    "test:server": "npm --prefix playground run test:server",
-    "test:artifacts": "node --test playground/tests/artifacts.test.mjs"
+    "start": "npm --prefix review-web start",
+    "dev": "npm --prefix review-web run dev",
+    "test:server": "npm --prefix review-web run test:server",
+    "test:artifacts": "node --test review-web/tests/artifacts.test.mjs"
   }
 }

@@ -11,7 +11,7 @@ if (typeof importScripts === 'function') importScripts('config.js', 'target.js')
     mutation = result.catch(() => {});
     return result;
   }
-  function targetURL(route) { return new URL(route, MoondiffConfig.playgroundUrl).href; }
+  function targetURL(route) { return new URL(route, MoondiffConfig.reviewUrl).href; }
   function stillAtTarget(tab, url) {
     try {
       const current = new URL(tab.pendingUrl || tab.url);
@@ -27,7 +27,7 @@ if (typeof importScripts === 'function') importScripts('config.js', 'target.js')
     const target = MoondiffTarget.parseGitHubTarget(sender?.tab?.pendingUrl || sender?.tab?.url || sender?.url);
     const route = MoondiffTarget.targetPath(target);
     if (source.origin !== 'https://github.com' || source.username || source.password || sender?.frameId !== 0 || !Number.isInteger(sender?.tab?.id) || sender.tab.id < 0 || !route ||
-      message?.v !== 1 || message.op !== 'playground.open' || message.args?.route !== route ||
+      message?.v !== 1 || message.op !== 'review.open' || message.args?.route !== route ||
       Object.keys(message).sort().join(',') !== 'args,op,v' || Object.keys(message.args).join(',') !== 'route') {
       throw new Error('Unsupported GitHub navigation.');
     }

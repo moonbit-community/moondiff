@@ -1,4 +1,4 @@
-import { defineConfig } from "../../playground/node_modules/@playwright/test/index.mjs";
+import { defineConfig } from "../../review-web/node_modules/@playwright/test/index.mjs";
 
 export default defineConfig({
   testDir: "./tests",

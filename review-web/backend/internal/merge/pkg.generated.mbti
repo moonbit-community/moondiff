@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-review-web-server/internal/merge"
+
+import {
+  "moonbit-community/moondiff-review-web-protocol",
+  "moonbit-community/moondiff-review-web-server/internal/storage",
+}
+
+// Values
+pub async fn pull_merge_status(@storage.App, @storage.Session?, @moondiff-review-web-protocol.PullMergeStatusGet) -> @moondiff-review-web-protocol.ApiPullMergeStatus
+
+pub async fn pull_rebase_merge(@storage.App, @storage.Session?, @moondiff-review-web-protocol.PullRebaseMerge) -> @moondiff-review-web-protocol.ApiPullMergeResult
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

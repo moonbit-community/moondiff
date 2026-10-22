@@ -21,8 +21,8 @@ export function readBuildConfig(env = process.env, mode = "development") {
   if (!["development", "amo"].includes(mode)) {
     throw new Error(`Unknown build mode: ${mode}`);
   }
-  const value = env.MOONDIFF_PLAYGROUND_URL;
-  if (!value) throw new Error("Missing MOONDIFF_PLAYGROUND_URL.");
+  const value = env.MOONDIFF_REVIEW_URL;
+  if (!value) throw new Error("Missing MOONDIFF_REVIEW_URL.");
   const url = new URL(value);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (
@@ -33,9 +33,9 @@ export function readBuildConfig(env = process.env, mode = "development") {
     url.hash ||
     !(url.protocol === "https:" || mode === "development" && loopback && url.protocol === "http:")
   ) {
-    throw new Error("MOONDIFF_PLAYGROUND_URL must be an HTTPS root URL; development also allows loopback HTTP.");
+    throw new Error("MOONDIFF_REVIEW_URL must be an HTTPS root URL; development also allows loopback HTTP.");
   }
-  return { playgroundUrl: `${url.origin}/` };
+  return { reviewUrl: `${url.origin}/` };
 }
 
 function crc32(buffer) {
@@ -132,10 +132,10 @@ function manifest(config) {
   return {
     manifest_version: 3,
     name: "Moondiff",
-    description: "Open GitHub changes in your Moondiff playground with the Open in Moondiff button.",
+    description: "Open GitHub changes in Moondiff Review with the Open in Moondiff button.",
     version: extensionVersion,
     permissions: ["storage"],
-    host_permissions: [`${new URL(config.playgroundUrl).origin}/*`],
+    host_permissions: [`${new URL(config.reviewUrl).origin}/*`],
     background: {
       scripts: ["config.js", "target.js", "background.js"],
     },
@@ -184,7 +184,7 @@ export function buildExtension({ env = process.env, log = process.stdout, mode =
     writeFileSync(
       join(stagingRoot, "config.js"),
       `globalThis.MoondiffConfig = Object.freeze(${JSON.stringify({
-        playgroundUrl: buildConfig.playgroundUrl,
+        reviewUrl: buildConfig.reviewUrl,
       })});\n`,
     );
     rmSync(outputRoot, { recursive: true, force: true });

@@ -1,0 +1,127 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff-review-web/internal/github_client"
+
+import {
+  "moonbit-community/moondiff-review-web-protocol",
+  "moonbit-community/moondiff-review-web/internal/github",
+  "moonbit-community/rabbita/cmd",
+}
+
+// Values
+pub fn auth_device_request(DeviceAction, String, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.DeviceResponse, Error]]) -> @cmd.Cmd
+
+pub fn auth_logout_request(@cmd.Emit[Result[@moondiff-review-web-protocol.ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn auth_status_request(@cmd.Emit[Result[@moondiff-review-web-protocol.ApiAuthStatus, Error]]) -> @cmd.Cmd
+
+pub fn cancel_before(Int32) -> @cmd.Cmd
+
+pub fn create_commit_comment(@moondiff-review-web-protocol.CommitCommentCreate, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiCommitComment, Error]]) -> @cmd.Cmd
+
+pub fn create_issue_comment(@moondiff-review-web-protocol.IssueCommentCreate, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiIssueComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_comment(@moondiff-review-web-protocol.ReviewCommentCreate, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn create_review_reply(@moondiff-review-web-protocol.ReviewReplyCreate, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiReviewComment, Error]]) -> @cmd.Cmd
+
+pub fn delete_commit_comment(@moondiff-review-web-protocol.CommentDelete, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn delete_issue_comment(@moondiff-review-web-protocol.CommentDelete, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn delete_review_comment(@moondiff-review-web-protocol.CommentDelete, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.DeleteResult, Error]]) -> @cmd.Cmd
+
+pub fn dispose() -> Unit
+
+pub fn get_commit(@moondiff-review-web-protocol.CommitGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiCommit, Error]]) -> @cmd.Cmd
+
+pub fn get_compare(@moondiff-review-web-protocol.CompareGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiCompare, Error]]) -> @cmd.Cmd
+
+pub fn get_content(@moondiff-review-web-protocol.ContentGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiSource, Error]], priority? : Bool) -> @cmd.Cmd
+
+pub fn get_pull(@moondiff-review-web-protocol.PullGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiPull, Error]]) -> @cmd.Cmd
+
+pub fn get_pull_commit_page(@moondiff-review-web-protocol.PullCommitPageGet, Int32, @cmd.Emit[Result[Array[@moondiff-review-web-protocol.ApiRangeCommit], Error]]) -> @cmd.Cmd
+
+pub fn get_pull_commits(@moondiff-review-web-protocol.PullCommitsGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiPullCommits, Error]]) -> @cmd.Cmd
+
+pub fn get_pull_files(@moondiff-review-web-protocol.PullFiles, Int32, @cmd.Emit[Result[Array[@moondiff-review-web-protocol.ApiFile], Error]]) -> @cmd.Cmd
+
+pub fn get_pull_fresh(@moondiff-review-web-protocol.PullGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiPull, Error]]) -> @cmd.Cmd
+
+pub fn get_pull_merge_status(@moondiff-review-web-protocol.PullMergeStatusGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiPullMergeStatus, Error]]) -> @cmd.Cmd
+
+pub fn get_pull_viewed(@moondiff-review-web-protocol.PullViewedGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiPullViewed, Error]]) -> @cmd.Cmd
+
+pub fn get_range_compare(@moondiff-review-web-protocol.RangeCompareGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiRangeCompare, Error]]) -> @cmd.Cmd
+
+pub fn get_viewer_pulls(@moondiff-review-web-protocol.ViewerPullsGet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiViewerPulls, Error]]) -> @cmd.Cmd
+
+pub fn http_error_code(Error) -> String?
+
+pub fn list_comments(@moondiff-review-web-protocol.CommentsList, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiCommentBundle, Error]]) -> @cmd.Cmd
+
+pub fn load_pull_snapshot(@moondiff-review-web-protocol.PullGet, Int32, @cmd.Emit[Result[SnapshotResult, Error]], revalidate? : Bool) -> @cmd.Cmd
+
+pub fn observe_auth_failure(() -> Unit) -> Unit
+
+pub fn prefetch_home(Array[PrefetchCandidate], Int32) -> @cmd.Cmd
+
+pub fn prefetch_intent(@moondiff-review-web-protocol.PullGet?, Bool) -> @cmd.Cmd
+
+pub fn prioritize_sources(Array[@github.SourceLocation], Int32) -> @cmd.Cmd
+
+pub fn rate_limit_reason(Error) -> RateLimitReason?
+
+pub fn rebase_merge_pull(@moondiff-review-web-protocol.PullRebaseMerge, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiPullMergeResult, Error]]) -> @cmd.Cmd
+
+pub fn resolve_sha(@moondiff-review-web-protocol.ResolveShaGet, Int32, @cmd.Emit[Result[String, Error]]) -> @cmd.Cmd
+
+pub fn resume_anonymous_sources(Int32) -> @cmd.Cmd
+
+pub fn set_file_viewed(@moondiff-review-web-protocol.PullFileViewedSet, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.ApiFileViewedResult, Error]]) -> @cmd.Cmd
+
+pub fn source_request(@github.SourceLocation, Int32, @cmd.Emit[Result[(String, Bytes), Error]], priority? : Bool) -> @cmd.Cmd
+
+pub fn stop_prefetch() -> @cmd.Cmd
+
+// Errors
+pub(all) suberror GitHubRequestError {
+  GitHubRequestError(String)
+}
+
+pub(all) suberror HttpRequestError {
+  HttpRequestError(status~ : Int32, code~ : String, detail~ : String)
+}
+
+pub(all) suberror RateLimited {
+  RateLimited(RateLimitReason)
+}
+
+// Types and methods
+pub(all) enum DeviceAction {
+  Start
+  Poll
+  Retry
+  Cancel
+}
+
+pub(all) struct PrefetchCandidate {
+  pull : @moondiff-review-web-protocol.PullGet
+  updated_at : String
+} derive(Eq)
+
+pub(all) enum RateLimitReason {
+  AnonymousRequests
+  AuthenticatedRequests
+} derive(Eq)
+pub fn RateLimitReason::message(Self) -> String
+
+pub(all) struct SnapshotResult {
+  snapshot : @moondiff-review-web-protocol.ApiPullSnapshot
+  confirmed : Bool
+} derive(Eq)
+
+// Type aliases
+pub using @moondiff-review-web-protocol {type ApiPullSnapshot as PullSnapshot}
+
+// Traits

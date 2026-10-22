@@ -1,0 +1,7 @@
+import {
+  "moonbit-community/moondiff-review-web/internal/highlight",
+  "moonbitlang/lexer",
+  "moonbitlang/lexer/tokens",
+}
+
+supported_targets = "js"

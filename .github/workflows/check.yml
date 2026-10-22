@@ -33,29 +33,29 @@ jobs:
       - name: moon check
         run: |
           moon check --target all
-          moon check playground/protocol --target all --deny-warn
-          (cd playground/frontend && moon check --target js --deny-warn)
-          (cd playground/backend && moon check --target wasm --deny-warn)
+          moon check review-web/protocol --target all --deny-warn
+          (cd review-web/frontend && moon check --target js --deny-warn)
+          (cd review-web/backend && moon check --target wasm --deny-warn)
       
       - name: format diff
         run: |
           moon fmt
-          (cd playground/frontend && moon fmt)
-          (cd playground/backend && moon fmt)
+          (cd review-web/frontend && moon fmt)
+          (cd review-web/backend && moon fmt)
           git diff --exit-code
 
       - name: info check
         run: |
           moon info
-          (cd playground/frontend && moon info --target js)
-          (cd playground/backend && moon info --target wasm)
+          (cd review-web/frontend && moon info --target js)
+          (cd review-web/backend && moon info --target wasm)
           git diff --exit-code
       
       - name: run test
         run: |
           moon test --target all
-          (cd playground/frontend && moon test --target js)
-          (cd playground/backend && moon test)
+          (cd review-web/frontend && moon test --target js)
+          (cd review-web/backend && moon test)
           bash scripts/cli_test.sh && git diff --exit-code cli_test
 
       - name: Set up Node.js
@@ -63,10 +63,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: playground/package-lock.json
+          cache-dependency-path: review-web/package-lock.json
 
-      - name: Install playground dependencies
-        working-directory: playground
+      - name: Install review app dependencies
+        working-directory: review-web
         run: npm ci
 
       - name: Build release artifacts
@@ -76,17 +76,17 @@ jobs:
         run: npm run test:artifacts
 
       - name: Install Playwright browsers
-        working-directory: playground
+        working-directory: review-web
         run: npx playwright install --with-deps chromium firefox
 
-      - name: Run playground integration tests
-        run: node --test playground/backend/tests/server.test.mjs
+      - name: Run review app integration tests
+        run: node --test review-web/backend/tests/server.test.mjs
 
       - name: Run extension tests
         run: npm run test:extension
 
       - name: Run browser component and integration tests
-        working-directory: playground
+        working-directory: review-web
         run: npm run test:e2e
 
       - name: Upload browser test failure artifacts
@@ -95,7 +95,7 @@ jobs:
         with:
           name: browser-test-failures-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            playground/test-results/
+            review-web/test-results/
             test-results/
           retention-days: 7
           if-no-files-found: ignore
@@ -120,24 +120,24 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: playground/package-lock.json
+          cache-dependency-path: review-web/package-lock.json
 
-      - name: Install playground dependencies
-        working-directory: playground
+      - name: Install review app dependencies
+        working-directory: review-web
         run: npm ci
 
       - name: Install Chromium
-        working-directory: playground
+        working-directory: review-web
         run: npx playwright install --with-deps chromium
 
       - name: Run rendering stress tests
-        run: npm run test:playground:stress
+        run: npm run test:review-web:stress
 
       - name: Upload rendering stress test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: rendering-stress-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: playground/test-results/
+          path: review-web/test-results/
           retention-days: 7
           if-no-files-found: ignore

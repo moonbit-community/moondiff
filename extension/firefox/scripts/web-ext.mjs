@@ -6,7 +6,7 @@ import { outputRoot, repositoryRoot } from "./build.mjs";
 
 const webExtEntry = join(
   repositoryRoot,
-  "playground",
+  "review-web",
   "node_modules",
   "web-ext",
   "index.js",
@@ -14,7 +14,7 @@ const webExtEntry = join(
 
 async function loadWebExt() {
   if (!existsSync(webExtEntry)) {
-    throw new Error("web-ext is not installed; run npm --prefix playground ci first.");
+    throw new Error("web-ext is not installed; run npm --prefix review-web ci first.");
   }
   return (await import(pathToFileURL(webExtEntry).href)).default;
 }

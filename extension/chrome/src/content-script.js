@@ -21,7 +21,7 @@
     opening = true;
     renderButton();
     try {
-      await chrome.runtime.sendMessage({ v: 1, op: 'playground.open', args: { route } });
+      await chrome.runtime.sendMessage({ v: 1, op: 'review.open', args: { route } });
     } catch {
       // Restore the button so the user can retry a worker/startup failure.
     } finally {

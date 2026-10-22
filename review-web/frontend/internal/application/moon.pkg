@@ -1,0 +1,23 @@
+import {
+  "moonbit-community/moondiff-review-web/internal/metrics",
+  "moonbitlang/core/string",
+  "moonbit-community/moondiff-review-web/internal/browser",
+  "moonbit-community/moondiff-review-web/internal/identity",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbit-community/moondiff-review-web-protocol" @protocol,
+  "moonbit-community/moondiff-review-web/internal/comment_requests",
+  "moonbit-community/moondiff-review-web/internal/change",
+  "moonbit-community/moondiff-review-web/internal/comments",
+  "moonbit-community/moondiff-review-web/internal/github",
+  "moonbit-community/moondiff-review-web/internal/github_client",
+  "moonbit-community/moondiff-review-web/internal/review",
+  "moonbit-community/moondiff-review-web/internal/routing",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/cmd",
+  "moonbit-community/rabbita/dom",
+  "moonbit-community/rabbita/sub",
+  "moonbit-community/rabbita/url",
+}
+
+supported_targets = "js"

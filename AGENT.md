@@ -24,10 +24,10 @@ bash scripts/cli_test.sh
 
 ## Web E2E Test
 
-### Playground
+### Moondiff Review
 
 ```
-npm run test:playground
+npm run test:review-web
 ```
 
 ### Browser Extension
