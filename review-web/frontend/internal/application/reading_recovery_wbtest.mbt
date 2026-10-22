@@ -287,6 +287,45 @@ test "a new auth recovery can start before completed metadata cleanup arrives" {
 }
 
 ///|
+test "skipped capture can recover a new pause before cleanup while cancellation stays blocked" {
+  for cancelled in [false, true] {
+    let model = new_reading_recovery(merge_test_model())
+    let token = model.reading_recovery.unwrap()
+    token.finished = true
+    token.cancelled = cancelled
+    let activated = prepare_reading_recovery(model, Review(PageReactivated))
+    assert_eq(activated.reading_recovery.unwrap().id != token.id, !cancelled)
+    let paused = reconcile_reading_recovery(
+      model,
+      { ..model, source_pause: Some(AnonymousRequests), },
+      Review(PageReactivated),
+    )
+    assert_eq(paused.reading_recovery.unwrap().id != token.id, !cancelled)
+  }
+}
+
+///|
+test "manual comment refresh owns its refresh ID through metadata and supersession" {
+  let model = review_test_model(Anonymous(None))
+  let emit : @rabbita.Emit[Msg] = _ => @rabbita.none
+  let started = update(
+      { ..model, reading_recovery_blocked: true, },
+      Review(RefreshComments),
+      emit,
+    ).model
+  let token = started.reading_recovery.unwrap()
+  assert_false(started.reading_recovery_blocked)
+  assert_eq(token.comments_refresh, Some(started.review.refresh_id))
+  let next = update(
+      started,
+      Review(BeginCommentsRefresh(started.generation, started.route.unwrap())),
+      emit,
+    ).model
+  assert_true(next.review.refresh_id > started.review.refresh_id)
+  assert_true(token.comments_refresh is None)
+}
+
+///|
 test "cancelled rounds cannot restart from late auth or source responses and old cleanup cannot clear a new round" {
   let model = new_reading_recovery(merge_test_model())
   let token = model.reading_recovery.unwrap()

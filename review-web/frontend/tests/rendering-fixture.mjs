@@ -21,6 +21,7 @@ export function gate() {
 
 async function fixtureValue(state, op, args) {
   state.calls.push({ op, args });
+  if (state.readGates?.[op]) await state.readGates[op].promise;
   const f = state.fixture;
   let value, failure;
   switch (op) {

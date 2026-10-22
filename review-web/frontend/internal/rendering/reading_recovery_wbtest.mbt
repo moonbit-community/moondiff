@@ -41,6 +41,20 @@ fn protected_reading(
 }
 
 ///|
+test "unavailable capture synchronously finishes without cancelling or recapturing" {
+  let coordinator = Coordinator::new()
+  let reading = protected_reading(coordinator)
+  coordinator.reading = None
+  coordinator.configure_reading(Some(reading.token), _ => @rabbita.none)
+  assert_true(reading.token.finished)
+  assert_false(reading.token.cancelled)
+  assert_true(coordinator.reading is None)
+  coordinator.configure_reading(Some(reading.token), _ => @rabbita.none)
+  assert_false(reading.token.cancelled)
+  assert_true(coordinator.anchoring.owners.is_empty())
+}
+
+///|
 test "reading merges retain the first baseline without taking the navigation slot or lock" {
   let coordinator = Coordinator::new()
   let reading = protected_reading(coordinator)
