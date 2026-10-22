@@ -114,13 +114,18 @@ fn update_auth(
       (
         next,
         if next.generation == 0 {
-          auth_status_request(next.auth_revision, emit)
+          auth_status_request(
+            next.auth_revision,
+            emit,
+            recovery=next.reading_recovery,
+          )
         } else {
           reactivation_auth_status_request(
             next.route,
             next.generation,
             next.auth_revision,
             emit,
+            recovery=next.reading_recovery,
           )
         },
       )

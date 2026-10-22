@@ -45,6 +45,12 @@ fn begin_viewed_refresh(
     },
   }
   let next = { ..model, viewed: state, }
+  if model.reading_recovery is Some(token) &&
+    !token.cancelled &&
+    !token.finished &&
+    (restart || token.viewed is Some(_)) {
+    token.viewed = Some((state.epoch, state.read_serial))
+  }
   let reference = view.reference
   (
     next,

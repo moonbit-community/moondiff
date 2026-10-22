@@ -71,6 +71,10 @@ pub fn start(id : String) -> Unit {
           generation,
           transition.after_commit,
         )
+        coordinator.configure_reading(
+          transition.reading_recovery,
+          coordinator.forward(raw),
+        )
         coordinator.configure_range(transition.model)
         coordinator.configure_progressive(
           transition.model,

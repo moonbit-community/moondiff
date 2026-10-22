@@ -8,11 +8,11 @@ import {
 }
 
 // Values
-pub fn auth_device_request(DeviceAction, String, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.DeviceResponse, Error]]) -> @cmd.Cmd
+pub fn auth_device_request(DeviceAction, String, Int32, @cmd.Emit[Result[@moondiff-review-web-protocol.DeviceResponse, Error]], finished? : () -> @cmd.Cmd) -> @cmd.Cmd
 
 pub fn auth_logout_request(@cmd.Emit[Result[@moondiff-review-web-protocol.ApiAuthStatus, Error]]) -> @cmd.Cmd
 
-pub fn auth_status_request(@cmd.Emit[Result[@moondiff-review-web-protocol.ApiAuthStatus, Error]]) -> @cmd.Cmd
+pub fn auth_status_request(@cmd.Emit[Result[@moondiff-review-web-protocol.ApiAuthStatus, Error]], finished? : () -> @cmd.Cmd) -> @cmd.Cmd
 
 pub fn cancel_before(Int32) -> @cmd.Cmd
 

@@ -15,11 +15,13 @@ priv struct ProgressiveState {
   mut stop : (() -> Unit)?
   mut emit : @rabbita.Emit[@application.Msg]?
   mut anchor : (@dom.Element, Double)?
-  mut native_anchoring : (@dom.Element, String, String)?
+  anchoring : NativeAnchoring
 }
 
 ///|
-fn ProgressiveState::new() -> ProgressiveState {
+fn ProgressiveState::new(
+  anchoring~ : NativeAnchoring = NativeAnchoring::new(),
+) -> ProgressiveState {
   {
     generation: -1,
     candidates: [],
@@ -36,40 +38,18 @@ fn ProgressiveState::new() -> ProgressiveState {
     stop: None,
     emit: None,
     anchor: None,
-    native_anchoring: None,
+    anchoring,
   }
 }
 
 ///|
 fn ProgressiveState::release_anchoring(self : ProgressiveState) -> Unit {
-  if self.native_anchoring is Some((page, value, priority)) {
-    self.native_anchoring = None
-    let style = @browser.style(page)
-    if value.is_empty() {
-      ignore(style.remove_property("overflow-anchor"))
-    } else {
-      style.set_property_with_priority("overflow-anchor", value, priority)
-    }
-  }
+  self.anchoring.release(History)
 }
 
 ///|
 fn ProgressiveState::hold_anchoring(self : ProgressiveState) -> Unit {
-  guard self.native_anchoring is None &&
-    !self.candidates.is_empty() &&
-    @browser.has_window() else {
-    return
-  }
-  let page = @dom.document().get_document_element().unwrap()
-  let style = @browser.style(page)
-  self.native_anchoring = Some(
-    (
-      page,
-      style.get_property_value("overflow-anchor"),
-      style.get_property_priority("overflow-anchor"),
-    ),
-  )
-  style.set_property_with_priority("overflow-anchor", "none", "important")
+  self.anchoring.acquire(History)
 }
 
 ///|
@@ -126,7 +106,7 @@ fn Coordinator::configure_progressive(
     state.candidates = candidates
     state.targets_dirty = true
   }
-  if candidates.is_empty() {
+  if candidates.is_empty() && !state.anchoring.owners.contains(History) {
     state.dispose()
     return
   }
@@ -246,6 +226,7 @@ fn Coordinator::check_progressive(self : Coordinator) -> Unit {
     !state.suppressed &&
     !state.navigation_locked &&
     self.navigation is None &&
+    self.reading is None &&
     !@dom.document().hidden() else {
     return
   }
@@ -291,7 +272,7 @@ fn in_expansion_range(top : Double, bottom : Double, height : Double) -> Bool {
 }
 
 ///|
-fn reading_anchor() -> (@dom.Element, Double)? {
+fn reading_edge() -> (Double, Double)? {
   guard @dom.document().query_selector(".change-main").to_option() is Some(main) else {
     return None
   }
@@ -302,8 +283,14 @@ fn reading_anchor() -> (@dom.Element, Double)? {
       top += element.get_bounding_client_rect().get_height()
     }
   }
+  Some((rect.get_left() + rect.get_width() / 2, top))
+}
+
+///|
+fn reading_anchor() -> (@dom.Element, Double)? {
+  guard reading_edge() is Some((x, top)) else { return None }
   @dom.document()
-  .element_from_point(rect.get_left() + rect.get_width() / 2, top)
+  .element_from_point(x, top)
   .bind(element => element.closest(".file-card"))
   .map(element => (element, element.get_bounding_client_rect().get_top()))
 }

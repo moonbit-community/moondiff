@@ -105,6 +105,14 @@ fn finish_sign_in(
   }
   (
     next,
-    @rabbita.batch([command, comments_request(reference, next.generation, emit)]),
+    @rabbita.batch([
+      command,
+      comments_request(
+        reference,
+        next.generation,
+        emit,
+        recovery=next.reading_recovery,
+      ),
+    ]),
   )
 }

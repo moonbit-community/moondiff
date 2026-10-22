@@ -46,7 +46,7 @@ fn Client::send_device(
               invalid_response("The server returned a different authorization."),
             )
           } else {
-            self.status_sequence += 1
+            self.supersede_status()
             self.adopt_status(response.status, poll)
             Ok(response)
           }

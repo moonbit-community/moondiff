@@ -256,11 +256,14 @@ fn split_review_line(
       ),
     )
   }
+  let key = source_row_key("split", row.file_index, row.old_line, row.new_line)
   let items : Array[(String, @rabbita.Html)] = [
     (
-      source_row_key("split", row.file_index, row.old_line, row.new_line),
+      key,
       @html.tr(
-        attrs=change_block_start_attrs(change_block),
+        attrs=change_block_start_attrs(change_block).data_set(
+          "reading-row", key,
+        ),
         class=if cards.is_empty() &&
           inline_draft_for_anchor(review, row.old_anchor) is None &&
           inline_draft_for_anchor(review, row.new_anchor) is None {
@@ -314,11 +317,14 @@ fn unified_source_line(
     inline_draft_for_anchor(review, new_anchor) is Some(_) {
     classes.push("comment-target")
   }
+  let key = source_row_key("unified", file_index, old_line, new_line)
   let items : Array[(String, @rabbita.Html)] = [
     (
-      source_row_key("unified", file_index, old_line, new_line),
+      key,
       @html.tr(
-        attrs=change_block_start_attrs(change_block),
+        attrs=change_block_start_attrs(change_block).data_set(
+          "reading-row", key,
+        ),
         class=classes.join(" "),
         [
           review_gutter(

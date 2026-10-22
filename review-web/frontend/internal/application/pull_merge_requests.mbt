@@ -25,6 +25,12 @@ fn begin_pull_merge_refresh(
     error: None,
   }
   let next = { ..model, pull_merge: state, }
+  if restart &&
+    model.reading_recovery is Some(token) &&
+    !token.cancelled &&
+    !token.finished {
+    token.merge = Some((state.epoch, state.serial))
+  }
   (
     next,
     @github_client.get_pull_merge_status(

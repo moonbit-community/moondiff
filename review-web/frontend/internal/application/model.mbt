@@ -62,6 +62,9 @@ pub(all) struct Model {
   file_tree : FileTreeState
   auth : AuthStatus
   auth_revision : Int32
+  reading_recovery : ReadingRecovery?
+  reading_recovery_serial : Int32
+  reading_recovery_blocked : Bool
   sign_in_dialog : SignInDialog
   restore_pending : Bool
   recovering_session : Bool
@@ -92,6 +95,9 @@ fn initial_model() -> Model {
     file_tree: initial_file_tree_state(),
     auth: AuthChecking,
     auth_revision: 0,
+    reading_recovery: None,
+    reading_recovery_serial: 0,
+    reading_recovery_blocked: false,
     sign_in_dialog: SignInDialog::new(),
     restore_pending: false,
     recovering_session: false,

@@ -13,6 +13,7 @@ priv struct LayoutState {
   records : Map[String, LayoutRecord]
   mut callbacks : Array[() -> Unit]
   mut frame : Double
+  mut revision : Int32
 }
 
 ///|
@@ -22,6 +23,7 @@ fn LayoutState::new() -> LayoutState {
     records: {},
     callbacks: [],
     frame: 0.0,
+    revision: 0,
   }
   state.publish()
   state
@@ -38,6 +40,7 @@ fn LayoutState::publish(self : LayoutState) -> Unit {
 ///|
 // One shared frame reads all dirty geometry, then writes offsets, then runs callbacks.
 fn LayoutState::schedule(self : LayoutState) -> Unit {
+  self.revision += 1
   if self.frame != 0.0 {
     self.publish()
     return

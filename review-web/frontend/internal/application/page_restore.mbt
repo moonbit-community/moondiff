@@ -18,7 +18,12 @@ fn restore_page_requests(
     ) {
     (
       { ..next, access: { ..next.access, freshness: Checking, }, },
-      shared_snapshot_request(reference, next.generation, emit),
+      shared_snapshot_request(
+        reference,
+        next.generation,
+        emit,
+        recovery=next.reading_recovery,
+      ),
     )
   } else {
     (next, @rabbita.none)
@@ -27,7 +32,12 @@ fn restore_page_requests(
     Showing(view) => {
       let commands = [
         snapshot_command,
-        comments_request(reference, next.generation, emit),
+        comments_request(
+          reference,
+          next.generation,
+          emit,
+          recovery=next.reading_recovery,
+        ),
       ]
       if next.range is Some(state) && state.loading_page is Some(page) {
         commands.push(
@@ -113,7 +123,16 @@ fn restore_page_requests(
       }
       (next, @rabbita.batch(commands))
     }
-    LoadFailed(_) => (next, comments_request(reference, next.generation, emit))
+    LoadFailed(_) =>
+      (
+        next,
+        comments_request(
+          reference,
+          next.generation,
+          emit,
+          recovery=next.reading_recovery,
+        ),
+      )
     _ => begin_change_load(next, reference, emit, preserve_draft=true)
   }
 }

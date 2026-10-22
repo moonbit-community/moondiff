@@ -62,8 +62,15 @@ fn shared_snapshot_request(
   generation : Int32,
   emit : @rabbita.Emit[Msg],
   revalidate~ : Bool = false,
+  recovery~ : ReadingRecovery? = None,
 ) -> @rabbita.Cmd {
   guard reference.target is PullRequest(number) else { return @rabbita.none }
+  if recovery is Some(token) &&
+    !token.cancelled &&
+    !token.finished &&
+    token.generation == generation {
+    token.snapshot = true
+  }
   @github_client.load_pull_snapshot(
     { owner: reference.owner, repo: reference.repo, number, },
     generation,
@@ -89,7 +96,13 @@ fn request_latest_snapshot(
         waiting_for_viewed: false,
       },
     },
-    shared_snapshot_request(reference, model.generation, emit, revalidate=true),
+    shared_snapshot_request(
+      reference,
+      model.generation,
+      emit,
+      revalidate=true,
+      recovery=model.reading_recovery,
+    ),
   )
 }
 
