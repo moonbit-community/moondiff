@@ -5,8 +5,8 @@ version = "0.1.0"
 import {
   "moonbit-community/prettyprinter@0.4.11",
   "moonbit-community/chalk@0.0.1",
-  "moonbitlang/lexer@0.4.3",
-  "moonbitlang/parser@0.4.5",
+  "moonbitlang/lexer@0.4.4",
+  "moonbitlang/parser@0.4.6",
   "moonbitlang/async@0.22.4",
 }
 
