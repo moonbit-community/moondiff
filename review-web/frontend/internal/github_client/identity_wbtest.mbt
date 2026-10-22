@@ -111,6 +111,8 @@ test "obsolete status responses cannot settle the newer identity check" {
     let previous = n.last()
     client.status(_ => ())
     let current = n.last()
+    assert_true(previous.aborted)
+    assert_true(older is [Err(Cancelled)])
     let writes : Array[Result[@protocol.RpcValue, Error]] = []
     client.rpc(
       IssueCommentCreate({
@@ -137,6 +139,43 @@ test "obsolete status responses cannot settle the newer identity check" {
     assert_true(
       writes is [Err(HttpRequestError(code="identity_unavailable", ..))],
     )
+  }
+}
+
+///|
+test "device authorization immediately retires a status request without waiting for its response" {
+  for valid in [false, true] {
+    let (client, network) = harness()
+    let id = "attempt-0000000000"
+    seed(client, network, id~)
+    let device : Array[Result[@protocol.DeviceResponse, Error]] = []
+    client.device(Poll, id, 0, result => device.push(result))
+    network.tick()
+    let poll = network.last()
+    let status : Array[Result[@protocol.ApiAuthStatus, Error]] = []
+    client.status(result => status.push(result))
+    let obsolete = network.last()
+    poll.reply(
+      device_fixture(if valid { id } else { "different" }, id~, phase=Completed),
+    )
+    if valid {
+      assert_true(obsolete.aborted)
+      assert_true(status is [Err(Cancelled)])
+      assert_true(client.authenticated)
+      assert_false(client.workspace.checking)
+      assert_true(client.pending.is_empty())
+      obsolete.reply(anonymous_status_fixture())
+      obsolete.identity_failure()
+      assert_true(status is [Err(Cancelled)])
+      assert_true(client.authenticated)
+    } else {
+      assert_false(obsolete.aborted)
+      assert_true(status.is_empty())
+      assert_true(client.workspace.checking)
+      assert_false(client.authenticated)
+      obsolete.reply(anonymous_status_fixture())
+    }
+    assert_eq(device.length(), 1)
   }
 }
 
