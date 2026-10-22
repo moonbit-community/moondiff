@@ -1,5 +1,15 @@
 # Snapshot loading and prefetch
 
+Auth status and device commands accept an optional `finished` notification. It is
+queued once after the business result, including on failure; cancellation queues
+only completion. Recovery bookkeeping must use this notification rather than
+counting business results. Commands without a completion hook retain multiple
+result delivery, such as a cached snapshot followed by its validation result.
+Starting a newer identity check or accepting a valid
+device response immediately aborts and settles superseded status requests, even
+if their network responses never arrive. Late responses cannot restore old auth
+or CSRF state.
+
 Snapshots and immutable source payloads share a 32 MiB session-memory LRU.
 Metadata has a separate key, so refreshing metadata cannot replace a complete
 snapshot. Complete snapshots have no hard expiry. Thirty seconds is the minimum

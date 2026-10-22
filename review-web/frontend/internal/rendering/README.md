@@ -137,6 +137,81 @@ order. Immediately before execution, navigation rechecks its sequence, generatio
 target mount, and the current pending updates. A route change or target unmount
 cancels it, including its focus transfer.
 
+Authentication, reactivation, manual comment refresh and rate-limit recovery have
+a separate reading lifetime. The application passes a `ReadingRecovery` token
+through `Transition`; it contains
+only an ID, generation, history entry, cancellation flag and request ownership.
+Status and device requests each register a request ID and auth revision in the
+current recovery. Their optional completion notification runs once on success,
+failure or cancellation, after any business result has registered follow-up work.
+Cancellation emits no business failure. A newer status query or valid device
+response aborts and completes older status requests immediately; cleanup from an
+old recovery, revision or request cannot retire newer work. Viewed and merge
+reads use epoch/serial, and comments use refresh ID, including manual refresh.
+Queued comment refreshes are registered when their
+commands are constructed, before dispatch. Viewed storage and its remote read,
+and comment metadata, list and validation, remain continuous work. Completion,
+failure and supersession release that work. Source prefetch and subsequent CI
+polls do not extend this lifetime; a first Pending CI result completes its read.
+
+Before any affected paint, the coordinator locates the loaded file at the reading
+edge and captures a visible source row below the sticky file and section headers.
+Split and Unified source rows expose `data-reading-row` using their existing
+stable row keys. Only visible tables in this file are queried; binary search over
+their ordered row positions finds the first unobscured row without measuring all
+rows or visiting other files' rows. If no source row is visible, the file card is
+the fallback anchor. The record holds the original node, viewport top and file
+mount instance. Later updates merge into it without sampling a new baseline,
+including when inline comments above the row are inserted, removed or resized.
+Each completed layout
+batch compensates `currentTop - savedTop` immediately, within the document's
+scroll range. This never takes the navigation slot, transfers focus, or sets
+`navigation_locked`. A valid navigation or history restoration wins immediately.
+The record is retired after its requests finish and two animation frames see no
+new central, regional or measured layout work. While waiting for the network,
+there is no animation loop and native scroll anchoring remains available.
+When a sign-in modal intercepts hit testing, capture uses the loaded card's
+geometry at the same reading edge behind the backdrop, then uses the same source
+row selection. The modal retains control
+of its inert background's scroll position; compensation resumes if authentication
+closes it automatically, while interaction in the dialog still cancels recovery.
+
+History and reading share native anchoring ownership. The first owner saves the
+inline `overflow-anchor` value and priority, and the last owner restores both.
+Reading holds ownership before paint until the batch is stable, even when every
+file is expanded. Capturing wheel, touch, pointer, click, keyboard or input intent
+synchronously cancels reading; the private non-bubbling scheduler click is
+excluded. Cancellation releases listeners, the scheduled frame and DOM references.
+Every callback checks token ID, cancellation/retirement, generation and mount instance;
+disconnected or collapsed anchors are discarded without selecting another row.
+An unscrolled page, unloaded code or missing anchor finishes synchronously without
+marking recovery blocked. Navigation, invalid mounts and user intent still cancel.
+ID-tagged cleanup clears the
+application token; retirement already prevents recapture before that message is
+processed. Late responses cannot restart a cancelled round, while a new
+explicit sign-in or manual refresh can create a new one. File-internal folding
+and Viewed's normal automatic folding are unchanged.
+
+`reading-recovery.spec.mjs` gates auth/metadata responses and regional paints to
+test overlapping layouts, delayed Viewed/comments/merge batches, synchronous
+input cancellation, route and mount replacement, native styles, and completion
+with source requests and Pending CI outstanding. It also covers overlapping
+identity checks in both response orders, an unresponsive superseded request,
+latest-request failure, and device authorization superseding a status query.
+The inline-comment matrix covers insertion, growth and deletion in Token/Tree
+and Split/Unified, through reactivation, manual refresh and modal sign-in.
+Probes retain only scalar
+coordinates, counters and lifetime flags. Assertions preserve the same DOM line
+within 2px, focus, and unrelated file render counts. Before the fix, the delayed
+Viewed case moved by 61.28px and both regional release orders failed; the same
+three cases also failed on parent commit `71894f8` (before the directory rename).
+The additional regressions reproduced recovery remaining active after overlapping
+identity requests, page-top capture preventing later recovery (90.39px drift when
+a delayed rate limit appeared), and a 142px reading line shift after an inline
+comment was inserted above it. The regressions require the same connected source
+line to remain within 2px and `active`, `metadata`, `listening` to be false and
+`frame` to be zero after completion.
+
 The same shared layout batch establishes browser rendering isolation for file
 cards. It first measures each card's real content-box height, writes that value as
 its intrinsic block-size fallback, and only then enables `content-visibility`.
