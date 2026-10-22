@@ -103,6 +103,7 @@ fn update_review(
           model.generation,
           model.auth_revision,
           emit,
+          recovery=model.reading_recovery,
         ),
       )
     }

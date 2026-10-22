@@ -218,6 +218,9 @@ pub(all) struct Model {
   file_tree : FileTreeState
   auth : AuthStatus
   auth_revision : Int32
+  reading_recovery : ReadingRecovery?
+  reading_recovery_serial : Int32
+  reading_recovery_blocked : Bool
   sign_in_dialog : SignInDialog
   restore_pending : Bool
   recovering_session : Bool
@@ -356,6 +359,22 @@ pub(all) struct RangeState {
   too_many_files : Bool
 } derive(Eq)
 
+pub(all) struct ReadingRecovery {
+  id : Int32
+  generation : Int32
+  entry : String
+  mut cancelled : Bool
+  mut finished : Bool
+  mut auth_serial : Int32
+  auth_requests : Map[Int32, Int32]
+  mut snapshot : Bool
+  mut comments_queued : Int32
+  mut comments_refresh : Int32?
+  mut viewed : (Int32, Int32)?
+  mut merge : (Int32, Int32)?
+} derive(Eq)
+pub fn ReadingRecovery::pending(Self) -> Bool
+
 pub(all) struct ReadyPage {
   user : String?
   version : String
@@ -469,11 +488,14 @@ pub(all) struct Transition {
   model : Model
   command : @cmd.Cmd
   after_commit : Array[AfterCommit]
+  reading_recovery : ReadingRecovery?
 }
 
 pub(all) enum UiMsg {
   Navigate(String)
   PositionRestored(Int32, String)
+  ReadingRecoveryFinished(Int32)
+  ReadingAuthRequestFinished(Int32, Int32, Int32)
   InputChanged(String)
   Submit
   RetryRoute

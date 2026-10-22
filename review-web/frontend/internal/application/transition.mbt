@@ -56,6 +56,7 @@ pub(all) struct Transition {
   model : Model
   command : @rabbita.Cmd
   after_commit : Array[AfterCommit]
+  reading_recovery : ReadingRecovery?
 }
 
 ///|
@@ -73,9 +74,6 @@ fn ui_after_commit(
   emit : @rabbita.Emit[Msg],
 ) -> Array[AfterCommit] {
   let actions : Array[AfterCommit] = []
-  if paused_reading_position(before, next) is Some(action) {
-    actions.push(action)
-  }
   if @metrics.pending("click_to_diff") &&
     next.phase is Showing(view) &&
     view.files

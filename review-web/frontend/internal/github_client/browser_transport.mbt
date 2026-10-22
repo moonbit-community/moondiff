@@ -82,13 +82,23 @@ pub fn cancel_before(generation : Int32) -> @rabbita.Cmd {
 fn[T] command(
   start : ((Result[T, Error]) -> Unit) -> Unit,
   emit : @rabbita.Emit[Result[T, Error]],
+  finished? : () -> @rabbita.Cmd,
 ) -> @rabbita.Cmd {
   @cmd.custom_cmd(scheduler => {
+    let mut settled = false
     start(result => {
-      if result is Err(Cancelled) {
-        return
+      // Snapshot commands also use this adapter and may emit cached data before
+      // validation. Only requests with a completion hook have a single result.
+      guard !settled || finished is None else { return }
+      settled = true
+      // Business handling registers follow-up work before completion retires
+      // this request. Cancellation has no business result or failure notice.
+      if !(result is Err(Cancelled)) {
+        scheduler.add(emit(result))
       }
-      scheduler.add(emit(result))
+      if finished is Some(finished) {
+        scheduler.add(finished())
+      }
     })
   })
 }
@@ -96,8 +106,9 @@ fn[T] command(
 ///|
 pub fn auth_status_request(
   emit : @rabbita.Emit[Result[@protocol.ApiAuthStatus, Error]],
+  finished? : () -> @rabbita.Cmd,
 ) -> @rabbita.Cmd {
-  command(done => client.status(done), emit)
+  command(done => client.status(done), emit, finished?)
 }
 
 ///|
@@ -106,8 +117,9 @@ pub fn auth_device_request(
   id : String,
   delay : Int32,
   emit : @rabbita.Emit[Result[@protocol.DeviceResponse, Error]],
+  finished? : () -> @rabbita.Cmd,
 ) -> @rabbita.Cmd {
-  command(done => client.device(action, id, delay, done), emit)
+  command(done => client.device(action, id, delay, done), emit, finished?)
 }
 
 ///|

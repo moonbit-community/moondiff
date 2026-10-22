@@ -2,6 +2,8 @@
 pub(all) enum UiMsg {
   Navigate(String)
   PositionRestored(Int32, String)
+  ReadingRecoveryFinished(Int32)
+  ReadingAuthRequestFinished(Int32, Int32, Int32)
   InputChanged(String)
   Submit
   RetryRoute
@@ -28,6 +30,20 @@ fn update_ui(
   msg : UiMsg,
   emit : @rabbita.Emit[Msg],
 ) -> (Model, @rabbita.Cmd) {
+  if msg is ReadingRecoveryFinished(id) {
+    return (
+      if model.reading_recovery is Some(token) && token.id == id {
+        {
+          ..model,
+          reading_recovery: None,
+          reading_recovery_blocked: token.cancelled,
+        }
+      } else {
+        model
+      },
+      @rabbita.none,
+    )
+  }
   if msg is Navigate(path) {
     return request_navigation(model, Path(path), emit)
   }
@@ -133,7 +149,10 @@ fn update_ui(
     }
   }
   let (next, command) = match msg {
-    Navigate(_) | PositionRestored(_, _) => (model, @rabbita.none)
+    Navigate(_)
+    | PositionRestored(_, _)
+    | ReadingRecoveryFinished(_)
+    | ReadingAuthRequestFinished(_, _, _) => (model, @rabbita.none)
     InputChanged(value) => ({ ..model, input: value, }, @rabbita.none)
     SelectView(view_mode) => ({ ..model, view_mode, }, @rabbita.none)
     OpenSignIn(generation, entry, _) => {

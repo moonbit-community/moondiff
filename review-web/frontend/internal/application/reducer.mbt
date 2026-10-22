@@ -16,6 +16,7 @@ pub fn update(
   msg : Msg,
   emit : @rabbita.Emit[Msg],
 ) -> Transition {
+  let model = prepare_reading_recovery(model, msg)
   let model = cancel_history_for_edit(model, msg)
   let model = synchronize_snapshot_permission(model)
   let (next, command) = match msg {
@@ -65,6 +66,7 @@ pub fn update(
   let next = pause_waiting_sources(next)
   let (next, sources_command) = reconcile_pull_sources(next, emit)
   let next = synchronize_history_restoration(model, next)
+  let next = reconcile_reading_recovery(model, next, msg)
   {
     model: next,
     command: @rabbita.batch([
@@ -79,5 +81,6 @@ pub fn update(
       leave_home_prefetch(model, next),
     ]),
     after_commit: ui_after_commit(model, next, msg, emit),
+    reading_recovery: next.reading_recovery,
   }
 }

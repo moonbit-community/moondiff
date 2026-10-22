@@ -83,7 +83,12 @@ fn show_pull_view(
     next,
     @rabbita.batch([
       commands_for_change(shown, model.generation, emit),
-      comments_request(reference, model.generation, emit),
+      comments_request(
+        reference,
+        model.generation,
+        emit,
+        recovery=model.reading_recovery,
+      ),
       commit_command,
     ]),
   )

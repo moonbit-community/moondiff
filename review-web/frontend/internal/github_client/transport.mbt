@@ -18,6 +18,7 @@ priv struct Transport {
 priv struct Pending {
   generation : Int32
   auth : Bool
+  status : Bool
   poll : Bool
   mut active : Bool
   mut abort : () -> Unit
@@ -122,6 +123,12 @@ fn Client::cancel_before(self : Client, generation : Int32) -> Unit {
 }
 
 ///|
+fn Client::supersede_status(self : Client) -> Unit {
+  self.status_sequence += 1
+  self.cancel_pending(p => p.status)
+}
+
+///|
 fn Client::stop_poll(self : Client) -> Unit {
   if self.poll_task is Some(task) {
     self.poll_task = None
@@ -203,7 +210,7 @@ fn[T : FromJson + ToJson] Client::send(
   }
   let revision = self.auth_revision
   if status {
-    self.status_sequence += 1
+    self.supersede_status()
   }
   let status_sequence = self.status_sequence
   self.sequence += 1
@@ -211,6 +218,7 @@ fn[T : FromJson + ToJson] Client::send(
   let request : Pending = {
     generation,
     auth,
+    status,
     poll,
     active: true,
     abort: () => (),

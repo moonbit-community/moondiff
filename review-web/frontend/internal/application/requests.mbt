@@ -70,10 +70,13 @@ fn commands_for_change(
 fn auth_status_request(
   revision : Int32,
   emit : @rabbita.Emit[Msg],
+  recovery~ : ReadingRecovery? = None,
 ) -> @rabbita.Cmd {
-  @github_client.auth_status_request(result => {
-    emit(Auth(AuthStatusLoaded(revision, result)))
-  })
+  let finished = recovery_auth_request(recovery, revision, emit)
+  @github_client.auth_status_request(
+    result => emit(Auth(AuthStatusLoaded(revision, result))),
+    finished~,
+  )
 }
 
 ///|
@@ -82,14 +85,19 @@ fn reactivation_auth_status_request(
   generation : Int32,
   revision : Int32,
   emit : @rabbita.Emit[Msg],
+  recovery~ : ReadingRecovery? = None,
 ) -> @rabbita.Cmd {
-  @github_client.auth_status_request(result => {
-    emit(
-      Auth(
-        ReactivationAuthStatusLoaded(revision, generation, reference, result),
-      ),
-    )
-  })
+  let finished = recovery_auth_request(recovery, revision, emit)
+  @github_client.auth_status_request(
+    result => {
+      emit(
+        Auth(
+          ReactivationAuthStatusLoaded(revision, generation, reference, result),
+        ),
+      )
+    },
+    finished~,
+  )
 }
 
 ///|
@@ -107,9 +115,16 @@ fn comments_request(
   reference : CommitRef,
   generation : Int32,
   emit : @rabbita.Emit[Msg],
+  recovery~ : ReadingRecovery? = None,
 ) -> @rabbita.Cmd {
   if range_reference_parts(reference) is Some(_) {
     return @rabbita.none
+  }
+  if recovery is Some(token) &&
+    !token.cancelled &&
+    !token.finished &&
+    token.generation == generation {
+    token.comments_queued += 1
   }
   emit(Review(BeginCommentsRefresh(generation, reference)))
 }
@@ -122,18 +137,29 @@ fn device_request(
   delay : Int32,
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Cmd {
-  @github_client.auth_device_request(operation, id, delay, result => {
-    emit(
-      Auth(
-        DeviceUpdated(
-          model.auth_revision,
-          id,
-          operation is (Start | Retry),
-          result,
+  let finished = recovery_auth_request(
+    model.reading_recovery,
+    model.auth_revision,
+    emit,
+  )
+  @github_client.auth_device_request(
+    operation,
+    id,
+    delay,
+    result => {
+      emit(
+        Auth(
+          DeviceUpdated(
+            model.auth_revision,
+            id,
+            operation is (Start | Retry),
+            result,
+          ),
         ),
-      ),
-    )
-  })
+      )
+    },
+    finished~,
+  )
 }
 
 ///|

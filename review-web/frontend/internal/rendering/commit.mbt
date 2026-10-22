@@ -8,6 +8,8 @@ priv struct PendingNavigation {
 
 ///|
 priv struct Coordinator {
+  anchoring : NativeAnchoring
+  mut reading : ReadingProtection?
   layout : LayoutState
   editor : EditorState
   progressive : ProgressiveState
@@ -26,10 +28,13 @@ priv struct Coordinator {
 
 ///|
 fn Coordinator::new() -> Coordinator {
+  let anchoring = NativeAnchoring::new()
   {
+    anchoring,
+    reading: None,
     layout: LayoutState::new(),
     editor: EditorState::new(),
-    progressive: ProgressiveState::new(),
+    progressive: ProgressiveState::new(anchoring~),
     scheduler: None,
     early_commands: [],
     generation: 0,
@@ -54,6 +59,7 @@ fn Coordinator::begin_update(
 ) -> Int32 {
   self.discard_cancelled_history()
   if self.generation != generation {
+    self.end_reading(true)
     self.generation = generation
     @application.clear_navigation_landings()
     self.navigation = None
@@ -62,7 +68,11 @@ fn Coordinator::begin_update(
   }
   self.revision += 1
   for action in actions {
+    if action.scope is HistoryLayout(token) && token.cancelled {
+      continue
+    }
     if action.scope is (PageLayout | HistoryLayout(_)) {
+      self.end_reading(true)
       if action.target is Navigation {
         // Prevent disappearing status notices from adjusting the restored PR
         // position after its explicit scroll command has completed.
@@ -117,6 +127,8 @@ fn Coordinator::finish_update(
     }
   }
   self.flush_navigation()
+  self.flush_reading()
+  self.schedule_reading()
   self.schedule_progressive()
 }
 
@@ -144,6 +156,8 @@ fn Coordinator::finish_region(
     self.run(command)
   }
   self.flush_navigation()
+  self.flush_reading()
+  self.schedule_reading()
   self.schedule_progressive()
 }
 
@@ -152,6 +166,12 @@ fn Coordinator::invalidate(
   self : Coordinator,
   mount : Mount,
 ) -> Array[@rabbita.Cmd] {
+  if self.reading is Some(reading) &&
+    reading.region == mount.region &&
+    reading.mount_instance == mount.instance &&
+    reading.token.generation == mount.generation {
+    self.end_reading(true)
+  }
   let commands = mount.invalidate()
   if self.mounts.get(mount.region) is Some(current) &&
     current.instance == mount.instance {

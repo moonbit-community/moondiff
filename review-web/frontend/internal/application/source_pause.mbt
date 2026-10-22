@@ -134,6 +134,7 @@ fn recover_anonymous_limit(
         model.generation,
         emit,
         revalidate=true,
+        recovery=model.reading_recovery,
       ),
     )
   }
