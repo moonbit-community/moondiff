@@ -344,29 +344,29 @@ fn pull_merge_status_view(
       class="pull-merge-live",
       attrs=@html.Attrs::build().aria_live("polite").aria_atomic("true"),
       [
-        match status {
-          Some(status) => ci_status_view(status)
-          None =>
-            @html.div(class="pull-ci-summary ci-pending", [
+        if status is Some(status) {
+          ci_status_view(status)
+        } else {
+          @html.div(class="pull-ci-summary ci-pending", [
+            if input.state.loading {
+              @html.span(class="spinner", "")
+            } else {
+              @html.span(
+                class="pull-ci-icon",
+                attrs=@html.Attrs::build().aria_hidden("true"),
+                "○",
+              )
+            },
+            @html.strong(
               if input.state.loading {
-                @html.span(class="spinner", "")
+                "Loading CI and merge status…"
+              } else if !(input.auth is SignedIn(..)) {
+                "Sign in to load CI and merge status"
               } else {
-                @html.span(
-                  class="pull-ci-icon",
-                  attrs=@html.Attrs::build().aria_hidden("true"),
-                  "○",
-                )
+                "CI and merge status unavailable"
               },
-              @html.strong(
-                if input.state.loading {
-                  "Loading CI and merge status…"
-                } else if !(input.auth is SignedIn(..)) {
-                  "Sign in to load CI and merge status"
-                } else {
-                  "CI and merge status unavailable"
-                },
-              ),
-            ])
+            ),
+          ])
         },
         if input.state.error is Some(message) {
           @html.p(

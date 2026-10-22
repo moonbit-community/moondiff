@@ -33,9 +33,10 @@ pub fn[T] set_property(
 pub fn current_element(
   target : @js.Nullable[@dom.EventTarget],
 ) -> @dom.Element? {
-  match target.to_option() {
-    Some(target) => target.to_element()
-    None => None
+  if target.to_option() is Some(target) {
+    target.to_element()
+  } else {
+    None
   }
 }
 

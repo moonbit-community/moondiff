@@ -221,24 +221,23 @@ pub fn range_revisions(
   pull_merge_base : String?,
 ) -> (Revision, Revision) {
   let fallback = reference_repository(reference)
-  let (base_repo, head_repo) = match pull {
-    Some(snapshot) => {
-      let upstream = branch_repository(snapshot.base, fallback)
-      let fork = branch_repository(snapshot.head, fallback)
-      (
-        if base == snapshot.base.sha || pull_merge_base == Some(base) {
-          upstream
-        } else {
-          fork
-        },
-        if head == snapshot.base.sha || pull_merge_base == Some(head) {
-          upstream
-        } else {
-          fork
-        },
-      )
-    }
-    None => (fallback, fallback)
+  let (base_repo, head_repo) = if pull is Some(snapshot) {
+    let upstream = branch_repository(snapshot.base, fallback)
+    let fork = branch_repository(snapshot.head, fallback)
+    (
+      if base == snapshot.base.sha || pull_merge_base == Some(base) {
+        upstream
+      } else {
+        fork
+      },
+      if head == snapshot.base.sha || pull_merge_base == Some(head) {
+        upstream
+      } else {
+        fork
+      },
+    )
+  } else {
+    (fallback, fallback)
   }
   ({ repository: base_repo, sha: base, }, { repository: head_repo, sha: head, })
 }

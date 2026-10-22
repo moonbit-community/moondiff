@@ -51,8 +51,9 @@ pub fn SourceHighlights::line(
   self : SourceHighlights,
   number : Int32,
 ) -> ArrayView[HighlightSpan] {
-  match self.lines.get(number - 1) {
-    Some(line) => line[:]
-    None => []
+  if self.lines.get(number - 1) is Some(line) {
+    line[:]
+  } else {
+    []
   }
 }

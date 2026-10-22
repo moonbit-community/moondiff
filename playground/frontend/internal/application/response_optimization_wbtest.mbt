@@ -271,7 +271,7 @@ test "evicted parsed pages restore a draft's lightweight original version before
 ///|
 test "active Viewed writes block replacement while completed stale confirmations allow Load latest" {
   let writing = viewed_test_toggle(
-    viewed_test_loaded(viewed_test_model(), @protocol.FileViewedState::Unviewed),
+    viewed_test_loaded(viewed_test_model(), Unviewed),
   )
   assert_true(snapshot_replacement_blocked(writing))
   let confirming = {
@@ -304,12 +304,7 @@ test "active Viewed writes block replacement while completed stale confirmations
 ///|
 test "manual Load latest retains the shown page and cannot interrupt an active Viewed write" {
   let writing = mark_snapshot_stale(
-    viewed_test_toggle(
-      viewed_test_loaded(
-        viewed_test_model(),
-        @protocol.FileViewedState::Unviewed,
-      ),
-    ),
+    viewed_test_toggle(viewed_test_loaded(viewed_test_model(), Unviewed)),
   )
   let checking = home_step(writing, Review(LoadLatestSnapshot))
   assert_eq(checking.generation, writing.generation)

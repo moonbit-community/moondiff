@@ -39,16 +39,16 @@ fn first_source_args(
   args : @protocol.PullGet,
   snapshot : PullSnapshot,
 ) -> Array[@protocol.ContentGet] {
-  let first = match
-    snapshot.files.iter().find_first(@github.is_interface_file) {
-    Some(file) => Some(file)
-    None =>
-      snapshot.files
-      .iter()
-      .find_first(file => {
-        @github.is_moonbit_file(file.filename) ||
-        file.previous_filename.map(@github.is_moonbit_file).unwrap_or(false)
-      })
+  let first = if snapshot.files.iter().find_first(@github.is_interface_file)
+    is Some(file) {
+    Some(file)
+  } else {
+    snapshot.files
+    .iter()
+    .find_first(file => {
+      @github.is_moonbit_file(file.filename) ||
+      file.previous_filename.map(@github.is_moonbit_file).unwrap_or(false)
+    })
   }
   guard first is Some(file) else { return [] }
   let reference = @github.pull_reference(args.owner, args.repo, args.number)

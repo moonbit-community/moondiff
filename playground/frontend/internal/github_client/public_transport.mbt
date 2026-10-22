@@ -157,7 +157,7 @@ fn fetch_public_text(
     sha,
     completed,
     failed,
-    buffer: @buffer.Buffer(),
+    buffer: Buffer(),
     timed_out: false,
     finished: false,
     timer: 0,

@@ -21,9 +21,10 @@ fn pull_range_state(pull : ApiPull, merge_base : String) -> RangeState {
 
 ///|
 fn auto_load_pull_commits(pull : ApiPull) -> Bool {
-  match pull.commits {
-    Some(count) => count > 0 && count <= 250
-    None => true
+  if pull.commits is Some(count) {
+    count > 0 && count <= 250
+  } else {
+    true
   }
 }
 

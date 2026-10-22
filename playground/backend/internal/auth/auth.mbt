@@ -66,35 +66,32 @@ pub fn status(
   app : @storage.App,
   session : @storage.Session?,
 ) -> @protocol.ApiAuthStatus raise {
-  match session {
-    None =>
-      {
-        authenticated: false,
-        install_url: Some(app.config.install_url),
-        csrf_token: None,
-        login: None,
-        user_id: None,
-        device_flow: None,
-      }
-    Some(session) =>
-      {
-        authenticated: !session.tokens.is_empty(),
-        install_url: Some(app.config.install_url),
-        csrf_token: Some(session.csrf),
-        login: if session.user.is_empty() {
-          None
-        } else {
-          Some(session.login)
-        },
-        user_id: if session.user.is_empty() {
-          None
-        } else {
-          Some(session.user)
-        },
-        device_flow: app
-        .visible_device(session)
-        .map(flow => flow.public_status()),
-      }
+  if session is Some(session) {
+    {
+      authenticated: !session.tokens.is_empty(),
+      install_url: Some(app.config.install_url),
+      csrf_token: Some(session.csrf),
+      login: if session.user.is_empty() {
+        None
+      } else {
+        Some(session.login)
+      },
+      user_id: if session.user.is_empty() {
+        None
+      } else {
+        Some(session.user)
+      },
+      device_flow: app.visible_device(session).map(flow => flow.public_status()),
+    }
+  } else {
+    {
+      authenticated: false,
+      install_url: Some(app.config.install_url),
+      csrf_token: None,
+      login: None,
+      user_id: None,
+      device_flow: None,
+    }
   }
 }
 

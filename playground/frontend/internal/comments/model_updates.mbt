@@ -60,9 +60,9 @@ fn insert_commit_comment(model : Model, comment : ApiCommitComment) -> Model {
 
 ///|
 fn insert_review_receipt(model : Model, comment : ApiReviewComment) -> Model {
-  match review_receipt(model, comment) {
-    Some(receipt) =>
-      with_review(model, merge_cache(model.review, PublishedReview(receipt)))
-    None => model
+  if review_receipt(model, comment) is Some(receipt) {
+    with_review(model, merge_cache(model.review, PublishedReview(receipt)))
+  } else {
+    model
   }
 }

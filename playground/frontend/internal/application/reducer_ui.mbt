@@ -300,34 +300,34 @@ fn update_ui(
       ({ ..model, ignore_tests, phase, }, @rabbita.none)
     }
     RetryRoute =>
-      match model.route {
-        Some(reference) =>
-          if reference.target is PullRequest(_) &&
-            (model.phase is Showing(_) || model.phase is ShowingPullSelector(_)) {
-            if model.access.freshness is Checking {
-              (model, @rabbita.none)
-            } else {
-              (
-                {
-                  ..model,
-                  access: {
-                    ..model.access,
-                    freshness: Checking,
-                    preparing: None,
-                  },
-                },
-                shared_snapshot_request(
-                  reference,
-                  model.generation,
-                  emit,
-                  revalidate=true,
-                ),
-              )
-            }
+      if model.route is Some(reference) {
+        if reference.target is PullRequest(_) &&
+          (model.phase is Showing(_) || model.phase is ShowingPullSelector(_)) {
+          if model.access.freshness is Checking {
+            (model, @rabbita.none)
           } else {
-            begin_change_load(model, reference, emit)
+            (
+              {
+                ..model,
+                access: {
+                  ..model.access,
+                  freshness: Checking,
+                  preparing: None,
+                },
+              },
+              shared_snapshot_request(
+                reference,
+                model.generation,
+                emit,
+                revalidate=true,
+              ),
+            )
           }
-        None => return update_ui(model, Submit, emit)
+        } else {
+          begin_change_load(model, reference, emit)
+        }
+      } else {
+        return update_ui(model, Submit, emit)
       }
     Submit =>
       match parse_change_url(model.input) {

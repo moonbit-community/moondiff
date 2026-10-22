@@ -479,9 +479,10 @@ fn update_load(
         model,
         Showing(set_file_state(view, index, changed)),
       )
-      let changed_model = match reason {
-        Some(reason) => pause_source_loading(changed_model, reason)
-        None => changed_model
+      let changed_model = if reason is Some(reason) {
+        pause_source_loading(changed_model, reason)
+      } else {
+        changed_model
       }
       let changed_model = if late_anonymous {
         promote_pull_file(changed_model, index)

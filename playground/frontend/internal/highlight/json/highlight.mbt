@@ -101,9 +101,10 @@ pub fn highlight(source : String) -> @highlight.SourceHighlights {
       mark_value(frames)
       continue end
     }
-    let boolean_end = match keyword_end(source, i, "true") {
-      Some(end) => Some(end)
-      None => keyword_end(source, i, "false")
+    let boolean_end = if keyword_end(source, i, "true") is Some(end) {
+      Some(end)
+    } else {
+      keyword_end(source, i, "false")
     }
     if boolean_end is Some(end) {
       add_span(spans, 0, i, end, Boolean)

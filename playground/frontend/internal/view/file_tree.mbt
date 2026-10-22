@@ -43,13 +43,12 @@ fn file_tree_children_for(
   children : Map[String, Array[FileTreeNode]],
   parent : String,
 ) -> Array[FileTreeNode] {
-  match children.get(parent) {
-    Some(nodes) => nodes
-    None => {
-      let nodes : Array[FileTreeNode] = []
-      children[parent] = nodes
-      nodes
-    }
+  if children.get(parent) is Some(nodes) {
+    nodes
+  } else {
+    let nodes : Array[FileTreeNode] = []
+    children[parent] = nodes
+    nodes
   }
 }
 

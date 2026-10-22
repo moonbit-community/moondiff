@@ -29,17 +29,14 @@ fn Coordinator::range_href(self : Coordinator, mount : Mount) -> String? {
 
 ///|
 fn write_range_href(link : @dom.Element, path : String?) -> Unit {
-  match path {
-    Some(path) => {
-      if link.get_attribute("href") != Some(path) {
-        link.set_attribute("href", path)
-      }
-      link.remove_attribute("aria-disabled")
+  if path is Some(path) {
+    if link.get_attribute("href") != Some(path) {
+      link.set_attribute("href", path)
     }
-    None => {
-      link.remove_attribute("href")
-      link.set_attribute("aria-disabled", "true")
-    }
+    link.remove_attribute("aria-disabled")
+  } else {
+    link.remove_attribute("href")
+    link.set_attribute("aria-disabled", "true")
   }
 }
 

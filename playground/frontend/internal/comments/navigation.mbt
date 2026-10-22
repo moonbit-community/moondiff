@@ -33,23 +33,22 @@ fn restore_navigation(
   paths : Array[String],
 ) -> Session {
   let sequence = session.draft_sequence + 1
-  let editor = match saved.draft {
-    None => Empty
-    Some(draft) => {
-      let kind = match draft.kind {
-        InlineDraft(_, anchor) =>
-          InlineDraft(
-            paths.search_by(path => path == anchor.path).unwrap_or(-1),
-            anchor,
-          )
-        other => other
-      }
-      Editing({
-        ..draft,
-        id: { generation: session.context.generation, sequence, },
-        kind,
-      })
+  let editor = if saved.draft is Some(draft) {
+    let kind = match draft.kind {
+      InlineDraft(_, anchor) =>
+        InlineDraft(
+          paths.search_by(path => path == anchor.path).unwrap_or(-1),
+          anchor,
+        )
+      other => other
     }
+    Editing({
+      ..draft,
+      id: { generation: session.context.generation, sequence, },
+      kind,
+    })
+  } else {
+    Empty
   }
   let restored = {
     ..session,

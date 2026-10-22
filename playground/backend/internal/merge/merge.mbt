@@ -275,6 +275,31 @@ async fn pull_commit_statuses(
 }
 
 ///|
+async fn read_ci_checks(
+  read : async () -> Array[@protocol.ApiCiCheck],
+  warnings : Array[String],
+  warning : String,
+) -> Array[@protocol.ApiCiCheck] {
+  read() catch {
+    @common.RpcError(_, _, _)
+    | @async.TimeoutError
+    | @os_error.OSError(_, ..)
+    | @socket.ResolveHostnameError(_)
+    | @tls.TlsError(_)
+    | @tls.ConnectionClosed
+    | @io.ReaderClosed
+    | @http.BadRequest
+    | @http.HttpVersionNotSupported(_)
+    | @http.NotImplemented
+    | @http.IncorrectBodyLength => {
+      warnings.push(warning)
+      []
+    }
+    error => raise error
+  }
+}
+
+///|
 pub async fn pull_merge_status(
   app : @storage.App,
   session : @storage.Session?,
@@ -293,28 +318,20 @@ pub async fn pull_merge_status(
   }
   let checks : Array[@protocol.ApiCiCheck] = []
   let warnings : Array[String] = []
-  let check_runs : Result[Array[@protocol.ApiCiCheck], Error] = Ok(
-    pull_check_runs(app, session, p.owner, p.repo, snapshot.head),
-  ) catch {
-    error => Err(error)
-  }
-  match check_runs {
-    Ok(values) => checks.append(values)
-    Err(_) =>
-      warnings.push("Check runs could not be read; CI results are incomplete.")
-  }
-  let statuses : Result[Array[@protocol.ApiCiCheck], Error] = Ok(
-    pull_commit_statuses(app, session, p.owner, p.repo, snapshot.head),
-  ) catch {
-    error => Err(error)
-  }
-  match statuses {
-    Ok(values) => checks.append(values)
-    Err(_) =>
-      warnings.push(
-        "Commit statuses could not be read; CI results are incomplete.",
-      )
-  }
+  checks.append(
+    read_ci_checks(
+      () => pull_check_runs(app, session, p.owner, p.repo, snapshot.head),
+      warnings,
+      "Check runs could not be read; CI results are incomplete.",
+    ),
+  )
+  checks.append(
+    read_ci_checks(
+      () => pull_commit_statuses(app, session, p.owner, p.repo, snapshot.head),
+      warnings,
+      "Commit statuses could not be read; CI results are incomplete.",
+    ),
+  )
   {
     base_sha: snapshot.base,
     head_sha: snapshot.head,
@@ -376,7 +393,8 @@ pub async fn pull_rebase_merge(
       Some(session),
       "/repos/\{p.owner}/\{p.repo}/pulls/\{p.number}",
     ) catch {
-      error => raise merge_http_error(error)
+      @common.RpcError(_, _, _) as error => raise merge_http_error(error)
+      error => raise error
     },
   )
   guard snapshot.base == p.expected_base_sha &&

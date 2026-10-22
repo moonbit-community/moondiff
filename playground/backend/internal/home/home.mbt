@@ -137,14 +137,14 @@ pub async fn viewer_pulls(
     Authored => "author:@me"
   }
   let scope = "pulls:\{qualifier}"
-  let initial : PullSearchCursor = match p.cursor {
-    Some(cursor) => read_home_cursor(app, session, scope, cursor)
-    None =>
-      {
-        windows: [{ since: 0, until: @storage.now(), page: 1, offset: 0, }],
-        total: 0,
-        total_confirmed: false,
-      }
+  let initial : PullSearchCursor = if p.cursor is Some(cursor) {
+    read_home_cursor(app, session, scope, cursor)
+  } else {
+    {
+      windows: [{ since: 0, until: @storage.now(), page: 1, offset: 0, }],
+      total: 0,
+      total_confirmed: false,
+    }
   }
   let windows = initial.windows.copy()
   let mut total = initial.total
@@ -215,9 +215,10 @@ pub async fn viewer_pulls(
       }
       // Split near the 50th result. Keep every PR sharing the boundary second
       // in one window, avoiding dropped ties at GitHub's 1,000-result ceiling.
-      let oldest = match items.last() {
-        Some(item) => search_second(item.updated_at)
-        None => raise home_invalid()
+      let oldest = if items.last() is Some(item) {
+        search_second(item.updated_at)
+      } else {
+        raise home_invalid()
       }
       guard oldest >= window.since && oldest <= window.until else {
         raise home_invalid()

@@ -125,9 +125,10 @@ fn receive_shared_snapshot(
   }
   match result {
     Err(error) => {
-      let model = match @github_client.rate_limit_reason(error) {
-        Some(reason) => pause_source_loading(model, reason)
-        None => model
+      let model = if @github_client.rate_limit_reason(error) is Some(reason) {
+        pause_source_loading(model, reason)
+      } else {
+        model
       }
       let message = error_message(error, true)
       if model.phase is Showing(_) || model.phase is ShowingPullSelector(_) {
@@ -314,19 +315,17 @@ fn install_snapshot(
   let (shown, command) = if snapshot.metadata.changed_files >
     @github.MAX_PULL_FILES {
     show_pull_selector(next, snapshot.metadata, snapshot.comparison, emit)
+  } else if prepared is Some(view) {
+    show_pull_view(next, view, snapshot.metadata, emit)
   } else {
-    match prepared {
-      Some(view) => show_pull_view(next, view, snapshot.metadata, emit)
-      None =>
-        show_pull(
-          next,
-          reference,
-          snapshot.metadata,
-          snapshot.comparison,
-          snapshot.files,
-          emit,
-        )
-    }
+    show_pull(
+      next,
+      reference,
+      snapshot.metadata,
+      snapshot.comparison,
+      snapshot.files,
+      emit,
+    )
   }
   (
     shown,

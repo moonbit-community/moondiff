@@ -429,9 +429,10 @@ test "source rows precede both sides of discussion and the selected editor" {
         content: @html.div("Comment \{id}"),
       }
       let key = discussion_key(0, side, 1)
-      match discussions.index.get(key) {
-        Some(items) => items.push(item)
-        None => discussions.index[key] = [item]
+      if discussions.index.get(key) is Some(items) {
+        items.push(item)
+      } else {
+        discussions.index[key] = [item]
       }
     }
     for side in [@review.Left, Right] {

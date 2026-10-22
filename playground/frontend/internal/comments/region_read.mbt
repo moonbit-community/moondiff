@@ -38,17 +38,16 @@ fn index_comments(before : Session, after : Session) -> Session {
   let groups : Map[String, ApiCommentBundle] = Map([])
   let owners : Map[String, String] = Map([])
   fn group(path : String) -> ApiCommentBundle {
-    match groups.get(path) {
-      Some(group) => group
-      None => {
-        let group : ApiCommentBundle = {
-          issue_comments: [],
-          review_comments: [],
-          commit_comments: [],
-        }
-        groups[path] = group
-        group
+    if groups.get(path) is Some(group) {
+      group
+    } else {
+      let group : ApiCommentBundle = {
+        issue_comments: [],
+        review_comments: [],
+        commit_comments: [],
       }
+      groups[path] = group
+      group
     }
   }
   if after.comments is CommentsReady(bundle) {
@@ -60,9 +59,10 @@ fn index_comments(before : Session, after : Session) -> Session {
       owners[ReviewComment(c.id).key()] = c.path
     }
     for c in bundle.review_comments {
-      let path = match c.in_reply_to_id {
-        Some(id) => owners.get(ReviewComment(id).key()).unwrap_or(c.path)
-        None => c.path
+      let path = if c.in_reply_to_id is Some(id) {
+        owners.get(ReviewComment(id).key()).unwrap_or(c.path)
+      } else {
+        c.path
       }
       group(path).review_comments.push(c)
       owners[ReviewComment(c.id).key()] = path
@@ -110,16 +110,12 @@ pub fn Session::draft_path(self : Session) -> String? {
     Some({ kind: ReplyDraft(id), .. }) =>
       if self.submission() is Some(SyncingReview(_)) {
         self.draft_target_path()
+      } else if self.index.owners.get(ReviewComment(id).key()) is Some(path) {
+        Some(path)
+      } else if self.comments is CommentsReady(_) {
+        None
       } else {
-        match self.index.owners.get(ReviewComment(id).key()) {
-          Some(path) => Some(path)
-          None =>
-            if self.comments is CommentsReady(_) {
-              None
-            } else {
-              self.draft_target_path()
-            }
-        }
+        self.draft_target_path()
       }
     _ => None
   }
@@ -221,24 +217,25 @@ pub fn Session::read_view(
   paths~ : ArrayView[String] = [],
   group? : CommentGroup,
 ) -> ReadView {
-  let group = match group {
-    Some(group) => group
-    None =>
-      match path {
-        Some(path) => self.file_comments(path)
-        None => self.overall_comments(paths)
-      }
+  let group = if group is Some(group) {
+    group
+  } else if path is Some(path) {
+    self.file_comments(path)
+  } else {
+    self.overall_comments(paths)
   }
   let draft_path = self.draft_path()
-  let own_draft = match path {
-    Some(path) => draft_path == Some(path)
-    None => draft_path is None || !paths.contains(draft_path.unwrap_or(""))
+  let own_draft = if path is Some(path) {
+    draft_path == Some(path)
+  } else {
+    draft_path is None || !paths.contains(draft_path.unwrap_or(""))
   }
   let selected_draft = if own_draft { self.draft() } else { None }
   let pending_review_receipts = self.pending_review_receipts.filter(receipt => {
-    match path {
-      Some(path) => receipt.path == path
-      None => !paths.contains(receipt.path)
+    if path is Some(path) {
+      receipt.path == path
+    } else {
+      !paths.contains(receipt.path)
     }
   })
   let deletion = self.deletion.filter(deletion => {
@@ -248,9 +245,10 @@ pub fn Session::read_view(
     match id {
       IssueComment(_) => path is None
       _ =>
-        match path {
-          Some(path) => self.index.owners.get(id.key()) == Some(path)
-          None => !paths.contains(self.index.owners.get(id.key()).unwrap_or(""))
+        if path is Some(path) {
+          self.index.owners.get(id.key()) == Some(path)
+        } else {
+          !paths.contains(self.index.owners.get(id.key()).unwrap_or(""))
         }
     }
   })

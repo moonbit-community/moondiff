@@ -82,18 +82,18 @@ fn reload_after_auth_identity_boundary(
     },
     @comments.update(model.review, Reset(true, false)).0,
   )
-  match cleared.route {
-    Some(reference) => begin_change_load(cleared, reference, emit)
-    None =>
-      (
-        {
-          ..cleared,
-          generation: cleared.generation + 1,
-          phase: Idle,
-          file_tree: reset_file_tree_state(cleared.file_tree),
-        },
-        @rabbita.none,
-      )
+  if cleared.route is Some(reference) {
+    begin_change_load(cleared, reference, emit)
+  } else {
+    (
+      {
+        ..cleared,
+        generation: cleared.generation + 1,
+        phase: Idle,
+        file_tree: reset_file_tree_state(cleared.file_tree),
+      },
+      @rabbita.none,
+    )
   }
 }
 

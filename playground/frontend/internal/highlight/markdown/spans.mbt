@@ -41,16 +41,15 @@ fn resolve_candidates(
   let spans : Array[HighlightSpan] = []
   let mut cursor = 0
   while cursor < kinds.length() {
-    match kinds[cursor] {
-      None => cursor += 1
-      Some(kind) => {
-        let start = cursor
+    if kinds[cursor] is Some(kind) {
+      let start = cursor
+      cursor += 1
+      while cursor < kinds.length() && kinds[cursor] == Some(kind) {
         cursor += 1
-        while cursor < kinds.length() && kinds[cursor] == Some(kind) {
-          cursor += 1
-        }
-        add_span(spans, 0, start, cursor, kind)
       }
+      add_span(spans, 0, start, cursor, kind)
+    } else {
+      cursor += 1
     }
   }
   spans

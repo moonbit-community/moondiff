@@ -29,11 +29,10 @@ pub fn prepare_sign_in_dialog(model : Model, msg : Msg) -> Unit {
       Ui(OpenSignIn(_, _, trigger)) => trigger
       _ => @dom.document().get_active_element()
     }
+  } else if previous is Some(state) {
+    state.trigger
   } else {
-    match previous {
-      Some(state) => state.trigger
-      None => None
-    }
+    None
   }
   sign_in_dialog_focus.val = Some({
     generation: model.generation,
@@ -109,9 +108,10 @@ fn commit_sign_in_dialog(
           !target.matches(":disabled") &&
           target.get_client_rects().get_length() > 0.0
         })
-        let target = match trigger {
-          Some(target) => Some(target)
-          None => file.query_selector(".file-toggle")
+        let target = if trigger is Some(target) {
+          Some(target)
+        } else {
+          file.query_selector(".file-toggle")
         }
         if target is Some(target) {
           @browser.focus(target)
@@ -171,11 +171,13 @@ pub fn trap_sign_in_focus(event : @dom.KeyboardEvent) -> Unit {
   let current = controls.search_by(control => {
     active.map(element => @browser.same(element, control)).unwrap_or(false)
   })
-  let next = match current {
-    Some(index) =>
-      (index + (if event.shift_key() { -1 } else { 1 }) + controls.length()) %
-      controls.length()
-    None => if event.shift_key() { controls.length() - 1 } else { 0 }
+  let next = if current is Some(index) {
+    (index + (if event.shift_key() { -1 } else { 1 }) + controls.length()) %
+    controls.length()
+  } else if event.shift_key() {
+    controls.length() - 1
+  } else {
+    0
   }
   focus_sign_in_control(dialog, controls[next])
 }

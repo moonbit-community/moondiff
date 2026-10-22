@@ -727,7 +727,7 @@ fn Network::reply_metadata(self : Network, pull : @protocol.ApiPull) -> Unit {
     if call.request() is PullSnapshotGet(_) {
       @protocol.RpcValue::PullSnapshot(MetadataOnly(pull))
     } else {
-      @protocol.RpcValue::Pull(pull)
+      Pull(pull)
     },
   )
 }

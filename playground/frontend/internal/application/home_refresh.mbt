@@ -36,17 +36,19 @@ fn[T] refresh_home_page(page : HomePage[T]) -> HomePage[T] {
 
 ///|
 fn[T] home_cursor(page : HomePage[T]) -> String? {
-  match page.refresh {
-    Some(refresh) => refresh.cursor
-    None => page.cursor
+  if page.refresh is Some(refresh) {
+    refresh.cursor
+  } else {
+    page.cursor
   }
 }
 
 ///|
 fn[T] home_items(page : HomePage[T]) -> Array[T] {
-  match page.refresh {
-    Some(refresh) => refresh.items
-    None => page.items
+  if page.refresh is Some(refresh) {
+    refresh.items
+  } else {
+    page.items
   }
 }
 
@@ -89,10 +91,7 @@ fn[T] receive_home_page(
   cursor : String?,
   incomplete? : String,
 ) -> HomePage[T] {
-  let load = match incomplete {
-    Some(message) => Failed(message)
-    None => Ready
-  }
+  let load = if incomplete is Some(message) { Failed(message) } else { Ready }
   if previous.refresh is Some(refresh) {
     if incomplete is Some(_) ||
       (items.length() < refresh.target && cursor is Some(_)) {
