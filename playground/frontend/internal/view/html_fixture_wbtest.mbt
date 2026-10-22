@@ -1,4 +1,7 @@
 ///|
+extern "js" fn clone_element(element : @dom.Element) -> @dom.Element = "el => el.cloneNode(true)"
+
+///|
 // Browser fixtures run through npm run test:views, with Chromium's real DOM.
 fn render_test_html(builder : () -> @html.Html) -> String {
   let id = create_view_fixture()
@@ -28,7 +31,7 @@ fn remove_view_fixture(id : String) -> Unit {
 ///|
 fn view_fixture_html(id : String) -> String {
   let root = @browser.element(id).unwrap()
-  let snapshot = @browser.clone_element(root)
+  let snapshot = clone_element(root)
   // HTML serialization omits live textarea values; copy them into the detached clone.
   let values : Array[String] = root
     .query_selector_all("textarea")

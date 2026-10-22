@@ -2,10 +2,6 @@
 using @github {
   type ChangeTarget,
   commit_reference,
-  decode_commit,
-  decode_compare,
-  decode_pull,
-  decode_pull_files,
   file_diff_mode,
   pull_reference,
 }

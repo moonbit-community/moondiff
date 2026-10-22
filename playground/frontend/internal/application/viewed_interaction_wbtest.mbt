@@ -419,7 +419,7 @@ test "Viewed failure rollback and uncertain confirmation preserve interactions a
 test "Viewed records anonymous interactions and retains them through initial sign in and same account restore" {
   let initial = viewed_interaction_model()
   let anonymous = with_auth(
-    { ..initial, viewed: ViewedState::new(), },
+    { ..initial, viewed: empty_viewed_state(0), },
     Anonymous(None),
   )
   let touched = viewed_interaction_update(

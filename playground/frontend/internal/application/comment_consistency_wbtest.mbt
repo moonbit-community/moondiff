@@ -68,7 +68,7 @@ test "PR refresh rejects metadata changes before and during list retrieval" {
       }
       let (stale, _) = update_review(pending, message, emit)
       assert_true(stale.review.snapshot_stale)
-      assert_true(stale.review.refresh() is RefreshIdle)
+      assert_false(stale.review.read_view().refresh_busy)
       assert_true(stale.review.comments() == model.review.comments())
       assert_true(stale.review.draft() == model.review.draft())
       assert_true(stale.phase == model.phase)
@@ -97,23 +97,27 @@ test "PR list waits for final metadata and accepts old commit anchors" {
     CommentsMetadataLoaded(5, 7, Ok(pull)),
     emit,
   )
-  assert_true(before.review.refresh() is RefreshList(Some(_)))
+  assert_true(before.review.read_view().refresh_busy)
+  assert_true(before.review.comments() == model.review.comments())
   let (listed, _) = update_review(
     before,
     CommentsLoaded(5, 7, Ok(updated)),
     emit,
   )
   assert_true(listed.review.comments() == model.review.comments())
-  assert_true(listed.review.refresh() is RefreshValidation(_, _))
+  assert_true(listed.review.read_view().refresh_busy)
   let (verified, _) = update_review(
     listed,
     CommentsValidated(5, 7, Ok(pull)),
     emit,
   )
   assert_true(verified.review.comments() == CommentsReady(updated))
-  let threads = @comments.review_threads(
-    review_test_view(),
-    updated.review_comments,
+  assert_false(verified.review.read_view().refresh_busy)
+  let file = review_test_view().files[0].file
+  let threads = @comments.file_threads(
+    verified.review.file_comments(file.filename),
+    Some(0),
+    parse_canonical_patch(file.filename, file.patch),
   )
   assert_false(threads[0].outdated)
   let (duplicate, _) = update_review(
@@ -193,9 +197,10 @@ test "network failures at all refresh stages preserve verified comments and draf
     assert_true(failed.review.draft() == model.review.draft())
     assert_true(failed.auth == model.auth)
     assert_true(failed.review.refresh_error is Some(_))
-    assert_true(failed.review.refresh() is RefreshIdle)
+    assert_false(failed.review.read_view().refresh_busy)
     let (recovered, _) = review_test_refresh(failed, bundle, emit)
     assert_true(recovered.review.refresh_error is None)
+    assert_false(recovered.review.read_view().refresh_busy)
   }
 }
 

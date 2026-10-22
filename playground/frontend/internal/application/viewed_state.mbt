@@ -347,11 +347,6 @@ fn reconcile_viewed(
 }
 
 ///|
-pub fn ViewedState::new() -> ViewedState {
-  empty_viewed_state(0)
-}
-
-///|
 fn viewed_paths(model : Model) -> Array[String] {
   match model.phase {
     Showing(view) => view.files.map(file => file.file.filename)

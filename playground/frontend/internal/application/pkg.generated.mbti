@@ -182,7 +182,6 @@ pub(all) struct HomeState {
   commits : Map[String, HomeCommits]
 } derive(Eq)
 pub fn HomeState::busy(Self) -> Bool
-pub fn HomeState::new() -> Self
 
 pub(all) enum LoadMsg {
   SharedSnapshotLoaded(Int32, Result[@github_client.SnapshotResult, Error])
@@ -316,7 +315,6 @@ pub(all) struct PullMergeState {
   poll_scheduled : Bool
   stale : Bool
 } derive(Eq)
-pub fn PullMergeState::new() -> Self
 
 pub(all) struct PullSourceState {
   generation : Int32
@@ -552,7 +550,6 @@ pub(all) struct ViewedState {
   retry : Int32
   poll_scheduled : Bool
 } derive(Eq)
-pub fn ViewedState::new() -> Self
 
 // Type aliases
 

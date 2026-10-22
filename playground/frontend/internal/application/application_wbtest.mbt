@@ -3,6 +3,11 @@ extern "js" fn read_fixture(path : String) -> String =
   #| (path) => require("node:fs").readFileSync(path, "utf8")
 
 ///|
+fn[T : @json.FromJson] decode_fixture(body : String) -> T raise {
+  @json.from_json(@json.parse(body))
+}
+
+///|
 fn fixture_file(
   filename : String,
   status : String,
@@ -23,7 +28,7 @@ fn fixture_file(
 test "stale commit responses are discarded by generation" {
   let model = Model::{
     viewed: empty_viewed_state(0),
-    home: HomeState::new(),
+    home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     input: "https://github.com/a/b/commit/abcdef1",
     navigation: NavigationState::new(),
@@ -48,7 +53,9 @@ test "stale commit responses are discarded by generation" {
     range: None,
     review: initial_review_state(),
   }
-  let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let fixture : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/root_commit.json"),
+  )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let (after, _) = update_load(model, CommitPageLoaded(1, 1, Ok(fixture)), emit)
   assert_true(after == model)
@@ -62,7 +69,7 @@ fn pull_test_model(
 ) -> Model {
   {
     viewed: empty_viewed_state(0),
-    home: HomeState::new(),
+    home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     input: canonical_github_url(reference),
     navigation: NavigationState::new(),
@@ -92,7 +99,7 @@ fn pull_test_model(
 ///|
 test "pull metadata starts a pinned snapshot and opens an over-limit selector" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let loading = pull_test_model(
     reference,
@@ -144,7 +151,7 @@ test "pull metadata starts a pinned snapshot and opens an over-limit selector" {
     emit,
   )
   assert_true(over_limit.phase is LoadingPullSelectorCompare(attempt=0, ..))
-  let compare = decode_compare(
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
   let (validating, _) = update_load(
@@ -173,11 +180,9 @@ test "pull metadata starts a pinned snapshot and opens an over-limit selector" {
 ///|
 test "over-limit selector retries a changed snapshot once and ignores old replies" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let initial = {
-    ..decode_pull(read_fixture("testdata/github/pull.json")),
-    changed_files: 3_001,
-  }
-  let compare = decode_compare(
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let initial = { ..pull, changed_files: 3_001, }
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
   let newer = { ..initial, head: { ..initial.head, sha: "d".repeat(40), }, }
@@ -223,11 +228,13 @@ test "over-limit selector retries a changed snapshot once and ignores old replie
 ///|
 test "pull compare and files can arrive out of order but wait for validation" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
-  let compare = decode_compare(
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
-  let files = decode_pull_files(read_fixture("testdata/github/pull_files.json"))
+  let files : Array[ApiFile] = decode_fixture(
+    read_fixture("testdata/github/pull_files.json"),
+  )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let loading = pull_test_model(
     reference,
@@ -299,11 +306,13 @@ test "pull compare and files can arrive out of order but wait for validation" {
 ///|
 test "a changed pull head retries once and discards the old attempt" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
-  let compare = decode_compare(
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
-  let files = decode_pull_files(read_fixture("testdata/github/pull_files.json"))
+  let files : Array[ApiFile] = decode_fixture(
+    read_fixture("testdata/github/pull_files.json"),
+  )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let validating = pull_test_model(
     reference,
@@ -408,11 +417,13 @@ test "a changed pull head retries once and discards the old attempt" {
 ///|
 test "a pull request that changes during both attempts fails explicitly" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
-  let compare = decode_compare(
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
-  let files = decode_pull_files(read_fixture("testdata/github/pull_files.json"))
+  let files : Array[ApiFile] = decode_fixture(
+    read_fixture("testdata/github/pull_files.json"),
+  )
   let validating = pull_test_model(
     reference,
     10,
@@ -440,11 +451,13 @@ test "a pull request that changes during both attempts fails explicitly" {
 ///|
 test "incomplete pull pagination retries once then keeps the incomplete error" {
   let reference = pull_reference("moonbitlang", "core", "4082")
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
-  let compare = decode_compare(
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
-  let files = decode_pull_files(read_fixture("testdata/github/pull_files.json"))
+  let files : Array[ApiFile] = decode_fixture(
+    read_fixture("testdata/github/pull_files.json"),
+  )
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let loading = pull_test_model(
     reference,
@@ -513,7 +526,9 @@ test "stale source responses are discarded by generation" {
 
 ///|
 fn diff_test_view(files : Array[ApiFile]) -> ChangeView raise {
-  let fixture = decode_commit(read_fixture("testdata/github/commit_page1.json"))
+  let fixture : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/commit_page1.json"),
+  )
   let view = finish_commit(
     commit_reference("example", "project", fixture.sha),
     { owner: "example", repo: "project", },
@@ -527,7 +542,7 @@ fn diff_test_view(files : Array[ApiFile]) -> ChangeView raise {
 fn diff_test_model(view : ChangeView) -> Model {
   {
     viewed: empty_viewed_state(0),
-    home: HomeState::new(),
+    home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     input: "",
     navigation: NavigationState::new(),
@@ -922,7 +937,9 @@ test "ignore comments has independent algorithm caches" {
 test "ignore comments survives commit navigation but stays out of routes" {
   let reference = commit_reference("owner", "repo", "abcdef1")
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
-  let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let fixture : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/root_commit.json"),
+  )
   let loading = {
     ..initial_model(),
     generation: 1,
@@ -966,7 +983,9 @@ test "ignore tests toggles independently and survives navigation without routes"
   )
 
   let reference = commit_reference("owner", "repo", "abcdef1")
-  let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let fixture : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/root_commit.json"),
+  )
   let loading = {
     ..toggled,
     generation: 1,
@@ -1402,7 +1421,7 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
   ).unwrap()
   let model = Model::{
     viewed: empty_viewed_state(0),
-    home: HomeState::new(),
+    home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     input: canonical_github_url(view.reference),
     navigation: NavigationState::new(),
@@ -1570,7 +1589,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
   }
   let model = Model::{
     viewed: empty_viewed_state(0),
-    home: HomeState::new(),
+    home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     input: canonical_github_url(view.reference),
     navigation: NavigationState::new(),
@@ -1787,7 +1806,7 @@ fn auth_test_model(
 ) -> Model {
   {
     viewed: empty_viewed_state(0),
-    home: HomeState::new(),
+    home: empty_home_state(0),
     pull_merge: empty_pull_merge_state(0),
     input: "",
     navigation: NavigationState::new(),

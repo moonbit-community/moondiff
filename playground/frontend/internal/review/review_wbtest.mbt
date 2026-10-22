@@ -6,7 +6,7 @@ test "canonical patch maps sides, source lines, and multi-hunk positions" {
       "@@ -1,3 +1,3 @@\n context\n-old\n+new\n tail\n@@ -10 +10,2 @@ fn later\n-old10\n+new10\n+extra\n\\ No newline at end of file",
     ),
   )
-  assert_true(patch_is_commentable(patch))
+  assert_true(patch is Commentable(_))
   assert_eq(
     canonical_anchor(patch, Right, 1),
     Some({ path: "src/main.mbt", line: 1, side: Right, position: Some(1), }),
@@ -42,7 +42,7 @@ test "canonical patch maps complete declaration context to absolute anchors" {
     $| \{""}
     $| fn unchanged_after() {}
   let patch = parse_canonical_patch("src/structural.mbt", Some(patch_text))
-  assert_true(patch_is_commentable(patch))
+  assert_true(patch is Commentable(_))
   assert_eq(canonical_anchor(patch, Right, 3).unwrap().line, 3)
   assert_eq(canonical_anchor(patch, Left, 12).unwrap().line, 12)
   assert_eq(canonical_anchor(patch, Right, 12).unwrap().line, 12)
@@ -69,7 +69,7 @@ test "missing truncated and malformed patches are not commentable" {
       Some("@@ -x +1 @@\n-old\n+new"),
       Some("diff --git a/a b/a\n@@ -1 +1 @@\n-old\n+new"),
     ] {
-    assert_false(patch_is_commentable(parse_canonical_patch("a", patch)))
+    assert_false(parse_canonical_patch("a", patch) is Commentable(_))
   }
 }
 

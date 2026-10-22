@@ -159,7 +159,9 @@ test "section toggles preserve drafts and refresh retains choices until a new sn
   assert_eq(collapsed_sections(reopened), [])
   assert_true(reopened.review.draft() == model.review.draft())
 
-  let commit = decode_commit(read_fixture("testdata/github/commit_page1.json"))
+  let commit : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/commit_page1.json"),
+  )
   let reference = commit_reference("example", "project", commit.sha)
   let (loading, _) = begin_change_load(refreshed, reference, emit)
   let (loaded, _) = update_load(

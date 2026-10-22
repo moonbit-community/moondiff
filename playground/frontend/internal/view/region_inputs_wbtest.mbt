@@ -54,9 +54,9 @@ fn region_model() -> Model {
     restore_pending: false,
     recovering_session: false,
     last_authenticated_user_id: None,
-    home: @application.HomeState::new(),
-    viewed: @application.ViewedState::new(),
-    pull_merge: @application.PullMergeState::new(),
+    home: test_home_state(),
+    viewed: test_viewed_state(),
+    pull_merge: test_pull_merge_state(),
     review,
     range: None,
   }

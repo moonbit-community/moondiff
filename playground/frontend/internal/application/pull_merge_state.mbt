@@ -27,11 +27,6 @@ fn empty_pull_merge_state(epoch : Int32) -> PullMergeState {
 }
 
 ///|
-pub fn PullMergeState::new() -> PullMergeState {
-  empty_pull_merge_state(0)
-}
-
-///|
 fn pull_merge_scope(model : Model) -> (CommitRef, String, String, String)? {
   guard model.phase is Showing(view) &&
     view.reference.target is PullRequest(number) &&

@@ -61,9 +61,18 @@ test "review threads group replies and mark every stale anchor condition outdate
     5,
     commit_id="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   )
-  let threads = review_threads(view, [
-    root, reply, no_position, missing_anchor, old_head,
-  ])
+  let group = {
+    ..empty_group,
+    review_comments: ReadOnlyArray::from_array([
+      root, reply, no_position, missing_anchor, old_head,
+    ]),
+  }
+  let file = view.files[0].file
+  let threads = file_threads(
+    group,
+    Some(0),
+    parse_canonical_patch(file.filename, file.patch),
+  )
   assert_eq(threads.length(), 4)
   assert_eq(threads[0].root.id, Int64::from_int(1))
   assert_eq(threads[0].replies.map(comment => comment.id), [Int64::from_int(2)])
@@ -102,7 +111,16 @@ test "commit discussions use only canonical patch positions" {
       line: None,
     },
   ]
-  let discussions = commit_discussions(view, comments)
+  let group = {
+    ..empty_group,
+    commit_comments: ReadOnlyArray::from_array(comments),
+  }
+  let file = view.files[0].file
+  let discussions = file_commit_discussions(
+    group,
+    Some(0),
+    parse_canonical_patch(file.filename, file.patch),
+  )
   assert_eq(discussions.map(item => item.file_index), [Some(0), Some(0)])
   assert_false(discussions[0].outdated)
   assert_true(discussions[1].outdated)
@@ -113,7 +131,16 @@ test "orphan replies form one thread after their root is deleted" {
   let view = review_test_view()
   let first = review_comment_fixture(2, reply_to=Some(1L))
   let second = review_comment_fixture(3, reply_to=Some(1L))
-  let threads = review_threads(view, [second, first])
+  let group = {
+    ..empty_group,
+    review_comments: ReadOnlyArray::from_array([second, first]),
+  }
+  let file = view.files[0].file
+  let threads = file_threads(
+    group,
+    Some(0),
+    parse_canonical_patch(file.filename, file.patch),
+  )
   assert_eq(threads.length(), 1)
   assert_eq(threads[0].root.id, 2L)
   assert_eq(threads[0].replies.map(c => c.id), [3L])
