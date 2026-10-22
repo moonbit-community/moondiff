@@ -1,13 +1,5 @@
 ///|
-using @change {type ChangeView}
-
-///|
-using @review {
-  type ReviewAnchor,
-  type ReviewSide,
-  canonical_anchor,
-  parse_canonical_patch,
-}
+using @review {type ReviewAnchor, type ReviewSide, canonical_anchor}
 
 ///|
 using @github {type CommitRef, same_pull_snapshot}

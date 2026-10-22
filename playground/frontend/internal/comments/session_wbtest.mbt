@@ -148,8 +148,24 @@ test "orphaned replies keep the original thread identity" {
   let first = review_comment_fixture(2, reply_to=Some(1L))
   let second = review_comment_fixture(3, reply_to=Some(1L))
   let view = review_test_view()
-  let complete = review_threads(view, [root, first, second])
-  let orphaned = review_threads(view, [second, first])
+  let file = view.files[0].file
+  let patch = parse_canonical_patch(file.filename, file.patch)
+  let complete = file_threads(
+    {
+      ..empty_group,
+      review_comments: ReadOnlyArray::from_array([root, first, second]),
+    },
+    Some(0),
+    patch,
+  )
+  let orphaned = file_threads(
+    {
+      ..empty_group,
+      review_comments: ReadOnlyArray::from_array([second, first]),
+    },
+    Some(0),
+    patch,
+  )
   assert_true(complete[0].id == orphaned[0].id)
   assert_true(orphaned[0].id == ReviewComment(1L))
   let session = session_list(session_fixture(), {

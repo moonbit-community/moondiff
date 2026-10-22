@@ -15,4 +15,8 @@ import {
   "moonbitlang/core/immut/hashmap" @immut_hashmap,
 }
 
+import {
+  "moonbitlang/core/json",
+} for "wbtest"
+
 supported_targets = "js"

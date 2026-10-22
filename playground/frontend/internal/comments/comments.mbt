@@ -124,51 +124,6 @@ fn review_side_from_api(side : @protocol.CommentSide?) -> ReviewSide? {
 }
 
 ///|
-fn find_file_index(view : ChangeView, path : String) -> Int32? {
-  for index, file in view.files {
-    if file.file.filename == path {
-      return Some(index)
-    }
-  }
-  None
-}
-
-///|
-fn review_comment_outdated(
-  view : ChangeView,
-  comment : ApiReviewComment,
-) -> Bool {
-  if comment.position is None || comment.line is None {
-    return true
-  }
-  guard comment.line is Some(line) &&
-    review_side_from_api(comment.side) is Some(side) &&
-    find_file_index(view, comment.path) is Some(index) else {
-    return true
-  }
-  let file = view.files[index].file
-  canonical_anchor(parse_canonical_patch(file.filename, file.patch), side, line)
-  is None
-}
-
-///|
-fn commit_comment_outdated(
-  view : ChangeView,
-  comment : ApiCommitComment,
-) -> Bool {
-  guard comment.path is Some(path) &&
-    comment.position is Some(position) &&
-    find_file_index(view, path) is Some(index) else {
-    return true
-  }
-  guard parse_canonical_patch(path, view.files[index].file.patch)
-    is Commentable(anchors) else {
-    return true
-  }
-  !anchors.any(anchor => anchor.position == Some(position))
-}
-
-///|
 pub(all) struct ReviewThread {
   id : CommentId
   root : ApiReviewComment
@@ -178,66 +133,10 @@ pub(all) struct ReviewThread {
 }
 
 ///|
-pub fn review_threads(
-  view : ChangeView,
-  comments : ArrayView[ApiReviewComment],
-) -> Array[ReviewThread] {
-  let threads : Array[ReviewThread] = []
-  for root in comments {
-    // GitHub can retain replies after deleting their root. Promote the oldest
-    // remaining reply so the rest of the thread stays visible.
-    if root.in_reply_to_id is Some(parent) {
-      if comments.any(comment => comment.id == parent) ||
-        comments.any(comment => {
-          comment.in_reply_to_id == Some(parent) && comment.id < root.id
-        }) {
-        continue
-      }
-    }
-    let replies : Array[ApiReviewComment] = []
-    for reply in comments {
-      if reply.id != root.id &&
-        (
-          reply.in_reply_to_id == Some(root.id) ||
-          (
-            root.in_reply_to_id is Some(parent) &&
-            reply.in_reply_to_id == Some(parent)
-          )
-        ) {
-        replies.push(reply)
-      }
-    }
-    threads.push({
-      id: ReviewComment(root.in_reply_to_id.unwrap_or(root.id)),
-      root,
-      replies,
-      file_index: find_file_index(view, root.path),
-      outdated: review_comment_outdated(view, root),
-    })
-  }
-  threads
-}
-
-///|
 pub(all) struct CommitDiscussion {
   comment : ApiCommitComment
   file_index : Int32?
   outdated : Bool
-}
-
-///|
-pub fn commit_discussions(
-  view : ChangeView,
-  comments : ArrayView[ApiCommitComment],
-) -> Array[CommitDiscussion] {
-  comments.map(comment => {
-    let file_index = if comment.path is Some(path) {
-      find_file_index(view, path)
-    } else {
-      None
-    }
-    { comment, file_index, outdated: commit_comment_outdated(view, comment), }
-  })
 }
 
 ///|

@@ -3,6 +3,11 @@ extern "js" fn read_fixture(path : String) -> String =
   #| (path) => require("node:fs").readFileSync(path, "utf8")
 
 ///|
+fn[T : @json.FromJson] decode_fixture(body : String) -> T raise {
+  @json.from_json(@json.parse(body))
+}
+
+///|
 fn fixture_file(
   filename : String,
   status : String,
@@ -21,7 +26,9 @@ fn fixture_file(
 
 ///|
 test "without interfaces the first twenty MoonBit files auto-load in original order" {
-  let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let fixture : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/root_commit.json"),
+  )
   let files : Array[ApiFile] = []
   files.push(fixture_file("README.md", "added"))
   files.push(fixture_file("moon.mod", "added"))
@@ -153,7 +160,9 @@ test "interfaces from either rename path lead a stable global partition" {
 
 ///|
 test "interface expansion uses twenty anonymous slots and an explicit signed-in policy" {
-  let fixture = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let fixture : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/root_commit.json"),
+  )
   let reference = commit_reference("example", "root", fixture.sha)
   for count in [0, 1, 19, 20, 21, 35] {
     for expand_all_interfaces in [false, true] {

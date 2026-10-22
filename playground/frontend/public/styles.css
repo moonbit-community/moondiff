@@ -1960,23 +1960,6 @@ button.file-tree-row.selected {
   line-height: 1.68rem;
 }
 
-.diff-scroll td.hunk-note {
-  border: 0.38rem solid var(--surface);
-  border-top: 0;
-  padding: 0.55rem 0.8rem;
-  color: var(--muted-strong);
-  background: color-mix(in srgb, #8064c8 7%, var(--surface));
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  font-size: 0.72rem;
-  line-height: 1.45;
-  white-space: normal;
-}
-
-.diff-scroll .hunk-note-title {
-  color: color-mix(in srgb, #8064c8 78%, var(--foreground));
-  font-weight: 650;
-}
-
 .diff-scroll .ctx {
   background: var(--surface);
 }

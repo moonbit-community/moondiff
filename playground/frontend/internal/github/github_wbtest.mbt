@@ -3,6 +3,11 @@ extern "js" fn read_fixture(path : String) -> String =
   #| (path) => require("node:fs").readFileSync(path, "utf8")
 
 ///|
+fn[T : @json.FromJson] decode_fixture(body : String) -> T raise {
+  @json.from_json(@json.parse(body))
+}
+
+///|
 fn fixture_file(
   filename : String,
   status : String,
@@ -79,16 +84,18 @@ test "generated interfaces match exact basenames at any depth and either rename 
 
 ///|
 test "raw content URLs percent-encode each path byte" {
-  let reference = commit_reference("moonbit-community", "moondiff", "abcdef1")
+  let repository = { owner: "moonbit-community", repo: "moondiff", }
   assert_eq(
-    raw_url(reference, "abcdef1", "src/a b#中?.mbt"),
+    raw_url_for_repository(repository, "abcdef1", "src/a b#中?.mbt"),
     "https://raw.githubusercontent.com/moonbit-community/moondiff/abcdef1/src/a%20b%23%E4%B8%AD%3F.mbt",
   )
 }
 
 ///|
 test "decode local GitHub fixtures and select the first merge parent" {
-  let merge = decode_commit(read_fixture("testdata/github/commit_page1.json"))
+  let merge : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/commit_page1.json"),
+  )
   assert_eq(merge.sha, "abcdef1234567890abcdef1234567890abcdef12")
   assert_eq(
     merge.commit.message,
@@ -102,18 +109,22 @@ test "decode local GitHub fixtures and select the first merge parent" {
   assert_eq(merge.files[0].previous_filename, None)
   assert_eq(merge.files[1].previous_filename, Some("src/old_name.txt"))
 
-  let root = decode_commit(read_fixture("testdata/github/root_commit.json"))
+  let root : ApiCommit = decode_fixture(
+    read_fixture("testdata/github/root_commit.json"),
+  )
   assert_eq(first_parent(root), None)
   assert_eq(root.stats.additions, 2)
 }
 
 ///|
 test "decode pull request metadata and choose merge base and head" {
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
-  let compare = decode_compare(
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let compare : ApiCompare = decode_fixture(
     read_fixture("testdata/github/pull_compare.json"),
   )
-  let files = decode_pull_files(read_fixture("testdata/github/pull_files.json"))
+  let files : Array[ApiFile] = decode_fixture(
+    read_fixture("testdata/github/pull_files.json"),
+  )
   assert_eq(pull.title, "Aggregate the whole pull request")
   assert_eq(pull.head.sha, "cccccccccccccccccccccccccccccccccccccccc")
   assert_eq(
@@ -160,8 +171,10 @@ test "pagination appends file metadata and stops at GitHub's 30-page cap" {
 
 ///|
 test "pull request files must be complete and within GitHub's limit" {
-  let pull = decode_pull(read_fixture("testdata/github/pull.json"))
-  let files = decode_pull_files(read_fixture("testdata/github/pull_files.json"))
+  let pull : ApiPull = decode_fixture(read_fixture("testdata/github/pull.json"))
+  let files : Array[ApiFile] = decode_fixture(
+    read_fixture("testdata/github/pull_files.json"),
+  )
   guard validate_pull_files({ ..pull, changed_files: 3_001, }, files)
     is Err(over_limit) else {
     fail("expected the 3,000-file limit to be rejected")
@@ -176,39 +189,44 @@ test "pull request files must be complete and within GitHub's limit" {
 
 ///|
 test "added deleted renamed merge and root commits choose the correct raw sides" {
-  let reference = commit_reference("owner", "repo", "abcdef1")
-  let parent = Some("1111111")
-  let added = source_pair(
-    reference,
+  let repository = { owner: "owner", repo: "repo", }
+  let (old_revision, new_revision) = repository_commit_revisions(
+    repository,
     "2222222",
-    parent,
+    Some("1111111"),
+  )
+  let added = source_pair_for_revisions(
+    old_revision,
+    new_revision,
     fixture_file("new.mbt", "added"),
   )
   assert_eq(added.old_url, None)
   assert_true(added.new_url is Some(_))
 
-  let deleted = source_pair(
-    reference,
-    "2222222",
-    parent,
+  let deleted = source_pair_for_revisions(
+    old_revision,
+    new_revision,
     fixture_file("old.mbt", "removed"),
   )
   assert_true(deleted.old_url is Some(_))
   assert_eq(deleted.new_url, None)
 
-  let renamed = source_pair(
-    reference,
-    "2222222",
-    parent,
+  let renamed = source_pair_for_revisions(
+    old_revision,
+    new_revision,
     fixture_file("new.mbt", "renamed", previous_filename="old name.mbt"),
   )
   assert_true(renamed.old_url.unwrap().has_suffix("/old%20name.mbt"))
   assert_true(renamed.new_url.unwrap().has_suffix("/new.mbt"))
 
-  let root = source_pair(
-    reference,
+  let (root_old, root_new) = repository_commit_revisions(
+    repository,
     "2222222",
     None,
+  )
+  let root = source_pair_for_revisions(
+    root_old,
+    root_new,
     fixture_file("main.mbt", "modified"),
   )
   assert_eq(root.old_url, None)

@@ -1,24 +1,4 @@
 ///|
-pub fn decode_commit(body : String) -> ApiCommit raise {
-  @json.from_json(@json.parse(body))
-}
-
-///|
-pub fn decode_pull(body : String) -> ApiPull raise {
-  @json.from_json(@json.parse(body))
-}
-
-///|
-pub fn decode_compare(body : String) -> ApiCompare raise {
-  @json.from_json(@json.parse(body))
-}
-
-///|
-pub fn decode_pull_files(body : String) -> Array[ApiFile] raise {
-  @json.from_json(@json.parse(body))
-}
-
-///|
 pub(all) enum FileDiffMode {
   MoonBitDiff
   LineDiff
@@ -208,16 +188,6 @@ pub fn branch_repository(
 }
 
 ///|
-fn commit_revisions(
-  reference : CommitRef,
-  sha : String,
-  parent_sha : String?,
-) -> (Revision?, Revision) {
-  let repository = reference_repository(reference)
-  (parent_sha.map(parent => { repository, sha: parent, }), { repository, sha, })
-}
-
-///|
 pub fn repository_commit_revisions(
   repository : RepositoryRef,
   sha : String,
@@ -283,15 +253,6 @@ fn raw_url_for_repository(
 }
 
 ///|
-pub fn raw_url(
-  reference : CommitRef,
-  revision : String,
-  path : String,
-) -> String {
-  raw_url_for_repository(reference_repository(reference), revision, path)
-}
-
-///|
 pub(all) struct SourceLocation {
   repository : RepositoryRef
   revision : String
@@ -350,19 +311,6 @@ pub fn source_pair_for_revisions(
     old_location,
     new_location,
   }
-}
-
-///|
-pub fn source_pair(
-  reference : CommitRef,
-  commit_sha : String,
-  parent_sha : String?,
-  file : ApiFile,
-) -> SourcePair {
-  let (old_revision, new_revision) = commit_revisions(
-    reference, commit_sha, parent_sha,
-  )
-  source_pair_for_revisions(old_revision, new_revision, file)
 }
 
 ///|

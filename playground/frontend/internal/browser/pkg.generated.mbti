@@ -12,8 +12,6 @@ pub fn chunk_bytes(@js.Value) -> Bytes
 
 pub fn click(@dom.Element) -> Unit
 
-pub fn clone_element(@dom.Element) -> @dom.Element
-
 pub fn copy_text(String, (Bool) -> Unit) -> Unit
 
 pub fn current_element(@js.Nullable[@dom.EventTarget]) -> @dom.Element?

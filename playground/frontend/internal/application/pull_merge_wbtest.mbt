@@ -114,7 +114,10 @@ test "rebase merge requires authentication and submits only once" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let ready = {
     ..merge_test_model(auth=Anonymous(None)),
-    pull_merge: { ..PullMergeState::new(), status: Some(merge_test_status()), },
+    pull_merge: {
+      ..empty_pull_merge_state(0),
+      status: Some(merge_test_status()),
+    },
   }
   let (anonymous, _) = update_pull_merge(ready, Submit, emit)
   assert_true(anonymous == ready)
@@ -156,7 +159,7 @@ test "merge failures become stable actionable states" {
       auth=SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
     ),
     pull_merge: {
-      ..PullMergeState::new(),
+      ..empty_pull_merge_state(0),
       status: Some(merge_test_status()),
       submitting: true,
       serial: 3,
@@ -195,7 +198,7 @@ test "snapshot changes during merge become stale without inventing conflicts" {
       auth=SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
     ),
     pull_merge: {
-      ..PullMergeState::new(),
+      ..empty_pull_merge_state(0),
       status: Some(merge_test_status()),
       submitting: true,
       serial: 4,
@@ -234,7 +237,7 @@ test "merge rejection stays retryable while expired authentication signs out" {
       auth=SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
     ),
     pull_merge: {
-      ..PullMergeState::new(),
+      ..empty_pull_merge_state(0),
       status: Some(merge_test_status()),
       submitting: true,
       serial: 4,

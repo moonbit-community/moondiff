@@ -215,8 +215,3 @@ pub fn canonical_anchor(
   }
   None
 }
-
-///|
-pub fn patch_is_commentable(patch : CanonicalPatch) -> Bool {
-  patch is Commentable(_)
-}

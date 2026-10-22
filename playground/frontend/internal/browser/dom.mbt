@@ -102,9 +102,6 @@ pub fn[T] event_property(event : @dom.Event, name : String) -> T {
 pub extern "js" fn mouse_click() -> @dom.Event = "() => new MouseEvent('click')"
 
 ///|
-pub extern "js" fn clone_element(element : @dom.Element) -> @dom.Element = "el => el.cloneNode(true)"
-
-///|
 pub extern "js" fn intersection_observer(
   callback : (
     FixedArray[@dom.IntersectionObserverEntry],

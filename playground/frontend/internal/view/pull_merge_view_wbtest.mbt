@@ -69,7 +69,7 @@ test "CI copy follows GitHub state wording and count grammar" {
 test "merge card renders GitHub-style CI summary warnings and safe job links" {
   let rendered = render_pull_merge({
     state: {
-      ..@application.PullMergeState::new(),
+      ..test_pull_merge_state(),
       status: Some(pull_merge_view_status()),
     },
     auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
@@ -112,7 +112,7 @@ test "merge card distinguishes stale draft conflict unknown and merged states" {
   let base = pull_merge_view_status()
   let state = fn(status) {
     @application.PullMergeState::{
-      ..@application.PullMergeState::new(),
+      ..test_pull_merge_state(),
       status: Some(status),
     }
   }

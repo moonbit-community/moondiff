@@ -72,11 +72,6 @@ fn empty_home_state(epoch : Int32) -> HomeState {
 }
 
 ///|
-pub fn HomeState::new() -> HomeState {
-  empty_home_state(0)
-}
-
-///|
 pub fn home_pull_key(pull : @protocol.ApiPullSummary) -> String {
   "\{pull.owner}/\{pull.repo}/\{pull.number}"
 }

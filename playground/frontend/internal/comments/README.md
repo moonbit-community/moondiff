@@ -3,8 +3,11 @@
 `Session::new` creates an empty session. Its fields are read-only outside this
 package, and editor state, context, receipts and mutable collections are private.
 `update(session, event)` is the only mutation entry point. It never mutates the
-previous session and has no browser, RPC or Rabbita dependency. Collection reads
-(`comments`, `refresh`, `deleted`) return detached copies.
+previous session and has no browser, RPC or Rabbita dependency.
+`Session::comments` returns detached copies. Views use `read_view` and immutable
+path groups from `file_comments`; `ReadView.refresh_busy` exposes refresh activity.
+`file_threads` and `file_commit_discussions` project each group using its file index
+and canonical patch.
 
 | Invariant | Owner |
 | --- | --- |

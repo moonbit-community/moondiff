@@ -2,7 +2,10 @@ import {
   "moonbit-community/moondiff-playground-protocol" @protocol,
   "moonbit-community/rabbita/url",
   "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/json",
 }
+
+import {
+  "moonbitlang/core/json",
+} for "wbtest"
 
 supported_targets = "js"

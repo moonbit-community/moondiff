@@ -20,14 +20,6 @@ pub fn check_source(Bytes) -> CheckedSource
 
 pub fn commit_reference(String, String, String) -> CommitRef
 
-pub fn decode_commit(String) -> @moondiff-playground-protocol.ApiCommit raise
-
-pub fn decode_compare(String) -> @moondiff-playground-protocol.ApiCompare raise
-
-pub fn decode_pull(String) -> @moondiff-playground-protocol.ApiPull raise
-
-pub fn decode_pull_files(String) -> Array[@moondiff-playground-protocol.ApiFile] raise
-
 pub fn file_diff_mode(@moondiff-playground-protocol.ApiFile) -> FileDiffMode
 
 pub fn first_parent(@moondiff-playground-protocol.ApiCommit) -> String?
@@ -58,8 +50,6 @@ pub fn range_reference(String, String, String, String) -> CommitRef
 
 pub fn range_revisions(CommitRef, String, String, @moondiff-playground-protocol.ApiPull?, String?) -> (Revision, Revision)
 
-pub fn raw_url(CommitRef, String, String) -> String
-
 pub fn reference_repository(CommitRef) -> RepositoryRef
 
 pub fn repository_commit_revisions(RepositoryRef, String, String?) -> (Revision?, Revision)
@@ -69,8 +59,6 @@ pub fn same_pull_snapshot(@moondiff-playground-protocol.ApiPull, @moondiff-playg
 pub fn should_fetch_next_page(Int32, Int32) -> Bool
 
 pub fn should_fetch_next_pull_page(Int32, Int32, Int32, Int32?) -> Bool
-
-pub fn source_pair(CommitRef, String, String?, @moondiff-playground-protocol.ApiFile) -> SourcePair
 
 pub fn source_pair_for_revisions(Revision?, Revision, @moondiff-playground-protocol.ApiFile) -> SourcePair
 
