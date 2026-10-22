@@ -234,13 +234,13 @@ fn projected_editor(
   file_index : Int32,
   site : String,
 ) -> Bool {
-  match anchor {
-    Some(a) =>
-      discussions.projection.editors.get(
-        discussion_key(file_index, a.side, a.line),
-      ) ==
-      Some(site)
-    None => false
+  if anchor is Some(a) {
+    discussions.projection.editors.get(
+      discussion_key(file_index, a.side, a.line),
+    ) ==
+    Some(site)
+  } else {
+    false
   }
 }
 

@@ -166,9 +166,10 @@ fn prepare_discussions(
   for item in result.items {
     if item.file_index is Some(file_index) && item.anchor is Some(anchor) {
       let key = discussion_key(file_index, anchor.side, anchor.line)
-      match result.index.get(key) {
-        Some(items) => items.push(item)
-        None => result.index[key] = [item]
+      if result.index.get(key) is Some(items) {
+        items.push(item)
+      } else {
+        result.index[key] = [item]
       }
     }
   }

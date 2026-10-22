@@ -18,7 +18,9 @@ async fn static_file(
   // Canonicalize both paths before opening, including any symlink components.
   let root = app.config.static_dir
   let full = @fs.realpath(root + name) catch {
-    _ => raise @common.RpcError(404, "not_found", "Page not found.")
+    @os_error.OSError(_, ..) =>
+      raise @common.RpcError(404, "not_found", "Page not found.")
+    error => raise error
   }
   guard full.has_prefix(root + "/") && @fs.kind(full) == Regular else {
     raise @common.RpcError(404, "not_found", "Page not found.")
@@ -42,9 +44,10 @@ async fn static_file(
   } else {
     None
   }
-  let size = match body {
-    Some(body) => body.length().to_int64()
-    None => file.size()
+  let size = if body is Some(body) {
+    body.length().to_int64()
+  } else {
+    file.size()
   }
   let etag = match (fingerprint, body) {
     (Some(hash), _) => "\"\{hash}\""
@@ -80,9 +83,10 @@ async fn static_file(
   headers["Content-Length"] = size.to_string()
   conn.connection.send_response(200, "OK", extra_headers=headers)
   if request.meth != Head {
-    match body {
-      Some(body) => conn.connection.write(body)
-      None => conn.connection.write_reader(file)
+    if body is Some(body) {
+      conn.connection.write(body)
+    } else {
+      conn.connection.write_reader(file)
     }
   }
   conn.connection.end_response()

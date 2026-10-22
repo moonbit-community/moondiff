@@ -61,16 +61,16 @@ fn home_tab(
       @html.span(home_tab_title(kind)),
       @html.span(
         class="home-tab-count",
-        attrs=match page.total {
-          Some(_) => @html.Attrs::build()
-          None =>
-            @html.Attrs::build().aria_label(
-              if page.load is Failed(_) {
-                "Count unavailable"
-              } else {
-                "Loading count"
-              },
-            )
+        attrs=if page.total is Some(_) {
+          @html.Attrs::build()
+        } else {
+          @html.Attrs::build().aria_label(
+            if page.load is Failed(_) {
+              "Count unavailable"
+            } else {
+              "Loading count"
+            },
+          )
         },
         page.total
         .map(total => total.to_string())
@@ -200,10 +200,10 @@ fn home_view(
     @html.div(class="home-toolbar", [
       @html.span(
         class="home-updated",
-        match page.updated_at {
-          Some(value) =>
-            @html.fragment([@html.span("Last updated "), home_time(value)])
-          None => @html.nothing
+        if page.updated_at is Some(value) {
+          @html.fragment([@html.span("Last updated "), home_time(value)])
+        } else {
+          @html.nothing
         },
       ),
       @html.button(

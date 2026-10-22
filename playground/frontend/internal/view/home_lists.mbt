@@ -5,13 +5,13 @@ fn[T] home_page_actions(
   retry : @rabbita.Cmd,
 ) -> @rabbita.Html {
   @html.div(class="home-page-actions", [
-    match page.total {
-      Some(total) =>
-        @html.p(
-          class="home-count",
-          "Showing \{page.items.length()} of \{total} \{noun}",
-        )
-      None => @html.nothing
+    if page.total is Some(total) {
+      @html.p(
+        class="home-count",
+        "Showing \{page.items.length()} of \{total} \{noun}",
+      )
+    } else {
+      @html.nothing
     },
     match page.load {
       Unloaded | Paused | Loading =>

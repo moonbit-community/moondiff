@@ -1,9 +1,10 @@
 ///|
 // The native popover is in the top layer. Keep positioning compatible with Chrome 116.
 fn menu_for(button : @dom.Element) -> @dom.Element? {
-  match button.get_parent_element() {
-    Some(parent) => parent.query_selector("[role=\"menu\"]")
-    None => None
+  if button.get_parent_element() is Some(parent) {
+    parent.query_selector("[role=\"menu\"]")
+  } else {
+    None
   }
 }
 
@@ -171,10 +172,10 @@ fn action_menu_key(event : @dom.KeyboardEvent) -> Unit {
     .query_selector_all("[role=\"menuitem\"]:not(:disabled)")
     .iter()
     .collect()
-  let index = match @dom.document().get_active_element() {
-    Some(active) =>
-      items.search_by(item => @browser.same(item, active)).unwrap_or(-1)
-    None => -1
+  let index = if @dom.document().get_active_element() is Some(active) {
+    items.search_by(item => @browser.same(item, active)).unwrap_or(-1)
+  } else {
+    -1
   }
   guard menu_key_index(event.key(), index, items.length()) is Some(next) else {
     return

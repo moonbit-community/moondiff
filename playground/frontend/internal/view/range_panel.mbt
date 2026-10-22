@@ -113,7 +113,7 @@ fn range_more_control(
       @html.button(
         type_="button",
         class="secondary range-load-more",
-        on_click=emit(@application.Msg::Range(LoadMore)),
+        on_click=emit(Range(LoadMore)),
         if state.error is Some(_) {
           "Retry loading commits"
         } else if state.commits.is_empty() {
@@ -161,9 +161,7 @@ fn pull_range_selector(
         @html.span("From"),
         @html.select(
           disabled=!selector_ready,
-          on_change=value => {
-            emit(@application.Msg::Range(FromSelected(input.generation, value)))
-          },
+          on_change=value => emit(Range(FromSelected(input.generation, value))),
           range_from_options(state),
         ),
       ]),
@@ -171,9 +169,7 @@ fn pull_range_selector(
         @html.span("To"),
         @html.select(
           disabled=!selector_ready,
-          on_change=value => {
-            emit(@application.Msg::Range(ToSelected(input.generation, value)))
-          },
+          on_change=value => emit(Range(ToSelected(input.generation, value))),
           range_to_options(state),
         ),
       ]),
@@ -218,9 +214,10 @@ fn range_review_panel(
   } else {
     range_commit_title(state.commits[0].commit.message)
   }
-  let head_title = match state.commits.last() {
-    Some(commit) => range_commit_title(commit.commit.message)
-    None => first_title
+  let head_title = if state.commits.last() is Some(commit) {
+    range_commit_title(commit.commit.message)
+  } else {
+    first_title
   }
   let github_url = "https://github.com/\{reference.owner}/\{reference.repo}/compare/\{state.base_sha}...\{state.head_sha}"
   let count = if state.too_many_files {
@@ -259,7 +256,7 @@ fn range_review_panel(
       @html.button(
         type_="button",
         class="secondary range-copy",
-        on_click=emit(@application.Msg::Range(CopyLink)),
+        on_click=emit(Range(CopyLink)),
         "Copy link",
       ),
     ]),
@@ -304,7 +301,7 @@ fn range_review_panel(
           "false"
         },
       ),
-      on_click=emit(@application.Msg::Range(ToggleCommits)),
+      on_click=emit(Range(ToggleCommits)),
       if state.expanded {
         "Hide commits"
       } else {

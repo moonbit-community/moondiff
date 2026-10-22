@@ -48,27 +48,27 @@ fn account_menu(
           class="account-identity",
           "Signed in\{login.map(name => " as \{name}").unwrap_or("")}",
         ),
-        match install_url {
-          Some(url) =>
-            @html.div([
-              @html.a(
-                escape=true,
-                href=url,
-                target=Blank,
-                rel="noopener noreferrer",
-                attrs=@html.Attrs::build()
-                  .role("menuitem")
-                  .tabindex(-1)
-                  .aria_describedby("account-authorization-hint"),
-                "Install Moondiff Github App ↗",
-              ),
-              @html.p(
-                id="account-authorization-hint",
-                class="account-hint",
-                "Choose which repositories this app can access on GitHub.",
-              ),
-            ])
-          None => @html.nothing
+        if install_url is Some(url) {
+          @html.div([
+            @html.a(
+              escape=true,
+              href=url,
+              target=Blank,
+              rel="noopener noreferrer",
+              attrs=@html.Attrs::build()
+                .role("menuitem")
+                .tabindex(-1)
+                .aria_describedby("account-authorization-hint"),
+              "Install Moondiff Github App ↗",
+            ),
+            @html.p(
+              id="account-authorization-hint",
+              class="account-hint",
+              "Choose which repositories this app can access on GitHub.",
+            ),
+          ])
+        } else {
+          @html.nothing
         },
         @html.button(
           type_="button",

@@ -14,16 +14,12 @@ pub async fn[T] with_viewed_scope(
     )
   }
   let key = "\{session.user}:\{p.owner.to_lower()}/\{p.repo.to_lower()}:\{p.number}"
-  let coordinator = match app.viewed_scopes.get(key) {
-    Some(coordinator) => coordinator
-    None => {
-      let coordinator = @storage.ViewedCoordinator::{
-        mutex: Mutex(),
-        users: 0,
-      }
-      app.viewed_scopes[key] = coordinator
-      coordinator
-    }
+  let coordinator = if app.viewed_scopes.get(key) is Some(coordinator) {
+    coordinator
+  } else {
+    let coordinator = @storage.ViewedCoordinator::{ mutex: Mutex(), users: 0, }
+    app.viewed_scopes[key] = coordinator
+    coordinator
   }
   coordinator.users += 1
   defer {

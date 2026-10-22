@@ -104,14 +104,11 @@ fn add_code_spans(
       cursor += 1
     }
     let size = cursor - opening
-    match find_exact_run(source, cursor, end, '`', size) {
-      None => ()
-      Some(closing) => {
-        candidate(candidates, opening, cursor, Operator, 110)
-        candidate(candidates, cursor, closing, StringLiteral, 109)
-        candidate(candidates, closing, closing + size, Operator, 110)
-        cursor = closing + size
-      }
+    if find_exact_run(source, cursor, end, '`', size) is Some(closing) {
+      candidate(candidates, opening, cursor, Operator, 110)
+      candidate(candidates, cursor, closing, StringLiteral, 109)
+      candidate(candidates, closing, closing + size, Operator, 110)
+      cursor = closing + size
     }
   }
 }
@@ -182,48 +179,41 @@ fn add_links(
       cursor += 1
       continue
     }
-    match find_char(source, open + 1, end, ']') {
-      None => cursor += 1
-      Some(close) => {
-        let after = close + 1
-        let mut finish = after
-        let mut destination : (Int32, Int32)? = None
-        if after < end && source[after] == '(' {
-          match find_char(source, after + 1, end, ')') {
-            Some(right) => {
-              destination = Some((after + 1, right))
-              finish = right + 1
-            }
-            None => ()
-          }
-        } else if after < end && source[after] == '[' {
-          match find_char(source, after + 1, end, ']') {
-            Some(right) => {
-              destination = Some((after + 1, right))
-              finish = right + 1
-            }
-            None => ()
-          }
-        } else {
-          // A shortcut reference is useful while its definition is outside a
-          // diff hunk, so color it without requiring a resolved definition.
-          finish = after
+    if find_char(source, open + 1, end, ']') is Some(close) {
+      let after = close + 1
+      let mut finish = after
+      let mut destination : (Int32, Int32)? = None
+      if after < end && source[after] == '(' {
+        if find_char(source, after + 1, end, ')') is Some(right) {
+          destination = Some((after + 1, right))
+          finish = right + 1
         }
-        if finish > after || after == finish {
-          if image {
-            candidate(candidates, cursor, open, Operator, 80)
-          }
-          candidate(candidates, open, open + 1, Operator, 80)
-          candidate(candidates, open + 1, close, Function, 60)
-          candidate(candidates, close, close + 1, Operator, 80)
-          if destination is Some((left, right)) {
-            candidate(candidates, after, after + 1, Operator, 80)
-            candidate(candidates, left, right, StringLiteral, 70)
-            candidate(candidates, right, right + 1, Operator, 80)
-          }
-          cursor = Int32::max(close + 1, finish)
+      } else if after < end && source[after] == '[' {
+        if find_char(source, after + 1, end, ']') is Some(right) {
+          destination = Some((after + 1, right))
+          finish = right + 1
         }
+      } else {
+        // A shortcut reference is useful while its definition is outside a
+        // diff hunk, so color it without requiring a resolved definition.
+        finish = after
       }
+      if finish > after || after == finish {
+        if image {
+          candidate(candidates, cursor, open, Operator, 80)
+        }
+        candidate(candidates, open, open + 1, Operator, 80)
+        candidate(candidates, open + 1, close, Function, 60)
+        candidate(candidates, close, close + 1, Operator, 80)
+        if destination is Some((left, right)) {
+          candidate(candidates, after, after + 1, Operator, 80)
+          candidate(candidates, left, right, StringLiteral, 70)
+          candidate(candidates, right, right + 1, Operator, 80)
+        }
+        cursor = Int32::max(close + 1, finish)
+      }
+    } else {
+      cursor += 1
     }
   }
 }
@@ -319,23 +309,22 @@ fn add_angle_autolinks(
       cursor += 1
       continue
     }
-    match find_char(source, cursor + 1, end, '>') {
-      None => cursor += 1
-      Some(close) => {
-        let body = source[cursor + 1:close]
-        let automatic = body.has_prefix("http://") ||
-          body.has_prefix("https://") ||
-          body.has_prefix("mailto:") ||
-          body.contains("@")
-        if automatic && !body.contains(" ") && !body.contains("\t") {
-          candidate(candidates, cursor, cursor + 1, Operator, 107)
-          candidate(candidates, cursor + 1, close, StringLiteral, 106)
-          candidate(candidates, close, close + 1, Operator, 107)
-          cursor = close + 1
-        } else {
-          cursor += 1
-        }
+    if find_char(source, cursor + 1, end, '>') is Some(close) {
+      let body = source[cursor + 1:close]
+      let automatic = body.has_prefix("http://") ||
+        body.has_prefix("https://") ||
+        body.has_prefix("mailto:") ||
+        body.contains("@")
+      if automatic && !body.contains(" ") && !body.contains("\t") {
+        candidate(candidates, cursor, cursor + 1, Operator, 107)
+        candidate(candidates, cursor + 1, close, StringLiteral, 106)
+        candidate(candidates, close, close + 1, Operator, 107)
+        cursor = close + 1
+      } else {
+        cursor += 1
       }
+    } else {
+      cursor += 1
     }
   }
 }
@@ -461,31 +450,30 @@ fn add_html(
           source[name_end] is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | '-') {
       name_end += 1
     }
-    match find_char(source, name_end, end, '>') {
-      None => cursor += 1
-      Some(close) => {
-        candidate(candidates, cursor, name_end, Type, 100)
-        if close > name_end {
-          let mut attr = name_end
-          while attr < close {
-            while attr < close && source[attr] is (' ' | '\t' | '/') {
-              attr += 1
-            }
-            let attr_start = attr
-            while attr < close &&
-                  source[attr]
-                  is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | ':' | '_' | '-') {
-              attr += 1
-            }
-            candidate(candidates, attr_start, attr, Attribute, 101)
-            while attr < close && !(source[attr] is (' ' | '\t')) {
-              attr += 1
-            }
+    if find_char(source, name_end, end, '>') is Some(close) {
+      candidate(candidates, cursor, name_end, Type, 100)
+      if close > name_end {
+        let mut attr = name_end
+        while attr < close {
+          while attr < close && source[attr] is (' ' | '\t' | '/') {
+            attr += 1
+          }
+          let attr_start = attr
+          while attr < close &&
+                source[attr]
+                is ('a'..<='z' | 'A'..<='Z' | '0'..<='9' | ':' | '_' | '-') {
+            attr += 1
+          }
+          candidate(candidates, attr_start, attr, Attribute, 101)
+          while attr < close && !(source[attr] is (' ' | '\t')) {
+            attr += 1
           }
         }
-        candidate(candidates, close, close + 1, Type, 100)
-        cursor = close + 1
       }
+      candidate(candidates, close, close + 1, Type, 100)
+      cursor = close + 1
+    } else {
+      cursor += 1
     }
   }
 }

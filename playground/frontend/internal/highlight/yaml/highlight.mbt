@@ -92,9 +92,10 @@ fn collect_tokens(source : String) -> Array[HighlightSpan] {
     }
     let in_flow = !flow.is_empty()
     let parent_indent = blocks.last().map(frame => frame.0).unwrap_or(-1)
-    let key = match flow.last() {
-      Some(frame) => frame.key
-      None => blocks.last().map(frame => frame.1).unwrap_or(false)
+    let key = if flow.last() is Some(frame) {
+      frame.key
+    } else {
+      blocks.last().map(frame => frame.1).unwrap_or(false)
     }
     if mapping_colon(input, in_flow) || (in_flow && adjacent && input[0] == ':') {
       add_span(spans, 0, start, start + 1, Operator)

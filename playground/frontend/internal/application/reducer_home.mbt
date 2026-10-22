@@ -202,16 +202,16 @@ fn update_home(
     }
     ToggleCommits(pull) => {
       let key = home_pull_key(pull)
-      let value = match model.home.commits.get(key) {
-        Some(value) => { ..value, expanded: !value.expanded, }
-        None =>
-          {
-            pull,
-            expanded: true,
-            page: empty_home_page(),
-            snapshot: None,
-            restarts: 0,
-          }
+      let value = if model.home.commits.get(key) is Some(value) {
+        { ..value, expanded: !value.expanded, }
+      } else {
+        {
+          pull,
+          expanded: true,
+          page: empty_home_page(),
+          snapshot: None,
+          restarts: 0,
+        }
       }
       (with_home_commits(model, key, value), @rabbita.none)
     }

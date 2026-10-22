@@ -45,9 +45,10 @@ fn pause_source_loading(
 
 ///|
 fn load_failure(model : Model, error : Error) -> Model {
-  let next = match @github_client.rate_limit_reason(error) {
-    Some(reason) => pause_source_loading(model, reason)
-    None => model
+  let next = if @github_client.rate_limit_reason(error) is Some(reason) {
+    pause_source_loading(model, reason)
+  } else {
+    model
   }
   with_phase(next, LoadFailed(error_message(error, true)))
 }

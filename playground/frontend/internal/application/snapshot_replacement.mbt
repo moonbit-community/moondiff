@@ -79,9 +79,10 @@ fn prepare_snapshot_replacement(
       })
     _ => None
   }
-  let target = match selected {
-    Some(_) => selected
-    None => view.files.search_by(file => file.expanded)
+  let target = if selected is Some(_) {
+    selected
+  } else {
+    view.files.search_by(file => file.expanded)
   }
   guard target is Some(index) else {
     return install_snapshot(model, snapshot, Some(view), emit)
@@ -201,9 +202,10 @@ fn receive_replacement_source(
   }
   if result is Err(error) &&
     @github_client.http_error_code(error) != Some("source_too_large") {
-    let model = match @github_client.rate_limit_reason(error) {
-      Some(reason) => pause_source_loading(model, reason)
-      None => model
+    let model = if @github_client.rate_limit_reason(error) is Some(reason) {
+      pause_source_loading(model, reason)
+    } else {
+      model
     }
     return (
       {

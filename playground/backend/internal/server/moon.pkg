@@ -14,6 +14,7 @@ import {
   "moonbitlang/async/io",
   "moonbitlang/async/fs",
   "moonbitlang/async/socket",
+  "moonbitlang/async/os_error",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/x/crypto" @xcrypto,

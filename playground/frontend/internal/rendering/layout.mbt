@@ -79,9 +79,10 @@ fn LayoutState::observe(
   region : String,
 ) -> () -> Unit {
   let host = @browser.element(host_id).unwrap()
-  let main = match host.closest(".change-main") {
-    Some(main) => Some(main)
-    None => @dom.document().query_selector(".change-main").to_option()
+  let main = if host.closest(".change-main") is Some(main) {
+    Some(main)
+  } else {
+    @dom.document().query_selector(".change-main").to_option()
   }
   let elements : Array[@dom.Element] = []
   let mut prepare : () -> Unit = () => ()

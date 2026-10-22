@@ -25,9 +25,10 @@ pub async fn upstream(
     }
     let client = @http.Client(base)
     defer client.close()
-    let bytes = match body {
-      Some(json) => @utf8.encode(json.stringify())
-      None => b""
+    let bytes = if body is Some(json) {
+      @utf8.encode(json.stringify())
+    } else {
+      b""
     }
     if body is Some(_) {
       headers["Content-Type"] = "application/json"

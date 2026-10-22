@@ -48,6 +48,21 @@ async fn[T : ToJson] respond_json(
 }
 
 ///|
+fn request_json(bytes : Bytes) -> Json raise {
+  @json.parse(@utf8.decode(bytes)) catch {
+    @utf8.Malformed(_)
+    | @json.InvalidChar(_, _)
+    | @json.InvalidEof
+    | @json.InvalidNumber(_, _)
+    | @json.InvalidIdentEscape(_)
+    | @json.DuplicateKey(_, _)
+    | @json.DepthLimitExceeded =>
+      raise @common.RpcError(400, "invalid_arguments", "Invalid JSON request.")
+    error => raise error
+  }
+}
+
+///|
 async fn handle(
   app : @storage.App,
   request : @http.Request,
@@ -64,11 +79,7 @@ async fn handle(
     let current = if session is Some(session) && !session.tokens.is_empty() {
       Some(
         @github.authenticated(app, session) catch {
-          error => {
-            guard error is @common.RpcError(401, _, _) ||
-              error is @crypto.InvalidCiphertext else {
-              raise error
-            }
+          @common.RpcError(401, _, _) | @crypto.InvalidCiphertext => {
             app.expire_auth(session)
             guard app.session(session.id) is Some(current) else {
               raise @common.RpcError(
@@ -77,6 +88,7 @@ async fn handle(
             }
             current
           }
+          error => raise error
         },
       )
     } else {
@@ -98,25 +110,19 @@ async fn handle(
       )
     }
     let bytes = @httpio.read_bounded(reader, 1024)
-    let value = @json.parse(@utf8.decode(bytes)) catch {
-      _ =>
-        raise @common.RpcError(
-          400, "invalid_arguments", "Invalid JSON request.",
-        )
-    }
+    let value = request_json(bytes)
     guard value == Json::object({}) else {
       raise @common.RpcError(
         400, "invalid_arguments", "Expected an empty JSON object.",
       )
     }
-    match session {
-      Some(session) => respond_json(conn, @auth.status(app, Some(session)))
-      None => {
-        let (cookie, created) = app.create_session()
-        respond_json(conn, @auth.status(app, Some(created)), cookies=[
-          @auth.cookie(app, cookie),
-        ])
-      }
+    if session is Some(session) {
+      respond_json(conn, @auth.status(app, Some(session)))
+    } else {
+      let (cookie, created) = app.create_session()
+      respond_json(conn, @auth.status(app, Some(created)), cookies=[
+        @auth.cookie(app, cookie),
+      ])
     }
     return
   }
@@ -137,26 +143,23 @@ async fn handle(
       )
     }
     let bytes = @httpio.read_bounded(reader, 1024)
-    let value = @json.parse(@utf8.decode(bytes)) catch {
-      _ =>
-        raise @common.RpcError(
-          400, "invalid_arguments", "Invalid JSON request.",
-        )
-    }
+    let value = request_json(bytes)
     let id = if path.has_suffix("/start") {
       let args : @protocol.DeviceStart = @protocol.decode(value) catch {
-        _ =>
+        @json.JsonDecodeError(_) | @protocol.ProtocolError(_, _) =>
           raise @common.RpcError(
             400, "invalid_arguments", "Invalid device request.",
           )
+        error => raise error
       }
       args.attempt_id
     } else {
       let args : @protocol.DeviceAuthorization = @protocol.decode(value) catch {
-        _ =>
+        @json.JsonDecodeError(_) | @protocol.ProtocolError(_, _) =>
           raise @common.RpcError(
             400, "invalid_arguments", "Invalid device request.",
           )
+        error => raise error
       }
       args.authorization_id
     }
@@ -205,12 +208,7 @@ async fn handle(
       )
     }
     let bytes = @httpio.read_bounded(reader, 131072)
-    let value = @json.parse(@utf8.decode(bytes)) catch {
-      _ =>
-        raise @common.RpcError(
-          400, "invalid_arguments", "Invalid JSON request.",
-        )
-    }
+    let value = request_json(bytes)
     let rpc = @protocol.decode_request(value) catch {
       @protocol.ProtocolError(code, message) =>
         raise @common.RpcError(400, code, message)
@@ -270,29 +268,29 @@ pub async fn run() -> Unit {
     conn,
   ) => {
     let conn = ResponseWriter::{ connection: conn, started: false, }
-    @async.with_timeout(60000, () => handle(app, request, reader, conn)) catch {
-      error => {
-        // A tab can close while headers/body are being written. Sending an
-        // error response on that same connection would start a second response
-        // and violate the HTTP sender's state machine. Abort only this request.
-        if conn.started || @async.is_being_cancelled() {
-          raise error
-        }
-        let error : Error = if error is @crypto.InvalidCiphertext {
-          @common.RpcError(
-            401, "authentication_required", "Your session cannot be decrypted. Sign in again.",
-          )
-        } else {
-          error
-        }
-        let (status, body) = @common.rpc_error(error)
-        respond(
-          conn,
-          status,
-          @utf8.encode(body.stringify()),
-          head=request.meth == Head,
+    let error : Error = try
+      @async.with_timeout(60000, () => handle(app, request, reader, conn))
+    catch {
+      @crypto.InvalidCiphertext if !conn.started && !@async.is_being_cancelled() =>
+        @common.RpcError(
+          401, "authentication_required", "Your session cannot be decrypted. Sign in again.",
         )
-      }
+      error => error
+    } noraise {
+      _ => return
     }
+    // A tab can close while headers/body are being written. Sending an
+    // error response on that same connection would start a second response
+    // and violate the HTTP sender's state machine. Abort only this request.
+    if conn.started || @async.is_being_cancelled() {
+      raise error
+    }
+    let (status, body) = @common.rpc_error(error)
+    respond(
+      conn,
+      status,
+      @utf8.encode(body.stringify()),
+      head=request.meth == Head,
+    )
   })
 }

@@ -327,30 +327,25 @@ fn collect_markdown(
       continue
     }
     if html_comment {
-      match html_comment_end(source, line.start, line.end) {
-        Some(finish) => {
-          candidate(candidates, line.start, finish, Comment, 130)
-          html_comment = false
-          scan_inline(source, finish, line.end, candidates)
-        }
-        None => candidate(candidates, line.start, line.end, Comment, 130)
+      if html_comment_end(source, line.start, line.end) is Some(finish) {
+        candidate(candidates, line.start, finish, Comment, 130)
+        html_comment = false
+        scan_inline(source, finish, line.end, candidates)
+      } else {
+        candidate(candidates, line.start, line.end, Comment, 130)
       }
       suppressed[index] = true
       continue
     }
-    match html_comment_start(source, line.start, line.end) {
-      Some(comment_start) =>
-        match html_comment_end(source, comment_start + 4, line.end) {
-          Some(finish) =>
-            candidate(candidates, comment_start, finish, Comment, 130)
-          None => {
-            scan_inline(source, line.start, comment_start, candidates)
-            candidate(candidates, comment_start, line.end, Comment, 130)
-            html_comment = true
-            suppressed[index] = true
-          }
-        }
-      None => ()
+    if html_comment_start(source, line.start, line.end) is Some(comment_start) {
+      if html_comment_end(source, comment_start + 4, line.end) is Some(finish) {
+        candidate(candidates, comment_start, finish, Comment, 130)
+      } else {
+        scan_inline(source, line.start, comment_start, candidates)
+        candidate(candidates, comment_start, line.end, Comment, 130)
+        html_comment = true
+        suppressed[index] = true
+      }
     }
     let prefix = block_prefix(source, line, candidates)
     let content = prefix.content

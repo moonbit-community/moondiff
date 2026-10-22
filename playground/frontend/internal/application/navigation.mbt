@@ -242,19 +242,19 @@ fn ready_page(model : Model, reference : CommitRef) -> ReadyPage? {
       .map(saved => page.version == route_version_key(reference, saved.snapshot))
       .unwrap_or(false)
     })
-  match ready {
-    Some(_) => ready
-    None =>
-      model.navigation.routes
-      .get(route_key(reference))
-      .bind(saved => {
-        saved.draft_view.map(view => {
-          user: model.last_authenticated_user_id,
-          version: route_version_key(reference, saved.snapshot),
-          view,
-          range: None,
-        })
+  if ready is Some(_) {
+    ready
+  } else {
+    model.navigation.routes
+    .get(route_key(reference))
+    .bind(saved => {
+      saved.draft_view.map(view => {
+        user: model.last_authenticated_user_id,
+        version: route_version_key(reference, saved.snapshot),
+        view,
+        range: None,
       })
+    })
   }
 }
 
@@ -590,50 +590,49 @@ fn restore_history_position(
   @cmd.custom_cmd(scheduler => {
     guard !restoration.cancelled else { return }
     if @browser.has_window() {
-      match position {
-        Some(position) => {
-          let candidates = @dom.document()
-            .query_selector_all(focus_candidates)
+      if position is Some(position) {
+        let candidates = @dom.document()
+          .query_selector_all(focus_candidates)
+          .iter()
+          .collect()
+        let indexed = position.focus_index.bind(index => candidates.get(index))
+        let target = match indexed {
+          Some(target) if focus_label(target) == position.focus_label =>
+            Some(target)
+          _ if !position.focus_label.is_empty() =>
+            candidates
             .iter()
-            .collect()
-          let indexed = position.focus_index.bind(index => candidates.get(index))
-          let target = match indexed {
-            Some(target) if focus_label(target) == position.focus_label =>
-              Some(target)
-            _ if !position.focus_label.is_empty() =>
-              candidates
-              .iter()
-              .find_first(target => focus_label(target) == position.focus_label)
-            _ => None
-          }
-          let found = match target {
-            Some(target) => {
-              guard !restoration.cancelled else { return }
-              @browser.focus(target)
-              true
-            }
-            _ => position.focus_index is None
-          }
-          if @dom.document().query_selector(".file-tree-scroll").to_option()
-            is Some(sidebar) {
-            guard !restoration.cancelled else { return }
-            sidebar.set_scroll_top(position.sidebar)
-          }
-          guard !restoration.cancelled else { return }
-          @browser.scroll_to(
-            if found {
-              position.x
-            } else {
-              0
-            },
-            if found {
-              position.y
-            } else {
-              0
-            },
-          )
+            .find_first(target => focus_label(target) == position.focus_label)
+          _ => None
         }
-        None => if !restoration.cancelled { @browser.scroll_to(0, 0) }
+        let found = match target {
+          Some(target) => {
+            guard !restoration.cancelled else { return }
+            @browser.focus(target)
+            true
+          }
+          _ => position.focus_index is None
+        }
+        if @dom.document().query_selector(".file-tree-scroll").to_option()
+          is Some(sidebar) {
+          guard !restoration.cancelled else { return }
+          sidebar.set_scroll_top(position.sidebar)
+        }
+        guard !restoration.cancelled else { return }
+        @browser.scroll_to(
+          if found {
+            position.x
+          } else {
+            0
+          },
+          if found {
+            position.y
+          } else {
+            0
+          },
+        )
+      } else if !restoration.cancelled {
+        @browser.scroll_to(0, 0)
       }
     }
     @metrics.finish("back_restore")

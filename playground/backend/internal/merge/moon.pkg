@@ -3,6 +3,12 @@ import {
   "moonbit-community/moondiff-playground-server/internal/protocol" @common,
   "moonbit-community/moondiff-playground-server/internal/github",
   "moonbit-community/moondiff-playground-server/internal/storage",
+  "moonbitlang/async",
+  "moonbitlang/async/http",
+  "moonbitlang/async/io",
+  "moonbitlang/async/os_error",
+  "moonbitlang/async/socket",
+  "moonbitlang/async/tls",
 }
 
 supported_targets = "native+wasm"

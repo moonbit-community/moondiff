@@ -146,23 +146,22 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
       match result {
         Err(error) => (fail_comments_refresh(model, error), [])
         Ok(bundle) =>
-          match before {
-            None => (accept_comments(model, bundle), [])
-            Some(pull) => {
-              guard model.route is Some(reference) &&
-                reference.target is PullRequest(number) else {
-                return (model, [])
-              }
-              (
-                with_review(model, {
-                  ..model.review,
-                  refresh: RefreshValidation(pull, copy_bundle(bundle)),
-                }),
-                raw_comment_head_request(reference, number, generation, result => {
-                  CommentsValidated(generation, id, result)
-                }),
-              )
+          if before is Some(pull) {
+            guard model.route is Some(reference) &&
+              reference.target is PullRequest(number) else {
+              return (model, [])
             }
+            (
+              with_review(model, {
+                ..model.review,
+                refresh: RefreshValidation(pull, copy_bundle(bundle)),
+              }),
+              raw_comment_head_request(reference, number, generation, result => {
+                CommentsValidated(generation, id, result)
+              }),
+            )
+          } else {
+            (accept_comments(model, bundle), [])
           }
       }
     }
