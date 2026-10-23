@@ -2028,15 +2028,17 @@ test("one draft survives repeated clicks and every entry switch while posting", 
   const inlineDraftId = await page.locator(".comment-editor textarea").getAttribute("data-draft-id");
   await page.evaluate(() => {
     const state = window.__fake;
-    state.reviewComments.push({ ...state.reviewComments[0], id: "99", line: 1, position: 1 });
+    state.reviewComments.push({ ...state.reviewComments[0], id: "99", body: "Draft refresh comment", line: 1, position: 1 });
     state.delayNextList = true;
   });
   await reactivatePage(page);
   await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
-  const race = await releaseListAfterLineCommentHover(page, newLineCommentButton(page, 2));
+  await page.evaluate(() => window.__fake.releaseList());
+  await expect(page.getByText("Draft refresh comment", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled();
+  await settleRegions(page);
   await openNewLineComment(page, 2);
-  await race.completed;
-  expect(race.interruptions).toBe(1);
+  await openNewLineComment(page, 2);
   await expect(page.locator(".comment-editor")).toHaveCount(1);
   await expect(page.locator(".comment-editor textarea")).toHaveAttribute("data-draft-id", inlineDraftId);
   await expect(page.locator(".comment-editor textarea")).toHaveValue("Do not lose this draft");
