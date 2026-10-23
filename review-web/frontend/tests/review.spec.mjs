@@ -2406,6 +2406,119 @@ for (const kind of ["pull", "commit"]) {
   }
 }
 
+for (const layout of ["Split", "Unified"]) {
+  for (const cancelled of [false, true]) {
+    test(`inline draft survives ${cancelled ? "cancelled" : "active"} reading recovery: ${layout}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await installRenderProbe(page);
+      const oldLines = ["fn main() {", ...Array.from({ length: 80 }, (_, i) => `  let value_${i} = ${i}`), "}"];
+      const newLines = ["fn main() {", ...Array.from({ length: 80 }, (_, i) => `  let value_${i} = ${i + 1}`), "}"];
+      await installApi(page, pullTarget(), {
+        authenticated: true,
+        oldSource: oldLines.join("\n"), newSource: newLines.join("\n"),
+        patch: `@@ -1,${oldLines.length} +1,${newLines.length} @@\n` +
+          oldLines.map(line => "-" + line).concat(newLines.map(line => "+" + line)).join("\n"),
+      });
+      await page.goto(reviewPath());
+      await waitForSignedInComments(page);
+      await page.getByRole("button", { name: layout, exact: true }).click();
+      await openNewLineComment(page, 40);
+      const editor = page.locator(".inline-comment-editor-row textarea");
+      const original = await editor.elementHandle();
+      const body = "Keep this draft and its reading position";
+      await editor.fill(body);
+      const draftId = await editor.getAttribute("data-draft-id");
+      const selection = await editor.evaluate(el => {
+        el.setSelectionRange(5, 14, "backward");
+        return [el.selectionStart, el.selectionEnd, el.selectionDirection];
+      });
+      await expect(editor).toBeFocused();
+      const anchor = page.locator(`#moondiff-file-0 table.${layout.toLowerCase()}:visible tr[data-reading-row]`).filter({
+        has: page.locator(".new-line-number .line-number-value", { hasText: /^35$/ }),
+      });
+      await anchor.evaluate(el => {
+        document.documentElement.style.setProperty("overflow-anchor", "none", "important");
+        el.scrollIntoView({ block: "start" });
+      });
+      await settleRegions(page);
+      // Use the measured sticky headers so the requested row is the first
+      // unobscured source row in either layout.
+      await anchor.evaluate(el => {
+        const headings = [
+          document.querySelector(".hero-workspace"),
+          document.querySelector(".change-titlebar"),
+          el.closest(".file-card").querySelector(".file-heading"),
+          el.closest(".semantic-section")?.querySelector(".semantic-section-title"),
+        ].filter(Boolean);
+        const edge = Math.max(...headings.map(heading => heading.getBoundingClientRect().bottom));
+        window.scrollBy(0, el.getBoundingClientRect().top - edge - 1);
+      });
+      await settleRegions(page);
+      const readingRow = await anchor.getAttribute("data-reading-row");
+      await page.evaluate(position => {
+        const state = window.__fake;
+        state.reviewComments.push({
+          ...state.reviewComments[0], id: "99", body: "Reading recovery insertion", line: 1, position,
+        });
+        state.delayNextList = true;
+      }, oldLines.length + 1);
+      await reactivatePage(page);
+      await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
+      await expect.poll(() => page.evaluate(() => __moondiffMetrics.reading)).toMatchObject({
+        active: true, listening: true, metadata: true, row: readingRow,
+      });
+      await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeDisabled();
+      await settleRegions(page);
+      if (cancelled) {
+        const reading = await page.evaluate(() => {
+          dispatchEvent(new Event("pointerdown", { bubbles: true }));
+          return { ...__moondiffMetrics.reading };
+        });
+        expect(reading).toMatchObject({ active: false, listening: false, frame: 0 });
+      }
+      await expect(page.locator("html")).toHaveCSS("overflow-anchor", "none");
+      const measure = el => ({
+        top: el.getBoundingClientRect().top,
+        rowHeight: el.getBoundingClientRect().height,
+        scroll: scrollY,
+        documentHeight: document.documentElement.scrollHeight,
+        compensated: __moondiffMetrics.counters?.reading_compensated ?? 0,
+      });
+      const before = await anchor.evaluate(measure);
+      expect(before.scroll).toBeGreaterThan(0);
+      await page.evaluate(() => window.__fake.releaseList());
+      await expect(page.getByText("Reading recovery insertion", { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled();
+      await expect.poll(() => page.evaluate(() => __moondiffMetrics.reading)).toMatchObject({
+        active: false, metadata: false, listening: false, frame: 0,
+      });
+      await settleRegions(page);
+      const after = await anchor.evaluate(measure);
+      const growth = after.documentHeight - before.documentHeight;
+      const displacement = after.top - before.top;
+      const scrollDelta = after.scroll - before.scroll;
+      expect(growth).toBeGreaterThan(before.rowHeight);
+      if (cancelled) {
+        expect(displacement).toBeGreaterThan(before.rowHeight);
+        expect(Math.abs(displacement - growth)).toBeLessThan(2);
+        expect(Math.abs(scrollDelta)).toBeLessThan(2);
+        expect(after.compensated).toBe(before.compensated);
+      } else {
+        expect(Math.abs(displacement)).toBeLessThan(2);
+        expect(scrollDelta).toBeGreaterThan(before.rowHeight);
+        expect(Math.abs(scrollDelta - growth)).toBeLessThan(2);
+        expect(after.compensated).toBeGreaterThan(before.compensated);
+      }
+      await expect(page.locator(".comment-editor")).toHaveCount(1);
+      expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
+      await expect(editor).toHaveAttribute("data-draft-id", draftId);
+      await expect(editor).toHaveValue(body);
+      await expect(editor).toBeFocused();
+      expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual(selection);
+    });
+  }
+}
+
 for (const kind of ["overall", "reply", "inline", "collapsed"]) {
   for (const direction of ["forward", "backward"]) {
     test(`${kind} editor keeps its DOM and ${direction} selection during background insert/remove and composition`, async ({ page }) => {
