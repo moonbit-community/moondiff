@@ -133,8 +133,9 @@ test('prefetch selects only the current tab first five, keeps one background req
   await page.goto('/');
   await expect.poll(() => kindCalls(state, 'PullFiles').length).toBe(2);
   await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(2);
+  // File/source requests can finish before the remaining metadata-only prefetches.
+  await expect.poll(() => [...new Set(kindCalls(state, 'PullGet').map(call => call.args.number))]).toEqual(['1', '2', '3', '4', '5']);
   expect(maxActive).toBe(1);
-  expect([...new Set(kindCalls(state, 'PullGet').map(call => call.args.number))]).toEqual(['1', '2', '3', '4', '5']);
   expect(kindCalls(state, 'ContentGet').map(call => call.args)).toEqual([
     { owner: 'upstream', repo: 'repo', path: 'old/exact name.mbt', revision: mergeBase },
     { owner: 'fork', repo: 'repo', path: 'src/renamed.mbt', revision: head },
