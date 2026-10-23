@@ -223,11 +223,11 @@ test('early Load latest waits for the real Viewed coordinator before replacing t
   expect(backend.state.mutations).toHaveLength(1);
 });
 
-test('special and ordinary filenames support source, inline comments and Viewed together', async ({ page, backend }) => {
-  backend.state.files = repositoryPaths;
-  for (const target of ['/alice/repo/pull/42', `/alice/repo/commit/${backend.state.head}`]) {
-    await open(page, backend, target);
-    for (const [i, path] of repositoryPaths.entries()) {
+for (const target of ['pull', 'commit']) {
+  for (const [i, path] of repositoryPaths.entries()) {
+    test(`${target} filename ${JSON.stringify(path)} supports source, inline comments${target === 'pull' ? ' and Viewed' : ''}`, async ({ page, backend }) => {
+      backend.state.files = repositoryPaths;
+      await open(page, backend, `/alice/repo/${target}/${target === 'pull' ? '42' : backend.state.head}`);
       const file = card(page, i);
       await ensureFileExpanded(file);
       const editor = await openInline(page, i);
@@ -236,7 +236,7 @@ test('special and ordinary filenames support source, inline comments and Viewed 
       await expect(editor).toHaveCount(0);
       expect(backend.state.comments.at(-1).path).toBe(path);
       expect(backend.calls.filter(c => c.op === 'github.content.get' && c.args.path === path).length).toBeGreaterThan(0);
-      if (target.includes('/pull/')) {
+      if (target === 'pull') {
         await expect(box(page, i)).toBeEnabled();
         const before = backend.state.mutations.length;
         await expectViewedWrite(backend, path, true, () => box(page, i).check());
@@ -252,11 +252,11 @@ test('special and ordinary filenames support source, inline comments and Viewed 
         expect(backend.state.forScope().get(path)).toBe('UNVIEWED');
         expect(backend.state.mutations[before + 1]).toMatchObject({ path, viewed: false });
       }
-    }
+      expect(backend.state.comments).toHaveLength(1);
+      expect(backend.state.mutations).toHaveLength(target === 'pull' ? 2 : 0);
+    });
   }
-  expect(backend.state.comments).toHaveLength(repositoryPaths.length * 2);
-  expect(backend.state.mutations).toHaveLength(repositoryPaths.length * 2);
-});
+}
 
 test('upstream timeout followed by old reads stays locked until the original GitHub mutation finishes', async ({ page, backend }) => {
   test.setTimeout(75000);
