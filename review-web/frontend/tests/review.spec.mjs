@@ -493,35 +493,20 @@ async function openNewLineComment(page, line) {
 }
 
 async function releaseListAfterLineCommentHover(page, button) {
-  let complete;
-  let fail;
-  const completed = new Promise((resolve, reject) => {
-    complete = resolve;
-    fail = reject;
-  });
-  completed.catch(() => {});
-  const race = { interruptions: 0, completed };
   const gutter = button.locator("xpath=..");
-  // Trigger only after hover, immediately before the click's actionability check.
-  await page.addLocatorHandler(button.and(page.locator(".review-gutter:hover > .line-comment-button")), async () => {
-    try {
-      const before = await gutter.boundingBox();
-      await expect(button).toHaveCSS("opacity", "1");
-      await page.evaluate(() => window.__fake.releaseList());
-      await expect.poll(async () => Math.abs((await gutter.boundingBox()).y - before.y)).toBeGreaterThan(before.height);
-      // Re-hit-test the stationary pointer at the gutter's original coordinates.
-      await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
-      await expect.poll(() => button.evaluate(el => el.parentElement.matches(":hover"))).toBe(false);
-      await expect(button).toHaveCSS("opacity", "0");
-      await expect(button).toHaveCSS("pointer-events", "none");
-      race.interruptions += 1;
-      complete();
-    } catch (error) {
-      fail(error);
-      throw error;
-    }
-  }, { times: 1, noWaitAfter: true });
-  return race;
+  expect(await page.evaluate(() => ({
+    scrollY,
+    readingActive: Boolean(__moondiffMetrics.reading?.active),
+  }))).toEqual({ scrollY: 0, readingActive: false });
+  const before = await gutter.boundingBox();
+  await expect(button).toHaveCSS("opacity", "1");
+  await page.evaluate(() => window.__fake.releaseList());
+  await expect.poll(async () => Math.abs((await gutter.boundingBox()).y - before.y)).toBeGreaterThan(before.height);
+  // Re-hit-test the stationary pointer at the gutter's original coordinates.
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await expect.poll(() => button.evaluate(el => el.parentElement.matches(":hover"))).toBe(false);
+  await expect(button).toHaveCSS("opacity", "0");
+  await expect(button).toHaveCSS("pointer-events", "none");
 }
 
 for (const phase of ["initial comment load", "background refresh"]) {
@@ -529,11 +514,13 @@ for (const phase of ["initial comment load", "background refresh"]) {
     for (const side of ["old", "new"]) {
       test(`line comment click recovers from ${phase} after hover: ${layout} ${side}`, async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 1200 });
+        await installRenderProbe(page);
         await installApi(page, pullTarget(), { authenticated: true });
         await page.addInitScript(phase => {
           if (phase === "initial comment load") window.__fake.delayNextList = true;
         }, phase);
         await page.goto(reviewPath());
+        await page.addStyleTag({ content: "html { overflow-anchor: none !important; }" });
         const file = page.locator("#moondiff-file-0");
         await expect(file).toContainText("src/main.mbt");
         await page.getByRole("button", { name: layout, exact: true }).click();
@@ -544,15 +531,17 @@ for (const phase of ["initial comment load", "background refresh"]) {
             state.reviewComments.push({ ...state.reviewComments[0], id: "99", line: 1, position: 1 });
             state.delayNextList = true;
           });
-          await reactivatePage(page);
         }
+        await settleRegions(page);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await settleRegions(page);
+        if (phase === "background refresh") await reactivatePage(page);
         await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe("function");
         const button = file.locator(`.${side}-line-number`)
           .getByRole("button", { name: "Comment on line 2", exact: true });
-        const race = await releaseListAfterLineCommentHover(page, button);
-        await clickLineCommentButton(button);
-        await race.completed;
-        expect(race.interruptions).toBe(1);
+        await clickLineCommentButton(button, {
+          afterHover: () => releaseListAfterLineCommentHover(page, button),
+        });
         const row = file.locator(".inline-comment-editor-row");
         const editor = row.locator("textarea");
         await expect(page.locator(".comment-editor")).toHaveCount(1);
