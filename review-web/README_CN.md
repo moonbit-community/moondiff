@@ -166,11 +166,6 @@ Compose 会替换容器并保留命名卷。`unless-stopped` 重启策略会在 
 重启后也需保持 `MOONDIFF_TOKEN_KEY` 不变。备份与恢复方法见[会话与备份](#会话与备份)。
 如果改用绑定挂载，请确保 UID/GID 为 `10001:10001` 的用户对挂载目录有写入权限。
 
-如果部署原先位于 `playground/`，升级时将已有的 `.env` 移到 `review-web/`，
-保留原来的 `MOONDIFF_TOKEN_KEY`。在该文件中设置 `COMPOSE_PROJECT_NAME=playground`，
-或沿用此前自定义的项目名，再从新目录运行 Compose。这样会继续使用原有容器和数据库卷；
-旧默认项目名对应的卷为 `playground_moondiff-data`。
-
 如需在本地构建镜像，在仓库根目录执行，以便构建过程能够访问所有 `moon.work` 成员：
 
 ```sh
@@ -208,12 +203,10 @@ Wasm 后端和静态资源，并以 UID/GID `10001:10001` 运行。
 构建根据最终 JS/CSS 内容生成 `index.<sha256>.js`、`styles.<sha256>.css`，
 并更新 `index.html` 中的引用。哈希资源使用
 `Cache-Control: public, max-age=31536000, immutable`，内容不变时跨构建保持同一 URL。
-HTML 使用 `no-cache` 和内容 ETag：GET/HEAD 携带匹配的 `If-None-Match` 时返回无正文的 304，
-发布新版本后下次访问即可获取新入口。其他固定名称的静态文件也通过 ETag 重新验证；
-API 响应继续使用 `no-store`。
+HTML 使用 `no-cache` 和内容 ETag：GET/HEAD 携带匹配的 `If-None-Match` 时返回无正文的 304。
+其他固定名称的静态文件也通过 ETag 重新验证；API 响应继续使用 `no-store`。
 
-部署时应一起更新 HTML 和其引用的哈希资源。滚动发布期间应保留旧哈希资源，
-以便刚取得旧 HTML 的页面仍能完成加载。代理/CDN 应保留后端的缓存头与 ETag，
+部署时应一起更新 HTML 和其引用的哈希资源。代理/CDN 应保留后端的缓存头与 ETag，
 不要把不可变缓存策略应用到 HTML、API 路径或固定名称资源。
 
 [Nginx 配置](deploy/nginx.conf) 为 JavaScript、CSS 和 SVG 启用 gzip level 5，
@@ -260,8 +253,7 @@ gzip 响应应包含 `Content-Encoding: gzip`，`Vary` 中应包含 `Accept-Enco
 仅在开始登录时创建未登录会话，有效期 20 分钟。发起新的设备授权时，会话期限会
 延长至该授权固定的 15 分钟期限再加 5 分钟宽限期。复用活动授权时，只会将较短的
 会话补足至同一个固定期限；重复的 start 请求不会持续向后滑动期限。成功登录会在
-同一数据库事务中将有效期延长至 30 天。升级后首次启动时，旧版闲置匿名会话会被
-删除，仍在授权的旧会话有效期会收紧至 20 分钟。退出登录会结束当前 Moondiff Review
+同一数据库事务中将有效期延长至 30 天。退出登录会结束当前 Moondiff Review
 会话，不会卸载 GitHub App，也不会撤销其他 GitHub 会话。
 
 备份时需**同时保存数据库和原始加密密钥**，并将密钥单独存放在受保护的密钥存储中。
@@ -318,7 +310,6 @@ start、poll 和 cancel 都返回 `{$tag:"Success",value:{request_id,status}}`�
 并在每次 `slow_down` 后至少增加 5 秒间隔。
 临时网络故障、服务端错误或频率限制会保留当前授权，并按退避策略重试。
 验证码被拒绝、无效或过期后需要重新发起登录。每次登录尝试最多持续 15 分钟。
-旧的 `/auth/login` 和 `/auth/callback` 路径返回 404。
 
 RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md)，由前后端通过 `@protocol` 引用。
 13 种请求由 `GitHubRequest` 枚举表达，成功结果由 `RpcValue` 枚举表达。
@@ -326,7 +317,6 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 源码响应包含 `{base64,size,content_type}`；评论 ID 使用十进制字符串，确保 64 位精度不丢失。
 请求先解码，再与重新编码的 JSON 比较，拒绝额外字段、小数截断和越界值，随后检查参数约束。
 后端只发送已建模字段；无效上游数据返回 `invalid_github_response`，客户端收到错误结果种类时返回 `invalid_server_response`。
-前后端须同步升级至 v2；不提供 v1 兼容层，SQLite 数据格式保持不变。
 
 浏览器公开读取与后端共用 REST 路径构造和响应校验。公开请求不发送
 `X-GitHub-Api-Version`，使用 GitHub 的
@@ -347,23 +337,11 @@ RPC 请求和返回类型统一定义在 [共享协议模块](protocol/README.md
 
 `GET`/`HEAD` 提供静态资源，并在 `/`、`/owner/repo/commit/sha`、
 `/owner/repo/pull/number` 和 `/owner/repo/pull/number/commits/sha` 提供应用入口。
-未知路径返回 404。旧的 `/#/…` 路由会在应用中显示链接无效错误，不会自动转换。
-
-## 迁移与验证
-
-1. 部署 Wasm 模块、兼容的 `moonrun`、静态目录、持久化数据库路径、密钥和 App 配置。
-   验证 HTTPS、`/healthz` 和变更详情直达链接。
-2. 构建轻量的跳转扩展，将 `MOONDIFF_REVIEW_URL` 设置为该服务的源地址；
-   详见 [Chrome 与 Firefox 扩展说明](../extension/README.md)。
-3. 扩展升级时会清除已有凭据。每个用户都需要重新登录，
-   不会导入浏览器中的令牌或旧审阅页面状态。
-4. Pages 发布工作流已移除。切换部署时，在 Settings → Pages 中关闭仓库旧的 GitHub Pages 站点，
-   如有自定义域名配置，也需删除。仓库中的这项变更不会自动下线已部署的 Pages 站点。
-   替换旧的 hash 分享链接。
-
-切换前运行[检查与测试](#检查与测试)。生产环境的授权和安装流程还需使用实际 App 进行冒烟测试。
+未知路径返回 404。
 
 ## 检查与测试
+
+生产环境的授权和安装流程需使用实际 App 进行冒烟测试。
 
 DOM 视图夹具保留为 MoonBit 白盒测试，通过
 `#skip("browser DOM: npm run test:views")` 标记，不在普通 Node 测试运行器中执行。

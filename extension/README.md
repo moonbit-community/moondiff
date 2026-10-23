@@ -12,8 +12,7 @@ The two implementations intentionally keep independent source, build, test, and
 version files. A browser-specific release can therefore be changed and reviewed
 without coupling its runtime to the other browser.
 
-Builds use `MOONDIFF_REVIEW_URL`, renamed from `MOONDIFF_PLAYGROUND_URL`, for the
-deployed Moondiff Review origin.
+Builds use `MOONDIFF_REVIEW_URL` for the deployed Moondiff Review origin.
 
 From the repository root, the commands without a browser suffix process Chrome
 first and Firefox second:

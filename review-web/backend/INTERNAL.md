@@ -20,8 +20,7 @@ authorization per session. Overlapping starts reuse it through alias records.
 Cancelled attempts are retained until expiry, including attempts cancelled
 before their start arrives.
 Late requests cannot recreate a cancelled attempt. Each attempt is limited to
-15 minutes; GitHub can shorten that deadline. The current pending authorization
-data format does not support old tokens or provide migration.
+15 minutes; GitHub can shorten that deadline.
 
 Pending operations share an async task per authorization. Deadlines are persisted
 in milliseconds and browser wait values round up to seconds, so subsecond
@@ -102,9 +101,9 @@ connection's foreign key enforcement setting. Native explicitly enables WAL,
 foreign keys and a 5-second busy timeout.
 
 The backend creates the database with read and write access restricted to its
-owner and holds a database lock to prevent overlapping instances, including
-during upgrades. The single-process lock applies to both targets. Operational
-requirements and backup procedures are in
+owner and holds a database lock to prevent overlapping instances.
+The single-process lock applies to both targets. Operational requirements and
+backup procedures are in
 [Sessions and backup](../README.md#sessions-and-backup).
 
 ## GitHub requests and static assets

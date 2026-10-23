@@ -5,8 +5,6 @@ English | [简体中文](README_CN.md)
 `moonbit-community/moondiff-review-web-protocol` is a standalone workspace module
 shared by the frontend and backend as `@protocol`. It supports JS, Wasm, Wasm GC
 and Native and contains only data types, JSON codecs and pure validation helpers.
-The frontend and backend must be upgraded together. There is no v1 compatibility
-layer, and this change does not change the SQLite storage format.
 
 ## Wire format
 
@@ -115,9 +113,7 @@ single second exceeds the limit, GitHub reports incomplete results, or a request
 exhausts its bounded window-discovery work, `incomplete` explains the unfinished
 state and `next_cursor` retries/continues that window. Previously loaded rows
 remain visible. Cursors are authenticated and bound to the session epoch and
-operation; refreshing starts a new search. Older PR search cursors without the
-total-confirmation flag return `invalid_cursor` (400), triggering the list
-recovery described below.
+operation; refreshing starts a new search.
 
 `PullCommitsGet` uses the PR's GraphQL `commits` connection for up to 250
 commits. Larger PRs use paginated
@@ -129,10 +125,9 @@ repository, including for fork PRs. Each traversal uses a single source,
 `next_cursor`, `base_sha` and `head_sha`; commit summaries contain `sha`,
 `message` (first line), `author` (login or name) and `committed_at` (committer
 timestamp), without diff data. Cursors also bind the repository, PR, snapshot,
-source and pagination position; the previous commit cursor format returns
-`invalid_cursor` (400). Base/head and commit count are checked before and after
-each page. Inconsistent compare totals, page lengths or accumulated counts are
-rejected, using the existing upstream timeouts and response size limits.
+source and pagination position. Base/head and commit count are checked before
+and after each page. Inconsistent compare totals, page lengths or accumulated
+counts are rejected, using the existing upstream timeouts and response size limits.
 A changed base/head or count returns
 `pull_commits_changed` (409); the frontend restarts that commit traversal from
 page one. During refresh, the previous commits remain visible until their
@@ -156,8 +151,8 @@ survive history navigation and page restoration. Refresh independently rebuilds
 each list from page one to its previous visible depth, retaining old rows until
 the replacement is ready; expanded commits are revalidated. Failed refreshes
 keep usable content and a retry path. Logout, account changes and expired
-sessions clear the caches. No database migration is required. Deploy the updated
-frontend and backend together using the existing combined build.
+sessions clear the caches.
+
 ## Merge status and rebase merge
 
 `PullMergeStatusGet` requires the current authenticated session, reads the current
@@ -236,8 +231,7 @@ Manual checks and page reactivation start a new round; a changed snapshot first
 requires **Load latest**. Login and reload recovery wait for the identity and PR
 file list, then match records by user/repository/PR/path, never by file index.
 Switching accounts isolates records. Loading a new snapshot retains unresolved
-operations without restoring old expansion choices. No backend state, database
-migration or RPC field is added for confirmation.
+operations without restoring old expansion choices.
 
 Records have no time-based expiry. The current tab's session storage covers reloads
 and login recovery; closing the tab or clearing storage can lose them. There is no
