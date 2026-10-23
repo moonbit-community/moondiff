@@ -37,8 +37,7 @@
   - [x] Reuse the existing diff/highlight caches within these boundaries and
     keep ignored-file notices lightweight. Verify that unchanged cards skip
     both view construction and virtual-DOM traversal, rather than only reusing
-    calculation results. Migrate incrementally, starting with file expand and
-    collapse, then source loading and review interactions.
+    calculation results.
   - [x] Scope sticky-layout observation and measurement to structural or size
     changes. Batch necessary reads and writes after rendering, preserve change
     navigation landing behavior, and clean up observers with their owning view.

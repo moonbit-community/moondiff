@@ -182,13 +182,6 @@ same `MOONDIFF_TOKEN_KEY` across restarts. See [Sessions and backup](#sessions-a
 for backup and restore instructions. If using a bind mount instead, make its
 directory writable by UID/GID `10001:10001`.
 
-When upgrading a deployment created from `playground/`, move its existing `.env`
-into `review-web/` and retain the original `MOONDIFF_TOKEN_KEY`. Set
-`COMPOSE_PROJECT_NAME=playground` in that file, or retain your existing custom
-project name, before running Compose from the new directory. This keeps the
-existing containers and database volume (`playground_moondiff-data` for the old
-default project name) associated with the deployment.
-
 To build an image locally, run from the repository root so the build can access
 all `moon.work` members:
 
@@ -232,14 +225,13 @@ The build hashes the final JS and CSS bytes, emits `index.<sha256>.js` and
 `styles.<sha256>.css`, and updates their references in `index.html`. These assets
 use `Cache-Control: public, max-age=31536000, immutable`; unchanged content keeps
 the same URL across builds. HTML uses `no-cache` with a content ETag, so repeat
-GET/HEAD requests with a matching `If-None-Match` return 304 without a body, and
-new releases are discovered on the next visit. Other unversioned static files
-also revalidate with ETags. API responses retain `no-store`.
+GET/HEAD requests with a matching `If-None-Match` return 304 without a body.
+Other unversioned static files also revalidate with ETags. API responses retain
+`no-store`.
 
-Deploy HTML and its hashed assets together. During rolling deployments, keep
-previous hashed assets available for pages that fetched the old HTML just before
-the update. Proxies/CDNs should preserve the backend's cache headers and ETags;
-do not apply the immutable policy to HTML, API routes, or fixed asset names.
+Deploy HTML and its hashed assets together. Proxies/CDNs should preserve the
+backend's cache headers and ETags; do not apply the immutable policy to HTML,
+API routes, or fixed asset names.
 
 The [Nginx configuration](deploy/nginx.conf) enables gzip level 5 for JavaScript,
 CSS and SVG, as well as Nginx's default HTML type. It includes `text/javascript`,
@@ -356,7 +348,6 @@ Server timing survives refresh and restart, enforces GitHub's minimum interval,
 and adds at least five seconds after each `slow_down`. Temporary network, server
 and rate-limit failures preserve the authorization with retry backoff. Rejected,
 invalid or expired codes require a new attempt. Attempts last at most 15 minutes.
-The former `/auth/login` and `/auth/callback` paths return 404.
 
 RPC requests and responses are defined in the [shared protocol module](protocol/README.md),
 imported by both applications as `@protocol`. `GitHubRequest` covers all 13
@@ -367,8 +358,7 @@ strings to preserve 64-bit precision. Strict decoding compares re-encoded JSON
 before validating parameter constraints, rejecting extra fields, fractional
 integer values and overflow. The backend sends only modeled fields and reports
 invalid upstream data as `invalid_github_response`; unexpected client result
-kinds produce `invalid_server_response`. Upgrade both applications together:
-there is no v1 compatibility layer, and the SQLite data format is unchanged.
+kinds produce `invalid_server_response`.
 
 The browser's public reads and backend share REST path construction and response
 validation. Public requests omit `X-GitHub-Api-Version` and follow GitHub's
@@ -393,26 +383,11 @@ the configured Origin and a session CSRF token in `X-CSRF-Token`.
 
 `GET`/`HEAD` serve assets and the app entry at `/`, `/owner/repo/commit/sha`,
 `/owner/repo/pull/number` and `/owner/repo/pull/number/commits/sha`. Unknown paths
-are 404. Old `/#/…` routes show an invalid-link error in the app, without conversion.
-
-## Migration and verification
-
-1. Deploy the Wasm module, compatible `moonrun`, static directory, persistent
-   database location, key and App settings. Verify HTTPS, `/healthz`, and direct
-   change links.
-2. Build the small redirect extension with `MOONDIFF_REVIEW_URL` set to this
-   origin; see the [Chrome and Firefox extension instructions](../extension/README.md).
-3. Existing extension credentials are removed on upgrade. Every user signs in
-   again; no browser token or old review-page state is imported.
-4. The Pages publishing workflow has been removed. At release cutover, disable
-   the repository's old GitHub Pages site in Settings → Pages and remove its old
-   custom-domain configuration if applicable. This repository change does not
-   unpublish an already deployed Pages site. Replace old hash share links.
-
-Run the [checks and tests](#checks-and-tests) before cutover. Production
-authorization and installation must also be smoke-tested with your actual App.
+are 404.
 
 ## Checks and tests
+
+Production authorization and installation must be smoke-tested with your actual App.
 
 The DOM view fixtures remain MoonBit white-box tests. They are marked
 `#skip("browser DOM: npm run test:views")` for the regular Node test runner and

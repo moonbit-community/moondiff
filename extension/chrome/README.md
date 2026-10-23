@@ -58,8 +58,6 @@ and the configured review app origin. The destination host permission lets the
 worker inspect a candidate tab's URL before reusing it, as described in the
 [Chrome tabs documentation](https://developer.chrome.com/docs/extensions/reference/api/tabs).
 There are no GitHub API/OAuth host permissions or general `tabs` permission.
-Upgrade initialization deletes the old extension's credential keys from local
-and session storage. Users must sign in again on the review app.
 
 ## Tests
 
@@ -70,10 +68,10 @@ npm run test:extension:chrome
 ```
 
 Unit tests cover aliases, permission/config validation, concurrent opens, worker
-restart, old credential cleanup and tab lifecycle. Chromium loads the real
-extension against local route fixtures for GitHub and the destination, covering
+restart and tab lifecycle. Chromium loads the real extension against local route
+fixtures for GitHub and the destination, covering
 button appearance, click-only opening, SPA navigation, page redraws, safe reuse,
 closed/navigated tabs and distinct source tabs. Content-script browser tests also
 cover trusted clicks, keyboard activation, pending requests and failure retries.
-The former review tests now live under `review-web/frontend/tests/` and use
+Review tests live under `review-web/frontend/tests/` and use
 same-origin HTTP fixtures.

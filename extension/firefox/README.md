@@ -83,8 +83,7 @@ Mappings are keyed by source GitHub tab and canonical change path in
 `browser.storage.session`, so they survive event-page suspension. Concurrent
 requests share one open operation. An existing destination is activated only if
 it still has the expected origin and path; a closed or navigated destination is
-forgotten, and existing page content is never replaced. Upgrade initialization
-deletes credential keys used by older extension versions.
+forgotten, and existing page content is never replaced.
 
 ## Tests
 
@@ -95,8 +94,8 @@ MOONDIFF_REVIEW_URL=https://diff.example npm run lint:extension:firefox
 ```
 
 Node tests cover URL parsing, message validation and Promise responses,
-concurrent opens, tab reuse and cleanup, event-page restart, credential cleanup,
-the generated manifest, strict production URL validation, AMO linting, and ZIP
+concurrent opens, tab reuse and cleanup, event-page restart, the generated
+manifest, strict production URL validation, AMO linting, and ZIP
 location. Playwright runs the content script in Firefox and covers button
 display, SPA transitions, redraws, trusted mouse and keyboard input, pending
 request disabling, and failure retry.
