@@ -4,6 +4,7 @@ package "moonbit-community/moondiff-review-web-server/internal/storage"
 import {
   "moonbit-community/moondiff-review-web-protocol",
   "moonbit-community/moondiff-review-web-server/internal/config",
+  "moonbit-community/moondiff-review-web-server/internal/httpclient",
   "moonbit-community/sqlite3",
   "moonbitlang/async",
 }
@@ -19,6 +20,8 @@ pub fn now_ms() -> Int64
 pub(all) struct App {
   config : @config.Config
   db : @sqlite3.Connection
+  api_pool : @httpclient.Pool
+  oauth_pool : @httpclient.Pool
   refreshes : Map[String, @async.Lazy[Session]]
   devices : Map[String, @async.Lazy[Unit]]
   viewed_scopes : Map[String, ViewedCoordinator]

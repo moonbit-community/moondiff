@@ -15,6 +15,8 @@ pub(all) struct Session {
 pub(all) struct App {
   config : @config.Config
   db : @sqlite3.Connection
+  api_pool : @httpclient.Pool
+  oauth_pool : @httpclient.Pool
   refreshes : Map[String, @async.Lazy[Session]]
   devices : Map[String, @async.Lazy[Unit]]
   viewed_scopes : Map[String, ViewedCoordinator]
@@ -88,7 +90,15 @@ pub fn App::open(config : @config.Config) -> App raise {
       Text(@crypto.seal(config.key, "database", "key-check", b"moondiff-v1")),
     ])
   }
-  { config, db, refreshes: {}, devices: {}, viewed_scopes: {}, }
+  {
+    api_pool: Pool(config.api_url, 8),
+    oauth_pool: Pool(config.oauth_url, 2),
+    config,
+    db,
+    refreshes: {},
+    devices: {},
+    viewed_scopes: {},
+  }
 }
 
 ///|

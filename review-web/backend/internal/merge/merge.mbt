@@ -291,6 +291,7 @@ async fn read_ci_checks(
     | @http.BadRequest
     | @http.HttpVersionNotSupported(_)
     | @http.NotImplemented
+    | @httpclient.ResponseProtocolError
     | @http.IncorrectBodyLength => {
       warnings.push(warning)
       []

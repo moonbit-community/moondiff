@@ -258,6 +258,8 @@ pub async fn run() -> Unit {
     error => raise error
   }
   defer app.db.close()
+  defer app.api_pool.close()
+  defer app.oauth_pool.close()
   @fs.chmod(config.database, 0o600)
   let server = @http.Server(@socket.Addr::parse(config.listen), reuse_addr=true)
   defer server.close()

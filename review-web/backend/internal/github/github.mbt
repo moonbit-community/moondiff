@@ -1,6 +1,6 @@
 ///|
 pub async fn upstream(
-  base : String,
+  pool : @httpclient.Pool,
   path : String,
   meth : @http.RequestMethod,
   token : String,
@@ -8,41 +8,30 @@ pub async fn upstream(
   source~ : Bool = false,
   accept~ : String = "",
 ) -> (@http.Response, Bytes) {
-  @async.with_timeout(30000, () => {
-    let headers : @http.Headers = {
-      "Accept": if !accept.is_empty() {
-        accept
-      } else if source {
-        "application/vnd.github.raw+json"
-      } else {
-        "application/vnd.github+json"
-      },
-      "X-GitHub-Api-Version": "2026-03-10",
-      "User-Agent": "moondiff",
-    }
-    if !token.is_empty() {
-      headers["Authorization"] = "Bearer " + token
-    }
-    let client = @http.Client(base)
-    defer client.close()
-    let bytes = if body is Some(json) {
-      @utf8.encode(json.stringify())
+  let headers : @http.Headers = {
+    "Accept": if !accept.is_empty() {
+      accept
+    } else if source {
+      "application/vnd.github.raw+json"
     } else {
-      b""
-    }
-    if body is Some(_) {
-      headers["Content-Type"] = "application/json"
-      headers["Content-Length"] = bytes.length().to_string()
-    }
-    client.request(meth, path, extra_headers=headers)
-    if body is Some(_) {
-      client.write(bytes)
-    }
-    let response = client.end_request()
-    let limit = if source { 1048576 } else { 8388608 }
-    let bytes = @httpio.read_bounded(client, limit, source~)
-    (response, bytes)
-  })
+      "application/vnd.github+json"
+    },
+    "X-GitHub-Api-Version": "2026-03-10",
+  }
+  if !token.is_empty() {
+    headers["Authorization"] = "Bearer " + token
+  }
+  let bytes = if body is Some(json) {
+    @utf8.encode(json.stringify())
+  } else {
+    b""
+  }
+  if body is Some(_) {
+    headers["Content-Type"] = "application/json"
+    headers["Content-Length"] = bytes.length().to_string()
+  }
+  let limit = if source { 1048576 } else { 8388608 }
+  pool.request(path, meth, headers, body.map(_ => bytes), limit, source~)
 }
 
 ///|
@@ -104,7 +93,7 @@ async fn oauth_token(
 ) -> Json {
   parameters["client_id"] = Json::string(app.config.client_id)
   let (response, bytes) = upstream(
-    app.config.oauth_url,
+    app.oauth_pool,
     "/login/oauth/access_token",
     Post,
     "",
@@ -207,7 +196,7 @@ pub async fn github(
   let current = authenticated(app, session)
   let token = @common.string(app.token_payload(current), "access_token")
   let (response, bytes) = upstream(
-    app.config.api_url,
+    app.api_pool,
     path,
     meth,
     token,
@@ -224,7 +213,7 @@ pub async fn github(
     let refreshed = authenticated(app, current, rejected_token=token)
     let token = @common.string(app.token_payload(refreshed), "access_token")
     let (response, bytes) = upstream(
-      app.config.api_url,
+      app.api_pool,
       path,
       meth,
       token,
