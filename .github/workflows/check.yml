@@ -80,7 +80,7 @@ jobs:
         run: npx playwright install --with-deps chromium firefox
 
       - name: Run review app integration tests
-        run: node --test review-web/backend/tests/server.test.mjs
+        run: npm run test:server
 
       - name: Run extension tests
         run: npm run test:extension
