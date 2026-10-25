@@ -127,7 +127,70 @@ async fn pull_snapshot(
     )
   }
   let session = @github.authenticated(app, session)
-  let key = "\{session.id}:\{session.epoch}:\{args.owner.to_lower()}/\{args.repo.to_lower()}/\{args.number}"
+  let key = "\{app.instance}:\{session.id}:\{session.epoch}:\{args.owner.to_lower()}/\{args.repo.to_lower()}/\{args.number}"
+  app.snapshot_generation += 1
+  let result = with_snapshot_read(
+    app.snapshot_reads,
+    key,
+    app.snapshot_generation,
+    () => read_snapshot(app, session, args, key),
+  )
+  guard app.still_current(session) else {
+    raise @common.RpcError(
+      401, "authentication_required", "This session is no longer active.",
+    )
+  }
+  result
+}
+
+///|
+async fn with_snapshot_read(
+  reads : Map[String, @storage.SnapshotRead],
+  key : String,
+  generation : Int64,
+  read : async () -> @protocol.ApiPullSnapshotResult,
+) -> @protocol.ApiPullSnapshotResult {
+  let pending = if reads.get(key) is Some(pending) {
+    pending
+  } else {
+    let pending = @async.Lazy(() => {
+      defer forget_snapshot_read(reads, key, generation)
+      @async.with_timeout(60000, read)
+    })
+    let entry : @storage.SnapshotRead = { pending, generation, waiters: 0, }
+    reads[key] = entry
+    entry
+  }
+  pending.waiters += 1
+  defer {
+    pending.waiters -= 1
+    if pending.waiters == 0 {
+      // Remove immediately, before Lazy finishes cancelling its worker. A new
+      // request must never attach to the old, already-cancelled generation.
+      forget_snapshot_read(reads, key, pending.generation)
+    }
+  }
+  pending.pending.wait()
+}
+
+///|
+fn forget_snapshot_read(
+  reads : Map[String, @storage.SnapshotRead],
+  key : String,
+  generation : Int64,
+) -> Unit {
+  if reads.get(key) is Some(current) && current.generation == generation {
+    reads.remove(key)
+  }
+}
+
+///|
+async fn read_snapshot(
+  app : @storage.App,
+  session : @storage.Session,
+  args : @protocol.PullGet,
+  key : String,
+) -> @protocol.ApiPullSnapshotResult {
   let mut metadata = snapshot_metadata(app, session, args)
   if snapshots.entries.iter().find_first(entry => entry.key == key)
     is Some(entry) &&
