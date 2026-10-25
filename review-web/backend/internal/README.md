@@ -7,6 +7,7 @@ infrastructure to transport:
 - `crypto` is the lowest-level security primitive package.
 - `protocol` owns shared errors and protocol/JSON adaptation.
 - `config` and `httpio` provide configuration and bounded I/O primitives.
+- `httpclient` owns bounded, fixed-origin upstream connection pools and recovery.
 - `storage` owns application state and SQLite persistence.
 - `auth`, `github`, and `device` implement session and upstream workflows.
 - `home`, `merge`, and `viewed` are feature packages.
