@@ -277,10 +277,9 @@ async fn pull_commit_statuses(
 ///|
 async fn read_ci_checks(
   read : async () -> Array[@protocol.ApiCiCheck],
-  warnings : Array[String],
   warning : String,
-) -> Array[@protocol.ApiCiCheck] {
-  read() catch {
+) -> (Array[@protocol.ApiCiCheck], Array[String]) {
+  try read() catch {
     @common.RpcError(_, _, _)
     | @async.TimeoutError
     | @os_error.OSError(_, ..)
@@ -292,11 +291,10 @@ async fn read_ci_checks(
     | @http.HttpVersionNotSupported(_)
     | @http.NotImplemented
     | @httpclient.ResponseProtocolError
-    | @http.IncorrectBodyLength => {
-      warnings.push(warning)
-      []
-    }
+    | @http.IncorrectBodyLength => ([], [warning])
     error => raise error
+  } noraise {
+    checks => (checks, [])
   }
 }
 
@@ -317,22 +315,22 @@ pub async fn pull_merge_status(
     snapshot.head == p.expected_head_sha else {
     raise merge_snapshot_changed()
   }
-  let checks : Array[@protocol.ApiCiCheck] = []
-  let warnings : Array[String] = []
-  checks.append(
-    read_ci_checks(
-      () => pull_check_runs(app, session, p.owner, p.repo, snapshot.head),
-      warnings,
-      "Check runs could not be read; CI results are incomplete.",
-    ),
+  let ((checks, warnings), (statuses, status_warnings)) = @async.with_task_group(group => {
+      let runs = group.spawn(() => {
+        read_ci_checks(
+          () => pull_check_runs(app, session, p.owner, p.repo, snapshot.head),
+          "Check runs could not be read; CI results are incomplete.",
+        )
+      })
+      let statuses = read_ci_checks(
+        () => pull_commit_statuses(app, session, p.owner, p.repo, snapshot.head),
+        "Commit statuses could not be read; CI results are incomplete.",
+      )
+      (runs.wait(), statuses)
+    },
   )
-  checks.append(
-    read_ci_checks(
-      () => pull_commit_statuses(app, session, p.owner, p.repo, snapshot.head),
-      warnings,
-      "Commit statuses could not be read; CI results are incomplete.",
-    ),
-  )
+  checks.append(statuses)
+  warnings.append(status_warnings)
   {
     base_sha: snapshot.base,
     head_sha: snapshot.head,
