@@ -1,0 +1,16 @@
+import {
+  "moonbit-community/moondiff-review-web-server/internal/httpio",
+  "moonbitlang/async",
+  "moonbitlang/async/http",
+  "moonbitlang/async/gzip",
+  "moonbitlang/async/io",
+  "moonbitlang/async/os_error",
+  "moonbitlang/async/tls",
+}
+
+supported_targets = "native+wasm"
+
+import {
+  "moonbitlang/async/socket",
+  "moonbit-community/moondiff-review-web-server/internal/protocol" @common,
+} for "wbtest"
