@@ -102,3 +102,75 @@ test('aggregate independently validates after both reads, rebuilds once and reje
   assert.equal(failure.error.code, 'pull_snapshot_changed');
   assert.equal(reads, 3);
 });
+
+test('concurrent normalized snapshot reads share the initial metadata and the complete 101-file flow; failures can be retried', async t => {
+  let fail = false;
+  const fixture = await startServer(async (request, response) => {
+    const url = new URL(request.path, 'http://fixture');
+    if (!url.pathname.toLowerCase().startsWith('/repos/alice/repo/')) return false;
+    await delay();
+    if (/\/pulls\/\d+$/.test(url.pathname)) {
+      if (fail) { response.statusCode = 503; response.end('{}'); }
+      else response.end(JSON.stringify(metadata(101)));
+    } else if (url.pathname.includes('/compare/')) response.end(JSON.stringify({ merge_base_commit: { sha: 'c'.repeat(40) } }));
+    else if (url.pathname.endsWith('/files')) {
+      const start = (Number(url.searchParams.get('page')) - 1) * 100;
+      response.end(JSON.stringify(Array.from({ length: Math.min(100, 101 - start) }, (_, i) => file(start + i))));
+    } else return false;
+    return true;
+  });
+  t.after(() => fixture.close());
+  const user = browser(fixture); await user.login();
+  let start = fixture.requests.length;
+  const results = await Promise.all([
+    user.rpc('github.pull.snapshot.get', args(101)),
+    user.rpc('github.pull.snapshot.get', { ...args(101), owner: 'ALICE', repo: 'REPO' }),
+  ]);
+  assert(results.every(result => result.ok), JSON.stringify(results));
+  assert.deepEqual(results[0], results[1]);
+  assert.equal(fixture.requests.length - start, 5);
+  assert.equal(results[0].value['0'].files.length, 101);
+  fail = true; start = fixture.requests.length;
+  const failures = await Promise.all(Array.from({ length: 2 }, () => user.rpc('github.pull.snapshot.get', args(102))));
+  assert(failures.every(result => !result.ok));
+  assert.equal(fixture.requests.length - start, 1, 'failed workers are also shared');
+  fail = false; start = fixture.requests.length;
+  const retried = await user.rpc('github.pull.snapshot.get', args(102));
+  assert.equal(retried.ok, true, JSON.stringify(retried));
+  assert.equal(fixture.requests.length - start, 5, 'failure does not poison subsequent attempts');
+});
+
+test('in-flight snapshots isolate sessions and auth epochs and reject late results after reauthentication', async t => {
+  const entered = Promise.withResolvers(), release = Promise.withResolvers();
+  let hold = false;
+  const fixture = await startServer(async (request, response) => {
+    const url = new URL(request.path, 'http://fixture');
+    if (!url.pathname.startsWith('/repos/alice/repo/')) return false;
+    if (/\/pulls\/\d+$/.test(url.pathname)) {
+      if (hold) { hold = false; entered.resolve(); await release.promise; }
+      await delay();
+      response.end(JSON.stringify(metadata(101)));
+    } else if (url.pathname.includes('/compare/')) response.end(JSON.stringify({ merge_base_commit: { sha: 'c'.repeat(40) } }));
+    else if (url.pathname.endsWith('/files')) {
+      const start = (Number(url.searchParams.get('page')) - 1) * 100;
+      response.end(JSON.stringify(Array.from({ length: Math.min(100, 101 - start) }, (_, i) => file(start + i))));
+    } else return false;
+    return true;
+  });
+  t.after(() => { release.resolve(); return fixture.close(); });
+  const alice = browser(fixture), bob = browser(fixture);
+  await alice.login(); await bob.login('bob');
+  const start = fixture.requests.length;
+  assert((await Promise.all([alice.rpc('github.pull.snapshot.get', args(1)), bob.rpc('github.pull.snapshot.get', args(1))])).every(result => result.ok));
+  assert.equal(fixture.requests.length - start, 10);
+  hold = true;
+  const old = alice.rpc('github.pull.snapshot.get', args(2));
+  await entered.promise;
+  await alice.login('bob');
+  const current = await alice.rpc('github.pull.snapshot.get', args(2));
+  assert.equal(current.ok, true, JSON.stringify(current));
+  release.resolve();
+  assert.equal((await old).error.code, 'authentication_required');
+  const metadataReads = fixture.requests.filter(request => request.path === '/repos/alice/repo/pulls/2');
+  assert.equal(metadataReads.length, 3, 'old epoch cannot join or publish the new epoch task');
+});

@@ -33,11 +33,14 @@ async test "Viewed FIFO survives holder cancellation and failed waits and cleans
       secure: false,
     },
     db,
+    instance: "test",
     api_pool: Pool("http://127.0.0.1", 8),
     oauth_pool: Pool("http://127.0.0.1", 2),
     refreshes: {},
     devices: {},
     viewed_scopes: {},
+    snapshot_reads: {},
+    snapshot_generation: 0,
   }
   let session : @storage.Session = {
     id: "session",

@@ -15,11 +15,14 @@ pub(all) struct Session {
 pub(all) struct App {
   config : @config.Config
   db : @sqlite3.Connection
+  instance : String
   api_pool : @httpclient.Pool
   oauth_pool : @httpclient.Pool
   refreshes : Map[String, @async.Lazy[Session]]
   devices : Map[String, @async.Lazy[Unit]]
   viewed_scopes : Map[String, ViewedCoordinator]
+  snapshot_reads : Map[String, SnapshotRead]
+  mut snapshot_generation : Int64
 }
 
 ///|
@@ -93,11 +96,14 @@ pub fn App::open(config : @config.Config) -> App raise {
   {
     api_pool: Pool(config.api_url, 8),
     oauth_pool: Pool(config.oauth_url, 2),
+    instance: @crypto.random_id(),
     config,
     db,
     refreshes: {},
     devices: {},
     viewed_scopes: {},
+    snapshot_reads: {},
+    snapshot_generation: 0,
   }
 }
 
