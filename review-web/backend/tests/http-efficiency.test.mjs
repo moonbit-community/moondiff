@@ -193,3 +193,54 @@ test('issue and review comment page chains cross a barrier together and preserve
   const denied = await user.rpc('github.comments.list', { owner: 'alice', repo: 'denied', kind: 'pull', number: '1' });
   assert.equal(denied.error.code, 'permission_denied');
 });
+
+test('check-run and commit-status chains overlap and merge results and warnings in a stable order', { timeout: 8000 }, async t => {
+  const gates = new Map();
+  const statusFailed = barrier();
+  const base = '1'.repeat(40), head = 'a'.repeat(40);
+  const fixture = await startServer(async (request, response) => {
+    const url = new URL(request.path, 'http://fixture');
+    const repo = url.pathname.split('/')[3];
+    if (url.pathname.endsWith('/pulls/42')) {
+      response.end(JSON.stringify({ base: { sha: base }, head: { sha: head }, state: 'open', draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean' }));
+      return true;
+    }
+    const runs = url.pathname.endsWith('/check-runs');
+    if (!runs && !url.pathname.endsWith('/status')) return false;
+    if (!gates.has(repo)) gates.set(repo, { ready: barrier(), branches: new Set() });
+    const gate = gates.get(repo);
+    const page = Number(url.searchParams.get('page'));
+    if (page === 1) {
+      gate.branches.add(runs ? 'runs' : 'statuses');
+      if (gate.branches.size === 2) gate.ready.resolve();
+      await gate.ready.promise;
+    }
+    if (repo === 'failed' || (repo === 'partial' && runs)) {
+      if (repo === 'failed' && runs) await statusFailed.promise;
+      response.statusCode = runs ? 403 : 503; response.end('{}');
+      if (!runs) statusFailed.resolve();
+      return true;
+    }
+    const start = (page - 1) * 100;
+    const values = Array.from({ length: page === 1 ? 100 : 1 }, (_, i) => runs
+      ? { name: `check-${start + i}`, status: 'completed', conclusion: 'success', output: { title: 'Passed' } }
+      : { context: `status-${start + i}`, state: 'success' });
+    response.end(JSON.stringify({ total_count: 101, [runs ? 'check_runs' : 'statuses']: values }));
+    return true;
+  });
+  t.after(() => { for (const gate of gates.values()) gate.ready.resolve(); statusFailed.resolve(); return fixture.close(); });
+  const user = browser(fixture); await user.login();
+  const status = repo => user.rpc('github.pull.merge.status', { owner: 'alice', repo, number: '42', expected_base_sha: base, expected_head_sha: head });
+  const result = await status('repo');
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.ci_checks.map(check => check.name), [...Array.from({ length: 101 }, (_, i) => `check-${i}`), ...Array.from({ length: 101 }, (_, i) => `status-${i}`)]);
+  assert.deepEqual(result.value.ci_warnings, []);
+  const partial = await status('partial');
+  assert.equal(partial.ok, true, JSON.stringify(partial));
+  assert.equal(partial.value.ci_checks.length, 101);
+  assert.deepEqual(partial.value.ci_warnings, ['Check runs could not be read; CI results are incomplete.']);
+  const failed = await status('failed');
+  assert.equal(failed.ok, true, JSON.stringify(failed));
+  assert.deepEqual(failed.value.ci_checks, []);
+  assert.deepEqual(failed.value.ci_warnings, ['Check runs could not be read; CI results are incomplete.', 'Commit statuses could not be read; CI results are incomplete.']);
+});

@@ -11,10 +11,8 @@ fn ci_check_fixture(state : @protocol.ApiCiState) -> @protocol.ApiCiCheck {
 
 ///|
 async test "CI reads keep results and report recoverable upstream failures" {
-  let warnings : Array[String] = []
-  let checks = read_ci_checks(
+  let (checks, warnings) = read_ci_checks(
     () => [ci_check_fixture(Success)],
-    warnings,
     "unavailable",
   )
   assert_eq(checks.length(), 1)
@@ -25,19 +23,17 @@ async test "CI reads keep results and report recoverable upstream failures" {
     @io.ReaderClosed,
   ]
   for error in failures {
-    let warnings : Array[String] = []
-    let checks = read_ci_checks(() => raise error, warnings, "unavailable")
+    let (checks, warnings) = read_ci_checks(() => raise error, "unavailable")
     assert_true(checks.is_empty())
     assert_eq(warnings, ["unavailable"])
   }
-  let timed_out = read_ci_checks(
+  let (timed_out, warnings) = read_ci_checks(
     () => {
       @async.with_timeout(1, () => {
         @async.sleep(1000)
         [ci_check_fixture(Success)]
       })
     },
-    warnings,
     "timed out",
   )
   assert_true(timed_out.is_empty())
@@ -49,11 +45,8 @@ priv suberror UnexpectedCiFailure
 
 ///|
 async test "CI reads propagate unexpected failures" {
-  let warnings : Array[String] = []
-  try
-    read_ci_checks(() => raise UnexpectedCiFailure, warnings, "unavailable")
-  catch {
-    UnexpectedCiFailure => assert_true(warnings.is_empty())
+  try read_ci_checks(() => raise UnexpectedCiFailure, "unavailable") catch {
+    UnexpectedCiFailure => ()
     error => raise error
   } noraise {
     _ => fail("Unexpected CI failure was hidden")
