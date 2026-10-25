@@ -3,6 +3,7 @@ import {
   "moonbit-community/moondiff-review-web-server/internal/protocol" @common,
   "moonbit-community/moondiff-review-web-server/internal/config",
   "moonbit-community/moondiff-review-web-server/internal/crypto",
+  "moonbit-community/moondiff-review-web-server/internal/httpclient",
   "moonbitlang/async",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",

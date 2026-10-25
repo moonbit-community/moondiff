@@ -3,6 +3,7 @@ package "moonbit-community/moondiff-review-web-server/internal/github"
 
 import {
   "moonbit-community/moondiff-review-web-protocol",
+  "moonbit-community/moondiff-review-web-server/internal/httpclient",
   "moonbit-community/moondiff-review-web-server/internal/storage",
   "moonbitlang/async/http",
 }
@@ -24,7 +25,7 @@ pub fn pull_snapshot(Json) -> PullSnapshot raise
 
 pub fn pull_variables(@moondiff-review-web-protocol.PullViewedGet) -> Json raise
 
-pub async fn upstream(String, String, @http.RequestMethod, String, Json?, source? : Bool, accept? : String) -> (@http.Response, Bytes)
+pub async fn upstream(@httpclient.Pool, String, @http.RequestMethod, String, Json?, source? : Bool, accept? : String) -> (@http.Response, Bytes)
 
 pub fn upstream_json(Bytes) -> Json raise
 

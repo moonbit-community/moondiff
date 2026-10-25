@@ -37,6 +37,9 @@ export async function startServer(handler, options = {}) {
   writeFileSync(join(root, 'outside.txt'), 'secret');
   if (!options.staticDir) symlinkSync(join(root, 'outside.txt'), join(staticDir, 'escape'));
   const requests = [];
+  const sockets = new Map();
+  const socketIds = new WeakMap();
+  const transport = { connections: 0, active: 0, maxActive: 0, maxOpen: 0 };
   const devices = new Map();
   function approve(userCode, who = 'alice') {
     const entry = [...devices.values()].find(entry => entry.user_code === userCode);
@@ -44,11 +47,17 @@ export async function startServer(handler, options = {}) {
     entry.who = who;
   }
   const stub = createServer(async (req, res) => {
+    transport.active++;
+    transport.maxActive = Math.max(transport.maxActive, transport.active);
+    let finished = false;
+    const finish = () => { if (!finished) { finished = true; transport.active--; } };
+    res.once('finish', finish);
+    res.once('close', finish);
     try {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       const text = Buffer.concat(chunks).toString();
-      const record = { path: req.url, method: req.method, headers: req.headers, body: text ? JSON.parse(text) : undefined };
+      const record = { path: req.url, method: req.method, headers: req.headers, body: text ? JSON.parse(text) : undefined, socket: socketIds.get(req.socket) };
       requests.push(record);
       res.setHeader('content-type', 'application/json');
       if (await handler?.(record, res, requests)) return;
@@ -72,6 +81,14 @@ export async function startServer(handler, options = {}) {
         res.end(JSON.stringify({ id: who === 'bob' ? 2 : 1, login: who }));
        } else { res.end(JSON.stringify({ sha: '123abcd', html_url: 'https://github.com/alice/repo/commit/123abcd', commit: {message: 'fixture'}, parents: [], stats: {additions: 0, deletions: 0, total: 0}, files: [] })); }
     } catch (error) { res.statusCode = 500; res.end(JSON.stringify({ error: String(error) })); }
+  });
+  stub.keepAliveTimeout = 60_000;
+  stub.on('connection', socket => {
+    const id = ++transport.connections;
+    socketIds.set(socket, id);
+    sockets.set(id, socket);
+    transport.maxOpen = Math.max(transport.maxOpen, sockets.size);
+    socket.once('close', () => sockets.delete(id));
   });
   stub.listen(0, '127.0.0.1');
   await once(stub, 'listening');
@@ -153,7 +170,7 @@ export async function startServer(handler, options = {}) {
     throw error;
   }
   return {
-    root, get base() { return base; }, get port() { return port; }, env, database, requests, devices, approve, get output() { return output; }, start, stop,
+    root, get base() { return base; }, get port() { return port; }, env, database, requests, sockets, transport, devices, approve, get output() { return output; }, start, stop,
     sql(sql, params = []) {
       const result = spawnSync('python3', ['-c', 'import sqlite3,json,sys; db=sqlite3.connect(sys.argv[1]); rows=db.execute(sys.argv[2],json.loads(sys.argv[3])).fetchall(); db.commit(); print(json.dumps(rows))', database, sql, JSON.stringify(params)], { encoding: 'utf8' });
       if (result.status !== 0) throw new Error(result.stderr);

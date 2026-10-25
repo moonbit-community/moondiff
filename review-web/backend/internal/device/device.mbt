@@ -16,13 +16,13 @@ fn retry_seconds(response : @http.Response) -> Int64 {
 
 ///|
 async fn device_upstream(
-  base : String,
+  pool : @httpclient.Pool,
   path : String,
   token : String,
   body : Json?,
 ) -> Json {
   let (response, bytes) = @github.upstream(
-    base,
+    pool,
     path,
     if body is Some(_) {
       Post
@@ -160,7 +160,7 @@ fn seal_device(
 async fn device_step(app : @storage.App, flow : @storage.DeviceFlow) -> Unit {
   if flow.phase == "starting" {
     let payload = device_upstream(
-      app.config.oauth_url,
+      app.oauth_pool,
       "/login/device/code",
       "",
       Some({ "client_id": app.config.client_id }),
@@ -210,7 +210,7 @@ async fn device_step(app : @storage.App, flow : @storage.DeviceFlow) -> Unit {
   let verifying = if flow.phase == "pending" {
     let credential = device_credentials(app, flow)
     let payload = device_upstream(
-      app.config.oauth_url,
+      app.oauth_pool,
       "/login/oauth/access_token",
       "",
       Some({
@@ -247,7 +247,7 @@ async fn device_step(app : @storage.App, flow : @storage.DeviceFlow) -> Unit {
   }
   let tokens = device_credentials(app, verifying)
   let user = device_upstream(
-    app.config.api_url,
+    app.api_pool,
     "/user",
     @common.string(tokens, "access_token"),
     None,
