@@ -164,3 +164,32 @@ test('disconnect recovery is limited to one reused GET before headers; writes an
   assert.equal((await read(user)).ok, true);
   assert.notEqual(fixture.requests.at(-1).socket, previous);
 });
+
+test('issue and review comment page chains cross a barrier together and preserve page order', { timeout: 8000 }, async t => {
+  const both = barrier();
+  const branches = new Set();
+  const fixture = await startServer(async (request, response) => {
+    const url = new URL(request.path, 'http://fixture');
+    if (!url.pathname.endsWith('/comments')) return false;
+    if (url.pathname.includes('/denied/')) { response.statusCode = 403; response.end('{}'); return true; }
+    const branch = url.pathname.includes('/issues/') ? 'issue' : 'review';
+    const page = Number(url.searchParams.get('page'));
+    if (page === 1) {
+      branches.add(branch);
+      if (branches.size === 2) both.resolve();
+      await both.promise;
+    }
+    const start = (branch === 'issue' ? 0 : 1000) + (page - 1) * 100;
+    response.end(JSON.stringify(Array.from({ length: page === 1 ? 100 : 1 }, (_, index) => ({ ...comment, id: start + index + 1, ...(branch === 'review' ? { path: 'file.mbt', commit_id: '123abcd' } : {}) }))));
+    return true;
+  });
+  t.after(() => { both.resolve(); return fixture.close(); });
+  const user = browser(fixture); await user.login();
+  const result = await user.rpc('github.comments.list', { owner: 'alice', repo: 'repo', kind: 'pull', number: '1' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.issue_comments.map(comment => comment.id), Array.from({ length: 101 }, (_, i) => String(i + 1)));
+  assert.deepEqual(result.value.review_comments.map(comment => comment.id), Array.from({ length: 101 }, (_, i) => String(i + 1001)));
+  assert.deepEqual(fixture.requests.filter(request => request.path.endsWith('page=1') && request.path.includes('/comments')).map(request => request.path.split('/')[4]).sort(), ['issues', 'pulls']);
+  const denied = await user.rpc('github.comments.list', { owner: 'alice', repo: 'denied', kind: 'pull', number: '1' });
+  assert.equal(denied.error.code, 'permission_denied');
+});
