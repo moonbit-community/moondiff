@@ -121,6 +121,39 @@ ID. The server does not accept arbitrary upstream URLs or follow redirects when
 sending requests. Response, request and pagination limits are listed in the
 [HTTP contract](../README.md#http-contract).
 
+Each application owns separate, fixed-origin HTTP pools for API traffic (at most
+eight connections) and OAuth traffic (at most two). Connections are created on
+demand; connecting, borrowed and idle connections share each pool's capacity.
+Idle connections older than 15 seconds are discarded on borrow and return, and
+all connections are closed when the server exits. These are built-in defaults,
+with no additional environment settings. Only User-Agent is persistent;
+Authorization, Accept and body headers are set for each request.
+
+A connection stays exclusive until the complete bounded response body and its
+HTTP framing have been consumed, including chunk trailers and gzip decoding.
+Transport errors, body limits, timeout, cancellation, `Connection: close` and
+close-delimited responses discard it. Queueing, connecting, reading and recovery
+share one 30-second deadline. Only GET/HEAD on a reused connection may retry once
+on a disconnect before complete response headers arrive, using a new connection.
+Timeouts, protocol errors and HTTP error responses do not trigger this recovery;
+POST, PUT, PATCH and DELETE are never automatically replayed by the transport.
+The existing authentication refresh flow remains separate.
+
+Authenticated pull snapshot reads register a shared `Lazy` task before the first
+metadata request, scoped by application instance, session, auth epoch, normalized
+repository and pull number. Each task has a 60-second deadline. Cancelling one
+waiter leaves the others running; cancelling every waiter cancels the read and
+immediately removes its registration. Generation checks prevent old cleanup from
+removing a replacement task. Success and failure both remove registrations, and
+each waiter rechecks its session before returning. The existing process-wide
+64 MiB snapshot cache budget, metadata confirmation, final independent validation
+and single rebuild on snapshot drift remain in effect.
+
+Issue/review comment page chains run concurrently, as do check-run/commit-status
+page chains. Each chain still pages sequentially. CI branches return their own
+checks and warnings, then merge in check-run followed by commit-status order,
+preserving partial failure behavior and stable output.
+
 The backend serves static resources and the app entry for valid change routes.
 It rejects path traversal and symlinks outside the static root.
 The health check endpoint becomes available after the database and listener have
