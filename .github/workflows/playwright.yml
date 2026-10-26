@@ -79,11 +79,11 @@ jobs:
         working-directory: review-web
         run: npm run test:e2e -- --workers=4 --shard=${{ matrix.shard }}/4
 
-      - name: Upload browser test failure artifacts
-        if: failure()
+      - name: Upload browser test results and performance reports
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: review-e2e-failures-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: review-e2e-results-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: review-web/test-results/
           retention-days: 7
           if-no-files-found: ignore
