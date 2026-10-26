@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../../tests/browser-test.mjs";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
 
 const sha = "3333333333333333333333333333333333333333";

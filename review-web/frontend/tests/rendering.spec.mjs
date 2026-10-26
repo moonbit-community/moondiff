@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../tests/browser-test.mjs';
 import { installRenderProbe, renderCounts, settleRegions } from '../../tests/render-probe.mjs';
 import { gate, installRenderingFixture, navigate, syntheticFixture } from './rendering-fixture.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';

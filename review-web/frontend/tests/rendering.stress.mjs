@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../tests/browser-test.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { installRenderProbe, renderCounts, settleRegions, toggleCommit, toggleDetailsPaint } from '../../tests/render-probe.mjs';

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 
 test('repeat visits reuse content-hashed JS and CSS from the browser cache', async ({ page }) => {
   // Request routing disables the browser HTTP cache, so use the local server's

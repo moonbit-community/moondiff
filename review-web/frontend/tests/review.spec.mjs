@@ -5,7 +5,7 @@ import { clickLineCommentButton } from "./comment-actions.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
 import { navigate } from "./rendering-fixture.mjs";
 import { settleRegions, installRenderProbe } from "../../tests/render-probe.mjs";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../../tests/browser-test.mjs";
 import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
 
 const head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

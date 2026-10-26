@@ -1,4 +1,5 @@
-import { expect, test as baseTest } from '@playwright/test';
+import { instrumentRenderProbe } from '../../tests/render-probe.mjs';
+import { expect, test as baseTest } from '../../tests/browser-test.mjs';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +16,7 @@ const test = baseTest.extend({
     // The Playwright webServer builds both targets before any test starts.
     const assets = mkdtempSync(join(tmpdir(), 'moondiff-viewed-browser-'));
     cpSync(join(repository, 'review-web/frontend/public'), assets, { recursive: true });
-    writeFileSync(join(assets, 'index.js'), minifyFrontend(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8')));
+    writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
     const f = await startViewedServer({ staticDir: assets });
     const user = browser(f);
     try {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { head, pull, commits, success, failure, gate, setup, reviews, authored, row, noLanding, selectTab, signOut } from './home-fixture.mjs';
 
 // A gate makes the session check visible and catches even a single frame of the old homepage.

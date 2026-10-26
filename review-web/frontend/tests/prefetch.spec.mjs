@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { writeFile } from 'node:fs/promises';
 import { setup, pull, success, gate, failure, row, selectTab, signOut, base, head } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';

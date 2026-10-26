@@ -1,6 +1,6 @@
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
 import { e2eOrigin } from '../../tests/e2e-config.mjs';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 const sha = 'abcdef1234567890abcdef1234567890abcdef12';
 const route = `/fixture/repo/commit/${sha}`;

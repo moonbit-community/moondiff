@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { setup, gate, failure, row } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';

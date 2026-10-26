@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect } from "../../tests/browser-test.mjs";
 
 export async function checkToolbar(page) {
   const hero = page.locator(".hero-workspace");

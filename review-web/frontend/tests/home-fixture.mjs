@@ -1,4 +1,5 @@
-import { expect } from '@playwright/test';
+import { createGate, trackRoute } from '../../tests/browser-control.mjs';
+import { expect } from '../../tests/browser-test.mjs';
 import { successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 
 const base = 'a'.repeat(40), head = 'b'.repeat(40);
@@ -6,7 +7,7 @@ const pull = (number, overrides = {}) => ({ owner: 'upstream', repo: 'repo', num
 const commits = (start, length, overrides = {}) => ({ items: Array.from({ length }, (_, i) => ({ sha: (start + i).toString(16).padStart(40, '0'), message: `Commit ${start + i}`, author: 'fork-author', committed_at: '2026-09-01T00:00:00Z' })), total_count: start + length - 1, base_sha: base, head_sha: head, ...overrides });
 const success = (kind, value) => ({ $tag: 'Success', value: { $tag: kind, '0': value } });
 const failure = (code, message, status = 502) => ({ status, json: { $tag: 'Failure', error: { status, code, message } } });
-function gate() { let release; const promise = new Promise(r => { release = r; }); return { promise, release }; }
+const gate = createGate;
 async function setup(page, handler) {
   const state = { user: 'alice', calls: [], statusGate: null, installUrl: null };
   await page.addInitScript(() => {
@@ -18,6 +19,7 @@ async function setup(page, handler) {
   });
   // Popups share the same session and API fixtures as the homepage.
   await page.context().route('**/api/auth/status', async route => {
+    route = trackRoute(route);
     if (state.statusGate) await state.statusGate.promise;
     await route.fulfill({ json: successFixture('auth.status', { authenticated: Boolean(state.user), csrf_token: 'fixture', ...(state.installUrl ? { install_url: state.installUrl } : {}), ...(state.user ? { login: state.user, user_id: state.user } : {}) }) });
   });

@@ -1,3 +1,5 @@
+import { clockFor, waitUntil, browserDiagnostic, withRealTimeout } from './browser-control.mjs';
+
 // Instrument only the temporary E2E bundle. Dependency sources are never edited.
 export function instrumentRenderProbe(source) {
   const inject = (pattern, code) => {
@@ -5,11 +7,50 @@ export function instrumentRenderProbe(source) {
     source = source.replace(pattern, match => { matches++; return `${match}\n${typeof code === 'function' ? code(match) : code}\n`; });
     if (matches !== 1) throw new Error(`Render probe expected one ${pattern}, found ${matches}`);
   };
+  inject(/const (\w+github__client6client) = [^\n]+;/, match => {
+    const client = match.match(/const (\w+)/)[1];
+    return `
+      // Return fresh scalar/array copies; no mutable application objects escape.
+      globalThis.__moondiffTestState = () => {
+        const client = ${client}, w = client.workspace;
+        return {
+          generation: client.generation, identityEpoch: w.epoch,
+          checking: w.checking, sourcePaused: w.source_pause !== undefined,
+          home: w.home, prefetchReady: w.prefetch_ready, limited: w.limited,
+          round: w.round, candidateIndex: w.index,
+          candidates: w.candidates.map(c => 'pull:' + c.pull.owner.toLowerCase() + '/' + c.pull.repo.toLowerCase() + '/' + c.pull.number),
+          sourceIndex: w.source_index, sourceCount: w.source_queue.length,
+          backgroundOwner: w.background_owner ?? null,
+          reads: w.reads.size, tasks: w.tasks.size,
+          cache: w.cache.map(entry => ({ key: entry.key, kind: entry.payload.$tag, created: entry.created })),
+          application: structuredClone(globalThis.__moondiffBusiness),
+        };
+      };`;
+  });
+  let updates = 0;
+  source = source.replace(/function (\w+application6update)\(model, msg, emit\) \{[\s\S]*?\n\}/g, (body, name) => {
+    updates++;
+    return `${body.replace(`function ${name}(`, `function ${name}__probed(`)}
+      function ${name}(model, msg, emit) {
+        const result = ${name}__probed(model, msg, emit), next = result.model;
+        globalThis.__moondiffBusiness = {
+          generation: next.generation, pageVisible: next.page_visible,
+          viewed: { ready: next.viewed.ready, loading: next.viewed.loading,
+            readSerial: next.viewed.read_serial, pollScheduled: next.viewed.poll_scheduled,
+            retry: next.viewed.retry, stale: next.viewed.stale },
+          merge: { loading: next.pull_merge.loading, pollScheduled: next.pull_merge.poll_scheduled,
+            serial: next.pull_merge.serial, retry: next.pull_merge.retry },
+        };
+        return result;
+      }`;
+  });
+  if (updates !== 1) throw new Error(`Render probe expected one application update, found ${updates}`);
   // Every test using settleRegions needs the scalar layout snapshot, even when
   // it does not install the full performance probe. Initialize before the
   // coordinator starts; this hook exists only in the temporary E2E bundle.
   inject(/function \w+rendering5start\(id\) \{/, `
-    globalThis.__moondiffMetrics ??= { files: {}, active: {} };`);
+    globalThis.__moondiffMetrics ??= { files: {}, active: {} };
+    globalThis.__moondiffPendingPaints ??= new Set();`);
   // A test may hold a region's next paint while the shell and network proceed.
   // Keep the hook in the temporary bundle, alongside the existing render probe.
   // BrowserHost replaced Sandbox; retain the mount ID for regional barriers.
@@ -68,49 +109,92 @@ export async function installRenderProbe(page) {
 }
 
 export async function settleRegions(page, timeout = 5_000) {
-  // Two consecutive idle animation frames cover central/regional paints and a
-  // layout callback that schedules more work later in the same frame.
-  const result = await page.evaluate(timeout => new Promise(resolve => {
-    let stableFrames = 0;
-    let animationFrame = 0;
-    let finished = false;
-    const snapshot = () => {
-      const layout = globalThis.__moondiffMetrics?.layout;
-      const pending = globalThis.__moondiffPendingPaints;
-      return {
-        pendingPaints: pending?.size ?? 0,
-        pendingMounts: pending ? [...pending].map(sandbox => sandbox.mount) : [],
-        layoutFrame: layout?.frame ?? 0,
-        layoutDirty: layout?.dirty ?? 0,
-        layoutCallbacks: layout?.callbacks ?? 0,
+  let finished = false;
+  // A single evaluation includes probe validation, both idle frames and normal
+  // cleanup. Each extra Playwright call captures the large DOM in traces and
+  // can itself take seconds under 6x CPU throttling.
+  const observation = page.evaluate(() => {
+    if (typeof globalThis.__moondiffTestState !== 'function' || !(globalThis.__moondiffPendingPaints instanceof Set)) {
+      throw new Error('settleRegions requires instrumentRenderProbe in the temporary browser bundle');
+    }
+    if (globalThis.__moondiffSettleFrame) throw new Error('Concurrent regional render wait');
+    return new Promise(resolve => {
+      const state = { stable: 0 };
+      state.cancel = () => { cancelAnimationFrame(state.frame); resolve(false); };
+      const next = () => {
+        state.frame = requestAnimationFrame(() => {
+          const layout = globalThis.__moondiffMetrics?.layout;
+          const idle = globalThis.__moondiffPendingPaints.size === 0 &&
+            layout?.frame === 0 && layout?.dirty === 0 && layout?.callbacks === 0;
+          state.stable = idle ? state.stable + 1 : 0;
+          if (state.stable >= 2) { delete globalThis.__moondiffSettleFrame; resolve(true); }
+          else next();
+        });
       };
-    };
-    const done = value => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-      resolve(value);
-    };
-    const next = () => {
-      animationFrame = requestAnimationFrame(() => {
-        animationFrame = 0;
-        const state = snapshot();
-        const idle = state.pendingPaints === 0 && state.layoutFrame === 0 &&
-          state.layoutDirty === 0 && state.layoutCallbacks === 0;
-        stableFrames = idle ? stableFrames + 1 : 0;
-        if (stableFrames >= 2) done({ ok: true, state });
-        else next();
-      });
-    };
-    const timer = setTimeout(() => done({ ok: false, state: snapshot(), stableFrames }), timeout);
-    next();
-  }), timeout);
-  if (!result.ok) throw new Error(`Regional rendering did not become idle: ${JSON.stringify(result)}`);
+      globalThis.__moondiffSettleFrame = state;
+      next();
+    });
+  }).then(result => { finished = true; return result; });
+  const completed = withRealTimeout(observation, timeout, 'regional render commit (two idle frames)');
+  try {
+    const clock = clockFor(page);
+    if (clock) {
+      const advance = async () => {
+        // Complete a round trip after registration before advancing frames.
+        await page.evaluate(() => {});
+        await waitUntil(async () => {
+          if (!finished) await clock.frames();
+          return finished;
+        }, { label: 'controlled regional render frames', timeout });
+      };
+      await Promise.all([completed, advance()]);
+    } else {
+      await completed;
+    }
+  } catch (error) {
+    finished = true;
+    if (!page.isClosed()) await page.evaluate(() => {
+      globalThis.__moondiffSettleFrame?.cancel();
+      delete globalThis.__moondiffSettleFrame;
+    });
+    if (error.message.includes('requires instrumentRenderProbe')) throw error;
+    throw new Error(`Regional rendering did not become idle: ${JSON.stringify(await browserDiagnostic(page))}`, { cause: error });
+  } finally { finished = true; }
 }
 
-export async function renderCounts(page) {
+export async function waitForState(page, predicate, label = 'application state', options = {}) {
+  const read = async () => {
+    const state = await page.evaluate(() => {
+      if (!globalThis.__moondiffTestState) throw new Error('Missing temporary application probe');
+      return globalThis.__moondiffTestState();
+    });
+    return predicate(state) && state;
+  };
+  const clock = clockFor(page);
+  const result = clock ? await clock.until(read, label, options)
+    : await waitUntil(read, { ...options, label, diagnostic: () => browserDiagnostic(page) });
   await settleRegions(page);
+  return result;
+}
+
+export async function waitForPrefetch(page, { owner, repo, number, sources = [] }) {
+  const key = `pull:${owner.toLowerCase()}/${repo.toLowerCase()}/${number}`;
+  return waitForState(page, state => !state.checking &&
+    state.cache.some(entry => entry.key === key) && sources.every(source => state.cache.some(entry => {
+      if (!entry.key.startsWith('{')) return false;
+      const request = JSON.parse(entry.key).request;
+      const args = request['0'];
+      return request.$tag === 'ContentGet' && Object.entries(source).every(([key, value]) => args[key] === value);
+    })), `prefetched snapshot and source pair for ${key}`);
+}
+
+export const waitForPrefetchRound = (page, { afterRound = -1 } = {}) => waitForState(page, state =>
+  state.round > afterRound && state.home && state.prefetchReady && state.backgroundOwner === null &&
+  state.candidateIndex === state.candidates.length && state.sourceIndex === state.sourceCount,
+  'completed prefetch round');
+
+export async function renderCounts(page, timeout = 5_000) {
+  await settleRegions(page, timeout);
   return page.evaluate(() => structuredClone({ ...__moondiffMetrics, sources: undefined }));
 }
 

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 
 const base = 'a'.repeat(40);
 const merge = 'b'.repeat(40);
