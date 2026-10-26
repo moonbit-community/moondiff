@@ -8,8 +8,6 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
@@ -20,7 +18,7 @@ jobs:
       - name: install
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s latest
-          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: moon version
         run: |
@@ -75,69 +73,12 @@ jobs:
       - name: Run release artifact tests
         run: npm run test:artifacts
 
-      - name: Install Playwright browsers
-        working-directory: review-web
-        run: npx playwright install --with-deps chromium firefox
-
       - name: Run review app integration tests
         run: npm run test:server
 
-      - name: Run extension tests
-        run: npm run test:extension
+      - name: Run extension unit tests
+        run: npm run test:extension:unit
 
-      - name: Run browser component and integration tests
+      - name: Run E2E configuration tests
         working-directory: review-web
-        run: npm run test:e2e
-
-      - name: Upload browser test failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: browser-test-failures-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            review-web/test-results/
-            test-results/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  rendering-stress:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Install MoonBit
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s latest
-          echo "$HOME/.moon/bin" >> $GITHUB_PATH
-
-      - name: Update MoonBit dependencies
-        run: moon update
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: review-web/package-lock.json
-
-      - name: Install review app dependencies
-        working-directory: review-web
-        run: npm ci
-
-      - name: Install Chromium
-        working-directory: review-web
-        run: npx playwright install --with-deps chromium
-
-      - name: Run rendering stress tests
-        run: npm run test:review-web:stress
-
-      - name: Upload rendering stress test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: rendering-stress-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: review-web/test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+        run: npm run test:e2e-config

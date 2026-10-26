@@ -421,13 +421,15 @@ For browser tests:
 ```sh
 npm ci
 npx playwright install chromium firefox
+npm run test:views
 npm run test:e2e
 ```
 
 `test:views` runs the isolated component fixtures without starting the backend.
-`test:e2e` includes these component tests before the page integration suite.
-Both commands are also available at the repository root as `npm run test:views`
-and `npm run test:review-web`.
+`test:e2e` runs only the page integration suite; `test:e2e-config` runs the
+browser-independent configuration checks separately.
+The component and page suites are also available at the repository root as
+`npm run test:views` and `npm run test:review-web`.
 
 Use `npx playwright install --with-deps chromium firefox` if system libraries are
 missing, and `npm run test:e2e:ui` for the interactive runner. The review app
@@ -448,9 +450,11 @@ Rendering stress tests run separately with `npm run test:e2e:stress` (or
 fixture/CPU cases with one worker and retains their performance attachments.
 `npm run test:e2e` and its UI runner select only `*.spec.mjs`; stress tests use
 `*.stress.mjs` and their own Playwright configuration.
-The `check` workflow runs stress tests in an independent job and uploads their
-results, including performance attachments. Its main job builds the release and
-runs `test:artifacts` as well as the regular test suites.
+The `playwright` workflow runs component fixtures, four page integration shards,
+Chrome and Firefox extension browser tests, and rendering stress tests in
+independent jobs. It uploads integration failure artifacts and stress results,
+including performance attachments. The `check` workflow runs only tests that
+do not launch a browser, builds the release, and runs `test:artifacts`.
 
 To verify the redirect extension and release artifacts:
 
@@ -461,15 +465,18 @@ npm --prefix .. run test:artifacts
 ```
 
 `test:extension` runs the Chrome unit and Chromium integration tests, followed
-by the Firefox unit and Firefox content-script tests. Browser-specific build,
+by the Firefox unit and Firefox content-script tests. `test:extension:unit`
+runs both unit suites without a browser; `test:extension:e2e` runs only the
+browser suites. Use `test:extension:chrome:e2e` or
+`test:extension:firefox:e2e` for one browser suite. Browser-specific build,
 test, and package commands use the `:chrome` or `:firefox` suffix; Firefox also
 provides `lint:extension:firefox`. See the
 [extension entry point](../extension/README.md) for packaging and temporary-load
 instructions.
 
 These test suites and artifact checks can also be run from the repository root
-with `npm run test:server`, `npm run test:review-web`, `npm run test:extension`,
-then `npm run build && npm run test:artifacts`. See
+with `npm run test:server`, `npm run test:views`, `npm run test:review-web`,
+`npm run test:extension`, then `npm run build && npm run test:artifacts`. See
 [regression coverage](backend/INTERNAL.md#regression-tests) for the implementation
 cases.
 
