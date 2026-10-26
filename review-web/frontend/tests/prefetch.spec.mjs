@@ -1,10 +1,11 @@
+import { cancelledRoute, installClock, clockFor, requestsFor } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { writeFile } from 'node:fs/promises';
 import { setup, pull, success, gate, failure, row, selectTab, signOut, base, head } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { navigate } from './rendering-fixture.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions, waitForPrefetch, waitForPrefetchRound, waitForState } from '../../tests/render-probe.mjs';
 
 const file = { filename: 'src/renamed.mbt', previous_filename: 'old/exact name.mbt', status: 'renamed', additions: 1, deletions: 1, changes: 2, patch: '@@ -1 +1 @@\n-pub fn answer() { 1 }\n+pub fn answer() { 2 }' };
 const mergeBase = 'c'.repeat(40);
@@ -34,38 +35,26 @@ async function fixture(page, handler) {
 }
 
 const kindCalls = (state, kind) => state.calls.filter(call => call.kind === kind);
-const prepared = page => expect.poll(() => page.evaluate(() => window.__moondiffMetrics?.prefetch?.cache_bytes || 0)).toBeGreaterThan(0);
-
-async function controlPrefetchDelay(page) {
-  await page.addInitScript(() => {
-    const schedule = window.setTimeout, cancel = window.clearTimeout;
-    const jobs = new Map();
-    let sequence = 0;
-    window.setTimeout = (callback, delay, ...args) => {
-      if (delay !== 250) return schedule(callback, delay, ...args);
-      const id = --sequence;
-      jobs.set(id, () => callback(...args));
-      return id;
-    };
-    window.clearTimeout = id => { if (!jobs.delete(id)) cancel(id); };
-    window.prefetchDelayCount = () => jobs.size;
-    window.tickPrefetchDelay = () => {
-      const pending = [...jobs.values()];
-      jobs.clear();
-      for (const run of pending) run();
-    };
-  });
-}
-
+const ready = page => waitForPrefetch(page, {
+  owner: 'upstream', repo: 'repo', number: 1,
+  sources: [
+    { owner: 'upstream', repo: 'repo', path: 'old/exact name.mbt', revision: mergeBase },
+    { owner: 'fork', repo: 'repo', path: 'src/renamed.mbt', revision: head },
+  ],
+});
+const prepared = ready;
+const controlPrefetchDelay = page => installClock(page);
 async function tickPrefetchDelay(page) {
-  await expect.poll(() => page.evaluate(() => window.prefetchDelayCount())).toBe(1);
-  await page.evaluate(() => window.tickPrefetchDelay());
+  const clock = clockFor(page);
+  const timer = await clock.timer(250);
+  await clock.before(timer);
+  await clock.fire(timer);
 }
 
 async function cachedVerification(page, { large = false } = {}) {
   let stage = 'warm', failRestored = false;
-  const gates = { initial: gate(), restored: gate() };
-  const held = {}, completed = {};
+  const gates = { initial: gate('initial cached PR validation'), restored: gate('restored cached PR validation') };
+  const held = {}, requests = {};
   const state = await fixture(page, async ({ route, kind, args }) => {
     if (kind === 'PullViewedGet') {
       await route.fulfill({ json: successFixture('github.pull.viewed.get', {
@@ -81,6 +70,7 @@ async function cachedVerification(page, { large = false } = {}) {
     const blocked = current !== 'warm' && args.number === '1';
     if (blocked) {
       held[current] = true;
+      (requests[current] ??= []).push(requestsFor(page).enter(route.request()));
       await gates[current].promise;
     }
     const response = blocked && current === 'restored' && failRestored
@@ -91,8 +81,7 @@ async function cachedVerification(page, { large = false } = {}) {
         head: { sha: head, repo: { full_name: 'fork/repo' } },
         additions: 1, deletions: 1, changed_files: large ? 3_001 : 1, commits: 0,
       }) };
-    await route.fulfill(response).catch(() => {});
-    if (blocked) completed[current] = true;
+    await route.fulfill(response);
     return true;
   });
   if (large) {
@@ -102,13 +91,19 @@ async function cachedVerification(page, { large = false } = {}) {
     await page.getByRole('link', { name: /Moondiff/ }).click();
   } else {
     await page.goto('/');
-    await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(2);
+    await ready(page);
   }
   stage = 'initial';
   await row(page, 'Pull request 1').getByRole('link').click();
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toBeVisible();
   await expect.poll(() => held.initial).toBe(true);
-  return { state, gates, held, completed, setStage: value => { stage = value; }, fail: () => { failRestored = true; } };
+  return { state, gates, held, async waitForCompletion(phase, expected) {
+    const recorder = requestsFor(page);
+    for (const request of requests[phase]) {
+      const terminal = await recorder.wait({ predicate: record => record.id === request.id && (record.phases.received || record.phases.cancelled) });
+      expect(terminal.phases[expected], `${phase} request ${request.id} ${expected}`).toBeDefined();
+    }
+  }, setStage: value => { stage = value; }, fail: () => { failRestored = true; } };
 }
 
 async function restoreVerification(page, cached) {
@@ -135,6 +130,7 @@ test('prefetch selects only the current tab first five, keeps one background req
   await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(2);
   // File/source requests can finish before the remaining metadata-only prefetches.
   await expect.poll(() => [...new Set(kindCalls(state, 'PullGet').map(call => call.args.number))]).toEqual(['1', '2', '3', '4', '5']);
+  await waitForPrefetchRound(page);
   expect(maxActive).toBe(1);
   expect(kindCalls(state, 'ContentGet').map(call => call.args)).toEqual([
     { owner: 'upstream', repo: 'repo', path: 'old/exact name.mbt', revision: mergeBase },
@@ -147,9 +143,11 @@ test('prefetch selects only the current tab first five, keeps one background req
   await selectTab(page, 'ReviewRequested');
   await expect.poll(() => kindCalls(state, 'PullFiles').length).toBe(4);
   await expect.poll(() => [...new Set(kindCalls(state, 'PullGet').map(call => call.args.number))]).toEqual(['1', '2', '3', '4', '5', '8', '9', '10']);
+  await waitForPrefetchRound(page);
+  const previousRound = await page.evaluate(() => __moondiffTestState().round);
   await page.getByRole('button', { name: 'Refresh lists', exact: true }).click();
   await expect.poll(() => kindCalls(state, 'ViewerPullsGet').length).toBe(4);
-  await page.waitForTimeout(350);
+  await waitForPrefetchRound(page, { afterRound: previousRound });
   expect(kindCalls(state, 'PullFiles')).toHaveLength(4);
 });
 
@@ -172,6 +170,7 @@ test('homepage prefetch warms the first interface before earlier source files', 
   });
   await page.goto('/');
   await expect.poll(() => kindCalls(state, 'PullGet').length).toBe(7);
+  await waitForPrefetchRound(page);
   await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(2);
   expect(kindCalls(state, 'ContentGet').map(call => call.args)).toEqual([
     { owner: 'upstream', repo: 'repo', revision: mergeBase, path: 'old/pkg.generated.mbti' },
@@ -200,30 +199,69 @@ test('opening an in-progress prefetch reuses its metadata chain and cancels the 
 });
 
 for (const intent of ['hover', 'keyboard focus']) test(`stable ${intent} promotes an eligible candidate within the two-snapshot budget`, async ({ page }) => {
-  const blocked = gate(); let first = true;
+  const clock = await installClock(page);
+  const blocked = gate('first metadata'); let first = true;
   const state = await fixture(page, async ({ kind, args }) => {
     if (kind === 'PullGet' && args.number === '1' && first) { first = false; await blocked.promise; }
     return false;
   });
   await page.goto('/');
-  await expect.poll(() => kindCalls(state, 'PullGet').length).toBe(1);
+  await tickPrefetchDelay(page);
+  await clock.until(() => kindCalls(state, 'PullGet').length === 1, 'first metadata request');
   const target = row(page, 'Pull request 5').getByRole('link');
   if (intent === 'hover') await target.hover();
   else await target.focus();
-  await page.waitForTimeout(120);
+  const intentTimer = await clock.timer(100);
+  const original = await page.evaluate(() => __moondiffTestState().candidates);
+  await clock.before(intentTimer);
+  expect(await page.evaluate(() => __moondiffTestState().candidates)).toEqual(original);
+  await clock.fire(intentTimer);
+  expect(await page.evaluate(() => __moondiffTestState().candidates)).toEqual(['pull:upstream/repo/1', 'pull:upstream/repo/5', 'pull:upstream/repo/2', 'pull:upstream/repo/3', 'pull:upstream/repo/4']);
   blocked.release();
   await expect.poll(() => kindCalls(state, 'PullFiles').length).toBe(2);
   await expect.poll(() => new Set(kindCalls(state, 'PullGet').map(call => call.args.number)).size).toBe(5);
+  await waitForPrefetchRound(page);
   expect(kindCalls(state, 'PullFiles').map(call => call.args.number)).toEqual(['1', '5']);
   expect(kindCalls(state, 'CompareGet')).toHaveLength(2);
 });
 
-test('a completed hit paints while real verification is blocked and disables every write until confirmed', async ({ page }) => {
+for (const intent of ['hover', 'keyboard focus']) test(`cancelled ${intent} never promotes an eligible candidate`, async ({ page }) => {
+  const clock = await installClock(page), blocked = gate('metadata while intent is cancelled');
+  let first = true;
+  const state = await fixture(page, async ({ kind, args }) => {
+    if (kind === 'PullGet' && args.number === '1' && first) { first = false; await blocked.promise; }
+    return false;
+  });
+  await page.goto('/');
+  await tickPrefetchDelay(page);
+  await clock.until(() => kindCalls(state, 'PullGet').length === 1, 'first metadata request');
+  const target = row(page, 'Pull request 5').getByRole('link');
+  if (intent === 'hover') await target.hover();
+  else await target.focus();
+  const timer = await clock.timer(100);
+  const original = await page.evaluate(() => __moondiffTestState().candidates);
+  if (intent === 'hover') await page.mouse.move(0, 0);
+  else await page.getByRole('button', { name: 'Refresh lists', exact: true }).focus();
+  await clock.timer(100, { after: timer.sequence - 1, state: 'cancelled' });
+  await clock.fire(timer);
+  expect(await page.evaluate(() => __moondiffTestState().candidates)).toEqual(original);
+  expect(kindCalls(state, 'PullGet')).toHaveLength(1);
+  blocked.release();
+  await waitForPrefetchRound(page);
+  expect(kindCalls(state, 'PullFiles').map(call => call.args.number)).toEqual(['1', '2']);
+});
+
+for (const sourceDelay of [0, 400]) test(`a completed hit paints while real verification is blocked and disables every write until confirmed (${sourceDelay}ms sources)`, async ({ page }) => {
   const validation = gate();
   let block = false;
-  const state = await fixture(page, async ({ kind }) => { if (kind === 'PullGet' && block) await validation.promise; return false; });
+  const state = await fixture(page, async ({ kind }) => {
+    if (kind === 'ContentGet' && sourceDelay) await new Promise(resolve => setTimeout(resolve, sourceDelay));
+    if (kind === 'PullGet' && block) await validation.promise;
+    return false;
+  });
   await page.goto('/');
-  await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(2);
+  await ready(page);
+  const before = { files: kindCalls(state, 'PullFiles').filter(call => call.args.number === '1').length, sources: kindCalls(state, 'ContentGet').length };
   block = true;
   await row(page, 'Pull request 1').getByRole('link').click();
   await expect(page.locator('.diff-scroll table').first()).toBeVisible();
@@ -236,8 +274,8 @@ test('a completed hit paints while real verification is blocked and disables eve
   validation.release(); block = false;
   await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);
-  expect(kindCalls(state, 'PullFiles')).toHaveLength(2);
-  expect(kindCalls(state, 'ContentGet')).toHaveLength(2);
+  expect(kindCalls(state, 'PullFiles').filter(call => call.args.number === '1')).toHaveLength(before.files);
+  expect(kindCalls(state, 'ContentGet')).toHaveLength(before.sources);
 });
 
 test('page restoration restarts cached PR validation and keeps every write locked until confirmation', async ({ page }) => {
@@ -254,7 +292,7 @@ test('page restoration restarts cached PR validation and keeps every write locke
   cached.state.statusGate.release();
   await expect.poll(() => cached.held.restored).toBe(true);
   cached.gates.initial.release();
-  await expect.poll(() => cached.completed.initial).toBe(true);
+  await cached.waitForCompletion('initial', 'cancelled');
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
   await expect(page.locator('.viewed-control input')).toBeDisabled();
@@ -267,7 +305,7 @@ test('page restoration restarts cached PR validation and keeps every write locke
   await expect(page.locator('.comment-editor textarea')).toHaveValue('Draft retained through restoration');
   expect(await page.evaluate(() => window.__moondiffMetrics.counters.prefetch_cache_hits)).toBe(hits + 1);
   expect(kindCalls(cached.state, 'ContentGet')).toHaveLength(2);
-  expect(kindCalls(cached.state, 'PullFiles')).toHaveLength(2);
+  expect(kindCalls(cached.state, 'PullFiles').filter(call => call.args.number === '1')).toHaveLength(1);
 });
 
 test('restored PR validation errors preserve the diff and offer a working retry', async ({ page }) => {
@@ -303,7 +341,7 @@ for (const large of [false, true]) test(`cached ${large ? 'large selector' : 'di
       const barrier = pending, failureResponse = response;
       const blocked = barrier && barrier !== lastHeld;
       if (blocked) { lastHeld = barrier; held++; await barrier.promise; }
-      await route.fulfill(blocked && failureResponse || { json: successFixture('github.pull.get', metadata) }).catch(() => {});
+      await route.fulfill(blocked && failureResponse || { json: successFixture('github.pull.get', metadata) }).catch(error => cancelledRoute(route, error));
       return true;
     } else if (kind === 'PullCommitPageGet') json = successFixture('github.pull.commit.page.get', [
       { sha: middle, commit: { message: 'First change' }, parents: [{ sha: mergeBase }] },
@@ -419,9 +457,8 @@ for (const stage of ['metadata', 'compare', 'files', 'validation', 'source']) te
     if (!held && match) {
       held = route.request();
       await blocked.promise;
-      stopped = true;
-      // The request was aborted while the barrier held its response.
-      await route.fulfill(failure('unavailable', 'Late response', 503)).catch(() => {});
+      // The recorder distinguishes a cancelled request from a delivered body.
+      stopped = await route.fulfill(failure('unavailable', 'Late response', 503));
       return true;
     }
     return false;
@@ -429,9 +466,9 @@ for (const stage of ['metadata', 'compare', 'files', 'validation', 'source']) te
   const aborted = [];
   page.on('requestfailed', request => aborted.push(request));
   await page.goto('/');
-  await expect(row(page, 'Pull request 1')).toBeVisible();
-  await settleRegions(page);
+  const clock = clockFor(page);
   await tickPrefetchDelay(page);
+  await clock.until(() => row(page, 'Pull request 1').isVisible(), 'homepage rendered');
   await expect.poll(() => Boolean(held)).toBe(true);
   const count = state.calls.length;
   const bytes = await page.evaluate(() => window.__moondiffMetrics.prefetch?.cache_bytes || 0);
@@ -441,7 +478,9 @@ for (const stage of ['metadata', 'compare', 'files', 'validation', 'source']) te
   });
   await expect.poll(() => aborted.includes(held)).toBe(true);
   blocked.release();
-  await expect.poll(() => stopped).toBe(true);
+  await expect.poll(() => stopped).toBe('cancelled');
+  await waitForState(page, state => !state.home && !state.prefetchReady && state.backgroundOwner === null, 'prefetch cancelled while hidden');
+  await clock.jump(60_000);
   await settleRegions(page);
   expect(state.calls).toHaveLength(count);
   expect(await page.evaluate(() => window.__moondiffMetrics.prefetch?.cache_bytes || 0)).toBe(bytes);
@@ -449,10 +488,12 @@ for (const stage of ['metadata', 'compare', 'files', 'validation', 'source']) te
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect.poll(() => page.evaluate(() => window.prefetchDelayCount())).toBe(1);
+  const resumeTimer = await clock.timer(250);
+  await clock.before(resumeTimer);
   expect(state.calls).toHaveLength(count);
-  await page.evaluate(() => window.tickPrefetchDelay());
-  await expect.poll(() => kindCalls(state, 'ContentGet').length).toBe(stage === 'source' ? 3 : 2);
+  await clock.fire(resumeTimer);
+  await waitForPrefetchRound(page);
+  expect(kindCalls(state, 'ContentGet')).toHaveLength(stage === 'source' ? 3 : 2);
   expect(kindCalls(state, 'PullFiles')).toHaveLength(stage === 'source' ? 1 : stage === 'metadata' || stage === 'compare' ? 1 : 2);
 });
 
@@ -465,7 +506,9 @@ test('late restored validation cannot replace a newly navigated PR', async ({ pa
   await expect(page.getByText('Ready PR 7', { exact: true })).toBeVisible();
   cached.gates.initial.release();
   cached.gates.restored.release();
-  await expect.poll(() => cached.completed.restored).toBe(true);
+  await cached.waitForCompletion('initial', 'cancelled');
+  await cached.waitForCompletion('restored', 'cancelled');
+  await settleRegions(page);
   await expect(page).toHaveURL(/\/pull\/7$/);
   await expect(page.getByText('Ready PR 7', { exact: true })).toBeVisible();
   await expect(page.getByText('Ready PR 1', { exact: true })).toHaveCount(0);
@@ -488,6 +531,7 @@ test('restoring cached large PR validation retains the selector and finishes con
 });
 
 test('large PRs remain metadata-only and rate limits stop their round', async ({ page }) => {
+  const clock = await installClock(page);
   const state = await fixture(page, async ({ route, kind, args }) => {
     if (kind !== 'PullGet') return false;
     if (args.number === '2') { await route.fulfill(failure('rate_limit', 'Fixture rate limit', 429)); return true; }
@@ -495,24 +539,32 @@ test('large PRs remain metadata-only and rate limits stop their round', async ({
     return true;
   });
   await page.goto('/');
-  await expect.poll(() => kindCalls(state, 'PullGet').length).toBe(2);
-  await page.waitForTimeout(350);
+  await tickPrefetchDelay(page);
+  await waitForState(page, state => state.limited && state.backgroundOwner === null, 'rate-limited prefetch round');
+  await clock.jump(60_000);
+  await settleRegions(page);
+  expect(kindCalls(state, 'PullGet')).toHaveLength(2);
   expect(kindCalls(state, 'PullFiles')).toHaveLength(0);
   expect(kindCalls(state, 'CompareGet')).toHaveLength(0);
   expect(kindCalls(state, 'ContentGet')).toHaveLength(0);
 });
 
 test('hidden homepages do not start background reads and sign-out rejects late responses', async ({ page }) => {
+  const clock = await installClock(page);
   const blocked = gate();
   await page.addInitScript(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); });
   const state = await fixture(page, async ({ kind }) => { if (kind === 'PullGet') await blocked.promise; return false; });
   await page.goto('/');
-  await expect(page.getByRole('tab').first()).toBeVisible();
-  await page.waitForTimeout(350);
+  await waitForState(page, state => !state.checking && !state.home, 'hidden homepage paused');
+  await clock.until(() => page.getByRole('tab').first().isVisible(), 'homepage rendered');
+  await clock.jump(60_000);
+  await settleRegions(page);
   expect(kindCalls(state, 'PullGet')).toHaveLength(0);
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
-  await expect.poll(() => kindCalls(state, 'PullGet').length).toBe(1);
+  await tickPrefetchDelay(page);
+  await clock.until(() => kindCalls(state, 'PullGet').length === 1, 'prefetch resumed');
   await signOut(page);
+  await waitForState(page, state => !state.home && state.cache.length === 0, 'signed-out cache cleared');
   blocked.release();
   await expect(page.locator('.hero-landing')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__moondiffMetrics.prefetch.cache_bytes)).toBe(0);

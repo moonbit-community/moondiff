@@ -1,3 +1,4 @@
+import { cancelledRoute } from '../../tests/browser-control.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { installRenderProbe, renderCounts, settleRegions } from '../../tests/render-probe.mjs';
@@ -110,7 +111,7 @@ for (const order of ['old-first', 'new-first', 'old-pending', 'new-fails']) {
       } : { json: successFixture('auth.status', {
         authenticated: index === 0, csrf_token: 'fixture',
         ...(index === 0 ? { login: 'obsolete', user_id: '99' } : {}),
-      }) }).catch(() => {});
+      }) }).catch(error => cancelledRoute(route, error));
     });
     await activate(page);
     await expect.poll(() => requests.length).toBe(1);
@@ -458,7 +459,7 @@ test('device authorization retires a hung identity check without a failure notic
     await status.promise;
     await route.fulfill({ json: successFixture('auth.status', {
       authenticated: false, csrf_token: 'obsolete',
-    }) }).catch(() => {});
+    }) }).catch(error => cancelledRoute(route, error));
   });
   await activate(page);
   await expect.poll(() => checking).toBe(true);

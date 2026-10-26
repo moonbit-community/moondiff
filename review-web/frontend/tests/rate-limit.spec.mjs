@@ -1,6 +1,7 @@
+import { installClock } from '../../tests/browser-control.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions, waitForState } from '../../tests/render-probe.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
 const sources = state => state.calls.filter(call => call.op === 'github.content.get');
@@ -50,24 +51,28 @@ async function visibilityCycle(page) {
 for (const [kind, route] of Object.entries(routes)) {
   test(`${kind} authenticated limit drains four requests and blocks every source trigger`, async ({ page }) => {
     const fixture = syntheticFixture({ files: 24, declarations: 2 });
+    const clock = await installClock(page);
     const initial = gate();
     const state = await installRenderingFixture(page, fixture, { authenticated: true,
       sourceGate: () => initial.promise, sourceFailure: () => limited });
     await page.goto(route(fixture));
-    await expect.poll(() => sources(state).length).toBe(4);
+    await clock.until(() => sources(state).length === 4, 'four source requests');
     initial.resolve();
+    await waitForState(page, state => state.sourcePaused && state.reads === 0, 'rate-limited sources drained');
     await expect(page.locator('.rate-limit')).toHaveText(authenticatedMessage);
     await expect(page.locator('.loading-inline')).toHaveCount(0);
     await expect(page.locator('.file-message.paused')).toHaveCount(20);
     await expect(page.locator('.rate-limit button')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Retry file|Try again|Sign in with GitHub/ })).toHaveCount(0);
     await toggle(page, 23);
+    await settleRegions(page);
     await expect(card(page, 23).locator('.paused')).toBeAttached();
     await card(page, 22).evaluate(element => {
       window.dispatchEvent(new WheelEvent('wheel', { deltaY: 1 })); element.scrollIntoView();
     });
     await visibilityCycle(page);
-    await page.waitForTimeout(150);
+    await clock.jump(120_000);
+    await settleRegions(page);
     expect(sources(state)).toHaveLength(4);
     expect(state.maxActiveSources).toBe(4);
     await expect(page.locator('.loading-inline')).toHaveCount(0);

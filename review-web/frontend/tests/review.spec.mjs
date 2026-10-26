@@ -1,3 +1,4 @@
+import { cancelledRoute } from '../../tests/browser-control.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs';
 import { checkToolbar } from "./toolbar.mjs";
@@ -431,11 +432,11 @@ async function installApi(page, target = pullTarget(), options = {}) {
     }
     const headers = { 'Access-Control-Allow-Origin': '*' };
     if (!payload.ok) {
-      await route.fulfill({ status: payload.error.status, json: { message: payload.error.message }, headers }).catch(() => {});
+      await route.fulfill({ status: payload.error.status, json: { message: payload.error.message }, headers }).catch(error => cancelledRoute(route, error));
     } else if (source) {
-      await route.fulfill({ body: Buffer.from(payload.value.base64, 'base64'), contentType: 'text/plain', headers }).catch(() => {});
+      await route.fulfill({ body: Buffer.from(payload.value.base64, 'base64'), contentType: 'text/plain', headers }).catch(error => cancelledRoute(route, error));
     } else {
-      await route.fulfill({ json: commentKind ? payload.value[commentKind] : payload.value, headers }).catch(() => {});
+      await route.fulfill({ json: commentKind ? payload.value[commentKind] : payload.value, headers }).catch(error => cancelledRoute(route, error));
     }
   });
   await page.route('**/api/**', async route => {
@@ -1161,7 +1162,7 @@ test('same-account recovery keeps the draft locked until snapshot validation fin
     const value = await page.evaluate(message => window.__dispatch(message), message);
     held++;
     await validation;
-    await route.fulfill({ json: successFixture(message.op, value) }).catch(() => {});
+    await route.fulfill({ json: successFixture(message.op, value) }).catch(error => cancelledRoute(route, error));
   });
   await page.getByRole('button', { name: 'Try sign-in' }).click();
   await expect(page.getByRole('button', { name: 'Account: tester' })).toBeVisible();
@@ -1321,7 +1322,7 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
         sourceRequests.push(request.args);
         if (holdSources) await sources;
       }
-      await route.fallback().catch(() => {});
+      await route.fallback().catch(error => cancelledRoute(route, error));
     });
     await page.goto(reviewPath(target));
     await waitForSignedInComments(page);
@@ -2759,7 +2760,7 @@ async function holdNextResponse(page, predicate) {
     held = true;
     const value = await page.evaluate(message => window.__dispatch(message), message);
     entered(); await gate;
-    await route.fulfill({ json: successFixture(message.op, value) }).catch(() => {});
+    await route.fulfill({ json: successFixture(message.op, value) }).catch(error => cancelledRoute(route, error));
     finished();
   });
   return { started, completed, release };

@@ -1,3 +1,4 @@
+import { cancelledRoute } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { settleRegions } from '../../tests/render-probe.mjs';
@@ -129,8 +130,8 @@ async function privateFixture(page, { rangeResponse = null, pullData = pull, com
       }; break;
       default: throw new Error(`Unexpected RPC ${op}`);
     }
-    if (value?.error) return route.fulfill({ status: value.error.status, json: { $tag: 'Failure', error: value.error } }).catch(() => {});
-    return route.fulfill({ json: successFixture(op, value) }).catch(() => {});
+    if (value?.error) return route.fulfill({ status: value.error.status, json: { $tag: 'Failure', error: value.error } }).catch(error => cancelledRoute(route, error));
+    return route.fulfill({ json: successFixture(op, value) }).catch(error => cancelledRoute(route, error));
   });
   return calls;
 }

@@ -1,5 +1,6 @@
+import { installClock, clockFor } from '../../tests/browser-control.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
-import { installRenderProbe, renderCounts, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe, renderCounts, settleRegions, waitForState } from '../../tests/render-probe.mjs';
 import { gate, installRenderingFixture, navigate, syntheticFixture } from './rendering-fixture.mjs';
 
 const card = (page, index) => page.locator(`#moondiff-file-${index}`);
@@ -10,6 +11,8 @@ const scroll = (page, index) => card(page, index).evaluate(element => {
   window.scrollTo({ top: window.scrollY + element.getBoundingClientRect().top - 160, behavior: 'instant' });
 });
 async function warm(page, state, count = 80) {
+  if (clockFor(page)) await clockFor(page).until(async () => sources(state).length === count &&
+    await page.evaluate(() => __moondiffMetrics.pull_sources?.pending === 0 && !document.querySelector('.loading-inline')), 'PR source loading completed', { timeout: 30_000 });
   await expect.poll(() => sources(state).length, { timeout: 30_000 }).toBe(count);
   await expect(page.locator('.loading-inline')).toHaveCount(0, { timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => __moondiffMetrics.pull_sources?.pending)).toBe(0);
@@ -70,6 +73,7 @@ for (const authenticated of [true]) {
 }
 
 test('anonymous forty-file PR preserves request quota for manual and scrolling loads', async ({ page }) => {
+  const clock = await installClock(page);
   const fixture = syntheticFixture({ files: 40, declarations: 2 });
   await installRenderProbe(page);
   // Forty initial source sides fit in the simulated anonymous allowance, plus
@@ -81,13 +85,16 @@ test('anonymous forty-file PR preserves request quota for manual and scrolling l
   });
   await page.goto('/example/regions/pull/1');
   await warm(page, state, 40);
-  await page.waitForTimeout(150);
+  await clock.jump(120_000);
+  await settleRegions(page);
   expect(sources(state)).toHaveLength(40);
   await expect(page.locator('.file-card.expanded')).toHaveCount(20);
   await toggle(page, 39);
+  await clock.until(() => card(page, 39).locator('.diff-scroll table').first().isVisible(), 'manual source loaded');
   await expect(card(page, 39).locator('.diff-scroll table').first()).toBeVisible();
   expect(sources(state)).toHaveLength(42);
   await scroll(page, 30);
+  await clock.until(() => card(page, 30).locator('.diff-scroll table').first().isVisible(), 'scrolled source loaded');
   await expect(card(page, 30).locator('.diff-scroll table').first()).toBeVisible();
   await settleRegions(page);
   expect(quota).toBeGreaterThanOrEqual(0);
@@ -121,19 +128,22 @@ test('PR demand overtakes initial files with four active reads and no duplicate 
 });
 
 test('hidden PR finishes in-flight reads and resumes dispatch on visibility', async ({ page }) => {
+  const clock = await installClock(page);
   const fixture = syntheticFixture({ files: 40, declarations: 1 });
   const initial = gate();
   await installRenderProbe(page);
   const state = await installRenderingFixture(page, fixture, { authenticated: true, sourceGate: () => initial.promise });
   await page.goto('/example/regions/pull/1');
-  await expect.poll(() => sources(state).length).toBe(4);
+  await clock.until(() => sources(state).length === 4, 'four in-flight sources');
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
   initial.resolve();
   await expect.poll(() => state.activeSources).toBe(0);
-  await page.waitForTimeout(150);
+  await waitForState(page, state => state.reads === 0, 'hidden page finished its in-flight sources');
+  await clock.jump(120_000);
+  await settleRegions(page);
   expect(sources(state)).toHaveLength(4);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
@@ -144,6 +154,7 @@ test('hidden PR finishes in-flight reads and resumes dispatch on visibility', as
 });
 
 test('PR rate limit blocks new demand while retaining ordinary file errors', async ({ page }) => {
+  const clock = await installClock(page);
   const fixture = syntheticFixture({ files: 40, declarations: 1 });
   await installRenderProbe(page);
   const state = await installRenderingFixture(page, fixture, { authenticated: true, sourceFailure: args => {
@@ -151,18 +162,22 @@ test('PR rate limit blocks new demand while retaining ordinary file errors', asy
     if (args.path === fixture.files[23].filename && args.ref === fixture.base) return { status: 429, code: 'rate_limit', detail: 'Rate limited' };
   } });
   await page.goto('/example/regions/pull/1');
-  await expect.poll(() => sources(state).length).toBeGreaterThanOrEqual(47);
+  await waitForState(page, state => state.sourcePaused && state.reads === 0, 'source queue paused and drained');
+  expect(sources(state).length).toBeGreaterThanOrEqual(47);
   await expect.poll(() => state.activeSources).toBe(0);
   await settleRegions(page);
   const stopped = sources(state).length;
   expect(stopped).toBeLessThan(80);
-  await page.waitForTimeout(150);
+  await clock.jump(120_000);
+  await settleRegions(page);
   expect(sources(state)).toHaveLength(stopped);
   await expect(page.locator('.rate-limit')).toHaveText('GitHub is limiting requests. Please refresh this page later.');
   await toggle(page, 30);
+  await settleRegions(page);
   await expect(card(page, 30).locator('.paused')).toBeAttached();
   await expect(card(page, 30).locator('.loading-inline')).toHaveCount(0);
   await toggle(page, 20);
+  await settleRegions(page);
   await expect(card(page, 20).getByRole('button', { name: 'Retry file' })).toBeAttached();
   state.sourceFailure = null;
   await card(page, 20).getByRole('button', { name: 'Retry file' }).evaluate(button => button.click());
