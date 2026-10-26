@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect } from "../../tests/browser-test.mjs";
 
 export async function clickLineCommentButton(button, { afterHover } = {}) {
   const retry = { timeout: 5_000, intervals: [100, 250, 500] };

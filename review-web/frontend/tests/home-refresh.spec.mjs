@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { pull, commits, success, failure, gate, setup, reviews, authored, row, selectTab } from './home-fixture.mjs';
 
 test('multi-page refresh retains the old lists and expanded commits until each replacement is ready', async ({ page }) => {

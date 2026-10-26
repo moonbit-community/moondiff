@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 import { installRenderProbe, instrumentRenderProbe, settleRegions } from '../../tests/render-probe.mjs';

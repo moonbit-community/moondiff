@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../../tests/browser-test.mjs";
 import { readFileSync } from "node:fs";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";

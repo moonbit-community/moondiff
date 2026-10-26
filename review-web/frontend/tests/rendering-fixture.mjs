@@ -1,3 +1,4 @@
+import { createGate, trackRoute, requestsFor } from '../../tests/browser-control.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 
 export function syntheticFixture({ files = 5, declarations = 24 } = {}) {
@@ -14,10 +15,7 @@ export function syntheticFixture({ files = 5, declarations = 24 } = {}) {
   return { sha, base, message: 'Independent rendering fixture', files: metadata, sources };
 }
 
-export function gate() {
-  let resolve; const promise = new Promise(r => { resolve = r; });
-  return { promise, resolve };
-}
+export const gate = createGate;
 
 async function fixtureValue(state, op, args) {
   state.calls.push({ op, args });
@@ -73,8 +71,12 @@ async function fixtureValue(state, op, args) {
 }
 
 export async function installRenderingFixture(page, fixture, options = {}) {
+  // Also cover standalone benchmarks and contexts created outside the shared
+  // Playwright fixture, before their first navigation/request can start.
+  requestsFor(page);
   const state = { fixture, authenticated: false, viewed: {}, contentGate: null, writeGate: null, calls: [], authStatusCalls: 0, ...options };
   await page.route('https://api.github.com/repos/example/regions/**', async route => {
+    route = trackRoute(route);
     const url = new URL(route.request().url());
     const path = url.pathname.replace('/repos/example/regions/', '');
     let op, args, commentKind;
@@ -101,11 +103,11 @@ export async function installRenderingFixture(page, fixture, options = {}) {
     const { value, failure } = await fixtureValue(state, op, args);
     const headers = { 'Access-Control-Allow-Origin': '*' };
     if (failure) {
-      await route.fulfill({ status: failure.status, json: { message: failure.detail }, headers }).catch(() => {});
+      await route.fulfill({ status: failure.status, json: { message: failure.detail }, headers });
     } else if (op === 'github.content.get') {
-      await route.fulfill({ body: Buffer.from(value.base64, 'base64'), contentType: 'text/plain', headers }).catch(() => {});
+      await route.fulfill({ body: Buffer.from(value.base64, 'base64'), contentType: 'text/plain', headers });
     } else {
-      await route.fulfill({ json: commentKind ? value[commentKind] : value, headers }).catch(() => {});
+      await route.fulfill({ json: commentKind ? value[commentKind] : value, headers });
     }
   });
   await page.route('**/api/**', async route => {
@@ -121,7 +123,7 @@ export async function installRenderingFixture(page, fixture, options = {}) {
     await route.fulfill({
       status: failure?.status || 200,
       json: failure ? { $tag: 'Failure', error: failure } : successFixture(op, value),
-    }).catch(() => {});
+    });
   });
   return state;
 }

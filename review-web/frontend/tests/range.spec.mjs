@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { settleRegions } from '../../tests/render-probe.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';

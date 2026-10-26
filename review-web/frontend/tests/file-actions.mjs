@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from '../../tests/browser-test.mjs';
 
 export async function ensureFileExpanded(file) {
   const table = file.locator('table.review-diff').first();

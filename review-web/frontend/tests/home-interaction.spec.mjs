@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { pull, commits, success, failure, gate, setup, reviews, authored, row, selectTab, noLanding } from './home-fixture.mjs';
 
 test('tabs support keyboard selection, cache both groups and retain the selected tab after visiting a PR and returning', async ({ page }) => {

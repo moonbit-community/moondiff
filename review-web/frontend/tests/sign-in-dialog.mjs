@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from '../../tests/browser-test.mjs';
 
 export const signInDialog = page => page.locator('#sign-in-dialog');
 export const pagePosition = page => page.evaluate(() => ({ x: scrollX, y: scrollY, url: location.href }));

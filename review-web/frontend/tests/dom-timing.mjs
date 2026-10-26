@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from '../../tests/browser-test.mjs';
 
 // Hold selected regional paints without freezing Playwright's actionability
 // frames. The corresponding hook exists only in serve.mjs's temporary bundle.

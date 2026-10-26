@@ -1,3 +1,4 @@
+import { trackRoute, aliasRequest } from './browser-control.mjs';
 // Test-only adapters between GitHub-shaped fixture data and the v2 wire schema.
 const operations = {
   'github.viewer.pulls.get': ['ViewerPullsGet', 'ViewerPulls'],
@@ -54,6 +55,7 @@ export function fixtureRequest(envelope) {
 // Legacy GitHub-shaped browser fixtures exercise the paginated fallback. New
 // aggregate tests intercept the real PullSnapshotGet wire request directly.
 export function metadataFallbackRoute(route) {
+  route = trackRoute(route);
   const request = route.request();
   let envelope;
   try { envelope = request.postDataJSON(); } catch { return route; }
@@ -63,6 +65,7 @@ export function metadataFallbackRoute(route) {
     const value = Reflect.get(target, key, target);
     return typeof value === 'function' ? value.bind(target) : value;
   } });
+  aliasRequest(legacyRequest, request);
   return new Proxy(route, { get(target, key) {
     if (key === 'request') return () => legacyRequest;
     if (key === 'fulfill') return options => {

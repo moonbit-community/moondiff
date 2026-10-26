@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
 const path = '/example/regions/pull/1';

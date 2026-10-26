@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../tests/browser-test.mjs';
 import { setup, gate, failure, row, signOut, selectTab } from './home-fixture.mjs';
 
 const routes = ['/upstream/repo/pull/1', `/fork/repo/commit/${'b'.repeat(40)}`];
