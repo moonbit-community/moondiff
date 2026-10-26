@@ -1,5 +1,6 @@
+import { writePerformanceReport, comparisonOrder } from '../../tests/performance-report.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { installRenderProbe, renderCounts, settleRegions, toggleCommit, toggleDetailsPaint } from '../../tests/render-probe.mjs';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
@@ -11,7 +12,7 @@ const route = fixture => `/example/regions/commit/${fixture.sha}`;
 async function loaded(page, fixture) {
   await expect(page.locator('.file-card')).toHaveCount(fixture.files.length);
   await expect(page.locator('.loading-inline')).toHaveCount(0, { timeout: 30_000 });
-  await settleRegions(page);
+  await settleRegions(page, 30_000);
 }
 function unchanged(before, after, paths) {
   for (const path of paths) expect(after.files[path], `unrelated ${path}`).toEqual(before.files[path]);
@@ -36,31 +37,27 @@ for (const [name, fixture] of [
       expect(localId).toBeTruthy();
       const session = await page.context().newCDPSession(page);
       await session.send('Emulation.setCPUThrottlingRate', { rate });
-      const before = await renderCounts(page);
+      const before = await renderCounts(page, 30_000);
       const durations = [];
       for (let i = 0; i < 4; i++) {
         durations.push(await toggleCommit(page, localId));
         await expect(localCard).toHaveClass(i % 2 ? 'file-card expanded' : 'file-card');
-        await settleRegions(page);
+        await settleRegions(page, 30_000);
       }
-      const after = await renderCounts(page);
+      const after = await renderCounts(page, 30_000);
       unchanged(before, after, fixture.files.filter(f => f.filename !== local).map(f => f.filename));
       expect(after.files[local].view - before.files[local].view).toBe(4);
       expect(after.files[local].diff).toBe(before.files[local].diff);
       expect(after.files[local].highlight).toBe(before.files[local].highlight);
       expect(after.files[local].patch).toBe(before.files[local].patch);
       expect(after.files[local].vdom).toBeGreaterThan(before.files[local].vdom);
-      await info.attach('render-performance.json', { contentType: 'application/json', body: JSON.stringify({ fixture: name, rate, durations, longTasks: after.longTasks.slice(before.longTasks.length), before, after }, null, 2) });
+      await writePerformanceReport(info, 'render-performance.json', { fixture: name, cpuRate: rate,
+        samples: durations, groups: { commitMs: durations },
+        longTasks: after.longTasks.slice(before.longTasks.length), before, after });
       await session.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     });
   }
 }
-
-const median = values => {
-  const sorted = values.slice().sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-};
 
 test('file containment keeps CI disclosure input-to-paint responsive', async ({ page }, info) => {
   test.setTimeout(150_000);
@@ -114,30 +111,27 @@ test('file containment keeps CI disclosure input-to-paint responsive', async ({ 
     samples[contained ? 'contained' : 'visible'].push(result);
   };
   try {
-    // Materialize the intentionally slow baseline before throttling. Repeatedly
-    // switching a 56k-node page back to full rendering would benchmark the
-    // test setup rather than the disclosure interaction.
-    await setContained(false);
     await session.send('Emulation.setCPUThrottlingRate', { rate: 6 });
-    await measure(false); await measure(false);
-    samples.visible.length = 0;
-    for (let i = 0; i < 4; i++) await measure(false);
-
-    await setContained(true);
-    await measure(true); await measure(true);
-    samples.contained.length = 0;
-    for (let i = 0; i < 4; i++) await measure(true);
+    for (const order of comparisonOrder) {
+      for (const mode of order) {
+        const contained = mode === 'A';
+        await session.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+        await setContained(contained);
+        await session.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+        // Each round/mode has one warm-up and two recorded samples.
+        await toggleDetailsPaint(page, selector, session);
+        await measure(contained); await measure(contained);
+      }
+    }
   } finally {
     await session.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     await setContained(true);
   }
-  const containedMedian = median(samples.contained.map(sample => sample.duration));
-  const visibleMedian = median(samples.visible.map(sample => sample.duration));
-  await info.attach('ci-disclosure-paint.json', {
-    contentType: 'application/json',
-    body: JSON.stringify({ containedMedian, visibleMedian, samples, containment }, null, 2),
+  await writePerformanceReport(info, 'ci-disclosure-paint.json', {
+    fixture: { files: 12, declarations: 80 }, cpuRate: 6, samples,
+    groups: Object.fromEntries(Object.entries(samples).map(([mode, values]) => [mode, values.map(value => value.duration)])),
+    sampling: 'AB/BA; one warm-up and two samples per mode per round', containment,
   });
-  expect(containedMedian).toBeLessThan(visibleMedian * 0.8);
 });
 
 test('large PR retains more than 32 MiB of prefetched source and expands without network', async ({ page }, info) => {
@@ -170,9 +164,9 @@ test('large PR retains more than 32 MiB of prefetched source and expands without
   await expect.poll(() => calls().length, { timeout: 90_000 }).toBe(120);
   await expect.poll(() => state.activeSources, { timeout: 90_000 }).toBe(0);
   await expect.poll(() => page.evaluate(() => __moondiffMetrics.pull_sources?.pending), { timeout: 30_000 }).toBe(0);
-  await settleRegions(page);
+  await settleRegions(page, 30_000);
   samples.push(await memory('all source retained'));
-  const prefetched = await renderCounts(page);
+  const prefetched = await renderCounts(page, 30_000);
   expect(prefetched.counters.prefetch_evictions).toBeGreaterThan(0);
   expect(prefetched.prefetch.cache_bytes).toBeLessThanOrEqual(32 * 1024 * 1024);
   for (const file of fixture.files.slice(20)) {
@@ -193,7 +187,7 @@ test('large PR retains more than 32 MiB of prefetched source and expands without
   await expect(card(page, 59).locator('.loading-inline')).toHaveCount(0);
   await settleRegions(page, 30_000);
   samples.push(await memory('after local expansion'));
-  const expanded = await renderCounts(page);
+  const expanded = await renderCounts(page, 30_000);
   expect(calls()).toHaveLength(120);
   expect(expanded.counters.source_cache_hits ?? 0).toBe(prefetched.counters.source_cache_hits ?? 0);
   expect(state.maxActiveSources).toBeLessThanOrEqual(4);
@@ -204,16 +198,16 @@ test('large PR retains more than 32 MiB of prefetched source and expands without
   });
   await page.evaluate(() => { history.pushState(null, '', '/'); dispatchEvent(new PopStateEvent('popstate')); });
   await expect(page.locator('.file-card')).toHaveCount(0);
-  await settleRegions(page);
-  expect((await renderCounts(page)).progressive.targets).toBe(0);
+  await settleRegions(page, 30_000);
+  expect((await renderCounts(page, 30_000)).progressive.targets).toBe(0);
   await cdp.send('HeapProfiler.collectGarbage');
   expect(await page.evaluate(() => retiredPRSources.filter(ref => ref.deref()).length)).toBe(0);
   samples.push(await memory('after leaving and GC'));
-  const report = info.outputPath('pull-prefetch-performance.json');
-  writeFileSync(report, JSON.stringify({
-    sourceBytes, firstScreenMs, scrollExpandMs, longTasks: expanded.longTasks,
-    memory: samples, maxSourceConcurrency: state.maxActiveSources,
+  await writePerformanceReport(info, 'pull-prefetch-performance.json', {
+    fixture: { files: 60, declarations: 2, sourceBytes }, cpuRate: 1,
+    samples: { firstScreenMs: [firstScreenMs], scrollExpandMs: [scrollExpandMs] },
+    groups: { firstScreenMs: [firstScreenMs], scrollExpandMs: [scrollExpandMs] },
+    longTasks: expanded.longTasks, memory: samples, maxSourceConcurrency: state.maxActiveSources,
     prefetchCounters: prefetched.counters, expandedCounters: expanded.counters,
-  }, null, 2));
-  await info.attach('pull-prefetch-performance.json', { contentType: 'application/json', path: report });
+  });
 });

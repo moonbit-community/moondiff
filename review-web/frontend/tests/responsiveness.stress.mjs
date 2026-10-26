@@ -1,12 +1,13 @@
+import { requestsFor, waitUntil, trackRoute } from '../../tests/browser-control.mjs';
+import { writePerformanceReport, comparisonOrder } from '../../tests/performance-report.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
-import { installRenderProbe, instrumentRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe, instrumentRenderProbe, settleRegions, waitForState } from '../../tests/render-probe.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { minifyFrontend } from '../../scripts/minify.mjs';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-const percentile = (values, p) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * p) - 1];
 const route = '/example/regions/pull/9';
 
 async function enter(page, path, history = false) {
@@ -38,38 +39,31 @@ test('fixed latency cold, five-minute repeat and history performance', async ({ 
   fixture.files[0].filename = 'src/primary.mbt';
   fixture.sources = Object.fromEntries(Object.entries(fixture.sources).map(([key, value]) => [key.replace(':local_test.mbt', ':src/primary.mbt'), value]));
   const samples = { current: [], ...(baseline ? { baseline: [] } : {}) };
-  for (let round = 0; round < 8; round++) {
-    // Interleave the two builds to reduce time-dependent host-load bias.
-    for (const variant of baseline ? (round % 2 ? ['current', 'baseline'] : ['baseline', 'current']) : ['current']) {
+  const orders = baseline ? comparisonOrder.map(order => order.map(mode => mode === 'A' ? 'current' : 'baseline')) : Array.from({ length: 8 }, () => ['current']);
+  for (const [round, order] of orders.entries()) {
+    for (const variant of order) for (let iteration = 0; iteration < (baseline ? 3 : 1); iteration++) {
       const context = await browser.newContext();
       try {
         const page = await context.newPage();
         await installRenderProbe(page);
-        await page.addInitScript(() => {
-          const now = Date.now;
-          window.fixtureAge = 0;
-          Date.now = () => now() + window.fixtureAge;
-        });
+        await page.clock.setFixedTime(new Date('2026-08-18T01:00:00Z'));
         if (variant === 'baseline') await page.route(/\/index\.[a-f\d]+\.js$/, handler => handler.fulfill({ body: baseline, contentType: 'text/javascript' }));
         await installRenderingFixture(page, fixture, { authenticated: true });
-        const requests = [], responses = [];
-        const pendingBodies = [], activeRequests = new Set();
-        let lastActivity = Date.now();
+        const requests = [], recorder = requestsFor(page);
+        const activeRequests = new Set();
         page.on('request', request => {
           if (request.url().endsWith('/api/rpc')) {
             requests.push(request.postDataJSON().request.$tag);
-            activeRequests.add(request); lastActivity = Date.now();
+            activeRequests.add(request);
           }
         });
         const finished = request => {
-          if (activeRequests.delete(request)) lastActivity = Date.now();
+          activeRequests.delete(request);
         };
         page.on('requestfinished', finished);
         page.on('requestfailed', finished);
-        page.on('response', response => {
-          if (response.url().endsWith('/api/rpc')) pendingBodies.push(response.body().then(body => responses.push(body.length)).catch(() => {}));
-        });
         await page.route('**/api/rpc', async handler => {
+          handler = trackRoute(handler);
           const { request } = handler.request().postDataJSON();
           // Model 25ms browser round-trip plus 25ms for each upstream stage.
           // Aggregate: metadata, parallel compare/files, independent validation.
@@ -91,17 +85,23 @@ test('fixed latency cold, five-minute repeat and history performance', async ({ 
             await page.locator('a.workspace-home').click();
             await expect(page.getByRole('tab').first()).toBeVisible();
           }
-          if (scenario === 'repeat') await page.evaluate(() => { window.fixtureAge += 300_000; });
-          const begin = requests.length, bytesBegin = responses.length;
+          if (scenario === 'repeat') await page.clock.setFixedTime(new Date('2026-08-18T01:05:00Z'));
+          const begin = requests.length, after = recorder.checkpoint();
           const duration = await enter(page, route, scenario === 'history');
           await expect(page.locator('.loading-inline')).toHaveCount(0);
           await settleRegions(page);
-          await expect.poll(() => activeRequests.size === 0 && Date.now() - lastActivity >= 100, { intervals: [25] }).toBe(true);
-          await Promise.all(pendingBodies);
+          await waitForState(page, state => state.reads === 0 && state.tasks === 0 &&
+            state.backgroundOwner === null && !state.checking &&
+            state.application?.viewed.ready && !state.application.viewed.loading && !state.application.merge.loading, 'completed navigation requests');
+          await waitUntil(() => activeRequests.size === 0, { label: 'all RPC bodies received', diagnostic: () => requestsFor(page).snapshot() });
+          const received = recorder.matching({ after, target: '/api/rpc' });
+          expect(received.filter(request => request.phases.failed || request.phases.cancelled ||
+            request.phases.received === undefined || !Number.isFinite(request.responseBytes))).toEqual([]);
           const metrics = await page.evaluate(() => window.__moondiffMetrics);
+          expect(metrics.errors).toEqual([]);
           sample[scenario] = {
             ms: duration, requests: requests.length - begin,
-            responseBytes: responses.slice(bytesBegin).reduce((sum, value) => sum + value, 0),
+            responseBytes: received.reduce((sum, request) => sum + request.responseBytes, 0),
             snapshotRpcs: requests.slice(begin).filter(kind => ['PullSnapshotGet', 'CompareGet', 'PullFiles'].includes(kind)).length,
             cacheHitRate: metrics.prefetch?.hit_rate || 0,
             files: Object.fromEntries(Object.entries(metrics.files).map(([path, counts]) => [path, { diff: counts.diff, highlight: counts.highlight }])),
@@ -109,20 +109,14 @@ test('fixed latency cold, five-minute repeat and history performance', async ({ 
           if (variant === 'current' && scenario !== 'cold') expect(sample[scenario].files).toEqual(sample.cold.files);
         }
         if (variant === 'current') expect(sample.cold.snapshotRpcs).toBe(1);
-        samples[variant].push(sample);
+        if (!baseline || iteration > 0) samples[variant].push({ round, ...sample });
       } finally { await context.close(); }
     }
   }
-  const summary = Object.fromEntries(Object.entries(samples).map(([variant, rounds]) => [variant,
-    Object.fromEntries(['cold', 'repeat', 'history'].map(scenario => [scenario, {
-      p50: percentile(rounds.map(round => round[scenario].ms), .5),
-      p95: percentile(rounds.map(round => round[scenario].ms), .95),
-      meanRequests: rounds.reduce((sum, round) => sum + round[scenario].requests, 0) / rounds.length,
-      meanResponseBytes: rounds.reduce((sum, round) => sum + round[scenario].responseBytes, 0) / rounds.length,
-      cacheHitRate: rounds.at(-1)[scenario].cacheHitRate,
-    }]))]));
-  const report = info.outputPath('response-performance.json');
-  await writeFile(report, JSON.stringify({ model: '25ms browser + 25ms upstream stages; eight interleaved rounds; two MoonBit files, 24 declarations each; repeat after five minutes', summary, samples }, null, 2));
-  await info.attach('response-performance.json', { contentType: 'application/json', path: report });
-  console.log(JSON.stringify(summary));
+  await writePerformanceReport(info, 'response-performance.json', {
+    fixture: { files: 2, declarations: 24, browserLatencyMs: 25, upstreamStageLatencyMs: 25 }, cpuRate: 1,
+    sampling: baseline ? 'AB/BA; one warm-up and two samples per mode per round' : 'eight samples per scenario', samples,
+    groups: Object.fromEntries(Object.entries(samples).flatMap(([variant, rounds]) =>
+      ['cold', 'repeat', 'history'].map(scenario => [`${variant}.${scenario}`, rounds.map(sample => sample[scenario].ms)]))),
+  });
 });

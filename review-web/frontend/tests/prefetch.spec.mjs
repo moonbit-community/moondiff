@@ -1,6 +1,6 @@
 import { cancelledRoute, installClock, clockFor, requestsFor } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
-import { writeFile } from 'node:fs/promises';
+import { writePerformanceReport, comparisonOrder } from '../../tests/performance-report.mjs';
 import { setup, pull, success, gate, failure, row, selectTab, signOut, base, head } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { navigate } from './rendering-fixture.mjs';
@@ -576,30 +576,39 @@ test('fixed-fixture cold and prefetched navigation report readable diff latency,
     if (['PullGet', 'CompareGet', 'PullFiles', 'ContentGet'].includes(kind)) await new Promise(resolve => setTimeout(resolve, 25));
     return false;
   });
-  await page.goto('/');
-  for (const [index, number] of [7, 8, 9].entries()) {
-    await row(page, `Pull request ${number}`).getByRole('link').click();
+  const samples = { cold: [], prefetched: [] };
+  const run = async mode => {
+    await page.goto('/');
+    await expect(page.getByRole('tab').first()).toBeVisible();
+    if (mode === 'prefetched') await ready(page);
+    const before = kindCalls(state, 'ContentGet').length;
+    await row(page, `Pull request ${mode === 'cold' ? 7 : 1}`).getByRole('link').click();
     await expect(page.locator('.diff-scroll table').first()).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.__moondiffMetrics.timings?.click_to_diff_cold?.samples?.length || 0)).toBe(index + 1);
-    await page.getByRole('link', { name: /Moondiff/ }).click();
-    // Complete two snapshots and both shared source blobs before visiting.
-    await expect.poll(() => kindCalls(state, 'PullFiles').filter(call => Number(call.args.number) <= 5).length).toBe(2);
-    await prepared(page);
-  }
-  for (const [index, number] of [1, 2, 3].entries()) {
-    await row(page, `Pull request ${number}`).getByRole('link').click();
-    await expect(page.locator('.diff-scroll table').first()).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.__moondiffMetrics.timings?.click_to_diff_prefetch?.samples?.length || 0)).toBe(index + 1);
+    await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);
+    await settleRegions(page);
+    if (mode === 'prefetched') expect(kindCalls(state, 'ContentGet')).toHaveLength(before);
+    const timing = mode === 'cold' ? 'click_to_diff_cold' : 'click_to_diff_prefetch';
+    await expect.poll(() => page.evaluate(key => __moondiffMetrics.timings?.[key]?.samples?.length ?? 0, timing)).toBe(1);
     await page.goBack();
     await expect(page.getByRole('tab').first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => __moondiffMetrics.timings?.back_restore?.samples?.length ?? 0)).toBe(1);
+    const metrics = await page.evaluate(() => ({ ...__moondiffMetrics, sources: undefined }));
+    if (mode === 'prefetched') {
+      expect(metrics.counters.prefetch_cache_hits).toBeGreaterThan(0);
+      expect(metrics.counters.prefetch_requests).toBeGreaterThan(0);
+      expect(metrics.counters.prefetch_bytes).toBeGreaterThan(0);
+      expect(metrics.prefetch.hit_rate).toBeGreaterThan(0);
+    }
+    return { navigationMs: metrics.timings[timing].samples[0], restoreMs: metrics.timings.back_restore.samples[0], metrics };
+  };
+  for (const order of comparisonOrder) for (const mode of order.map(mode => mode === 'A' ? 'cold' : 'prefetched')) {
+    await run(mode);
+    for (let sample = 0; sample < 2; sample++) samples[mode].push(await run(mode));
   }
-  await expect.poll(() => page.evaluate(() => window.__moondiffMetrics.timings?.back_restore?.samples?.length || 0)).toBeGreaterThan(0);
-  const metrics = await page.evaluate(() => ({ ...window.__moondiffMetrics, sources: undefined }));
-  expect(metrics.prefetch.hits).toBeGreaterThan(0);
-  expect(metrics.prefetch.hit_rate).toBeGreaterThan(0);
-  expect(metrics.counters.prefetch_requests).toBeGreaterThan(0);
-  expect(metrics.counters.prefetch_bytes).toBeGreaterThan(0);
-  const report = testInfo.outputPath('navigation-performance.json');
-  await writeFile(report, JSON.stringify(metrics, null, 2));
-  await testInfo.attach('navigation-performance.json', { path: report, contentType: 'application/json' });
+  await writePerformanceReport(testInfo, 'navigation-performance.json', {
+    fixture: { files: 1, sourceDelayMs: 25, owner: 'upstream/repo', renamed: true }, cpuRate: 1,
+    sampling: 'AB/BA; one warm-up and two samples per mode per round', samples,
+    groups: Object.fromEntries(Object.entries(samples).flatMap(([mode, values]) =>
+      ['navigationMs', 'restoreMs'].map(key => [`${mode}.${key}`, values.map(value => value[key])]))),
+  });
 });
