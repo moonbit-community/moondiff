@@ -1,3 +1,4 @@
+import { installClock } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 
 const base = 'a'.repeat(40);
@@ -202,7 +203,7 @@ for (const source of [false, true]) test(`public ${source ? 'source' : 'metadata
 
 test('public request deadline aborts the fetch and reports timeout without backend fallback', async ({ page }) => {
   const { rpc } = await install(page);
-  await page.clock.install();
+  const clock = await installClock(page);
   await page.addInitScript(commit => {
     const original = window.fetch;
     window.publicDeadlineStarted = false;
@@ -217,8 +218,12 @@ test('public request deadline aborts the fetch and reports timeout without backe
     };
   }, commit);
   await page.goto(`/example/project/commit/${commit}`);
-  await expect.poll(() => page.evaluate(() => window.publicDeadlineStarted)).toBe(true);
-  await page.clock.fastForward(30_001);
+  await clock.until(() => page.evaluate(() => window.publicDeadlineStarted), 'public fetch started');
+  const timer = await clock.timer(30_000);
+  await clock.before(timer);
+  expect(await page.evaluate(() => window.publicDeadlineAborted)).toBe(false);
+  await clock.fire(timer);
+  await clock.until(() => page.locator('.error').first().isVisible(), 'public timeout rendered');
   await expect(page.locator('.error').first()).toContainText('did not respond within 30 seconds');
   expect(await page.evaluate(() => window.publicDeadlineAborted)).toBe(true);
   expect(rpc).toEqual([]);

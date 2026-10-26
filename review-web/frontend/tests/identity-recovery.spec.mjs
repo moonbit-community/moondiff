@@ -1,3 +1,4 @@
+import { requestsFor, trackRoute } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { setup, gate, base, head } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
@@ -30,7 +31,7 @@ async function reactivate(page) {
 async function cachedAnonymousPull(page, large) {
   await page.addInitScript(() => { window.__moondiffMetrics = { files: {}, active: {} }; });
   const publicValidation = gate(), privateValidation = gate();
-  let blockPublic = false, publicHeld = false, privateHeld = false;
+  let blockPublic = false, publicHeld = false, privateHeld = false, publicRequest, privateRequest;
   const metadata = {
     title: 'Anonymous cached PR', html_url: 'https://github.com/upstream/repo/pull/1',
     base: { sha: base, repo: { full_name: 'upstream/repo' } },
@@ -42,7 +43,7 @@ async function cachedAnonymousPull(page, large) {
     switch (kind) {
       case 'ViewerPullsGet': op = 'github.viewer.pulls.get'; value = { items: [], total_count: 0 }; break;
       case 'PullGet':
-        if (!privateHeld) { privateHeld = true; await privateValidation.promise; }
+        if (!privateHeld) { privateRequest = requestsFor(page).enter(route.request()); privateHeld = true; await privateValidation.promise; }
         op = 'github.pull.get'; value = metadata; break;
       case 'CompareGet': op = 'github.compare.get'; value = { merge_base_commit: { sha: mergeBase } }; break;
       case 'PullFiles': op = 'github.pull.files'; value = [file]; break;
@@ -74,11 +75,12 @@ async function cachedAnonymousPull(page, large) {
     }) });
   });
   await page.route('https://api.github.com/**', async route => {
+    route = trackRoute(route);
     const url = new URL(route.request().url()), pathname = url.pathname;
     const headers = { 'Access-Control-Allow-Origin': '*' };
     let value;
     if (pathname.endsWith('/pulls/1')) {
-      if (blockPublic && !publicHeld) { publicHeld = true; await publicValidation.promise; }
+      if (blockPublic && !publicHeld) { publicRequest = requestsFor(page).enter(route.request()); publicHeld = true; await publicValidation.promise; }
       value = metadata;
     } else if (pathname.includes('/compare/')) value = { merge_base_commit: { sha: mergeBase } };
     else if (pathname.endsWith('/pulls/1/files')) value = [file];
@@ -87,7 +89,7 @@ async function cachedAnonymousPull(page, large) {
     else if (pathname.includes('/contents/')) {
       return route.fulfill({ body: url.searchParams.get('ref') === mergeBase ? 'fn answer() { 1 }\n' : 'fn answer() { 2 }\n', contentType: 'text/plain', headers });
     } else throw new Error(`Unexpected public request ${url}`);
-    await route.fulfill({ json: value, headers }).catch(() => {});
+    await route.fulfill({ json: value, headers });
   });
   await page.goto(path);
   await expect(page.locator('.range-selector select').first()).toBeEnabled();
@@ -100,7 +102,7 @@ async function cachedAnonymousPull(page, large) {
   await expect(page.getByText(checking, { exact: true })).toBeVisible();
   await expect.poll(() => publicHeld).toBe(true);
   expect(await page.evaluate(() => window.__moondiffMetrics.counters.prefetch_cache_hits)).toBe(1);
-  return { state, publicValidation, privateValidation, privateHeld: () => privateHeld };
+  return { state, publicValidation, privateValidation, privateHeld: () => privateHeld, publicRequest: () => publicRequest, privateRequest: () => privateRequest };
 }
 
 for (const large of [false, true]) test(`first sign-in resumes an anonymous cached ${large ? 'large PR selector' : 'PR'} without losing its selection`, async ({ page }) => {
@@ -134,9 +136,11 @@ for (const large of [false, true]) test(`first sign-in resumes an anonymous cach
   await reactivate(page);
   await expect(page.getByText(checking, { exact: true })).toBeVisible();
   cached.publicValidation.release();
+  await requestsFor(page).wait({ phase: 'cancelled', predicate: request => request.id === cached.publicRequest().id });
   await settleRegions(page);
   await expect(page.getByText(checking, { exact: true })).toBeVisible();
   cached.privateValidation.release();
+  await requestsFor(page).wait({ phase: 'received', predicate: request => request.id === cached.privateRequest().id });
   await expect(page.getByText(checking, { exact: true })).toHaveCount(0);
   const confirmedCounters = await page.evaluate(() => window.__moondiffMetrics.counters);
   for (const key of ['snapshot_misses', 'prefetch_cache_hits', 'prefetch_inflight_hits']) {

@@ -1,3 +1,5 @@
+import { settleRegions } from '../../tests/render-probe.mjs';
+import { requestsFor } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { pull, commits, success, failure, gate, setup, reviews, authored, row, selectTab } from './home-fixture.mjs';
 
@@ -123,15 +125,15 @@ for (const target of ['ReviewRequested', 'Commits']) test(`${target} refresh cur
 });
 
 test('page restoration resumes a refresh from its staged cursor and discards the interrupted response', async ({ page }) => {
-  let refreshing = false, seconds = 0;
+  let refreshing = false, seconds = 0, heldRequest;
   const pending = gate();
   const state = await setup(page, async ({ route, kind, args }) => {
     if (kind !== 'ViewerPullsGet' || args.kind.$tag !== 'ReviewRequested' || !refreshing) return false;
     if (!args.cursor) await route.fulfill({ json: success('ViewerPulls', { items: [pull(8)], total_count: 2, next_cursor: 'second' }) });
     else {
       const interrupted = ++seconds === 1;
-      if (interrupted) await pending.promise;
-      await route.fulfill({ json: success('ViewerPulls', { items: [pull(interrupted ? 99 : 9)], total_count: 2 }) }).catch(() => {});
+      if (interrupted) { heldRequest = requestsFor(page).enter(route.request()); await pending.promise; }
+      await route.fulfill({ json: success('ViewerPulls', { items: [pull(interrupted ? 99 : 9)], total_count: 2 }) });
     }
     return true;
   });
@@ -141,21 +143,30 @@ test('page restoration resumes a refresh from its staged cursor and discards the
   await expect(row(page, 'Pull request 1')).toBeVisible();
   await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); dispatchEvent(new Event('focus')); });
   await expect(row(page, 'Pull request 9')).toBeVisible();
-  pending.release(); await expect(row(page, 'Pull request 99')).toHaveCount(0);
+  pending.release();
+  await requestsFor(page).wait({ phase: 'cancelled', predicate: request => request.id === heldRequest.id });
+  await settleRegions(page);
+  await expect(row(page, 'Pull request 99')).toHaveCount(0);
   expect(state.calls.filter(c => c.kind === 'ViewerPullsGet' && c.args.kind.$tag === 'ReviewRequested').map(c => c.args.cursor)).toEqual([undefined, undefined, 'second', 'second']);
 });
 
 test('session expiry during refresh clears visible and staged private data before a late response', async ({ page }) => {
-  let refreshing = false; const pending = gate();
+  let refreshing = false, heldRequest;
+  const pending = gate('old authored list'), expiry = gate('expiry after the authored request enters');
   await setup(page, async ({ route, kind, args }) => {
     if (kind !== 'ViewerPullsGet' || !refreshing) return false;
-    if (args.kind.$tag === 'ReviewRequested') await route.fulfill(failure('authentication_required', 'Sign in again.', 401));
-    else { await pending.promise; await route.fulfill({ json: success('ViewerPulls', { items: [pull(99)], total_count: 1 }) }).catch(() => {}); }
+    if (args.kind.$tag === 'ReviewRequested') { await expiry.promise; await route.fulfill(failure('authentication_required', 'Sign in again.', 401)); }
+    else { heldRequest = requestsFor(page).enter(route.request()); await pending.promise; await route.fulfill({ json: success('ViewerPulls', { items: [pull(99)], total_count: 1 }) }); }
     return true;
   });
   await page.goto('/'); await selectTab(page, 'ReviewRequested'); await expect(page.getByRole('button', { name: 'Refresh lists' })).toBeEnabled();
   refreshing = true; await page.getByRole('button', { name: 'Refresh lists' }).click();
+  await expect.poll(() => Boolean(heldRequest)).toBe(true);
+  expiry.release();
   await expect(page.locator('.pr-dashboard')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Try sign-in' })).toBeVisible();
-  pending.release(); await expect(page.getByText('Pull request 99')).toHaveCount(0);
+  pending.release();
+  await requestsFor(page).wait({ phase: 'cancelled', predicate: request => request.id === heldRequest.id });
+  await settleRegions(page);
+  await expect(page.getByText('Pull request 99')).toHaveCount(0);
 });

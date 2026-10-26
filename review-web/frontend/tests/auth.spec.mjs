@@ -1,4 +1,6 @@
+import { cancelledRoute, createGate, installClock, clockFor, requestsFor } from '../../tests/browser-control.mjs';
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
+import { settleRegions } from '../../tests/render-probe.mjs';
 import { e2eOrigin } from '../../tests/e2e-config.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -156,8 +158,7 @@ test('real Wasm device login displays and copies the code, opens GitHub and comp
 
 for (const outcome of ['failure', 'cancel', 'success']) {
   test(`an in-flight public source finishes after sign-in ${outcome}`, async ({ page }) => {
-    let release;
-    const gate = new Promise(resolve => { release = resolve; });
+    const { release, promise: gate } = createGate('public source during sign-in');
     let started;
     const requested = new Promise(resolve => { started = resolve; });
     let sourceReads = 0;
@@ -166,7 +167,7 @@ for (const outcome of ['failure', 'cancel', 'success']) {
       started();
       await gate;
       await handler.fulfill({ body: 'pub fn hello() { 42 }\n', contentType: 'text/plain',
-        headers: { 'Access-Control-Allow-Origin': '*' } }).catch(() => {});
+        headers: { 'Access-Control-Allow-Origin': '*' } }).catch(error => cancelledRoute(handler, error));
     });
     if (outcome === 'failure') {
       await page.route('**/api/auth/device/start', handler => handler.fulfill({ status: 403,
@@ -218,11 +219,13 @@ test('reload and navigation retain a pending code; cancellation allows a fresh a
 });
 
 test('cancel during startup ignores its delayed response after a new attempt begins', async ({ page }) => {
-  let release; const gate = new Promise(r => { release = r; });
+  const { release, promise: gate } = createGate('delayed auth response');
   let entered; const started = new Promise(r => { entered = r; });
+  let heldRequest;
   await page.route('**/api/auth/device/start', async handler => {
+    heldRequest = requestsFor(page).enter(handler.request());
     const response = await handler.fetch(); entered(); await gate;
-    await handler.fulfill({ response }).catch(() => {});
+    await handler.fulfill({ response }).catch(error => cancelledRoute(handler, error));
   }, { times: 1 });
   await page.goto(route);
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
@@ -233,23 +236,29 @@ test('cancel during startup ignores its delayed response after a new attempt beg
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
   await expect(page.locator('.device-code')).toBeVisible();
   const code = await page.locator('.device-code').textContent(); release();
+  await requestsFor(page).wait({ predicate: record => record.id === heldRequest.id && (record.phases.received || record.phases.cancelled) });
+  await settleRegions(page);
   await expect(page.locator('.device-code')).toHaveText(code);
   await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
 
 test('a delayed successful poll cannot replace a newer sign-in after cancellation', async ({ page }) => {
-  let release; const gate = new Promise(r => { release = r; });
+  const { release, promise: gate } = createGate('delayed auth response');
   let entered; const polling = new Promise(r => { entered = r; });
+  let heldRequest;
   await page.route('**/api/auth/device/poll', async handler => {
+    heldRequest = requestsFor(page).enter(handler.request());
     const { authorization_id } = handler.request().postDataJSON(); entered(); await gate;
-    await handler.fulfill({ json: successFixture('auth.device.poll', { csrf_token: 'fixture', authenticated: true, user_id: 'stale-user', login: 'stale-user', authorization_id, device_flow: { id: authorization_id, phase: 'completed', user_code: '', verification_uri: '', expires_at: 0, retry_after: 0, message: '' } }) }).catch(() => {});
+    await handler.fulfill({ json: successFixture('auth.device.poll', { csrf_token: 'fixture', authenticated: true, user_id: 'stale-user', login: 'stale-user', authorization_id, device_flow: { id: authorization_id, phase: 'completed', user_code: '', verification_uri: '', expires_at: 0, retry_after: 0, message: '' } }) }).catch(error => cancelledRoute(handler, error));
   }, { times: 1 });
   await page.goto(route);
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click(); await polling;
   await page.getByRole('button', { name: 'Cancel sign-in' }).click();
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
   await expect(page.locator('.device-code')).toBeVisible(); const code = await page.locator('.device-code').textContent();
-  release(); await expect(page.locator('.device-code')).toHaveText(code);
+  release();
+  await requestsFor(page).wait({ predicate: record => record.id === heldRequest.id && (record.phases.received || record.phases.cancelled) });
+  await settleRegions(page); await expect(page.locator('.device-code')).toHaveText(code);
   await expect(page.getByRole('button', { name: 'Account: stale-user', exact: true })).toHaveCount(0);
   await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
@@ -266,8 +275,7 @@ const shareRoutes = [
 
 for (const [kind, path, githubUrl] of shareRoutes) {
   test(`${kind} share route shows its workspace while the first session check is pending`, async ({ page }) => {
-    let releaseStatus;
-    const statusGate = new Promise(resolve => { releaseStatus = resolve; });
+    const { release: releaseStatus, promise: statusGate } = createGate('initial session status');
     let markStatusEntered;
     const statusEntered = new Promise(resolve => { markStatusEntered = resolve; });
     const githubReads = [];
@@ -275,7 +283,7 @@ for (const [kind, path, githubUrl] of shareRoutes) {
     await page.route('**/api/auth/status', async handler => {
       markStatusEntered();
       await statusGate;
-      await handler.continue().catch(() => {});
+      await handler.continue().catch(error => cancelledRoute(handler, error));
     });
     page.on('request', request => {
       const url = new URL(request.url());
@@ -300,8 +308,7 @@ for (const [kind, path, githubUrl] of shareRoutes) {
 }
 
 test('initial session resolution precedes change loading even when navigating during startup', async ({ page }) => {
-  let releaseStatus;
-  const statusRelease = new Promise(resolve => { releaseStatus = resolve; });
+  const { release: releaseStatus, promise: statusRelease } = createGate('startup session status');
   let markStatusEntered;
   const statusEntered = new Promise(resolve => { markStatusEntered = resolve; });
   let statusReleased = false;
@@ -356,11 +363,13 @@ test('legacy hash links display an invalid-link error without loading a change',
 });
 
 test('a page restored during startup resumes the server code after unloading its request', async ({ page }) => {
-  let release; const gate = new Promise(r => { release = r; });
+  const { release, promise: gate } = createGate('delayed auth response');
   let entered; const started = new Promise(r => { entered = r; });
+  let heldRequest;
   await page.route('**/api/auth/device/start', async handler => {
+    heldRequest = requestsFor(page).enter(handler.request());
     const response = await handler.fetch(); entered(); await gate;
-    await handler.fulfill({ response }).catch(() => {});
+    await handler.fulfill({ response }).catch(error => cancelledRoute(handler, error));
   }, { times: 1 });
   await page.goto(route);
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click(); await started;
@@ -370,28 +379,21 @@ test('a page restored during startup resumes the server code after unloading its
     dispatchEvent(new Event('focus'));
   });
   await expect(page.locator('.device-code')).toBeVisible(); release();
+  await requestsFor(page).wait({ predicate: record => record.id === heldRequest.id && (record.phases.received || record.phases.cancelled) });
+  await settleRegions(page);
   const code = await page.locator('.device-code').textContent();
   await authorize(page, code); await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
 });
 
-// Install and pause before navigation: real response/actionability waits must
-// never consume the application's retry budget. The install time precedes the
-// fixed pause time so pauseAt cannot race a moving wall clock.
 async function installAuthClock(page) {
-  await page.clock.install({ time: new Date('2026-08-18T00:00:00Z') });
-  await page.clock.pauseAt(new Date('2026-08-18T01:00:00Z'));
+  await installClock(page);
   await page.addInitScript(() => {
     const randomUUID = crypto.randomUUID.bind(crypto);
     window.__attempts = [];
     crypto.randomUUID = () => { const id = randomUUID(); window.__attempts.push(id); return id; };
-    const timeout = window.setTimeout.bind(window);
-    window.__authTimers = [];
-    window.setTimeout = (callback, ms, ...args) => {
-      if ([5_000, 10_000, 20_000].includes(ms)) window.__authTimers.push({ ms, at: Date.now() });
-      return timeout(callback, ms, ...args);
-    };
   });
 }
+const authTimers = async page => (await clockFor(page).timers()).filter(timer => [5_000, 10_000, 20_000].includes(timer.ms));
 
 async function fulfillAuth(page, handler, response, responseDelay) {
   if (responseDelay) {
@@ -409,24 +411,16 @@ function authResponse(page, endpoint) {
 async function renderAuthResponse(page, pending, locator, timerCount) {
   const response = await pending;
   expect(await response.finished(), `response body for ${response.url()}`).toBeNull();
-  // Body completion precedes the central and regional paints. Advance only a
-  // small bounded budget, well below the shortest (5 second) auth timer.
-  for (let frames = 0; frames < 60; frames++) {
-    await page.clock.runFor(16);
-    if (await locator.isVisible() && await page.evaluate(count => window.__authTimers.length === count, timerCount)) return;
-  }
-  const diagnostic = await page.evaluate(() => ({ now: Date.now(), timers: window.__authTimers, text: document.body.innerText.slice(0, 2_000) }));
-  throw new Error(`Auth did not render ${locator} after ${response.url()} within 60 frames (960ms): ${JSON.stringify(diagnostic)}`);
+  await clockFor(page).until(async () => await locator.isVisible() && (await authTimers(page)).length === timerCount,
+    `auth UI and ${timerCount} registered timers after ${response.url()}`);
+  await settleRegions(page);
 }
 
 async function beforeAuthDeadline(page, index, ms) {
-  const { timer, now } = await page.evaluate(index => ({ timer: window.__authTimers[index], now: Date.now() }), index);
-  expect(timer, `auth timer ${index}`).toMatchObject({ ms });
-  // Account for every frame already consumed while waiting for the UI.
-  const remaining = timer.at + ms - now;
-  expect(remaining, `time left before ${ms}ms auth deadline`).toBeGreaterThan(1);
-  await page.clock.runFor(remaining - 1);
-  expect(await page.evaluate(() => Date.now())).toBe(timer.at + ms - 1);
+  const timer = (await authTimers(page))[index];
+  expect(timer, `auth timer ${index}`).toMatchObject({ ms, state: 'pending' });
+  await clockFor(page).before(timer);
+  expect(await clockFor(page).now()).toBe(timer.due - 1);
 }
 
 for (const responseDelay of [0, 250]) {
@@ -480,7 +474,7 @@ for (const responseDelay of [0, 250]) {
     expect(sessions).toBe(2);
     expect(starts).toEqual([]);
     response = authResponse(page, 'device/start');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     await renderAuthResponse(page, response, retryMessage, 2);
     expect(sessions).toBe(3);
     expect(starts).toHaveLength(1);
@@ -488,7 +482,7 @@ for (const responseDelay of [0, 250]) {
     expect(sessions).toBe(3);
     expect(starts).toHaveLength(1);
     response = authResponse(page, 'device/start');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     await renderAuthResponse(page, response, page.locator('.device-code'), 3);
     await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
     expect(sessions).toBe(4);
@@ -503,13 +497,13 @@ for (const responseDelay of [0, 250]) {
     await beforeAuthDeadline(page, 2, 5_000);
     expect(polls).toEqual([]);
     response = authResponse(page, 'device/poll');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     await renderAuthResponse(page, response, retryMessage, 4);
     expect(polls).toHaveLength(1);
     await beforeAuthDeadline(page, 3, 10_000);
     expect(polls).toHaveLength(1);
     response = authResponse(page, 'device/poll');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     const account = page.getByRole('button', { name: 'Account: alice', exact: true });
     await renderAuthResponse(page, response, account, 4);
     await commentsRefreshed;
@@ -559,7 +553,7 @@ for (const responseDelay of [0, 250]) {
     await beforeAuthDeadline(page, 0, 10_000);
     expect(sessions).toBe(2);
     response = authResponse(page, 'status');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     await renderAuthResponse(page, response, retryMessage, 2);
     expect(sessions).toBe(3);
     expect(starts).toEqual([]);
@@ -567,7 +561,7 @@ for (const responseDelay of [0, 250]) {
     expect(sessions).toBe(3);
     expect(starts).toEqual([]);
     response = authResponse(page, 'device/start');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     await renderAuthResponse(page, response, page.locator('.device-code'), 3);
     await expect(page.locator('.device-code')).toHaveText('ABCD-EFGH');
     expect(sessions).toBe(4);
@@ -578,7 +572,7 @@ for (const responseDelay of [0, 250]) {
     await beforeAuthDeadline(page, 2, 5_000);
     expect(polls).toEqual([]);
     response = authResponse(page, 'device/poll');
-    await page.clock.runFor(1);
+    await clockFor(page).advance(1);
     const account = page.getByRole('button', { name: 'Account: alice', exact: true });
     await renderAuthResponse(page, response, account, 3);
     await commentsRefreshed;
@@ -589,3 +583,36 @@ for (const responseDelay of [0, 250]) {
     expect(await page.evaluate(() => window.__attempts)).toEqual(attempts);
   });
 }
+
+
+test('cancelling sign-in during backoff prevents later session and start requests', async ({ page }) => {
+  await installAuthClock(page);
+  let sessions = 0, starts = 0;
+  await page.route('**/api/auth/status', handler => {
+    sessions++;
+    return handler.fulfill(sessions === 2
+      ? { status: 503, json: { $tag: 'Failure', error: { status: 503, code: 'unavailable', message: 'Session unavailable' } } }
+      : { json: successFixture('auth.status', { authenticated: false, csrf_token: 'fixture' }) });
+  });
+  await page.route('**/api/auth/device/start', handler => { starts++; return handler.abort(); });
+  await page.route('**/api/auth/device/cancel', handler => handler.fulfill({ json: successFixture('auth.device.cancel', {
+    authorization_id: handler.request().postDataJSON().authorization_id,
+    authenticated: false, csrf_token: 'fixture',
+  }) }));
+  let response = authResponse(page, 'status');
+  await page.goto(route);
+  const signIn = page.getByRole('button', { name: 'Sign in with GitHub' });
+  await renderAuthResponse(page, response, signIn, 0);
+  response = authResponse(page, 'status');
+  await signIn.click();
+  await renderAuthResponse(page, response, page.getByText('Connection interrupted. Sign-in will retry automatically.'), 1);
+  await beforeAuthDeadline(page, 0, 10_000);
+  expect(sessions).toBe(2);
+  await page.getByRole('button', { name: 'Cancel sign-in', exact: true }).click();
+  await clockFor(page).until(() => page.getByRole('button', { name: 'Sign in with GitHub', exact: true }).isVisible(), 'cancelled sign-in rendered');
+  const afterCancel = sessions;
+  await clockFor(page).jump(120_000);
+  await settleRegions(page);
+  expect(sessions).toBe(afterCancel);
+  expect(starts).toBe(0);
+});

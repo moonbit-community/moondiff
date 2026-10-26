@@ -1,3 +1,5 @@
+import { settleRegions } from '../../tests/render-probe.mjs';
+import { requestsFor } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { head, pull, commits, success, failure, gate, setup, reviews, authored, row, noLanding, selectTab, signOut } from './home-fixture.mjs';
 
@@ -183,12 +185,12 @@ test('commit pages keep GitHub order past 250 and restart on snapshot changes; r
 });
 
 test('logout and account changes clear data and discard delayed pages', async ({ page }) => {
-  const pending = gate(); let entered = 0;
+  const pending = gate('old account PR list'); let entered = 0, heldRequest;
   const state = await setup(page, async ({ route, kind, args, state }) => {
     if (kind !== 'ViewerPullsGet' || args.kind.$tag !== 'ReviewRequested') return false;
     const owner = state.user;
-    if (owner === 'alice') { entered++; await pending.promise; }
-    await route.fulfill({ json: success('ViewerPulls', { items: [pull(1, { title: `${owner} private PR` })], total_count: 1 }) }).catch(() => {}); return true;
+    if (owner === 'alice') { heldRequest = requestsFor(page).enter(route.request()); entered++; await pending.promise; }
+    await route.fulfill({ json: success('ViewerPulls', { items: [pull(1, { title: `${owner} private PR` })], total_count: 1 }) }); return true;
   });
   await page.goto('/'); await expect.poll(() => entered).toBe(1);
   state.user = 'bob';
@@ -196,26 +198,32 @@ test('logout and account changes clear data and discard delayed pages', async ({
   await expect(page.getByRole('button', { name: 'Account: bob' })).toBeVisible();
   await selectTab(page, 'ReviewRequested');
   await expect(page.getByRole('link', { name: 'bob private PR' })).toBeVisible();
-  pending.release(); await expect(page.getByRole('link', { name: 'alice private PR' })).toHaveCount(0);
+  pending.release();
+  await requestsFor(page).wait({ phase: 'cancelled', predicate: request => request.id === heldRequest.id });
+  await settleRegions(page);
+  await expect(page.getByRole('link', { name: 'alice private PR' })).toHaveCount(0);
   await signOut(page);
   await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
   await expect(page.locator('.pr-dashboard')).toHaveCount(0); await expect(page.locator('#commit-url')).toBeVisible();
 });
 
 test('page restoration resumes aborted commit pages without losing loaded lists and expanded state', async ({ page }) => {
-  const pending = gate(); let commitCalls = 0;
+  const pending = gate('interrupted commit page'); let commitCalls = 0, heldRequest;
   const state = await setup(page, async ({ route, kind }) => {
     if (kind !== 'PullCommitsGet') return false;
     commitCalls++;
-    if (commitCalls === 1) await pending.promise;
-    await route.fulfill({ json: success('PullCommits', commits(1, 1)) }).catch(() => {}); return true;
+    if (commitCalls === 1) { heldRequest = requestsFor(page).enter(route.request()); await pending.promise; }
+    await route.fulfill({ json: success('PullCommits', commits(1, 1)) }); return true;
   });
   await page.goto('/'); await selectTab(page, 'ReviewRequested'); const one = row(page, 'Pull request 1');
   await one.getByRole('button', { name: /Expand/ }).click(); await expect.poll(() => commitCalls).toBe(1);
   await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); dispatchEvent(new Event('focus')); });
   await expect(one.getByRole('link', { name: /Commit 1/ })).toBeVisible();
   expect(commitCalls).toBe(2); expect(state.calls.filter(c => c.kind === 'ViewerPullsGet')).toHaveLength(2);
-  pending.release(); await expect(one.locator('.home-commit')).toHaveCount(1);
+  pending.release();
+  await requestsFor(page).wait({ phase: 'cancelled', predicate: request => request.id === heldRequest.id });
+  await settleRegions(page);
+  await expect(one.locator('.home-commit')).toHaveCount(1);
 });
 
 test('mobile dashboard wraps long titles and repositories with working keyboard controls', async ({ page }, testInfo) => {
@@ -258,16 +266,19 @@ for (const invalidInput of [false, true]) test(`finishing real device sign-in on
 });
 
 test('signing out while PR lists load immediately clears the dashboard and ignores late responses', async ({ page }) => {
-  const pending = gate(); let entered = 0;
+  const pending = gate('PR lists during sign-out'), heldRequests = []; let entered = 0;
   await setup(page, async ({ route, kind }) => {
     if (kind !== 'ViewerPullsGet') return false;
+    heldRequests.push(requestsFor(page).enter(route.request()));
     entered++; await pending.promise;
-    await route.fulfill({ json: success('ViewerPulls', { items: [pull(1, { title: 'Late private PR' })], total_count: 1 }) }).catch(() => {}); return true;
+    await route.fulfill({ json: success('ViewerPulls', { items: [pull(1, { title: 'Late private PR' })], total_count: 1 }) }); return true;
   });
   await page.goto('/'); await expect.poll(() => entered).toBe(2);
   await signOut(page);
   await expect(page.locator('.pr-dashboard')).toHaveCount(0);
   pending.release();
+  for (const held of heldRequests) await requestsFor(page).wait({ phase: 'cancelled', predicate: request => request.id === held.id });
+  await settleRegions(page);
   await expect(page.getByRole('button', { name: 'Sign in with GitHub' })).toBeVisible();
   await expect(page.getByText('Late private PR')).toHaveCount(0);
 });

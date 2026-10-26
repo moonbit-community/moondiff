@@ -1,3 +1,5 @@
+import { installClock } from '../../tests/browser-control.mjs';
+import { waitForState, settleRegions } from '../../tests/render-probe.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
@@ -124,6 +126,7 @@ test('conflicts and repository rules never expose an enabled merge action', asyn
 });
 
 test('pending CI polls into a successful status', async ({ page }) => {
+  const clock = await installClock(page);
   const fixture = syntheticFixture({ files: 1, declarations: 1 });
   let statusCalls = 0;
   const state = await installRenderingFixture(page, fixture, {
@@ -151,10 +154,15 @@ test('pending CI polls into a successful status', async ({ page }) => {
     },
   });
   await page.goto(path);
+  await waitForState(page, state => state.application?.merge.pollScheduled, 'pending CI poll scheduled');
   const card = page.locator('.pull-merge-card');
   await expect(card.getByText('Some checks haven’t completed yet', { exact: true })).toBeVisible();
   await expect(card.getByText('1 in progress check', { exact: true })).toBeVisible();
-  await expect(card.getByText('All checks have passed', { exact: true })).toBeVisible({ timeout: 4_500 });
+  const timer = await clock.timer(2000);
+  await clock.before(timer);
+  expect(statusCalls).toBe(1);
+  await clock.fire(timer);
+  await clock.until(() => card.getByText('All checks have passed', { exact: true }).isVisible(), 'successful CI poll rendered');
   await expect(card.getByText('1 successful check', { exact: true })).toBeVisible();
   expect(state.calls.filter(call => call.op === 'github.pull.merge.status')).toHaveLength(2);
 });
@@ -214,4 +222,22 @@ test('a failed merge stays retryable and a retry succeeds', async ({ page }) => 
   await card.getByRole('button', { name: 'Rebase and merge', exact: true }).click();
   await expect(card.getByText('✓ This pull request is merged.', { exact: true })).toBeVisible();
   expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(2);
+});
+
+
+test('navigating away cancels the effect of a pending CI poll', async ({ page }) => {
+  const clock = await installClock(page);
+  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const state = await installRenderingFixture(page, fixture, { authenticated: true,
+    mergeStatus: { base_sha: fixture.base, head_sha: fixture.sha, open: true, draft: false,
+      merged: false, mergeable: true, rebaseable: true, mergeable_state: 'clean',
+      ci_summary: { $tag: 'Pending' }, ci_checks: [], ci_warnings: [] },
+  });
+  await page.goto(path);
+  await waitForState(page, state => state.application?.merge.pollScheduled, 'CI poll scheduled');
+  await page.locator('a.workspace-home').click();
+  await clock.until(() => page.getByRole('tab').first().isVisible(), 'navigation committed');
+  await clock.jump(120_000);
+  await settleRegions(page);
+  expect(state.calls.filter(call => call.op === 'github.pull.merge.status')).toHaveLength(1);
 });

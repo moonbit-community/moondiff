@@ -1,8 +1,10 @@
+import { createGate, installClock, clockFor, requestsFor } from '../../tests/browser-control.mjs';
+import { cancelledRoute } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions, waitForState } from '../../tests/render-probe.mjs';
 
 const base = '1'.repeat(40), head = 'a'.repeat(40), merge = '2'.repeat(40);
 const path = '/alice/repo/pull/42';
@@ -11,12 +13,12 @@ const files = ['src/a.txt', 'src/new name.txt', 'README.md'].map((filename, i) =
   status: i === 1 ? 'renamed' : 'modified', additions: 1, deletions: 1, changes: 2,
   patch: '@@ -1,3 +1,3 @@\n context\n-old\n+new\n tail',
 }));
-function gate() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
+const gate = createGate;
 async function install(page, options = {}) {
   const state = {
     user: 'alice', authenticated: true, base, head, calls: [], states: {},
     readGate: null, writeGate: null, readFailure: null, writeFailure: null, applyOnFailure: false,
-    files, reviewComments: [], contentFailure: null,
+    page, files, reviewComments: [], contentFailure: null,
     ...options,
   };
   const states = () => state.states[state.user] ??= {};
@@ -63,7 +65,7 @@ async function install(page, options = {}) {
     const headers = { 'Access-Control-Allow-Origin': '*' };
     await route.fulfill(source
       ? { body: value, contentType: 'text/plain', headers }
-      : { json: value, headers }).catch(() => {});
+      : { json: value, headers }).catch(error => cancelledRoute(route, error));
   });
   await page.route('**/api/**', async route => {
     route = metadataFallbackRoute(route);
@@ -119,7 +121,7 @@ async function install(page, options = {}) {
       const pending = state.writeGate; state.writeGate = null;
       if (pending) await pending.promise;
     } else throw new Error(`Unhandled ${op}`);
-    await route.fulfill({ status: failure?.status || 200, json: failure ? { $tag: 'Failure', error: failure } : successFixture(op, value) }).catch(() => {});
+    await route.fulfill({ status: failure?.status || 200, json: failure ? { $tag: 'Failure', error: failure } : successFixture(op, value) }).catch(error => cancelledRoute(route, error));
   });
   return state;
 }
@@ -130,6 +132,8 @@ async function expectViewedWrite(state, path, viewed, action) {
   const before = calls(state, 'github.pull.file.viewed.set').length;
   const expected = { path, base_sha: state.base, head_sha: state.head, viewed };
   await action();
+  if (clockFor(state.page)) await clockFor(state.page).until(
+    () => calls(state, 'github.pull.file.viewed.set').length === before + 1, 'Viewed write dispatched');
   // Native checkbox state and enabled controls can precede the render that sends the write.
   await expect.poll(() => calls(state, 'github.pull.file.viewed.set').length).toBe(before + 1);
   expect(calls(state, 'github.pull.file.viewed.set')[before].args).toMatchObject(expected);
@@ -190,7 +194,7 @@ for (const width of [1280, 390]) {
 
 test('Viewed rejects repeated operations, rolls back clear failure and keeps a comment draft', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
   await page.getByRole('button', { name: 'Add overall comment', exact: true }).click();
   const editor = page.locator('textarea'); await editor.fill('Keep this comment draft');
@@ -214,7 +218,7 @@ test('Viewed rejects repeated operations, rolls back clear failure and keeps a c
 for (const applied of [true, false]) {
   test(`Viewed reconciles an uncertain write that ${applied ? 'was' : 'was not'} applied`, async ({ page }) => {
     const state = await install(page);
-    await page.goto(path); await expect(box(page)).toBeEnabled();
+    await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
     await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
     const waiting = gate(); state.readGate = waiting;
     state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' }; state.applyOnFailure = applied;
@@ -257,7 +261,7 @@ test('Viewed read errors preserve diff; retry restores status and snapshot chang
 
 test('a stale read cannot overwrite a newer write or another account', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   const staleRead = gate(); state.readGate = staleRead;
   await refresh(page);
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(2);
@@ -281,7 +285,7 @@ test('a stale read cannot overwrite a newer write or another account', async ({ 
 
 test('anonymous PR exposes sign-in and restores Viewed after login; commits do not show it', async ({ page }) => {
   const state = await install(page, { authenticated: false, states: { alice: { 'src/a.txt': 'Viewed' } } });
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Sign in to sync Viewed' })).toBeVisible();
   expect(calls(state, 'github.pull.viewed.get')).toHaveLength(0);
   state.authenticated = true; await refresh(page);
@@ -357,7 +361,7 @@ test('anonymous PR entry points focus the dialog status during a session check',
 
 test('manual refresh and page restoration retain an expanded viewed file and its inline draft', async ({ page }) => {
   const state = await install(page, { states: { alice: { 'src/a.txt': 'Viewed' } } });
-  await page.goto(path); await expect(box(page)).toBeChecked();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeChecked();
   await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
   const gutter = card(page).locator('.review-gutter.new-line-number').filter({ has: page.locator('.line-number-value', { hasText: /^2$/ }) });
   await clickLineCommentButton(gutter.getByRole('button', { name: 'Comment on line 2', exact: true }));
@@ -537,7 +541,7 @@ for (const kind of ['inline', 'reply']) {
   for (const failure of ['clear', 'uncertain']) {
     test(`unmark Viewed then start ${kind} preserves editor after ${failure} failure`, async ({ page }) => {
       const state = await installMbt(page);
-      await page.goto(path); await expect(mbtBox(page)).toBeChecked();
+      await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeChecked();
       await expect(card(page)).not.toHaveClass(/expanded/);
       const waiting = gate();
       state.writeFailure = { status: failure === 'clear' ? 403 : 504, code: failure === 'clear' ? 'permission_denied' : 'github_timeout', message: 'Failed' };
@@ -609,45 +613,51 @@ test('anonymous section interaction survives first login without protecting othe
 const pendingRecords = page => page.evaluate(() => Object.keys(sessionStorage)
   .filter(key => key.startsWith('moondiff.viewed.pending.v1:'))
   .map(key => JSON.parse(sessionStorage.getItem(key))));
-const waitingForConfirmation = page => expect(card(page).getByText('Waiting for GitHub confirmation', { exact: true })).toBeVisible();
-const readFinished = page => expect(page.locator('.viewed-refreshing')).toHaveCount(0);
-// Count snapshot-loader requests, including cached snapshots revalidated through
-// PullGet rather than the aggregate PullSnapshotGet endpoint.
-const snapshotLoads = page => page.evaluate(() => globalThis.__moondiffMetrics.prefetch?.visits ?? 0);
-async function controlViewedTimers(page) {
-  // Control only the retry delays. Rabbita's animation-frame rendering and
-  // transport callbacks keep running, so UI assertions also observe real renders.
-  await page.addInitScript(() => {
-    const schedule = window.setTimeout, cancel = window.clearTimeout;
-    const jobs = new Map();
-    let now = 0, sequence = 0;
-    window.setTimeout = (callback, delay, ...args) => {
-      if (![2000, 4000, 8000, 16000, 30000].includes(delay)) return schedule(callback, delay, ...args);
-      const id = --sequence;
-      jobs.set(id, { at: now + delay, run: () => callback(...args) });
-      return id;
-    };
-    window.clearTimeout = id => { if (!jobs.delete(id)) cancel(id); };
-    window.viewedTimerDelays = () => [...jobs.values()]
-      .map(job => job.at - now)
-      .sort((a, b) => a - b);
-    window.advanceViewed = delta => {
-      now += delta;
-      for (const [id, job] of jobs) if (job.at <= now) { jobs.delete(id); job.run(); }
-    };
-  });
+async function viewedReady(page) {
+  if (clockFor(page)) await waitForState(page, state =>
+    state.application?.viewed.ready && !state.application.viewed.loading, 'initial Viewed state accepted');
 }
-const waitForViewedTimer = (page, delay) => expect.poll(
-  () => page.evaluate(() => window.viewedTimerDelays()),
-).toContain(delay);
-const advanceViewed = (page, ms) => page.evaluate(ms => window.advanceViewed(ms), ms);
+const waitingForConfirmation = async page => {
+  const label = card(page).getByText('Waiting for GitHub confirmation', { exact: true });
+  if (clockFor(page)) await clockFor(page).until(() => label.isVisible(), 'Viewed confirmation pending');
+  await expect(label).toBeVisible();
+};
+const readFinished = async page => {
+  if (clockFor(page)) await waitForState(page, state =>
+    state.application?.viewed.ready && !state.application.viewed.loading, 'Viewed read accepted');
+  await expect(page.locator('.viewed-refreshing')).toHaveCount(0);
+};
+// Cached snapshots revalidate through PullGet rather than PullSnapshotGet.
+const snapshotLoads = page => page.evaluate(() => globalThis.__moondiffMetrics.prefetch?.visits ?? 0);
+const controlViewedTimers = page => installClock(page);
+const viewedTimers = new WeakMap();
+async function waitForViewedTimer(page, ms) {
+  const current = await page.evaluate(() => __moondiffTestState().application);
+  viewedTimers.set(page, await clockFor(page).timer(ms, { predicate: timer =>
+    timer.context.generation === current.generation && timer.context.viewedReadSerial === current.viewed.readSerial }));
+}
+async function advanceViewed(page, ms) {
+  const clock = clockFor(page), timer = viewedTimers.get(page);
+  if (timer && ms === timer.ms - 1) return clock.before(timer);
+  const after = requestsFor(page).checkpoint();
+  if (timer && (ms === timer.ms || ms === 1)) {
+    await clock.fire(timer);
+    await clock.until(() => requestsFor(page).matching({ after, operation: 'PullViewedGet', phase: 'received' }).length,
+      'Viewed confirmation response received');
+    await readFinished(page);
+    viewedTimers.delete(page);
+  } else {
+    await clock.jump(ms);
+    await settleRegions(page);
+  }
+}
 
 for (const viewed of [true, false]) {
   test(`timed-out ${viewed ? 'mark' : 'unmark'} keeps waiting through old reads and automatically confirms one late mutation`, async ({ page }) => {
     await controlViewedTimers(page);
     if (viewed) await page.setViewportSize({ width: 390, height: 850 });
     const state = await install(page, { states: { alice: { 'src/a.txt': viewed ? 'Unviewed' : 'Viewed' } } });
-    await page.goto(path); await expect(box(page)).toBeEnabled();
+    await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
     state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
     await expectViewedWrite(state, files[0].filename, viewed, () => box(page).setChecked(viewed));
     await waitingForConfirmation(page); await readFinished(page);
@@ -679,7 +689,7 @@ for (const viewed of [true, false]) {
 test('confirmation retries have a finite schedule, tolerate read errors and restart manually', async ({ page }) => {
   await controlViewedTimers(page);
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
   state.readFailure = { status: 503, code: 'unavailable', message: 'Read unavailable' };
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await waitingForConfirmation(page); await readFinished(page);
@@ -698,6 +708,7 @@ test('confirmation retries have a finite schedule, tolerate read errors and rest
   expect(await pendingRecords(page)).toHaveLength(1);
   await expect(page.getByText(/^Confirmation is paused/)).toBeVisible();
   await page.getByRole('button', { name: 'Recheck Viewed', exact: true }).click();
+  await clockFor(page).until(() => calls(state, 'github.pull.viewed.get').length === 9, 'manual Viewed recheck');
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(9);
   await readFinished(page);
   state.states.alice[files[0].filename] = 'Viewed';
@@ -714,13 +725,14 @@ test('confirmation retries have a finite schedule, tolerate read errors and rest
 test('rate limits pause confirmation and page restoration opens a new round', async ({ page }) => {
   await controlViewedTimers(page);
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
   state.readFailure = { status: 429, code: 'rate_limit', message: 'Try later' };
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await waitingForConfirmation(page); await readFinished(page);
   await advanceViewed(page, 120000);
   expect(calls(state, 'github.pull.viewed.get')).toHaveLength(2);
   await refresh(page);
+  if (clockFor(page)) await clockFor(page).until(() => calls(state, 'github.pull.viewed.get').length === 3, 'restored Viewed recheck');
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(3);
   await readFinished(page);
   state.states.alice[files[0].filename] = 'Viewed';
@@ -734,7 +746,7 @@ test('rate limits pause confirmation and page restoration opens a new round', as
 
 test('reload restores pending changes by path after reordering and isolates login accounts', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await waitingForConfirmation(page); await readFinished(page);
   const [record] = await pendingRecords(page);
@@ -778,6 +790,7 @@ async function holdUpdatedChecks(page, state) {
   state.head = 'b'.repeat(40);
   state.title = 'Latest Viewed fixture';
   await refresh(page);
+  if (clockFor(page)) await clockFor(page).until(() => calls(state, 'github.pull.viewed.get').length === readCount + 1, 'reactivated Viewed read');
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(readCount + 1);
   await expect.poll(() => calls(state, 'github.pull.merge.status').length).toBe(mergeCount + 1);
   await expect.poll(() => calls(state, 'github.pull.get').length).toBe(metadataCount + 1);
@@ -788,7 +801,7 @@ for (const first of ['Merge', 'Viewed']) {
   test(`Load latest retains an unconfirmed operation without restoring its old expansion: ${first} first`, async ({ page }) => {
     await controlViewedTimers(page);
     const state = await installMbt(page);
-    await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+    await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeEnabled();
     state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
     await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
     await card(page).getByRole('button', { name: 'Collapse src/main.mbt', exact: true }).click();
@@ -796,6 +809,7 @@ for (const first of ['Merge', 'Viewed']) {
     const held = await holdUpdatedChecks(page, state);
     try {
       held[first === 'Merge' ? 'merge' : 'viewed'].resolve();
+      await clockFor(page).until(() => page.getByRole('button', { name: 'Load latest', exact: true }).isVisible(), 'updated snapshot detected');
       await expect(page.getByRole('button', { name: 'Load latest', exact: true })).toBeVisible();
       // The UI proves the first response has been reduced before releasing the second.
       if (first === 'Merge') await expect(page.getByRole('button', { name: 'Recheck Viewed', exact: true })).toBeDisabled();
@@ -803,7 +817,9 @@ for (const first of ['Merge', 'Viewed']) {
       held[first === 'Merge' ? 'viewed' : 'merge'].resolve();
       await readFinished(page);
       const snapshots = await snapshotLoads(page);
+      await clockFor(page).until(() => page.getByRole('button', { name: 'Load latest', exact: true }).isVisible(), 'updated snapshot detected');
       await page.getByRole('button', { name: 'Load latest', exact: true }).click();
+      await clockFor(page).until(() => page.getByText('Latest Viewed fixture', { exact: true }).isVisible(), 'latest snapshot committed');
       await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
       await waitingForConfirmation(page); await readFinished(page);
       expect(await snapshotLoads(page)).toBe(snapshots + 1);
@@ -812,6 +828,7 @@ for (const first of ['Merge', 'Viewed']) {
       expect(await pendingRecords(page)).toEqual([record]);
       state.states.alice[mbtFiles[0].filename] = 'Unviewed';
       await page.getByRole('button', { name: 'Recheck Viewed', exact: true }).click();
+      await clockFor(page).until(() => mbtBox(page).isEnabled(), 'Viewed confirmed');
       await expect(mbtBox(page)).toBeEnabled();
       await expect(mbtBox(page)).not.toBeChecked();
       expect(state.states.alice[mbtFiles[0].filename]).toBe('Unviewed');
@@ -823,7 +840,7 @@ for (const first of ['Merge', 'Viewed']) {
 test('one early Load latest click waits for Viewed confirmation and then replaces once', async ({ page }) => {
   await controlViewedTimers(page);
   const state = await installMbt(page);
-  await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeEnabled();
   state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
   await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
   await card(page).getByRole('button', { name: 'Collapse src/main.mbt', exact: true }).click();
@@ -832,6 +849,7 @@ test('one early Load latest click waits for Viewed confirmation and then replace
   try {
     held.merge.resolve();
     const latest = page.getByRole('button', { name: 'Load latest', exact: true });
+    await clockFor(page).until(() => latest.isVisible(), 'updated snapshot detected');
     await expect(latest).toBeVisible();
     await expect(page.getByRole('button', { name: 'Recheck Viewed', exact: true })).toBeDisabled();
     const snapshots = await snapshotLoads(page);
@@ -843,7 +861,8 @@ test('one early Load latest click waits for Viewed confirmation and then replace
     expect(await snapshotLoads(page)).toBe(snapshots);
     expect(calls(state, 'github.pull.viewed.get')).toHaveLength(reads);
     held.viewed.resolve();
-    await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
+    await clockFor(page).until(() => page.getByText('Latest Viewed fixture', { exact: true }).isVisible(), 'latest snapshot committed');
+      await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
     await waitingForConfirmation(page); await readFinished(page);
     await expect(card(page)).toHaveClass(/expanded/);
     expect(await pendingRecords(page)).toEqual([record]);
@@ -856,7 +875,7 @@ for (const response of ['old value', 'temporary failure', 'rate limit']) {
   test(`waiting Load latest survives Viewed ${response} and resumes after recheck`, async ({ page }) => {
     await controlViewedTimers(page);
     const state = await installMbt(page);
-    await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+    await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeEnabled();
     state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
     await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
     const [record] = await pendingRecords(page);
@@ -867,6 +886,7 @@ for (const response of ['old value', 'temporary failure', 'rate limit']) {
     const held = await holdUpdatedChecks(page, state);
     try {
       held.merge.resolve();
+      await clockFor(page).until(() => page.getByRole('button', { name: 'Load latest', exact: true }).isVisible(), 'updated snapshot detected');
       await page.getByRole('button', { name: 'Load latest', exact: true }).click();
       const snapshots = await snapshotLoads(page);
       held.viewed.resolve(); await readFinished(page);
@@ -895,12 +915,13 @@ for (const response of ['old value', 'temporary failure', 'rate limit']) {
         expect(await snapshotLoads(page)).toBe(snapshots);
       }
       await recheck.click();
+      await clockFor(page).until(() => page.getByText('Latest Viewed fixture', { exact: true }).isVisible(), 'latest snapshot committed');
       await expect(page.getByText('Latest Viewed fixture', { exact: true })).toBeVisible();
       await waitingForConfirmation(page); await readFinished(page);
       expect(await snapshotLoads(page)).toBe(snapshots + 1);
       expect(await pendingRecords(page)).toEqual([record]);
       state.states.alice[mbtFiles[0].filename] = 'Unviewed';
-      await recheck.click(); await expect(mbtBox(page)).toBeEnabled();
+      await recheck.click(); await clockFor(page).until(() => mbtBox(page).isEnabled(), 'Viewed confirmed'); await expect(mbtBox(page)).toBeEnabled();
       expect(await pendingRecords(page)).toHaveLength(0);
       expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
     } finally { held.merge.resolve(); held.viewed.resolve(); held.metadata.resolve(); }
@@ -909,7 +930,7 @@ for (const response of ['old value', 'temporary failure', 'rate limit']) {
 
 test('session storage failure sends no mutation and preserves draft selection and expansion', async ({ page }) => {
   const state = await installMbt(page);
-  await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeEnabled();
   await card(page).getByRole('button', { name: 'Expand src/main.mbt', exact: true }).click();
   const editor = await openMbtDraft(page, 'inline');
   const checkDraft = await captureDraft(editor, 'No storage draft');
@@ -932,11 +953,16 @@ test('session storage failure sends no mutation and preserves draft selection an
 
 test('late completion cannot remove a newer pending operation after reload', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
+  const recorder = requestsFor(page), after = recorder.checkpoint();
   const first = gate(); state.writeGate = first;
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await expect(box(page)).toBeDisabled();
   const [oldRecord] = await pendingRecords(page);
   // The mock applies before replying. Reload confirms its target from storage.
+  // Observe pagehide's cancellation before destroying the old document;
+  // Chromium can otherwise omit requestfailed for its intercepted fetch.
+  await page.evaluate(() => dispatchEvent(new Event('pagehide')));
+  await recorder.wait({ after, operation: 'PullFileViewedSet', phase: 'cancelled' });
   await page.reload(); await expect(box(page)).toBeEnabled();
   await expect(box(page)).toBeChecked();
   expect(state.states.alice[files[0].filename]).toBe('Viewed');
@@ -957,7 +983,7 @@ test('late completion cannot remove a newer pending operation after reload', asy
 
 test('cleanup compares operation IDs before removing a pending record', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   const waiting = gate(); state.writeGate = waiting;
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await expect(box(page)).toBeDisabled();
   const [record] = await pendingRecords(page);
@@ -975,7 +1001,7 @@ test('cleanup compares operation IDs before removing a pending record', async ({
 
 test('failed storage cleanup can be retried without sending another write', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   await page.evaluate(() => {
     const remove = Storage.prototype.removeItem;
     window.blockViewedCleanup = true;
@@ -999,7 +1025,7 @@ test('failed storage cleanup can be retried without sending another write', asyn
 
 test('storage read failure on reload keeps controls locked until records can be recovered', async ({ page }) => {
   const state = await install(page);
-  await page.goto(path); await expect(box(page)).toBeEnabled();
+  await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check()); await waitingForConfirmation(page); await readFinished(page);
   const [record] = await pendingRecords(page);
@@ -1026,7 +1052,7 @@ test('storage read failure on reload keeps controls locked until records can be 
 for (const kind of ['inline', 'reply', 'overall']) {
   test(`a delayed identity check retains the ${kind} editor while Viewed waits for confirmation`, async ({ page }) => {
     const state = await installMbt(page);
-    await page.goto(path); await expect(mbtBox(page)).toBeEnabled();
+    await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeEnabled();
     state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
     await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
     if (kind === 'overall') await page.getByRole('button', { name: 'Add overall comment', exact: true }).click();
@@ -1128,3 +1154,33 @@ for (const width of [1440, 390]) {
     await expect(next).toBeFocused();
   });
 }
+
+
+for (const boundary of ['navigation', 'account change']) test(`Viewed confirmation timers stop after ${boundary}`, async ({ page }) => {
+  const clock = await controlViewedTimers(page);
+  const state = await install(page);
+  await page.goto(path); await viewedReady(page);
+  state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
+  await expectViewedWrite(state, files[0].filename, true, () => box(page).check());
+  await waitingForConfirmation(page); await readFinished(page);
+  await waitForViewedTimer(page, 2000);
+  if (boundary === 'navigation') {
+    await page.locator('a.workspace-home').click();
+    await clock.until(() => page.getByRole('tab').first().isVisible(), 'left Viewed scope');
+  } else {
+    const before = await page.evaluate(() => __moondiffTestState());
+    state.user = 'bob';
+    await refresh(page);
+    await waitForState(page, state => state.identityEpoch > before.identityEpoch &&
+      state.application?.generation > before.application.generation && !state.checking &&
+      state.application.viewed.ready && !state.application.viewed.loading, 'new account Viewed state accepted');
+    await expect(page.getByRole('button', { name: 'Account: bob', exact: true })).toBeVisible();
+    await expect(box(page)).toBeEnabled();
+    await expect(page.locator('.viewed-refreshing')).toHaveCount(0);
+  }
+  const reads = calls(state, 'github.pull.viewed.get').length;
+  await clock.jump(120_000);
+  await settleRegions(page);
+  expect(calls(state, 'github.pull.viewed.get')).toHaveLength(reads);
+  expect(calls(state, 'github.pull.file.viewed.set')).toHaveLength(1);
+});

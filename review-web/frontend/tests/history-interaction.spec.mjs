@@ -1,10 +1,20 @@
+import { scrollAndWait } from '../../tests/scroll-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
 import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
 
-async function returnToDraft(page) {
-  const fixture = syntheticFixture({ files: 24, declarations: 3 });
+async function returnToDraft(page, { small = false } = {}) {
+  const fixture = syntheticFixture(small ? { files: 8, declarations: 1 } : { files: 24, declarations: 3 });
+  if (small) {
+    // Restoration only needs real scrollable files and a focus target. Added
+    // files avoid loading/rendering a second source side for this timing probe.
+    fixture.files = fixture.files.map(file => {
+      const lines = fixture.sources[`${fixture.sha}:${file.filename}`].trimEnd().split('\n');
+      return { ...file, status: 'added', additions: lines.length, deletions: 0, changes: lines.length,
+        patch: `@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join('\n')}` };
+    });
+  }
   await installRenderProbe(page);
   const state = await installRenderingFixture(page, fixture, { authenticated: true });
   await page.goto('/example/regions/pull/1');
@@ -34,7 +44,9 @@ async function returnToDraft(page) {
 for (const timing of ['validation', 'queued']) {
   for (const interaction of ['typing', 'wheel', 'keyboard']) {
     test(`${interaction} cancels history restoration during ${timing}`, async ({ page }) => {
-      const { state, validation } = await returnToDraft(page);
+      // Exercise restoration scheduling under CPU throttling with enough files
+      // to scroll/focus file 7, without benchmarking bulk source rendering.
+      const { state, validation } = await returnToDraft(page, { small: true });
       let barrier;
       if (timing === 'queued') {
         // Validation has finished and restoration is waiting on a regional paint.
@@ -49,15 +61,14 @@ for (const timing of ['validation', 'queued']) {
         await editor.evaluate(element => element.setSelectionRange(4, 9, 'backward'));
       } else {
         await page.locator('#moondiff-file-0 .file-toggle').evaluate(button => button.focus({ preventScroll: true }));
-        if (interaction === 'wheel') {
-          await page.mouse.move(1000, 500);
-          await page.mouse.wheel(0, 380);
-        } else {
-          await page.keyboard.press('PageDown');
-        }
-        // Allow the browser's scroll animation to settle before releasing data.
-        await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
-        await page.waitForTimeout(250);
+        await scrollAndWait(page, async () => {
+          if (interaction === 'wheel') {
+            await page.mouse.move(1000, 500);
+            await page.mouse.wheel(0, 380);
+          } else {
+            await page.keyboard.press('PageDown');
+          }
+        });
       }
       const position = await page.evaluate(() => {
         window.historyInteractionFocus = document.activeElement;
