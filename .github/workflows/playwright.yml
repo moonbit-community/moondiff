@@ -1,0 +1,172 @@
+name: playwright
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  review-views:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s latest
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Update MoonBit dependencies
+        run: moon update
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: review-web/package-lock.json
+
+      - name: Install review app dependencies
+        working-directory: review-web
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: review-web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser component tests
+        run: npm run test:views
+
+  review-e2e:
+    name: review-e2e (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s latest
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Update MoonBit dependencies
+        run: moon update
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: review-web/package-lock.json
+
+      - name: Install review app dependencies
+        working-directory: review-web
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: review-web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser integration test shard
+        working-directory: review-web
+        run: npm run test:e2e -- --workers=4 --shard=${{ matrix.shard }}/4
+
+      - name: Upload browser test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-e2e-failures-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: review-web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  extension-e2e:
+    name: extension-e2e (${{ matrix.extension }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - extension: chrome
+            browser: chromium
+          - extension: firefox
+            browser: firefox
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: review-web/package-lock.json
+
+      - name: Install extension test dependencies
+        working-directory: review-web
+        run: npm ci
+
+      - name: Install browser
+        working-directory: review-web
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run extension browser tests
+        run: npm run test:extension:${{ matrix.extension }}:e2e
+
+      - name: Upload extension browser test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension-e2e-failures-${{ matrix.extension }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  rendering-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s latest
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Update MoonBit dependencies
+        run: moon update
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: review-web/package-lock.json
+
+      - name: Install review app dependencies
+        working-directory: review-web
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: review-web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run rendering stress tests
+        run: npm run test:review-web:stress
+
+      - name: Upload rendering stress test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rendering-stress-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: review-web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

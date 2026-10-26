@@ -27,3 +27,9 @@ Use the `:chrome` or `:firefox` suffix to process only one implementation, for
 example `build:extension:firefox`, `test:extension:firefox`, or
 `package:extension:firefox`. Production packages embed the destination and only
 accept an HTTPS root URL. Development builds additionally allow loopback HTTP.
+
+`npm run test:extension:unit` runs both unit suites without a browser.
+`npm run test:extension:e2e` runs only the Playwright suites; use
+`test:extension:chrome:e2e` or `test:extension:firefox:e2e` to select one browser.
+CI runs the unit suites in the `check` workflow and the browser suites in
+separate jobs in the `playwright` workflow.

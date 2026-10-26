@@ -374,10 +374,12 @@ npm run test:server
 ```sh
 npm ci
 npx playwright install chromium firefox
+npm run test:views
 npm run test:e2e
 ```
 
-`test:views` 单独运行组件夹具，不启动后端；`test:e2e` 会先运行这批组件测试，再运行页面集成测试。
+`test:views` 单独运行组件夹具，不启动后端；`test:e2e` 只运行页面集成测试。
+不启动浏览器的配置检查单独使用 `test:e2e-config` 运行。
 仓库根目录对应的命令为 `npm run test:views` 和 `npm run test:review-web`。
 
 如果缺少系统库，使用 `npx playwright install --with-deps chromium firefox` 安装；
@@ -394,8 +396,10 @@ gzip level 5 后不超过 500,000 字节。
 `npm run test:review-web:stress`。该命令以单 worker 运行 6 项夹具/CPU 组合，
 并保留性能数据附件。`npm run test:e2e` 及交互式测试界面只选择 `*.spec.mjs`；
 压力测试使用 `*.stress.mjs` 和独立的 Playwright 配置。
-`check` 工作流通过独立 job 运行压力测试并上传结果（包括性能附件）；主 job
-会构建发布产物并运行 `test:artifacts`，同时保留常规测试套件。
+`playwright` 工作流分别通过独立 job 运行组件夹具、四个页面集成测试分片、
+Chrome 和 Firefox 扩展浏览器测试，以及渲染压力测试，并上传集成测试失败产物
+和压力测试结果（包括性能附件）。`check` 工作流只运行不启动浏览器的测试，
+构建发布产物并运行 `test:artifacts`。
 
 验证跳转扩展和发布产物：
 
@@ -406,11 +410,14 @@ npm --prefix .. run test:artifacts
 ```
 
 `test:extension` 会先运行 Chrome 单元测试和 Chromium 集成测试，再运行 Firefox
-单元测试及 Firefox 内容脚本测试。浏览器专用的构建、测试和打包命令使用
+单元测试及 Firefox 内容脚本测试。`test:extension:unit` 只运行两组单元测试，
+无需浏览器；`test:extension:e2e` 只运行浏览器测试。使用
+`test:extension:chrome:e2e` 或 `test:extension:firefox:e2e` 可单独运行某个浏览器套件。
+浏览器专用的构建、测试和打包命令使用
 `:chrome` 或 `:firefox` 后缀；Firefox 还提供 `lint:extension:firefox`。
 打包及临时加载方法见[扩展入口说明](../extension/README.md)。
 
-也可以在仓库根目录依次运行 `npm run test:server`、`npm run test:review-web`、
+也可以在仓库根目录依次运行 `npm run test:server`、`npm run test:views`、`npm run test:review-web`、
 `npm run test:extension` 和 `npm run build && npm run test:artifacts`，执行上述测试套件和产物检查。
 实现层面的测试用例见[回归测试覆盖范围](backend/INTERNAL_CN.md#回归测试)。
 
