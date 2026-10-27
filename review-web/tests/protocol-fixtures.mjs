@@ -94,7 +94,7 @@ const comment = (v, kind) => {
 export function modeledValue(kind, value) {
   switch (kind) {
     case 'Commit': return { ...pick(value, 'sha html_url'), commit: pick(value.commit, 'message'), parents: value.parents.map(v => pick(v, 'sha')), stats: pick(value.stats, 'additions deletions total'), files: value.files.map(file) };
-    case 'Pull': return { ...pick(value, 'title html_url additions deletions changed_files commits'), ...Object.fromEntries(['base', 'head'].map(k => [k, { sha: value[k].sha, ...(value[k].repo ? { repo: pick(value[k].repo, 'full_name') } : {}) }])) };
+    case 'Pull': return { ...pick(value, 'title body html_url additions deletions changed_files commits'), ...Object.fromEntries(['base', 'head'].map(k => [k, { sha: value[k].sha, ...(value[k].repo ? { repo: pick(value[k].repo, 'full_name') } : {}) }])) };
     case 'Compare': return { merge_base_commit: pick(value.merge_base_commit, 'sha') };
     case 'RangeCompare': return {
       base_commit: { sha: value.base_commit.sha, commit: pick(value.base_commit.commit, 'message'), parents: value.base_commit.parents.map(parent => pick(parent, 'sha')) },

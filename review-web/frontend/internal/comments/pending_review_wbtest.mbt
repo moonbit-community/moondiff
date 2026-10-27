@@ -2,6 +2,7 @@
 fn pending_review_pull() -> ApiPull {
   {
     title: "Pull request",
+    body: None,
     html_url: "https://github.com/upstream/project/pull/17",
     base: {
       sha: "1111111111111111111111111111111111111111",

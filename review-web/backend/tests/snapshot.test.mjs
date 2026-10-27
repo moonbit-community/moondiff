@@ -6,6 +6,7 @@ before(buildServer);
 const args = number => ({ owner: 'alice', repo: 'repo', number: String(number) });
 const metadata = (count, overrides = {}) => ({
   title: `Snapshot ${count}`, html_url: 'https://github.com/alice/repo/pull/1',
+  body: '## Snapshot details\n\nA **Markdown** description.',
   base: { sha: 'a'.repeat(40), repo: { full_name: 'alice/repo' } },
   head: { sha: 'b'.repeat(40), repo: { full_name: 'fork/repo' } },
   additions: count, deletions: 0, changed_files: count, commits: 0, ...overrides,
@@ -40,6 +41,7 @@ test('aggregate boundaries, metadata-only fallback, two upstream reads and sessi
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.value.$tag, 'Complete');
     assert.equal(result.value['0'].files.length, count);
+    assert.equal(result.value['0'].metadata.body, metadata(count).body);
     const reads = fixture.requests.slice(start);
     assert.match(reads.at(-1).path, /\/pulls\/\d+$/);
     assert.equal(reads.filter(read => read.path.includes('/files?')).length, Math.ceil(count / 100));
@@ -51,6 +53,7 @@ test('aggregate boundaries, metadata-only fallback, two upstream reads and sessi
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.value.$tag, 'MetadataOnly');
     assert.equal(result.value['0'].changed_files, count);
+    assert.equal(result.value['0'].body, metadata(count).body);
   }
   title = 'Title changed without changing content';
   let start = fixture.requests.length;

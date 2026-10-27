@@ -1196,6 +1196,7 @@ fn review_test_view(target~ : ChangeTarget = PullRequest("17")) -> ChangeView {
 fn review_test_pull() -> ApiPull {
   {
     title: "Review fixture",
+    body: None,
     html_url: "https://github.com/upstream/project/pull/17",
     base: {
       sha: "1111111111111111111111111111111111111111",
@@ -1498,6 +1499,7 @@ test "PR head race preserves the line draft and waits for manual snapshot loadin
   }
   let changed = ApiPull::{
     title: "Moved head",
+    body: None,
     html_url: "https://github.com/upstream/project/pull/17",
     base: {
       sha: "1111111111111111111111111111111111111111",
