@@ -1,4 +1,4 @@
-import { cancelledRoute } from '../../tests/browser-control.mjs';
+import { cancelledRoute, createGate, installClock, trackRoute } from '../../tests/browser-control.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs';
 import { checkToolbar } from "./toolbar.mjs";
@@ -745,6 +745,33 @@ for (const failure of [403, 404, 'invalid']) {
     expect(requests).toBe(1);
   });
 }
+
+test('Markdown images show a link while pending and degrade at exactly ten seconds', async ({ page }) => {
+  const clock = await installClock(page);
+  await installRenderProbe(page);
+  const response = createGate('image response after timeout');
+  let requests = 0;
+  await page.route('https://camo.githubusercontent.com/slow', async route => {
+    requests++;
+    await response.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await installApi(page, pullTarget(), { pullBody: '![slow image](https://camo.githubusercontent.com/slow)' });
+  await page.goto(reviewPath());
+  const timer = await clock.timer(10000);
+  const description = page.locator('.pull-request-body');
+  await expect(description.getByRole('link', { name: 'slow image', exact: true })).toBeVisible();
+  await expect(description.locator('img')).toBeHidden();
+  await clock.before(timer);
+  await expect(description.locator('.markdown-image[data-image-state="pending"]')).toHaveCount(1);
+  await clock.fire(timer);
+  await expect(description.locator('img')).toHaveCount(0);
+  await expect(description.getByRole('link', { name: 'slow image', exact: true })).toBeVisible();
+  response.release();
+  await settleRegions(page);
+  await expect(description.locator('img')).toHaveCount(0);
+  expect(requests).toBe(1);
+});
 
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
