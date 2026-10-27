@@ -660,6 +660,29 @@ test('Markdown images in commit comments use the pinned commit repository', asyn
   expect(seen).toEqual([expected]);
 });
 
+test('Markdown images sanitize HTML attributes and reuse wrapping links', async ({ page }) => {
+  await page.route('https://camo.githubusercontent.com/**', route => route.fulfill({ contentType: 'image/png', body: markdownImagePng }));
+  const body = [
+    '[![wrapped](https://camo.githubusercontent.com/wrapped)](https://example.com/destination)',
+    '',
+    '<img src="https://camo.githubusercontent.com/html" alt="HTML &amp; caption" title="a &quot;title&quot;" width="40" height="20" srcset="https://outside.example/2x 2x" style="display:none" onerror="window.markdownAttack=true">',
+    '<img src="https://camo.githubusercontent.com/empty" alt="" width="-1" height="0">',
+  ].join('\n');
+  await installApi(page, pullTarget(), { pullBody: body });
+  await page.goto(reviewPath());
+  const description = page.locator('.pull-request-body');
+  await expect(description.locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(3);
+  await expect(description.locator('a a')).toHaveCount(0);
+  await expect(description.getByRole('link').first()).toHaveAttribute('href', 'https://example.com/destination');
+  const html = description.getByRole('img', { name: 'HTML & caption', exact: true });
+  await expect(html).toHaveAttribute('title', 'a "title"');
+  await expect(html).toHaveAttribute('width', '40');
+  await expect(html).toHaveAttribute('height', '20');
+  await expect(description.locator('img[onerror], img[srcset], img[style], img[width="-1"], img[height="0"]')).toHaveCount(0);
+  await expect(description.locator('.markdown-image-fallback').last()).toHaveText('查看图片 · camo.githubusercontent.com');
+  expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+});
+
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
