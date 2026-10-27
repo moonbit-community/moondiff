@@ -20,6 +20,10 @@ pub fn decode_request(Json) -> GitHubRequest raise
 
 pub fn github_id(Json) -> String raise
 
+pub fn markdown_image_csp_sources() -> String
+
+pub fn markdown_image_hosts() -> ReadOnlyArray[String]
+
 pub fn normalize_github(Json) -> Json
 
 pub fn resolved_sha(String, String) -> String raise
