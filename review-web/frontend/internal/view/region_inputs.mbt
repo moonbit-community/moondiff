@@ -15,6 +15,7 @@ pub(all) struct FileInput {
   review : @comments.ReadView
   viewed : ViewedControl
   navigation_enabled : Bool
+  markdown : MarkdownContext?
 }
 
 ///|
@@ -25,7 +26,8 @@ pub impl Eq for FileInput with fn equal(a, b) {
   a.display == b.display &&
   a.review == b.review &&
   a.viewed == b.viewed &&
-  a.navigation_enabled == b.navigation_enabled
+  a.navigation_enabled == b.navigation_enabled &&
+  a.markdown == b.markdown
 }
 
 ///|
@@ -49,6 +51,7 @@ fn file_input(
     },
     viewed: viewed_control(is_pull, model, index, file.file.filename),
     navigation_enabled: @application.file_navigation_enabled(model, index),
+    markdown: markdown_context(model),
   }
 }
 
@@ -133,6 +136,7 @@ pub(all) struct DiscussionInput {
   review : @comments.ReadView
   auth : @application.AuthStatus
   sign_in_dialog : @application.SignInDialog
+  markdown : MarkdownContext?
 } derive(Eq)
 
 ///|
@@ -183,6 +187,7 @@ pub(all) struct ShellInput {
   selector_only : Bool
   message : String
   pull_body : String?
+  markdown : MarkdownContext?
   drawer_open : Bool
   preferred_width : Int32
   display : DisplayOptions
@@ -206,6 +211,7 @@ pub fn shell_input(model : Model) -> ShellInput {
       ShowingPullSelector(pull) => pull.body
       _ => None
     },
+    markdown: markdown_context(model),
     drawer_open: model.file_tree.drawer_open,
     preferred_width: model.file_tree.preferred_width,
     display: display_options(model),
@@ -358,6 +364,7 @@ pub fn RegionProjection::inputs(
           review: model.review.read_view(paths~, group~),
           auth: model.auth,
           sign_in_dialog: model.sign_in_dialog,
+          markdown: markdown_context(model),
         }),
       ),
     )

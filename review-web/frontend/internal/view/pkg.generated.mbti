@@ -44,6 +44,7 @@ pub(all) struct DiscussionInput {
   review : @comments.ReadView
   auth : @application.AuthStatus
   sign_in_dialog : @application.SignInDialog
+  markdown : MarkdownContext?
 } derive(Eq)
 
 pub(all) struct DisplayOptions {
@@ -66,10 +67,21 @@ pub(all) struct FileInput {
   review : @comments.ReadView
   viewed : ViewedControl
   navigation_enabled : Bool
+  markdown : MarkdownContext?
 }
 pub impl Eq for FileInput
 
 type FileTreeRow derive(Eq, @debug.Debug)
+
+pub(all) struct MarkdownContext {
+  page_url : String
+  repository : @github.RepositoryRef
+  sha : String
+} derive(Eq)
+#deprecated
+pub fn MarkdownContext::equal(Self, Self) -> Bool
+#deprecated
+pub fn MarkdownContext::not_equal(Self, Self) -> Bool
 
 pub(all) struct MountHost {
   region : @application.Region
@@ -124,6 +136,7 @@ pub(all) struct ShellInput {
   selector_only : Bool
   message : String
   pull_body : String?
+  markdown : MarkdownContext?
   drawer_open : Bool
   preferred_width : Int32
   display : DisplayOptions
