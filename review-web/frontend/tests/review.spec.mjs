@@ -773,6 +773,34 @@ test('Markdown images show a link while pending and degrade at exactly ten secon
   expect(requests).toBe(1);
 });
 
+test('Markdown images cancel removed-node timers and ignore old responses after refresh and route changes', async ({ page }) => {
+  const clock = await installClock(page);
+  await installRenderProbe(page);
+  const response = createGate('retired image response');
+  await page.route('https://camo.githubusercontent.com/retired', async route => {
+    await response.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await page.route('https://camo.githubusercontent.com/current', route => route.fulfill({ contentType: 'image/png', body: markdownImagePng }));
+  await installApi(page, pullTarget(), { issueBody: '![retired](https://camo.githubusercontent.com/retired)' });
+  await page.goto(reviewPath());
+  const timer = await clock.timer(10000);
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '![current](https://camo.githubusercontent.com/current)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await clock.until(() => page.locator('#comments .markdown-image[data-image-state="loaded"]').count(), 'replacement image loaded');
+  expect((await clock.timers()).find(t => t.sequence === timer.sequence).state).toBe('cancelled');
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '![retired again](https://camo.githubusercontent.com/retired)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  const next = await clock.timer(10000, { after: timer.sequence });
+  await navigate(page, '/');
+  await clock.until(async () => await page.locator('.markdown-body img').count() === 0, 'route retired image nodes');
+  expect((await clock.timers()).filter(t => t.ms === 10000 && t.state === 'pending')).toEqual([]);
+  expect((await clock.timers()).find(t => t.sequence === next.sequence).state).toBe('cancelled');
+  response.release();
+  await clock.jump(10001);
+  await expect(page.locator('.markdown-body')).toHaveCount(0);
+});
+
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
