@@ -23,6 +23,9 @@ fn Coordinator::forward(
 
 ///|
 pub fn start(id : String) -> Unit {
+  if @browser.element(id) is Some(root) {
+    install_markdown_images(root)
+  }
   let coordinator = Coordinator::new()
   @rabbita.new(() => {
     let (model, raw) = @rabbita.create_state_with_init(
