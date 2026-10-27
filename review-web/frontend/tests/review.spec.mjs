@@ -99,14 +99,14 @@ async function installApi(page, target = pullTarget(), options = {}) {
       authenticationFailureOps: [],
       issueComments: [{
         id: "10",
-        body: "Existing overall comment",
+        body: options.issueBody ?? "Existing overall comment",
         html_url: "https://github.com/upstream/project/issues/17#issuecomment-10",
         created_at: "2026-08-18T08:00:00Z",
         user: { login: "reviewer" },
       }],
       reviewComments: [{
         id: "20",
-        body: "Existing inline comment",
+        body: options.inlineBody ?? "Existing inline comment",
         html_url: "https://github.com/upstream/project/pull/17#discussion_r20",
         created_at: "2026-08-18T08:01:00Z",
         user: { login: "reviewer" },
@@ -117,7 +117,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
         commit_id: head,
       }, {
         id: "21",
-        body: "Existing reply",
+        body: options.replyBody ?? "Existing reply",
         html_url: "https://github.com/upstream/project/pull/17#discussion_r21",
         created_at: "2026-08-18T08:02:00Z",
         user: { login: "author" },
@@ -140,7 +140,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
       }],
       commitComments: [{
         id: "30",
-        body: "Existing commit comment",
+        body: options.commitBody ?? "Existing commit comment",
         html_url: "https://github.com/upstream/project/commit/example#commitcomment-30",
         created_at: "2026-08-18T08:03:00Z",
         user: { login: "reviewer" },
@@ -176,6 +176,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
     function pullMetadata() {
       return {
         title: options.identitySpecificDiff ? `Fork PR for ${state.login}` : "Fork PR",
+        body: options.pullBody ?? null,
         html_url: "https://github.com/upstream/project/pull/17",
         base: { sha: state.currentBase, repo: { full_name: "upstream/project" } },
         head: { sha: state.currentHead, repo: { full_name: "contributor/project-fork" } },
@@ -457,6 +458,93 @@ async function waitForSignedInComments(page) {
   await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
 }
+
+const markdownFixture = [
+  '## Markdown heading',
+  '',
+  '**Bold** and *italic*, ~~removed~~, `inline`.',
+  'First line',
+  'Second line',
+  '',
+  '> Quoted text',
+  '',
+  '- [x] Complete',
+  '- [ ] Pending',
+  '',
+  '| Name | Result |',
+  '| :--- | ---: |',
+  '| Tests | Pass |',
+  '',
+  '```moonbit',
+  'let html = "<escaped>"',
+  'let long = "' + 'long code '.repeat(100) + '"',
+  '```',
+  '',
+  '[Documentation](https://example.com/guide)',
+  '',
+  '<img src=x onerror="window.markdownAttack = true">',
+  '',
+  '[Unsafe](javascript:alert%281%29)',
+].join('\n');
+
+for (const authenticated of [false, true]) {
+  test(`renders PR body and discussion Markdown for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
+    await installApi(page, pullTarget(), {
+      authenticated,
+      pullBody: markdownFixture,
+      issueBody: markdownFixture,
+      inlineBody: markdownFixture,
+      replyBody: '**Reply formatting**',
+    });
+    await page.goto(reviewPath());
+    const description = page.getByRole('region', { name: 'Pull request description' });
+    await expect(description.locator('h2')).toHaveText('Markdown heading');
+    const overall = page.locator('#comments .github-comment-body');
+    const inline = page.locator('.review-thread .github-comment-body').first();
+    await expect(inline.locator('h2')).toHaveText('Markdown heading');
+    await expect(page.locator('.review-thread .github-comment-body strong').filter({ hasText: 'Reply formatting' })).toBeVisible();
+
+    for (const body of [description.locator('.markdown-body'), overall, inline]) {
+      await expect(body.locator('strong').first()).toHaveText('Bold');
+      await expect(body.locator('em')).toHaveText('italic');
+      await expect(body.locator('del')).toHaveText('removed');
+      await expect(body.locator('blockquote')).toHaveText('Quoted text');
+      await expect(body.locator('input[type=checkbox]')).toHaveCount(2);
+      await expect(body.locator('input[type=checkbox]').first()).toBeChecked();
+      await expect(body.locator('input[type=checkbox]').last()).not.toBeChecked();
+      await expect(body.locator('input[type=checkbox]').first()).toBeDisabled();
+      await expect(body.locator('table th')).toHaveText(['Name', 'Result']);
+      await expect(body.locator('table td')).toHaveText(['Tests', 'Pass']);
+      await expect(body.locator('pre code.language-moonbit')).toContainText('<escaped>');
+      await expect(body.getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://example.com/guide');
+      await expect(body.locator('script, img[onerror], a[href^="javascript:"]')).toHaveCount(0);
+      await expect(body.locator('p').filter({ hasText: 'First line' }).locator('br')).toHaveCount(2);
+    }
+    expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+
+    for (const width of [1280, 480]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const body of [description.locator('.markdown-body'), inline]) {
+        await expect(body).toHaveCSS('font-size', '14px');
+        await expect(body).toHaveCSS('line-height', '21px');
+        expect(await body.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await expect(body.locator('table td').first()).toHaveCSS('font-family', await body.evaluate(node => getComputedStyle(node).fontFamily));
+      }
+    }
+    await page.evaluate(() => { window.__fake.reviewComments[0].body = '**Updated Markdown**'; });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(page.locator('.review-thread .github-comment-body').first().locator('strong')).toHaveText('Updated Markdown');
+  });
+}
+
+test('renders commit comment Markdown without changing commit message formatting', async ({ page }) => {
+  await installApi(page, commitTarget(), { commitBody: '**Commit comment** with `code`' });
+  await page.goto(reviewPath(commitTarget()));
+  await expect(page.locator('.github-comment-body strong')).toHaveText('Commit comment');
+  await expect(page.locator('.github-comment-body code')).toHaveText('code');
+  await expect(page.locator('.commit-message-title')).toHaveText('Commit change');
+  await expect(page.locator('.pull-description')).toHaveCount(0);
+});
 
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
