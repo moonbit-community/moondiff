@@ -801,6 +801,44 @@ test('Markdown images cancel removed-node timers and ignore old responses after 
   await expect(page.locator('.markdown-body')).toHaveCount(0);
 });
 
+test('Markdown images handle cached completion and repeated rendering without nested links or retries', async ({ page }) => {
+  let requests = 0;
+  await page.route('https://camo.githubusercontent.com/cached', async route => {
+    requests++;
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng, headers: { 'cache-control': 'public, max-age=3600' } });
+  });
+  await installApi(page, pullTarget(), { issueBody: '[![cached](https://camo.githubusercontent.com/cached)](https://example.com/destination)' });
+  await page.goto(reviewPath());
+  const comment = page.locator('#comments .github-comment').first();
+  await expect(comment.locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(1);
+  await page.evaluate(() => {
+    const image = document.querySelector('#comments .markdown-image img');
+    image.dataset.testOriginal = 'true';
+    const clone = image.parentElement.parentElement.cloneNode(true);
+    const copy = clone.querySelector('img');
+    copy.removeAttribute('data-image-started');
+    copy.removeAttribute('data-test-original');
+    copy.removeAttribute('src');
+    copy.hidden = true;
+    clone.querySelector('.markdown-image').removeAttribute('data-image-state');
+    const setAttribute = copy.setAttribute.bind(copy);
+    copy.setAttribute = (name, value) => {
+      setAttribute(name, value);
+      if (name === 'src') copy.dataset.cacheComplete = String(copy.complete && copy.naturalWidth > 0);
+    };
+    clone.querySelector('.markdown-image-fallback').hidden = false;
+    document.getElementById('app').append(clone);
+  });
+  await expect(page.locator('#app .markdown-image[data-image-state="loaded"]')).toHaveCount(2);
+  await expect(page.locator('img[data-cache-complete="true"]')).toBeVisible();
+  await comment.getByRole('button', { name: 'More options', exact: true }).click();
+  await expect(comment.getByRole('menu')).toBeVisible();
+  await expect(comment.locator('img[data-test-original]')).toHaveCount(1);
+  await expect(comment.locator('a a')).toHaveCount(0);
+  await expect(comment.getByRole('link', { name: 'cached', exact: true })).toHaveAttribute('href', 'https://example.com/destination');
+  expect(requests).toBe(1);
+});
+
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
