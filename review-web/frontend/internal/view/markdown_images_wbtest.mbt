@@ -159,10 +159,11 @@ test "Markdown and reference images emit escaped links and inert hidden images" 
 }
 
 ///|
-test "linked Markdown images reuse the safe outer anchor" {
+test "linked Markdown and HTML images reuse the safe outer anchor" {
   for
     source in [
       "[![linked](https://camo.githubusercontent.com/image)](https://example.com/destination)",
+      "[<img src='https://camo.githubusercontent.com/image' alt='linked'>](https://example.com/destination)",
       "[![linked](https://example.com/image)](https://example.com/destination)",
     ] {
     let rendered = markdown_html(source)
@@ -173,4 +174,86 @@ test "linked Markdown images reuse the safe outer anchor" {
     )
     assert_true(rendered.contains("linked"), msg=rendered)
   }
+}
+
+///|
+test "HTML images parse only complete image tags and rebuild safe attributes" {
+  let rendered = markdown_html(
+    (
+      #|<IMG SRC="https://raw.githubusercontent.com/o/r/main/a.png?x=1&amp;y=2" ALT="&lt;alt&gt; &quot;quoted&quot;" TITLE='a &#38; b' WIDTH="64" height='32' onload="alert(1)" onerror="alert(2)" style="background:url(https://evil.example/x)" srcset="https://evil.example/image 2x" data-markdown-src="https://evil.example/image" />
+      #|<img src="https://camo.githubusercontent.com/a" alt="second" width="0" height="-1">
+    ),
+  )
+  assert_eq(rendered.split("<img ").count() - 1, 2, msg=rendered)
+  for
+    safe in [
+      "width=\"64\"", "height=\"32\"", "alt=\"&lt;alt&gt; &quot;quoted&quot;\"",
+      "title=\"a &amp; b\"", "a.png?x=1&amp;y=2",
+    ] {
+    assert_true(rendered.contains(safe), msg=rendered)
+  }
+  for
+    forbidden in [
+      "onload", "onerror", "style=", "srcset", "evil.example", "width=\"0\"", "height=\"-1\"",
+    ] {
+    assert_false(rendered.contains(forbidden), msg=rendered)
+  }
+  assert_eq(
+    markdown_html(
+      "before <img src='javascript&#58;alert(1)' alt='safe &amp; text'> after",
+    ),
+    "<p>before safe &amp; text after</p>",
+  )
+  assert_true(
+    markdown_html("<img src='https://example.com/image' alt='outside'>").contains(
+      ">outside</a>",
+    ),
+  )
+  for
+    source in [
+      "javascript&#58alert(1)", "jav&#x61script:alert(1)", "java&#9script:alert(1)",
+      "javascript&#0000000000000000000000000058;alert(1)",
+    ] {
+    let rendered = markdown_html(
+      "<img src='\{source}' alt='encoded protocol'>",
+      markdown=image_test_context(),
+    )
+    assert_true(rendered.contains("encoded protocol"), msg=rendered)
+    assert_false(rendered.contains("<img"), msg=rendered)
+    assert_false(rendered.contains("<a "), msg=rendered)
+  }
+  let duplicate = markdown_html(
+    "<img SRC='https://example.com/image' src='https://camo.githubusercontent.com/image' alt='duplicate'>",
+  )
+  assert_false(duplicate.contains("<img"), msg=duplicate)
+  for
+    source in [
+      "<div><img src='https://camo.githubusercontent.com/a'></div>", "<img src='https://camo.githubusercontent.com/a'>\n<script>alert(1)</script>",
+    ] {
+    assert_false(markdown_html(source).contains("<img"), msg=source)
+  }
+  for
+    source in [
+      "<img src='unterminated>", "<img src=\"a\"alt=\"b\">", "<image src='a'>", "<img src=\"a\"><!--comment-->",
+      "<img src=\"a\"><svg></svg>", "<img src=\"a\"/", "🙂🙂🙂",
+    ] {
+    assert_true(parse_html_images(source) is None, msg=source)
+  }
+}
+
+///|
+#warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
+test "image markup mounts without a src or nested anchors" {
+  let rendered = render_test_html(() => {
+    markdown_view(
+      "[![linked](https://raw.githubusercontent.com/o/r/main/image.png)](https://example.com/)\n\n<img src=\"https://camo.githubusercontent.com/image\" alt=\"<caption>\" width=\"40\" onerror=\"alert(1)\">",
+      class="image-test",
+    )
+  })
+  assert_eq(rendered.split("<img ").count() - 1, 2, msg=rendered)
+  assert_eq(rendered.split("<a ").count() - 1, 2, msg=rendered)
+  assert_false(rendered.contains(" src="), msg=rendered)
+  assert_false(rendered.contains("onerror="), msg=rendered)
+  assert_true(rendered.contains("&lt;caption&gt;"), msg=rendered)
 }

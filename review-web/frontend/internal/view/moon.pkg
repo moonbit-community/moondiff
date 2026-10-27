@@ -2,6 +2,7 @@ import {
   "moonbit-community/cmark/cmark",
   "moonbit-community/cmark/cmark_html",
   "moonbit-community/cmark/cmark_renderer",
+  "moonbit-community/cmark/char" @cmark_char,
   "moonbit-community/moondiff-review-web/internal/github_client",
   "moonbitlang/core/encoding/utf8",
   "moonbit-community/moondiff-review-web/internal/browser",

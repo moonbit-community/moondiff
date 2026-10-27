@@ -217,3 +217,166 @@ fn markdown_image_html(
   }
   result.to_string()
 }
+
+///|
+fn image_html_space(c : UInt16) -> Bool {
+  c is (' ' | '\t' | '\n' | '\r' | '\u000C')
+}
+
+///|
+fn image_html_attribute(value : String) -> String {
+  // HTML attributes also permit numeric character references without a trailing
+  // semicolon. Canonicalize them before CommonMark's entity decoder, including
+  // long runs of leading zeroes, so encoded protocols get the same URL policy.
+  let normalized = StringBuilder()
+  for start = 0, i = 0; i < value.length(); {
+    if value[i] == '&' && i + 2 < value.length() && value[i + 1] == '#' {
+      let hex = value[i + 2] is ('x' | 'X')
+      let digits = i + (if hex { 3 } else { 2 })
+      let mut end = digits
+      let mut code = 0
+      while end < value.length() {
+        let digit = match value[end] {
+          '0'..<='9' as c => c.to_int() - 48
+          'a'..<='f' as c if hex => c.to_int() - 87
+          'A'..<='F' as c if hex => c.to_int() - 55
+          _ => break
+        }
+        code = Int32::min(0x110000, code * (if hex { 16 } else { 10 }) + digit)
+        end += 1
+      }
+      if end > digits {
+        normalized.write_view(value[start:i])
+        normalized.write_string("&#\{code};")
+        if end < value.length() && value[end] == ';' {
+          end += 1
+        }
+        continue end, end
+      }
+    }
+    continue start, i + 1
+  } nobreak {
+    normalized.write_view(value[start:])
+  }
+  let value = normalized.to_string()
+  @cmark_char.utf_16_clean_unref(
+    StringBuilder(),
+    value,
+    first=0,
+    last=value.length() - 1,
+  )
+}
+
+///|
+fn image_html_dimension(value : String?) -> String? {
+  value.filter(s => {
+    !s.is_empty() &&
+    s.iter().all(c => c is ('0'..<='9')) &&
+    s.iter().any(c => c != '0')
+  })
+}
+
+///|
+// Accept complete img tags and whitespace only. Parse attributes ourselves and
+// rebuild the markup; raw HTML never reaches the DOM or starts image requests.
+fn parse_html_images(source : String) -> Array[MarkdownImage]? {
+  let images : Array[MarkdownImage] = []
+  let mut i = 0
+  while i < source.length() {
+    if image_html_space(source[i]) {
+      i += 1
+      continue
+    }
+    guard i + 4 < source.length() &&
+      source[i] == '<' &&
+      source[i + 1] is ('i' | 'I') &&
+      source[i + 2] is ('m' | 'M') &&
+      source[i + 3] is ('g' | 'G') &&
+      (image_html_space(source[i + 4]) || source[i + 4] is ('/' | '>')) else {
+      return None
+    }
+    i += 4
+    let attrs : Map[String, String] = Map([])
+    let mut closed = false
+    while i < source.length() {
+      let before_space = i
+      while i < source.length() && image_html_space(source[i]) {
+        i += 1
+      }
+      if source[i:].has_prefix("/>") {
+        i += 2
+        closed = true
+        break
+      }
+      if i < source.length() && source[i] == '>' {
+        i += 1
+        closed = true
+        break
+      }
+      guard i > before_space else { return None }
+      let start = i
+      while i < source.length() &&
+            !image_html_space(source[i]) &&
+            !(source[i] is ('/' | '>' | '=' | '<' | '"' | '\'' | '\u{0}')) {
+        i += 1
+      }
+      guard i > start else { return None }
+      let name = source[start:i].to_owned().to_lower()
+      let after_name = i
+      while i < source.length() && image_html_space(source[i]) {
+        i += 1
+      }
+      let value = if i < source.length() && source[i] == '=' {
+        i += 1
+        while i < source.length() && image_html_space(source[i]) {
+          i += 1
+        }
+        guard i < source.length() else { return None }
+        if source[i] is ('"' | '\'') {
+          let quote = source[i]
+          i += 1
+          let start = i
+          while i < source.length() && source[i] != quote {
+            i += 1
+          }
+          guard i < source.length() else { return None }
+          let value = source[start:i].to_owned()
+          i += 1
+          value
+        } else {
+          let start = i
+          while i < source.length() &&
+                !image_html_space(source[i]) &&
+                source[i] != '>' {
+            guard !(source[i] is ('<' | '"' | '\'' | '=' | '`' | '\u{0}')) else {
+              return None
+            }
+            i += 1
+          }
+          guard i > start else { return None }
+          source[start:i].to_owned()
+        }
+      } else {
+        i = after_name
+        ""
+      }
+      // Match HTML's first-attribute-wins behavior, including mixed casing.
+      if !attrs.contains(name) {
+        attrs[name] = image_html_attribute(value)
+      }
+    }
+    guard closed else { return None }
+    images.push({
+      src: attrs.get("src").unwrap_or(""),
+      alt: attrs.get("alt").unwrap_or(""),
+      title: attrs.get("title"),
+      width: image_html_dimension(attrs.get("width")),
+      height: image_html_dimension(attrs.get("height")),
+    })
+  }
+  if images.is_empty() {
+    None
+  } else {
+    Some(images)
+  }
+}

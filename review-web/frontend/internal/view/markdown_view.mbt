@@ -2,50 +2,72 @@
 fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
   let safe = @cmark_html.renderer(safe=true)
   let linked = Ref(0)
-  let images = @cmark_renderer.Renderer::new(inline=fn(context, inline) raise {
-    match inline {
-      Break(_) => {
-        context.string("<br>\n")
-        true
-      }
-      Link(_) => {
-        // Let the safe renderer handle the outer link and its destination.
-        // Child images reuse it instead of emitting a nested anchor.
-        linked.val += 1
-        defer {
-          linked.val -= 1
+  let images = @cmark_renderer.Renderer::new(
+    inline=fn(context, inline) raise {
+      match inline {
+        Break(_) => {
+          context.string("<br>\n")
+          true
         }
-        (safe.inline)(context, inline)
-      }
-      Image(image) => {
-        guard image.v.reference_definition(context.doc.defs)
-          is Some(LinkDef(definition)) else {
-          return false
+        Link(_) => {
+          // Let the safe renderer handle the outer link and its destination.
+          // Child images reuse it instead of emitting a nested anchor.
+          linked.val += 1
+          defer {
+            linked.val -= 1
+          }
+          (safe.inline)(context, inline)
         }
-        context.string(
-          markdown_image_html(
-            {
-              src: definition.v.dest.map(n => n.v).unwrap_or(""),
-              alt: image.v.text
-              .to_plain_text(break_on_soft=false)
-              .iter()
-              .map(line => line.iter().join(""))
-              .join("\n"),
-              title: definition.v.title.map(lines => {
-                lines.iter().map(t => t.node.v).join("\n")
-              }),
-              width: None,
-              height: None,
-            },
-            markdown,
-            linked.val > 0,
-          ),
-        )
-        true
+        Image(image) => {
+          guard image.v.reference_definition(context.doc.defs)
+            is Some(LinkDef(definition)) else {
+            return false
+          }
+          context.string(
+            markdown_image_html(
+              {
+                src: definition.v.dest.map(n => n.v).unwrap_or(""),
+                alt: image.v.text
+                .to_plain_text(break_on_soft=false)
+                .iter()
+                .map(line => line.iter().join(""))
+                .join("\n"),
+                title: definition.v.title.map(lines => {
+                  lines.iter().map(t => t.node.v).join("\n")
+                }),
+                width: None,
+                height: None,
+              },
+              markdown,
+              linked.val > 0,
+            ),
+          )
+          true
+        }
+        RawHtml(raw) => {
+          let source = raw.v.0.iter().map(t => t.node.v).join("\n")
+          guard parse_html_images(source) is Some(images) else { return false }
+          for image in images {
+            context.string(markdown_image_html(image, markdown, linked.val > 0))
+          }
+          true
+        }
+        _ => false
       }
-      _ => false
-    }
-  })
+    },
+    block=fn(context, block) {
+      guard block is HtmlBlock(raw) &&
+        parse_html_images(raw.v.0.iter().map(n => n.v).join("\n"))
+        is Some(images) else {
+        return false
+      }
+      for image in images {
+        context.string(markdown_image_html(image, markdown, linked.val > 0))
+      }
+      context.string("\n")
+      true
+    },
+  )
   safe
   .compose(images)
   .doc_to_string(@cmark.Doc::from_string(strict=false, source))
