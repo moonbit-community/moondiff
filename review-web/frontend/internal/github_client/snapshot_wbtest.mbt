@@ -17,6 +17,7 @@ fn snapshot_pull(
 ) -> @protocol.ApiPull {
   {
     title: "Snapshot fixture",
+    body: None,
     html_url: "https://github.com/upstream/repo/pull/1",
     base: { sha: "a".repeat(40), repo: Some({ full_name: "upstream/repo", }), },
     head: { sha: head, repo: Some({ full_name: "fork/repo", }), },

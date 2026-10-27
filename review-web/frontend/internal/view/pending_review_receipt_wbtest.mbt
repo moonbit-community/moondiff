@@ -2,6 +2,7 @@
 fn receipt_test_pull() -> @protocol.ApiPull {
   {
     title: "Pull request",
+    body: None,
     html_url: "https://github.com/owner/repo/pull/17",
     base: {
       sha: "1111111111111111111111111111111111111111",

@@ -50,6 +50,7 @@ pub(all) struct ApiPullBranch {
 ///|
 pub(all) struct ApiPull {
   title : String
+  body : String?
   html_url : String
   base : ApiPullBranch
   head : ApiPullBranch
