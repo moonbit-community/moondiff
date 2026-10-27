@@ -683,6 +683,69 @@ test('Markdown images sanitize HTML attributes and reuse wrapping links', async 
   expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
 });
 
+test('Markdown images keep stable links across CSP-allowed and rejected redirects', async ({ page }) => {
+  const allowed = 'https://github.com/user-attachments/assets/allowed-redirect';
+  const rejected = 'https://github.com/user-attachments/assets/rejected-redirect';
+  const signed = 'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png?signature=temporary';
+  let signedRequests = 0, rejectedRequests = 0;
+  // Playwright's page.route handles only the first URL of a redirect chain.
+  // CDP intercepts each hop, so allowed targets stay entirely inside the fixture.
+  const session = await page.context().newCDPSession(page);
+  const interceptionErrors = [];
+  await session.send('Fetch.enable', { patterns: [
+    { urlPattern: 'https://github.com/user-attachments/assets/*redirect', resourceType: 'Image' },
+    { urlPattern: 'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png*', resourceType: 'Image' },
+    { urlPattern: 'https://outside.example/*', resourceType: 'Image' },
+  ] });
+  session.on('Fetch.requestPaused', async ({ requestId, request }) => {
+    try {
+      if (request.url === allowed || request.url === rejected) {
+        await session.send('Fetch.fulfillRequest', { requestId, responseCode: 302,
+          responseHeaders: [{ name: 'Location', value: request.url === allowed ? signed : 'https://outside.example/redirected.png' }] });
+      } else {
+        if (request.url === signed) signedRequests++;
+        else rejectedRequests++;
+        await session.send('Fetch.fulfillRequest', { requestId, responseCode: 200,
+          responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body: markdownImagePng.toString('base64') });
+      }
+    } catch (error) { interceptionErrors.push(String(error)); }
+  });
+  await installApi(page, pullTarget(), { pullBody: `![allowed](${allowed})\n![rejected](${rejected})` });
+  await page.goto(reviewPath());
+  const description = page.locator('.pull-request-body');
+  await expect(description.getByRole('img', { name: 'allowed', exact: true })).toBeVisible();
+  await expect(description.getByRole('link', { name: 'allowed', exact: true })).toHaveAttribute('href', allowed);
+  await expect(description.getByRole('link', { name: 'rejected', exact: true })).toBeVisible();
+  await expect(description.getByRole('link', { name: 'rejected', exact: true })).toHaveAttribute('href', rejected);
+  await expect(description.locator('.markdown-image[data-image-state="link"]')).toHaveCount(1);
+  await expect(description.locator('img')).toHaveCount(1);
+  expect(signedRequests).toBe(1);
+  expect(rejectedRequests).toBe(0);
+  expect(await description.innerHTML()).not.toContain('signature=temporary');
+  expect(interceptionErrors).toEqual([]);
+  await session.detach();
+});
+
+for (const failure of [403, 404, 'invalid']) {
+  test(`Markdown images degrade ${failure} responses once per mount`, async ({ page }) => {
+    let requests = 0;
+    await page.route('https://camo.githubusercontent.com/failure', async route => {
+      requests++;
+      await route.fulfill({ status: typeof failure === 'number' ? failure : 200, contentType: 'image/png', body: 'invalid image' });
+    });
+    await installApi(page, pullTarget(), { issueBody: '![unavailable](https://camo.githubusercontent.com/failure)' });
+    await page.goto(reviewPath());
+    const comment = page.locator('#comments .github-comment').first();
+    await expect(comment.locator('.markdown-image[data-image-state="link"]')).toHaveCount(1);
+    await expect(comment.getByRole('link', { name: 'unavailable', exact: true })).toBeVisible();
+    await expect(comment.locator('.github-comment-body img')).toHaveCount(0);
+    // A regional rerender of the same body must not restart the failed image.
+    await comment.getByRole('button', { name: 'More options', exact: true }).click();
+    await expect(comment.getByRole('menu')).toBeVisible();
+    expect(requests).toBe(1);
+  });
+}
+
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
