@@ -58,9 +58,15 @@ pub fn manual_scroll_restoration() -> Unit
 
 pub fn mouse_click() -> @dom.Event
 
+pub fn mutation_added_nodes(@dom.MutationRecord) -> FixedArray[@dom.Node]
+
+pub fn mutation_has_removed_nodes(@dom.MutationRecord) -> Bool
+
 pub fn parse_float(String) -> Double
 
 pub fn parse_url(String, base? : String) -> URL?
+
+pub fn performance_now() -> Double
 
 pub fn[T] property(@dom.Element, String) -> T
 

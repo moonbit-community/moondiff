@@ -6,6 +6,9 @@ pub extern "js" fn date_parse(value : String) -> Double = "value => Date.parse(v
 pub extern "js" fn date_now() -> Double = "() => Date.now()"
 
 ///|
+pub extern "js" fn performance_now() -> Double = "() => performance.now()"
+
+///|
 pub extern "js" fn date_iso_now() -> String = "() => new Date().toISOString()"
 
 ///|

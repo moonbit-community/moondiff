@@ -110,3 +110,13 @@ pub extern "js" fn intersection_observer(
   ) -> Unit,
   margin : String,
 ) -> @dom.IntersectionObserver = "(callback, rootMargin) => new IntersectionObserver(callback, { rootMargin })"
+
+///|
+pub extern "js" fn mutation_added_nodes(
+  record : @dom.MutationRecord,
+) -> FixedArray[@dom.Node] = "record => Array.from(record.addedNodes)"
+
+///|
+pub extern "js" fn mutation_has_removed_nodes(
+  record : @dom.MutationRecord,
+) -> Bool = "record => record.removedNodes.length > 0"
