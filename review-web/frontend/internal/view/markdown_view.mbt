@@ -34,3 +34,15 @@ fn markdown_view(source : String, class~ : String) -> @rabbita.Html {
       )
   }
 }
+
+///|
+fn pull_body_view(body : String?) -> @rabbita.Html {
+  guard body is Some(body) && !body.trim().is_empty() else {
+    return @html.nothing
+  }
+  @html.section(
+    class="pull-description",
+    attrs=@html.Attrs::build().aria_label("Pull request description"),
+    markdown_view(body, class="pull-request-body"),
+  )
+}

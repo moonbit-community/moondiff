@@ -2499,6 +2499,15 @@ button.comment-delete-confirm:hover {
   padding: 12px;
 }
 
+.pull-description {
+  min-width: 0;
+  margin: 0.75rem 0.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--surface);
+}
+
 .markdown-body {
   min-width: 0;
   color: var(--foreground);

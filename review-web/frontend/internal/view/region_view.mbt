@@ -137,7 +137,10 @@ pub fn shell_view(
       host(Toolbar),
       host(Status),
       if input.selector_only {
-        @html.section(class="results selector-only", [host(RangePanel)])
+        @html.section(class="results selector-only", [
+          pull_body_view(input.pull_body),
+          host(RangePanel),
+        ])
       } else if input.showing {
         @html.section(class="results", [
           @html.div(
@@ -159,6 +162,7 @@ pub fn shell_view(
                   ),
                 [
                   commit_message_view(input.message, host(Navigation)),
+                  pull_body_view(input.pull_body),
                   host(RangePanel),
                   host(ViewedSummary),
                   host(Discussion),

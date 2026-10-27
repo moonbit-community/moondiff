@@ -182,6 +182,7 @@ pub(all) struct ShellInput {
   showing : Bool
   selector_only : Bool
   message : String
+  pull_body : String?
   drawer_open : Bool
   preferred_width : Int32
   display : DisplayOptions
@@ -199,6 +200,11 @@ pub fn shell_input(model : Model) -> ShellInput {
     message: match model.phase {
       Showing(view) => view.message
       _ => ""
+    },
+    pull_body: match model.phase {
+      Showing(view) => view.pull_snapshot.bind(pull => pull.body)
+      ShowingPullSelector(pull) => pull.body
+      _ => None
     },
     drawer_open: model.file_tree.drawer_open,
     preferred_width: model.file_tree.preferred_width,
