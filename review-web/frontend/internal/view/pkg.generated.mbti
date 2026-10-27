@@ -123,6 +123,7 @@ pub(all) struct ShellInput {
   showing : Bool
   selector_only : Bool
   message : String
+  pull_body : String?
   drawer_open : Bool
   preferred_width : Int32
   display : DisplayOptions
