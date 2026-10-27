@@ -98,6 +98,7 @@ fn comment_body_view(
   id : @comments.CommentId,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
+  markdown? : MarkdownContext,
 ) -> @rabbita.Html {
   @html.article(class="github-comment", [
     @html.div(class="github-comment-meta", [
@@ -112,7 +113,11 @@ fn comment_body_view(
       ]),
       comment_menu(id, html_url, review, emit),
     ]),
-    markdown_view(body, class="github-comment-body"),
+    markdown_view(
+      body,
+      class="github-comment-body",
+      markdown?=markdown.map(context => { ..context, page_url: html_url, }),
+    ),
     comment_delete_controls(id, review, emit),
   ])
 }

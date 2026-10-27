@@ -48,6 +48,7 @@ fn prepare_discussions(
   emit : @rabbita.Emit[Msg],
   cache? : FileDerivation,
   projection~ : ReviewProjection = { lines: Map([]), editors: Map([]), },
+  markdown? : MarkdownContext,
 ) -> InlineDiscussions {
   let result = {
     ..empty_discussions(),
@@ -100,7 +101,7 @@ fn prepare_discussions(
       anchor,
       location,
       outdated: thread.outdated,
-      content: review_thread_view(thread, review, emit),
+      content: review_thread_view(thread, review, emit, markdown?),
     })
   }
   for
@@ -138,6 +139,7 @@ fn prepare_discussions(
         CommitComment(comment.id),
         review,
         emit,
+        markdown?,
       ),
     })
   }
