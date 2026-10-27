@@ -614,6 +614,52 @@ test('Markdown images outside the allowlist produce links and zero image request
   expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
 });
 
+test('Markdown images resolve the fork snapshot SHA and explicit GitHub branch paths', async ({ page }) => {
+  const expected = [
+    `https://raw.githubusercontent.com/contributor/project-fork/${head}/docs/image.png`,
+    `https://raw.githubusercontent.com/contributor/project-fork/${head}/assets/root.png`,
+    'https://raw.githubusercontent.com/upstream/project/main/image.png?raw=true',
+    'https://raw.githubusercontent.com/other/repository/release/image.png?raw=true',
+  ];
+  const seen = [];
+  await page.route('https://raw.githubusercontent.com/**', async route => {
+    seen.push(route.request().url());
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  const body = [
+    '![relative](docs/image.png)',
+    '![root](/assets/root.png)',
+    '![branch](../blob/main/image.png?raw=true)',
+    '![repository](../../../other/repository/blob/release/image.png?raw=true)',
+  ].join('\n');
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body });
+  await page.goto(reviewPath());
+  await expect(page.locator('.pull-request-body .markdown-image[data-image-state="loaded"]')).toHaveCount(4);
+  await expect(page.locator('#comments .github-comment-body .markdown-image[data-image-state="loaded"]')).toHaveCount(4);
+  await expect(page.locator('.review-thread .github-comment-body').first().locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(4);
+  expect(new Set(seen)).toEqual(new Set(expected));
+  await page.evaluate(() => { window.__fake.currentHead = 'b'.repeat(40); });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.locator('.snapshot-stale')).toBeVisible();
+  await expect(page.locator('.pull-request-body img').first()).toHaveAttribute('src', expected[0]);
+  expect(seen.some(url => url.includes('/' + changedHead + '/'))).toBe(false);
+});
+
+test('Markdown images in commit comments use the pinned commit repository', async ({ page }) => {
+  const expected = `https://raw.githubusercontent.com/upstream/project/${commitSha}/docs/image.png`;
+  const seen = [];
+  await page.route('https://raw.githubusercontent.com/**', async route => {
+    seen.push(route.request().url());
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await installApi(page, commitTarget(), { commitBody: '![commit image](docs/image.png)' });
+  await page.goto(reviewPath(commitTarget()));
+  const image = page.locator('.github-comment-body').getByRole('img', { name: 'commit image', exact: true });
+  await expect(image).toBeVisible();
+  await expect(image).toHaveAttribute('src', expected);
+  expect(seen).toEqual([expected]);
+});
+
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
