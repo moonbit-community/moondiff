@@ -546,6 +546,74 @@ test('renders commit comment Markdown without changing commit message formatting
   await expect(page.locator('.pull-description')).toHaveCount(0);
 });
 
+const markdownImagePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXWQAAAAASUVORK5CYII=', 'base64');
+const markdownImageSources = [
+  'https://github.com/user-attachments/assets/image-id',
+  'https://github.com/owner/repo/assets/123/image-id',
+  'https://user-images.githubusercontent.com/123/image.png',
+  'https://private-user-images.githubusercontent.com/123/image.png',
+  'https://raw.githubusercontent.com/owner/repo/main/image.png',
+  'https://camo.githubusercontent.com/image-id',
+  'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png',
+];
+
+test('Markdown images load exact approved sources in descriptions and all discussion regions', async ({ page }) => {
+  const seen = [];
+  await page.route(url => markdownImageSources.includes(url.href), async route => {
+    seen.push(route.request().url());
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  const body = markdownImageSources.map((src, i) => `![image ${i}](${src})`).join('\n');
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body, replyBody: body });
+  const response = await page.goto(reviewPath());
+  expect(response.headers()['content-security-policy']).toContain('https://private-user-images.githubusercontent.com');
+  for (const region of ['.pull-request-body', '#comments .github-comment-body', '.review-thread .github-comment-body']) {
+    const body = page.locator(region).first();
+    await expect(body.locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(markdownImageSources.length);
+    for (let i = 0; i < markdownImageSources.length; i++) {
+      const image = body.getByRole('img', { name: `image ${i}`, exact: true });
+      await expect(image).toBeVisible();
+      await expect(image.locator('..').locator('.markdown-image-fallback')).toBeHidden();
+      await expect(image.locator('../..')).toHaveAttribute('href', markdownImageSources[i]);
+      await expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
+    }
+  }
+  expect(new Set(seen)).toEqual(new Set(markdownImageSources));
+});
+
+test('Markdown images outside the allowlist produce links and zero image requests', async ({ page }) => {
+  const sources = [
+    'https://outside.example/image.png',
+    'https://raw.githubusercontent.com.evil.example/image.png',
+    'https://github.com/owner/repo/issues/1',
+    'http://raw.githubusercontent.com/owner/repo/main/image.png',
+    'https://raw.githubusercontent.com:444/owner/repo/main/image.png',
+    'https://user@raw.githubusercontent.com/owner/repo/main/image.png',
+  ];
+  const seen = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    const avatar = url.hostname === 'avatars.githubusercontent.com' ||
+      (url.hostname === 'github.com' && /^\/(reviewer|author)\.png$/.test(url.pathname));
+    if (request.resourceType() === 'image' && !avatar) seen.push(request.url());
+  });
+  const body = sources.map((src, i) => `![outside ${i}](${src})`).concat([
+    '![danger](javascript:alert%281%29)',
+    '<img src="data:image/png;base64,abc" alt="data image" onerror="window.markdownAttack=true">',
+    '<img src="jav&#x61script&#58alert(1)" alt="encoded protocol">',
+  ]).join('\n\n');
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body });
+  await page.goto(reviewPath());
+  const description = page.locator('.pull-request-body');
+  await expect(description.getByRole('link')).toHaveCount(sources.length);
+  for (let i = 0; i < sources.length; i++) await expect(description.getByRole('link', { name: `outside ${i}`, exact: true })).toHaveAttribute('href', sources[i]);
+  await expect(description).toContainText('danger');
+  await expect(description).toContainText('data image');
+  await expect(page.locator('.markdown-body img')).toHaveCount(0);
+  expect(seen).toEqual([]);
+  expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+});
+
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();
   await waitForSignedInComments(page);
