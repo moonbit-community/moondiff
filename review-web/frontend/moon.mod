@@ -7,6 +7,7 @@ import {
   "moonbit-community/moondiff@0.1.1",
   "moonbit-community/rabbita@0.16.5",
   "moonbitlang/lexer@0.4.2",
+  "moonbit-community/cmark@0.4.12",
 }
 
 readme = "README.md"

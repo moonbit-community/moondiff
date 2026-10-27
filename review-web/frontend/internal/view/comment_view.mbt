@@ -112,7 +112,7 @@ fn comment_body_view(
       ]),
       comment_menu(id, html_url, review, emit),
     ]),
-    @html.p(class="github-comment-body", body),
+    markdown_view(body, class="github-comment-body"),
     comment_delete_controls(id, review, emit),
   ])
 }
