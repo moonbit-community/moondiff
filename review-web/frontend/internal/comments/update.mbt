@@ -17,6 +17,7 @@ pub(all) enum Event {
   ConfirmCommentDelete(CommentId)
   CommentDeleted(Int32, Int32, CommentId, Result[DeleteResult, Failure])
   CommentsLoaded(Int32, Int32, Result[ApiCommentBundle, Failure])
+  ToggleCommentBody(Int32, CommentId)
   OpenOverallDraft
   OpenInlineDraft(Int32, ReviewAnchor)
   OpenReplyDraft(Int64)
@@ -88,6 +89,22 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
         }),
         [],
       )
+    ToggleCommentBody(generation, id) => {
+      guard generation == model.generation &&
+        model.review.comments is CommentsReady(bundle) &&
+        bundle_contains(bundle, id) else {
+        return (model, [])
+      }
+      let expanded = model.review.expanded_bodies
+      let next = if expanded.contains(id) {
+        expanded.filter(other => other != id)
+      } else {
+        let next = expanded.copy()
+        next.push(id)
+        next
+      }
+      (with_review(model, { ..model.review, expanded_bodies: next, }), [])
+    }
     AskDelete(id) => update_deletion(model, id, false)
     ConfirmCommentDelete(id) => update_deletion(model, id, true)
     CancelDelete =>

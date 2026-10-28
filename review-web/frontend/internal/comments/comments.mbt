@@ -69,6 +69,8 @@ pub struct Session {
   deletion : CommentDeletion?
   // Successful deletions remain excluded from refreshes until the route generation changes.
   priv deleted : Array[CommentId]
+  // Reading choices belong to this page and are not exported with navigation state.
+  priv expanded_bodies : Array[CommentId]
 } derive(Eq)
 
 ///|
@@ -95,6 +97,7 @@ pub fn Session::new(enabled~ : Bool = false) -> Session {
     deletion_id: 0,
     deletion: None,
     deleted: [],
+    expanded_bodies: [],
     comments: if enabled {
       CommentsLoading
     } else {
