@@ -187,6 +187,7 @@ pub(all) struct ShellInput {
   selector_only : Bool
   message : String
   pull_body : String?
+  pull_user : @protocol.ApiCommentUser?
   markdown : MarkdownContext?
   drawer_open : Bool
   preferred_width : Int32
@@ -209,6 +210,11 @@ pub fn shell_input(model : Model) -> ShellInput {
     pull_body: match model.phase {
       Showing(view) => view.pull_snapshot.bind(pull => pull.body)
       ShowingPullSelector(pull) => pull.body
+      _ => None
+    },
+    pull_user: match model.phase {
+      Showing(view) => view.pull_snapshot.bind(pull => pull.user)
+      ShowingPullSelector(pull) => pull.user
       _ => None
     },
     markdown: markdown_context(model),

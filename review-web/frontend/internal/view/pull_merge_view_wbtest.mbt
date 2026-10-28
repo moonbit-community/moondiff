@@ -167,6 +167,7 @@ test "merge region sits between discussion and changed files" {
         selector_only: false,
         message: "Review",
         pull_body: None,
+        pull_user: None,
         markdown: None,
         drawer_open: false,
         preferred_width: 300,
