@@ -81,6 +81,7 @@ fn pull_region_model() -> Model {
   let pull : @protocol.ApiPull = {
     title: "Pull request",
     body: None,
+    user: None,
     html_url: "https://github.com/owner/repo/pull/17",
     base: { sha: base, repo: Some({ full_name: "owner/repo", }), },
     head: { sha: head, repo: Some({ full_name: "owner/repo", }), },

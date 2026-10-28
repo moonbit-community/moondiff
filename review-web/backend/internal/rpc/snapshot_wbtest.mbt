@@ -4,6 +4,7 @@ test "the process snapshot LRU accounts encoded bytes, refreshes recency and ref
   let metadata : @protocol.ApiPull = {
     title: "x".repeat(6 * 1048576),
     body: None,
+    user: None,
     html_url: "url",
     base: { sha: "a".repeat(40), repo: None, },
     head: { sha: "b".repeat(40), repo: None, },

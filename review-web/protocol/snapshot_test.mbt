@@ -26,6 +26,7 @@ test "complete and metadata-only snapshot results roundtrip with a semantic sign
   let metadata : @protocol.ApiPull = {
     title: "Snapshot",
     body: Some("## Description\n\nA **Markdown** PR body."),
+    user: Some({ login: "alice", }),
     html_url: "url",
     base: { sha: "a".repeat(40), repo: None, },
     head: { sha: "b".repeat(40), repo: Some({ full_name: "fork/repo", }), },
