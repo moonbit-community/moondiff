@@ -2,7 +2,7 @@
 fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
   let safe = @cmark_html.renderer(safe=true)
   let linked = Ref(0)
-  let images = @cmark_renderer.Renderer::new(
+  let discussion = @cmark_renderer.Renderer::new(
     inline=fn(context, inline) raise {
       match inline {
         Break(_) => {
@@ -46,30 +46,30 @@ fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
         }
         RawHtml(raw) => {
           let source = raw.v.0.iter().map(t => t.node.v).join("\n")
-          guard parse_html_images(source) is Some(images) else { return false }
-          for image in images {
-            context.string(markdown_image_html(image, markdown, linked.val > 0))
-          }
+          context.string(
+            markdown_raw_html(source, markdown, linked.val > 0, block=false),
+          )
           true
         }
         _ => false
       }
     },
     block=fn(context, block) {
-      guard block is HtmlBlock(raw) &&
-        parse_html_images(raw.v.0.iter().map(n => n.v).join("\n"))
-        is Some(images) else {
-        return false
-      }
-      for image in images {
-        context.string(markdown_image_html(image, markdown, linked.val > 0))
-      }
+      guard block is HtmlBlock(raw) else { return false }
+      context.string(
+        markdown_raw_html(
+          raw.v.0.iter().map(n => n.v).join("\n"),
+          markdown,
+          linked.val > 0,
+          block=true,
+        ),
+      )
       context.string("\n")
       true
     },
   )
   safe
-  .compose(images)
+  .compose(discussion)
   .doc_to_string(@cmark.Doc::from_string(strict=false, source))
   .trim_end(chars="\n")
   .to_owned()
@@ -87,7 +87,7 @@ fn markdown_view(
     _ => @html.div(class="\{class} markdown-body markdown-fallback", source)
   } noraise {
     rendered =>
-      // cmark safe output plus rebuilt, escaped image markup reaches this sink.
+      // Only safe cmark output, escaped HTML text and rebuilt images reach here.
       @html.div(
         class="\{class} markdown-body",
         attrs=@html.Attrs::build().inner_html(rendered),
