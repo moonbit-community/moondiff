@@ -136,6 +136,7 @@ pub(all) struct ShellInput {
   selector_only : Bool
   message : String
   pull_body : String?
+  pull_user : @moondiff-review-web-protocol.ApiCommentUser?
   markdown : MarkdownContext?
   drawer_open : Bool
   preferred_width : Int32

@@ -97,13 +97,24 @@ fn markdown_view(
 }
 
 ///|
-fn pull_body_view(body : String?, markdown? : MarkdownContext) -> @rabbita.Html {
+fn pull_body_view(
+  body : String?,
+  user : @protocol.ApiCommentUser?,
+  markdown? : MarkdownContext,
+) -> @rabbita.Html {
   guard body is Some(body) && !body.trim().is_empty() else {
     return @html.nothing
   }
+  let author = author_label(user)
   @html.section(
     class="pull-description",
     attrs=@html.Attrs::build().aria_label("Pull request description"),
-    markdown_view(body, class="pull-request-body", markdown?),
+    [
+      @html.div(class="github-comment-meta pull-description-meta", [
+        comment_avatar(if author == "ghost" { None } else { Some(author) }),
+        @html.div(class="comment-byline", @html.strong(author)),
+      ]),
+      markdown_view(body, class="pull-request-body", markdown?),
+    ],
   )
 }

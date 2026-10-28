@@ -139,7 +139,11 @@ pub fn shell_view(
       host(Status),
       if input.selector_only {
         @html.section(class="results selector-only", [
-          pull_body_view(input.pull_body, markdown?=input.markdown),
+          pull_body_view(
+            input.pull_body,
+            input.pull_user,
+            markdown?=input.markdown,
+          ),
           host(RangePanel),
         ])
       } else if input.showing {
@@ -163,7 +167,11 @@ pub fn shell_view(
                   ),
                 [
                   commit_message_view(input.message, host(Navigation)),
-                  pull_body_view(input.pull_body, markdown?=input.markdown),
+                  pull_body_view(
+                    input.pull_body,
+                    input.pull_user,
+                    markdown?=input.markdown,
+                  ),
                   host(RangePanel),
                   host(ViewedSummary),
                   host(Discussion),

@@ -2508,6 +2508,11 @@ button.comment-delete-confirm:hover {
   background: var(--surface);
 }
 
+.pull-description-meta {
+  margin-bottom: 12px;
+  padding: 0;
+}
+
 .markdown-body {
   min-width: 0;
   color: var(--foreground);
