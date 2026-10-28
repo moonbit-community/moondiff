@@ -627,6 +627,50 @@ for (const target of [pullTarget(), commitTarget()]) {
   });
 }
 
+test('footnotes stay within each body and keep their IDs across refresh and regional redraws', async ({ page }) => {
+  await installRenderProbe(page);
+  const body = 'First[^note], repeat[^note], Unicode[^说明🙂].\n\n[^note]: First footnote.\n\n[^说明🙂]: Unicode footnote.';
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body, replyBody: body, commitBody: body });
+  await page.goto(reviewPath());
+  const bodies = page.locator('.markdown-body').filter({ has: page.locator('[role="doc-noteref"]') });
+  await expect(bodies).toHaveCount(4);
+  const ids = () => bodies.evaluateAll(elements => elements.flatMap(el => Array.from(el.querySelectorAll('[id]'), node => node.id)));
+  const initial = await ids();
+  expect(new Set(initial).size).toBe(initial.length);
+  expect(initial).toHaveLength(20);
+  const assertLocal = async () => {
+    expect(await bodies.evaluateAll(elements => elements.every(body =>
+      Array.from(body.querySelectorAll('[role="doc-noteref"], [role="doc-backlink"]')).every(link => {
+        const href = link.getAttribute('href');
+        return href.startsWith('#') && document.getElementById(decodeURIComponent(href.slice(1)))?.closest('.markdown-body') === body;
+      })))).toBe(true);
+  };
+  await assertLocal();
+  const issue = commentCard(page, 'issue', 10);
+  await issue.getByRole('button', { name: 'Show more', exact: true }).click();
+  const reference = issue.locator('[role="doc-noteref"]').first();
+  const href = await reference.getAttribute('href');
+  await reference.click();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe(href);
+  await page.getByRole('button', { name: 'Unified', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await settleRegions(page);
+  expect(await ids()).toEqual(initial);
+  await assertLocal();
+  await page.evaluate(() => { window.__fake.reviewComments[0].body += '\n\nUpdated without changing labels.'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(commentCard(page, 'review', 20)).toContainText('Updated without changing labels.');
+  expect(await ids()).toEqual(initial);
+  await assertLocal();
+  await page.evaluate(target => { window.__fake.target = target; }, commitTarget());
+  await navigate(page, reviewPath(commitTarget()));
+  await expect(bodies).toHaveCount(1);
+  const commitIds = await ids();
+  expect(commitIds).toHaveLength(5);
+  expect(commitIds.some(id => initial.includes(id))).toBe(false);
+  await assertLocal();
+});
+
 
 for (const authenticated of [false, true]) {
   test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
