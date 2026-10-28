@@ -2387,6 +2387,11 @@ button.comment-delete-confirm:hover {
   background: var(--surface);
 }
 
+.comments-overview,
+.overall-comments {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .comments-overview {
   display: grid;
   gap: 0.8rem;
