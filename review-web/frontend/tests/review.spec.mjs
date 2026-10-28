@@ -602,6 +602,29 @@ for (const target of [pullTarget(), commitTarget()]) {
     expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
     expect(requests).toEqual([]);
   });
+
+  test(`ordinary Markdown links use the ${target.kind} body source URL`, async ({ page }) => {
+    const body = '[relative](../guide?view=1#part)\n[root](/upstream/project/issues/18)\n' +
+      '[query](?view=files&x=1)\n[section](#section)\n[reference][guide]\n\n[guide]: ./guide.md';
+    await installApi(page, target, {
+      pullBody: body, issueBody: body, inlineBody: body, replyBody: body, commitBody: body,
+    });
+    await page.goto(reviewPath(target));
+    const cases = target.kind === 'pull' ? [
+      [page.locator('.pull-request-body'), 'pull/17'],
+      [commentCard(page, 'issue', 10).locator('.markdown-body'), 'issues/17'],
+      [commentCard(page, 'review', 20).locator('.markdown-body'), 'pull/17'],
+      [commentCard(page, 'review', 21).locator('.markdown-body'), 'pull/17'],
+    ] : [[commentCard(page, 'commit', 30).locator('.markdown-body'), 'commit/example']];
+    for (const [markdown, path] of cases) {
+      const source = `https://github.com/upstream/project/${path}`;
+      await expect(markdown.getByRole('link', { name: 'relative', exact: true })).toHaveAttribute('href', 'https://github.com/upstream/project/guide?view=1#part');
+      await expect(markdown.getByRole('link', { name: 'root', exact: true })).toHaveAttribute('href', 'https://github.com/upstream/project/issues/18');
+      await expect(markdown.getByRole('link', { name: 'query', exact: true })).toHaveAttribute('href', `${source}?view=files&x=1`);
+      await expect(markdown.getByRole('link', { name: 'section', exact: true })).toHaveAttribute('href', `${source}#section`);
+      await expect(markdown.getByRole('link', { name: 'reference', exact: true })).toHaveAttribute('href', `${source.slice(0, source.lastIndexOf('/'))}/guide.md`);
+    }
+  });
 }
 
 
