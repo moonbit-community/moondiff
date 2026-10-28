@@ -160,7 +160,7 @@ fn LayoutState::observe(
   let prepare_region = prepare
   let read_region = read
   let write_region = write
-  let region_count = Ref(0)
+  let body_layouts : Ref[Array[CommentBodyLayout]] = Ref([])
   let record : LayoutRecord = {
     host,
     alive: true,
@@ -172,12 +172,12 @@ fn LayoutState::observe(
     },
     read: () => {
       let heights = read_region()
-      region_count.val = heights.length()
-      heights.push_iter(bodies.read().iter())
+      body_layouts.val = bodies.read()
       heights
     },
     write: heights => {
-      bodies.write(heights[region_count.val:])
+      bodies.write(body_layouts.val)
+      body_layouts.val.clear()
       write_region(heights)
     },
   }
@@ -228,6 +228,7 @@ fn LayoutState::observe(
     }
     observed.val = None
     bodies.entries.clear()
+    body_layouts.val.clear()
     if region == "navigation" {
       @dom.window().remove_event_listener("resize", on_resize)
       @dom.window().remove_event_listener("scroll", on_scroll)
