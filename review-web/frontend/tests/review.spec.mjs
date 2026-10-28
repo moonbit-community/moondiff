@@ -741,6 +741,66 @@ test('table previews measure visible links after intervening hidden links', asyn
   expect(await card.locator('.comment-body-clip').evaluate(el => el.scrollTop)).toBe(0);
 });
 
+test('preview link focus follows wrapping, delayed images and replacement bodies without retaining nodes', async ({ page }) => {
+  await installRenderProbe(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const image = createGate('focus preview image');
+  await page.route('https://camo.githubusercontent.com/focus-preview', async route => {
+    await image.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  const body = 'One\nTwo\nThree\nFour\n[' + 'Wrapped link words '.repeat(24).trim() + '](https://example.com/wrapped)';
+  await installApi(page, pullTarget(), { issueBody: body });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const toggle = card.locator('.comment-body-toggle');
+  const link = card.locator('.markdown-body a').last();
+  await expect(link).toHaveCount(1);
+  await settleRegions(page);
+  // A link spanning the fifth and sixth lines must be skipped as a whole.
+  expect(await link.evaluate(el => el.getClientRects().length)).toBeGreaterThan(1);
+  await expect(link).toHaveAttribute('tabindex', '-1');
+  await toggle.click();
+  await expect(link).not.toHaveAttribute('tabindex');
+  await page.evaluate(() => { window.__fake.issueComments[0].body = 'Wrapped words '.repeat(30) + '[Resize link](https://example.com/resize)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(link).toHaveText('Resize link');
+  await toggle.evaluate(el => el.click());
+  await settleRegions(page);
+  await expect(link).not.toHaveAttribute('tabindex');
+  await link.focus();
+  await page.setViewportSize({ width: 480, height: 900 });
+  await expect(link).toHaveAttribute('tabindex', '-1');
+  await expect(toggle).toBeFocused();
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(link).not.toHaveAttribute('tabindex');
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '<img src="https://camo.githubusercontent.com/focus-preview" alt="Delayed" width="240" height="240">\n\n[After image](https://example.com/after)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'pending');
+  await expect(link).toHaveText('After image');
+  await settleRegions(page);
+  await expect(link).not.toHaveAttribute('tabindex');
+  await link.focus();
+  image.release();
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'loaded');
+  await expect(link).toHaveAttribute('tabindex', '-1');
+  await expect(toggle).toBeFocused();
+  await card.locator('.markdown-body a').evaluateAll(nodes => { window.retiredCommentLinks = nodes.map(node => new WeakRef(node)); });
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '[Replacement](https://example.com/replacement)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(link).toHaveText('Replacement');
+  await settleRegions(page);
+  await expect(link).not.toHaveAttribute('tabindex');
+  const session = await page.context().newCDPSession(page);
+  await session.send('HeapProfiler.collectGarbage');
+  expect(await page.evaluate(() => retiredCommentLinks.filter(ref => ref.deref()).length)).toBe(0);
+  await link.evaluate(node => { window.retiredCommentLinks.push(new WeakRef(node)); });
+  await navigate(page, '/');
+  await settleRegions(page);
+  await session.send('HeapProfiler.collectGarbage');
+  expect(await page.evaluate(() => retiredCommentLinks.filter(ref => ref.deref()).length)).toBe(0);
+  expect((await page.evaluate(() => __moondiffMetrics.active)).observers).toBe(0);
+});
 
 for (const authenticated of [false, true]) {
   test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
