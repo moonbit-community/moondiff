@@ -16,6 +16,44 @@ function unchanged(before, after, paths) {
   expect(after.errors).toEqual([]);
 }
 
+test('expanding a comment paints only its owning file and releases layout observers on navigation', async ({ page }) => {
+  await installRenderProbe(page);
+  const fixture = syntheticFixture({ files: 3, declarations: 4 });
+  const comments = fixture.files.slice(0, 2).map((file, index) => ({
+    id: String(20 + index),
+    body: Array.from({ length: 8 }, (_, i) => `Comment ${index} line ${i + 1}`).join('\n'),
+    user: { login: 'reviewer' },
+    html_url: `https://github.com/example/regions/pull/1#discussion_r${20 + index}`,
+    created_at: '2026-10-27T00:00:00Z',
+    path: file.filename, line: 2, side: 'RIGHT', position: 3, commit_id: fixture.sha,
+  }));
+  await installRenderingFixture(page, fixture, { comments });
+  await page.goto('/example/regions/pull/1');
+  await loaded(page, fixture);
+  const first = page.locator(`[data-region="file:${fixture.files[0].filename}"]`);
+  const second = page.locator(`[data-region="file:${fixture.files[1].filename}"]`);
+  await expect(first.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  await expect(second.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  const before = await renderCounts(page);
+  await first.getByRole('button', { name: 'Show more', exact: true }).click();
+  await expect(first.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+  await settleRegions(page);
+  const after = await renderCounts(page);
+  unchanged(before, after, fixture.files.slice(1).map(file => file.filename));
+  const path = fixture.files[0].filename;
+  expect(after.files[path].view).toBe(before.files[path].view + 1);
+  for (const count of ['patch', 'projection', 'rows', 'diff', 'highlight']) {
+    expect(after.files[path][count], count).toBe(before.files[path][count]);
+  }
+  await page.getByRole('button', { name: `Collapse ${path}`, exact: true }).click();
+  await expect(first.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: `Expand ${path}`, exact: true }).click();
+  await expect(first.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+  await navigate(page, '/');
+  await settleRegions(page);
+  expect((await renderCounts(page)).active).toMatchObject({ observers: 0, mounts: 2 });
+});
+
 test('file regions restore exact render containment after their height changes', async ({ page }) => {
   const fixture = syntheticFixture({ files: 3, declarations: 8 });
   await installRenderingFixture(page, fixture);
