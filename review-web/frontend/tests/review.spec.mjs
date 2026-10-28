@@ -559,6 +559,107 @@ test('renders commit comment Markdown without changing commit message formatting
   await expect(page.locator('.pull-description')).toHaveCount(0);
 });
 
+function commentCard(page, kind, id) {
+  return page.locator('.github-comment').filter({
+    has: page.locator(`.comment-body-toggle[aria-controls$="${kind}:${id}"]`),
+  });
+}
+
+const commentLines = (label, count) => Array.from({ length: count }, (_, i) => `${label} ${i + 1}`).join('\n');
+
+for (const authenticated of [false, true]) {
+  test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
+    await installRenderProbe(page);
+    await page.setViewportSize({ width: authenticated ? 1280 : 480, height: 900 });
+    const description = commentLines('Description line', 9);
+    await installApi(page, pullTarget(), {
+      authenticated,
+      pullBody: description,
+      issueBody: commentLines('Overall line', 9),
+      inlineBody: '- **First item**\n- Second item\n- Third item\n- Fourth item\n- Fifth item\n- Sixth item',
+      replyBody: '```moonbit\n' + commentLines('let value =', 8) + '\n```',
+    });
+    await page.goto(reviewPath());
+    const overall = commentCard(page, 'issue', 10);
+    const inline = commentCard(page, 'review', 20);
+    const reply = commentCard(page, 'review', 21);
+    for (const card of [overall, inline, reply]) {
+      const button = card.getByRole('button', { name: 'Show more', exact: true });
+      await expect(button).toBeVisible();
+      await expect(button).toHaveAttribute('aria-expanded', 'false');
+      const geometry = await card.evaluate(el => {
+        const body = el.querySelector('.github-comment-body');
+        const clip = el.querySelector('.comment-body-clip');
+        const button = el.querySelector('.comment-body-toggle');
+        return { natural: body.getBoundingClientRect().height, preview: clip.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(body).lineHeight),
+          buttonBelow: button.getBoundingClientRect().top >= clip.getBoundingClientRect().bottom,
+          controls: document.getElementById(button.getAttribute('aria-controls')) === clip,
+          metaOutside: !clip.contains(el.querySelector('.github-comment-meta')) };
+      });
+      expect(geometry.preview).toBeCloseTo(geometry.lineHeight * 5, 1);
+      expect(geometry.natural).toBeGreaterThan(geometry.preview);
+      expect(geometry).toMatchObject({ buttonBelow: true, controls: true, metaOutside: true });
+    }
+    const pullBody = page.getByRole('region', { name: 'Pull request description' });
+    await expect(pullBody.locator('.comment-body-clip, .comment-body-toggle')).toHaveCount(0);
+    expect(await pullBody.locator('.markdown-body').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(105);
+    await expect(inline.locator('li')).toHaveCount(6);
+    await expect(inline.locator('strong')).toContainText(['reviewer', 'First item']);
+    await expect(reply.locator('pre code')).toContainText('let value = 8');
+
+    // Native keyboard activation keeps focus and exposes the complete Markdown.
+    const toggle = overall.locator('.comment-body-toggle');
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveText('Show less');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveCSS('outline-style', 'solid');
+    await expect(toggle).toHaveCSS('outline-width', '2px');
+    await page.keyboard.press('Space');
+    await expect(toggle).toHaveText('Show more');
+    await toggle.click();
+    await reply.getByRole('button', { name: 'Show more', exact: true }).click();
+    await expect(inline.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+
+    for (const layout of ['Unified', 'Split']) {
+      await page.getByRole('button', { name: layout, exact: true }).click();
+      await expect(overall.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+      await expect(reply.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+      await expect(inline.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+    }
+    await page.evaluate(() => { window.__fake.issueComments[0].body += '\nUpdated overall'; });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(overall.locator('.github-comment-body')).toContainText('Updated overall');
+    await expect(overall.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+    await expect(reply.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+    await expect(overall.locator('.github-comment-body')).toHaveCount(1);
+    await settleRegions(page);
+    if (!authenticated) await expectNoAnonymousWrites(page);
+
+    await navigate(page, '/');
+    await expect(page.locator('.github-comment')).toHaveCount(0);
+    await navigate(page, reviewPath());
+    await expect(overall.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+    await overall.getByRole('button', { name: 'Show more', exact: true }).click();
+    await page.reload();
+    await expect(overall.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  });
+}
+
+test('long commit comments use the shared preview and preserve full code blocks', async ({ page }) => {
+  const body = '```moonbit\n' + commentLines('let value =', 8) + '\n```';
+  await installApi(page, commitTarget(), { commitBody: body });
+  await page.goto(reviewPath(commitTarget()));
+  const card = commentCard(page, 'commit', 30);
+  await expect(card.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  await expect(card.locator('pre code')).toContainText('let value = 8');
+  await card.getByRole('button', { name: 'Show more', exact: true }).click();
+  await expect(card.getByRole('button', { name: 'Show less', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.commit-message-title')).toHaveText('Commit change');
+});
+
 const markdownImagePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXWQAAAAASUVORK5CYII=', 'base64');
 const markdownImageSources = [
   'https://github.com/user-attachments/assets/image-id',
