@@ -722,6 +722,40 @@ const markdownImageSources = [
   'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png',
 ];
 
+test('comment preview observes delayed images and updated Markdown without retaining retired nodes', async ({ page }) => {
+  await installRenderProbe(page);
+  const response = createGate('long comment image');
+  await page.route('https://camo.githubusercontent.com/long-comment', async route => {
+    await response.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await installApi(page, pullTarget(), {
+    issueBody: '<img src="https://camo.githubusercontent.com/long-comment" alt="Delayed image" width="240" height="240">',
+  });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const toggle = card.locator('.comment-body-toggle');
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'pending');
+  await settleRegions(page);
+  await expect(toggle).toBeHidden();
+  response.release();
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'loaded');
+  await expect(toggle).toBeVisible();
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBe(105);
+  await toggle.click();
+  await expect(toggle).toHaveText('Show less');
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(240);
+  // Removing the image remeasures Markdown in the existing comment card.
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '**Replacement**'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(card.locator('.github-comment-body strong')).toHaveText('Replacement');
+  await expect(card.locator('img')).toHaveCount(0);
+  await expect(toggle).toBeHidden();
+  await navigate(page, '/');
+  await settleRegions(page);
+  expect((await page.evaluate(() => __moondiffMetrics.active)).observers).toBe(0);
+});
+
 test('Markdown images load exact approved sources in descriptions and all discussion regions', async ({ page }) => {
   const seen = [];
   await page.route(url => markdownImageSources.includes(url.href), async route => {
