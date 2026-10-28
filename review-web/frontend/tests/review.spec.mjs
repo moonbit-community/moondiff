@@ -722,6 +722,25 @@ test('Tab skips clipped comment links and restores their original tabindex after
   expect(await commit.locator('.comment-body-clip').evaluate(el => el.scrollTop)).toBe(0);
 });
 
+test('table previews measure visible links after intervening hidden links', async ({ page }) => {
+  await installRenderProbe(page);
+  await page.setViewportSize({ width: 480, height: 900 });
+  const cell = label => `[${label} visible](https://example.com/visible) ${'Filler words '.repeat(20)} [${label} hidden](https://example.com/hidden)`;
+  await installApi(page, pullTarget(), { issueBody: `| Left | Right |\n| --- | --- |\n| ${cell('Left')} | ${cell('Right')} |` });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const links = card.locator('.markdown-body a');
+  await expect(links).toHaveCount(4);
+  await settleRegions(page);
+  expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('tabindex')))).toEqual([null, '-1', null, '-1']);
+  await links.first().focus();
+  await page.keyboard.press('Tab');
+  await expect(links.nth(2)).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(card.locator('.comment-body-toggle')).toBeFocused();
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.scrollTop)).toBe(0);
+});
+
 
 for (const authenticated of [false, true]) {
   test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
