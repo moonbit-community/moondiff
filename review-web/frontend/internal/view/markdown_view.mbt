@@ -9,9 +9,33 @@ fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
           context.string("<br>\n")
           true
         }
-        Link(_) => {
-          // Let the safe renderer handle the outer link and its destination.
-          // Child images reuse it instead of emitting a nested anchor.
+        Link(link) => {
+          let inline = match link.v.reference_definition(context.doc.defs) {
+            Some(LinkDef(definition)) => {
+              guard markdown_link_destination(
+                  definition.v.dest.map(n => n.v).unwrap_or(""),
+                  markdown,
+                )
+                is Some(destination) else {
+                context.inline(link.v.text)
+                return true
+              }
+              @cmark.Inline::Link(
+                link.map(value => {
+                  ..value,
+                  reference: Inline(
+                    definition.map(value => {
+                      ..value,
+                      dest: Some(@cmark.Node::new(destination)),
+                    }),
+                  ),
+                }),
+              )
+            }
+            // Generated footnotes keep their document-local fragment links.
+            _ => inline
+          }
+          // Child images reuse the outer link instead of nesting an anchor.
           linked.val += 1
           defer {
             linked.val -= 1
