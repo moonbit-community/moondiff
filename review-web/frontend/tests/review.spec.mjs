@@ -648,6 +648,57 @@ for (const authenticated of [false, true]) {
   });
 }
 
+test('comment previews distinguish short, exactly five and six rendered lines after refresh', async ({ page }) => {
+  await installRenderProbe(page);
+  await installApi(page);
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const toggle = card.locator('.comment-body-toggle');
+  await expect(card.locator('.github-comment-body')).toHaveText('Existing overall comment');
+  await settleRegions(page);
+  await expect(toggle).toBeHidden();
+  for (const count of [5, 6]) {
+    const body = commentLines('Line', count);
+    await page.evaluate(body => { window.__fake.issueComments[0].body = body; }, body);
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(card.locator('.github-comment-body')).toHaveText(body);
+    await settleRegions(page);
+    expect(await card.locator('.github-comment-body').evaluate(el => el.getBoundingClientRect().height)).toBe(count * 21);
+    expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBe(105);
+    if (count === 5) await expect(toggle).toBeHidden();
+    else await expect(toggle).toBeVisible();
+  }
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBe(126);
+  await page.evaluate(() => { window.__fake.issueComments[0].body = 'Short again'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(card.locator('.github-comment-body')).toHaveText('Short again');
+  await expect(toggle).toBeHidden();
+});
+
+test('comment previews measure automatic wrapping when the viewport changes', async ({ page }) => {
+  await installRenderProbe(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await installApi(page, pullTarget(), { issueBody: 'Wrapped words '.repeat(30).trim() });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  await expect(card.locator('.github-comment-body p')).toHaveCount(1);
+  await settleRegions(page);
+  const toggle = card.locator('.comment-body-toggle');
+  await expect(toggle).toBeHidden();
+  await page.setViewportSize({ width: 480, height: 900 });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toHaveText('Show less');
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(105);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(toggle).toBeHidden();
+  await page.setViewportSize({ width: 480, height: 900 });
+  await expect(toggle).toHaveText('Show less');
+  await expect(toggle).toBeVisible();
+});
+
 test('long commit comments use the shared preview and preserve full code blocks', async ({ page }) => {
   const body = '```moonbit\n' + commentLines('let value =', 8) + '\n```';
   await installApi(page, commitTarget(), { commitBody: body });
