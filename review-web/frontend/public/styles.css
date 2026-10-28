@@ -2499,14 +2499,56 @@ button.comment-delete-confirm:hover {
   background-position: center;
 }
 
-.github-comment-body {
-  margin: 0;
+.github-comment-content {
   padding: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.github-comment-body {
+  display: flow-root;
+  margin: 0;
 }
 
 .markdown-html-raw {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.github-comment-body.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.comment-body-clip[data-expanded="false"] {
+  max-height: var(--comment-preview-height, 7.5em);
+  overflow: hidden;
+}
+
+.comment-body-toggle {
+  min-height: 0;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 2px;
+  box-shadow: none;
+  color: var(--home-link);
+  font: inherit;
+  cursor: pointer;
+}
+
+.comment-body-toggle[hidden] {
+  display: none;
+}
+
+.comment-body-toggle:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.comment-body-toggle:focus-visible {
+  outline: 2px solid var(--home-link);
+  outline-offset: 3px;
 }
 
 .pull-description {

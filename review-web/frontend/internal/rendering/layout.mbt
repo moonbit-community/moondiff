@@ -155,7 +155,32 @@ fn LayoutState::observe(
       @application.clear_navigation_landing(main)
     }
   }
-  let record : LayoutRecord = { host, alive: true, prepare, read, write, }
+  let bodies : CommentBodies = { host, entries: [], }
+  let observed : Ref[@dom.ResizeObserver?] = Ref(None)
+  let prepare_region = prepare
+  let read_region = read
+  let write_region = write
+  let region_count = Ref(0)
+  let record : LayoutRecord = {
+    host,
+    alive: true,
+    prepare: () => {
+      prepare_region()
+      if observed.val is Some(observer) {
+        bodies.sync(observer)
+      }
+    },
+    read: () => {
+      let heights = read_region()
+      region_count.val = heights.length()
+      heights.push_iter(bodies.read().iter())
+      heights
+    },
+    write: heights => {
+      bodies.write(heights[region_count.val:])
+      write_region(heights)
+    },
+  }
   let on_resize : @dom.Listener = _ => {
     clear_landing(main)
     self.dirty[host_id] = record
@@ -174,16 +199,20 @@ fn LayoutState::observe(
       passive=true,
     )
   }
-  let observer = if elements.is_empty() {
+  // The comment overview can commit before its first comments arrive.
+  let observer = if elements.is_empty() && region != "discussion" {
     None
   } else {
     let observer = @dom.ResizeObserver::new((_, _) => {
+      guard record.alive else { return }
       self.dirty[host_id] = record
       self.schedule()
     })
+    observed.val = Some(observer)
     for element in elements {
       observer.observe(element)
     }
+    (record.prepare)()
     self.dirty[host_id] = record
     self.schedule()
     @metrics.active("observers", 1)
@@ -197,6 +226,8 @@ fn LayoutState::observe(
       observer.disconnect()
       @metrics.active("observers", -1)
     }
+    observed.val = None
+    bodies.entries.clear()
     if region == "navigation" {
       @dom.window().remove_event_listener("resize", on_resize)
       @dom.window().remove_event_listener("scroll", on_scroll)
