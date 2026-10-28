@@ -567,6 +567,44 @@ function commentCard(page, kind, id) {
 
 const commentLines = (label, count) => Array.from({ length: count }, (_, i) => `${label} ${i + 1}`).join('\n');
 
+for (const target of [pullTarget(), commitTarget()]) {
+  test(`unsupported HTML stays readable and inert in ${target.kind} Markdown`, async ({ page }) => {
+    await installRenderProbe(page);
+    await page.setViewportSize({ width: 480, height: 900 });
+    const requests = [];
+    await page.route(/https:\/\/(evil\.example|camo\.githubusercontent\.com)\//, route => {
+      requests.push(route.request().url());
+      return route.abort();
+    });
+    const raw = '<details>\n<summary>Summary</summary>\nImportant body ' + 'word'.repeat(150) +
+      '\n<img src="https://camo.githubusercontent.com/mixed-html">\n</details>';
+    const body = [raw, 'Before <mark>inline content</mark> after',
+      '<div broken="unterminated>\nMalformed HTML body',
+      '<script>window.markdownAttack = true; fetch("https://evil.example/request")</script>',
+      '<!-- hidden template comment -->'].join('\n\n');
+    await installApi(page, target, {
+      pullBody: body, issueBody: body, inlineBody: body, replyBody: body, commitBody: body,
+    });
+    await page.goto(reviewPath(target));
+    const bodies = page.locator('.markdown-body').filter({ hasText: 'Important body' });
+    await expect(bodies).toHaveCount(target.kind === 'pull' ? 4 : 1);
+    for (const markdown of await bodies.all()) {
+      await expect(markdown).toContainText(raw);
+      await expect(markdown).toContainText('Before <mark>inline content</mark> after');
+      await expect(markdown).toContainText('Malformed HTML body');
+      await expect(markdown).toContainText('window.markdownAttack = true');
+      await expect(markdown).not.toContainText('hidden template comment');
+      await expect(markdown.locator('details, summary, mark, img, script, iframe')).toHaveCount(0);
+      await expect(markdown.locator('.markdown-html-raw').first()).toHaveCSS('white-space', 'pre-wrap');
+      expect(await markdown.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    }
+    await settleRegions(page);
+    expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+    expect(requests).toEqual([]);
+  });
+}
+
+
 for (const authenticated of [false, true]) {
   test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
     await installRenderProbe(page);
