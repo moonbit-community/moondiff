@@ -671,6 +671,57 @@ test('footnotes stay within each body and keep their IDs across refresh and regi
   await assertLocal();
 });
 
+test('Tab skips clipped comment links and restores their original tabindex after expansion', async ({ page }) => {
+  await installRenderProbe(page);
+  const body = Array.from({ length: 9 }, (_, i) => `[Link ${i + 1}](https://example.com/${i + 1})`).join('\n');
+  await installApi(page, pullTarget(), { issueBody: body, inlineBody: body, replyBody: body, commitBody: body });
+  await page.goto(reviewPath());
+  for (const [kind, id] of [['issue', 10], ['review', 20], ['review', 21]]) {
+    const card = commentCard(page, kind, id);
+    const links = card.locator('.markdown-body a');
+    const clip = card.locator('.comment-body-clip');
+    const toggle = card.locator('.comment-body-toggle');
+    await expect(toggle).toBeVisible();
+    await settleRegions(page);
+    expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('tabindex')))).toEqual([null, null, null, null, null, '-1', '-1', '-1', '-1']);
+    await links.first().focus();
+    for (let i = 1; i < 5; i++) {
+      await page.keyboard.press('Tab');
+      await expect(links.nth(i)).toBeFocused();
+    }
+    await page.keyboard.press('Tab');
+    await expect(toggle).toBeFocused();
+    expect(await clip.evaluate(el => el.scrollTop)).toBe(0);
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveText('Show less');
+    await settleRegions(page);
+    expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('tabindex')))).toEqual(Array(9).fill(null));
+    // Capture a pre-existing explicit tabindex before suppressing it again.
+    await links.last().evaluate(el => el.setAttribute('tabindex', '0'));
+    await toggle.evaluate(el => el.click());
+    await expect(links.last()).toHaveAttribute('tabindex', '-1');
+    // Programmatic focus models a fragment jump into a clipped body.
+    await links.last().focus();
+    expect(await clip.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    await toggle.evaluate(el => el.click());
+    await expect(links.last()).toHaveAttribute('tabindex', '0');
+    await toggle.evaluate(el => el.click());
+    await settleRegions(page);
+    await expect(toggle).toBeFocused();
+    expect(await clip.evaluate(el => el.scrollTop)).toBe(0);
+    await toggle.click();
+    await expect(links.last()).toHaveAttribute('tabindex', '0');
+  }
+  await page.evaluate(target => { window.__fake.target = target; }, commitTarget());
+  await navigate(page, reviewPath(commitTarget()));
+  const commit = commentCard(page, 'commit', 30);
+  await expect(commit.locator('.markdown-body a').last()).toHaveAttribute('tabindex', '-1');
+  await commit.locator('.markdown-body a').nth(4).focus();
+  await page.keyboard.press('Tab');
+  await expect(commit.locator('.comment-body-toggle')).toBeFocused();
+  expect(await commit.locator('.comment-body-clip').evaluate(el => el.scrollTop)).toBe(0);
+});
+
 
 for (const authenticated of [false, true]) {
   test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
