@@ -116,6 +116,7 @@ fn comment_body_view(
     markdown_view(
       body,
       class="github-comment-body",
+      scope=review.comment_key(id),
       markdown?=markdown.map(context => { ..context, page_url: html_url, }),
     ),
     comment_delete_controls(id, review, emit),

@@ -29,7 +29,7 @@ test "Markdown image origins require exact hosts HTTPS no credentials and the de
     ] {
     let destination = image_destination(url, None).unwrap()
     assert_false(destination.automatic, msg=url)
-    let rendered = markdown_html("![image](\{url})")
+    let rendered = markdown_html(scope="test", "![image](\{url})")
     assert_true(rendered.contains("<a href="), msg=rendered)
     assert_false(rendered.contains("<img"), msg=rendered)
   }
@@ -127,13 +127,14 @@ test "relative Markdown images use the fork snapshot and explicit GitHub reposit
   assert_true(
     image_destination("./image.png", Some({ ..context, sha: "HEAD", })) is None,
   )
-  let rendered = markdown_html("![relative](image.png)")
+  let rendered = markdown_html(scope="test", "![relative](image.png)")
   assert_eq(rendered, "<p>relative</p>")
 }
 
 ///|
 test "Markdown and reference images emit escaped links and inert hidden images" {
   let rendered = markdown_html(
+    scope="test",
     (
       #|![a **bold** & "quoted" &lt;alt&gt;](https://raw.githubusercontent.com/o/r/main/a.png?x=1&y=2 "a & title")
       #|![reference][screenshot]
@@ -166,7 +167,7 @@ test "linked Markdown and HTML images reuse the safe outer anchor" {
       "[<img src='https://camo.githubusercontent.com/image' alt='linked'>](https://example.com/destination)",
       "[![linked](https://example.com/image)](https://example.com/destination)",
     ] {
-    let rendered = markdown_html(source)
+    let rendered = markdown_html(scope="test", source)
     assert_eq(rendered.split("<a ").count() - 1, 1, msg=rendered)
     assert_true(
       rendered.contains("href=\"https://example.com/destination\""),
@@ -179,6 +180,7 @@ test "linked Markdown and HTML images reuse the safe outer anchor" {
 ///|
 test "HTML images parse only complete image tags and rebuild safe attributes" {
   let rendered = markdown_html(
+    scope="test",
     (
       #|<IMG SRC="https://raw.githubusercontent.com/o/r/main/a.png?x=1&amp;y=2" ALT="&lt;alt&gt; &quot;quoted&quot;" TITLE='a &#38; b' WIDTH="64" height='32' onload="alert(1)" onerror="alert(2)" style="background:url(https://evil.example/x)" srcset="https://evil.example/image 2x" data-markdown-src="https://evil.example/image" />
       #|<img src="https://camo.githubusercontent.com/a" alt="second" width="0" height="-1">
@@ -200,14 +202,16 @@ test "HTML images parse only complete image tags and rebuild safe attributes" {
   }
   assert_eq(
     markdown_html(
+      scope="test",
       "before <img src='javascript&#58;alert(1)' alt='safe &amp; text'> after",
     ),
     "<p>before safe &amp; text after</p>",
   )
   assert_true(
-    markdown_html("<img src='https://example.com/image' alt='outside'>").contains(
-      ">outside</a>",
-    ),
+    markdown_html(
+      scope="test",
+      "<img src='https://example.com/image' alt='outside'>",
+    ).contains(">outside</a>"),
   )
   for
     source in [
@@ -215,6 +219,7 @@ test "HTML images parse only complete image tags and rebuild safe attributes" {
       "javascript&#0000000000000000000000000058;alert(1)",
     ] {
     let rendered = markdown_html(
+      scope="test",
       "<img src='\{source}' alt='encoded protocol'>",
       markdown=image_test_context(),
     )
@@ -223,6 +228,7 @@ test "HTML images parse only complete image tags and rebuild safe attributes" {
     assert_false(rendered.contains("<a "), msg=rendered)
   }
   let duplicate = markdown_html(
+    scope="test",
     "<img SRC='https://example.com/image' src='https://camo.githubusercontent.com/image' alt='duplicate'>",
   )
   assert_false(duplicate.contains("<img"), msg=duplicate)
@@ -230,7 +236,10 @@ test "HTML images parse only complete image tags and rebuild safe attributes" {
     source in [
       "<div><img src='https://camo.githubusercontent.com/a'></div>", "<img src='https://camo.githubusercontent.com/a'>\n<script>alert(1)</script>",
     ] {
-    assert_false(markdown_html(source).contains("<img"), msg=source)
+    assert_false(
+      markdown_html(scope="test", source).contains("<img"),
+      msg=source,
+    )
   }
   for
     source in [
@@ -247,6 +256,7 @@ test "HTML images parse only complete image tags and rebuild safe attributes" {
 test "image markup mounts without a src or nested anchors" {
   let rendered = render_test_html(() => {
     markdown_view(
+      scope="test",
       "[![linked](https://raw.githubusercontent.com/o/r/main/image.png)](https://example.com/)\n\n<img src=\"https://camo.githubusercontent.com/image\" alt=\"<caption>\" width=\"40\" onerror=\"alert(1)\">",
       class="image-test",
     )

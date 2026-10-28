@@ -1,6 +1,7 @@
 ///|
 test "GitHub Markdown enables extensions and preserves discussion line breaks" {
   let rendered = markdown_html(
+    scope="test",
     (
       #|## Summary
       #|
@@ -31,13 +32,14 @@ test "GitHub Markdown enables extensions and preserves discussion line breaks" {
     ] {
     assert_true(rendered.contains(expected), msg=rendered)
   }
-  assert_eq(markdown_html("Plain text"), "<p>Plain text</p>")
-  assert_eq(markdown_html(""), "")
+  assert_eq(markdown_html(scope="test", "Plain text"), "<p>Plain text</p>")
+  assert_eq(markdown_html(scope="test", ""), "")
 }
 
 ///|
 test "GitHub Markdown strips active HTML and unsafe destinations" {
   let rendered = markdown_html(
+    scope="test",
     (
       #|<script>window.markdownAttack = true</script>
       #|
@@ -73,7 +75,7 @@ test "comments and PR descriptions mount safe Markdown inside block containers" 
   let source = "## Heading\n\n**Formatted** text.\n\n- item"
   let rendered = render_test_html(() => {
     @html.fragment([
-      pull_body_view(Some(source), Some({ login: "author", })),
+      pull_body_view(generation=0, Some(source), Some({ login: "author", })),
       comment_body_view(
         "author",
         "2026-10-27T00:00:00Z",
@@ -98,9 +100,9 @@ test "comments and PR descriptions mount safe Markdown inside block containers" 
   assert_false(rendered.contains("**Formatted**"), msg=rendered)
   let empty = render_test_html(() => {
     @html.fragment([
-      pull_body_view(None, Some({ login: "author", })),
-      pull_body_view(Some(""), Some({ login: "author", })),
-      pull_body_view(Some(" \n\t"), Some({ login: "author", })),
+      pull_body_view(generation=0, None, Some({ login: "author", })),
+      pull_body_view(generation=0, Some(""), Some({ login: "author", })),
+      pull_body_view(generation=0, Some(" \n\t"), Some({ login: "author", })),
     ])
   })
   assert_false(empty.contains("pull-description"), msg=empty)

@@ -142,6 +142,7 @@ pub fn shell_view(
           pull_body_view(
             input.pull_body,
             input.pull_user,
+            generation=input.generation,
             markdown?=input.markdown,
           ),
           host(RangePanel),
@@ -170,6 +171,7 @@ pub fn shell_view(
                   pull_body_view(
                     input.pull_body,
                     input.pull_user,
+                    generation=input.generation,
                     markdown?=input.markdown,
                   ),
                   host(RangePanel),
