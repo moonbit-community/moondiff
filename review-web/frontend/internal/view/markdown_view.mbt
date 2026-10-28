@@ -1,5 +1,9 @@
 ///|
-fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
+fn markdown_html(
+  source : String,
+  scope~ : String,
+  markdown? : MarkdownContext,
+) -> String raise {
   let safe = @cmark_html.renderer(safe=true)
   let linked = Ref(0)
   let discussion = @cmark_renderer.Renderer::new(
@@ -94,7 +98,12 @@ fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
   )
   safe
   .compose(discussion)
-  .doc_to_string(@cmark.Doc::from_string(strict=false, source))
+  .doc_to_string(
+    markdown_scope_footnotes(
+      @cmark.Doc::from_string(strict=false, source),
+      scope,
+    ),
+  )
   .trim_end(chars="\n")
   .to_owned()
 }
@@ -104,9 +113,10 @@ fn markdown_html(source : String, markdown? : MarkdownContext) -> String raise {
 fn markdown_view(
   source : String,
   class~ : String,
+  scope~ : String,
   markdown? : MarkdownContext,
 ) -> @rabbita.Html {
-  try markdown_html(source, markdown?) catch {
+  try markdown_html(source, scope~, markdown?) catch {
     // A rendering failure must not hide a discussion or interrupt the diff.
     _ => @html.div(class="\{class} markdown-body markdown-fallback", source)
   } noraise {
@@ -124,6 +134,7 @@ fn markdown_view(
 fn pull_body_view(
   body : String?,
   user : @protocol.ApiCommentUser?,
+  generation~ : Int32,
   markdown? : MarkdownContext,
 ) -> @rabbita.Html {
   guard body is Some(body) && !body.trim().is_empty() else {
@@ -138,7 +149,12 @@ fn pull_body_view(
         comment_avatar(if author == "ghost" { None } else { Some(author) }),
         @html.div(class="comment-byline", @html.strong(author)),
       ]),
-      markdown_view(body, class="pull-request-body", markdown?),
+      markdown_view(
+        body,
+        class="pull-request-body",
+        scope="\{generation}:pull-description",
+        markdown?,
+      ),
     ],
   )
 }
