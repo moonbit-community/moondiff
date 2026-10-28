@@ -277,6 +277,7 @@ test "fork pull revisions retain base and head repositories" {
   let pull = ApiPull::{
     title: "Fork change",
     body: None,
+    user: None,
     html_url: "https://github.com/upstream/project/pull/7",
     base: {
       sha: "1111111111111111111111111111111111111111",
@@ -320,6 +321,7 @@ test "fork intervals read merge base from upstream and PR commits from fork" {
   let pull : ApiPull = {
     title: "fork",
     body: None,
+    user: None,
     html_url: "url",
     base: {
       sha: "c".repeat(40),

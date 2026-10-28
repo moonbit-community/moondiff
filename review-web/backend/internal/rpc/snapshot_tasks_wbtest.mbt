@@ -3,6 +3,7 @@ fn snapshot_result_fixture() -> @protocol.ApiPullSnapshotResult {
   MetadataOnly({
     title: "snapshot",
     body: None,
+    user: None,
     html_url: "url",
     base: { sha: "a".repeat(40), repo: None, },
     head: { sha: "b".repeat(40), repo: None, },
