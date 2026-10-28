@@ -71,6 +71,7 @@ async function fixtureValue(state, op, args) {
 }
 
 export async function installRenderingFixture(page, fixture, options = {}) {
+  await page.route('https://github.com/*.png?size=64', route => route.abort());
   // Also cover standalone benchmarks and contexts created outside the shared
   // Playwright fixture, before their first navigation/request can start.
   requestsFor(page);
