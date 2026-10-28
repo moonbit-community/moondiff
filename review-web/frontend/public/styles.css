@@ -2499,6 +2499,11 @@ button.comment-delete-confirm:hover {
   padding: 12px;
 }
 
+.markdown-html-raw {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .pull-description {
   min-width: 0;
   margin: 0.75rem 0.5rem;
