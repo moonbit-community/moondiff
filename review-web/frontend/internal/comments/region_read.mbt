@@ -89,6 +89,11 @@ fn index_comments(before : Session, after : Session) -> Session {
   }
   {
     ..after,
+    expanded_bodies: match after.comments {
+      CommentsReady(bundle) =>
+        after.expanded_bodies.filter(id => bundle_contains(bundle, id))
+      _ => after.expanded_bodies
+    },
     index: { version: before.index.version + 1, groups: indexed, owners, },
   }
 }
@@ -178,6 +183,7 @@ pub struct ReadView {
   priv selected_draft : CommentDraft?
   priv can_submit : Bool
   priv can_load : Bool
+  priv expanded_bodies : ReadOnlyArray[CommentId]
 } derive(Eq)
 
 ///|
@@ -255,6 +261,15 @@ pub fn Session::read_view(
   {
     permissions: self.permission_summary(),
     group,
+    expanded_bodies: ReadOnlyArray::from_array(
+      self.expanded_bodies.filter(id => {
+        match id {
+          IssueComment(id) => group.issue_comments.any(c => c.id == id)
+          ReviewComment(id) => group.review_comments.any(c => c.id == id)
+          CommitComment(id) => group.commit_comments.any(c => c.id == id)
+        }
+      }),
+    ),
     pending_review_receipts: ReadOnlyArray::from_array(pending_review_receipts),
     generation: self.generation(),
     snapshot_stale: self.snapshot_stale,
@@ -305,6 +320,11 @@ pub fn ReadView::draft_visible(self : ReadView) -> Bool {
 ///|
 pub fn ReadView::comment_key(self : ReadView, id : CommentId) -> String {
   "\{self.generation}:\{id.key()}"
+}
+
+///|
+pub fn ReadView::body_expanded(self : ReadView, id : CommentId) -> Bool {
+  self.expanded_bodies.contains(id)
 }
 
 ///|
