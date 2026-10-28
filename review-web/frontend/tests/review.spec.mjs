@@ -69,6 +69,7 @@ async function cancelCommentDeletion(card, checkpoint) {
 }
 
 async function installApi(page, target = pullTarget(), options = {}) {
+  await page.route('https://github.com/*.png?size=64', route => route.abort());
   const commentPairs = createCommentBundlePairs();
   await page.addInitScript(({ target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch }) => {
     let savedAuth = {};
@@ -177,6 +178,7 @@ async function installApi(page, target = pullTarget(), options = {}) {
       return {
         title: options.identitySpecificDiff ? `Fork PR for ${state.login}` : "Fork PR",
         body: options.pullBody ?? null,
+        user: { login: "pull-author" },
         html_url: "https://github.com/upstream/project/pull/17",
         base: { sha: state.currentBase, repo: { full_name: "upstream/project" } },
         head: { sha: state.currentHead, repo: { full_name: "contributor/project-fork" } },
@@ -489,6 +491,7 @@ const markdownFixture = [
 
 for (const authenticated of [false, true]) {
   test(`renders PR body and discussion Markdown for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
+    await page.route('https://github.com/*.png?size=64', route => route.abort());
     await installApi(page, pullTarget(), {
       authenticated,
       pullBody: markdownFixture,
@@ -498,6 +501,12 @@ for (const authenticated of [false, true]) {
     });
     await page.goto(reviewPath());
     const description = page.getByRole('region', { name: 'Pull request description' });
+    await expect(description.locator('.comment-byline strong')).toHaveText('pull-author');
+    await expect(description.locator('.comment-avatar-image')).toHaveCSS('background-image', 'url("https://github.com/pull-author.png?size=64")');
+    await expect(description.locator('.comment-avatar')).toHaveCSS('width', '32px');
+    await expect(description.locator('.comment-avatar')).toHaveCSS('height', '32px');
+    await expect(description.locator('.comment-avatar')).toHaveCSS('border-radius', '50%');
+    await expect(description.locator('.comment-avatar-placeholder')).toHaveCount(1);
     await expect(description.locator('h2')).toHaveText('Markdown heading');
     const overall = page.locator('#comments .github-comment-body');
     const inline = page.locator('.review-thread .github-comment-body').first();
@@ -524,6 +533,10 @@ for (const authenticated of [false, true]) {
 
     for (const width of [1280, 480]) {
       await page.setViewportSize({ width, height: 900 });
+      const avatar = await description.locator('.comment-avatar').boundingBox();
+      const body = await description.locator('.pull-request-body').boundingBox();
+      expect(Math.abs(avatar.x - body.x)).toBeLessThan(1);
+      expect(avatar.y + avatar.height).toBeLessThan(body.y);
       for (const body of [description.locator('.markdown-body'), inline]) {
         await expect(body).toHaveCSS('font-size', '14px');
         await expect(body).toHaveCSS('line-height', '21px');
@@ -594,7 +607,7 @@ test('Markdown images outside the allowlist produce links and zero image request
   page.on('request', request => {
     const url = new URL(request.url());
     const avatar = url.hostname === 'avatars.githubusercontent.com' ||
-      (url.hostname === 'github.com' && /^\/(reviewer|author)\.png$/.test(url.pathname));
+      (url.hostname === 'github.com' && /^\/(reviewer|author|pull-author)\.png$/.test(url.pathname));
     if (request.resourceType() === 'image' && !avatar) seen.push(request.url());
   });
   const body = sources.map((src, i) => `![outside ${i}](${src})`).concat([
