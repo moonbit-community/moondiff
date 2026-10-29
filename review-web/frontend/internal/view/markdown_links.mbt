@@ -1,4 +1,16 @@
 ///|
+fn markdown_link_open(destination : String, title : String?) -> String {
+  let title = title.map(t => " title=\"\{markdown_escape(t)}\"").unwrap_or("")
+  let external = if destination.has_prefix("https://") ||
+    destination.has_prefix("http://") {
+    " target=\"_blank\" rel=\"noopener noreferrer\""
+  } else {
+    ""
+  }
+  "<a href=\"\{markdown_escape(destination)}\"\{title}\{external}>"
+}
+
+///|
 fn markdown_link_destination(
   source : String,
   markdown : MarkdownContext?,
