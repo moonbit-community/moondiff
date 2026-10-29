@@ -1,4 +1,31 @@
 ///|
+test "setting comment expansion is idempotent and rejects retired or missing comments" {
+  let initial = session_list(session_fixture(), body_bundle())
+  let id = ReviewComment(1L)
+  let (expanded, effects) = update(initial, SetCommentBodyExpanded(7, id, true))
+  assert_true(effects.is_empty())
+  assert_true(expanded.read_view(path="a.mbt").body_expanded(id))
+  let again = update(expanded, SetCommentBodyExpanded(7, id, true)).0
+  assert_true(@identity.same(expanded, again))
+  for
+    event in [
+      SetCommentBodyExpanded(6, id, false),
+      SetCommentBodyExpanded(8, id, false),
+      SetCommentBodyExpanded(7, ReviewComment(99L), true),
+    ] {
+    assert_true(@identity.same(expanded, update(expanded, event).0))
+  }
+  let collapsed = update(expanded, SetCommentBodyExpanded(7, id, false)).0
+  assert_false(collapsed.read_view(path="a.mbt").body_expanded(id))
+  assert_true(
+    @identity.same(
+      collapsed,
+      update(collapsed, SetCommentBodyExpanded(7, id, false)).0,
+    ),
+  )
+}
+
+///|
 fn body_bundle() -> ApiCommentBundle {
   {
     issue_comments: [
