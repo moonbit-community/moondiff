@@ -1,6 +1,7 @@
 ///|
 pub(all) enum ReviewMsg {
   Domain(@comments.Event)
+  BodyActivated(CommentBodyRequest)
   RefreshComments
   LoadLatestSnapshot
   BeginCommentsRefresh(Int32, CommitRef)
@@ -61,6 +62,16 @@ fn update_review(
   }
   let event : @comments.Event = match msg {
     Domain(event) => event
+    BodyActivated(request) => {
+      guard comment_body_snapshot(model, request) is Some(_) else {
+        return (model, @rabbita.none)
+      }
+      match request.action {
+        Toggle(_) => ToggleCommentBody(request.generation, request.id)
+        Footnote(_) =>
+          SetCommentBodyExpanded(request.generation, request.id, true)
+      }
+    }
     LoadLatestSnapshot => {
       guard @comments.permission(model.review, LoadSnapshot).allowed() &&
         model.route is Some(reference) else {

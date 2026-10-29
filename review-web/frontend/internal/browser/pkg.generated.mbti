@@ -38,6 +38,8 @@ pub fn finite(Double) -> Bool
 
 pub fn focus(@dom.Element) -> Unit
 
+pub fn fragment_target(String) -> @dom.Element?
+
 pub fn has_focus() -> Bool
 
 pub fn has_window() -> Bool
@@ -61,6 +63,8 @@ pub fn mouse_click() -> @dom.Event
 pub fn mutation_added_nodes(@dom.MutationRecord) -> FixedArray[@dom.Node]
 
 pub fn mutation_has_removed_nodes(@dom.MutationRecord) -> Bool
+
+pub fn navigate_fragment(String) -> Unit
 
 pub fn parse_float(String) -> Double
 

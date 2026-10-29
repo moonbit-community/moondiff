@@ -115,33 +115,46 @@ fn comment_body_view(
       ]),
       comment_menu(id, html_url, review, emit),
     ]),
-    @html.div(class="github-comment-content", [
-      @html.div(
-        id=body_id,
-        class="comment-body-clip",
-        attrs=@html.Attrs::build().data_set("expanded", expanded.to_string()),
-        markdown_view(
-          body,
-          class="github-comment-body",
-          scope=review.comment_key(id),
-          markdown?=markdown.map(context => { ..context, page_url: html_url, }),
+    @html.div(
+      class="github-comment-content",
+      attrs=@html.Attrs::build().on_click(event => {
+        @application.follow_comment_footnote(event, review.generation, id, emit)
+      }),
+      [
+        @html.div(
+          id=body_id,
+          class="comment-body-clip",
+          attrs=@html.Attrs::build().data_set("expanded", expanded.to_string()),
+          markdown_view(
+            body,
+            class="github-comment-body",
+            scope=review.comment_key(id),
+            markdown?=markdown.map(context => { ..context, page_url: html_url, }),
+          ),
         ),
-      ),
-      @html.button(
-        type_="button",
-        class="comment-body-toggle",
-        hidden=true,
-        attrs=@html.Attrs::build()
-          .aria_expanded(expanded.to_string())
-          .aria_controls(body_id),
-        on_click=emit(Review(Domain(ToggleCommentBody(review.generation, id)))),
-        if expanded {
-          "Show less"
-        } else {
-          "Show more"
-        },
-      ),
-    ]),
+        @html.button(
+          type_="button",
+          class="comment-body-toggle",
+          hidden=true,
+          attrs=@html.Attrs::build()
+            .aria_expanded(expanded.to_string())
+            .aria_controls(body_id)
+            .on_click(event => {
+              @application.toggle_comment_body(
+                event,
+                review.generation,
+                id,
+                emit,
+              )
+            }),
+          if expanded {
+            "Show less"
+          } else {
+            "Show more"
+          },
+        ),
+      ],
+    ),
     comment_delete_controls(id, review, emit),
   ])
 }

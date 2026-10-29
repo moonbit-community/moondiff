@@ -103,6 +103,25 @@ pub fn[T] event_property(event : @dom.Event, name : String) -> T {
 pub extern "js" fn mouse_click() -> @dom.Event = "() => new MouseEvent('click')"
 
 ///|
+pub fn fragment_target(href : String) -> @dom.Element? {
+  fragment_target_native(href).to_option()
+}
+
+///|
+extern "js" fn fragment_target_native(
+  href : String,
+) -> @js.Nullable[@dom.Element] =
+  #| href => {
+  #|   if (!href.startsWith('#')) return null;
+  #|   try { return document.getElementById(decodeURIComponent(href.slice(1))); }
+  #|   catch { return null; }
+  #| }
+
+///|
+pub extern "js" fn navigate_fragment(id : String) -> Unit =
+  #| id => { location.hash = encodeURIComponent(id); }
+
+///|
 pub extern "js" fn intersection_observer(
   callback : (
     FixedArray[@dom.IntersectionObserverEntry],

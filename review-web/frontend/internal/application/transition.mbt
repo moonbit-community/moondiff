@@ -74,6 +74,9 @@ fn ui_after_commit(
   emit : @rabbita.Emit[Msg],
 ) -> Array[AfterCommit] {
   let actions : Array[AfterCommit] = []
+  if comment_body_after_commit(next, msg) is Some(action) {
+    actions.push(action)
+  }
   if @metrics.pending("click_to_diff") &&
     next.phase is Showing(view) &&
     view.files

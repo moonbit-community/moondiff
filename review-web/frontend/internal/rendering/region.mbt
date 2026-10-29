@@ -329,6 +329,7 @@ fn Mount::finish(self : Mount, ticket : CommitTicket) -> Array[@rabbita.Cmd] {
 ///|
 fn Mount::invalidate(self : Mount) -> Array[@rabbita.Cmd] {
   self.alive = false
+  @application.discard_comment_body_region(self.generation, self.region)
   if self.dispose_range_link is Some(dispose) {
     dispose()
   }
