@@ -570,6 +570,8 @@ for (const kind of ['inline', 'reply']) {
 }
 
 test('first Viewed sync preserves section changes and content retries only on the touched file', async ({ page }) => {
+  // Comment avatars are incidental to this fixture and must not outlive its reload.
+  await page.route('https://github.com/*.png?size=64', route => route.abort());
   for (const action of ['section', 'retry']) {
     const waiting = gate();
     await page.unroute('**/api/**');

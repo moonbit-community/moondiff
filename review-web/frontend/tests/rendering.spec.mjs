@@ -21,7 +21,7 @@ test('expanding a comment paints only its owning file and releases layout observ
   const fixture = syntheticFixture({ files: 3, declarations: 4 });
   const comments = fixture.files.slice(0, 2).map((file, index) => ({
     id: String(20 + index),
-    body: Array.from({ length: 8 }, (_, i) => `Comment ${index} line ${i + 1}`).join('\n'),
+    body: 'Reference[^note]\n\n' + Array.from({ length: 8 }, (_, i) => `Comment ${index} line ${i + 1}`).join('\n') + '\n\n[^note]: Footnote text.',
     user: { login: 'reviewer' },
     html_url: `https://github.com/example/regions/pull/1#discussion_r${20 + index}`,
     created_at: '2026-10-27T00:00:00Z',
@@ -44,6 +44,20 @@ test('expanding a comment paints only its owning file and releases layout observ
   expect(after.files[path].view).toBe(before.files[path].view + 1);
   for (const count of ['patch', 'projection', 'rows', 'diff', 'highlight']) {
     expect(after.files[path][count], count).toBe(before.files[path][count]);
+  }
+  for (const activate of [
+    () => first.getByRole('button', { name: 'Show less', exact: true }).click(),
+    () => first.locator('[role="doc-noteref"]').click(),
+    () => first.locator('[role="doc-backlink"]').click(),
+  ]) {
+    const before = await renderCounts(page);
+    await activate();
+    await settleRegions(page);
+    const after = await renderCounts(page);
+    unchanged(before, after, fixture.files.slice(1).map(file => file.filename));
+    for (const count of ['patch', 'projection', 'rows', 'diff', 'highlight']) {
+      expect(after.files[path][count], count).toBe(before.files[path][count]);
+    }
   }
   await page.getByRole('button', { name: `Collapse ${path}`, exact: true }).click();
   await expect(first.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
