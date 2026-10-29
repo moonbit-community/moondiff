@@ -174,9 +174,45 @@ test "scoping footnotes preserves nested link definitions and case folded refere
   assert_eq(rendered.split("role=\"doc-backlink\"").count() - 1, 2)
   assert_true(
     rendered.contains(
-      "href=\"https://github.com/upstream/project/guide\">Nested reference</a>",
+      "href=\"https://github.com/upstream/project/guide\" target=\"_blank\" rel=\"noopener noreferrer\">Nested reference</a>",
     ),
     msg=rendered,
+  )
+}
+
+///|
+test "web links open new tabs while mail and generated footnotes retain native behavior" {
+  let rendered = markdown_html(
+    "[ordinary](https://example.com/a?x=1&y=2 \"a & b\") [reference][ref] <http://example.com/auto> [![image](https://example.com/image.png)](/root) [mail](mailto:reader@example.com) <reader@example.com> Note[^note].\n\n[ref]: ../guide\n\n[^note]: footnote",
+    scope="targets",
+    markdown=image_test_context(),
+  )
+  assert_eq(
+    rendered.split("target=\"_blank\" rel=\"noopener noreferrer\"").count() - 1,
+    4,
+    msg=rendered,
+  )
+  assert_true(
+    rendered.contains(
+      "href=\"https://example.com/a?x=1&amp;y=2\" title=\"a &amp; b\" target=\"_blank\"",
+    ),
+  )
+  assert_true(rendered.contains("href=\"mailto:reader@example.com\">mail</a>"))
+  assert_true(
+    rendered.contains(
+      "href=\"mailto:reader@example.com\">reader@example.com</a>",
+    ),
+  )
+  assert_true(rendered.contains("role=\"doc-noteref\""))
+  assert_true(rendered.contains("role=\"doc-backlink\""))
+  let image_reference = markdown_html(
+    "[![image](https://example.com/image.png)][^note]\n\n[^note]: Footnote.",
+    scope="image-reference",
+  )
+  assert_eq(image_reference.split("<a ").count() - 1, 2, msg=image_reference)
+  assert_false(
+    image_reference.contains("target=\"_blank\""),
+    msg=image_reference,
   )
 }
 

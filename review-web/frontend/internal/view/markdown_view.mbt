@@ -13,8 +13,8 @@ fn markdown_html(
           context.string("<br>\n")
           true
         }
-        Link(link) => {
-          let inline = match link.v.reference_definition(context.doc.defs) {
+        Link(link) =>
+          match link.v.reference_definition(context.doc.defs) {
             Some(LinkDef(definition)) => {
               guard markdown_link_destination(
                   definition.v.dest.map(n => n.v).unwrap_or(""),
@@ -24,27 +24,43 @@ fn markdown_html(
                 context.inline(link.v.text)
                 return true
               }
-              @cmark.Inline::Link(
-                link.map(value => {
-                  ..value,
-                  reference: Inline(
-                    definition.map(value => {
-                      ..value,
-                      dest: Some(@cmark.Node::new(destination)),
-                    }),
-                  ),
-                }),
+              context.string(
+                markdown_link_open(
+                  destination,
+                  definition.v.title.map(lines => {
+                    lines.iter().map(t => t.node.v).join("\n")
+                  }),
+                ),
               )
+              // Child images reuse the outer link instead of nesting an anchor.
+              linked.val += 1
+              defer {
+                linked.val -= 1
+              }
+              context.inline(link.v.text)
+              context.string("</a>")
+              true
             }
             // Generated footnotes keep their document-local fragment links.
-            _ => inline
+            _ => {
+              linked.val += 1
+              defer {
+                linked.val -= 1
+              }
+              (safe.inline)(context, inline)
+            }
           }
-          // Child images reuse the outer link instead of nesting an anchor.
-          linked.val += 1
-          defer {
-            linked.val -= 1
+        Autolink(link) => {
+          let source = (if link.v.is_email { "mailto:" } else { "" }) +
+            link.v.link.v
+          if markdown_link_destination(source, markdown) is Some(destination) {
+            context.string(markdown_link_open(destination, None))
+            context.string(markdown_escape(link.v.link.v))
+            context.string("</a>")
+          } else {
+            context.string(markdown_escape(link.v.link.v))
           }
-          (safe.inline)(context, inline)
+          true
         }
         Image(image) => {
           guard image.v.reference_definition(context.doc.defs)
