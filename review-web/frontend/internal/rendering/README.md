@@ -226,6 +226,22 @@ Editor interaction is captured from the registered draft node at the event
 boundary and restored in the same region commit, before another browser event can
 modify the replacement editor. No global editor query is needed.
 
+Comment previews keep five lines and independent expansion state. The layout
+batch measures links, code blocks, table scroll containers and explicit tabindex
+elements against the preview, restoring their original attributes on expansion.
+Resize and image loading also move clipped focus to the toggle and reset the
+preview scroll position. Region disposal releases the tracked nodes and observer.
+
+Collapse and footnote navigation use transient application intents followed by
+`AfterCommit(PageLayout)`. Collapse preserves the toggle's viewport position;
+footnotes idempotently expand the comment before native fragment navigation and
+focus, accounting for the toolbar, file and section headings. A newer interaction,
+changed body, generation or owning region invalidates pending intent. Temporary
+footnote tabindex attributes last until blur. HTTP(S) Markdown links carry native
+new-tab attributes so following them preserves an open draft. Browser regressions
+live in `../../tests/comment-body.spec.mjs` and share `review-fixture.mjs` with
+the existing comment suite.
+
 The coordinator owns typed MoonBit layout and editor records. Layout measurements,
 read/write batching, callback queues and interaction restoration no longer live
 in JavaScript globals. The application owns the navigation landing snapshot and

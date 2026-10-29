@@ -3,11 +3,11 @@ priv struct CommentBody {
   body : @dom.Element
   clip : @dom.Element
   button : @dom.Element
-  mut links : Array[CommentBodyLink]
+  mut candidates : Array[CommentBodyFocus]
 }
 
 ///|
-priv struct CommentBodyLink {
+priv struct CommentBodyFocus {
   element : @dom.Element
   mut tabindex : String?
   mut suppressed : Bool
@@ -19,7 +19,7 @@ priv struct CommentBodyLayout {
   preview : Double
   natural : Double
   expanded : Bool
-  visible_links : Array[Bool]
+  visible_candidates : Array[Bool]
   focus_hidden : Bool
 }
 
@@ -46,23 +46,26 @@ fn CommentBodies::sync(
         .unwrap_or_else(() => {
           // The inner Markdown always keeps its natural height, including images.
           observer.observe(body)
-          { body, clip, button, links: [], }
+          { body, clip, button, candidates: [], }
         })
-      let links : Array[CommentBodyLink] = []
-      // innerHTML can replace anchors while retaining the Markdown container.
-      for element in body.query_selector_all("a[href]").iter() {
-        links.push(
-          entry.links
+      let candidates : Array[CommentBodyFocus] = []
+      // innerHTML can replace focus candidates while retaining the Markdown container.
+      for
+        element in body
+        .query_selector_all("a[href], pre, div[role=\"region\"], [tabindex]")
+        .iter() {
+        candidates.push(
+          entry.candidates
           .iter()
-          .find_first(link => @browser.same(link.element, element))
+          .find_first(candidate => @browser.same(candidate.element, element))
           .unwrap_or_else(() => {
             element,
-            tabindex: element.get_attribute("tabindex"),
+            tabindex: comment_body_tabindex(element),
             suppressed: false,
           }),
         )
       }
-      entry.links = links
+      entry.candidates = candidates
       entries.push(entry)
     }
   }
@@ -83,17 +86,30 @@ fn CommentBodies::read(self : CommentBodies) -> Array[CommentBodyLayout] {
     let preview = @browser.parse_float(style["line-height"]) * 5.0
     let body = entry.body.get_bounding_client_rect()
     let expanded = entry.clip.get_attribute("data-expanded") == Some("true")
-    let mut focus_hidden = false
-    let visible_links = entry.links.map(link => {
-      if !link.suppressed {
-        link.tabindex = link.element.get_attribute("tabindex")
+    // Include focused fragment targets as well as tracked Tab candidates.
+    let focus_hidden = !expanded &&
+      active
+      .map(active => {
+        entry.body.contains(active.as_node()) &&
+        !active
+        .get_client_rects()
+        .iter()
+        .all(rect => {
+          rect.get_top() >= body.get_top() - 0.5 &&
+          rect.get_bottom() <= body.get_top() + preview + 0.5
+        })
+      })
+      .unwrap_or(false)
+    let visible_candidates = entry.candidates.map(candidate => {
+      if !candidate.suppressed {
+        candidate.tabindex = comment_body_tabindex(candidate.element)
       }
       let visible = if expanded {
         true
       } else {
-        // Read every fragment of wrapped links relative to the natural body.
+        // Read every fragment of wrapped candidates relative to the natural body.
         // This remains correct when a prior focus/fragment jump scrolled the clip.
-        let rects = link.element.get_client_rects()
+        let rects = candidate.element.get_client_rects()
         rects.length() > 0 &&
         rects
         .iter()
@@ -102,11 +118,6 @@ fn CommentBodies::read(self : CommentBodies) -> Array[CommentBodyLayout] {
           rect.get_bottom() <= body.get_top() + preview + 0.5
         })
       }
-      if !visible &&
-        active is Some(active) &&
-        @browser.same(active, link.element) {
-        focus_hidden = true
-      }
       visible
     })
     layouts.push({
@@ -114,11 +125,20 @@ fn CommentBodies::read(self : CommentBodies) -> Array[CommentBodyLayout] {
       preview,
       natural: body.get_height(),
       expanded,
-      visible_links,
+      visible_candidates,
       focus_hidden,
     })
   }
   layouts
+}
+
+///|
+fn comment_body_tabindex(element : @dom.Element) -> String? {
+  if element.get_attribute("data-comment-footnote-focus") is Some(_) {
+    None
+  } else {
+    element.get_attribute("tabindex")
+  }
 }
 
 ///|
@@ -127,7 +147,7 @@ fn CommentBodies::write(
   layouts : ArrayView[CommentBodyLayout],
 ) -> Unit {
   for
-    { entry, preview, natural, expanded, visible_links, focus_hidden, } in layouts {
+    { entry, preview, natural, expanded, visible_candidates, focus_hidden, } in layouts {
     if !@browser.finite(preview) || preview <= 0.0 {
       continue
     }
@@ -141,16 +161,16 @@ fn CommentBodies::write(
     } else {
       entry.button.set_attribute("hidden", "")
     }
-    for index, link in entry.links {
-      if !visible_links[index] {
-        link.element.set_attribute("tabindex", "-1")
-        link.suppressed = true
-      } else if link.suppressed {
-        match link.tabindex {
-          Some(value) => link.element.set_attribute("tabindex", value)
-          None => link.element.remove_attribute("tabindex")
+    for index, candidate in entry.candidates {
+      if !visible_candidates[index] {
+        candidate.element.set_attribute("tabindex", "-1")
+        candidate.suppressed = true
+      } else if candidate.suppressed {
+        match candidate.tabindex {
+          Some(value) => candidate.element.set_attribute("tabindex", value)
+          None => candidate.element.remove_attribute("tabindex")
         }
-        link.suppressed = false
+        candidate.suppressed = false
       }
     }
     if !expanded {

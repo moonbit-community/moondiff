@@ -30,15 +30,21 @@ pub fn clear_navigation_landing(@dom.Element) -> Unit
 
 pub fn clear_navigation_landings() -> Unit
 
+pub fn discard_comment_body_region(Int32, Region) -> Unit
+
 pub fn file_dom_id(Int32) -> String
 
 pub fn file_navigation_enabled(Model, Int32) -> Bool
+
+pub fn follow_comment_footnote(@dom.MouseEvent, Int32, @comments.CommentId, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn home_pull_key(@moondiff-review-web-protocol.ApiPullSummary) -> String
 
 pub fn navigate_section_change(@dom.MouseEvent, Int32, Int32, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn navigation_scrolled(@dom.Element) -> Unit
+
+pub fn prepare_comment_body(Model, Msg) -> Unit
 
 pub fn prepare_sign_in_dialog(Model, Msg) -> Unit
 
@@ -51,6 +57,8 @@ pub fn range_pull_selector_ready(RangeState) -> Bool
 pub fn range_selected_path(@github.CommitRef, RangeState) -> String?
 
 pub fn snapshot_confirmed(Model) -> Bool
+
+pub fn toggle_comment_body(@dom.MouseEvent, Int32, @comments.CommentId, @cmd.Emit[Msg]) -> @cmd.Cmd
 
 pub fn trap_sign_in_focus(@dom.KeyboardEvent) -> Unit
 
@@ -91,6 +99,18 @@ pub(all) enum AuthStatus {
   SignedIn(login~ : String?, user_id~ : String?, install_url~ : String?)
   AuthFailed(String)
 } derive(Eq)
+
+pub(all) enum CommentBodyAction {
+  Toggle(Double)
+  Footnote(String)
+}
+
+pub(all) struct CommentBodyRequest {
+  generation : Int32
+  id : @comments.CommentId
+  region : Region
+  action : CommentBodyAction
+}
 
 pub(all) enum CommitScope {
   Region
@@ -399,6 +419,7 @@ pub fn Region::key(Self) -> String
 
 pub(all) enum ReviewMsg {
   Domain(@comments.Event)
+  BodyActivated(CommentBodyRequest)
   RefreshComments
   LoadLatestSnapshot
   BeginCommentsRefresh(Int32, @github.CommitRef)
