@@ -211,6 +211,50 @@ fn ci_status_view(status : @protocol.ApiPullMergeStatus) -> @rabbita.Html {
 }
 
 ///|
+// Navigation depends only on the action, not CI results, errors or poll metadata.
+fn PullMergeInput::rebase_merge_input(
+  self : PullMergeInput,
+) -> RebaseMergeInput? {
+  guard !self.state.stale &&
+    !self.snapshot_stale &&
+    self.auth is SignedIn(..) &&
+    self.state.status is Some(status) &&
+    status.open &&
+    !status.merged &&
+    !status.draft &&
+    status.mergeable is Some(true) &&
+    status.rebaseable is Some(true) else {
+    return None
+  }
+  Some({
+    disabled: self.state.loading ||
+    self.state.submitting ||
+    !self.write_enabled ||
+    status.mergeable_state == "blocked",
+    submitting: self.state.submitting,
+  })
+}
+
+///|
+fn rebase_merge_button(
+  input : RebaseMergeInput?,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Html {
+  guard input is Some(input) else { return @html.nothing }
+  @html.button(
+    type_="button",
+    class="rebase-merge-button",
+    disabled=input.disabled,
+    on_click=emit(PullMerge(Submit)),
+    if input.submitting {
+      "Rebasing and merging…"
+    } else {
+      "Rebase and merge"
+    },
+  )
+}
+
+///|
 fn pull_merge_action_view(
   input : PullMergeInput,
   emit : @rabbita.Emit[Msg],
@@ -290,27 +334,10 @@ fn pull_merge_action_view(
   if status.mergeable_state == "blocked" {
     return @html.div(class="pull-merge-action-state", [
       @html.p("○ Repository rules currently block this merge."),
-      @html.button(
-        type_="button",
-        class="rebase-merge-button",
-        disabled=true,
-        "Rebase and merge",
-      ),
+      rebase_merge_button(input.rebase_merge_input(), emit),
     ])
   }
-  @html.button(
-    type_="button",
-    class="rebase-merge-button",
-    disabled=input.state.loading ||
-      input.state.submitting ||
-      !input.write_enabled,
-    on_click=emit(PullMerge(Submit)),
-    if input.state.submitting {
-      "Rebasing and merging…"
-    } else {
-      "Rebase and merge"
-    },
-  )
+  rebase_merge_button(input.rebase_merge_input(), emit)
 }
 
 ///|

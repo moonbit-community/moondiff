@@ -108,6 +108,11 @@ pub(all) struct RangePanelInput {
   file_count : Int32
 } derive(Eq)
 
+pub(all) struct RebaseMergeInput {
+  disabled : Bool
+  submitting : Bool
+} derive(Eq)
+
 pub(all) enum RegionInput {
   Home(@application.AuthStatus, @application.HomeState)
   Toolbar(ToolbarInput)
