@@ -147,12 +147,25 @@ fn LayoutState::observe(
     let title = host.closest(".change-titlebar").unwrap()
     elements.push(title)
     elements.push(main)
+    prepare = () => @application.clear_navigation_landing(main)
+    read = () => {
+      let rect = title.get_bounding_client_rect()
+      [
+        rect.get_height(),
+        if host.query_selector(".rebase-merge-button") is Some(_) &&
+          rebase_merge_in_titlebar(main, rect.get_bottom()) {
+          1.0
+        } else {
+          0.0
+        },
+      ]
+    }
     write = heights => {
       @browser.style(main).set_property(
         "--change-title-height",
         "\{heights[0]}px",
       )
-      @application.clear_navigation_landing(main)
+      place_rebase_merge(main, heights[1] == 1.0)
     }
   }
   let bodies : CommentBodies = { host, entries: [], }
@@ -190,6 +203,10 @@ fn LayoutState::observe(
     if main is Some(main) {
       @application.navigation_scrolled(main)
     }
+    if host.query_selector(".rebase-merge-button") is Some(_) {
+      self.dirty[host_id] = record
+      self.schedule()
+    }
   }
   if region == "navigation" {
     @dom.window().add_event_listener("resize", on_resize)
@@ -205,6 +222,9 @@ fn LayoutState::observe(
   } else {
     let observer = @dom.ResizeObserver::new((_, _) => {
       guard record.alive else { return }
+      if region == "navigation" {
+        clear_landing(main)
+      }
       self.dirty[host_id] = record
       self.schedule()
     })
@@ -232,6 +252,9 @@ fn LayoutState::observe(
     if region == "navigation" {
       @dom.window().remove_event_listener("resize", on_resize)
       @dom.window().remove_event_listener("scroll", on_scroll)
+      if main is Some(main) {
+        main.remove_attribute("data-rebase-in-titlebar")
+      }
     }
     if region == "toolbar" && host.closest(".workspace") is Some(workspace) {
       ignore(@browser.style(workspace).remove_property("--toolbar-inset"))

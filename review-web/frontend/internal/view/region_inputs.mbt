@@ -127,6 +127,7 @@ pub(all) struct TreeInput {
 pub(all) struct NavigationInput {
   generation : Int32
   enabled : Bool
+  rebase_merge : RebaseMergeInput?
 } derive(Eq)
 
 ///|
@@ -310,6 +311,12 @@ pub fn RegionProjection::inputs(
   }
   let is_pull = view.reference.target is PullRequest(_)
   let is_range = view.reference.target is (Range(_, _) | PullRange(_, _, _))
+  let pull_merge : PullMergeInput = {
+    state: model.pull_merge,
+    auth: model.auth,
+    snapshot_stale: model.review.snapshot_stale,
+    write_enabled: @application.writes_allowed(model),
+  }
   if model.range is Some(state) {
     inputs.push(
       (
@@ -342,7 +349,18 @@ pub fn RegionProjection::inputs(
     inputs.push((File(file.file.filename), File(input)))
   }
   inputs.push(
-    (Navigation, Navigation({ generation: model.generation, enabled, })),
+    (
+      Navigation,
+      Navigation({
+        generation: model.generation,
+        enabled,
+        rebase_merge: if is_pull {
+          pull_merge.rebase_merge_input()
+        } else {
+          None
+        },
+      }),
+    ),
   )
   if !is_range {
     inputs.push(
@@ -382,17 +400,7 @@ pub fn RegionProjection::inputs(
     )
   }
   if is_pull {
-    inputs.push(
-      (
-        PullMergeStatus,
-        PullMergeStatus({
-          state: model.pull_merge,
-          auth: model.auth,
-          snapshot_stale: model.review.snapshot_stale,
-          write_enabled: @application.writes_allowed(model),
-        }),
-      ),
-    )
+    inputs.push((PullMergeStatus, PullMergeStatus(pull_merge)))
   }
   inputs
 }
