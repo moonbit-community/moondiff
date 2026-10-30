@@ -52,7 +52,7 @@ fn parse_patch_decimal(value : String) -> Int32? {
 ///|
 fn parse_patch_range(token : String, prefix : Char) -> PatchRange? {
   guard token.get_char(0) == Some(prefix) else { return None }
-  let rest = token.view(start_offset=1).to_owned()
+  let rest = token[1:].to_owned()
   let parts : Array[String] = rest
     .split(",")
     .map(StringView::to_owned)

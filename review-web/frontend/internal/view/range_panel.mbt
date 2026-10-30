@@ -1,6 +1,6 @@
 ///|
 fn range_short_sha(sha : String) -> String {
-  sha.view(start_offset=0, end_offset=Int32::min(7, sha.length())).to_owned()
+  sha[0:Int32::min(7, sha.length())].to_owned()
 }
 
 ///|

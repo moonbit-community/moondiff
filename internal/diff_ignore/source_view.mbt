@@ -229,7 +229,7 @@ fn mark_comment(
     return
   }
   guard source_comment_start(line) is Some(comment_start) else { return }
-  let prefix = line.view(end_offset=comment_start).to_owned()
+  let prefix = line[:comment_start].to_owned()
   let code = prefix.trim_end().to_owned()
   mark_ignored_range(
     ignored,

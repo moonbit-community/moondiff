@@ -12,7 +12,7 @@ test "plain unified hunks preserve renderer boundaries and file-edge ranges" {
   let removed = @linediff.line_diff(old=["x", ""], new=[], context=0)
   assert_eq(@unified.render_unified_hunks(removed), ["@@ -1,2 +0,0 @@\n-x\n-\n"])
   for patch in patches {
-    let header = patch.view(end_offset=patch.find("\n").unwrap())
+    let header = patch[:patch.find("\n").unwrap()]
     assert_true(
       @render_html.render_unified(document).contains(
         "<span class=\"hunk-header\">\{header}</span>",
@@ -32,7 +32,7 @@ test "MoonBit hunks follow semantic line cleanup used by HTML" {
   assert_eq(cleaned.length(), 1)
   assert_true(cleaned[0].contains("-let b = old\n"))
   assert_true(cleaned[0].contains("+let b = new\n"))
-  let header = cleaned[0].view(end_offset=cleaned[0].find("\n").unwrap())
+  let header = cleaned[0][:cleaned[0].find("\n").unwrap()]
   assert_true(
     @render_html.render_side_by_side(cleaned_document).contains(
       "<td class=\"hunk-header\" colspan=\"2\">\{header}</td>",
@@ -152,7 +152,7 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
     assert_eq(rendered_hunks.length(), semantic_patches.length())
     for index, rendered in rendered_hunks {
       let patch = semantic_patches[index]
-      let header = patch.view(end_offset=patch.find("\n").unwrap())
+      let header = patch[:patch.find("\n").unwrap()]
       assert_true(rendered.contains(header))
       assert_eq(rendered.split("class=\"hunk-header\"").count(), 2)
     }
@@ -165,7 +165,7 @@ test "per-hunk HTML renderers preserve indexes, wrappers, and notes" {
     assert_eq(rendered_hunks.length(), plain_patches.length())
     for index, rendered in rendered_hunks {
       let patch = plain_patches[index]
-      let header = patch.view(end_offset=patch.find("\n").unwrap())
+      let header = patch[:patch.find("\n").unwrap()]
       assert_true(rendered.contains(header))
       assert_eq(rendered.split("class=\"hunk-header\"").count(), 2)
     }
