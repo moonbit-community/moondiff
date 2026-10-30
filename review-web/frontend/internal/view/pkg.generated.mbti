@@ -91,6 +91,7 @@ pub(all) struct MountHost {
 pub(all) struct NavigationInput {
   generation : Int32
   enabled : Bool
+  rebase_merge : RebaseMergeInput?
 } derive(Eq)
 
 pub(all) struct PullMergeInput {

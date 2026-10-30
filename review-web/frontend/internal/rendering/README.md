@@ -95,7 +95,7 @@ Verification for PR prefetch and progressive expansion:
 | Shell | generation, phase, file identities, drawer, width, layout signature |
 | Toolbar | URL, auth on landing, file count, drawer, display options |
 | File tree | path/status metadata, tree controls, Viewed markers |
-| Navigation | generation, whether any expanded unviewed file has changes |
+| Navigation | generation, whether any expanded unviewed file has changes, rebase button availability/disabled/submitting state |
 | Viewed summary | auth, Viewed aggregate, snapshot staleness |
 | Overall discussion | overall comments, auth/refresh notices, permission summary, its draft |
 | File and fallback discussions | that FileState identity, display options, its Viewed state, its comment group and draft, permission summary |

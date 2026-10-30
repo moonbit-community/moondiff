@@ -1758,10 +1758,14 @@ button.file-tree-row.selected {
 .section-change-controls {
   display: inline-flex;
   flex: none;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
   gap: 0.2rem;
 }
 
 .section-change-button {
+  flex: none;
   width: auto;
   min-width: 4rem;
   height: 1.65rem;
@@ -3516,7 +3520,36 @@ button.rebase-merge-button {
 button.rebase-merge-button:hover { border-color: #1a7f37; background: #1a7f37; }
 button.rebase-merge-button:disabled { cursor: default; opacity: 0.58; }
 
+/* Keep both slots sized so moving the action cannot move the scroll threshold. */
+.change-titlebar:has(.rebase-merge-button) {
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
+}
+
+.change-titlebar:has(.rebase-merge-button) .commit-message-title {
+  flex: 1 1 18rem;
+}
+
+.change-titlebar .rebase-merge-button {
+  visibility: hidden;
+  min-width: 0;
+  margin-left: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.change-main[data-rebase-in-titlebar] .change-titlebar .rebase-merge-button {
+  visibility: visible;
+}
+
+.change-main[data-rebase-in-titlebar] .pull-merge-card .rebase-merge-button {
+  visibility: hidden;
+}
+
 @media (max-width: 540px) {
+  .change-titlebar:has(.rebase-merge-button) .commit-message-title { flex-basis: 100%; }
   .pull-merge-card { border-radius: 0; padding-inline: 0.7rem; }
   .pull-ci-summary { align-items: flex-start; flex-wrap: wrap; }
   .pull-ci-toggle { margin-left: 1.9rem; }
