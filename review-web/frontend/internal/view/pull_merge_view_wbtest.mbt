@@ -40,6 +40,67 @@ fn pull_merge_view_status() -> @protocol.ApiPullMergeStatus {
 }
 
 ///|
+test "rebase button projection preserves eligibility and disabled states" {
+  let status = pull_merge_view_status()
+  let input : PullMergeInput = {
+    state: { ..test_pull_merge_state(), status: Some(status), },
+    auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
+    snapshot_stale: false,
+    write_enabled: true,
+  }
+  assert_true(
+    input.rebase_merge_input() is Some({ disabled: false, submitting: false, }),
+  )
+  for
+    hidden in [
+      { ..input, snapshot_stale: true, },
+      { ..input, state: { ..input.state, stale: true, }, },
+      { ..input, auth: Anonymous(None), },
+      { ..input, state: { ..input.state, status: None, }, },
+    ] {
+    assert_true(hidden.rebase_merge_input() is None)
+  }
+  for
+    unavailable in [
+      { ..status, open: false, },
+      { ..status, merged: true, },
+      { ..status, draft: true, },
+      { ..status, mergeable: Some(false), },
+      { ..status, rebaseable: Some(false), },
+      { ..status, mergeable: None, },
+      { ..status, rebaseable: None, },
+    ] {
+    let hidden = {
+      ..input,
+      state: { ..input.state, status: Some(unavailable), },
+    }
+    assert_true(hidden.rebase_merge_input() is None)
+  }
+  for
+    disabled in [
+      { ..input, write_enabled: false, },
+      { ..input, state: { ..input.state, loading: true, }, },
+      {
+        ..input,
+        state: {
+          ..input.state,
+          status: Some({ ..status, mergeable_state: "blocked", }),
+        },
+      },
+    ] {
+    assert_true(
+      disabled.rebase_merge_input()
+      is Some({ disabled: true, submitting: false, }),
+    )
+  }
+  let submitting = { ..input, state: { ..input.state, submitting: true, }, }
+  assert_true(
+    submitting.rebase_merge_input()
+    is Some({ disabled: true, submitting: true, }),
+  )
+}
+
+///|
 #warnings("-alert_unstable")
 test "CI copy follows GitHub state wording and count grammar" {
   let success : @protocol.ApiCiCheck = {

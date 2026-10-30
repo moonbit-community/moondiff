@@ -130,6 +130,12 @@ pub(all) struct NavigationInput {
 } derive(Eq)
 
 ///|
+pub(all) struct RebaseMergeInput {
+  disabled : Bool
+  submitting : Bool
+} derive(Eq)
+
+///|
 pub(all) struct DiscussionInput {
   generation : Int32
   is_pull : Bool
