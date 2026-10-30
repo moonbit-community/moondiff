@@ -138,12 +138,8 @@ fn percent_encode_path(path : String) -> String {
       encoded.write_char(byte.to_char())
     } else {
       encoded.write_char('%')
-      encoded.write_view(
-        hex.view(start_offset=value / 16, end_offset=value / 16 + 1),
-      )
-      encoded.write_view(
-        hex.view(start_offset=value % 16, end_offset=value % 16 + 1),
-      )
+      encoded.write_view(hex[value / 16:value / 16 + 1])
+      encoded.write_view(hex[value % 16:value % 16 + 1])
     }
   }
   encoded.to_string()
