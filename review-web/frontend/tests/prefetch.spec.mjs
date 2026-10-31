@@ -572,6 +572,8 @@ test('hidden homepages do not start background reads and sign-out rejects late r
 });
 
 test('fixed-fixture cold and prefetched navigation report readable diff latency, restoration and hit metrics', async ({ page }, testInfo) => {
+  // Allow all twelve navigation rounds to finish on shared CI runners.
+  test.setTimeout(60_000);
   const state = await fixture(page, async ({ kind }) => {
     if (['PullGet', 'CompareGet', 'PullFiles', 'ContentGet'].includes(kind)) await new Promise(resolve => setTimeout(resolve, 25));
     return false;
