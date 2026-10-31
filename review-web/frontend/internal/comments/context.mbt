@@ -67,7 +67,19 @@ pub fn update(session : Session, event : Event) -> (Session, Array[Effect]) {
     } else {
       session.snapshot_stale
     }
-    return ({ ..session, context, snapshot_stale: stale, }, [])
+    return (
+      {
+        ..session,
+        context,
+        snapshot_stale: stale,
+        expanded_bodies: if context.generation == session.context.generation {
+          session.expanded_bodies
+        } else {
+          []
+        },
+      },
+      [],
+    )
   }
   let context = session.context
   let model = Model::{

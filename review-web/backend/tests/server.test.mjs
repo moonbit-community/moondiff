@@ -159,7 +159,7 @@ function raw(f, path, method = 'GET') {
 
 test('Wasm serves direct routes and HEAD; denies traversal, symlinks, missing paths', async t => {
   const f = await startServer(); t.after(() => f.close());
-  const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+  const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com data: https://github.com https://user-images.githubusercontent.com https://private-user-images.githubusercontent.com https://raw.githubusercontent.com https://camo.githubusercontent.com https://github-production-user-asset-6210df.s3.amazonaws.com; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
   for (const path of ['/', '/alice/repo/pull/42', '/alice/repo/commit/123abcd', '/alice/repo/pull/42/commits/123abcd', '/alice/repo/compare/123abcd..abcdef0', '/alice/repo/pull/42/compare/123abcd..abcdef0']) {
     const res = await fetch(f.base + path); assert.equal(res.status, 200); assert.equal(res.headers.get('content-security-policy'), contentSecurityPolicy); assert.match(await res.text(), /fixture/);
   }

@@ -171,6 +171,8 @@ test "every RPC result and response envelope roundtrips including int64 ids" {
     }),
     Pull({
       title: "pull",
+      body: None,
+      user: Some(user),
       html_url: "url",
       base: { sha: "123abcd", repo: Some({ full_name: "alice/repo", }), },
       head: { sha: "abcdef0", repo: None, },

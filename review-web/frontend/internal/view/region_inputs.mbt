@@ -15,6 +15,7 @@ pub(all) struct FileInput {
   review : @comments.ReadView
   viewed : ViewedControl
   navigation_enabled : Bool
+  markdown : MarkdownContext?
 }
 
 ///|
@@ -25,7 +26,8 @@ pub impl Eq for FileInput with fn equal(a, b) {
   a.display == b.display &&
   a.review == b.review &&
   a.viewed == b.viewed &&
-  a.navigation_enabled == b.navigation_enabled
+  a.navigation_enabled == b.navigation_enabled &&
+  a.markdown == b.markdown
 }
 
 ///|
@@ -49,6 +51,7 @@ fn file_input(
     },
     viewed: viewed_control(is_pull, model, index, file.file.filename),
     navigation_enabled: @application.file_navigation_enabled(model, index),
+    markdown: markdown_context(model),
   }
 }
 
@@ -124,6 +127,13 @@ pub(all) struct TreeInput {
 pub(all) struct NavigationInput {
   generation : Int32
   enabled : Bool
+  rebase_merge : RebaseMergeInput?
+} derive(Eq)
+
+///|
+pub(all) struct RebaseMergeInput {
+  disabled : Bool
+  submitting : Bool
 } derive(Eq)
 
 ///|
@@ -133,6 +143,7 @@ pub(all) struct DiscussionInput {
   review : @comments.ReadView
   auth : @application.AuthStatus
   sign_in_dialog : @application.SignInDialog
+  markdown : MarkdownContext?
 } derive(Eq)
 
 ///|
@@ -182,6 +193,9 @@ pub(all) struct ShellInput {
   showing : Bool
   selector_only : Bool
   message : String
+  pull_body : String?
+  pull_user : @protocol.ApiCommentUser?
+  markdown : MarkdownContext?
   drawer_open : Bool
   preferred_width : Int32
   display : DisplayOptions
@@ -200,6 +214,17 @@ pub fn shell_input(model : Model) -> ShellInput {
       Showing(view) => view.message
       _ => ""
     },
+    pull_body: match model.phase {
+      Showing(view) => view.pull_snapshot.bind(pull => pull.body)
+      ShowingPullSelector(pull) => pull.body
+      _ => None
+    },
+    pull_user: match model.phase {
+      Showing(view) => view.pull_snapshot.bind(pull => pull.user)
+      ShowingPullSelector(pull) => pull.user
+      _ => None
+    },
+    markdown: markdown_context(model),
     drawer_open: model.file_tree.drawer_open,
     preferred_width: model.file_tree.preferred_width,
     display: display_options(model),
@@ -286,6 +311,12 @@ pub fn RegionProjection::inputs(
   }
   let is_pull = view.reference.target is PullRequest(_)
   let is_range = view.reference.target is (Range(_, _) | PullRange(_, _, _))
+  let pull_merge : PullMergeInput = {
+    state: model.pull_merge,
+    auth: model.auth,
+    snapshot_stale: model.review.snapshot_stale,
+    write_enabled: @application.writes_allowed(model),
+  }
   if model.range is Some(state) {
     inputs.push(
       (
@@ -318,7 +349,18 @@ pub fn RegionProjection::inputs(
     inputs.push((File(file.file.filename), File(input)))
   }
   inputs.push(
-    (Navigation, Navigation({ generation: model.generation, enabled, })),
+    (
+      Navigation,
+      Navigation({
+        generation: model.generation,
+        enabled,
+        rebase_merge: if is_pull {
+          pull_merge.rebase_merge_input()
+        } else {
+          None
+        },
+      }),
+    ),
   )
   if !is_range {
     inputs.push(
@@ -352,22 +394,13 @@ pub fn RegionProjection::inputs(
           review: model.review.read_view(paths~, group~),
           auth: model.auth,
           sign_in_dialog: model.sign_in_dialog,
+          markdown: markdown_context(model),
         }),
       ),
     )
   }
   if is_pull {
-    inputs.push(
-      (
-        PullMergeStatus,
-        PullMergeStatus({
-          state: model.pull_merge,
-          auth: model.auth,
-          snapshot_stale: model.review.snapshot_stale,
-          write_enabled: @application.writes_allowed(model),
-        }),
-      ),
-    )
+    inputs.push((PullMergeStatus, PullMergeStatus(pull_merge)))
   }
   inputs
 }

@@ -98,7 +98,10 @@ fn comment_body_view(
   id : @comments.CommentId,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
+  markdown? : MarkdownContext,
 ) -> @rabbita.Html {
+  let body_id = "comment-body-" + review.comment_key(id)
+  let expanded = review.body_expanded(id)
   @html.article(class="github-comment", [
     @html.div(class="github-comment-meta", [
       comment_avatar(if author == "ghost" { None } else { Some(author) }),
@@ -112,7 +115,46 @@ fn comment_body_view(
       ]),
       comment_menu(id, html_url, review, emit),
     ]),
-    @html.p(class="github-comment-body", body),
+    @html.div(
+      class="github-comment-content",
+      attrs=@html.Attrs::build().on_click(event => {
+        @application.follow_comment_footnote(event, review.generation, id, emit)
+      }),
+      [
+        @html.div(
+          id=body_id,
+          class="comment-body-clip",
+          attrs=@html.Attrs::build().data_set("expanded", expanded.to_string()),
+          markdown_view(
+            body,
+            class="github-comment-body",
+            scope=review.comment_key(id),
+            markdown?=markdown.map(context => { ..context, page_url: html_url, }),
+          ),
+        ),
+        @html.button(
+          type_="button",
+          class="comment-body-toggle",
+          hidden=true,
+          attrs=@html.Attrs::build()
+            .aria_expanded(expanded.to_string())
+            .aria_controls(body_id)
+            .on_click(event => {
+              @application.toggle_comment_body(
+                event,
+                review.generation,
+                id,
+                emit,
+              )
+            }),
+          if expanded {
+            "Show less"
+          } else {
+            "Show more"
+          },
+        ),
+      ],
+    ),
     comment_delete_controls(id, review, emit),
   ])
 }

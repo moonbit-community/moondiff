@@ -9,6 +9,8 @@ const success = (kind, value) => ({ $tag: 'Success', value: { $tag: kind, '0': v
 const failure = (code, message, status = 502) => ({ status, json: { $tag: 'Failure', error: { status, code, message } } });
 const gate = createGate;
 async function setup(page, handler) {
+  // Avatar requests are decorative and must not hold fixture cleanup open.
+  await page.route('https://github.com/*.png?size=64', route => route.abort());
   const state = { user: 'alice', calls: [], statusGate: null, installUrl: null };
   await page.addInitScript(() => {
     window.dashboardDocumentId = crypto.randomUUID();

@@ -80,6 +80,8 @@ fn pull_region_model() -> Model {
   let head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   let pull : @protocol.ApiPull = {
     title: "Pull request",
+    body: None,
+    user: None,
     html_url: "https://github.com/owner/repo/pull/17",
     base: { sha: base, repo: Some({ full_name: "owner/repo", }), },
     head: { sha: head, repo: Some({ full_name: "owner/repo", }), },
@@ -293,13 +295,16 @@ test "sign-in dialog changes invalidate only Discussion" {
 }
 
 ///|
-test "merge status changes invalidate only the independent merge region" {
+test "merge action changes invalidate navigation and the independent merge region" {
   assert_false(
     RegionProjection::new()
     .inputs(region_model())
     .any(entry => entry.0 is PullMergeStatus),
   )
-  let model = pull_region_model()
+  let model = {
+    ..pull_region_model(),
+    auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
+  }
   let projection = RegionProjection::new()
   let before = projection.inputs(model)
   let status : @protocol.ApiPullMergeStatus = {
@@ -325,11 +330,33 @@ test "merge status changes invalidate only the independent merge region" {
     let (before_region, before_input) = before[index]
     let (after_region, after_input) = after[index]
     assert_true(before_region == after_region)
-    if before_region is PullMergeStatus {
+    if before_region is (PullMergeStatus | Navigation) {
       assert_false(before_input == after_input)
     } else {
       assert_true(before_input == after_input)
     }
+  }
+  // Error messages and CI details stay local when the button state is unchanged.
+  let ci_changed = {
+    ..changed,
+    pull_merge: {
+      ..changed.pull_merge,
+      status: Some({
+        ..status,
+        ci_summary: Some(Failure),
+        ci_warnings: ["CI results are incomplete"],
+      }),
+      error: Some("Try again"),
+      serial: changed.pull_merge.serial + 1,
+      poll_scheduled: true,
+    },
+  }
+  let after_ci = projection.inputs(ci_changed)
+  for index in 0..<after.length() {
+    assert_eq(
+      after[index].1 != after_ci[index].1,
+      after[index].0 is PullMergeStatus,
+    )
   }
 }
 

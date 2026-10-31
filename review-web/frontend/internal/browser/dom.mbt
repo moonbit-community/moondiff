@@ -103,6 +103,25 @@ pub fn[T] event_property(event : @dom.Event, name : String) -> T {
 pub extern "js" fn mouse_click() -> @dom.Event = "() => new MouseEvent('click')"
 
 ///|
+pub fn fragment_target(href : String) -> @dom.Element? {
+  fragment_target_native(href).to_option()
+}
+
+///|
+extern "js" fn fragment_target_native(
+  href : String,
+) -> @js.Nullable[@dom.Element] =
+  #| href => {
+  #|   if (!href.startsWith('#')) return null;
+  #|   try { return document.getElementById(decodeURIComponent(href.slice(1))); }
+  #|   catch { return null; }
+  #| }
+
+///|
+pub extern "js" fn navigate_fragment(id : String) -> Unit =
+  #| id => { location.hash = encodeURIComponent(id); }
+
+///|
 pub extern "js" fn intersection_observer(
   callback : (
     FixedArray[@dom.IntersectionObserverEntry],
@@ -110,3 +129,13 @@ pub extern "js" fn intersection_observer(
   ) -> Unit,
   margin : String,
 ) -> @dom.IntersectionObserver = "(callback, rootMargin) => new IntersectionObserver(callback, { rootMargin })"
+
+///|
+pub extern "js" fn mutation_added_nodes(
+  record : @dom.MutationRecord,
+) -> FixedArray[@dom.Node] = "record => Array.from(record.addedNodes)"
+
+///|
+pub extern "js" fn mutation_has_removed_nodes(
+  record : @dom.MutationRecord,
+) -> Bool = "record => record.removedNodes.length > 0"

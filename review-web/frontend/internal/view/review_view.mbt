@@ -702,6 +702,7 @@ fn review_thread_view(
   thread : ReviewThread,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
+  markdown? : MarkdownContext,
 ) -> @rabbita.Html {
   let can_comment = review.permissions.can_comment
   let comments : Map[String, @rabbita.Html] = Map([])
@@ -713,6 +714,7 @@ fn review_thread_view(
     ReviewComment(thread.root.id),
     review,
     emit,
+    markdown?,
   )
   for reply in thread.replies {
     comments[review.comment_key(ReviewComment(reply.id))] = comment_body_view(
@@ -723,6 +725,7 @@ fn review_thread_view(
       ReviewComment(reply.id),
       review,
       emit,
+      markdown?,
     )
   }
   let reply_draft = review
@@ -903,6 +906,7 @@ fn comments_overview(
       IssueComment(comment.id),
       review,
       emit,
+      markdown?=input.markdown,
     )
   }
   @html.section(id="comments", class="comments-overview", [
@@ -973,7 +977,10 @@ fn comments_overview(
       Failed(message) => @html.p(class="comment-error", message)
       _ => @html.nothing
     },
-    fallback_discussions(prepare_discussions(None, None, review, emit), None),
+    fallback_discussions(
+      prepare_discussions(None, None, review, emit, markdown?=input.markdown),
+      None,
+    ),
     if is_pull {
       @html.div(class="overall-comments", [
         @html.div(issue_views),

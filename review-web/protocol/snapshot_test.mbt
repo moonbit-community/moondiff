@@ -25,6 +25,8 @@ test "pull snapshot is a validated read-only v2 operation" {
 test "complete and metadata-only snapshot results roundtrip with a semantic signature" {
   let metadata : @protocol.ApiPull = {
     title: "Snapshot",
+    body: Some("## Description\n\nA **Markdown** PR body."),
+    user: Some({ login: "alice", }),
     html_url: "url",
     base: { sha: "a".repeat(40), repo: None, },
     head: { sha: "b".repeat(40), repo: Some({ full_name: "fork/repo", }), },

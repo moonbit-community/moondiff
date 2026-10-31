@@ -147,15 +147,53 @@ fn LayoutState::observe(
     let title = host.closest(".change-titlebar").unwrap()
     elements.push(title)
     elements.push(main)
+    prepare = () => @application.clear_navigation_landing(main)
+    read = () => {
+      let rect = title.get_bounding_client_rect()
+      [
+        rect.get_height(),
+        if host.query_selector(".rebase-merge-button") is Some(_) &&
+          rebase_merge_in_titlebar(main, rect.get_bottom()) {
+          1.0
+        } else {
+          0.0
+        },
+      ]
+    }
     write = heights => {
       @browser.style(main).set_property(
         "--change-title-height",
         "\{heights[0]}px",
       )
-      @application.clear_navigation_landing(main)
+      place_rebase_merge(main, heights[1] == 1.0)
     }
   }
-  let record : LayoutRecord = { host, alive: true, prepare, read, write, }
+  let bodies : CommentBodies = { host, entries: [], }
+  let observed : Ref[@dom.ResizeObserver?] = Ref(None)
+  let prepare_region = prepare
+  let read_region = read
+  let write_region = write
+  let body_layouts : Ref[Array[CommentBodyLayout]] = Ref([])
+  let record : LayoutRecord = {
+    host,
+    alive: true,
+    prepare: () => {
+      prepare_region()
+      if observed.val is Some(observer) {
+        bodies.sync(observer)
+      }
+    },
+    read: () => {
+      let heights = read_region()
+      body_layouts.val = bodies.read()
+      heights
+    },
+    write: heights => {
+      bodies.write(body_layouts.val)
+      body_layouts.val.clear()
+      write_region(heights)
+    },
+  }
   let on_resize : @dom.Listener = _ => {
     clear_landing(main)
     self.dirty[host_id] = record
@@ -164,6 +202,10 @@ fn LayoutState::observe(
   let on_scroll : @dom.Listener = _ => {
     if main is Some(main) {
       @application.navigation_scrolled(main)
+    }
+    if host.query_selector(".rebase-merge-button") is Some(_) {
+      self.dirty[host_id] = record
+      self.schedule()
     }
   }
   if region == "navigation" {
@@ -174,16 +216,23 @@ fn LayoutState::observe(
       passive=true,
     )
   }
-  let observer = if elements.is_empty() {
+  // The comment overview can commit before its first comments arrive.
+  let observer = if elements.is_empty() && region != "discussion" {
     None
   } else {
     let observer = @dom.ResizeObserver::new((_, _) => {
+      guard record.alive else { return }
+      if region == "navigation" {
+        clear_landing(main)
+      }
       self.dirty[host_id] = record
       self.schedule()
     })
+    observed.val = Some(observer)
     for element in elements {
       observer.observe(element)
     }
+    (record.prepare)()
     self.dirty[host_id] = record
     self.schedule()
     @metrics.active("observers", 1)
@@ -197,9 +246,15 @@ fn LayoutState::observe(
       observer.disconnect()
       @metrics.active("observers", -1)
     }
+    observed.val = None
+    bodies.entries.clear()
+    body_layouts.val.clear()
     if region == "navigation" {
       @dom.window().remove_event_listener("resize", on_resize)
       @dom.window().remove_event_listener("scroll", on_scroll)
+      if main is Some(main) {
+        main.remove_attribute("data-rebase-in-titlebar")
+      }
     }
     if region == "toolbar" && host.closest(".workspace") is Some(workspace) {
       ignore(@browser.style(workspace).remove_property("--toolbar-inset"))

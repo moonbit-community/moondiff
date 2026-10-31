@@ -1,6 +1,6 @@
-import { cancelledRoute } from '../../tests/browser-control.mjs';
+import { cancelledRoute, createGate, installClock, trackRoute } from '../../tests/browser-control.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
-import { createCommentBundlePairs } from '../../tests/comment-bundle-pairing.mjs';
+import { head, changedHead, base, mergeBase, commitSha, parentSha, patch, pullTarget, commitTarget, pullCommitTarget, reviewPath, installApi, commentCard, commentLines } from './review-fixture.mjs';
 import { checkToolbar } from "./toolbar.mjs";
 import { clickLineCommentButton } from "./comment-actions.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
@@ -8,33 +8,6 @@ import { navigate } from "./rendering-fixture.mjs";
 import { settleRegions, installRenderProbe } from "../../tests/render-probe.mjs";
 import { expect, test } from "../../tests/browser-test.mjs";
 import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
-
-const head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const changedHead = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const base = "1111111111111111111111111111111111111111";
-const mergeBase = "2222222222222222222222222222222222222222";
-const commitSha = "cccccccccccccccccccccccccccccccccccccccc";
-const parentSha = "dddddddddddddddddddddddddddddddddddddddd";
-const patch = "@@ -1,3 +1,3 @@\n context\n-old value\n+new value\n tail";
-
-function pullTarget() {
-  return { owner: "upstream", repo: "project", kind: "pull", number: "17" };
-}
-
-function commitTarget() {
-  return { owner: "upstream", repo: "project", kind: "commit", sha: commitSha };
-}
-
-function pullCommitTarget() {
-  return { owner: "upstream", repo: "project", kind: "pull_commit", number: "17", sha: commitSha };
-}
-
-function reviewPath(target = pullTarget()) {
-  const root = `/${target.owner}/${target.repo}`;
-  if (target.kind === "commit") return `${root}/commit/${target.sha}`;
-  if (target.kind === "pull") return `${root}/pull/${target.number}`;
-  return `${root}/pull/${target.number}/commits/${target.sha}`;
-}
 
 async function requestCommentDeletion(card, checkpoint) {
   const confirmation = card.getByRole("button", { name: "Confirm delete", exact: true });
@@ -68,395 +41,816 @@ async function cancelCommentDeletion(card, checkpoint) {
   await expect(actions).toHaveCount(0);
 }
 
-async function installApi(page, target = pullTarget(), options = {}) {
-  const commentPairs = createCommentBundlePairs();
-  await page.addInitScript(({ target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch }) => {
-    let savedAuth = {};
-    try {
-      savedAuth = JSON.parse(sessionStorage.getItem("moondiff-fake-auth") || "{}");
-    } catch {}
-    const initialLogin = options.login ?? savedAuth.login ?? "tester";
-    const state = {
-      target,
-      calls: [],
-      authenticated: options.authenticated ?? Boolean(savedAuth.authenticated),
-      login: initialLogin,
-      terminalUsed: Boolean(savedAuth.terminalUsed),
-      device: null,
-      currentHead: head,
-      currentBase: base,
-      headRace: false,
-      metadataCalls: 0,
-      commentListCalls: 0,
-      anonymousPullDelayed: false,
-      anonymousPullReleased: false,
-      releaseAnonymousPull: null,
-      accountSwitchPullDelayed: false,
-      accountSwitchPullReleased: false,
-      releaseAccountSwitchPull: null,
-      documentHidden: false,
-      documentFocused: true,
-      authenticationFailureOps: [],
-      issueComments: [{
-        id: "10",
-        body: "Existing overall comment",
-        html_url: "https://github.com/upstream/project/issues/17#issuecomment-10",
-        created_at: "2026-08-18T08:00:00Z",
-        user: { login: "reviewer" },
-      }],
-      reviewComments: [{
-        id: "20",
-        body: "Existing inline comment",
-        html_url: "https://github.com/upstream/project/pull/17#discussion_r20",
-        created_at: "2026-08-18T08:01:00Z",
-        user: { login: "reviewer" },
-        path: "src/main.mbt",
-        line: 2,
-        side: "RIGHT",
-        position: 3,
-        commit_id: head,
-      }, {
-        id: "21",
-        body: "Existing reply",
-        html_url: "https://github.com/upstream/project/pull/17#discussion_r21",
-        created_at: "2026-08-18T08:02:00Z",
-        user: { login: "author" },
-        path: "src/main.mbt",
-        line: 2,
-        side: "RIGHT",
-        position: 3,
-        commit_id: head,
-        in_reply_to_id: "20",
-      }, {
-        id: "24",
-        body: "Outdated inline comment",
-        html_url: "https://github.com/upstream/project/pull/17#discussion_r24",
-        created_at: "2026-08-18T08:03:00Z",
-        user: { login: "reviewer" },
-        path: "src/main.mbt",
-        line: 2,
-        side: "RIGHT",
-        commit_id: head,
-      }],
-      commitComments: [{
-        id: "30",
-        body: "Existing commit comment",
-        html_url: "https://github.com/upstream/project/commit/example#commitcomment-30",
-        created_at: "2026-08-18T08:03:00Z",
-        user: { login: "reviewer" },
-        path: "src/main.mbt",
-        position: 3,
-        line: 2,
-      }],
-    };
-    window.__fake = state;
-    Object.defineProperty(document, "hidden", {
-      configurable: true,
-      get: () => state.documentHidden,
-    });
-    document.hasFocus = () => state.documentFocused;
-
-    function saveAuth() {
-      sessionStorage.setItem("moondiff-fake-auth", JSON.stringify({
-        authenticated: state.authenticated,
-        login: state.login,
-        terminalUsed: state.terminalUsed,
-      }));
-    }
-
-    function authStatus() {
-      const status = state.authenticated
-        ? { authenticated: true, user_id: state.login, login: state.login, install_url: "https://github.com/apps/moondiff-test/installations/new" }
-        : { authenticated: false, install_url: "https://github.com/apps/moondiff-test/installations/new" };
-      if (state.device) status.device_flow = state.device;
-      status.csrf_token = "fixture";
-      return status;
-    }
-
-    function pullMetadata() {
-      return {
-        title: options.identitySpecificDiff ? `Fork PR for ${state.login}` : "Fork PR",
-        html_url: "https://github.com/upstream/project/pull/17",
-        base: { sha: state.currentBase, repo: { full_name: "upstream/project" } },
-        head: { sha: state.currentHead, repo: { full_name: "contributor/project-fork" } },
-        additions: options.additions ?? 1,
-        deletions: options.deletions ?? 1,
-        changed_files: 1,
-        commits: 0,
-      };
-    }
-    function file() {
-      const additions = options.additions ?? 1;
-      const deletions = options.deletions ?? 1;
-      const identityPatch = options.identitySpecificDiff
-        ? patch.replace("+new value", `+new value for ${state.login}`)
-        : patch;
-      return {
-        filename: "src/main.mbt",
-        status: "modified",
-        additions,
-        deletions,
-        changes: additions + deletions,
-        patch: options.patch ?? identityPatch,
-      };
-    }
-    function commit() {
-      return {
-        sha: commitSha,
-        html_url: "https://github.com/upstream/project/commit/" + commitSha,
-        commit: { message: "Commit change" },
-        parents: [{ sha: parentSha }],
-        stats: { additions: 1, deletions: 1, total: 2 },
-        files: [file()],
-      };
-    }
-    function content(ref) {
-      const oldSource = options.oldSource ?? "context\nold value\ntail";
-      const defaultNewSource = options.identitySpecificDiff
-        ? `context\nnew value for ${state.login}\ntail`
-        : "context\nnew value\ntail";
-      const newSource = options.newSource ?? defaultNewSource;
-      const text = ref === mergeBase || ref === parentSha ? oldSource : newSource;
-      return { base64: btoa(text), size: text.length, contentType: "text/plain" };
-    }
-    async function dispatch(message) {
-      const { op, args = {} } = message;
-      state.calls.push({ op, args });
-      if (op === "auth.status") return authStatus();
-      if (op === "auth.device.start") {
-        state.device = { id: args.attempt_id, phase: 'pending', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_at: Date.now() / 1000 + 900, retry_after: 0, message: '' };
-        return { ...authStatus(), attempt_id: args.attempt_id };
-      }
-      if (op === "auth.device.poll") {
-        const flow = state.device;
-        if (state.delayNextDevicePoll) {
-          state.delayNextDevicePoll = false;
-          await new Promise(resolve => { state.releaseDevicePoll = resolve; });
-        }
-        if (!state.device || state.device.id !== args.authorization_id) {
-          return { ...authStatus(), device_flow: { ...flow, phase: 'cancelled' }, authorization_id: args.authorization_id };
-        }
-        state.authenticated = true;
-        const device_flow = { ...state.device, phase: 'completed' };
-        state.device = null;
-        saveAuth();
-        return { ...authStatus(), device_flow, authorization_id: args.authorization_id };
-      }
-      if (op === "auth.device.cancel") {
-        state.device = null;
-        return { ...authStatus(), authorization_id: args.authorization_id };
-      }
-      if (op === "auth.logout") {
-        state.authenticated = false;
-        saveAuth();
-        return authStatus();
-      }
-      const authenticationFailureIndex = state.authenticationFailureOps.indexOf(op);
-      if (authenticationFailureIndex >= 0) {
-        state.authenticationFailureOps.splice(authenticationFailureIndex, 1);
-        state.authenticated = false;
-        saveAuth();
-        throw Object.assign(new Error("Your GitHub session expired. Sign in again."), {
-          status: 401,
-          code: "authentication_required",
-        });
-      }
-      if (op.endsWith(".create") && state.delayCreate) {
-        state.delayCreate = false;
-        await new Promise(resolve => { state.releaseCreate = resolve; });
-      }
-      if (op === "github.pull.get") {
-        if (options.delayAnonymousPull && !state.authenticated && !state.anonymousPullDelayed) {
-          state.anonymousPullDelayed = true;
-          return new Promise((_, reject) => {
-            state.releaseAnonymousPull = () => {
-              state.releaseAnonymousPull = null;
-              state.anonymousPullReleased = true;
-              reject(Object.assign(new Error("GitHub could not find this resource. For private repositories, sign in and install the GitHub App."), {
-                status: 404,
-                code: "not_found_or_not_installed",
-              }));
-            };
-          });
-        }
-        if (options.privateUntilAuth && !state.authenticated) {
-          throw Object.assign(new Error("GitHub could not find this resource. For private repositories, sign in and install the GitHub App."), { status: 404, code: "not_found_or_not_installed" });
-        }
-        if (
-          options.delayAccountSwitchPull &&
-          state.authenticated &&
-          state.login !== initialLogin &&
-          !state.accountSwitchPullDelayed
-        ) {
-          state.accountSwitchPullDelayed = true;
-          return new Promise(resolve => {
-            state.releaseAccountSwitchPull = () => {
-              state.releaseAccountSwitchPull = null;
-              state.accountSwitchPullReleased = true;
-              state.metadataCalls += 1;
-              resolve(pullMetadata());
-            };
-          });
-        }
-        state.metadataCalls += 1;
-        if (state.headRace) {
-          state.currentHead = changedHead;
-          state.headRace = false;
-          state.reviewComments[0].commit_id = changedHead;
-          state.reviewComments[1].commit_id = changedHead;
-        }
-        return pullMetadata();
-      }
-      if (op === "github.compare.get") return { merge_base_commit: { sha: mergeBase } };
-      if (op === "github.pull.merge.status") return { base_sha: state.currentBase, head_sha: state.currentHead, open: true, draft: false, merged: false, mergeable: true, rebaseable: true, mergeable_state: "clean", ci_checks: [], ci_warnings: [] };
-      if (op === "github.pull.rebase.merge") return { merged: true, sha: "d".repeat(40), message: "Pull request successfully merged" };
-      if (op === "github.pull.viewed.get") return { base_sha: state.currentBase, head_sha: state.currentHead, files: [{ path: file().filename, state: { $tag: "Unviewed" } }] };
-      if (op === "github.pull.files") return [file()];
-      if (op === "github.commit.get") return commit();
-      if (op === "github.content.get") return content(args.ref);
-      if (op === "github.comments.list") {
-        if (state.updateDuringList || options.updateDuringFirstList && state.commentListCalls === 0) {
-          state.currentBase = changedHead;
-          state.updateDuringList = false;
-        }
-        if (options.commentListError) {
-          throw Object.assign(new Error(options.commentListError.detail), {
-            status: options.commentListError.status,
-            code: options.commentListError.code,
-          });
-        }
-        if (options.privateUntilAuth && !state.authenticated) {
-          throw Object.assign(new Error("Sign in and install the GitHub App for private repositories."), { status: 404, code: "not_found_or_not_installed" });
-        }
-        state.commentListCalls += 1;
-        if (state.delayNextList) {
-          state.delayNextList = false;
-          const snapshot = structuredClone(state.target.kind === "pull"
-            ? { issue_comments: state.issueComments, review_comments: state.reviewComments, commit_comments: [] }
-            : { issue_comments: [], review_comments: [], commit_comments: state.commitComments });
-          await new Promise(resolve => { state.releaseList = resolve; });
-          return snapshot;
-        }
-        return state.target.kind === "pull"
-          ? { issue_comments: state.issueComments, review_comments: state.reviewComments, commit_comments: [] }
-          : { issue_comments: [], review_comments: [], commit_comments: state.commitComments };
-      }
-      if (op.endsWith(".comment.delete")) {
-        if (state.deleteDelay) await new Promise(resolve => { state.releaseDelete = resolve; });
-        if (state.deleteError) throw Object.assign(new Error(state.deleteError), { status: 403, code: "permission_denied" });
-        const field = op.includes(".issue.") ? "issueComments" : op.includes(".review.") ? "reviewComments" : "commitComments";
-        state[field] = state[field].filter(comment => comment.id !== args.comment_id);
-        return { deleted: true };
-      }
-      if (op === "github.issue.comment.create") {
-        const created = { id: "11", body: args.body, html_url: "https://github.com/comment/11", created_at: "2026-08-18T09:00:00Z", user: { login: "tester" } };
-        state.issueComments.push(created);
-        return created;
-      }
-      if (op === "github.review.comment.create") {
-        const created = { id: "22", body: args.body, html_url: "https://github.com/comment/22", created_at: "2026-08-18T09:01:00Z", user: { login: "tester" }, path: args.path, line: args.line, side: args.side, position: 3, commit_id: args.commit_id };
-        state.reviewComments.push(created);
-        return created;
-      }
-      if (op === "github.commit.comment.create") {
-        const created = { id: "31", body: args.body, html_url: "https://github.com/comment/31", created_at: "2026-08-18T09:02:00Z", user: { login: "tester" }, path: args.path, position: args.position, line: 2 };
-        state.commitComments.push(created);
-        return created;
-      }
-      if (op === "github.review.reply.create") {
-        const root = state.reviewComments.find(c => String(c.id) === String(args.comment_id));
-        if (!root || root.in_reply_to_id != null) throw Object.assign(new Error("Reply target must be an existing root"), { status: 422 });
-        const created = { id: "23", body: args.body, html_url: "https://github.com/comment/23", created_at: "2026-08-18T09:03:00Z", user: { login: "tester" }, path: "src/main.mbt", line: 2, side: "RIGHT", position: 3, commit_id: state.currentHead, in_reply_to_id: String(args.comment_id) };
-        state.reviewComments.push(created);
-        return created;
-      }
-      throw Object.assign(new Error("Unhandled fake operation: " + op), { status: 400, code: "unhandled" });
-    }
-    window.__dispatch = dispatch;
-  }, { target, options, head, changedHead, base, mergeBase, commitSha, parentSha, patch });
-  await page.route('https://api.github.com/repos/**', async route => {
-    const url = new URL(route.request().url());
-    const [, , owner, repo, ...resource] = url.pathname.split('/');
-    if (!((owner === 'upstream' && repo === 'project') ||
-      (owner === 'contributor' && repo === 'project-fork'))) {
-      throw new Error(`Unexpected review fixture GitHub repository ${owner}/${repo}`);
-    }
-    const path = resource.join('/');
-    const common = { owner, repo };
-    let message, commentKind, commentTarget, issueGeneration, source = false;
-    if (path.startsWith('contents/')) {
-      source = true;
-      message = { op: 'github.content.get', args: { ...common,
-        path: path.slice('contents/'.length).split('/').map(decodeURIComponent).join('/'), ref: url.searchParams.get('ref') } };
-    } else if (/^issues\/\d+\/comments$/.test(path)) {
-      commentKind = 'issue_comments';
-      commentTarget = { owner, repo, number: path.split('/')[1] };
-      message = { op: 'github.comments.list', args: { ...commentTarget, kind: 'pull' } };
-      issueGeneration = commentPairs.begin(commentTarget);
-    } else if (/^pulls\/\d+\/comments$/.test(path)) {
-      commentKind = 'review_comments';
-      commentTarget = { owner, repo, number: path.split('/')[1] };
-      message = { op: 'github.comments.list', args: { ...commentTarget, kind: 'pull' } };
-    } else if (/^commits\/[^/]+\/comments$/.test(path)) {
-      commentKind = 'commit_comments'; message = { op: 'github.comments.list', args: target };
-    } else if (/^pulls\/\d+\/files$/.test(path)) {
-      message = { op: 'github.pull.files', args: { ...common, number: path.split('/')[1], page: Number(url.searchParams.get('page') || 1) } };
-    } else if (/^pulls\/\d+$/.test(path)) {
-      message = { op: 'github.pull.get', args: { ...common, number: path.split('/')[1] } };
-    } else if (/^commits\/[^/]+$/.test(path)) {
-      message = { op: 'github.commit.get', args: { ...common, sha: path.split('/')[1], page: Number(url.searchParams.get('page') || 1) } };
-    } else if (path.startsWith('compare/')) {
-      const [compareBase, compareHead] = path.slice('compare/'.length).split('...');
-      message = { op: 'github.compare.get', args: { ...common, base: compareBase, head: compareHead } };
-    } else {
-      throw new Error(`Unhandled review fixture GitHub URL ${url}`);
-    }
-    let payload;
-    try {
-      if (commentKind === 'review_comments') {
-        const value = await commentPairs.consume(commentTarget);
-        payload = { ok: true, value };
-      } else {
-        payload = await page.evaluate(async message => {
-          try { return { ok: true, value: await window.__dispatch(message) }; }
-          catch (error) { return { ok: false, error: { status: error.status || 500, message: error.message } }; }
-        }, message);
-        if (commentKind === 'issue_comments') {
-          if (payload.ok) commentPairs.publish(issueGeneration, payload.value);
-          else commentPairs.cancel(issueGeneration, new Error(payload.error.message));
-        }
-      }
-    } catch (error) {
-      if (issueGeneration) commentPairs.cancel(issueGeneration, error);
-      payload = { ok: false, error: { status: 500, message: `Review fixture comment pairing failed: ${error.message}` } };
-    }
-    const headers = { 'Access-Control-Allow-Origin': '*' };
-    if (!payload.ok) {
-      await route.fulfill({ status: payload.error.status, json: { message: payload.error.message }, headers }).catch(error => cancelledRoute(route, error));
-    } else if (source) {
-      await route.fulfill({ body: Buffer.from(payload.value.base64, 'base64'), contentType: 'text/plain', headers }).catch(error => cancelledRoute(route, error));
-    } else {
-      await route.fulfill({ json: commentKind ? payload.value[commentKind] : payload.value, headers }).catch(error => cancelledRoute(route, error));
-    }
-  });
-  await page.route('**/api/**', async route => {
-    route = metadataFallbackRoute(route);
-    const path = new URL(route.request().url()).pathname;
-    const message = path.startsWith('/api/auth/device/') ? { op: 'auth.device.' + path.split('/').at(-1), args: route.request().postDataJSON() } : path === '/api/auth/status' ? { op: 'auth.status' } : path === '/api/auth/logout' ? { op: 'auth.logout' } : fixtureRequest(route.request().postDataJSON());
-    const payload = await page.evaluate(async message => {
-      try { return { ok: true, value: await window.__dispatch(message) }; }
-      catch (error) { return { ok: false, error: { status: error.status || 500, code: error.code || 'fake_error', message: error.message } }; }
-    }, message);
-    await route.fulfill({ status: payload.ok ? 200 : payload.error.status, json: payload.ok ? successFixture(message.op, payload.value) : { $tag: 'Failure', error: payload.error } });
-  });
-
-
-}
-
 async function waitForSignedInComments(page) {
   await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
 }
+
+const markdownFixture = [
+  '## Markdown heading',
+  '',
+  '**Bold** and *italic*, ~~removed~~, `inline`.',
+  'First line',
+  'Second line',
+  '',
+  '> Quoted text',
+  '',
+  '- [x] Complete',
+  '- [ ] Pending',
+  '',
+  '| Name | Result |',
+  '| :--- | ---: |',
+  '| Tests | Pass |',
+  '',
+  '```moonbit',
+  'let html = "<escaped>"',
+  'let long = "' + 'long code '.repeat(100) + '"',
+  '```',
+  '',
+  '[Documentation](https://example.com/guide)',
+  '',
+  '<img src=x onerror="window.markdownAttack = true">',
+  '',
+  '[Unsafe](javascript:alert%281%29)',
+].join('\n');
+
+for (const authenticated of [false, true]) {
+  test(`renders PR body and discussion Markdown for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
+    await page.route('https://github.com/*.png?size=64', route => route.abort());
+    await installApi(page, pullTarget(), {
+      authenticated,
+      pullBody: markdownFixture,
+      issueBody: markdownFixture,
+      inlineBody: markdownFixture,
+      replyBody: '**Reply formatting**',
+    });
+    await page.goto(reviewPath());
+    const description = page.getByRole('region', { name: 'Pull request description' });
+    await expect(description.locator('.comment-byline strong')).toHaveText('pull-author');
+    await expect(description.locator('.comment-avatar-image')).toHaveCSS('background-image', 'url("https://github.com/pull-author.png?size=64")');
+    await expect(description.locator('.comment-avatar')).toHaveCSS('width', '32px');
+    await expect(description.locator('.comment-avatar')).toHaveCSS('height', '32px');
+    await expect(description.locator('.comment-avatar')).toHaveCSS('border-radius', '50%');
+    await expect(description.locator('.comment-avatar-placeholder')).toHaveCount(1);
+    await expect(description.locator('h2')).toHaveText('Markdown heading');
+    const overall = page.locator('#comments .github-comment-body');
+    const inline = page.locator('.review-thread .github-comment-body').first();
+    await expect(inline.locator('h2')).toHaveText('Markdown heading');
+    await expect(page.locator('.review-thread .github-comment-body strong').filter({ hasText: 'Reply formatting' })).toBeVisible();
+
+    for (const body of [description.locator('.markdown-body'), overall, inline]) {
+      await expect(body.locator('strong').first()).toHaveText('Bold');
+      await expect(body.locator('em')).toHaveText('italic');
+      await expect(body.locator('del')).toHaveText('removed');
+      await expect(body.locator('blockquote')).toHaveText('Quoted text');
+      await expect(body.locator('input[type=checkbox]')).toHaveCount(2);
+      await expect(body.locator('input[type=checkbox]').first()).toBeChecked();
+      await expect(body.locator('input[type=checkbox]').last()).not.toBeChecked();
+      await expect(body.locator('input[type=checkbox]').first()).toBeDisabled();
+      await expect(body.locator('table th')).toHaveText(['Name', 'Result']);
+      await expect(body.locator('table td')).toHaveText(['Tests', 'Pass']);
+      await expect(body.locator('pre code.language-moonbit')).toContainText('<escaped>');
+      await expect(body.getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://example.com/guide');
+      await expect(body.locator('script, img[onerror], a[href^="javascript:"]')).toHaveCount(0);
+      await expect(body.locator('p').filter({ hasText: 'First line' }).locator('br')).toHaveCount(2);
+    }
+    expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+
+    for (const width of [1280, 480]) {
+      await page.setViewportSize({ width, height: 900 });
+      const avatar = await description.locator('.comment-avatar').boundingBox();
+      const body = await description.locator('.pull-request-body').boundingBox();
+      expect(Math.abs(avatar.x - body.x)).toBeLessThan(1);
+      expect(avatar.y + avatar.height).toBeLessThan(body.y);
+      for (const body of [description.locator('.markdown-body'), inline]) {
+        await expect(body).toHaveCSS('font-size', '14px');
+        await expect(body).toHaveCSS('line-height', '21px');
+        expect(await body.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await expect(body.locator('table td').first()).toHaveCSS('font-family', await body.evaluate(node => getComputedStyle(node).fontFamily));
+      }
+    }
+    await page.evaluate(() => { window.__fake.reviewComments[0].body = '**Updated Markdown**'; });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(page.locator('.review-thread .github-comment-body').first().locator('strong')).toHaveText('Updated Markdown');
+  });
+}
+
+test('renders commit comment Markdown without changing commit message formatting', async ({ page }) => {
+  await installApi(page, commitTarget(), { commitBody: '**Commit comment** with `code`' });
+  await page.goto(reviewPath(commitTarget()));
+  await expect(page.locator('.github-comment-body strong')).toHaveText('Commit comment');
+  await expect(page.locator('.github-comment-body code')).toHaveText('code');
+  await expect(page.locator('.commit-message-title')).toHaveText('Commit change');
+  await expect(page.locator('.pull-description')).toHaveCount(0);
+});
+
+for (const target of [pullTarget(), commitTarget()]) {
+  test(`unsupported HTML stays readable and inert in ${target.kind} Markdown`, async ({ page }) => {
+    await installRenderProbe(page);
+    await page.setViewportSize({ width: 480, height: 900 });
+    const requests = [];
+    await page.route(/https:\/\/(evil\.example|camo\.githubusercontent\.com)\//, route => {
+      requests.push(route.request().url());
+      return route.abort();
+    });
+    const raw = '<details>\n<summary>Summary</summary>\nImportant body ' + 'word'.repeat(150) +
+      '\n<img src="https://camo.githubusercontent.com/mixed-html">\n</details>';
+    const body = [raw, 'Before <mark>inline content</mark> after',
+      '<div broken="unterminated>\nMalformed HTML body',
+      '<script>window.markdownAttack = true; fetch("https://evil.example/request")</script>',
+      '<!-- hidden template comment -->'].join('\n\n');
+    await installApi(page, target, {
+      pullBody: body, issueBody: body, inlineBody: body, replyBody: body, commitBody: body,
+    });
+    await page.goto(reviewPath(target));
+    const bodies = page.locator('.markdown-body').filter({ hasText: 'Important body' });
+    await expect(bodies).toHaveCount(target.kind === 'pull' ? 4 : 1);
+    for (const markdown of await bodies.all()) {
+      await expect(markdown).toContainText(raw);
+      await expect(markdown).toContainText('Before <mark>inline content</mark> after');
+      await expect(markdown).toContainText('Malformed HTML body');
+      await expect(markdown).toContainText('window.markdownAttack = true');
+      await expect(markdown).not.toContainText('hidden template comment');
+      await expect(markdown.locator('details, summary, mark, img, script, iframe')).toHaveCount(0);
+      await expect(markdown.locator('.markdown-html-raw').first()).toHaveCSS('white-space', 'pre-wrap');
+      expect(await markdown.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    }
+    await settleRegions(page);
+    expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+    expect(requests).toEqual([]);
+  });
+
+  test(`ordinary Markdown links use the ${target.kind} body source URL`, async ({ page }) => {
+    const body = '[relative](../guide?view=1#part)\n[root](/upstream/project/issues/18)\n' +
+      '[query](?view=files&x=1)\n[section](#section)\n[reference][guide]\n\n[guide]: ./guide.md';
+    await installApi(page, target, {
+      pullBody: body, issueBody: body, inlineBody: body, replyBody: body, commitBody: body,
+    });
+    await page.goto(reviewPath(target));
+    const cases = target.kind === 'pull' ? [
+      [page.locator('.pull-request-body'), 'pull/17'],
+      [commentCard(page, 'issue', 10).locator('.markdown-body'), 'issues/17'],
+      [commentCard(page, 'review', 20).locator('.markdown-body'), 'pull/17'],
+      [commentCard(page, 'review', 21).locator('.markdown-body'), 'pull/17'],
+    ] : [[commentCard(page, 'commit', 30).locator('.markdown-body'), 'commit/example']];
+    for (const [markdown, path] of cases) {
+      const source = `https://github.com/upstream/project/${path}`;
+      await expect(markdown.getByRole('link', { name: 'relative', exact: true })).toHaveAttribute('href', 'https://github.com/upstream/project/guide?view=1#part');
+      await expect(markdown.getByRole('link', { name: 'root', exact: true })).toHaveAttribute('href', 'https://github.com/upstream/project/issues/18');
+      await expect(markdown.getByRole('link', { name: 'query', exact: true })).toHaveAttribute('href', `${source}?view=files&x=1`);
+      await expect(markdown.getByRole('link', { name: 'section', exact: true })).toHaveAttribute('href', `${source}#section`);
+      await expect(markdown.getByRole('link', { name: 'reference', exact: true })).toHaveAttribute('href', `${source.slice(0, source.lastIndexOf('/'))}/guide.md`);
+    }
+  });
+}
+
+test('footnotes stay within each body and keep their IDs across refresh and regional redraws', async ({ page }) => {
+  await installRenderProbe(page);
+  const body = 'First[^note], repeat[^note], Unicode[^说明🙂].\n\n[^note]: First footnote.\n\n[^说明🙂]: Unicode footnote.';
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body, replyBody: body, commitBody: body });
+  await page.goto(reviewPath());
+  const bodies = page.locator('.markdown-body').filter({ has: page.locator('[role="doc-noteref"]') });
+  await expect(bodies).toHaveCount(4);
+  const ids = () => bodies.evaluateAll(elements => elements.flatMap(el => Array.from(el.querySelectorAll('[id]'), node => node.id)));
+  const initial = await ids();
+  expect(new Set(initial).size).toBe(initial.length);
+  expect(initial).toHaveLength(20);
+  const assertLocal = async () => {
+    expect(await bodies.evaluateAll(elements => elements.every(body =>
+      Array.from(body.querySelectorAll('[role="doc-noteref"], [role="doc-backlink"]')).every(link => {
+        const href = link.getAttribute('href');
+        return href.startsWith('#') && document.getElementById(decodeURIComponent(href.slice(1)))?.closest('.markdown-body') === body;
+      })))).toBe(true);
+  };
+  await assertLocal();
+  const issue = commentCard(page, 'issue', 10);
+  await issue.getByRole('button', { name: 'Show more', exact: true }).click();
+  const reference = issue.locator('[role="doc-noteref"]').first();
+  const href = await reference.getAttribute('href');
+  await reference.click();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe(href);
+  await page.getByRole('button', { name: 'Unified', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await settleRegions(page);
+  expect(await ids()).toEqual(initial);
+  await assertLocal();
+  await page.evaluate(() => { window.__fake.reviewComments[0].body += '\n\nUpdated without changing labels.'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(commentCard(page, 'review', 20)).toContainText('Updated without changing labels.');
+  expect(await ids()).toEqual(initial);
+  await assertLocal();
+  await page.evaluate(target => { window.__fake.target = target; }, commitTarget());
+  await navigate(page, reviewPath(commitTarget()));
+  await expect(bodies).toHaveCount(1);
+  const commitIds = await ids();
+  expect(commitIds).toHaveLength(5);
+  expect(commitIds.some(id => initial.includes(id))).toBe(false);
+  await assertLocal();
+});
+
+test('Tab skips clipped comment links and restores their original tabindex after expansion', async ({ page }) => {
+  await installRenderProbe(page);
+  const body = Array.from({ length: 9 }, (_, i) => `[Link ${i + 1}](https://example.com/${i + 1})`).join('\n');
+  await installApi(page, pullTarget(), { issueBody: body, inlineBody: body, replyBody: body, commitBody: body });
+  await page.goto(reviewPath());
+  for (const [kind, id] of [['issue', 10], ['review', 20], ['review', 21]]) {
+    const card = commentCard(page, kind, id);
+    const links = card.locator('.markdown-body a');
+    const clip = card.locator('.comment-body-clip');
+    const toggle = card.locator('.comment-body-toggle');
+    await expect(toggle).toBeVisible();
+    await settleRegions(page);
+    expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('tabindex')))).toEqual([null, null, null, null, null, '-1', '-1', '-1', '-1']);
+    await links.first().focus();
+    for (let i = 1; i < 5; i++) {
+      await page.keyboard.press('Tab');
+      await expect(links.nth(i)).toBeFocused();
+    }
+    await page.keyboard.press('Tab');
+    await expect(toggle).toBeFocused();
+    expect(await clip.evaluate(el => el.scrollTop)).toBe(0);
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveText('Show less');
+    await settleRegions(page);
+    expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('tabindex')))).toEqual(Array(9).fill(null));
+    // Capture a pre-existing explicit tabindex before suppressing it again.
+    await links.last().evaluate(el => el.setAttribute('tabindex', '0'));
+    await toggle.evaluate(el => el.click());
+    await expect(links.last()).toHaveAttribute('tabindex', '-1');
+    // Programmatic focus models a fragment jump into a clipped body.
+    await links.last().focus();
+    expect(await clip.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    await toggle.evaluate(el => el.click());
+    await expect(links.last()).toHaveAttribute('tabindex', '0');
+    await toggle.evaluate(el => el.click());
+    await settleRegions(page);
+    await expect(toggle).toBeFocused();
+    expect(await clip.evaluate(el => el.scrollTop)).toBe(0);
+    await toggle.click();
+    await expect(links.last()).toHaveAttribute('tabindex', '0');
+  }
+  await page.evaluate(target => { window.__fake.target = target; }, commitTarget());
+  await navigate(page, reviewPath(commitTarget()));
+  const commit = commentCard(page, 'commit', 30);
+  await expect(commit.locator('.markdown-body a').last()).toHaveAttribute('tabindex', '-1');
+  await expect(page.locator('.loading-inline')).toHaveCount(0);
+  await settleRegions(page);
+  await commit.locator('.markdown-body a').nth(4).focus();
+  await page.keyboard.press('Tab');
+  await expect(commit.locator('.comment-body-toggle')).toBeFocused();
+  expect(await commit.locator('.comment-body-clip').evaluate(el => el.scrollTop)).toBe(0);
+});
+
+test('table previews measure visible links after intervening hidden links', async ({ page }) => {
+  await installRenderProbe(page);
+  await page.setViewportSize({ width: 480, height: 900 });
+  const cell = label => `[${label} visible](https://example.com/visible) ${'Filler words '.repeat(20)} [${label} hidden](https://example.com/hidden)`;
+  await installApi(page, pullTarget(), { issueBody: `| Left | Right |\n| --- | --- |\n| ${cell('Left')} | ${cell('Right')} |` });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const links = card.locator('.markdown-body a');
+  await expect(links).toHaveCount(4);
+  await settleRegions(page);
+  expect(await links.evaluateAll(nodes => nodes.map(node => node.getAttribute('tabindex')))).toEqual([null, '-1', null, '-1']);
+  await links.first().focus();
+  await page.keyboard.press('Tab');
+  await expect(links.nth(2)).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(card.locator('.comment-body-toggle')).toBeFocused();
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.scrollTop)).toBe(0);
+});
+
+test('preview link focus follows wrapping, delayed images and replacement bodies without retaining nodes', async ({ page }) => {
+  await installRenderProbe(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const image = createGate('focus preview image');
+  await page.route('https://camo.githubusercontent.com/focus-preview', async route => {
+    await image.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  const body = 'One\nTwo\nThree\nFour\n[' + 'Wrapped link words '.repeat(24).trim() + '](https://example.com/wrapped)';
+  await installApi(page, pullTarget(), { issueBody: body });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const toggle = card.locator('.comment-body-toggle');
+  const link = card.locator('.markdown-body a').last();
+  await expect(link).toHaveCount(1);
+  await settleRegions(page);
+  // A link spanning the fifth and sixth lines must be skipped as a whole.
+  expect(await link.evaluate(el => el.getClientRects().length)).toBeGreaterThan(1);
+  await expect(link).toHaveAttribute('tabindex', '-1');
+  await toggle.click();
+  await expect(link).not.toHaveAttribute('tabindex');
+  await page.evaluate(() => { window.__fake.issueComments[0].body = 'Wrapped words '.repeat(30) + '[Resize link](https://example.com/resize)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(link).toHaveText('Resize link');
+  await toggle.evaluate(el => el.click());
+  await settleRegions(page);
+  await expect(link).not.toHaveAttribute('tabindex');
+  await link.focus();
+  await page.setViewportSize({ width: 480, height: 900 });
+  await expect(link).toHaveAttribute('tabindex', '-1');
+  await expect(toggle).toBeFocused();
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(link).not.toHaveAttribute('tabindex');
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '<img src="https://camo.githubusercontent.com/focus-preview" alt="Delayed" width="240" height="240">\n\n[After image](https://example.com/after)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'pending');
+  await expect(link).toHaveText('After image');
+  await settleRegions(page);
+  await expect(link).not.toHaveAttribute('tabindex');
+  await link.focus();
+  image.release();
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'loaded');
+  await expect(link).toHaveAttribute('tabindex', '-1');
+  await expect(toggle).toBeFocused();
+  await card.locator('.markdown-body a').evaluateAll(nodes => { window.retiredCommentLinks = nodes.map(node => new WeakRef(node)); });
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '[Replacement](https://example.com/replacement)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(link).toHaveText('Replacement');
+  await settleRegions(page);
+  await expect(link).not.toHaveAttribute('tabindex');
+  const session = await page.context().newCDPSession(page);
+  await session.send('HeapProfiler.collectGarbage');
+  expect(await page.evaluate(() => retiredCommentLinks.filter(ref => ref.deref()).length)).toBe(0);
+  await link.evaluate(node => { window.retiredCommentLinks.push(new WeakRef(node)); });
+  await navigate(page, '/');
+  await settleRegions(page);
+  await session.send('HeapProfiler.collectGarbage');
+  expect(await page.evaluate(() => retiredCommentLinks.filter(ref => ref.deref()).length)).toBe(0);
+  expect((await page.evaluate(() => __moondiffMetrics.active)).observers).toBe(0);
+});
+
+for (const authenticated of [false, true]) {
+  test(`long comments retain independent expansion for ${authenticated ? 'signed-in' : 'public'} readers`, async ({ page }) => {
+    await installRenderProbe(page);
+    await page.setViewportSize({ width: authenticated ? 1280 : 480, height: 900 });
+    const description = commentLines('Description line', 9);
+    await installApi(page, pullTarget(), {
+      authenticated,
+      pullBody: description,
+      issueBody: commentLines('Overall line', 9),
+      inlineBody: '- **First item**\n- Second item\n- Third item\n- Fourth item\n- Fifth item\n- Sixth item',
+      replyBody: '```moonbit\n' + commentLines('let value =', 8) + '\n```',
+    });
+    await page.goto(reviewPath());
+    const overall = commentCard(page, 'issue', 10);
+    const inline = commentCard(page, 'review', 20);
+    const reply = commentCard(page, 'review', 21);
+    for (const card of [overall, inline, reply]) {
+      const button = card.getByRole('button', { name: 'Show more', exact: true });
+      await expect(button).toBeVisible();
+      await expect(button).toHaveAttribute('aria-expanded', 'false');
+      const geometry = await card.evaluate(el => {
+        const body = el.querySelector('.github-comment-body');
+        const clip = el.querySelector('.comment-body-clip');
+        const button = el.querySelector('.comment-body-toggle');
+        return { natural: body.getBoundingClientRect().height, preview: clip.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(body).lineHeight),
+          buttonBelow: button.getBoundingClientRect().top >= clip.getBoundingClientRect().bottom,
+          controls: document.getElementById(button.getAttribute('aria-controls')) === clip,
+          metaOutside: !clip.contains(el.querySelector('.github-comment-meta')) };
+      });
+      expect(geometry.preview).toBeCloseTo(geometry.lineHeight * 5, 1);
+      expect(geometry.natural).toBeGreaterThan(geometry.preview);
+      expect(geometry).toMatchObject({ buttonBelow: true, controls: true, metaOutside: true });
+    }
+    const pullBody = page.getByRole('region', { name: 'Pull request description' });
+    await expect(pullBody.locator('.comment-body-clip, .comment-body-toggle')).toHaveCount(0);
+    expect(await pullBody.locator('.markdown-body').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(105);
+    await expect(inline.locator('li')).toHaveCount(6);
+    await expect(inline.locator('strong')).toContainText(['reviewer', 'First item']);
+    await expect(reply.locator('pre code')).toContainText('let value = 8');
+
+    // Native keyboard activation keeps focus and exposes the complete Markdown.
+    const toggle = overall.locator('.comment-body-toggle');
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveText('Show less');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveCSS('outline-style', 'solid');
+    await expect(toggle).toHaveCSS('outline-width', '2px');
+    await page.keyboard.press('Space');
+    await expect(toggle).toHaveText('Show more');
+    await toggle.click();
+    await reply.getByRole('button', { name: 'Show more', exact: true }).click();
+    await expect(inline.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+
+    for (const layout of ['Unified', 'Split']) {
+      await page.getByRole('button', { name: layout, exact: true }).click();
+      await expect(overall.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+      await expect(reply.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+      await expect(inline.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+    }
+    await page.evaluate(() => { window.__fake.issueComments[0].body += '\nUpdated overall'; });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(overall.locator('.github-comment-body')).toContainText('Updated overall');
+    await expect(overall.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+    await expect(reply.getByRole('button', { name: 'Show less', exact: true })).toBeVisible();
+    await expect(overall.locator('.github-comment-body')).toHaveCount(1);
+    await settleRegions(page);
+    if (!authenticated) await expectNoAnonymousWrites(page);
+
+    await navigate(page, '/');
+    await expect(page.locator('.github-comment')).toHaveCount(0);
+    await navigate(page, reviewPath());
+    await expect(overall.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+    await overall.getByRole('button', { name: 'Show more', exact: true }).click();
+    await page.reload();
+    await expect(overall.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  });
+}
+
+test('comment previews distinguish short, exactly five and six rendered lines after refresh', async ({ page }) => {
+  await installRenderProbe(page);
+  await installApi(page);
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const toggle = card.locator('.comment-body-toggle');
+  await expect(card.locator('.github-comment-body')).toHaveText('Existing overall comment');
+  await settleRegions(page);
+  await expect(toggle).toBeHidden();
+  for (const count of [5, 6]) {
+    const body = commentLines('Line', count);
+    await page.evaluate(body => { window.__fake.issueComments[0].body = body; }, body);
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(card.locator('.github-comment-body')).toHaveText(body);
+    await settleRegions(page);
+    expect(await card.locator('.github-comment-body').evaluate(el => el.getBoundingClientRect().height)).toBe(count * 21);
+    expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBe(105);
+    if (count === 5) await expect(toggle).toBeHidden();
+    else await expect(toggle).toBeVisible();
+  }
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBe(126);
+  await page.evaluate(() => { window.__fake.issueComments[0].body = 'Short again'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(card.locator('.github-comment-body')).toHaveText('Short again');
+  await expect(toggle).toBeHidden();
+});
+
+test('comment previews measure automatic wrapping when the viewport changes', async ({ page }) => {
+  await installRenderProbe(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await installApi(page, pullTarget(), { issueBody: 'Wrapped words '.repeat(30).trim() });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  await expect(card.locator('.github-comment-body p')).toHaveCount(1);
+  await settleRegions(page);
+  const toggle = card.locator('.comment-body-toggle');
+  await expect(toggle).toBeHidden();
+  await page.setViewportSize({ width: 480, height: 900 });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toHaveText('Show less');
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(105);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(toggle).toBeHidden();
+  await page.setViewportSize({ width: 480, height: 900 });
+  await expect(toggle).toHaveText('Show less');
+  await expect(toggle).toBeVisible();
+});
+
+test('long commit comments use the shared preview and preserve full code blocks', async ({ page }) => {
+  const body = '```moonbit\n' + commentLines('let value =', 8) + '\n```';
+  await installApi(page, commitTarget(), { commitBody: body });
+  await page.goto(reviewPath(commitTarget()));
+  const card = commentCard(page, 'commit', 30);
+  await expect(card.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  await expect(card.locator('pre code')).toContainText('let value = 8');
+  await card.getByRole('button', { name: 'Show more', exact: true }).click();
+  await expect(card.getByRole('button', { name: 'Show less', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.commit-message-title')).toHaveText('Commit change');
+});
+
+const markdownImagePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXWQAAAAASUVORK5CYII=', 'base64');
+const markdownImageSources = [
+  'https://github.com/user-attachments/assets/image-id',
+  'https://github.com/owner/repo/assets/123/image-id',
+  'https://user-images.githubusercontent.com/123/image.png',
+  'https://private-user-images.githubusercontent.com/123/image.png',
+  'https://raw.githubusercontent.com/owner/repo/main/image.png',
+  'https://camo.githubusercontent.com/image-id',
+  'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png',
+];
+
+test('comment preview observes delayed images and updated Markdown without retaining retired nodes', async ({ page }) => {
+  await installRenderProbe(page);
+  const response = createGate('long comment image');
+  await page.route('https://camo.githubusercontent.com/long-comment', async route => {
+    await response.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await installApi(page, pullTarget(), {
+    issueBody: '<img src="https://camo.githubusercontent.com/long-comment" alt="Delayed image" width="240" height="240">',
+  });
+  await page.goto(reviewPath());
+  const card = commentCard(page, 'issue', 10);
+  const toggle = card.locator('.comment-body-toggle');
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'pending');
+  await settleRegions(page);
+  await expect(toggle).toBeHidden();
+  response.release();
+  await expect(card.locator('.markdown-image')).toHaveAttribute('data-image-state', 'loaded');
+  await expect(toggle).toBeVisible();
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBe(105);
+  await toggle.click();
+  await expect(toggle).toHaveText('Show less');
+  expect(await card.locator('.comment-body-clip').evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(240);
+  // Removing the image remeasures Markdown in the existing comment card.
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '**Replacement**'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(card.locator('.github-comment-body strong')).toHaveText('Replacement');
+  await expect(card.locator('img')).toHaveCount(0);
+  await expect(toggle).toBeHidden();
+  await navigate(page, '/');
+  await settleRegions(page);
+  expect((await page.evaluate(() => __moondiffMetrics.active)).observers).toBe(0);
+});
+
+test('Markdown images load exact approved sources in descriptions and all discussion regions', async ({ page }) => {
+  const seen = [];
+  await page.route(url => markdownImageSources.includes(url.href), async route => {
+    seen.push(route.request().url());
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  const body = markdownImageSources.map((src, i) => `![image ${i}](${src})`).join('\n');
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body, replyBody: body });
+  const response = await page.goto(reviewPath());
+  expect(response.headers()['content-security-policy']).toContain('https://private-user-images.githubusercontent.com');
+  for (const region of ['.pull-request-body', '#comments .github-comment-body', '.review-thread .github-comment-body']) {
+    const body = page.locator(region).first();
+    await expect(body.locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(markdownImageSources.length);
+    for (let i = 0; i < markdownImageSources.length; i++) {
+      const image = body.getByRole('img', { name: `image ${i}`, exact: true });
+      await expect(image).toBeVisible();
+      await expect(image.locator('..').locator('.markdown-image-fallback')).toBeHidden();
+      await expect(image.locator('../..')).toHaveAttribute('href', markdownImageSources[i]);
+      await expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
+    }
+  }
+  expect(new Set(seen)).toEqual(new Set(markdownImageSources));
+});
+
+test('Markdown images outside the allowlist produce links and zero image requests', async ({ page }) => {
+  const sources = [
+    'https://outside.example/image.png',
+    'https://raw.githubusercontent.com.evil.example/image.png',
+    'https://github.com/owner/repo/issues/1',
+    'http://raw.githubusercontent.com/owner/repo/main/image.png',
+    'https://raw.githubusercontent.com:444/owner/repo/main/image.png',
+    'https://user@raw.githubusercontent.com/owner/repo/main/image.png',
+  ];
+  const seen = [];
+  page.on('request', request => {
+    const url = new URL(request.url());
+    const avatar = url.hostname === 'avatars.githubusercontent.com' ||
+      (url.hostname === 'github.com' && /^\/(reviewer|author|pull-author)\.png$/.test(url.pathname));
+    if (request.resourceType() === 'image' && !avatar) seen.push(request.url());
+  });
+  const body = sources.map((src, i) => `![outside ${i}](${src})`).concat([
+    '![danger](javascript:alert%281%29)',
+    '<img src="data:image/png;base64,abc" alt="data image" onerror="window.markdownAttack=true">',
+    '<img src="jav&#x61script&#58alert(1)" alt="encoded protocol">',
+  ]).join('\n\n');
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body });
+  await page.goto(reviewPath());
+  const description = page.locator('.pull-request-body');
+  await expect(description.getByRole('link')).toHaveCount(sources.length);
+  for (let i = 0; i < sources.length; i++) await expect(description.getByRole('link', { name: `outside ${i}`, exact: true })).toHaveAttribute('href', sources[i]);
+  await expect(description).toContainText('danger');
+  await expect(description).toContainText('data image');
+  await expect(page.locator('.markdown-body img')).toHaveCount(0);
+  expect(seen).toEqual([]);
+  expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+});
+
+test('Markdown images resolve the fork snapshot SHA and explicit GitHub branch paths', async ({ page }) => {
+  const expected = [
+    `https://raw.githubusercontent.com/contributor/project-fork/${head}/docs/image.png`,
+    `https://raw.githubusercontent.com/contributor/project-fork/${head}/assets/root.png`,
+    'https://raw.githubusercontent.com/upstream/project/main/image.png?raw=true',
+    'https://raw.githubusercontent.com/other/repository/release/image.png?raw=true',
+  ];
+  const seen = [];
+  await page.route('https://raw.githubusercontent.com/**', async route => {
+    seen.push(route.request().url());
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  const body = [
+    '![relative](docs/image.png)',
+    '![root](/assets/root.png)',
+    '![branch](../blob/main/image.png?raw=true)',
+    '![repository](../../../other/repository/blob/release/image.png?raw=true)',
+  ].join('\n');
+  await installApi(page, pullTarget(), { pullBody: body, issueBody: body, inlineBody: body });
+  await page.goto(reviewPath());
+  await expect(page.locator('.pull-request-body .markdown-image[data-image-state="loaded"]')).toHaveCount(4);
+  await expect(page.locator('#comments .github-comment-body .markdown-image[data-image-state="loaded"]')).toHaveCount(4);
+  await expect(page.locator('.review-thread .github-comment-body').first().locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(4);
+  expect(new Set(seen)).toEqual(new Set(expected));
+  await page.evaluate(() => { window.__fake.currentHead = 'b'.repeat(40); });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.locator('.snapshot-stale')).toBeVisible();
+  await expect(page.locator('.pull-request-body img').first()).toHaveAttribute('src', expected[0]);
+  expect(seen.some(url => url.includes('/' + changedHead + '/'))).toBe(false);
+});
+
+test('Markdown images in commit comments use the pinned commit repository', async ({ page }) => {
+  const expected = `https://raw.githubusercontent.com/upstream/project/${commitSha}/docs/image.png`;
+  const seen = [];
+  await page.route('https://raw.githubusercontent.com/**', async route => {
+    seen.push(route.request().url());
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await installApi(page, commitTarget(), { commitBody: '![commit image](docs/image.png)' });
+  await page.goto(reviewPath(commitTarget()));
+  const image = page.locator('.github-comment-body').getByRole('img', { name: 'commit image', exact: true });
+  await expect(image).toBeVisible();
+  await expect(image).toHaveAttribute('src', expected);
+  expect(seen).toEqual([expected]);
+});
+
+test('Markdown images sanitize HTML attributes and reuse wrapping links', async ({ page }) => {
+  await page.route('https://camo.githubusercontent.com/**', route => route.fulfill({ contentType: 'image/png', body: markdownImagePng }));
+  const body = [
+    '[![wrapped](https://camo.githubusercontent.com/wrapped)](https://example.com/destination)',
+    '',
+    '<img src="https://camo.githubusercontent.com/html" alt="HTML &amp; caption" title="a &quot;title&quot;" width="40" height="20" srcset="https://outside.example/2x 2x" style="display:none" onerror="window.markdownAttack=true">',
+    '<img src="https://camo.githubusercontent.com/empty" alt="" width="-1" height="0">',
+  ].join('\n');
+  await installApi(page, pullTarget(), { pullBody: body });
+  await page.goto(reviewPath());
+  const description = page.locator('.pull-request-body');
+  await expect(description.locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(3);
+  await expect(description.locator('a a')).toHaveCount(0);
+  await expect(description.getByRole('link').first()).toHaveAttribute('href', 'https://example.com/destination');
+  const html = description.getByRole('img', { name: 'HTML & caption', exact: true });
+  await expect(html).toHaveAttribute('title', 'a "title"');
+  await expect(html).toHaveAttribute('width', '40');
+  await expect(html).toHaveAttribute('height', '20');
+  await expect(description.locator('img[onerror], img[srcset], img[style], img[width="-1"], img[height="0"]')).toHaveCount(0);
+  await expect(description.locator('.markdown-image-fallback').last()).toHaveText('查看图片 · camo.githubusercontent.com');
+  expect(await page.evaluate(() => window.markdownAttack)).toBeUndefined();
+});
+
+test('Markdown images keep stable links across CSP-allowed and rejected redirects', async ({ page }) => {
+  const allowed = 'https://github.com/user-attachments/assets/allowed-redirect';
+  const rejected = 'https://github.com/user-attachments/assets/rejected-redirect';
+  const signed = 'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png?signature=temporary';
+  let signedRequests = 0, rejectedRequests = 0;
+  // Playwright's page.route handles only the first URL of a redirect chain.
+  // CDP intercepts each hop, so allowed targets stay entirely inside the fixture.
+  const session = await page.context().newCDPSession(page);
+  const interceptionErrors = [];
+  await session.send('Fetch.enable', { patterns: [
+    { urlPattern: 'https://github.com/user-attachments/assets/*redirect', resourceType: 'Image' },
+    { urlPattern: 'https://github-production-user-asset-6210df.s3.amazonaws.com/image.png*', resourceType: 'Image' },
+    { urlPattern: 'https://outside.example/*', resourceType: 'Image' },
+  ] });
+  session.on('Fetch.requestPaused', async ({ requestId, request }) => {
+    try {
+      if (request.url === allowed || request.url === rejected) {
+        await session.send('Fetch.fulfillRequest', { requestId, responseCode: 302,
+          responseHeaders: [{ name: 'Location', value: request.url === allowed ? signed : 'https://outside.example/redirected.png' }] });
+      } else {
+        if (request.url === signed) signedRequests++;
+        else rejectedRequests++;
+        await session.send('Fetch.fulfillRequest', { requestId, responseCode: 200,
+          responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body: markdownImagePng.toString('base64') });
+      }
+    } catch (error) { interceptionErrors.push(String(error)); }
+  });
+  await installApi(page, pullTarget(), { pullBody: `![allowed](${allowed})\n![rejected](${rejected})` });
+  await page.goto(reviewPath());
+  const description = page.locator('.pull-request-body');
+  await expect(description.getByRole('img', { name: 'allowed', exact: true })).toBeVisible();
+  await expect(description.getByRole('link', { name: 'allowed', exact: true })).toHaveAttribute('href', allowed);
+  await expect(description.getByRole('link', { name: 'rejected', exact: true })).toBeVisible();
+  await expect(description.getByRole('link', { name: 'rejected', exact: true })).toHaveAttribute('href', rejected);
+  await expect(description.locator('.markdown-image[data-image-state="link"]')).toHaveCount(1);
+  await expect(description.locator('img')).toHaveCount(1);
+  expect(signedRequests).toBe(1);
+  expect(rejectedRequests).toBe(0);
+  expect(await description.innerHTML()).not.toContain('signature=temporary');
+  expect(interceptionErrors).toEqual([]);
+  await session.detach();
+});
+
+for (const failure of [403, 404, 'invalid']) {
+  test(`Markdown images degrade ${failure} responses once per mount`, async ({ page }) => {
+    let requests = 0;
+    await page.route('https://camo.githubusercontent.com/failure', async route => {
+      requests++;
+      await route.fulfill({ status: typeof failure === 'number' ? failure : 200, contentType: 'image/png', body: 'invalid image' });
+    });
+    await installApi(page, pullTarget(), { issueBody: '![unavailable](https://camo.githubusercontent.com/failure)' });
+    await page.goto(reviewPath());
+    const comment = page.locator('#comments .github-comment').first();
+    await expect(comment.locator('.markdown-image[data-image-state="link"]')).toHaveCount(1);
+    await expect(comment.getByRole('link', { name: 'unavailable', exact: true })).toBeVisible();
+    await expect(comment.locator('.github-comment-body img')).toHaveCount(0);
+    // A regional rerender of the same body must not restart the failed image.
+    await comment.getByRole('button', { name: 'More options', exact: true }).click();
+    await expect(comment.getByRole('menu')).toBeVisible();
+    expect(requests).toBe(1);
+  });
+}
+
+test('Markdown images show a link while pending and degrade at exactly ten seconds', async ({ page }) => {
+  const clock = await installClock(page);
+  await installRenderProbe(page);
+  const response = createGate('image response after timeout');
+  let requests = 0;
+  await page.route('https://camo.githubusercontent.com/slow', async route => {
+    requests++;
+    await response.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await installApi(page, pullTarget(), { pullBody: '![slow image](https://camo.githubusercontent.com/slow)' });
+  await page.goto(reviewPath());
+  const timer = await clock.timer(10000);
+  const description = page.locator('.pull-request-body');
+  await expect(description.getByRole('link', { name: 'slow image', exact: true })).toBeVisible();
+  await expect(description.locator('img')).toBeHidden();
+  await clock.before(timer);
+  await expect(description.locator('.markdown-image[data-image-state="pending"]')).toHaveCount(1);
+  await clock.fire(timer);
+  await expect(description.locator('img')).toHaveCount(0);
+  await expect(description.getByRole('link', { name: 'slow image', exact: true })).toBeVisible();
+  response.release();
+  await settleRegions(page);
+  await expect(description.locator('img')).toHaveCount(0);
+  expect(requests).toBe(1);
+});
+
+test('Markdown images cancel removed-node timers and ignore old responses after refresh and route changes', async ({ page }) => {
+  const clock = await installClock(page);
+  await installRenderProbe(page);
+  const response = createGate('retired image response');
+  await page.route('https://camo.githubusercontent.com/retired', async route => {
+    await response.promise;
+    await trackRoute(route).fulfill({ contentType: 'image/png', body: markdownImagePng });
+  });
+  await page.route('https://camo.githubusercontent.com/current', route => route.fulfill({ contentType: 'image/png', body: markdownImagePng }));
+  await installApi(page, pullTarget(), { issueBody: '![retired](https://camo.githubusercontent.com/retired)' });
+  await page.goto(reviewPath());
+  const timer = await clock.timer(10000);
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '![current](https://camo.githubusercontent.com/current)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await clock.until(() => page.locator('#comments .markdown-image[data-image-state="loaded"]').count(), 'replacement image loaded');
+  expect((await clock.timers()).find(t => t.sequence === timer.sequence).state).toBe('cancelled');
+  await page.evaluate(() => { window.__fake.issueComments[0].body = '![retired again](https://camo.githubusercontent.com/retired)'; });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  const next = await clock.timer(10000, { after: timer.sequence });
+  await navigate(page, '/');
+  await clock.until(async () => await page.locator('.markdown-body img').count() === 0, 'route retired image nodes');
+  expect((await clock.timers()).filter(t => t.ms === 10000 && t.state === 'pending')).toEqual([]);
+  expect((await clock.timers()).find(t => t.sequence === next.sequence).state).toBe('cancelled');
+  response.release();
+  await clock.jump(10001);
+  await expect(page.locator('.markdown-body')).toHaveCount(0);
+});
+
+test('Markdown images handle cached completion and repeated rendering without nested links or retries', async ({ page }) => {
+  let requests = 0;
+  await page.route('https://camo.githubusercontent.com/cached', async route => {
+    requests++;
+    await route.fulfill({ contentType: 'image/png', body: markdownImagePng, headers: { 'cache-control': 'public, max-age=3600' } });
+  });
+  await installApi(page, pullTarget(), { issueBody: '[![cached](https://camo.githubusercontent.com/cached)](https://example.com/destination)' });
+  await page.goto(reviewPath());
+  const comment = page.locator('#comments .github-comment').first();
+  await expect(comment.locator('.markdown-image[data-image-state="loaded"]')).toHaveCount(1);
+  await page.evaluate(() => {
+    const image = document.querySelector('#comments .markdown-image img');
+    image.dataset.testOriginal = 'true';
+    const clone = image.parentElement.parentElement.cloneNode(true);
+    const copy = clone.querySelector('img');
+    copy.removeAttribute('data-image-started');
+    copy.removeAttribute('data-test-original');
+    copy.removeAttribute('src');
+    copy.hidden = true;
+    clone.querySelector('.markdown-image').removeAttribute('data-image-state');
+    const setAttribute = copy.setAttribute.bind(copy);
+    copy.setAttribute = (name, value) => {
+      setAttribute(name, value);
+      if (name === 'src') copy.dataset.cacheComplete = String(copy.complete && copy.naturalWidth > 0);
+    };
+    clone.querySelector('.markdown-image-fallback').hidden = false;
+    document.getElementById('app').append(clone);
+  });
+  await expect(page.locator('#app .markdown-image[data-image-state="loaded"]')).toHaveCount(2);
+  await expect(page.locator('img[data-cache-complete="true"]')).toBeVisible();
+  await comment.getByRole('button', { name: 'More options', exact: true }).click();
+  await expect(comment.getByRole('menu')).toBeVisible();
+  await expect(comment.locator('img[data-test-original]')).toHaveCount(1);
+  await expect(comment.locator('a a')).toHaveCount(0);
+  await expect(comment.getByRole('link', { name: 'cached', exact: true })).toHaveAttribute('href', 'https://example.com/destination');
+  expect(requests).toBe(1);
+});
 
 async function signInAndWaitForComments(page) {
   await page.getByRole("button", { name: "Sign in with GitHub" }).click();

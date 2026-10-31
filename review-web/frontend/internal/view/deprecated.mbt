@@ -42,6 +42,11 @@ pub extend NavigationInput with Eq::{not_equal, equal}
 ///|
 #deprecated
 #doc(hidden)
+pub extend RebaseMergeInput with Eq::{not_equal, equal}
+
+///|
+#deprecated
+#doc(hidden)
 pub extend PullMergeInput with Eq::{not_equal, equal}
 
 ///|

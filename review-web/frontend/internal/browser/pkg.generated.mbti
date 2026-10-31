@@ -38,6 +38,8 @@ pub fn finite(Double) -> Bool
 
 pub fn focus(@dom.Element) -> Unit
 
+pub fn fragment_target(String) -> @dom.Element?
+
 pub fn has_focus() -> Bool
 
 pub fn has_window() -> Bool
@@ -58,7 +60,17 @@ pub fn manual_scroll_restoration() -> Unit
 
 pub fn mouse_click() -> @dom.Event
 
+pub fn mutation_added_nodes(@dom.MutationRecord) -> FixedArray[@dom.Node]
+
+pub fn mutation_has_removed_nodes(@dom.MutationRecord) -> Bool
+
+pub fn navigate_fragment(String) -> Unit
+
 pub fn parse_float(String) -> Double
+
+pub fn parse_url(String, base? : String) -> URL?
+
+pub fn performance_now() -> Double
 
 pub fn[T] property(@dom.Element, String) -> T
 
@@ -123,6 +135,18 @@ pub fn Response::ok(Self) -> Bool
 pub fn Response::reader(Self) -> Reader
 pub fn Response::status(Self) -> Int32
 pub fn Response::text(Self) -> @js_async.Promise[String]
+
+#external
+pub type URL
+pub fn URL::hash(Self) -> String
+pub fn URL::hostname(Self) -> String
+pub fn URL::href(Self) -> String
+pub fn URL::password(Self) -> String
+pub fn URL::pathname(Self) -> String
+pub fn URL::port(Self) -> String
+pub fn URL::protocol(Self) -> String
+pub fn URL::search(Self) -> String
+pub fn URL::username(Self) -> String
 
 // Type aliases
 

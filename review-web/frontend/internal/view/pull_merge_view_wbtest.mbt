@@ -40,6 +40,121 @@ fn pull_merge_view_status() -> @protocol.ApiPullMergeStatus {
 }
 
 ///|
+test "rebase button projection preserves eligibility and disabled states" {
+  let status = pull_merge_view_status()
+  let input : PullMergeInput = {
+    state: { ..test_pull_merge_state(), status: Some(status), },
+    auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
+    snapshot_stale: false,
+    write_enabled: true,
+  }
+  assert_true(
+    input.rebase_merge_input() is Some({ disabled: false, submitting: false, }),
+  )
+  for
+    hidden in [
+      { ..input, snapshot_stale: true, },
+      { ..input, state: { ..input.state, stale: true, }, },
+      { ..input, auth: Anonymous(None), },
+      { ..input, state: { ..input.state, status: None, }, },
+    ] {
+    assert_true(hidden.rebase_merge_input() is None)
+  }
+  for
+    unavailable in [
+      { ..status, open: false, },
+      { ..status, merged: true, },
+      { ..status, draft: true, },
+      { ..status, mergeable: Some(false), },
+      { ..status, rebaseable: Some(false), },
+      { ..status, mergeable: None, },
+      { ..status, rebaseable: None, },
+    ] {
+    let hidden = {
+      ..input,
+      state: { ..input.state, status: Some(unavailable), },
+    }
+    assert_true(hidden.rebase_merge_input() is None)
+  }
+  for
+    disabled in [
+      { ..input, write_enabled: false, },
+      { ..input, state: { ..input.state, loading: true, }, },
+      {
+        ..input,
+        state: {
+          ..input.state,
+          status: Some({ ..status, mergeable_state: "blocked", }),
+        },
+      },
+    ] {
+    assert_true(
+      disabled.rebase_merge_input()
+      is Some({ disabled: true, submitting: false, }),
+    )
+  }
+  let submitting = { ..input, state: { ..input.state, submitting: true, }, }
+  assert_true(
+    submitting.rebase_merge_input()
+    is Some({ disabled: true, submitting: true, }),
+  )
+}
+
+///|
+#warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
+test "navigation and card share the rebase button after previous and next" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  for submitting in [false, true] {
+    let input : PullMergeInput = {
+      state: {
+        ..test_pull_merge_state(),
+        status: Some(pull_merge_view_status()),
+        submitting,
+      },
+      auth: SignedIn(login=Some("alice"), user_id=Some("1"), install_url=None),
+      snapshot_stale: false,
+      write_enabled: true,
+    }
+    let navigation = render_test_html(() => {
+      change_controls(
+        {
+          generation: 1,
+          enabled: true,
+          rebase_merge: input.rebase_merge_input(),
+        },
+        emit,
+      )
+    })
+    let button = render_test_html(() => {
+      rebase_merge_button(input.rebase_merge_input(), emit)
+    })
+    assert_true(navigation.contains(button), msg=navigation)
+    assert_true(render_pull_merge(input).contains(button))
+    assert_true(
+      navigation.find("Previous change").unwrap() <
+      navigation.find("Next change").unwrap(),
+    )
+    assert_true(
+      navigation.find("Next change").unwrap() <
+      navigation.find("rebase-merge-button").unwrap(),
+    )
+    assert_eq(button.contains("disabled"), submitting)
+    assert_true(
+      button.contains(
+        if submitting {
+          "Rebasing and merging…"
+        } else {
+          "Rebase and merge"
+        },
+      ),
+    )
+    assert_false(navigation.contains("MoonBit tests"))
+    assert_false(navigation.contains("CI results are incomplete"))
+  }
+}
+
+///|
 #warnings("-alert_unstable")
 test "CI copy follows GitHub state wording and count grammar" {
   let success : @protocol.ApiCiCheck = {
@@ -166,6 +281,9 @@ test "merge region sits between discussion and changed files" {
         showing: true,
         selector_only: false,
         message: "Review",
+        pull_body: None,
+        pull_user: None,
+        markdown: None,
         drawer_open: false,
         preferred_width: 300,
         range_limit: false,

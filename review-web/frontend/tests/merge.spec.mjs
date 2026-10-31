@@ -1,9 +1,183 @@
 import { installClock } from '../../tests/browser-control.mjs';
-import { waitForState, settleRegions } from '../../tests/render-probe.mjs';
+import { waitForState, settleRegions, renderCounts, installRenderProbe } from '../../tests/render-probe.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
 const path = '/example/regions/pull/1';
+
+async function scrollMergeCard(page, gap = -1) {
+  await settleRegions(page);
+  const position = await page.locator('.pull-merge-card').evaluate((card, gap) => {
+    const title = document.querySelector('.change-titlebar');
+    const bottom = parseFloat(getComputedStyle(title).top) + title.getBoundingClientRect().height;
+    window.scrollTo({ top: scrollY + card.getBoundingClientRect().bottom - bottom - gap, behavior: 'instant' });
+    return scrollY;
+  }, gap);
+  await settleRegions(page);
+  return position;
+}
+
+async function expectMergeSlot(page, inTitlebar) {
+  await expect(page.locator('.change-titlebar .rebase-merge-button')).toHaveCSS('visibility', inTitlebar ? 'visible' : 'hidden');
+  await expect(page.locator('.pull-merge-card .rebase-merge-button')).toHaveCSS('visibility', inTitlebar ? 'hidden' : 'visible');
+  await expect(page.locator('.rebase-merge-button:visible')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /Rebas(e and merge|ing and merging…)/ })).toHaveCount(1);
+}
+
+for (const width of [1440, 420, 320]) {
+  test(`rebase follows the card boundary without moving layout or focus at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const fixture = syntheticFixture({ files: 2, declarations: 16 });
+    fixture.message = 'A long pull request title with an_unbroken_identifier_that_wraps_inside_the_available_width';
+    await installRenderingFixture(page, fixture, { authenticated: true });
+    await page.goto(path);
+    const card = page.locator('.pull-merge-card');
+    const original = card.locator('.rebase-merge-button');
+    const title = page.locator('.change-titlebar');
+    const sticky = title.locator('.rebase-merge-button');
+    await expect(original).toBeEnabled();
+    await expect(page.locator('.loading-inline')).toHaveCount(0);
+    await expectMergeSlot(page, false);
+    await scrollMergeCard(page, await card.evaluate(el => el.getBoundingClientRect().height + 8));
+    await expect(original).toBeInViewport();
+    await original.evaluate(el => el.focus({ preventScroll: true }));
+    await scrollMergeCard(page, 1);
+    await expectMergeSlot(page, false);
+    await expect(original).toBeFocused();
+    const sizes = () => page.evaluate(() => ({
+      card: document.querySelector('.pull-merge-card').getBoundingClientRect().height,
+      title: document.querySelector('.change-titlebar').getBoundingClientRect().height,
+      document: document.documentElement.scrollHeight,
+    }));
+    const before = await sizes();
+    const down = await scrollMergeCard(page);
+    await expectMergeSlot(page, true);
+    await expect(sticky).toBeFocused();
+    expect(await sizes()).toEqual(before);
+    expect(await page.evaluate(() => scrollY)).toBe(down);
+    // The hidden copy cannot steal focus, even through a direct DOM focus call.
+    await original.evaluate(el => el.focus({ preventScroll: true }));
+    await expect(sticky).toBeFocused();
+    await title.getByRole('button', { name: 'Previous change', exact: true }).focus();
+    await page.keyboard.press('Tab');
+    await expect(title.getByRole('button', { name: 'Next change', exact: true })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(sticky).toBeFocused();
+    const up = await scrollMergeCard(page, 1);
+    await expectMergeSlot(page, false);
+    await expect(original).toBeFocused();
+    expect(await sizes()).toEqual(before);
+    expect(await page.evaluate(() => scrollY)).toBe(up);
+    await sticky.evaluate(el => el.focus({ preventScroll: true }));
+    await expect(original).toBeFocused();
+
+    await scrollMergeCard(page);
+    expect(await title.evaluate(el => {
+      const buttons = [...el.querySelectorAll('button')].map(button => button.getBoundingClientRect());
+      return buttons.every((button, index) => button.left >= 0 && button.right <= innerWidth &&
+        Math.abs(button.top + button.height / 2 - buttons[0].top - buttons[0].height / 2) < 1 &&
+        (index === 0 || button.left >= buttons[index - 1].right));
+    })).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (width <= 420) {
+      expect(await title.evaluate(el => el.querySelector('.section-change-controls').getBoundingClientRect().top >=
+        el.querySelector('.commit-message-title').getBoundingClientRect().bottom)).toBe(true);
+    }
+    const rows = page.locator('.file-card [data-change-block-start]');
+    for (const [direction, index] of [['Next change', 0], ['Next change', 1], ['Previous change', 0]]) {
+      await title.getByRole('button', { name: direction, exact: true }).click();
+      await expect.poll(() => rows.nth(index).evaluate(row => {
+        const file = row.closest('.file-card');
+        const section = row.closest('.semantic-section');
+        const bottom = document.querySelector('.change-titlebar').getBoundingClientRect().bottom +
+          file.querySelector('.file-heading').getBoundingClientRect().height +
+          section.querySelector('summary').getBoundingClientRect().height + 8;
+        return Math.abs(row.getBoundingClientRect().top - bottom);
+      })).toBeLessThanOrEqual(1);
+      await expectMergeSlot(page, true);
+    }
+  });
+}
+
+test('rebase placement responds to CI height and window resize and releases its layout lifecycle', async ({ page }) => {
+  await installRenderProbe(page);
+  const fixture = syntheticFixture({ files: 2, declarations: 16 });
+  await installRenderingFixture(page, fixture, {
+    authenticated: true,
+    mergeStatus: {
+      base_sha: fixture.base, head_sha: fixture.sha, open: true, draft: false, merged: false,
+      mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_summary: { $tag: 'Success' },
+      ci_checks: Array.from({ length: 4 }, (_, i) => ({ name: `Check ${i}`, state: { $tag: 'Success' }, description: 'Passed', source: { $tag: 'CheckRun' } })),
+      ci_warnings: [],
+    },
+  });
+  await page.goto(path);
+  await expect(page.locator('.pull-merge-card .rebase-merge-button')).toBeEnabled();
+  await expect(page.locator('.loading-inline')).toHaveCount(0);
+  // Keep native anchoring from moving the viewport when the hidden disclosure grows.
+  await page.evaluate(() => { document.documentElement.style.overflowAnchor = 'none'; });
+  await scrollMergeCard(page, -8);
+  const disclosure = page.locator('.pull-ci-disclosure');
+  const position = await page.evaluate(() => scrollY);
+  await disclosure.evaluate(el => { el.open = true; });
+  await expectMergeSlot(page, false);
+  expect(await page.evaluate(() => scrollY)).toBe(position);
+  await disclosure.evaluate(el => { el.open = false; });
+  await expectMergeSlot(page, true);
+  expect(await page.evaluate(() => scrollY)).toBe(position);
+  for (const width of [420, 960, 320, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await settleRegions(page);
+    const above = await page.evaluate(() => document.querySelector('.pull-merge-card').getBoundingClientRect().bottom <=
+      document.querySelector('.change-titlebar').getBoundingClientRect().bottom);
+    await expectMergeSlot(page, above);
+    await scrollMergeCard(page);
+    await expectMergeSlot(page, true);
+    await scrollMergeCard(page, 1);
+    await expectMergeSlot(page, false);
+  }
+  await page.locator('a.workspace-home').click();
+  await expect(page.getByRole('tab').first()).toBeVisible();
+  await settleRegions(page);
+  const retired = await renderCounts(page);
+  expect(retired.active.observers).toBe(0);
+  await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
+  await page.evaluate(() => { dispatchEvent(new Event('scroll')); dispatchEvent(new Event('resize')); });
+  await settleRegions(page);
+  expect((await renderCounts(page)).layout).toEqual(retired.layout);
+  expect((await renderCounts(page)).errors).toEqual([]);
+});
+
+test('the titlebar rebase submits once and both copies stay disabled until success', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const fixture = syntheticFixture({ files: 2, declarations: 16 });
+  const mergeGate = gate();
+  const state = await installRenderingFixture(page, fixture, { authenticated: true, mergeGate });
+  await page.goto(path);
+  await expect(page.locator('.pull-merge-card .rebase-merge-button')).toBeEnabled();
+  await expect(page.locator('.loading-inline')).toHaveCount(0);
+  await scrollMergeCard(page);
+  const sticky = page.locator('.change-titlebar .rebase-merge-button');
+  await expectMergeSlot(page, true);
+  await sticky.evaluate(el => { el.click(); el.click(); });
+  await expect.poll(() => state.calls.filter(call => call.op === 'github.pull.rebase.merge').length).toBe(1);
+  for (const button of [sticky, page.locator('.pull-merge-card .rebase-merge-button')]) {
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveText('Rebasing and merging…');
+  }
+  expect(state.calls.find(call => call.op === 'github.pull.rebase.merge').args).toMatchObject({
+    expected_base_sha: fixture.base, expected_head_sha: fixture.sha,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await scrollMergeCard(page, 1);
+  await expectMergeSlot(page, false);
+  await scrollMergeCard(page);
+  await expectMergeSlot(page, true);
+  mergeGate.resolve();
+  await expect(page.locator('.pull-merge-card')).toContainText('✓ This pull request is merged.');
+  await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(1);
+});
 
 test('merge card shows aggregate CI and submits one pinned rebase merge', async ({ page }) => {
   const fixture = syntheticFixture({ files: 1, declarations: 2 });
@@ -121,7 +295,27 @@ test('conflicts and repository rules never expose an enabled merge action', asyn
   await page.goto(path);
   const card = page.locator('.pull-merge-card');
   await expect(card.getByText('× This branch has conflicts that must be resolved before rebasing.', { exact: true })).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Rebase and merge', exact: true })).toHaveCount(0);
+  await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
+});
+
+test('repository rules keep the rebase action disabled in either position', async ({ page }) => {
+  const fixture = syntheticFixture({ files: 2, declarations: 16 });
+  const state = await installRenderingFixture(page, fixture, {
+    authenticated: true,
+    mergeStatus: {
+      base_sha: fixture.base, head_sha: fixture.sha, open: true, draft: false, merged: false,
+      mergeable: true, rebaseable: true, mergeable_state: 'blocked', ci_checks: [], ci_warnings: [],
+    },
+  });
+  await page.goto(path);
+  await expect(page.locator('.pull-merge-card')).toContainText('Repository rules currently block this merge.');
+  await expect(page.locator('.pull-merge-card .rebase-merge-button')).toBeDisabled();
+  await expect(page.locator('.loading-inline')).toHaveCount(0);
+  await scrollMergeCard(page);
+  await expectMergeSlot(page, true);
+  await expect(page.locator('.change-titlebar .rebase-merge-button')).toBeDisabled();
+  await expect(page.locator('.change-titlebar')).not.toContainText('Repository rules');
   expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
 });
 
@@ -193,34 +387,45 @@ test('a changed snapshot offers Load latest and hides merge', async ({ page }) =
 });
 
 test('a snapshot change during merge offers Load latest without showing a conflict', async ({ page }) => {
-  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const fixture = syntheticFixture({ files: 2, declarations: 16 });
   const state = await installRenderingFixture(page, fixture, {
     authenticated: true,
     mergeFailure: { status: 409, code: 'pull_snapshot_changed', message: 'This pull request changed.' },
   });
   await page.goto(path);
   const card = page.locator('.pull-merge-card');
-  await card.getByRole('button', { name: 'Rebase and merge', exact: true }).click();
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  await expect(page.locator('.loading-inline')).toHaveCount(0);
+  await scrollMergeCard(page);
+  await page.locator('.change-titlebar').getByRole('button', { name: 'Rebase and merge', exact: true }).click();
   await expect(card.getByText('This PR snapshot is out of date. Load the latest changes before merging.', { exact: true })).toBeVisible();
   await expect(card.getByText('Load latest', { exact: true })).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Rebase and merge', exact: true })).toHaveCount(0);
+  await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
+  await expect(page.locator('.change-titlebar')).not.toContainText('Load latest');
   await expect(card.getByText('× This branch has conflicts that must be resolved before rebasing.', { exact: true })).toHaveCount(0);
   expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(1);
 });
 
 test('a failed merge stays retryable and a retry succeeds', async ({ page }) => {
-  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const fixture = syntheticFixture({ files: 2, declarations: 16 });
   const state = await installRenderingFixture(page, fixture, {
     authenticated: true,
     mergeFailure: { status: 503, code: 'merge_upstream_failure', message: 'GitHub could not complete the rebase merge.' },
   });
   await page.goto(path);
   const card = page.locator('.pull-merge-card');
-  await card.getByRole('button', { name: 'Rebase and merge', exact: true }).click();
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  await expect(page.locator('.loading-inline')).toHaveCount(0);
+  await scrollMergeCard(page);
+  const sticky = page.locator('.change-titlebar').getByRole('button', { name: 'Rebase and merge', exact: true });
+  await sticky.click();
   await expect(card.getByText('GitHub could not complete the rebase merge. Try again.', { exact: true })).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Rebase and merge', exact: true })).toBeEnabled();
-  await card.getByRole('button', { name: 'Rebase and merge', exact: true }).click();
+  await expect(page.locator('.change-titlebar')).not.toContainText('GitHub could not complete');
+  await scrollMergeCard(page);
+  await expect(sticky).toBeEnabled();
+  await sticky.click();
   await expect(card.getByText('✓ This pull request is merged.', { exact: true })).toBeVisible();
+  await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
   expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(2);
 });
 

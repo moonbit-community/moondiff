@@ -137,6 +137,8 @@ pub(all) enum Event {
   ConfirmCommentDelete(CommentId)
   CommentDeleted(Int32, Int32, CommentId, Result[@moondiff-review-web-protocol.DeleteResult, Failure])
   CommentsLoaded(Int32, Int32, Result[@moondiff-review-web-protocol.ApiCommentBundle, Failure])
+  ToggleCommentBody(Int32, CommentId)
+  SetCommentBodyExpanded(Int32, CommentId, Bool)
   OpenOverallDraft
   OpenInlineDraft(Int32, @review.ReviewAnchor)
   OpenReplyDraft(Int64)
@@ -222,6 +224,7 @@ pub struct ReadView {
   // private fields
 } derive(Eq)
 pub fn ReadView::allowed(Self, Action) -> Bool
+pub fn ReadView::body_expanded(Self, CommentId) -> Bool
 pub fn ReadView::can_delete(Self, CommentId) -> Bool
 pub fn ReadView::comment_key(Self, CommentId) -> String
 pub fn ReadView::draft(Self) -> CommentDraft?
