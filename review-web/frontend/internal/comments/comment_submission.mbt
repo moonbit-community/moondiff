@@ -1,9 +1,16 @@
 ///|
-fn open_comment_draft(model : Model, kind : DraftKind) -> (Model, Effects) {
-  if !review_can_comment(model.review) || model.review.submission() is Some(_) {
+fn open_comment_draft(
+  model : Model,
+  kind : DraftKind,
+  body~ : String = "",
+) -> (Model, Effects) {
+  if model.review.submission() is Some(_) {
     return (model, [])
   }
   if permission(model.review, OpenDraft(kind)) is Denied(message) {
+    if !review_can_comment(model.review) {
+      return (model, [])
+    }
     return (with_review(model, { ..model.review, notice: Some(message), }), [])
   }
   if model.review.draft() is Some(_) {
@@ -19,7 +26,7 @@ fn open_comment_draft(model : Model, kind : DraftKind) -> (Model, Effects) {
       ReplyDraft(id) => model.review.index.owners.get(ReviewComment(id).key())
       OverallDraft => None
     },
-    body: "",
+    body,
     error: None,
   }
   (

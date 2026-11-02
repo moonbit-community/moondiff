@@ -19,6 +19,7 @@ pub(all) enum ReviewMsg {
   CommentsLoaded(Int32, Int32, Result[ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
+  OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
@@ -121,6 +122,7 @@ fn update_review(
     RefreshComments => RefreshComments
     CancelDelete => CancelDelete
     OpenOverallDraft => OpenOverallDraft
+    OverallDraftBodyChanged(body) => OverallDraftBodyChanged(body)
     CancelDraft => CancelDraft
     SubmitDraft => SubmitDraft
     BeginCommentsRefresh(generation, reference) =>

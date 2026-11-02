@@ -69,7 +69,12 @@ pub fn permission(review : Session, action : Action) -> Permission {
       Allowed
     }
     OpenDraft(kind) => {
-      if !review_can_comment(review) {
+      // A transient check of a known account must not interrupt typing in the
+      // persistent composer. Posting still requires a verified identity.
+      if !review_can_comment(review) &&
+        !(kind is OverallDraft &&
+        review.identity_checking &&
+        review.login is Some(_)) {
         return Denied("Sign in with GitHub before posting a comment.")
       }
       if review.submission() is Some(_) {

@@ -139,6 +139,7 @@ pub(all) enum ReadStatus {
 pub struct PermissionSummary {
   fresh : Bool
   can_comment : Bool
+  identity_checking : Bool
   visible : Bool
   login : String?
   stale : Bool
@@ -153,6 +154,7 @@ pub struct PermissionSummary {
 pub fn Session::permission_summary(self : Session) -> PermissionSummary {
   {
     can_comment: self.can_comment,
+    identity_checking: self.identity_checking,
     fresh: self.snapshot_confirmed,
     visible: self.draft_visible(),
     login: self.login,
@@ -373,7 +375,10 @@ pub fn ReadView::allowed(self : ReadView, action : Action) -> Bool {
       !self.draft_blocks_deletion(id)
     OpenDraft(kind) => {
       let p = self.permissions
-      p.can_comment &&
+      (
+        p.can_comment ||
+        (kind is OverallDraft && p.identity_checking && p.login is Some(_))
+      ) &&
       !p.posting &&
       (p.target is None || same_draft_target(p.target.unwrap(), kind)) &&
       (match kind {

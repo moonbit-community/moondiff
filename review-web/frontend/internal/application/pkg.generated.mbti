@@ -432,6 +432,7 @@ pub(all) enum ReviewMsg {
   CommentsLoaded(Int32, Int32, Result[@moondiff-review-web-protocol.ApiCommentBundle, Error])
   PageReactivated
   OpenOverallDraft
+  OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, @review.ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
