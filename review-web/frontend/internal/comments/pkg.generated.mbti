@@ -140,6 +140,7 @@ pub(all) enum Event {
   ToggleCommentBody(Int32, CommentId)
   SetCommentBodyExpanded(Int32, CommentId, Bool)
   OpenOverallDraft
+  OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, @review.ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
@@ -191,6 +192,7 @@ pub fn Permission::allowed(Self) -> Bool
 pub struct PermissionSummary {
   fresh : Bool
   can_comment : Bool
+  identity_checking : Bool
   visible : Bool
   login : String?
   stale : Bool

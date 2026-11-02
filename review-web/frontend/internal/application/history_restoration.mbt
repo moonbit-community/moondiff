@@ -20,6 +20,7 @@ fn cancel_history_for_edit(model : Model, msg : Msg) -> Model {
       msg
       is Review(
         DraftBodyChanged(_)
+        | OverallDraftBodyChanged(_)
         | OpenOverallDraft
         | OpenInlineDraft(_, _)
         | OpenReplyDraft(_)

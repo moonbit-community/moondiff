@@ -20,6 +20,7 @@ pub(all) enum Event {
   ToggleCommentBody(Int32, CommentId)
   SetCommentBodyExpanded(Int32, CommentId, Bool)
   OpenOverallDraft
+  OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, ReviewAnchor)
   OpenReplyDraft(Int64)
   DraftBodyChanged(String)
@@ -196,6 +197,14 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
       }
     }
     OpenOverallDraft => open_comment_draft(model, OverallDraft)
+    OverallDraftBodyChanged(body) =>
+      match model.review.draft() {
+        Some({ kind: OverallDraft, .. }) =>
+          update_review(model, DraftBodyChanged(body))
+        Some(_) => (model, [])
+        None if body.is_empty() => (model, [])
+        None => open_comment_draft(model, OverallDraft, body~)
+      }
     OpenInlineDraft(file_index, anchor) => {
       guard !model.review.snapshot_stale else { return (model, []) }
       open_comment_draft(model, InlineDraft(file_index, anchor))
