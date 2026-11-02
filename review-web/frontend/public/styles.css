@@ -2302,6 +2302,18 @@ button.sign-in-dialog-close:hover {
   gap: 8px;
 }
 
+.comment-editor-title {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+}
+
+.comment-textarea:disabled {
+  color: var(--muted);
+  background: var(--surface-subtle);
+  cursor: default;
+}
+
 .comment-textarea {
   box-sizing: border-box;
   width: 100%;

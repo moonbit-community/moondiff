@@ -939,7 +939,7 @@ for (const phase of ["initial comment load", "background refresh"]) {
         });
         const row = file.locator(".inline-comment-editor-row");
         const editor = row.locator("textarea");
-        await expect(page.locator(".comment-editor")).toHaveCount(1);
+        await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
         await expect(editor).toBeVisible();
         await expect(editor).toBeFocused();
         await expect(row.locator(".comment-location")).toHaveText(`src/main.mbt · ${side === "old" ? "Old" : "New"} · 2`);
@@ -969,13 +969,13 @@ test("anonymous public PR loads comments and a safe narrow diff without Analyze"
   await expect(page.locator("table.split.review-diff")).toBeVisible();
   await expect(page.getByRole("button", { name: /Analyze/u })).toHaveCount(0);
   await expect(page.locator(".diff-scroll [innerhtml]")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.locator('.overall-comment-editor textarea')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
 });
 
 async function expectNoAnonymousWrites(page) {
-  await expect(page.locator('.comment-editor')).toHaveCount(0);
+  await expect(page.locator('.comment-editor[data-draft-id]')).toHaveCount(0);
   await expect(page.getByRole('checkbox', { name: 'Viewed src/main.mbt', exact: true })).not.toBeChecked();
   expect(await page.evaluate(() => window.__fake.calls.filter(call =>
     call.op.startsWith('auth.device.') || call.op.endsWith('.create') ||
@@ -1152,7 +1152,7 @@ test('PR dialog uses current auth after a delayed commit and continues sign-in w
   }
   await waitForSignedInComments(page);
   await expect(signInDialog(page)).toBeHidden();
-  await expect(page.locator('.comment-editor')).toHaveCount(0);
+  await expect(page.locator('.comment-editor[data-draft-id]')).toHaveCount(0);
   await expect(page.locator('.viewed-control input')).not.toBeChecked();
   expect(await page.evaluate(() => window.__fake.calls.filter(call =>
     call.op.endsWith('.create') || call.op === 'github.pull.file.viewed.set'))).toEqual([]);
@@ -1261,7 +1261,7 @@ test('PR sign-in success closes the dialog without scrolling, a draft or a Viewe
   await expect(signInDialog(page)).toBeHidden();
   await expect(entry).toBeFocused();
   await expectPagePosition(page, position);
-  await expect(page.locator('.comment-editor')).toHaveCount(0);
+  await expect(page.locator('.comment-editor[data-draft-id]')).toHaveCount(0);
   await expect(page.locator('.viewed-control input')).not.toBeChecked();
   expect(await page.evaluate(() => window.__fake.calls.filter(call =>
     call.op.endsWith('.create') || call.op === 'github.pull.file.viewed.set'))).toEqual([]);
@@ -1384,7 +1384,7 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
   await page.goto(reviewPath());
   await expect(page.getByText("Existing inline comment")).toBeVisible();
   await expect(page.locator("table.split.review-diff")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.locator('.overall-comment-editor textarea')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
   await signInAndWaitForComments(page);
@@ -1399,9 +1399,8 @@ test("login, overall comment, inline comment, reply, reactivation refresh, and v
   ]);
   expect(buttonBox.height).toBeLessThanOrEqual(gutterBox.height);
 
-  await page.getByRole("button", { name: "Add overall comment" }).click();
-  await page.locator(".comment-editor textarea").fill("New overall comment");
-  await page.getByRole("button", { name: "Post comment" }).click();
+  await page.locator('.overall-comment-editor textarea').fill("New overall comment");
+  await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("New overall comment")).toBeVisible();
 
 
@@ -1459,7 +1458,7 @@ test("expired credentials during comment refresh offer sign-in and preserve comm
   await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
   await expect(page.getByRole("button", { name: "Try sign-in" })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.locator('.overall-comment-editor textarea')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reply" })).toHaveCount(0);
   await expect(page.locator(".line-comment-sign-in").first()).toBeAttached();
   await clickLineCommentButton(newLineCommentButton(page, 2));
@@ -1468,7 +1467,7 @@ test("expired credentials during comment refresh offer sign-in and preserve comm
 
   await page.getByRole("button", { name: "Try sign-in" }).click();
   await waitForSignedInComments(page);
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeVisible();
+  await expect(page.locator('.overall-comment-editor textarea')).toBeVisible();
   await expect(page.getByRole("button", { name: "Reply" }).first()).toBeVisible();
   await expect(page.locator(".line-comment-button").first()).toBeAttached();
 });
@@ -1478,11 +1477,12 @@ for (const kind of ["overall", "inline", "reply"]) {
     await installApi(page, pullTarget(), { authenticated: true });
     await page.goto(reviewPath());
     await waitForSignedInComments(page);
-    if (kind === "overall") await page.getByRole("button", { name: "Add overall comment" }).click();
+    if (kind === "overall") await page.locator('.overall-comment-editor textarea').focus();
     else if (kind === "inline") await openNewLineComment(page, 2);
     else await page.getByRole("button", { name: "Reply" }).first().click();
-    const editor = page.locator(".comment-editor textarea");
+    const editor = page.locator(kind === 'overall' ? '.overall-comment-editor textarea' : '.comment-editor[data-draft-id] textarea');
     await editor.fill("Keep this draft through re-login");
+    await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
     const id = await editor.getAttribute('data-draft-id');
     await page.evaluate(() => {
       window.__fake.authenticationFailureOps.push("github.comments.list");
@@ -1495,8 +1495,8 @@ for (const kind of ["overall", "inline", "reply"]) {
     await editor.fill('Edited while expired');
     await editor.evaluate(element => element.select());
     expect(await editor.evaluate(element => element.value.slice(element.selectionStart, element.selectionEnd))).toBe('Edited while expired');
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
-    await expect(page.locator('.comment-editor')).toContainText('Sign in with GitHub before posting');
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
+    await expect(page.locator('.comment-editor[data-draft-id]')).toContainText('Sign in with GitHub before posting');
     await page.getByRole("button", { name: "Try sign-in" }).click();
     await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseDevicePoll)).toBe("function");
     await editor.fill('Edited during sign-in');
@@ -1505,7 +1505,7 @@ for (const kind of ["overall", "inline", "reply"]) {
     await search.fill("main");
     await page.evaluate(() => window.__fake.releaseDevicePoll());
     await waitForSignedInComments(page);
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
     await expect(editor).toHaveValue('Edited during sign-in');
     await expect(editor).toHaveAttribute('data-draft-id', id);
     await expect(search).toBeFocused();
@@ -1519,21 +1519,20 @@ test("expired credentials during comment submission retain the draft for manual 
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
-  await page.getByRole("button", { name: "Add overall comment" }).click();
-  const editor = page.locator('.comment-editor textarea');
+  const editor = page.locator('.overall-comment-editor textarea');
   await editor.fill("Keep this draft");
   await page.evaluate(() => { window.__fake.authenticationFailureOps.push("github.issue.comment.create"); });
-  await page.getByRole("button", { name: "Post comment" }).click();
+  await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment" }).click();
   await expect(page.locator(".auth-controls.error")).toContainText("GitHub session expired");
   await expect(editor).toHaveValue('Keep this draft');
   await expect(editor).toBeEnabled();
   await editor.fill('Edited retry');
   await page.getByRole("button", { name: "Try sign-in" }).click();
   await waitForSignedInComments(page);
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
   await expect(editor).toHaveValue('Edited retry');
   expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(1);
-  await page.getByRole("button", { name: "Post comment" }).click();
+  await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment" }).click();
   await expect(page.getByText("Edited retry", { exact: true })).toBeVisible();
 });
 
@@ -1542,7 +1541,7 @@ test('same-account recovery keeps the draft locked until snapshot validation fin
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
-  const editor = page.locator('.comment-editor textarea');
+  const editor = page.locator('.comment-editor[data-draft-id] textarea');
   await editor.fill('Original anchor');
   await page.evaluate(() => window.__fake.authenticationFailureOps.push('github.comments.list'));
   await reactivatePage(page);
@@ -1561,10 +1560,10 @@ test('same-account recovery keeps the draft locked until snapshot validation fin
   await page.getByRole('button', { name: 'Try sign-in' }).click();
   await expect(page.getByRole('button', { name: 'Account: tester' })).toBeVisible();
   await expect.poll(() => held).toBeGreaterThan(0);
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
   await editor.fill('Edited during snapshot validation');
   release();
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
   await expect(editor).toHaveValue('Edited during snapshot validation');
   expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(0);
 });
@@ -1596,13 +1595,13 @@ test("reactivation synchronizes cross-tab login and logout", async ({ page }) =>
   await page.evaluate(() => { window.__fake.authenticated = true; });
   await reactivatePage(page);
   await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeVisible();
+  await expect(page.locator('.overall-comment-editor textarea')).toBeVisible();
 
   await page.evaluate(() => { window.__fake.authenticated = false; });
   await reactivatePage(page);
   await expect(page.getByRole("button", { name: "Sign in with GitHub" })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Account: tester', exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toHaveCount(0);
+  await expect(page.locator('.overall-comment-editor textarea')).toHaveCount(0);
 });
 
 test("cross-tab account switch clears the old draft and diff before reloading", async ({ page }) => {
@@ -1616,8 +1615,7 @@ test("cross-tab account switch clears the old draft and diff before reloading", 
   await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
   await expect(page.getByText("Fork PR for alice")).toBeVisible();
   await expect(page.getByText("new value for alice", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Add overall comment" }).click();
-  await page.locator(".comment-editor textarea").fill("Alice-only draft");
+  await page.locator('.overall-comment-editor textarea').fill("Alice-only draft");
   const pullCallsBeforeSwitch = await page.evaluate(() => window.__fake.calls
     .filter(call => call.op === "github.pull.get").length);
 
@@ -1625,7 +1623,7 @@ test("cross-tab account switch clears the old draft and diff before reloading", 
   await reactivatePage(page);
   await expect.poll(() => page.evaluate(() => window.__fake.accountSwitchPullDelayed)).toBe(true);
   await expect(page.getByText("Loading pull request metadata…")).toBeVisible();
-  await expect(page.locator(".comment-editor textarea")).toHaveCount(0);
+  await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveCount(0);
   await expect(page.getByText("Alice-only draft")).toHaveCount(0);
   await expect(page.getByText("Fork PR for alice")).toHaveCount(0);
   await expect(page.getByText("new value for alice", { exact: false })).toHaveCount(0);
@@ -1697,8 +1695,8 @@ test("PR head race preserves the draft until manually loading the snapshot", asy
   await expect(page.locator(".snapshot-stale")).toHaveCount(0);
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
-  await page.locator(".comment-editor textarea").fill("New snapshot comment");
-  await page.getByRole("button", { name: "Post comment", exact: true }).click();
+  await page.locator(".comment-editor[data-draft-id] textarea").fill("New snapshot comment");
+  await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment", exact: true }).click();
   await expect(page.getByText("New snapshot comment", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__fake.calls.find(call => call.op === "github.review.comment.create").args.commit_id)).toBe(changedHead);
 });
@@ -1727,7 +1725,7 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
     await page.evaluate(() => { window.__fake.authenticationFailureOps.push('github.comments.list'); });
     await reactivatePage(page);
     await expect(page.locator('.auth-controls.error')).toContainText('GitHub session expired');
-    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
     holdSources = false;
     await page.getByRole('button', { name: 'Try sign-in' }).click();
     await waitForSignedInComments(page);
@@ -1737,9 +1735,9 @@ for (const target of [commitTarget(), pullCommitTarget()]) {
     await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);
     await openNewLineComment(page, 2);
     const body = `New ${target.kind} comment after sign-in`;
-    await page.locator('.comment-editor textarea').fill(body);
-    await expect(page.getByRole('button', { name: 'Post comment', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+    await page.locator('.comment-editor[data-draft-id] textarea').fill(body);
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment', exact: true })).toBeEnabled();
+    await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment', exact: true }).click();
     await expect(page.getByText(body, { exact: true })).toBeVisible();
     expect(await commitReads()).toBe(before);
     expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op === 'github.commit.comment.create').length)).toBe(1);
@@ -2279,6 +2277,7 @@ for (const algorithm of ["Token", "Tree"]) {
       const draft = `Draft on ${side} neutral line`;
       await expect(editor).toBeFocused();
       await editor.fill(draft);
+      await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
       const draftId = await editor.getAttribute("data-draft-id");
       for (const layout of ["Split", "Unified"]) {
         await page.getByRole("button", { name: layout, exact: true }).click();
@@ -2369,20 +2368,20 @@ for (const external of [false, true]) {
       await page.getByRole("button", { name: algorithm, exact: true }).click();
       for (const layout of ["Split", "Unified"]) {
         await page.getByRole("button", { name: layout, exact: true }).click();
-        await expect(page.locator(".comment-editor")).toHaveCount(1);
-        await expect(page.locator(".comment-editor textarea")).toHaveValue("Preserve this reply");
+        await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
+        await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveValue("Preserve this reply");
         if (external) {
-          await expect(page.locator(".comment-editor textarea")).toBeEnabled();
-          await expect(page.locator(".comment-editor").getByRole("button", { name: "Post comment" })).toBeDisabled();
+          await expect(page.locator(".comment-editor[data-draft-id] textarea")).toBeEnabled();
+          await expect(page.locator(".comment-editor[data-draft-id]").getByRole("button", { name: "Post comment" })).toBeDisabled();
           await expect(page.locator(".review-thread").filter({ hasText: "Existing reply" }).getByRole("button", { name: "Reply", exact: true })).toBeDisabled();
-          await page.locator(".comment-editor textarea").evaluate(el => el.select());
-          expect(await page.locator(".comment-editor textarea").evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd))).toBe("Preserve this reply");
+          await page.locator(".comment-editor[data-draft-id] textarea").evaluate(el => el.select());
+          expect(await page.locator(".comment-editor[data-draft-id] textarea").evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd))).toBe("Preserve this reply");
         }
       }
     }
     expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op.endsWith(".delete") || c.op === "github.review.reply.create").length)).toBe(0);
-    await page.locator(".comment-editor").getByRole("button", { name: "Cancel", exact: true }).click();
-    await expect(page.locator(".comment-editor")).toHaveCount(0);
+    await page.locator(".comment-editor[data-draft-id]").getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(0);
     if (!external) {
       await own.getByRole("button", { name: "Confirm delete", exact: true }).click();
       await expect(own).toHaveCount(0);
@@ -2395,21 +2394,23 @@ test("one draft survives repeated clicks and every entry switch while posting", 
   await installApi(page, pullTarget(), { authenticated: true });
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
-  await page.getByRole("button", { name: "Add overall comment" }).click();
+  await page.locator('.overall-comment-editor textarea').focus();
   const overallEditor = page.locator(".overall-comments textarea");
   await overallEditor.fill("Keep the overall draft");
+  await expect(overallEditor).toHaveAttribute('data-draft-id', /draft:/);
   const overallDraftId = await overallEditor.getAttribute("data-draft-id");
   await newLineCommentGutter(page, 2).hover();
   await expect(newLineCommentButton(page, 2)).toBeDisabled();
   await expect(clickLineCommentButton(newLineCommentButton(page, 2))).rejects.toThrow(/not enabled/);
-  await expect(page.locator(".comment-editor")).toHaveCount(1);
+  await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
   await expect(overallEditor).toHaveAttribute("data-draft-id", overallDraftId);
   await expect(overallEditor).toHaveValue("Keep the overall draft");
   await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await openNewLineComment(page, 2);
-  await page.locator(".comment-editor textarea").fill("Do not lose this draft");
-  const inlineDraftId = await page.locator(".comment-editor textarea").getAttribute("data-draft-id");
+  await page.locator(".comment-editor[data-draft-id] textarea").fill("Do not lose this draft");
+  await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveAttribute('data-draft-id', /draft:/);
+  const inlineDraftId = await page.locator(".comment-editor[data-draft-id] textarea").getAttribute("data-draft-id");
   await page.evaluate(() => {
     const state = window.__fake;
     state.reviewComments.push({ ...state.reviewComments[0], id: "99", body: "Draft refresh comment", line: 1, position: 1 });
@@ -2423,16 +2424,16 @@ test("one draft survives repeated clicks and every entry switch while posting", 
   await settleRegions(page);
   await openNewLineComment(page, 2);
   await openNewLineComment(page, 2);
-  await expect(page.locator(".comment-editor")).toHaveCount(1);
-  await expect(page.locator(".comment-editor textarea")).toHaveAttribute("data-draft-id", inlineDraftId);
-  await expect(page.locator(".comment-editor textarea")).toHaveValue("Do not lose this draft");
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
+  await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
+  await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveAttribute("data-draft-id", inlineDraftId);
+  await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveValue("Do not lose this draft");
+  await expect(page.locator('.overall-comment-editor textarea')).toBeDisabled();
   await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
   await expect(page.locator(".inline-comment-editor-row textarea")).toHaveValue("Do not lose this draft");
   await page.evaluate(() => { window.__fake.delayCreate = true; });
-  await page.getByRole("button", { name: "Post comment", exact: true }).click();
+  await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment", exact: true }).click();
   await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseCreate)).toBe("function");
-  await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
+  await expect(page.locator('.overall-comment-editor textarea')).toBeDisabled();
   await expect(page.getByRole("button", { name: "Reply", exact: true }).first()).toBeDisabled();
   await expect(page.locator(".line-comment-button").first()).toBeDisabled();
   await page.evaluate(() => window.__fake.releaseCreate());
@@ -2452,7 +2453,7 @@ test("a base update during refresh preserves verified comments and the collapsed
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
-  await page.locator(".comment-editor textarea").fill("Old snapshot draft");
+  await page.locator(".comment-editor[data-draft-id] textarea").fill("Old snapshot draft");
   const before = await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.pull.files").length);
   await page.evaluate(() => {
     window.__fake.updateDuringList = true;
@@ -2464,10 +2465,10 @@ test("a base update during refresh preserves verified comments and the collapsed
   await expect(page.getByText("Unverified replacement", { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === "github.pull.files").length)).toBe(before);
   await page.getByRole("button", { name: "Unified", exact: true }).click();
-  await expect(page.locator(".comment-editor textarea")).toHaveValue("Old snapshot draft");
+  await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveValue("Old snapshot draft");
   await page.getByRole("button", { name: "Collapse src/main.mbt", exact: true }).click();
   await expect(page.locator(".file-discussions textarea")).toHaveValue("Old snapshot draft");
-  await expect(page.getByRole("button", { name: "Post comment", exact: true })).toBeDisabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Load latest" }).click();
@@ -2512,12 +2513,13 @@ for (const kind of ["inline", "reply"]) {
     if (kind === "inline") await openNewLineComment(page, 2);
     else await page.getByRole("button", { name: "Reply", exact: true }).first().click();
     const body = `${kind} remains visible until GitHub synchronization finishes`;
-    const editor = page.locator(".comment-editor textarea");
+    const editor = page.locator(".comment-editor[data-draft-id] textarea");
     await editor.fill(body);
+    await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
     const draftId = await editor.getAttribute("data-draft-id");
     await editor.evaluate(node => { window.__postingEditor = node; });
     await page.evaluate(() => { window.__fake.delayCreate = true; });
-    await page.getByRole("button", { name: "Post comment", exact: true }).click();
+    await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment", exact: true }).click();
     await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseCreate)).toBe("function");
     await page.evaluate(() => {
       window.__fake.delayNextList = true;
@@ -2528,17 +2530,17 @@ for (const kind of ["inline", "reply"]) {
     const file = page.locator("#moondiff-file-0");
     const formal = file.locator(".github-comment-body").filter({ hasText: body });
     async function expectPosting() {
-      await expect(page.locator(".comment-editor")).toHaveCount(1);
+      await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
       await expect(editor).toHaveAttribute("data-draft-id", draftId);
       await expect(editor).toHaveValue(body);
       await expect(editor).toBeDisabled();
       expect(await editor.evaluate(node => node === window.__postingEditor)).toBe(true);
       await expect(page.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
       await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
-      await expect(page.getByRole("button", { name: "Add overall comment" })).toBeDisabled();
+      await expect(page.locator('.overall-comment-editor textarea')).toBeDisabled();
       await expect(page.locator(".line-comment-button").first()).toBeDisabled();
       await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
-      await expect(page.locator(".comment-notice")).toHaveCount(0);
+      await expect(page.locator(".comment-notice:not(#overall-comment-notice)")).toHaveCount(0);
       await expect(formal).toHaveCount(0);
     }
     await expectPosting();
@@ -2546,7 +2548,7 @@ for (const kind of ["inline", "reply"]) {
       const file = document.querySelector("#moondiff-file-0");
       const frames = [];
       const record = () => frames.push({
-        editor: file.querySelectorAll(".comment-editor").length,
+        editor: file.querySelectorAll(".comment-editor[data-draft-id]").length,
         formal: [...file.querySelectorAll(".github-comment-body")]
           .filter(node => node.textContent === body).length,
       });
@@ -2568,8 +2570,8 @@ for (const kind of ["inline", "reply"]) {
     await page.evaluate(() => window.__fake.releaseValidation());
     await expect(formal).toBeVisible();
     await expect(editor).toHaveCount(0);
-    await expect(page.locator(".comment-notice")).toHaveText("Comment published.");
-    await expect(page.getByRole("button", { name: "Add overall comment" })).toBeEnabled();
+    await expect(page.locator(".comment-notice:not(#overall-comment-notice)")).toHaveText("Comment published.");
+    await expect(page.locator('.overall-comment-editor textarea')).toBeEnabled();
     const frames = await page.evaluate(() => {
       window.__postingSwap.record();
       window.__postingSwap.observer.disconnect();
@@ -2588,7 +2590,7 @@ test("failed review synchronization retains Posting and retries without repostin
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
   const body = "Published before synchronization failed";
-  const editor = page.locator(".comment-editor");
+  const editor = page.locator(".comment-editor[data-draft-id]");
   await editor.locator("textarea").fill(body);
   await page.evaluate(() => {
     const dispatch = window.__dispatch;
@@ -2653,11 +2655,11 @@ test("Posting root preserves replies across collapse, layouts, refresh and root 
     await expect(thread).toBeVisible();
     await expect(thread.locator(".github-comment-body")).toHaveText(replies);
     await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
-    await expect(page.locator(".comment-editor")).toHaveCount(1);
-    await expect(page.locator(".comment-editor textarea")).toHaveValue(body);
-    await expect(page.locator(".comment-editor textarea")).toBeDisabled();
+    await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
+    await expect(page.locator(".comment-editor[data-draft-id] textarea")).toHaveValue(body);
+    await expect(page.locator(".comment-editor[data-draft-id] textarea")).toBeDisabled();
     await expect(page.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
-    await expect(page.locator(".comment-editor .comment-error"))
+    await expect(page.locator(".comment-editor[data-draft-id] .comment-error"))
       .toHaveText("Waiting for GitHub to sync this comment. Refresh to retry.");
   }
   for (const layout of ["Split", "Unified"]) {
@@ -2689,9 +2691,9 @@ test("line creation after a PR update stays Posting and allows loading the lates
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
-  await page.locator(".comment-editor textarea").fill("Published on the old snapshot");
+  await page.locator(".comment-editor[data-draft-id] textarea").fill("Published on the old snapshot");
   await page.evaluate(() => { window.__fake.delayCreate = true; });
-  await page.getByRole("button", { name: "Post comment", exact: true }).click();
+  await page.locator('.comment-editor[data-draft-id]').getByRole("button", { name: "Post comment", exact: true }).click();
   await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseCreate)).toBe("function");
   await page.evaluate(value => { window.__fake.currentHead = value; }, changedHead);
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -2699,9 +2701,9 @@ test("line creation after a PR update stays Posting and allows loading the lates
   await expect(page.getByRole("button", { name: "Load latest" })).toBeDisabled();
   await page.evaluate(() => window.__fake.releaseCreate());
   await expect(page.locator(".published-comment-link")).toBeVisible();
-  await expect(page.locator(".comment-notice")).toHaveCount(0);
+  await expect(page.locator(".comment-notice:not(#overall-comment-notice)")).toHaveCount(0);
   await expect(page.locator(".pending-review-receipt")).toHaveCount(0);
-  const editor = page.locator("#moondiff-file-0 .comment-editor");
+  const editor = page.locator("#moondiff-file-0 .comment-editor[data-draft-id]");
   await expect(editor.locator("textarea")).toHaveValue("Published on the old snapshot");
   await expect(editor.locator("textarea")).toBeDisabled();
   await expect(editor.getByRole("button", { name: "Posting…", exact: true })).toBeDisabled();
@@ -2822,6 +2824,7 @@ for (const layout of ["Split", "Unified"]) {
       const original = await editor.elementHandle();
       const body = "Keep this draft and its reading position";
       await editor.fill(body);
+      await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
       const draftId = await editor.getAttribute("data-draft-id");
       const selection = await editor.evaluate(el => {
         el.setSelectionRange(5, 14, "backward");
@@ -2904,7 +2907,7 @@ for (const layout of ["Split", "Unified"]) {
         expect(Math.abs(scrollDelta - growth)).toBeLessThan(2);
         expect(after.compensated).toBeGreaterThan(before.compensated);
       }
-      await expect(page.locator(".comment-editor")).toHaveCount(1);
+      await expect(page.locator(".comment-editor[data-draft-id]")).toHaveCount(1);
       expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
       await expect(editor).toHaveAttribute("data-draft-id", draftId);
       await expect(editor).toHaveValue(body);
@@ -2920,7 +2923,7 @@ for (const kind of ["overall", "reply", "inline", "collapsed"]) {
       await installApi(page, pullTarget(), { authenticated: true });
       await page.goto(reviewPath());
       await waitForSignedInComments(page);
-      if (kind === "overall") await page.getByRole("button", { name: "Add overall comment" }).click();
+      if (kind === "overall") await page.locator('.overall-comment-editor textarea').focus();
       else if (kind === "reply") await page.locator(".review-thread").filter({ hasText: "Existing inline comment" }).getByRole("button", { name: "Reply", exact: true }).click();
       else {
         await openNewLineComment(page, 2);
@@ -2929,7 +2932,7 @@ for (const kind of ["overall", "reply", "inline", "collapsed"]) {
           await expect(page.locator(".file-discussions textarea")).toBeVisible();
         }
       }
-      const editor = page.locator(".comment-editor textarea");
+      const editor = page.locator(kind === 'overall' ? '.overall-comment-editor textarea' : '.comment-editor[data-draft-id] textarea');
       await editor.fill("Keep composing text");
       await expect(editor).toHaveValue("Keep composing text");
       await expect(editor).toBeFocused();
@@ -2966,8 +2969,9 @@ test("draft remount restores selection without taking toolbar focus and cleans u
   await page.goto(reviewPath());
   await waitForSignedInComments(page);
   await openNewLineComment(page, 2);
-  let editor = page.locator(".comment-editor textarea");
+  let editor = page.locator(".comment-editor[data-draft-id] textarea");
   await editor.fill("Selection survives containers");
+  await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
   const draftId = await editor.getAttribute("data-draft-id");
   await editor.evaluate(el => el.setSelectionRange(3, 12, "backward"));
   const collapse = page.getByRole("button", { name: "Collapse src/main.mbt", exact: true });
@@ -3025,12 +3029,13 @@ for (const change of ["modified", "inserted", "deleted"]) {
     const side = change === "deleted" ? "old" : "new";
     const anchor = second.locator(`.${side}-line-number button[aria-label="Comment on line 1"]`);
     await clickLineCommentButton(anchor);
-    const editor = page.locator(".comment-editor textarea");
+    const editor = page.locator(".comment-editor[data-draft-id] textarea");
     await expect(editor).toHaveCount(1);
     await expect(second.locator("textarea")).toBeVisible();
     await expect(editor).toBeFocused();
     const body = "Same-line draft with selection\n" + "Keep the scroll position\n".repeat(30);
     await editor.fill(body);
+    await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
     const draftId = await editor.getAttribute("data-draft-id");
     const interaction = el => [el.selectionStart, el.selectionEnd, el.selectionDirection, el.scrollTop];
     let saved = await editor.evaluate(el => {
@@ -3117,7 +3122,7 @@ for (const change of ["modified", "inserted", "deleted"]) {
     await editor.focus();
     await page.keyboard.type("NEXT");
     await expect(editor).toHaveValue(body.slice(0, 3) + "NEXT" + body.slice(12));
-    await page.locator(".comment-editor").getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.locator(".comment-editor[data-draft-id]").getByRole("button", { name: "Cancel", exact: true }).click();
     await secondSummary.click();
     await expect(second).toHaveJSProperty("open", false);
     await page.evaluate(value => { window.__fake.currentHead = value; }, changedHead);
@@ -3165,13 +3170,13 @@ for (const kind of ['overall', 'inline', 'reply']) {
     await installApi(page, pullTarget(), { authenticated: true });
     await page.goto(reviewPath());
     await waitForSignedInComments(page);
-    if (kind === 'overall') await page.getByRole('button', { name: 'Add overall comment' }).click();
+    if (kind === 'overall') await page.locator('.overall-comment-editor textarea').focus();
     else if (kind === 'inline') await openNewLineComment(page, 2);
     else await page.getByRole('button', { name: 'Reply' }).first().click();
-    const editor = page.locator('.comment-editor textarea');
+    const editor = page.locator(kind === 'overall' ? '.overall-comment-editor textarea' : '.comment-editor[data-draft-id] textarea');
     await editor.fill('Uncertain submitted body');
     const write = await holdNextResponse(page, message => message.op.endsWith('.create'));
-    await page.getByRole('button', { name: 'Post comment' }).click();
+    await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' }).click();
     await write.started;
     await page.evaluate(() => window.__fake.authenticationFailureOps.push('github.comments.list'));
     await reactivatePage(page);
@@ -3183,7 +3188,7 @@ for (const kind of ['overall', 'inline', 'reply']) {
     await expect(editor).toHaveValue('New text after expiry');
     await page.getByRole('button', { name: 'Try sign-in' }).click();
     await waitForSignedInComments(page);
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
     await expect(editor).toHaveValue('New text after expiry');
     expect(await page.evaluate(() => window.__fake.calls.filter(call => call.op.endsWith('.create')).length)).toBe(1);
   });
@@ -3194,13 +3199,11 @@ for (const boundary of ['logout', 'account switch']) {
     await installApi(page, pullTarget(), { authenticated: true });
     await page.goto(reviewPath());
     await waitForSignedInComments(page);
-    await page.getByRole('button', { name: 'Add overall comment' }).click();
-    await page.locator('.comment-editor textarea').fill('Route seventeen');
+    await page.locator('.overall-comment-editor textarea').fill('Route seventeen');
     await navigate(page, '/upstream/project/pull/18');
-    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
     await waitForSignedInComments(page);
-    await page.getByRole('button', { name: 'Add overall comment' }).click();
-    await page.locator('.comment-editor textarea').fill('Route eighteen');
+    await page.locator('.overall-comment-editor textarea').fill('Route eighteen');
     await page.evaluate(() => {
       window.__fake.authenticationFailureOps.push('github.comments.list');
       window.__fake.delayNextDevicePoll = true;
@@ -3211,17 +3214,17 @@ for (const boundary of ['logout', 'account switch']) {
     await page.getByRole('button', { name: 'Cancel sign-in' }).first().click();
     await expect(page.getByRole('button', { name: 'Sign in with GitHub', exact: true }).first()).toBeVisible();
     await page.evaluate(() => window.__fake.releaseDevicePoll());
-    await expect(page.locator('.comment-editor textarea')).toHaveValue('Route eighteen');
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Route eighteen');
     await navigate(page, reviewPath());
-    await expect(page.locator('.comment-editor textarea')).toHaveValue('Route seventeen');
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Route seventeen');
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
     // A later verified status completes recovery without reusing the cancelled poll.
     await page.evaluate(() => {
       window.__fake.device = null;
       window.__fake.authenticated = true;
     });
     await reactivatePage(page);
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
     if (boundary === 'logout') {
       await page.getByRole('button', { name: 'Account: tester' }).click();
       await page.getByRole('menuitem', { name: 'Sign out' }).click();
@@ -3230,10 +3233,10 @@ for (const boundary of ['logout', 'account switch']) {
       await reactivatePage(page);
       await expect(page.getByRole('button', { name: 'Account: another-user' })).toBeVisible();
     }
-    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
     await navigate(page, '/upstream/project/pull/18');
     await expect(page.getByText('Fork PR', { exact: true })).toBeVisible();
-    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
   });
 }
 
@@ -3245,8 +3248,7 @@ for (const collapsed of [false, true]) {
       await page.goto(reviewPath());
       await held.started;
       await waitForSignedInComments(page);
-      await page.getByRole('button', { name: 'Add overall comment' }).click();
-      await page.locator('.comment-editor textarea').fill('Draft survives restoration');
+      await page.locator('.overall-comment-editor textarea').fill('Draft survives restoration');
       if (collapsed) await page.getByRole('button', { name: 'Collapse src/main.mbt', exact: true }).click();
       if (sessionFails) {
         await page.route('**/api/auth/status', route => route.fulfill({ status: 503, json: { $tag: 'Failure', error: { code: 'unavailable', status: 503, message: 'Temporary session failure' } } }), { times: 1 });
@@ -3259,7 +3261,7 @@ for (const collapsed of [false, true]) {
       }
       await waitForSignedInComments(page);
       await expect.poll(() => page.evaluate(() => window.__fake.calls.filter(c => c.op === 'github.content.get').map(c => c.args.ref).sort())).toEqual([mergeBase, head, head].sort());
-      await expect(page.locator('.comment-editor textarea')).toHaveValue('Draft survives restoration');
+      await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Draft survives restoration');
       await expect(page.locator('#moondiff-file-0 .file-toggle')).toHaveAttribute('aria-expanded', String(!collapsed));
       if (collapsed) await page.getByRole('button', { name: 'Expand src/main.mbt', exact: true }).click();
       await expect(page.locator('table.split.review-diff')).toContainText('new value');
@@ -3268,7 +3270,7 @@ for (const collapsed of [false, true]) {
       await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(before);
       held.release(); await held.completed;
       expect(await page.evaluate(() => window.__fake.calls.filter(c => c.op === 'github.content.get').length)).toBe(3);
-      await expect(page.locator('.comment-editor textarea')).toHaveValue('Draft survives restoration');
+      await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Draft survives restoration');
     });
   }
 }
@@ -3292,8 +3294,7 @@ for (const boundary of ['navigation', 'account']) {
     const source = await holdNextResponse(page, message => message.op === 'github.content.get' && message.args.ref === head);
     await page.goto(reviewPath()); await source.started;
     await waitForSignedInComments(page);
-    await page.getByRole('button', { name: 'Add overall comment' }).click();
-    await page.locator('.comment-editor textarea').fill('Previous account draft');
+    await page.locator('.overall-comment-editor textarea').fill('Previous account draft');
     if (boundary === 'account') await page.evaluate(() => { window.__fake.login = 'bob'; });
     const session = await holdNextResponse(page, message => message.op === 'auth.status');
     await restorePage(page); await session.started;
@@ -3308,7 +3309,7 @@ for (const boundary of ['navigation', 'account']) {
       await expect(page.locator('table.split.review-diff')).toContainText('new value for bob');
     }
     source.release(); await source.completed;
-    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
     await expect(page.locator('table.split.review-diff')).toContainText(boundary === 'account' ? 'new value for bob' : 'new value for tester');
   });
 }
@@ -3318,19 +3319,19 @@ for (const kind of ['overall', 'inline', 'reply', 'commit', 'head-check']) {
     const target = kind === 'commit' ? commitTarget() : pullTarget();
     await installApi(page, target, { authenticated: true });
     await page.goto(reviewPath(target)); await waitForSignedInComments(page);
-    if (kind === 'overall') await page.getByRole('button', { name: 'Add overall comment' }).click();
+    if (kind === 'overall') await page.locator('.overall-comment-editor textarea').focus();
     else if (kind === 'reply') await page.getByRole('button', { name: 'Reply' }).first().click();
     else await openNewLineComment(page, 2);
-    const editor = page.locator('.comment-editor textarea');
+    const editor = page.locator(kind === 'overall' ? '.overall-comment-editor textarea' : '.comment-editor[data-draft-id] textarea');
     await editor.fill('Interrupted draft');
     const held = await holdNextResponse(page, message => kind === 'head-check' ? message.op === 'github.pull.get' : message.op.endsWith('.create'));
-    await page.getByRole('button', { name: 'Post comment', exact: true }).click(); await held.started;
+    await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment', exact: true }).click(); await held.started;
     await expect(editor).toBeDisabled();
     await restorePage(page);
     await expect(editor).toBeEnabled();
     await expect(editor).toHaveValue('Interrupted draft');
-    await expect(page.locator('.comment-editor .comment-error')).toHaveText('请求已中断，结果尚未确认，请检查后再重试');
-    await expect(page.getByRole('button', { name: 'Post comment', exact: true })).toBeEnabled();
+    await expect(page.locator('.comment-editor[data-draft-id] .comment-error')).toHaveText('请求已中断，结果尚未确认，请检查后再重试');
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment', exact: true })).toBeEnabled();
     const lists = await page.evaluate(() => window.__fake.commentListCalls);
     await reactivatePage(page);
     await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(lists);
@@ -3389,6 +3390,7 @@ for (const algorithm of ["Token", "Tree"]) {
       await clickLineCommentButton(anchor);
       const editor = page.locator(".inline-comment-editor-row textarea");
       await editor.fill("Preserve this line-one draft");
+      await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
       const draftId = await editor.getAttribute("data-draft-id");
       await editor.evaluate(element => element.setSelectionRange(2, 9, "backward"));
       // Global navigation follows the reading position, so place the second

@@ -177,7 +177,7 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
     await page.getByRole('button', { name: 'Search files', exact: true }).click();
     const search = page.getByRole('searchbox', { name: 'Search changed files' });
     await card(page, 1).getByRole('button', { name: 'Reply', exact: true }).click();
-    const editor = page.locator('.comment-editor textarea');
+    const editor = page.locator('.comment-editor[data-draft-id] textarea');
     await expect(editor).toBeFocused();
     const body = 'Keep this migrating reply\n' + 'Keep the scroll position\n'.repeat(30);
     await editor.fill(body);
@@ -205,7 +205,7 @@ for (const layout of ['Split', 'Unified']) for (const action of ['restore', 'sea
       await barrier.blocked();
       if (action === 'cancel') {
         // The source region still shows its old editor while both commits wait.
-        await page.locator('.comment-editor').getByRole('button', { name: 'Cancel', exact: true }).evaluate(el => el.click());
+        await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Cancel', exact: true }).evaluate(el => el.click());
         await expect.poll(() => page.evaluate(() => __moondiffMetrics.editor.records)).toBe(0);
       }
       await barrier.release([fileRegion]);

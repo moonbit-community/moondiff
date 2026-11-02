@@ -126,9 +126,8 @@ for (const large of [false, true]) test(`first sign-in resumes an anonymous cach
   await expect(page.locator('.range-selector select').nth(1)).toHaveValue(head);
   expect(await page.evaluate(selector => document.querySelector(selector) === window.identityContent, content)).toBe(true);
   if (!large) {
-    await page.getByRole('button', { name: 'Add overall comment' }).click();
-    await page.locator('.comment-editor textarea').fill('Comment after validation');
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+    await page.locator('.overall-comment-editor textarea').fill('Comment after validation');
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
     await expect(page.locator('.viewed-control input')).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Rebase and merge', exact: true })).toBeDisabled();
   }
@@ -154,10 +153,10 @@ for (const large of [false, true]) test(`first sign-in resumes an anonymous cach
     await expect(page.locator('.file-card')).toHaveCount(0);
     expect(cached.state.calls.filter(call => call.kind === 'PullFiles')).toHaveLength(0);
   } else {
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
     await expect(page.locator('.viewed-control input')).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Rebase and merge', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Post comment' }).click();
+    await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' }).click();
     await expect(page.getByRole('article').filter({ hasText: 'Comment after validation' })).toBeVisible();
     expect(cached.state.calls.filter(call => call.kind === 'IssueCommentCreate')).toHaveLength(1);
   }

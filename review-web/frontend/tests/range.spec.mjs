@@ -364,10 +364,9 @@ for (const outcome of ['success', 'failure']) {
     });
     await page.goto('/upstream/project/pull/17');
     await expect(page.locator('.range-selector select').first()).toBeEnabled();
-    await page.locator('.add-overall-comment').click();
-    const editor = page.locator('.comment-editor textarea');
+    const editor = page.locator('.overall-comment-editor textarea');
     await editor.fill('Keep the clicked interval');
-    await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+    await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment', exact: true }).click();
     await started;
     await settleRegions(page);
     const barrier = await holdRegionFrames(page, ['range-panel']);
@@ -469,7 +468,7 @@ test('fork PR selector visits a fixed interval and returns to PR comments', asyn
   const calls = await privateFixture(page);
   await page.goto('/upstream/project/pull/17');
   await expect(page.locator('.file-card')).toHaveCount(1);
-  await expect(page.locator('.add-overall-comment')).toBeVisible();
+  await expect(page.locator('.overall-comment-editor textarea')).toBeVisible();
   await expect(page.locator('.range-selector input')).toHaveCount(0);
   await expect(page.locator('.range-selector select')).toHaveCount(2);
   await page.evaluate(() => { window.originalCard = document.querySelector('.file-card'); });
@@ -503,7 +502,7 @@ test('fork PR selector visits a fixed interval and returns to PR comments', asyn
   expect(sources).toContainEqual(['fork', 'project', middle]);
   await page.goBack();
   await expect(page).toHaveURL('/upstream/project/pull/17');
-  await expect(page.locator('.add-overall-comment')).toBeVisible();
+  await expect(page.locator('.overall-comment-editor textarea')).toBeVisible();
   await expect(page.locator('.range-selector select').nth(1)).toHaveValue(middle);
   await page.goForward();
   await expect(page).toHaveURL(`/upstream/project/pull/17/compare/${base}..${middle}`);
@@ -754,7 +753,7 @@ test('a merged PR keeps its diff and explains why commit intervals are unavailab
   await expect(page.locator('.range-selector select').first()).toBeDisabled();
   await expect(page.locator('.range-selector select').nth(1)).toBeDisabled();
   await expect(page.locator('.range-apply')).toBeDisabled();
-  await expect(page.locator('.add-overall-comment')).toBeVisible();
+  await expect(page.locator('.overall-comment-editor textarea')).toBeVisible();
   await settleRegions(page);
   expect(await page.evaluate(() => document.querySelector('.file-card') === window.originalCard)).toBe(true);
   expect(calls.filter(c => c.op === 'github.range.compare.get')).toHaveLength(0);

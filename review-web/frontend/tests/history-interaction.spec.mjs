@@ -22,8 +22,7 @@ async function returnToDraft(page, { small = false } = {}) {
   // when the temporary validation banner disappears.
   await page.addStyleTag({ content: 'html { overflow-anchor: none !important; }' });
   await expect(page.locator('.loading-inline')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  await page.locator('.comment-editor textarea').fill('History draft');
+  await page.locator('.overall-comment-editor textarea').fill('History draft');
   await settleRegions(page);
   await page.evaluate(() => {
     document.querySelector('#moondiff-file-7 .file-toggle').focus({ preventScroll: true });
@@ -35,7 +34,7 @@ async function returnToDraft(page, { small = false } = {}) {
   state.metadataGate = validation;
   const reads = state.calls.filter(call => call.op === 'github.pull.get').length;
   await page.goBack();
-  await expect(page.locator('.comment-editor textarea')).toHaveValue('History draft');
+  await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('History draft');
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toBeVisible();
   await expect.poll(() => state.calls.filter(call => call.op === 'github.pull.get').length).toBeGreaterThan(reads);
   return { state, validation };
@@ -55,7 +54,7 @@ for (const timing of ['validation', 'queued']) {
         validation.resolve();
         await barrier.blocked();
       }
-      const editor = page.locator('.comment-editor textarea');
+      const editor = page.locator('.comment-editor[data-draft-id] textarea');
       if (interaction === 'typing') {
         await editor.fill('User typing takes precedence');
         await editor.evaluate(element => element.setSelectionRange(4, 9, 'backward'));

@@ -166,65 +166,130 @@ fn comment_editor(
   emit : @rabbita.Emit[Msg],
   unavailable~ : Bool = false,
 ) -> @rabbita.Html {
-  @html.div(class="comment-editor", [
-    comment_avatar(review.login),
-    @html.div(class="comment-editor-content", [
-      @html.textarea(
-        class="comment-textarea",
-        value=draft.body,
-        rows=4,
-        maxlength=65_536,
-        placeholder="Leave a comment",
-        attrs=@html.Attrs::build()
-          .data_set("draft-id", draft.id.key())
-          .aria_label(
-            if draft.kind is ReplyDraft(_) {
-              "Write a reply"
+  comment_editor_view(Some(draft), review, emit, unavailable~)
+}
+
+///|
+// The overall composer uses the same tree before and after its first input.
+// Draft identity is an attribute, never a key that could replace the textarea.
+fn comment_editor_view(
+  draft : CommentDraft?,
+  review : @comments.ReadView,
+  emit : @rabbita.Emit[Msg],
+  overall~ : Bool = false,
+  unavailable~ : Bool = false,
+) -> @rabbita.Html {
+  let blocked = overall &&
+    review.permissions.target is Some(kind) &&
+    !(kind is OverallDraft)
+  let submitting = draft.map(draft => draft.submitting).unwrap_or(false)
+  let attrs = @html.Attrs::build()
+  let textarea_attrs = @html.Attrs::build().aria_label(
+    if overall {
+      "Add a comment"
+    } else if draft is Some({ kind: ReplyDraft(_), .. }) {
+      "Write a reply"
+    } else {
+      "Leave a comment"
+    },
+  )
+  if draft is Some(draft) {
+    attrs.data_set("draft-id", draft.id.key()) |> ignore
+    textarea_attrs.data_set("draft-id", draft.id.key()) |> ignore
+  }
+  if blocked {
+    textarea_attrs.aria_describedby("overall-comment-notice") |> ignore
+  }
+  @html.div(
+    class=if overall {
+      "comment-editor overall-comment-editor"
+    } else {
+      "comment-editor"
+    },
+    attrs~,
+    [
+      comment_avatar(review.login),
+      @html.div(class="comment-editor-content", [
+        if overall {
+          @html.h3(class="comment-editor-title", "Add a comment")
+        } else {
+          @html.nothing
+        },
+        @html.textarea(
+          class="comment-textarea",
+          value=draft.map(draft => draft.body).unwrap_or(""),
+          rows=4,
+          maxlength=65_536,
+          placeholder="Leave a comment",
+          attrs=textarea_attrs,
+          disabled=submitting ||
+            blocked ||
+            (draft is None && !review.allowed(OpenDraft(OverallDraft))),
+          on_input=value => {
+            emit(
+              Review(
+                if overall {
+                  OverallDraftBodyChanged(value)
+                } else {
+                  DraftBodyChanged(value)
+                },
+              ),
+            )
+          },
+          "",
+        ),
+        if draft is Some({ error: Some(message), .. }) {
+          @html.p(
+            class="comment-error",
+            attrs=@html.Attrs::build().role("alert"),
+            message,
+          )
+        } else {
+          @html.nothing
+        },
+        if blocked {
+          @html.p(
+            id="overall-comment-notice",
+            class="comment-notice",
+            "Post or cancel your current draft before adding an overall comment.",
+          )
+        } else if !review.permissions.can_comment {
+          @html.p(
+            class="comment-notice",
+            if review.permissions.identity_checking {
+              "Checking your GitHub account. You can keep writing."
             } else {
-              "Leave a comment"
+              "Sign in with GitHub before posting. Your draft stays editable."
+            },
+          )
+        } else {
+          @html.nothing
+        },
+        @html.div(class="comment-editor-actions", [
+          if draft is Some(_) {
+            @html.button(
+              type_="button",
+              class="comment-cancel",
+              disabled=submitting,
+              on_click=emit(Review(CancelDraft)),
+              "Cancel",
+            )
+          } else {
+            @html.nothing
+          },
+          @html.button(
+            type_="button",
+            class="comment-submit",
+            disabled=draft is None || unavailable || !review.allowed(Submit),
+            on_click=emit(Review(SubmitDraft)),
+            if submitting {
+              "Posting…"
+            } else {
+              "Post comment"
             },
           ),
-        disabled=draft.submitting,
-        on_input=value => emit(Review(DraftBodyChanged(value))),
-        "",
-      ),
-      if draft.error is Some(message) {
-        @html.p(
-          class="comment-error",
-          attrs=@html.Attrs::build().role("alert"),
-          message,
-        )
-      } else {
-        @html.nothing
-      },
-      if !review.permissions.can_comment {
-        @html.p(
-          class="comment-notice",
-          "Sign in with GitHub before posting. Your draft stays editable.",
-        )
-      } else {
-        @html.nothing
-      },
-      @html.div(class="comment-editor-actions", [
-        @html.button(
-          type_="button",
-          class="comment-cancel",
-          disabled=draft.submitting,
-          on_click=emit(Review(CancelDraft)),
-          "Cancel",
-        ),
-        @html.button(
-          type_="button",
-          class="comment-submit",
-          disabled=unavailable || !review.allowed(Submit),
-          on_click=emit(Review(SubmitDraft)),
-          if draft.submitting {
-            "Posting…"
-          } else {
-            "Post comment"
-          },
-        ),
+        ]),
       ]),
-    ]),
-  ])
+    ],
+  )
 }

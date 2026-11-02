@@ -985,19 +985,12 @@ fn comments_overview(
       @html.div(class="overall-comments", [
         @html.div(issue_views),
         if review.draft_visible() {
-          if review.draft() is Some(draft) && draft.kind is OverallDraft {
-            comment_editor(draft, review, emit)
-          } else if review.permissions.can_comment {
-            @html.button(
-              type_="button",
-              class="secondary add-overall-comment",
-              disabled=!review.allowed(OpenDraft(OverallDraft)),
-              on_click=emit(Review(OpenOverallDraft)),
-              "Add overall comment",
-            )
-          } else {
-            @html.nothing
-          }
+          comment_editor_view(
+            review.draft().filter(draft => draft.kind is OverallDraft),
+            review,
+            emit,
+            overall=true,
+          )
         } else {
           @html.nothing
         },

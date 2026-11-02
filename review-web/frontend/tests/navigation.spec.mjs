@@ -9,16 +9,15 @@ test('drafts survive SPA history with new editor identities and disappear after 
   await page.goto('/');
   const documentId = await page.evaluate(() => window.dashboardDocumentId);
   await row(page, 'Pull request 3').getByRole('link').click();
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  await page.locator('.comment-editor textarea').fill('Remember this route');
+  await page.locator('.overall-comment-editor textarea').fill('Remember this route');
   await page.getByRole('link', { name: /Moondiff/ }).click();
   await expect(page.getByRole('tab').first()).toBeVisible();
   await page.goBack();
-  await expect(page.locator('.comment-editor textarea')).toHaveValue('Remember this route');
+  await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Remember this route');
   expect(await page.evaluate(() => window.dashboardDocumentId)).toBe(documentId);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Add overall comment' })).toBeVisible();
-  await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+  await expect(page.locator('.overall-comment-editor textarea')).toBeVisible();
+  await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
 });
 
 for (const failed of [false, true]) test(`history navigation during a comment write ${failed ? 'stays on failure' : 'replays after success'}`, async ({ page }) => {
@@ -33,21 +32,20 @@ for (const failed of [false, true]) test(`history navigation during a comment wr
   });
   await page.goto('/');
   await row(page, 'Pull request 3').getByRole('link').click();
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  await page.locator('.comment-editor textarea').fill('Frozen body');
-  await page.getByRole('button', { name: 'Post comment' }).click();
+  await page.locator('.overall-comment-editor textarea').fill('Frozen body');
+  await page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' }).click();
   await page.goBack();
   await expect(page).toHaveURL(/\/pull\/3$/);
-  await expect(page.locator('.comment-editor textarea')).toHaveValue('Frozen body');
+  await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Frozen body');
   writing.release();
   if (failed) {
-    await expect(page.locator('.comment-editor')).toContainText('Fixture write failed');
+    await expect(page.locator('.comment-editor[data-draft-id]')).toContainText('Fixture write failed');
     await expect(page).toHaveURL(/\/pull\/3$/);
   } else {
     await expect(page).toHaveURL(/\/$/);
     await page.goForward();
     await expect(page.getByText('Frozen body', { exact: true })).toBeVisible();
-    await expect(page.locator('.comment-editor textarea')).toHaveCount(0);
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveCount(0);
   }
 });
 
