@@ -3,9 +3,14 @@
 Browser specs import `test` and `expect` from `../../tests/browser-test.mjs`.
 The automatic fixture records requests without intercepting them, attaches
 request/timer/render diagnostics on failure, releases gates, waits for in-flight
-requests to reach a terminal phase, then removes routes and waits for their
-handlers to finish. Cleanup shares one five-second real-clock budget per page;
-timeouts report unfinished requests and close the page. Ordinary tests keep four
+requests to finish or retire with their document, then removes Page routes and
+finally Context routes using `behavior: 'wait'`. Cleanup shares one five-second
+real-clock deadline across all pages and handlers, including closed popups.
+Callback registration is observed through the public `route`/`unroute` methods
+without installing interception rules. This also waits for the tail of callbacks
+that caught a route cancellation, or outlived a one-use/removed registration.
+Failures preserve request snapshots before closure, spend at most one second on
+page diagnostics, then attempt bounded recovery. Ordinary tests keep four
 workers and zero retries. `static-cache.spec.mjs` installs no routes, preserving
 the browser's real HTTP cache.
 
@@ -35,16 +40,35 @@ The request phases have deliberately different meanings:
 | `received` | The browser finished receiving the body (`requestfinished`). |
 | `cancelled` / `failed` | The browser reported a terminal transport failure. |
 | `closed` | The page closed before the request reached another terminal phase. |
+| `retired` | An observed document commit, Frame detach or page close ended the request's owner. This is cleanup evidence, not a transport result. |
 
-A cancelled request never proves that the browser received its response. Body
+Records carry stable `frameId`, increasing per-Frame `documentId`, and
+`ownership` (`document`, `pending-navigation`, or `unknown`). These do not change
+the meaning of request `generation`. Navigation requests and redirect chains
+belong to a pending navigation until its commit identifies the new document.
+Only unfinished requests from the replaced document retire; unknown ownership
+continues to block cleanup. Snapshots include current documents and the reason,
+time and replacement document for each retirement.
+
+`tests/browser-lifecycle.mjs` isolates the private Playwright Frame `navigated`
+event contract. Only a `newDocument` without a navigation error proves a commit.
+Hash/history changes, public `framenavigated`, synthetic `pagehide/pageshow` and
+failed or aborted navigations do not retire the current document. Existing
+popup documents are treated as initial observations, with no inferred history.
+Run `npm run test:e2e-config` and the `browser-lifecycle.spec.mjs` compatibility
+regressions when upgrading Playwright; incompatible internals must fail clearly.
+
+A cancelled or retired request never proves that the browser received its response. Body
 receipt does not prove that the application accepted that response. For late
 responses, await the captured request's terminal phase, then assert the current
 account, route, version or write permissions. Do not use a handler's boolean
 `completed` flag as a substitute for receipt or acceptance.
-When a held response spans a reload, dispatch the application's `pagehide` and
-observe its confirmed request cancellation before destroying the old document.
-Chromium can omit `requestfailed` for an intercepted fetch during document
-destruction; a successful late `fulfill` alone still does not establish receipt.
+Chromium can omit terminal events for an intercepted fetch during document
+destruction. Retirement only removes that request from cleanup waiting; it does
+not fabricate `received`, `cancelled` or `failed`, suppress handler errors, or
+count response bytes. Late real events update the same record. Tests asserting
+application cancellation must still observe a real `cancelled` event (for
+example, dispatch `pagehide` and await cancellation before a deliberate reload).
 
 ## Virtual time
 
