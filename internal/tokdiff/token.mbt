@@ -64,7 +64,7 @@ fn alignment_weight(token : Tok) -> Int32 {
 /// and comment spacing are weightless `Filler` — shared boilerplate must not
 /// make unrelated comments look similar.
 fn push_comment_tokens(toks : Array[Tok], body : String) -> Unit {
-  let mut rest = body.view()
+  let mut rest = body[:]
   while rest is [_, ..] {
     rest = lexmatch rest with longest {
       (re"^//+" as t, after=next) => {
@@ -157,7 +157,7 @@ fn push_fallback_comment_tokens(
     }
     toks.push({
       kind,
-      text: line.view(start_offset=token_start, end_offset=offset).to_owned(),
+      text: line.exact_view(start=token_start, end=offset).to_owned(),
     })
   }
 }
@@ -196,7 +196,7 @@ fn fallback_tokenize_line(line : String) -> Array[Tok] {
         1 => Word
         _ => Punct
       },
-      text: line.view(start_offset=token_start, end_offset=offset).to_owned(),
+      text: line.exact_view(start=token_start, end=offset).to_owned(),
     })
   }
   toks
@@ -266,15 +266,15 @@ pub fn tokenize_line(line : String) -> Array[Tok] {
     if sp.cnum > prev_end {
       toks.push({
         kind: Space,
-        text: line.view(start_offset=prev_end, end_offset=sp.cnum).to_owned(),
+        text: line.exact_view(start=prev_end, end=sp.cnum).to_owned(),
       })
     }
-    let text = line.view(start_offset=sp.cnum, end_offset=ep.cnum).to_owned()
+    let text = line.exact_view(start=sp.cnum, end=ep.cnum).to_owned()
     match tok {
       COMMENT(_) =>
         if text is ['/', '/', '/', '|', ..] {
           toks.push({ kind: Marker, text: "///|", })
-          push_comment_tokens(toks, text.view(start_offset=4).to_owned())
+          push_comment_tokens(toks, text.exact_view(start=4).to_owned())
         } else {
           push_comment_tokens(toks, text)
         }
@@ -283,10 +283,7 @@ pub fn tokenize_line(line : String) -> Array[Tok] {
     prev_end = ep.cnum
   }
   if prev_end < line.length() {
-    toks.push({
-      kind: Space,
-      text: line.view(start_offset=prev_end).to_owned(),
-    })
+    toks.push({ kind: Space, text: line.exact_view(start=prev_end).to_owned(), })
   }
   toks
 }
