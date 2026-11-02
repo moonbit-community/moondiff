@@ -237,6 +237,8 @@ test('Page and Context callback exceptions after document replacement still fail
   await writeFile(config, `export default ${JSON.stringify({
     testDir: directory, testMatch: 'handler-errors.spec.mjs', outputDir: join(directory, 'artifacts'),
     workers: 1, retries: 0, reporter: 'json', use: { browserName: 'chromium', channel: 'chromium' },
+    // CI git metadata can contain this spec's source, including its timeout assertion.
+    metadata: { note: 'Timed out in report metadata is not a test error' },
   })};`);
   await writeFile(join(directory, 'handler-errors.spec.mjs'), `
     import { test } from ${JSON.stringify(new URL('../../tests/browser-test.mjs', import.meta.url).href)};
@@ -261,6 +263,20 @@ test('Page and Context callback exceptions after document replacement still fail
   expect(result.code, result.stderr).toBe(1);
   const report = JSON.parse(result.stdout);
   expect(report.stats.unexpected).toBe(2);
-  for (const kind of ['Page', 'Context']) expect(result.stdout).toContain(`${kind} intentional handler failure`);
-  expect(result.stdout).not.toContain('Timed out');
+  expect(report.errors).toEqual([]);
+  const specs = report.suites.flatMap(suite => suite.specs);
+  expect(specs).toHaveLength(2);
+  for (const kind of ['Page', 'Context']) {
+    const spec = specs.find(spec => spec.title === `${kind} handler error after replacement`);
+    expect(spec?.tests, `${kind} child test`).toHaveLength(1);
+    const [child] = spec.tests;
+    expect(child.results).toHaveLength(1);
+    const [result] = child.results;
+    expect(result.status).toBe('failed');
+    const errors = result.errors.map(error => error.message ?? error.value ?? '');
+    expect(errors).toEqual(expect.arrayContaining([
+      expect.stringMatching(new RegExp(`^Error: ${kind} intentional handler failure(?:\\n|$)`)),
+    ]));
+    expect(errors.join('\n')).not.toContain('Timed out');
+  }
 });
