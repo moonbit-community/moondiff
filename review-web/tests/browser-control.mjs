@@ -1,8 +1,14 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { performance } from 'node:perf_hooks';
+import { observeDocumentCommits } from './browser-lifecycle.mjs';
 
 const controls = new WeakMap();
+const routeControls = new WeakMap();
 let scope;
+let frameSerial = 0;
+
+const terminal = record => ['received', 'cancelled', 'failed', 'closed', 'retired']
+  .some(phase => record.phases[phase] !== undefined);
 
 // All deadlines in this module use Node's real clock, including when the page
 // is paused. The callback may inspect the browser, but never advances its time.
@@ -71,6 +77,9 @@ export class RequestRecorder {
     this.records = [];
     this.requests = new WeakMap();
     this.generations = new Map();
+    this.frames = new Map();
+    this.committedNavigations = new WeakMap();
+    this.disposed = false;
     this.handlers = {
       request: request => this.enter(request),
       response: response => this.mark(response.request(), 'response', { status: response.status() }),
@@ -79,25 +88,90 @@ export class RequestRecorder {
         const error = request.failure()?.errorText ?? 'unknown failure';
         this.mark(request, /abort|cancel/i.test(error) ? 'cancelled' : 'failed', { error });
       },
-      close: () => {
-        for (const record of this.unfinished()) record.phases.closed = performance.now();
-      },
+      frameattached: frame => this.observeFrame(frame),
+      framedetached: frame => this.detachFrame(frame),
+      close: () => this.close(),
     };
-    for (const [event, handler] of Object.entries(this.handlers)) page.on(event, handler);
+    try {
+      for (const [event, handler] of Object.entries(this.handlers)) page.on(event, handler);
+      for (const frame of page.frames()) this.observeFrame(frame);
+      if (page.isClosed()) this.close();
+    } catch (error) { this.dispose(); throw error; }
   }
-  enter(request) {
+  observeFrame(frame) {
+    if (this.disposed || this.frames.has(frame)) return;
+    // A popup may already have committed before context's page event. Its
+    // observed document is the initial one; never reconstruct unseen history.
+    const state = { frameId: ++frameSerial, documentId: 1, url: frame.url(), detached: false };
+    const dispose = observeDocumentCommits(frame, event => this.commit(frame, event));
+    this.frames.set(frame, { state, dispose });
+  }
+  commit(frame, { url, request }) {
+    const { state } = this.frames.get(frame);
+    const previous = state.documentId;
+    state.documentId++;
+    state.url = url;
+    // Only the request identified by this commit (and its redirect ancestors)
+    // belongs to the new document. Other pending navigations remain pending.
+    for (let navigation = request; navigation; navigation = navigation.redirectedFrom()) {
+      const owner = { frameId: state.frameId, documentId: state.documentId, ownership: 'document' };
+      this.committedNavigations.set(navigation, owner);
+      const record = this.requests.get(navigation);
+      if (record) Object.assign(record, owner);
+    }
+    for (const record of this.records) {
+      if (record.frameId === state.frameId && record.documentId === previous) {
+        this.retire(record, 'document-replaced', state.documentId);
+      }
+    }
+  }
+  retire(record, reason, replacementDocumentId = null) {
+    if (terminal(record)) return;
+    const at = performance.now();
+    record.phases.retired = at;
+    record.retirement = { reason, at, replacementDocumentId };
+  }
+  detachFrame(frame) {
+    const entry = this.frames.get(frame);
+    if (!entry || entry.state.detached) return;
+    entry.state.detached = true;
+    entry.dispose();
+    for (const record of this.records) {
+      if (record.frameId === entry.state.frameId) this.retire(record, 'frame-detached');
+    }
+  }
+  close() {
+    for (const record of this.unfinished()) {
+      this.retire(record, 'page-closed');
+      record.phases.closed = performance.now();
+    }
+    for (const frame of this.frames.keys()) this.detachFrame(frame);
+  }
+  enter(request, { observed = true } = {}) {
     if (this.requests.has(request)) return this.requests.get(request);
     const description = describeRequest(request);
     const key = JSON.stringify([description.operation, description.target, description.args]);
     const generation = (this.generations.get(key) ?? 0) + 1;
     this.generations.set(key, generation);
-    const record = { id: this.records.length + 1, ...description, generation, phases: { entered: performance.now() } };
+    let frame;
+    try { frame = request.frame(); } catch { /* Service workers have no Frame. */ }
+    const state = this.frames.get(frame)?.state;
+    const navigation = request.isNavigationRequest?.() ?? false;
+    const owner = this.committedNavigations.get(request) ?? {
+      frameId: state?.frameId ?? null,
+      documentId: state && !state.detached && observed && !navigation ? state.documentId : null,
+      ownership: state && !state.detached && observed ? (navigation ? 'pending-navigation' : 'document') : 'unknown',
+    };
+    const record = { id: this.records.length + 1, ...description, generation, ...owner, navigation,
+      phases: { entered: performance.now() } };
     this.records.push(record);
     this.requests.set(request, record);
     return record;
   }
   mark(request, phase, detail = {}) {
-    const record = this.enter(request);
+    // A late response seen without its request event cannot prove which
+    // document initiated it. A commit can still identify a navigation exactly.
+    const record = this.enter(request, { observed: false });
     record.phases[phase] = performance.now();
     Object.assign(record, detail);
     return record;
@@ -114,27 +188,81 @@ export class RequestRecorder {
     });
   }
   unfinished() {
-    return this.records.filter(record => !['received', 'cancelled', 'failed', 'closed'].some(phase => record.phases[phase] !== undefined));
+    return this.records.filter(record => !terminal(record));
   }
   snapshot() {
     const requests = structuredClone(this.records);
     return { requests, unfinished: structuredClone(this.unfinished()),
+      documents: structuredClone([...this.frames.values()].map(({ state }) => state)),
+      routeHandlers: routeControls.get(this.page)?.snapshot(),
       gates: [...(scope?.gates ?? [])].map(g => g.snapshot()) };
   }
-  dispose() { for (const [event, handler] of Object.entries(this.handlers)) this.page.off(event, handler); }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const [event, handler] of Object.entries(this.handlers)) this.page.off(event, handler);
+    for (const { dispose } of this.frames.values()) dispose();
+  }
 }
 
 export function requestsFor(page) {
   let control = controls.get(page);
-  if (!control) { control = { requests: new RequestRecorder(page) }; controls.set(page, control); }
+  if (!control) {
+    control = { requests: new RequestRecorder(page) };
+    controls.set(page, control);
+    observeRouteHandlers(page);
+  }
   return control.requests;
 }
 export const clockFor = page => controls.get(page)?.clock;
 
+// Observe callbacks registered through the public API; installing this wrapper
+// adds no routes and does not disable HTTP caching. Playwright's own wait skips
+// callbacks whose Route previously threw, even if a fixture caught cancellation
+// and is still doing work. Track the entire callback, including that tail and
+// handlers removed by unroute/dispose or by a { times: 1 } registration.
+export function observeRouteHandlers(owner) {
+  if (routeControls.has(owner) || typeof owner.route !== 'function') return;
+  const originalRoute = owner.route, originalUnroute = owner.unroute;
+  const wrappers = new WeakMap(), active = new Set(), errors = [];
+  const route = async function (url, handler, options) {
+    let wrapped = wrappers.get(handler);
+    if (!wrapped) {
+      wrapped = async (...args) => {
+        const complete = Promise.withResolvers();
+        const invocation = { complete: complete.promise, url: args[0].request().url(), at: performance.now() };
+        active.add(invocation);
+        try { return await handler(...args); }
+        catch (error) { errors.push(error); throw error; }
+        finally { active.delete(invocation); complete.resolve(); }
+      };
+      wrappers.set(handler, wrapped);
+    }
+    return originalRoute.call(this, url, wrapped, options);
+  };
+  const unroute = function (url, handler) {
+    return originalUnroute.call(this, url, wrappers.get(handler) ?? handler);
+  };
+  owner.route = route; owner.unroute = unroute;
+  routeControls.set(owner, {
+    snapshot: () => ({ active: [...active].map(({ url, at }) => ({ url, at })), errors: errors.map(String) }),
+    async drain() {
+      while (active.size) await Promise.all([...active].map(invocation => invocation.complete));
+      if (errors.length) throw new AggregateError(errors, 'Route callbacks failed');
+    },
+    dispose() {
+      if (owner.route === route) owner.route = originalRoute;
+      if (owner.unroute === unroute) owner.unroute = originalUnroute;
+    },
+  });
+}
+
 // Protocol-fixture proxies retain the identity of the actual network request.
 export function aliasRequest(alias, request) {
   if (typeof request.frame !== 'function') return;
-  const recorder = requestsFor(request.frame().page());
+  let page;
+  try { page = request.frame().page(); } catch { return; }
+  const recorder = requestsFor(page);
   recorder.requests.set(alias, recorder.enter(request));
 }
 
@@ -260,8 +388,7 @@ export async function installClock(page, { time = '2026-08-18T01:00:00Z' } = {})
   return clock;
 }
 
-export async function browserDiagnostic(page) {
-  const requests = requestsFor(page).snapshot();
+export async function browserDiagnostic(page, requests = requestsFor(page).snapshot()) {
   if (page.isClosed()) return { ...requests, closed: true };
   return { ...requests, browser: await page.evaluate(() => ({
     now: Date.now(), timers: globalThis.__moondiffTimerSnapshot?.(),
@@ -272,35 +399,124 @@ export async function browserDiagnostic(page) {
   })) };
 }
 
-export function beginControls() { scope = { gates: new Set() }; return scope; }
-export async function finishControls(current, pages) {
+export async function collectBrowserDiagnostics(pages, snapshots = pages.map(page => controls.get(page)?.requests.snapshot() ?? {})) {
+  // Snapshot every request before evaluating any page or closing anything.
+  const diagnostics = snapshots.map((snapshot, page) => ({ page, ...snapshot }));
+  try {
+    await withRealTimeout(Promise.all(pages.map(async (page, i) => {
+      try { Object.assign(diagnostics[i], await browserDiagnostic(page, snapshots[i])); }
+      catch (error) { diagnostics[i].diagnosticError = String(error); }
+    })), 1_000, 'browser cleanup diagnostics');
+  } catch (error) {
+    for (const state of diagnostics) state.diagnosticError ??= String(error);
+  }
+  return structuredClone(diagnostics);
+}
+
+export function beginControls() {
+  scope = { gates: new Set(), cleanedPages: new Set(), cleanedContexts: new Set(), errors: [] };
+  return scope;
+}
+
+async function removeRoutes(owner, kind, remaining) {
+  await withRealTimeout((async () => {
+    const outcomes = await Promise.allSettled([
+      Promise.resolve().then(() => owner.unrouteAll({ behavior: 'wait' })),
+      routeControls.get(owner)?.drain(),
+    ]);
+    const errors = outcomes.flatMap((outcome, i) => {
+      if (outcome.status === 'fulfilled') return [];
+      // A closed target's interception-pattern update is expected only after
+      // the full callback drain. Callback errors are never filtered this way.
+      if (i === 0 && owner.isClosed?.() &&
+          [
+            'Target page, context or browser has been closed',
+            `${kind}.unrouteAll: Target page, context or browser has been closed`,
+          ].includes(outcome.reason.message)) return [];
+      return [outcome.reason];
+    });
+    if (errors.length === 1) throw errors[0];
+    if (errors.length) throw new AggregateError(errors, `${kind} route cleanup failed`);
+  })(), remaining(), `${kind} route handler cleanup`);
+}
+
+export function finishControls(current, pages, { context } = {}) {
   current.closing = true;
   for (const gate of current.gates) gate.release();
-  const errors = [];
+  // Serialize repeated calls, while allowing the automatic fixture to clean a
+  // Context after a test explicitly cleaned just its Page using the old API.
+  const run = () => drainControls(current, pages, context);
+  const cleanup = current.cleanup ? current.cleanup.then(run, run) : run();
+  current.cleanup = cleanup;
+  return cleanup;
+}
+
+async function drainControls(current, pages, context) {
+  const deadline = performance.now() + 5_000;
+  const remaining = () => Math.max(0, deadline - performance.now());
+  const attempted = new Set();
+  const capture = error => {
+    // Preserve the first failure's evidence, before page.close can give every
+    // request a terminal phase. The fixture attaches this saved snapshot.
+    current.failurePages ??= [...pages];
+    current.failureSnapshots ??= current.failurePages.map(page => controls.get(page)?.requests.snapshot() ?? {});
+    current.contextHandlers ??= routeControls.get(context)?.snapshot();
+    current.errors.push(error);
+  };
   try {
-    for (const page of pages) {
-      const requests = controls.get(page)?.requests;
-      const deadline = performance.now() + 5_000;
-      try {
-        if (!page.isClosed()) {
-          // Keep routes installed until the browser finishes receiving every
-          // response. Removing them while concurrent fulfills are still being
-          // dispatched can let a request fall through to the real server.
-          if (requests) await waitUntil(() => page.isClosed() || requests.unfinished().length === 0, {
-            label: 'in-flight request cleanup', timeout: Math.max(0, deadline - performance.now()),
-            diagnostic: () => requests.snapshot(),
+    // The registry can grow if an in-flight handler opens a popup during drain.
+    for (;;) {
+      const pending = [...pages].filter(page => !current.cleanedPages.has(page) && !attempted.has(page));
+      if (!pending.length) break;
+      pending.forEach(page => attempted.add(page));
+      const drained = await Promise.all(pending.map(async page => {
+        const requests = controls.get(page)?.requests;
+        try {
+          if (requests) await waitUntil(() => requests.unfinished().length === 0, {
+            label: 'in-flight request cleanup', timeout: remaining(), diagnostic: () => requests.snapshot(),
           });
-          if (!page.isClosed()) await withRealTimeout(page.unrouteAll({ behavior: 'wait' }),
-            Math.max(0, deadline - performance.now()), 'route handler cleanup');
+          return true;
+        } catch (error) { capture(error); return false; }
+      }));
+      // Page handlers may fall back to Context handlers. Keep Context routes
+      // installed until all Page handlers return, including closed pages.
+      await Promise.all(pending.map(async (page, i) => {
+        if (!drained[i]) return;
+        try { await removeRoutes(page, 'page', remaining); }
+        catch (error) {
+          const snapshot = controls.get(page)?.requests.snapshot() ?? {};
+          capture(error.name === 'RealTimeoutError'
+            ? new Error(`${error.message}: ${JSON.stringify(snapshot)}`, { cause: error }) : error);
         }
-      } catch (error) {
-        errors.push(error.name === 'RealTimeoutError'
-          ? new Error(`${error.message}: ${JSON.stringify(requests?.snapshot() ?? {})}`, { cause: error }) : error);
-        if (!page.isClosed()) {
-          try { await page.close(); } catch (error) { errors.push(error); }
-        }
-      } finally { requests?.dispose(); }
+      }));
     }
-  } finally { if (scope === current) scope = undefined; }
-  if (errors.length) throw new AggregateError(errors, 'Browser control cleanup failed');
+    if (context && !current.cleanedContexts.has(context)) {
+      try { await removeRoutes(context, 'browserContext', remaining); }
+      catch (error) { capture(error); }
+      finally { current.cleanedContexts.add(context); routeControls.get(context)?.dispose(); }
+    }
+    if (current.errors.length && !current.diagnostics) {
+      current.diagnostics = await collectBrowserDiagnostics(current.failurePages, current.failureSnapshots);
+      // Recovery also has a real deadline; an unresponsive target cannot hang
+      // teardown indefinitely after its original failure has been recorded.
+      const recovery = [...pages].filter(page => !page.isClosed()).map(page => () => page.close());
+      if (context) recovery.push(() => context.close());
+      const recovered = await Promise.allSettled(recovery.map(close => withRealTimeout(
+        Promise.resolve().then(close), 1_000, 'forced browser cleanup')));
+      for (const result of recovered) if (result.status === 'rejected') current.errors.push(result.reason);
+    }
+  } finally {
+    for (const page of attempted) {
+      controls.get(page)?.requests.dispose();
+      routeControls.get(page)?.dispose();
+      current.cleanedPages.add(page);
+    }
+    if (scope === current) scope = undefined;
+  }
+  if (current.errors.length) {
+    const error = new AggregateError(current.errors, 'Browser control cleanup failed');
+    error.diagnostics = current.diagnostics;
+    error.contextHandlers = current.contextHandlers;
+    throw error;
+  }
 }
