@@ -266,13 +266,12 @@ for (const sourceDelay of [0, 400]) test(`a completed hit paints while real veri
   await row(page, 'Pull request 1').getByRole('link').click();
   await expect(page.locator('.diff-scroll table').first()).toBeVisible();
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  await page.locator('.comment-editor textarea').fill('Wait for verification');
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+  await page.locator('.overall-comment-editor textarea').fill('Wait for verification');
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Rebase and merge', exact: true })).toBeDisabled();
   await expect(page.locator('.viewed-control input')).toBeDisabled();
   validation.release(); block = false;
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);
   expect(kindCalls(state, 'PullFiles').filter(call => call.args.number === '1')).toHaveLength(before.files);
   expect(kindCalls(state, 'ContentGet')).toHaveLength(before.sources);
@@ -281,28 +280,27 @@ for (const sourceDelay of [0, 400]) test(`a completed hit paints while real veri
 test('page restoration restarts cached PR validation and keeps every write locked until confirmation', async ({ page }) => {
   const cached = await cachedVerification(page);
   await expect(page.locator('.diff-scroll table')).toBeVisible();
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  await page.locator('.comment-editor textarea').fill('Draft retained through restoration');
+  await page.locator('.overall-comment-editor textarea').fill('Draft retained through restoration');
   const hits = await page.evaluate(() => window.__moondiffMetrics.counters.prefetch_cache_hits);
   cached.state.statusGate = gate();
   await restoreVerification(page, cached);
   await expect(page.locator('.discussion-auth')).toHaveText('Checking GitHub session…');
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
   expect(cached.held.restored).toBeUndefined();
   cached.state.statusGate.release();
   await expect.poll(() => cached.held.restored).toBe(true);
   cached.gates.initial.release();
   await cached.waitForCompletion('initial', 'cancelled');
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
   await expect(page.locator('.viewed-control input')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Rebase and merge', exact: true })).toBeDisabled();
   cached.gates.restored.release();
   await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
   await expect(page.locator('.viewed-control input')).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Rebase and merge', exact: true })).toBeEnabled();
-  await expect(page.locator('.comment-editor textarea')).toHaveValue('Draft retained through restoration');
+  await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Draft retained through restoration');
   expect(await page.evaluate(() => window.__moondiffMetrics.counters.prefetch_cache_hits)).toBe(hits + 1);
   expect(kindCalls(cached.state, 'ContentGet')).toHaveLength(2);
   expect(kindCalls(cached.state, 'PullFiles').filter(call => call.args.number === '1')).toHaveLength(1);
@@ -360,8 +358,7 @@ for (const large of [false, true]) test(`cached ${large ? 'large selector' : 'di
   await page.locator('.range-selector select').first().selectOption(middle);
   await expect(page.locator('.range-selector select').first()).toHaveValue(middle);
   if (!large) {
-    await page.getByRole('button', { name: 'Add overall comment' }).click();
-    await page.locator('.comment-editor textarea').fill('Keep this draft during retries');
+    await page.locator('.overall-comment-editor textarea').fill('Keep this draft during retries');
   }
   await page.getByRole('link', { name: /Moondiff/ }).click();
   await expect(page.getByRole('tab').first()).toBeVisible();
@@ -378,8 +375,8 @@ for (const large of [false, true]) test(`cached ${large ? 'large selector' : 'di
     await expect(from).toHaveValue(middle);
     await expect(page.locator(large ? '.range-limit' : '.diff-scroll table')).toBeVisible();
     if (!large) {
-      await expect(page.locator('.comment-editor textarea')).toHaveValue('Keep this draft during retries');
-      await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+      await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Keep this draft during retries');
+      await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
       await expect(page.locator('.viewed-control input')).toBeDisabled();
     }
     pending = gate();
@@ -397,7 +394,7 @@ for (const large of [false, true]) test(`cached ${large ? 'large selector' : 'di
   await expect(from).toHaveValue(middle);
   expect(await status.evaluate(node => node === document.querySelector('[data-region="status"]'))).toBe(true);
   expect(await page.locator('main').evaluate(root => root.querySelector('[data-navigation-generation]')?.dataset.navigationGeneration ?? null)).toBe(generation);
-  if (!large) await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  if (!large) await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
 });
 
 for (const expired of [false, true]) test(`display metadata changes keep restored inline drafts submittable with ${expired ? 'expired' : 'valid'} snapshot cache`, async ({ page }) => {
@@ -422,7 +419,7 @@ for (const expired of [false, true]) test(`display metadata changes keep restore
   await expect(page.locator('.diff-scroll table')).toBeVisible();
   const gutter = page.locator('.review-gutter.new-line-number').filter({ has: page.locator('.line-number-value', { hasText: /^1$/ }) });
   await clickLineCommentButton(gutter.getByRole('button', { name: 'Comment on line 1', exact: true }));
-  await page.locator('.comment-editor textarea').fill('Keep original inline anchor');
+  await page.locator('.comment-editor[data-draft-id] textarea').fill('Keep original inline anchor');
   await page.getByRole('link', { name: /Moondiff/ }).click();
   await expect(page.getByRole('tab').first()).toBeVisible();
   if (expired) await page.clock.setFixedTime(new Date(Date.now() + 31_000));
@@ -430,11 +427,11 @@ for (const expired of [false, true]) test(`display metadata changes keep restore
   const filesBefore = kindCalls(state, 'PullFiles').length;
   await page.goBack();
   await expect.poll(() => held).toBe(true);
-  if (!expired) await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+  if (!expired) await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
   validation.release();
   await expect(page.getByText('Updated display title', { exact: true })).toBeVisible();
-  await expect(page.locator('.comment-editor textarea')).toHaveValue('Keep original inline anchor');
-  await expect(page.getByRole('button', { name: 'Post comment' })).toBeEnabled();
+  await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('Keep original inline anchor');
+  await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeEnabled();
   await expect(page.getByText(/PR updated\. Copy or cancel/)).toHaveCount(0);
   expect(kindCalls(state, 'PullFiles')).toHaveLength(filesBefore);
 });

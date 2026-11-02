@@ -41,8 +41,7 @@ test('Markdown web links open real new tabs and preserve the current draft and e
   const body = '[Ordinary](https://example.com/ordinary)\n[Reference][ref]\n<https://example.com/automatic>\n[![Wrapped image](https://example.com/image.png)](https://example.com/wrapped)\n[Mail](mailto:reader@example.com)\n\nNote[^note].\n\n[ref]: https://example.com/reference\n\n[^note]: Local footnote.';
   await installApi(page, pullTarget(), { authenticated: true, issueBody: body });
   await page.goto(reviewPath());
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  const editor = page.locator('.comment-editor textarea');
+  const editor = page.locator('.overall-comment-editor textarea');
   await editor.fill('Keep this unsent draft\nwith another line');
   await editor.evaluate(el => { window.savedEditor = el; });
   const card = commentCard(page, 'issue', 10);
@@ -183,8 +182,7 @@ test('queued footnote and collapse actions yield to newer input and route change
   await installRenderProbe(page);
   await installApi(page, pullTarget(), { authenticated: true, issueBody: longFootnote });
   await page.goto(reviewPath());
-  await page.getByRole('button', { name: 'Add overall comment' }).click();
-  const editor = page.locator('.comment-editor textarea');
+  const editor = page.locator('.overall-comment-editor textarea');
   await editor.fill('Keep editing');
   const card = commentCard(page, 'issue', 10);
   const reference = card.locator('[role="doc-noteref"]').first();

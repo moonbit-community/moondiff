@@ -4,6 +4,11 @@
 package, and editor state, context, receipts and mutable collections are private.
 `update(session, event)` is the only mutation entry point. It never mutates the
 previous session and has no browser, RPC or Rabbita dependency.
+The persistent overall composer is not a draft until its first nonempty input.
+`OverallDraftBodyChanged` creates that draft with its text atomically, then edits
+only that overall draft. Other draft kinds keep the composer visible but disabled.
+Known-account identity checks allow local overall input while submission stays
+disabled; anonymous readers without a retained draft use the sign-in controls.
 `Session::comments` returns detached copies. Views use `read_view` and immutable
 path groups from `file_comments`; `ReadView.refresh_busy` exposes refresh activity.
 `file_threads` and `file_commit_discussions` project each group using its file index
@@ -90,6 +95,8 @@ does not change draft identity or body, and is not persisted in the URL or stora
 Comment lists use generation plus typed comment IDs. Threads retain the original
 root ID after root deletion. Draft keys use generation plus a separate draft
 sequence. The editor keeps this key through publication and synchronization.
+The overall composer keeps the same textarea when it acquires or clears a draft;
+`data-draft-id` identifies an active draft separately from the empty composer.
 Source rows, semantic sections and file containers also have stable
 keys, so inserting replies or other cards cannot replace an active editor.
 

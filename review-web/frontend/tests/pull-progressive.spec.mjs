@@ -245,7 +245,7 @@ test('PR navigation and history restoration keep their position and an active ed
   await expect(card(page, 31)).toHaveClass('file-card');
   const comment = card(page, 30).locator('.new-line-number').getByRole('button', { name: 'Comment on line 2', exact: true }).first();
   await comment.evaluate(button => button.click());
-  const editor = page.locator('textarea');
+  const editor = page.locator('textarea[data-draft-id]');
   await expect(editor).toBeFocused();
   await editor.fill('Keep my place and selection');
   await editor.evaluate(element => element.setSelectionRange(2, 9, 'backward'));

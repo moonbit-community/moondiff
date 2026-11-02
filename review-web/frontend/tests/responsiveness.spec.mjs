@@ -92,15 +92,14 @@ for (const draft of [false, true]) test(`a prepared new version ${draft ? 'prese
   await expect(page.locator('.file-card')).toContainText('value_0');
   await expect(page.locator('.file-card')).not.toContainText('new_revision');
   if (draft) {
-    await page.getByRole('button', { name: 'Add overall comment' }).click();
-    await page.locator('.comment-editor textarea').fill('This draft belongs to the old version');
+    await page.locator('.overall-comment-editor textarea').fill('This draft belongs to the old version');
   }
   sources.resolve();
   if (draft) {
     await expect(page.getByText(/This PR has a newer version/)).toBeVisible();
     await expect(page.locator('.file-card')).toContainText('value_0');
-    await expect(page.locator('.comment-editor textarea')).toHaveValue('This draft belongs to the old version');
-    await expect(page.getByRole('button', { name: 'Post comment' })).toBeDisabled();
+    await expect(page.locator('.comment-editor[data-draft-id] textarea')).toHaveValue('This draft belongs to the old version');
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment' })).toBeDisabled();
   } else {
     await expect(page.locator('.file-card')).toContainText('new_revision');
     await expect(page.getByText('Checking the current PR version…', { exact: true })).toHaveCount(0);

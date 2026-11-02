@@ -196,8 +196,7 @@ test('Viewed rejects repeated operations, rolls back clear failure and keeps a c
   const state = await install(page);
   await page.goto(path); await viewedReady(page); await expect(box(page)).toBeEnabled();
   await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
-  await page.getByRole('button', { name: 'Add overall comment', exact: true }).click();
-  const editor = page.locator('textarea'); await editor.fill('Keep this comment draft');
+  const editor = page.locator('.overall-comment-editor textarea'); await editor.fill('Keep this comment draft');
   const waiting = gate(); state.writeGate = waiting;
   state.writeFailure = { status: 403, code: 'permission_denied', message: 'Viewed access denied' };
   await expectViewedWrite(state, files[0].filename, true, () => box(page).check());
@@ -365,11 +364,11 @@ test('manual refresh and page restoration retain an expanded viewed file and its
   await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
   const gutter = card(page).locator('.review-gutter.new-line-number').filter({ has: page.locator('.line-number-value', { hasText: /^2$/ }) });
   await clickLineCommentButton(gutter.getByRole('button', { name: 'Comment on line 2', exact: true }));
-  await page.locator('textarea').fill('Inline Viewed draft');
+  await page.locator('textarea[data-draft-id]').fill('Inline Viewed draft');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(2);
   await expect(card(page)).toHaveClass(/expanded/);
-  await expect(page.locator('textarea')).toHaveValue('Inline Viewed draft');
+  await expect(page.locator('textarea[data-draft-id]')).toHaveValue('Inline Viewed draft');
   await page.evaluate(() => { dispatchEvent(new Event('pagehide')); dispatchEvent(new Event('pageshow')); });
   await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(3);
   await expect(card(page)).toHaveClass(/expanded/);
@@ -381,9 +380,9 @@ test('manual refresh and page restoration retain an expanded viewed file and its
   await expect(box(page)).toBeEnabled(); await expect(box(page)).toBeChecked();
   expect(state.states.alice[files[0].filename]).toBe('Viewed');
   await expect(card(page)).not.toHaveClass(/expanded/);
-  await expect(page.locator('textarea')).toHaveValue('Inline Viewed draft');
+  await expect(page.locator('textarea[data-draft-id]')).toHaveValue('Inline Viewed draft');
   await card(page).getByRole('button', { name: 'Expand src/a.txt', exact: true }).click();
-  await expect(page.locator('textarea')).toHaveValue('Inline Viewed draft');
+  await expect(page.locator('textarea[data-draft-id]')).toHaveValue('Inline Viewed draft');
 });
 
 const mbtFiles = ['src/main.mbt', 'src/second.mbt'].map(filename => ({
@@ -512,7 +511,7 @@ for (const kind of ['inline', 'reply']) {
       const editor = await openMbtDraft(page, kind);
       if (finish === 'post') await editor.fill('Completed draft');
       await card(page).getByRole('button', { name: finish === 'post' ? 'Post comment' : 'Cancel', exact: true }).click();
-      await expect(page.locator('textarea')).toHaveCount(0);
+      await expect(page.locator('textarea[data-draft-id]')).toHaveCount(0);
       if (finish === 'post') await expect(card(page).getByText('Completed draft', { exact: true })).toBeVisible();
       await expect.poll(() => calls(state, 'github.pull.viewed.get').length).toBe(1);
       waiting.resolve();
@@ -1057,9 +1056,9 @@ for (const kind of ['inline', 'reply', 'overall']) {
     await page.goto(path); await viewedReady(page); await expect(mbtBox(page)).toBeEnabled();
     state.writeFailure = { status: 504, code: 'github_timeout', message: 'Timed out' };
     await expectViewedWrite(state, mbtFiles[0].filename, false, () => mbtBox(page).uncheck()); await waitingForConfirmation(page); await readFinished(page);
-    if (kind === 'overall') await page.getByRole('button', { name: 'Add overall comment', exact: true }).click();
+    if (kind === 'overall') await page.locator('.overall-comment-editor textarea').focus();
     else await openMbtDraft(page, kind);
-    const editor = page.locator('textarea');
+    const editor = page.locator(kind === 'overall' ? '.overall-comment-editor textarea' : 'textarea[data-draft-id]');
     await editor.fill('Preserve this selection');
     await editor.focus();
     await editor.evaluate(el => el.setSelectionRange(2, 8, 'backward'));
@@ -1069,7 +1068,7 @@ for (const kind of ['inline', 'reply', 'overall']) {
     await expect(page.getByText('Checking GitHub session…', { exact: true })).toBeVisible();
     await expect(editor).toBeFocused();
     await expect(editor).toHaveValue('Preserve this selection');
-    await expect(page.getByRole('button', { name: 'Post comment', exact: true })).toBeDisabled();
+    await expect(page.locator('.comment-editor[data-draft-id]').getByRole('button', { name: 'Post comment', exact: true })).toBeDisabled();
     expect(await original.evaluate(el => el.isConnected && el === document.activeElement)).toBe(true);
     authGate.resolve();
     await expect(page.getByRole('button', { name: 'Account: alice', exact: true })).toBeVisible();
