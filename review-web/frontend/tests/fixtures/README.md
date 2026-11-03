@@ -6,6 +6,12 @@ commit `836b5e037954fee5e8b233aca8e3587621842875` and its parent
 responses and never contact GitHub. The ignored reproduction file occupies index
 0 for stable selectors. The upstream license is in `parser-LICENSE`.
 
+`array_get_view.mbt` pins the 44-line `Array::get_view` declaration from
+MoonBit core's `builtin/arrayview.mbt`. `ignored-comment-alignment.spec.mjs`
+inserts one intrinsic attribute after its documentation and mocks both GitHub
+revisions. The complete Token section must have 45 rows, with identical
+documentation paired in Split and emitted once in Unified, in both directions.
+
 The JSON shape is `{ sha, base, message, files, sources }`; `sources` keys are
 `SHA:path`. Compression uses gzip with mtime 0. `rendering.stress.mjs` uses this
 parser fixture and independent synthetic fixtures with configurable file and
