@@ -17,10 +17,11 @@ pub fn render_unified_hunks(@model.HunkDocument, line_numbers? : Bool, hunk_note
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) struct HunkNote {
   title : String
   body : String
-} derive(Eq)
+}
 
 // Type aliases
 

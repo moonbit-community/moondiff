@@ -47,6 +47,7 @@ pub struct Vertex {
 /// current `Vertex`, other edges may also be available.
 ///
 /// See `set_neighbours` for all the edges available for a given `Vertex`.
+#derive(Debug)
 pub enum Edge {
   /// Is this node just punctuation? We penalise this case,
   /// because it's more useful to match e.g. a variable name
@@ -61,10 +62,11 @@ pub enum Edge {
   // rather doing LHS and RHS separately.
   EnterNovelDelimiterLHS
   EnterNovelDelimiterRHS
-} derive(Debug)
+}
 
 ///|UUID(879374f4-7c01-44be-8149-5b29afe3bf22)
 /// Tracks entering syntax List nodes.
+#derive(Eq)
 enum EnteredDelimiter {
   /// If we've entered the LHS or RHS separately, we can pop either
   /// side independently.
@@ -79,7 +81,7 @@ enum EnteredDelimiter {
   /// New: (a b) c
   /// ```
   PopBoth(Syntax, Syntax)
-} derive(Eq)
+}
 
 ///|UUID(8b967118-a93e-40d9-a68c-a62c8bb8cffc)
 pub impl Show for EnteredDelimiter with fn output(self, logger) {

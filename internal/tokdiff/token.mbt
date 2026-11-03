@@ -3,6 +3,7 @@
 /// alignment scorer: identifiers and literals carry full signal, punctuation
 /// less, comment content little, and comment boilerplate / whitespace none to
 /// almost none.
+#derive(Eq)
 pub(all) enum TokKind {
   Word // identifiers, keywords, numbers
   Str // string / char / bytes / regex literals (one token each)
@@ -11,7 +12,7 @@ pub(all) enum TokKind {
   Filler // comment boilerplate: `//` markers and comment whitespace
   Space // inter-token whitespace (reconstructed from lexer position gaps)
   Marker // the `///|` block separator (full weight: structural, not prose)
-} derive(Eq)
+}
 
 ///|
 /// One diffable token: its weight class and its exact source text.

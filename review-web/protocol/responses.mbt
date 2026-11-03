@@ -1,17 +1,20 @@
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiError {
   status : Int32
   code : String
   message : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum Response[T] {
   Success(value~ : T)
   Failure(error~ : ApiError)
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum RpcValue {
   ViewerPulls(ApiViewerPulls)
   PullCommits(ApiPullCommits)
@@ -33,14 +36,15 @@ pub(all) enum RpcValue {
   ReviewComment(ApiReviewComment)
   CommitComment(ApiCommitComment)
   Deleted(DeleteResult)
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiSource {
   base64 : String
   size : Int32
   content_type : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
 pub fn ApiSource::decode(self : ApiSource) -> Bytes raise {

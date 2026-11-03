@@ -26,11 +26,12 @@ pub struct SourceView {
 /// Result of translating one original syntax span into a filtered source
 /// view. `Filtered` is a valid span hidden by the active filters (or a valid
 /// zero-width span); `OutOfBounds` reports invalid source coordinates.
+#derive(Debug)
 pub(all) enum SpanMapping {
   Mapped(@span.SingleLineSpan)
   Filtered
   OutOfBounds
-} derive(Debug)
+}
 
 ///|
 fn source_line_is_blank(line : String) -> Bool {

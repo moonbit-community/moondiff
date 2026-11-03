@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 priv enum Punctuation {
   OpenParen
   CloseParen
@@ -11,7 +12,7 @@ priv enum Punctuation {
   HashHash
   Operator
   Other
-} derive(Eq)
+}
 
 ///|
 /// Return the token's meaning and the remaining source. Delimiters have

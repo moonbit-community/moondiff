@@ -1,17 +1,19 @@
 ///|
+#derive(FromJson, ToJson)
 priv enum CommitPosition {
   GraphQL(String)
   Compare(Int32)
-} derive(FromJson, ToJson)
+}
 
 ///|
+#derive(FromJson, ToJson)
 priv struct CommitCursor {
   position : CommitPosition
   base : String
   head : String
   loaded : Int32
   total : Int32
-} derive(FromJson, ToJson)
+}
 
 ///|
 const PULL_COMMITS_SNAPSHOT_QUERY : String =

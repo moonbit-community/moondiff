@@ -1,14 +1,16 @@
 ///|UUID(db3b80c2-5673-4e03-8acb-478ba009c852)
+#derive(Eq)
 struct Node[T] {
   val : T
   next : Node[T]?
-} derive(Eq)
+}
 
 ///|UUID(1abc1ea8-aa15-4919-aa1c-126e2860d439)
 /// A persistent stack.
 ///
 /// TODO: use List
-pub struct Stack[T](Node[T]?) derive(Eq)
+#derive(Eq)
+pub struct Stack[T](Node[T]?)
 
 ///|UUID(ccb74e09-ee80-4917-9bf2-814ebbe7325a)
 pub fn[T] Stack::new() -> Stack[T] {

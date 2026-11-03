@@ -2,16 +2,18 @@
 pub type PullSnapshot = @protocol.ApiPullSnapshot
 
 ///|
+#derive(Eq)
 pub(all) struct SnapshotResult {
   snapshot : PullSnapshot
   confirmed : Bool
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct PrefetchCandidate {
   pull : @protocol.PullGet
   updated_at : String
-} derive(Eq)
+}
 
 ///|
 priv enum Payload {

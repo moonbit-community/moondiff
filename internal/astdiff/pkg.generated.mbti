@@ -18,6 +18,7 @@ pub fn shortest_path_with_budget(Vertex, Int32, Int32, @computation.ScopeBudget)
 // Errors
 
 // Types and methods
+#derive(@debug.Debug)
 pub enum Edge {
   UnchangedNode(depth_difference~ : UInt32, probably_punctuation~ : Bool)
   EnterUnchangedDelimiter(depth_difference~ : UInt32)
@@ -27,9 +28,10 @@ pub enum Edge {
   NovelAtomRHS
   EnterNovelDelimiterLHS
   EnterNovelDelimiterRHS
-} derive(@debug.Debug)
+}
 
-type EnteredDelimiter derive(Eq)
+#derive(Eq)
+type EnteredDelimiter
 pub impl Show for EnteredDelimiter
 
 pub(all) enum GraphLimitResult[T] {
@@ -37,9 +39,11 @@ pub(all) enum GraphLimitResult[T] {
   GraphLimitExceeded
 }
 
-type Node[T] derive(Eq)
+#derive(Eq)
+type Node[T]
 
-pub struct Stack[T](Node[T]?) derive(Eq)
+#derive(Eq)
+pub struct Stack[T](Node[T]?)
 pub fn[T] Stack::is_empty(Self[T]) -> Bool
 pub fn[T] Stack::new() -> Self[T]
 pub fn[T] Stack::peek(Self[T]) -> T?

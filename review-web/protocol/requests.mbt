@@ -1,95 +1,108 @@
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum CommentSide {
   Left
   Right
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum CommentTarget {
   Commit(sha~ : String)
   Pull(number~ : String)
   PullCommit(number~ : String, sha~ : String)
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct CommitGet {
   owner : String
   repo : String
   sha : String
   page : Int32
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct PullGet {
   owner : String
   repo : String
   number : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct CompareGet {
   owner : String
   repo : String
   base : String
   head : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct RangeCompareGet {
   owner : String
   repo : String
   base : String
   head : String
   page : Int32
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct PullCommitPageGet {
   owner : String
   repo : String
   number : String
   page : Int32
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ResolveShaGet {
   owner : String
   repo : String
   sha : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct PullFiles {
   owner : String
   repo : String
   number : String
   page : Int32
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ContentGet {
   owner : String
   repo : String
   path : String
   revision : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct CommentsList {
   owner : String
   repo : String
   target : CommentTarget
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct IssueCommentCreate {
   owner : String
   repo : String
   number : String
   body : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ReviewCommentCreate {
   owner : String
   repo : String
@@ -99,9 +112,10 @@ pub(all) struct ReviewCommentCreate {
   line : Int32
   side : CommentSide
   body : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct CommitCommentCreate {
   owner : String
   repo : String
@@ -109,25 +123,28 @@ pub(all) struct CommitCommentCreate {
   path : String
   position : Int32
   body : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ReviewReplyCreate {
   owner : String
   repo : String
   number : String
   comment_id : Int64
   body : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct CommentDelete {
   owner : String
   repo : String
   comment_id : Int64
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum GitHubRequest {
   ViewerPullsGet(ViewerPullsGet)
   PullCommitsGet(PullCommitsGet)
@@ -152,10 +169,11 @@ pub(all) enum GitHubRequest {
   IssueCommentDelete(CommentDelete)
   ReviewCommentDelete(CommentDelete)
   CommitCommentDelete(CommentDelete)
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct RpcRequest {
   v : Int32
   request : GitHubRequest
-} derive(Eq, FromJson, ToJson)
+}

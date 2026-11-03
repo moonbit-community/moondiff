@@ -1,9 +1,10 @@
 ///|
 /// A short annotation rendered immediately below a diff hunk header.
+#derive(Eq)
 pub(all) struct HunkNote {
   title : String
   body : String
-} derive(Eq)
+}
 
 ///|
 fn esc(text : String) -> String {

@@ -10,21 +10,21 @@ pub const SNAPSHOT_BYTE_LIMIT : Int32 = 8388608
 
 pub const SNAPSHOT_FILE_LIMIT : Int32 = 300
 
-pub fn comment_for_protocol(Json) -> Json raise
+pub fn comment_for_protocol(@json.Json) -> @json.Json raise
 
-pub fn[T : @json.FromJson + ToJson] decode(Json) -> T raise
+pub fn[T : @json.FromJson + @json.ToJson] decode(@json.Json) -> T raise
 
-pub fn[T : @json.FromJson + ToJson] decode_github(Json) -> T raise
+pub fn[T : @json.FromJson + @json.ToJson] decode_github(@json.Json) -> T raise
 
-pub fn decode_request(Json) -> GitHubRequest raise
+pub fn decode_request(@json.Json) -> GitHubRequest raise
 
-pub fn github_id(Json) -> String raise
+pub fn github_id(@json.Json) -> String raise
 
 pub fn markdown_image_csp_sources() -> String
 
 pub fn markdown_image_hosts() -> ReadOnlyArray[String]
 
-pub fn normalize_github(Json) -> Json
+pub fn normalize_github(@json.Json) -> @json.Json
 
 pub fn resolved_sha(String, String) -> String raise
 
@@ -50,6 +50,7 @@ pub suberror ProtocolError {
 }
 
 // Types and methods
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiAuthStatus {
   authenticated : Bool
   csrf_token : String?
@@ -57,38 +58,44 @@ pub(all) struct ApiAuthStatus {
   user_id : String?
   install_url : String?
   device_flow : ApiDeviceFlow?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCiCheck {
   name : String
   state : ApiCiState
   description : String
   details_url : String?
   source : ApiCiSource
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum ApiCiSource {
   CheckRun
   CommitStatus
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum ApiCiState {
   Success
   Pending
   Failure
   Neutral
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCommentBundle {
   issue_comments : Array[ApiIssueComment]
   review_comments : Array[ApiReviewComment]
   commit_comments : Array[ApiCommitComment]
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCommentUser {
   login : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCommit {
   sha : String
   html_url : String
@@ -96,8 +103,9 @@ pub(all) struct ApiCommit {
   parents : Array[ApiParent]
   stats : ApiStats
   files : Array[ApiFile]
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCommitComment {
   id : Int64
   body : String
@@ -107,23 +115,27 @@ pub(all) struct ApiCommitComment {
   path : String?
   position : Int32?
   line : Int32?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCommitInfo {
   message : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCommitSummary {
   sha : String
   message : String
   author : String
   committed_at : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiCompare {
   merge_base_commit : ApiParent
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiDeviceFlow {
   id : String
   phase : DevicePhase
@@ -132,14 +144,16 @@ pub(all) struct ApiDeviceFlow {
   expires_at : Double
   retry_after : Int32
   message : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiError {
   status : Int32
   code : String
   message : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiFile {
   filename : String
   previous_filename : String?
@@ -148,31 +162,36 @@ pub(all) struct ApiFile {
   deletions : Int32
   changes : Int32
   patch : String?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiFileViewed {
   path : String
   state : FileViewedState
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiFileViewedResult {
   base_sha : String
   head_sha : String
   file : ApiFileViewed
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiIssueComment {
   id : Int64
   body : String
   html_url : String
   created_at : String
   user : ApiCommentUser?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiParent {
   sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPull {
   title : String
   body : String?
@@ -184,27 +203,31 @@ pub(all) struct ApiPull {
   deletions : Int32
   changed_files : Int32
   commits : Int32?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullBranch {
   sha : String
   repo : ApiRepository?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullCommits {
   items : Array[ApiCommitSummary]
   total_count : Int32
   next_cursor : String?
   base_sha : String
   head_sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullMergeResult {
   merged : Bool
   sha : String?
   message : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullMergeStatus {
   base_sha : String
   head_sha : String
@@ -217,20 +240,23 @@ pub(all) struct ApiPullMergeStatus {
   ci_summary : ApiCiState?
   ci_checks : Array[ApiCiCheck]
   ci_warnings : Array[String]
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullSnapshot {
   metadata : ApiPull
   comparison : ApiCompare
   files : Array[ApiFile]
   signature : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum ApiPullSnapshotResult {
   Complete(ApiPullSnapshot)
   MetadataOnly(ApiPull)
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullSummary {
   owner : String
   repo : String
@@ -239,32 +265,37 @@ pub(all) struct ApiPullSummary {
   author : String
   updated_at : String
   draft : Bool
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiPullViewed {
   base_sha : String
   head_sha : String
   files : Array[ApiFileViewed]
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiRangeCommit {
   sha : String
   commit : ApiCommitInfo
   parents : Array[ApiParent]
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiRangeCompare {
   base_commit : ApiRangeCommit
   merge_base_commit : ApiParent
   total_commits : Int32
   commits : Array[ApiRangeCommit]
   files : Array[ApiFile]?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiRepository {
   full_name : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiReviewComment {
   id : Int64
   body : String
@@ -278,52 +309,60 @@ pub(all) struct ApiReviewComment {
   position : Int32?
   commit_id : String
   in_reply_to_id : Int64?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiSource {
   base64 : String
   size : Int32
   content_type : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 pub fn ApiSource::decode(Self) -> Bytes raise
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiStats {
   additions : Int32
   deletions : Int32
   total : Int32
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ApiViewerPulls {
   items : Array[ApiPullSummary]
   total_count : Int32
   next_cursor : String?
   incomplete : String?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct CommentDelete {
   owner : String
   repo : String
   comment_id : Int64
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum CommentSide {
   Left
   Right
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum CommentTarget {
   Commit(sha~ : String)
   Pull(number~ : String)
   PullCommit(number~ : String, sha~ : String)
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct CommentsList {
   owner : String
   repo : String
   target : CommentTarget
-} derive(Eq, ToJson, @json.FromJson)
+}
 pub fn CommentsList::public_paths(Self) -> Array[String]
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct CommitCommentCreate {
   owner : String
   repo : String
@@ -331,37 +370,43 @@ pub(all) struct CommitCommentCreate {
   path : String
   position : Int32
   body : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct CommitGet {
   owner : String
   repo : String
   sha : String
   page : Int32
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct CompareGet {
   owner : String
   repo : String
   base : String
   head : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ContentGet {
   owner : String
   repo : String
   path : String
   revision : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct DeleteResult {
   deleted : Bool
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct DeviceAuthorization {
   authorization_id : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum DevicePhase {
   Starting
   Pending
@@ -371,24 +416,28 @@ pub(all) enum DevicePhase {
   Expired
   Denied
   Failed
-} derive(Eq, ToJson, @json.FromJson)
+}
 pub fn DevicePhase::active(Self) -> Bool
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct DeviceResponse {
   request_id : String
   status : ApiAuthStatus
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct DeviceStart {
   attempt_id : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum FileViewedState {
   Viewed
   Unviewed
   Dismissed
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum GitHubRequest {
   ViewerPullsGet(ViewerPullsGet)
   PullCommitsGet(PullCommitsGet)
@@ -413,33 +462,37 @@ pub(all) enum GitHubRequest {
   IssueCommentDelete(CommentDelete)
   ReviewCommentDelete(CommentDelete)
   CommitCommentDelete(CommentDelete)
-} derive(Eq, ToJson, @json.FromJson)
-pub fn GitHubRequest::encode(Self) -> Json
+}
+pub fn GitHubRequest::encode(Self) -> @json.Json
 pub fn GitHubRequest::is_write(Self) -> Bool
 pub fn GitHubRequest::public_path(Self) -> String?
 pub fn GitHubRequest::validate(Self) -> Unit raise
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct IssueCommentCreate {
   owner : String
   repo : String
   number : String
   body : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullCommitPageGet {
   owner : String
   repo : String
   number : String
   page : Int32
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullCommitsGet {
   owner : String
   repo : String
   number : String
   cursor : String?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullFileViewedSet {
   owner : String
   repo : String
@@ -448,62 +501,71 @@ pub(all) struct PullFileViewedSet {
   viewed : Bool
   base_sha : String
   head_sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullFiles {
   owner : String
   repo : String
   number : String
   page : Int32
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullGet {
   owner : String
   repo : String
   number : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullMergeStatusGet {
   owner : String
   repo : String
   number : String
   expected_base_sha : String
   expected_head_sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullRebaseMerge {
   owner : String
   repo : String
   number : String
   expected_base_sha : String
   expected_head_sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct PullViewedGet {
   owner : String
   repo : String
   number : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct RangeCompareGet {
   owner : String
   repo : String
   base : String
   head : String
   page : Int32
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ResolveShaGet {
   owner : String
   repo : String
   sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum Response[T] {
   Success(value~ : T)
   Failure(error~ : ApiError)
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ReviewCommentCreate {
   owner : String
   repo : String
@@ -513,21 +575,24 @@ pub(all) struct ReviewCommentCreate {
   line : Int32
   side : CommentSide
   body : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ReviewReplyCreate {
   owner : String
   repo : String
   number : String
   comment_id : Int64
   body : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct RpcRequest {
   v : Int32
   request : GitHubRequest
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum RpcValue {
   ViewerPulls(ApiViewerPulls)
   PullCommits(ApiPullCommits)
@@ -549,17 +614,19 @@ pub(all) enum RpcValue {
   ReviewComment(ApiReviewComment)
   CommitComment(ApiCommitComment)
   Deleted(DeleteResult)
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) enum ViewerPullKind {
   ReviewRequested
   Authored
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ViewerPullsGet {
   kind : ViewerPullKind
   cursor : String?
-} derive(Eq, ToJson, @json.FromJson)
+}
 
 // Type aliases
 

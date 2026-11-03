@@ -22,11 +22,12 @@ pub fn LineWidths::get_line_width(Self, Int32) -> Int32
 pub fn LineWidths::loc_to_spans(Self, @basic.Location) -> Array[SingleLineSpan]
 pub impl @debug.Debug for LineWidths
 
+#derive(@debug.Debug)
 pub(all) struct SingleLineSpan {
   line : Int32
   start_col : Int32
   end_col : Int32
-} derive(@debug.Debug)
+}
 
 // Type aliases
 

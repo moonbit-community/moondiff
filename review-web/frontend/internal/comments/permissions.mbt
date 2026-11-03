@@ -1,16 +1,18 @@
 ///|
+#derive(Eq)
 pub(all) enum Action {
   OpenDraft(DraftKind)
   Submit
   Delete(CommentId)
   LoadSnapshot
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum Permission {
   Allowed
   Denied(String)
-} derive(Eq)
+}
 
 ///|
 pub fn Permission::allowed(self : Permission) -> Bool {

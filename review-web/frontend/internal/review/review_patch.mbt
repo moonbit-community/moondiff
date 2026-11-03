@@ -1,16 +1,18 @@
 ///|
+#derive(Debug, Eq)
 pub(all) enum ReviewSide {
   Left
   Right
-} derive(Debug, Eq)
+}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ReviewAnchor {
   path : String
   line : Int32
   side : ReviewSide
   position : Int32?
-} derive(Debug, Eq)
+}
 
 ///|
 pub(all) enum CanonicalPatch {

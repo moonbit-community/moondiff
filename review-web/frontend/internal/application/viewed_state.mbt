@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 pub(all) struct ViewedPending {
   deferred : Bool
   record : ViewedRecord
@@ -7,18 +8,20 @@ pub(all) struct ViewedPending {
   expanded : Bool
   expansion_revision : Int32
   confirming : Bool
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct ViewedFile {
   state : @protocol.FileViewedState?
   pending : ViewedPending?
   error : String?
   touched : Bool
   expansion_revision : Int32
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct ViewedState {
   user_id : String?
   epoch : Int32
@@ -33,7 +36,7 @@ pub(all) struct ViewedState {
   storage_ready : Bool
   retry : Int32
   poll_scheduled : Bool
-} derive(Eq)
+}
 
 ///|
 fn empty_viewed_state(epoch : Int32) -> ViewedState {

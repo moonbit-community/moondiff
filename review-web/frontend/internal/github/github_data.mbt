@@ -1,8 +1,9 @@
 ///|
+#derive(Eq)
 pub(all) enum FileDiffMode {
   MoonBitDiff
   LineDiff
-} derive(Eq)
+}
 
 ///|
 pub fn file_diff_mode(file : ApiFile) -> FileDiffMode {
@@ -146,16 +147,18 @@ fn percent_encode_path(path : String) -> String {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct RepositoryRef {
   owner : String
   repo : String
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct Revision {
   repository : RepositoryRef
   sha : String
-} derive(Eq)
+}
 
 ///|
 pub fn reference_repository(reference : CommitRef) -> RepositoryRef {

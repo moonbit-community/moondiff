@@ -2,14 +2,16 @@
 /// A published review keeps its editor in Posting until a verified GitHub list
 /// observes the comment ID. Receipts track synchronization independently from
 /// the frozen body in the editor.
+#derive(Eq)
 pub(all) enum PendingReviewStatus {
   ReceiptSyncing
   ReceiptWaiting
   ReceiptSyncFailed
   ReceiptPrChanged
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct PendingReviewReceipt {
   id : Int64
   url : String
@@ -17,7 +19,7 @@ pub(all) struct PendingReviewReceipt {
   path : String
   generation : Int32
   status : PendingReviewStatus
-} derive(Eq)
+}
 
 ///|
 pub fn PendingReviewReceipt::key(self : PendingReviewReceipt) -> String {

@@ -1,19 +1,22 @@
 ///|
+#derive(Eq)
 pub(all) enum CommentsStatus {
   CommentsDisabled
   CommentsLoading
   CommentsReady(ApiCommentBundle)
   CommentsFailed(String)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum DraftKind {
   OverallDraft
   InlineDraft(Int32, ReviewAnchor)
   ReplyDraft(Int64)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct CommentDraft {
   snapshot : Snapshot?
   id : DraftId
@@ -22,17 +25,19 @@ pub(all) struct CommentDraft {
   // Read-only projection of EditorState; never stored as an independent flag.
   submitting : Bool
   error : String?
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum CommentRefresh {
   RefreshIdle
   RefreshMetadata
   RefreshList(@protocol.ApiPull?)
   RefreshValidation(@protocol.ApiPull, ApiCommentBundle)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum SubmissionPhase {
   CheckingHead
   PostingIssue
@@ -40,9 +45,10 @@ pub(all) enum SubmissionPhase {
   PostingCommit
   PostingReply
   SyncingReview(Int64)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub struct Session {
   priv index : CommentIndex
   priv draft_sequence : Int32
@@ -71,7 +77,7 @@ pub struct Session {
   priv deleted : Array[CommentId]
   // Reading choices belong to this page and are not exported with navigation state.
   priv expanded_bodies : Array[CommentId]
-} derive(Eq)
+}
 
 ///|
 pub fn Session::new(enabled~ : Bool = false) -> Session {
@@ -143,10 +149,11 @@ pub(all) struct CommitDiscussion {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct DraftId {
   generation : Int32
   sequence : Int32
-} derive(Eq)
+}
 
 ///|
 pub fn DraftId::key(self : DraftId) -> String {

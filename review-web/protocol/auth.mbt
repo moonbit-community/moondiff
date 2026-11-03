@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum DevicePhase {
   Starting
   Pending
@@ -8,7 +9,7 @@ pub(all) enum DevicePhase {
   Expired
   Denied
   Failed
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
 pub fn DevicePhase::active(self : DevicePhase) -> Bool {
@@ -16,6 +17,7 @@ pub fn DevicePhase::active(self : DevicePhase) -> Bool {
 }
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiAuthStatus {
   authenticated : Bool
   csrf_token : String?
@@ -23,9 +25,10 @@ pub(all) struct ApiAuthStatus {
   user_id : String?
   install_url : String?
   device_flow : ApiDeviceFlow?
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiDeviceFlow {
   id : String
   phase : DevicePhase
@@ -34,20 +37,23 @@ pub(all) struct ApiDeviceFlow {
   expires_at : Double
   retry_after : Int32
   message : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct DeviceResponse {
   request_id : String
   status : ApiAuthStatus
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct DeviceStart {
   attempt_id : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct DeviceAuthorization {
   authorization_id : String
-} derive(Eq, FromJson, ToJson)
+}

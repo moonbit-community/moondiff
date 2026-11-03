@@ -13,15 +13,17 @@ pub fn diff_document_detailed(String, String, context? : Int32, graph_limit? : U
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) enum AlignedDiffMode {
   Lexical
   Ast
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : @model.DiffStatus
-} derive(Eq)
+}
 
 // Type aliases
 

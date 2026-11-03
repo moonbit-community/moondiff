@@ -1,6 +1,7 @@
 ///|
 // Only operation metadata belongs in sessionStorage. Expansion, code, drafts and
 // credentials stay out of this record. Paths are kept verbatim, including controls.
+#derive(Eq, ToJson, FromJson)
 pub(all) struct ViewedRecord {
   id : String
   user_id : String
@@ -11,7 +12,7 @@ pub(all) struct ViewedRecord {
   viewed : Bool
   base_sha : String
   head_sha : String
-} derive(Eq, ToJson, FromJson)
+}
 
 ///|
 fn ViewedRecord::target(self : ViewedRecord) -> @protocol.FileViewedState {

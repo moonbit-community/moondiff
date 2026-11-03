@@ -1,8 +1,9 @@
 ///|
+#derive(Eq)
 pub(all) enum SignInEntry {
   Comment(Int32)
   Viewed(Int32)
-} derive(Eq)
+}
 
 ///|
 pub fn SignInEntry::file_index(self : SignInEntry) -> Int32 {
@@ -12,10 +13,11 @@ pub fn SignInEntry::file_index(self : SignInEntry) -> Int32 {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct SignInDialog {
   revision : Int32
   entry : SignInEntry?
-} derive(Eq)
+}
 
 ///|
 pub fn SignInDialog::new() -> SignInDialog {

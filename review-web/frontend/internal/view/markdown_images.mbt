@@ -1,9 +1,10 @@
 ///|
+#derive(Eq)
 pub(all) struct MarkdownContext {
   page_url : String
   repository : @github.RepositoryRef
   sha : String
-} derive(Eq)
+}
 
 ///|
 #deprecated

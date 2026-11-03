@@ -4,11 +4,12 @@ using @syntax {type MatchKind, type MatchedPos}
 ///|
 // One normalized body trigram. Keeping the three tokens as an exact hash key
 // avoids making extraction continuity depend on syntax-tree content ids.
+#derive(Eq, Hash)
 priv struct ImplBodyTrigram {
   first : String
   second : String
   third : String
-} derive(Eq, Hash)
+}
 
 ///|
 // Comment-free token trigrams for one function body. Mass counts duplicate

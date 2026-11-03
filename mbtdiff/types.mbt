@@ -9,10 +9,11 @@
 /// file boundaries or between declarations) are intentionally outside the
 /// comparison. A whole-file lexical result still compares those lines using
 /// the requested context radius.
+#derive(Debug, Eq)
 pub(all) enum DiffMode {
   Ast
   Lexical
-} derive(Debug, Eq)
+}
 
 ///|
 /// Renderer-free diff options. Display labels, colors, and layouts belong to

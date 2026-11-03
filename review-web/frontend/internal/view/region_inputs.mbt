@@ -1,10 +1,11 @@
 ///|
+#derive(Eq)
 pub(all) struct DisplayOptions {
   mode : ViewMode
   algorithm : DiffAlgorithm
   ignore_comments : Bool
   ignore_tests : Bool
-} derive(Eq)
+}
 
 ///|
 pub(all) struct FileInput {
@@ -66,6 +67,7 @@ fn display_options(model : Model) -> DisplayOptions {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct ToolbarInput {
   input : String
   landing : Bool
@@ -76,7 +78,7 @@ pub(all) struct ToolbarInput {
   view_mode : ViewMode
   ignore_comments : Bool
   ignore_tests : Bool
-} derive(Eq)
+}
 
 ///|
 fn toolbar_input(model : Model) -> ToolbarInput {
@@ -97,11 +99,12 @@ fn toolbar_input(model : Model) -> ToolbarInput {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct TreeMetadata {
   path : String
   previous_filename : String?
   status : String
-} derive(Eq)
+}
 
 ///|
 pub struct TreeData {
@@ -116,27 +119,31 @@ pub impl Eq for TreeData with fn equal(a, b) {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct TreeInput {
   generation : Int32
   tree : TreeData
   state : FileTreeState
   viewed : Array[Bool]
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct NavigationInput {
   generation : Int32
   enabled : Bool
   rebase_merge : RebaseMergeInput?
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct RebaseMergeInput {
   disabled : Bool
   submitting : Bool
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct DiscussionInput {
   generation : Int32
   is_pull : Bool
@@ -144,34 +151,38 @@ pub(all) struct DiscussionInput {
   auth : @application.AuthStatus
   sign_in_dialog : @application.SignInDialog
   markdown : MarkdownContext?
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct PullMergeInput {
   write_enabled : Bool
   state : @application.PullMergeState
   auth : @application.AuthStatus
   snapshot_stale : Bool
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct RangePanelInput {
   generation : Int32
   reference : @github.CommitRef
   state : @application.RangeState
   stats : @protocol.ApiStats
   file_count : Int32
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum StatusInput {
   Empty
   Loading(String)
   Failed(String, @application.AuthStatus)
   RateLimited(@github_client.RateLimitReason, @application.AuthStatus)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum RegionInput {
   Home(@application.AuthStatus, @application.HomeState)
   Toolbar(ToolbarInput)
@@ -183,9 +194,10 @@ pub(all) enum RegionInput {
   PullMergeStatus(PullMergeInput)
   RangePanel(RangePanelInput)
   File(FileInput)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct ShellInput {
   home : Bool
   generation : Int32
@@ -200,7 +212,7 @@ pub(all) struct ShellInput {
   preferred_width : Int32
   display : DisplayOptions
   range_limit : Bool
-} derive(Eq)
+}
 
 ///|
 pub fn shell_input(model : Model) -> ShellInput {
@@ -470,6 +482,7 @@ fn home_shell(model : Model) -> Bool {
 }
 
 ///|
+#derive(Eq)
 pub(all) struct ViewedControl {
   is_pull : Bool
   requires_sign_in : Bool
@@ -484,9 +497,10 @@ pub(all) struct ViewedControl {
   title : String
   error : String?
   retry_disabled : Bool
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct ViewedSummaryInput {
   is_pull : Bool
   total : Int32
@@ -499,4 +513,4 @@ pub(all) struct ViewedSummaryInput {
   stale : Bool
   can_refresh : Bool
   poll_scheduled : Bool
-} derive(Eq)
+}

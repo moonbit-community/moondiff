@@ -37,16 +37,19 @@ pub fn source_requests_for_file(ChangeView, Int32) -> Array[(SourceSide, @github
 // Errors
 
 // Types and methods
+#derive(Eq, Hash)
 pub(all) enum CacheKey {
   Line
   MoonBit(DiffAlgorithm, Bool, Bool)
-} derive(Eq, Hash)
+}
 
+#derive(Eq)
 pub(all) enum CachedDiffResult {
   Line(@model.HunkDocument)
   MoonBit(document~ : @model.DiffDocument, status~ : @model.DiffStatus, ignore_reason~ : @model.IgnoreReason?)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct ChangeView {
   reference : @github.CommitRef
   pull_snapshot : @moondiff-review-web-protocol.ApiPull?
@@ -59,22 +62,25 @@ pub(all) struct ChangeView {
   stats : @moondiff-review-web-protocol.ApiStats
   total_files : Int32
   files : Array[FileState]
-} derive(Eq)
+}
 
+#derive(Eq, Hash)
 pub(all) enum DiffAlgorithm {
   LexicalAlgorithm
   AstAlgorithm
-} derive(Eq, Hash)
+}
 
+#derive(Eq)
 pub(all) struct DiffCache {
   entries : @hashmap.HashMap[CacheKey, CachedDiffResult]
   navigable : @hashmap.HashMap[CacheKey, Bool]
   highlights : @highlight.FileHighlights?
-} derive(Eq)
+}
 pub fn DiffCache::empty() -> Self
 pub fn DiffCache::get(Self, CacheKey) -> CachedDiffResult?
 pub fn DiffCache::put(Self, CacheKey, CachedDiffResult) -> Self
 
+#derive(Eq)
 pub(all) struct FileState {
   file : @moondiff-review-web-protocol.ApiFile
   diff_mode : @github.FileDiffMode
@@ -84,8 +90,9 @@ pub(all) struct FileState {
   old_side : SideLoad
   new_side : SideLoad
   diff_cache : DiffCache
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum SideLoad {
   NotRequested
   Loading
@@ -93,17 +100,19 @@ pub(all) enum SideLoad {
   Ready(Array[String])
   CannotRender(String, Bool)
   LoadFailed(String)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum SourceSide {
   Old
   New
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum ViewMode {
   Split
   Unified
-} derive(Eq)
+}
 
 // Type aliases
 

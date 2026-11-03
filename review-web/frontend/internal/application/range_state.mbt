@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 pub(all) struct RangeState {
   from_sha : String
   to_sha : String
@@ -15,7 +16,7 @@ pub(all) struct RangeState {
   pull : ApiPull?
   pull_merge_base : String?
   too_many_files : Bool
-} derive(Eq)
+}
 
 ///|
 fn range_state(base : String, head : String, pull : ApiPull?) -> RangeState {

@@ -1,5 +1,6 @@
 ///|
 // Shared lexical categories rendered by the review app light and dark themes.
+#derive(Eq, Debug)
 pub(all) enum HighlightKind {
   Keyword
   Control
@@ -18,27 +19,30 @@ pub(all) enum HighlightKind {
   Operator
   Attribute
   AttributeParameter
-} derive(Eq, Debug)
+}
 
 ///|
 // Half-open UTF-16 columns, relative to a source line. Internal collectors use
 // the same shape for absolute offsets before indexing the completed source.
+#derive(Eq, Debug)
 pub(all) struct HighlightSpan {
   start : Int32
   end : Int32
   kind : HighlightKind
-} derive(Eq, Debug)
+}
 
 ///|
+#derive(Eq)
 pub struct SourceHighlights {
   lines : Array[Array[HighlightSpan]]
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct FileHighlights {
   old : SourceHighlights?
   new : SourceHighlights?
-} derive(Eq)
+}
 
 ///|
 pub fn FileHighlights::empty() -> FileHighlights {

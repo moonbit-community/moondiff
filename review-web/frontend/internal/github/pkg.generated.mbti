@@ -75,39 +75,44 @@ pub fn validate_pull_files(@moondiff-review-web-protocol.ApiPull, ArrayView[@moo
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) enum ChangeTarget {
   Commit(String)
   PullRequest(String)
   PullCommit(String, String)
   Range(String, String)
   PullRange(String, String, String)
-} derive(Eq)
+}
 
 pub(all) enum CheckedSource {
   Renderable(Array[String])
   Rejected(String, Bool)
 }
 
+#derive(Eq)
 pub(all) struct CommitRef {
   owner : String
   repo : String
   target : ChangeTarget
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum FileDiffMode {
   MoonBitDiff
   LineDiff
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct RepositoryRef {
   owner : String
   repo : String
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct Revision {
   repository : RepositoryRef
   sha : String
-} derive(Eq)
+}
 
 pub(all) struct SourceLocation {
   repository : RepositoryRef

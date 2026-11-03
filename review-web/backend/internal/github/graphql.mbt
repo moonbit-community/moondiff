@@ -64,11 +64,12 @@ pub async fn graphql(
 }
 
 ///|
+#derive(Eq)
 pub(all) struct PullSnapshot {
   id : String
   base : String
   head : String
-} derive(Eq)
+}
 
 ///|
 pub extend PullSnapshot with Eq::{equal, not_equal}

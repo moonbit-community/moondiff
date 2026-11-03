@@ -3,43 +3,47 @@
 /// distinguishes verified unchanged text from plain, unrefined text.
 /// Renderers decide how to present `Changed`; the calculation layer never
 /// assigns markup, colors, or terminal styles.
+#derive(Eq)
 pub(all) enum DiffSegmentKind {
   Unchanged
   Changed
   /// Source text excluded from comparison but retained for faithful display.
   Ignored
-} derive(Eq)
+}
 
 ///|
 /// One exact source-text segment in a changed line. Concatenating a line's
 /// segment texts always reconstructs that source line byte-for-byte.
+#derive(Eq)
 pub(all) struct DiffSegment {
   kind : DiffSegmentKind
   text : String
-} derive(Eq)
+}
 
 ///|
 /// Whether a line's intraline segments were calculated. Without a completed
 /// calculation, the absence of `Changed` segments says nothing about whether
 /// the line changed. Plain insertions/deletions and rejected optional refinement
 /// retain their line-level changes with `NotComputed`.
+#derive(Eq)
 pub(all) enum IntralineStatus {
   /// No completed intraline result; preserve the containing block's changes.
   NotComputed
   /// Segments report a completed token, word, or structural calculation.
   Computed
-} derive(Eq)
+}
 
 ///|
 /// One changed source line. `index` is zero-based in its original input.
 /// `segments` is a zero-copy read-only view whose backing storage is never
 /// mutated after the line is published. Only `Computed` intraline results can
 /// establish that this side has no changed segments, including across reflow.
+#derive(Eq)
 pub(all) struct DiffLine {
   index : Int32
   segments : ArrayView[DiffSegment]
   intraline : IntralineStatus
-} derive(Eq)
+}
 
 ///|
 /// Reconstruct the exact source text of this line.
@@ -53,25 +57,28 @@ pub fn DiffLine::text(self : DiffLine) -> String {
 
 ///|
 /// One unchanged line shared by both inputs. Indices are zero-based.
+#derive(Eq)
 pub(all) struct ContextLine {
   old_index : Int32
   new_index : Int32
   text : String
-} derive(Eq)
+}
 
 ///|
 /// One aligned row in a change block. The enum keeps a present blank line
 /// distinct from a missing side without relying on empty-string sentinels.
+#derive(Eq)
 pub(all) enum DiffRow {
   Paired(DiffLine, DiffLine)
   OldOnly(DiffLine)
   NewOnly(DiffLine)
-} derive(Eq)
+}
 
 ///|
 /// One ordered block inside a hunk. Change-block boundaries are retained so a
 /// unified renderer can emit all deletions before all insertions while a split
 /// renderer consumes the aligned rows directly.
+#derive(Eq)
 pub(all) enum DiffBlock {
   ContextBlock(ArrayView[ContextLine])
   ChangeBlock(ArrayView[DiffRow])
@@ -79,28 +86,30 @@ pub(all) enum DiffBlock {
   /// Renderers keep their original text and line numbers without presenting
   /// them as additions or deletions.
   IgnoredBlock(ArrayView[DiffRow])
-} derive(Eq)
+}
 
 ///|
 /// One grouped diff hunk. Starts are zero-based cursors and lengths are source
 /// line counts. Renderers derive display headers from these numeric ranges.
 /// `blocks` is a zero-copy read-only view with stable backing storage.
+#derive(Eq)
 pub(all) struct DiffHunk {
   old_start : Int32
   old_len : Int32
   new_start : Int32
   new_len : Int32
   blocks : ArrayView[DiffBlock]
-} derive(Eq)
+}
 
 ///|
 /// A fully calculated, renderer-neutral diff for one semantic fragment. Hunk
 /// indexes are local to that fragment unless a consumer explicitly calls
 /// `rebase`. Its recursively nested collections are zero-copy read-only views;
 /// their backing storage is never mutated after publication.
+#derive(Eq)
 pub(all) struct HunkDocument {
   hunks : ArrayView[DiffHunk]
-} derive(Eq)
+}
 
 ///|
 fn DiffLine::rebase_index(self : DiffLine, offset : Int32) -> DiffLine {

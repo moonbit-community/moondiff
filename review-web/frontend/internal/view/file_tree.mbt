@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Debug)
 enum FileTreeRow {
   TreeDirectory(path~ : String, name~ : String, depth~ : Int32)
   TreeFile(
@@ -9,7 +10,7 @@ enum FileTreeRow {
     status~ : String,
     previous_path~ : String?
   )
-} derive(Eq, Debug)
+}
 
 ///|
 priv enum FileTreeNode {

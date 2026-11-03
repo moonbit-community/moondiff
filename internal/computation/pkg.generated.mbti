@@ -10,9 +10,10 @@ import {
 pub fn default_scope_limit() -> UInt32
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror ScopeLimitExceeded {
   ScopeLimitExceeded(stage~ : Stage, limit~ : UInt32)
-} derive(Eq, @debug.Debug)
+}
 
 // Types and methods
 pub struct ScopeBudget {
@@ -23,11 +24,12 @@ pub fn ScopeBudget::charge(Self, UInt32, Stage) -> Unit raise ScopeLimitExceeded
 pub fn ScopeBudget::charge_matrix(Self, Int32, Int32, Stage) -> Unit raise ScopeLimitExceeded
 pub fn ScopeBudget::new(UInt32) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Stage {
   TopLevelAlignment
   SyntaxMatching
   IntralineMatching
-} derive(Eq, @debug.Debug)
+}
 
 // Type aliases
 

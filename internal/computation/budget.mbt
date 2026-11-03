@@ -1,18 +1,20 @@
 ///|
 /// The structural-diff stage that requested work from the current independently
 /// budgeted calculation scope.
+#derive(Debug, Eq)
 pub(all) enum Stage {
   TopLevelAlignment
   SyntaxMatching
   IntralineMatching
-} derive(Debug, Eq)
+}
 
 ///|
 /// Raised before work would exceed the current calculation scope's budget.
 /// Independent scopes do not charge one aggregate file-level budget.
+#derive(Debug, Eq)
 pub(all) suberror ScopeLimitExceeded {
   ScopeLimitExceeded(stage~ : Stage, limit~ : UInt32)
-} derive(Debug, Eq)
+}
 
 ///|
 /// A monotonically-decreasing budget shared within one calculation scope.

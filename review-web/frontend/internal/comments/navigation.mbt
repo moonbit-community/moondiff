@@ -1,11 +1,12 @@
 ///|
 // In-memory route state contains no request, renderer, or editor node.
+#derive(Eq)
 pub struct NavigationReview {
   priv draft : DraftData?
   priv receipts : ApiCommentBundle
   priv pending : Array[PendingReviewReceipt]
   priv deleted : Array[CommentId]
-} derive(Eq)
+}
 
 ///|
 pub fn Session::export_navigation(self : Session) -> NavigationReview {

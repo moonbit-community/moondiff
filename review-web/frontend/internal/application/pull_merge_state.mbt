@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 pub(all) struct PullMergeState {
   epoch : Int32
   serial : Int32
@@ -9,7 +10,7 @@ pub(all) struct PullMergeState {
   retry : Int32
   poll_scheduled : Bool
   stale : Bool
-} derive(Eq)
+}
 
 ///|
 fn empty_pull_merge_state(epoch : Int32) -> PullMergeState {

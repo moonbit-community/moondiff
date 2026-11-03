@@ -2,12 +2,13 @@
 // The current PR owns validated SideLoad values, independently of the shared
 // transport cache. Only four sides are admitted at a time, including all
 // expanded interface files. Historical page retention keeps its existing budget.
+#derive(Eq)
 pub(all) struct PullSourceState {
   generation : Int32
   pending : Array[(Int32, SourceSide)]
   urgent : Array[Int32]
   cursor : Int32
-} derive(Eq)
+}
 
 ///|
 #deprecated

@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 pub(all) enum Phase {
   Idle
   LoadingCommit(
@@ -42,9 +43,10 @@ pub(all) enum Phase {
   LoadFailed(String)
   Showing(ChangeView)
   ShowingPullSelector(ApiPull)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct Model {
   input : String
   access : SnapshotAccess
@@ -74,7 +76,7 @@ pub(all) struct Model {
   pull_merge : PullMergeState
   review : Session
   range : RangeState?
-} derive(Eq)
+}
 
 ///|
 fn initial_model() -> Model {

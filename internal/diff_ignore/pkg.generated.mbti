@@ -39,11 +39,12 @@ pub fn SourceView::lines(Self) -> ArrayView[String]
 pub fn SourceView::map_span(Self, @span.SingleLineSpan) -> SpanMapping
 pub fn SourceView::slice(Self, Int32, Int32) -> Self
 
+#derive(@debug.Debug)
 pub(all) enum SpanMapping {
   Mapped(@span.SingleLineSpan)
   Filtered
   OutOfBounds
-} derive(@debug.Debug)
+}
 
 // Type aliases
 

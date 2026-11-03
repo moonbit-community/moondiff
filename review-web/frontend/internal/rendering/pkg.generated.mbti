@@ -7,7 +7,8 @@ pub fn start(String) -> Unit
 // Errors
 
 // Types and methods
-type CommitTicket derive(Eq)
+#derive(Eq)
+type CommitTicket
 
 // Type aliases
 

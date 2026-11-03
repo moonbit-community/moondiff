@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 pub(all) struct FileTreeState {
   drawer_open : Bool
   search_open : Bool
@@ -7,7 +8,7 @@ pub(all) struct FileTreeState {
   collapsed_directories : Array[String]
   selected_file_index : Int32?
   preferred_width : Int32
-} derive(Eq)
+}
 
 ///|
 fn initial_file_tree_state() -> FileTreeState {

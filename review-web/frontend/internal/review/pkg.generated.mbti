@@ -23,12 +23,13 @@ pub(all) enum CanonicalPatch {
   NotCommentable
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ReviewAnchor {
   path : String
   line : Int32
   side : ReviewSide
   position : Int32?
-} derive(Eq, @debug.Debug)
+}
 
 pub(all) enum ReviewItem {
   ReviewHunk(String)
@@ -57,10 +58,11 @@ pub(all) enum ReviewRowKind {
   IgnoredRow
 }
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ReviewSide {
   Left
   Right
-} derive(Eq, @debug.Debug)
+}
 
 // Type aliases
 
