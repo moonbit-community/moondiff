@@ -130,6 +130,32 @@ fn view_hunk_start(view : SourceView, index : Int32) -> Int32 {
 }
 
 ///|
+// Pair only an exact ignored prefix before a one-sided edit. The editing
+// side stops at its pending gap's end; the opposite side stops at the hunk
+// boundary or its next visible line. Each matched line is consumed once.
+fn shared_ignored_prefix_length(
+  old : SourceView,
+  new : SourceView,
+  old_start : Int32,
+  old_end : Int32,
+  new_start : Int32,
+  new_end : Int32,
+) -> Int32 {
+  for offset = 0
+      old_start + offset < old_end &&
+     new_start + offset < new_end &&
+     old.visible_indices[old_start + offset] < 0 &&
+     new.visible_indices[new_start + offset] < 0 &&
+     old.source_lines[old_start + offset] ==
+     new.source_lines[new_start + offset]
+      offset = offset + 1 {
+
+  } nobreak {
+    offset
+  }
+}
+
+///|
 fn append_mapped_context_lines(
   blocks : Array[@model.DiffBlock],
   lines : ArrayView[@model.ContextLine],
@@ -213,6 +239,8 @@ fn append_mapped_rows(
   new : SourceView,
   old_cursor : Int32,
   new_cursor : Int32,
+  old_end : Int32,
+  new_end : Int32,
 ) -> (Int32, Int32) {
   let changed : Array[@model.DiffRow] = []
   let ignored : Array[@model.DiffRow] = []
@@ -237,6 +265,42 @@ fn append_mapped_rows(
     }
   }
   for row in rows {
+    let shared = match row {
+      OldOnly(line) =>
+        shared_ignored_prefix_length(
+          old,
+          new,
+          old_cursor,
+          old.source_indices[line.index],
+          new_cursor,
+          new_end,
+        )
+      NewOnly(line) =>
+        shared_ignored_prefix_length(
+          old,
+          new,
+          old_cursor,
+          old_end,
+          new_cursor,
+          new.source_indices[line.index],
+        )
+      Paired(_, _) => 0
+    }
+    if shared > 0 {
+      flush_changed(blocks, changed)
+      flush_ignored(blocks, ignored)
+      append_ignored_source_gap(
+        blocks,
+        old,
+        new,
+        old_cursor,
+        old_cursor + shared,
+        new_cursor,
+        new_cursor + shared,
+      )
+      old_cursor += shared
+      new_cursor += shared
+    }
     let (old_target, new_target) = match row {
       Paired(old_line, new_line) =>
         (old.source_indices[old_line.index], new.source_indices[new_line.index])
@@ -322,11 +386,11 @@ pub fn restore_document(
           )
         ChangeBlock(rows) =>
           append_mapped_rows(
-            blocks, rows, false, old, new, old_cursor, new_cursor,
+            blocks, rows, false, old, new, old_cursor, new_cursor, old_end, new_end,
           )
         IgnoredBlock(rows) =>
           append_mapped_rows(
-            blocks, rows, true, old, new, old_cursor, new_cursor,
+            blocks, rows, true, old, new, old_cursor, new_cursor, old_end, new_end,
           )
       }
       old_cursor = cursors.0
