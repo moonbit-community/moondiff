@@ -1,5 +1,6 @@
 ///|
 /// High-level classification of a renderer-free diff result.
+#derive(Debug, Eq)
 pub(all) enum DiffStatus {
   Identical
   Changed
@@ -12,36 +13,40 @@ pub(all) enum DiffStatus {
   NoStructuralChanges
   /// The inputs differ only in content excluded by enabled filters.
   IgnoredOnly
-} derive(Debug, Eq)
+}
 
 ///|
 /// Why differing inputs produced an `IgnoredOnly` result.
+#derive(Debug, Eq)
 pub(all) enum IgnoreReason {
   /// A test-file path excluded the entire comparison before parsing.
   TestFile
   /// Test-block, comment, or blank-line filters excluded all changes.
   FilteredContent
-} derive(Debug, Eq)
+}
 
 ///|
 /// The input side associated with a calculation fallback.
+#derive(Debug, Eq)
 pub(all) enum DiffSide {
   Old
   New
-} derive(Debug, Eq)
+}
 
 ///|
 /// A bounded stage within one independently budgeted structural calculation.
+#derive(Debug, Eq)
 pub(all) enum ComputationStage {
   TopLevelAlignment
   SyntaxMatching
   IntralineMatching
-} derive(Debug, Eq)
+}
 
 ///|
 /// The typed reason that structural diffing degraded to a lexical result.
 /// Side collections are exposed as zero-copy read-only views with stable
 /// backing storage.
+#derive(Debug, Eq)
 pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   /// A structural position did not belong to the rendered source lines for
@@ -50,11 +55,12 @@ pub(all) enum FallbackReason {
   GraphLimitExceeded(limit~ : UInt32)
   /// The current calculation scope exhausted its configured work ceiling.
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt32)
-} derive(Debug, Eq)
+}
 
 ///|
 /// A zero-based source range.
+#derive(Debug, Eq)
 pub(all) struct LineRange {
   start : Int32
   len : Int32
-} derive(Debug, Eq)
+}

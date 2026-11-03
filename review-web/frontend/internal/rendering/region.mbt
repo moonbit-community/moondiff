@@ -1,9 +1,10 @@
 ///|
+#derive(Eq)
 struct CommitTicket {
   generation : Int32
   mount_instance : Int32
   revision : Int32
-} derive(Eq)
+}
 
 ///|
 priv struct Waiting {

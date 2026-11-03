@@ -1,16 +1,18 @@
 ///|
+#derive(Eq)
 pub(all) enum CommentId {
   IssueComment(Int64)
   ReviewComment(Int64)
   CommitComment(Int64)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum CommentDeletion {
   ConfirmDelete(CommentId)
   Deleting(CommentId)
   DeleteFailed(CommentId, String)
-} derive(Eq)
+}
 
 ///|
 pub fn without_deleted(

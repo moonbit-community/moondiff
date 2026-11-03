@@ -91,6 +91,7 @@ pub(all) enum AuthMsg {
   AuthLogoutFinished(Int32, Result[@moondiff-review-web-protocol.ApiAuthStatus, Error])
 }
 
+#derive(Eq)
 pub(all) enum AuthStatus {
   AuthChecking
   Anonymous(String?)
@@ -98,7 +99,7 @@ pub(all) enum AuthStatus {
   DeviceCancelling(String, String)
   SignedIn(login~ : String?, user_id~ : String?, install_url~ : String?)
   AuthFailed(String)
-} derive(Eq)
+}
 
 pub(all) enum CommentBodyAction {
   Toggle(Double)
@@ -112,12 +113,14 @@ pub(all) struct CommentBodyRequest {
   action : CommentBodyAction
 }
 
+#derive(Eq)
 pub(all) enum CommitScope {
   Region
   PageLayout
   HistoryLayout(HistoryRestoration)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct FileTreeState {
   drawer_open : Bool
   search_open : Bool
@@ -126,43 +129,47 @@ pub(all) struct FileTreeState {
   collapsed_directories : Array[String]
   selected_file_index : Int32?
   preferred_width : Int32
-} derive(Eq)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct HistoryEntry {
   id : String
   sequence : Int32
   path : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 #deprecated
 pub fn HistoryEntry::equal(Self, Self) -> Bool
 #deprecated
-pub fn HistoryEntry::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn HistoryEntry::from_json(@json.Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
 #deprecated
 pub fn HistoryEntry::not_equal(Self, Self) -> Bool
 #deprecated
-pub fn HistoryEntry::to_json(Self) -> Json
+pub fn HistoryEntry::to_json(Self) -> @json.Json
 
+#derive(Eq)
 pub(all) struct HistoryRestoration {
   generation : Int32
   entry : String
   mut cancelled : Bool
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct HomeCommits {
   pull : @moondiff-review-web-protocol.ApiPullSummary
   expanded : Bool
   page : HomePage[@moondiff-review-web-protocol.ApiCommitSummary]
   snapshot : (String, String)?
   restarts : Int32
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum HomeLoad {
   Unloaded
   Loading
   Paused
   Ready
   Failed(String)
-} derive(Eq)
+}
 
 pub(all) enum HomeMsg {
   PrefetchIntent(@moondiff-review-web-protocol.PullGet?, Bool)
@@ -176,6 +183,7 @@ pub(all) enum HomeMsg {
   CommitsLoaded(Int32, Int32, Int32, String, Result[@moondiff-review-web-protocol.ApiPullCommits, Error])
 }
 
+#derive(Eq)
 pub(all) struct HomePage[T] {
   items : Array[T]
   total : Int32?
@@ -183,16 +191,18 @@ pub(all) struct HomePage[T] {
   load : HomeLoad
   refresh : HomeRefresh[T]?
   updated_at : String?
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct HomeRefresh[T] {
   items : Array[T]
   total : Int32?
   cursor : String?
   target : Int32
   cursor_restarts : Int32
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct HomeState {
   user : String?
   epoch : Int32
@@ -200,7 +210,7 @@ pub(all) struct HomeState {
   reviews : HomePage[@moondiff-review-web-protocol.ApiPullSummary]
   authored : HomePage[@moondiff-review-web-protocol.ApiPullSummary]
   commits : Map[String, HomeCommits]
-} derive(Eq)
+}
 pub fn HomeState::busy(Self) -> Bool
 
 pub(all) enum LoadMsg {
@@ -221,6 +231,7 @@ pub(all) enum LoadMsg {
   PullCommitMetadataLoaded(Int32, Result[@moondiff-review-web-protocol.ApiPull, Error])
 }
 
+#derive(Eq)
 pub(all) struct Model {
   input : String
   access : SnapshotAccess
@@ -250,7 +261,7 @@ pub(all) struct Model {
   pull_merge : PullMergeState
   review : @comments.Session
   range : RangeState?
-} derive(Eq)
+}
 
 pub(all) enum Msg {
   Home(HomeMsg)
@@ -263,11 +274,13 @@ pub(all) enum Msg {
   Ui(UiMsg)
 }
 
+#derive(Eq)
 pub(all) enum NavigationPolicy {
   Cancel
   Continue
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct NavigationState {
   entry : HistoryEntry
   pending : RouteDestination?
@@ -278,25 +291,27 @@ pub(all) struct NavigationState {
   positions : Map[String, PagePosition]
   routes : Map[String, RouteMemory]
   pages : Array[ReadyPage]
-} derive(Eq)
+}
 #deprecated
 pub fn NavigationState::equal(Self, Self) -> Bool
 pub fn NavigationState::new() -> Self
 #deprecated
 pub fn NavigationState::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) struct PagePosition {
   x : Double
   y : Double
   sidebar : Double
   focus_index : Int32?
   focus_label : String
-} derive(Eq)
+}
 #deprecated
 pub fn PagePosition::equal(Self, Self) -> Bool
 #deprecated
 pub fn PagePosition::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) enum Phase {
   Idle
   LoadingCommit(reference~ : @github.CommitRef, repository~ : @github.RepositoryRef, page~ : Int32, first~ : @moondiff-review-web-protocol.ApiCommit?, files~ : Array[@moondiff-review-web-protocol.ApiFile])
@@ -312,12 +327,13 @@ pub(all) enum Phase {
   LoadFailed(String)
   Showing(@change.ChangeView)
   ShowingPullSelector(@moondiff-review-web-protocol.ApiPull)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct PreparedSnapshot {
   snapshot : @moondiff-review-web-protocol.ApiPullSnapshot
   view : @change.ChangeView
-} derive(Eq)
+}
 
 pub(all) enum PullMergeMsg {
   Refresh
@@ -327,6 +343,7 @@ pub(all) enum PullMergeMsg {
   MergeFinished(Int32, Int32, Result[@moondiff-review-web-protocol.ApiPullMergeResult, Error])
 }
 
+#derive(Eq)
 pub(all) struct PullMergeState {
   epoch : Int32
   serial : Int32
@@ -337,14 +354,15 @@ pub(all) struct PullMergeState {
   retry : Int32
   poll_scheduled : Bool
   stale : Bool
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct PullSourceState {
   generation : Int32
   pending : Array[(Int32, @change.SourceSide)]
   urgent : Array[Int32]
   cursor : Int32
-} derive(Eq)
+}
 
 pub(all) enum RangeMsg {
   FromSelected(Int32, String)
@@ -361,6 +379,7 @@ pub(all) enum RangeMsg {
   RangePullCommitPageValidated(Int32, Int32, Array[@moondiff-review-web-protocol.ApiRangeCommit], Result[@moondiff-review-web-protocol.ApiPull, Error])
 }
 
+#derive(Eq)
 pub(all) struct RangeState {
   from_sha : String
   to_sha : String
@@ -377,8 +396,9 @@ pub(all) struct RangeState {
   pull : @moondiff-review-web-protocol.ApiPull?
   pull_merge_base : String?
   too_many_files : Bool
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct ReadingRecovery {
   id : Int32
   generation : Int32
@@ -392,16 +412,18 @@ pub(all) struct ReadingRecovery {
   mut comments_refresh : Int32?
   mut viewed : (Int32, Int32)?
   mut merge : (Int32, Int32)?
-} derive(Eq)
+}
 pub fn ReadingRecovery::pending(Self) -> Bool
 
+#derive(Eq)
 pub(all) struct ReadyPage {
   user : String?
   version : String
   view : @change.ChangeView
   range : RangeState?
-} derive(Eq)
+}
 
+#derive(Eq, Hash)
 pub(all) enum Region {
   Home
   Shell
@@ -414,7 +436,7 @@ pub(all) enum Region {
   PullMergeStatus
   RangePanel
   File(String)
-} derive(Eq, Hash)
+}
 pub fn Region::key(Self) -> String
 
 pub(all) enum ReviewMsg {
@@ -445,15 +467,17 @@ pub(all) enum ReviewMsg {
   ReviewReplyCreated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiReviewComment, Error])
 }
 
+#derive(Eq)
 pub(all) enum RouteDestination {
   Path(String)
   History(HistoryEntry)
-} derive(Eq)
+}
 #deprecated
 pub fn RouteDestination::equal(Self, Self) -> Bool
 #deprecated
 pub fn RouteDestination::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) struct RouteMemory {
   review : @comments.NavigationReview
   snapshot : @comments.Snapshot?
@@ -465,46 +489,50 @@ pub(all) struct RouteMemory {
   ignore_comments : Bool
   ignore_tests : Bool
   draft_view : @change.ChangeView?
-} derive(Eq)
+}
 #deprecated
 pub fn RouteMemory::equal(Self, Self) -> Bool
 #deprecated
 pub fn RouteMemory::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) struct SignInDialog {
   revision : Int32
   entry : SignInEntry?
-} derive(Eq)
+}
 #deprecated
 pub fn SignInDialog::equal(Self, Self) -> Bool
 pub fn SignInDialog::new() -> Self
 #deprecated
 pub fn SignInDialog::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) enum SignInEntry {
   Comment(Int32)
   Viewed(Int32)
-} derive(Eq)
+}
 #deprecated
 pub fn SignInEntry::equal(Self, Self) -> Bool
 pub fn SignInEntry::file_index(Self) -> Int32
 #deprecated
 pub fn SignInEntry::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) struct SnapshotAccess {
   freshness : SnapshotFreshness
   identity_checking : Bool
   preparing : PreparedSnapshot?
   reload_requested : Bool
   waiting_for_viewed : Bool
-} derive(Eq)
+}
 pub fn SnapshotAccess::new() -> Self
 
+#derive(Eq)
 pub(all) enum SnapshotFreshness {
   Confirmed
   Checking
   Unavailable(String)
-} derive(Eq)
+}
 
 pub(all) struct Transition {
   model : Model
@@ -538,13 +566,14 @@ pub(all) enum UiMsg {
   ToggleIgnoreTests
 }
 
+#derive(Eq)
 pub(all) struct ViewedFile {
   state : @moondiff-review-web-protocol.FileViewedState?
   pending : ViewedPending?
   error : String?
   touched : Bool
   expansion_revision : Int32
-} derive(Eq)
+}
 
 pub(all) enum ViewedMsg {
   Toggle(Int32, Int32)
@@ -557,6 +586,7 @@ pub(all) enum ViewedMsg {
   Saved(Int32, Int32, String, Result[@moondiff-review-web-protocol.ApiFileViewedResult, Error])
 }
 
+#derive(Eq)
 pub(all) struct ViewedPending {
   deferred : Bool
   record : ViewedRecord
@@ -565,8 +595,9 @@ pub(all) struct ViewedPending {
   expanded : Bool
   expansion_revision : Int32
   confirming : Bool
-} derive(Eq)
+}
 
+#derive(Eq, @json.FromJson, @json.ToJson)
 pub(all) struct ViewedRecord {
   id : String
   user_id : String
@@ -577,8 +608,9 @@ pub(all) struct ViewedRecord {
   viewed : Bool
   base_sha : String
   head_sha : String
-} derive(Eq, ToJson, @json.FromJson)
+}
 
+#derive(Eq)
 pub(all) struct ViewedState {
   user_id : String?
   epoch : Int32
@@ -593,7 +625,7 @@ pub(all) struct ViewedState {
   storage_ready : Bool
   retry : Int32
   poll_scheduled : Bool
-} derive(Eq)
+}
 
 // Type aliases
 

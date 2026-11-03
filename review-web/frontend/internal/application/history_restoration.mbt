@@ -2,11 +2,12 @@
 // Shared by the state, its interaction listener and any queued render command.
 // Cancellation is synchronous so even a command ahead of the next reducer event
 // cannot steal focus or scroll after the user has taken control.
+#derive(Eq)
 pub(all) struct HistoryRestoration {
   generation : Int32
   entry : String
   mut cancelled : Bool
-} derive(Eq)
+}
 
 ///|
 #deprecated

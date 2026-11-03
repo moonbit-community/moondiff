@@ -1,6 +1,7 @@
 ///|
 // Request bookkeeping only. The renderer owns all nodes, geometry and listeners.
 // A cancelled token remains invalid even if a retained request callback uses it.
+#derive(Eq)
 pub(all) struct ReadingRecovery {
   id : Int32
   generation : Int32
@@ -14,7 +15,7 @@ pub(all) struct ReadingRecovery {
   mut comments_refresh : Int32?
   mut viewed : (Int32, Int32)?
   mut merge : (Int32, Int32)?
-} derive(Eq)
+}
 
 ///|
 #deprecated

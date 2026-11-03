@@ -1,26 +1,30 @@
 ///|
+#derive(Eq, ToJson, FromJson)
 pub(all) struct HistoryEntry {
   id : String
   sequence : Int32
   path : String
-} derive(Eq, ToJson, FromJson)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum RouteDestination {
   Path(String)
   History(HistoryEntry)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct PagePosition {
   x : Double
   y : Double
   sidebar : Double
   focus_index : Int32?
   focus_label : String
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct RouteMemory {
   review : @comments.NavigationReview
   snapshot : @comments.Snapshot?
@@ -32,9 +36,10 @@ pub(all) struct RouteMemory {
   ignore_comments : Bool
   ignore_tests : Bool
   draft_view : ChangeView?
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct NavigationState {
   entry : HistoryEntry
   pending : RouteDestination?
@@ -45,17 +50,18 @@ pub(all) struct NavigationState {
   positions : Map[String, PagePosition]
   routes : Map[String, RouteMemory]
   pages : Array[ReadyPage]
-} derive(Eq)
+}
 
 ///|
 // Only domain data is retained. Renderers, editors and requests own their own
 // lifetimes and must never enter this cache.
+#derive(Eq)
 pub(all) struct ReadyPage {
   user : String?
   version : String
   view : ChangeView
   range : RangeState?
-} derive(Eq)
+}
 
 ///|
 pub fn NavigationState::new() -> NavigationState {

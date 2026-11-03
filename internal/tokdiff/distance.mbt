@@ -225,11 +225,12 @@ priv struct WindowStream {
 }
 
 ///|
+#derive(Eq)
 priv enum GapKind {
   Empty
   Horizontal
   Multiline
-} derive(Eq)
+}
 
 ///|
 priv enum PairMode {

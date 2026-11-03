@@ -33,19 +33,22 @@ pub fn without_deleted(@moondiff-review-web-protocol.ApiCommentBundle, Array[Com
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) enum Action {
   OpenDraft(DraftKind)
   Submit
   Delete(CommentId)
   LoadSnapshot
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum CommentDeletion {
   ConfirmDelete(CommentId)
   Deleting(CommentId)
   DeleteFailed(CommentId, String)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct CommentDraft {
   snapshot : Snapshot?
   id : DraftId
@@ -53,7 +56,7 @@ pub(all) struct CommentDraft {
   body : String
   submitting : Bool
   error : String?
-} derive(Eq)
+}
 
 pub struct CommentGroup {
   issue_comments : ReadOnlyArray[@moondiff-review-web-protocol.ApiIssueComment]
@@ -62,26 +65,29 @@ pub struct CommentGroup {
 }
 pub impl Eq for CommentGroup
 
+#derive(Eq)
 pub(all) enum CommentId {
   IssueComment(Int64)
   ReviewComment(Int64)
   CommitComment(Int64)
-} derive(Eq)
+}
 pub fn CommentId::key(Self) -> String
 
+#derive(Eq)
 pub(all) enum CommentRefresh {
   RefreshIdle
   RefreshMetadata
   RefreshList(@moondiff-review-web-protocol.ApiPull?)
   RefreshValidation(@moondiff-review-web-protocol.ApiPull, @moondiff-review-web-protocol.ApiCommentBundle)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum CommentsStatus {
   CommentsDisabled
   CommentsLoading
   CommentsReady(@moondiff-review-web-protocol.ApiCommentBundle)
   CommentsFailed(String)
-} derive(Eq)
+}
 
 pub(all) struct CommitDiscussion {
   comment : @moondiff-review-web-protocol.ApiCommitComment
@@ -89,24 +95,27 @@ pub(all) struct CommitDiscussion {
   outdated : Bool
 }
 
+#derive(Eq)
 pub(all) struct Context {
   generation : Int32
   route : @github.CommitRef?
   snapshot : Snapshot?
   enabled : Bool
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct DraftId {
   generation : Int32
   sequence : Int32
-} derive(Eq)
+}
 pub fn DraftId::key(Self) -> String
 
+#derive(Eq)
 pub(all) enum DraftKind {
   OverallDraft
   InlineDraft(Int32, @review.ReviewAnchor)
   ReplyDraft(Int64)
-} derive(Eq)
+}
 
 pub(all) enum Effect {
   CommentsRequest(@github.CommitRef, Int32, (Result[@moondiff-review-web-protocol.ApiCommentBundle, Failure]) -> Event)
@@ -153,19 +162,22 @@ pub(all) enum Event {
   ReviewReplyCreated(Int32, Int32, Result[@moondiff-review-web-protocol.ApiReviewComment, Failure])
 }
 
+#derive(Eq)
 pub(all) struct Failure {
   message : String
   code : String?
-} derive(Eq)
+}
 
+#derive(Eq)
 pub struct NavigationReview {
   // private fields
-} derive(Eq)
+}
 #deprecated
 pub fn NavigationReview::equal(Self, Self) -> Bool
 #deprecated
 pub fn NavigationReview::not_equal(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) struct PendingReviewReceipt {
   id : Int64
   url : String
@@ -173,22 +185,25 @@ pub(all) struct PendingReviewReceipt {
   path : String
   generation : Int32
   status : PendingReviewStatus
-} derive(Eq)
+}
 pub fn PendingReviewReceipt::key(Self) -> String
 
+#derive(Eq)
 pub(all) enum PendingReviewStatus {
   ReceiptSyncing
   ReceiptWaiting
   ReceiptSyncFailed
   ReceiptPrChanged
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum Permission {
   Allowed
   Denied(String)
-} derive(Eq)
+}
 pub fn Permission::allowed(Self) -> Bool
 
+#derive(Eq)
 pub struct PermissionSummary {
   fresh : Bool
   can_comment : Bool
@@ -201,15 +216,17 @@ pub struct PermissionSummary {
   deleting : Bool
   has_snapshot : Bool
   is_pull : Bool
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum ReadStatus {
   Disabled
   Loading
   Ready
   Failed(String)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub struct ReadView {
   permissions : PermissionSummary
   group : CommentGroup
@@ -224,7 +241,7 @@ pub struct ReadView {
   notice : String?
   published_url : String?
   // private fields
-} derive(Eq)
+}
 pub fn ReadView::allowed(Self, Action) -> Bool
 pub fn ReadView::body_expanded(Self, CommentId) -> Bool
 pub fn ReadView::can_delete(Self, CommentId) -> Bool
@@ -242,6 +259,7 @@ pub(all) struct ReviewThread {
   outdated : Bool
 }
 
+#derive(Eq)
 pub struct Session {
   verified_snapshot : Snapshot?
   refresh_id : Int32
@@ -257,7 +275,7 @@ pub struct Session {
   deletion_id : Int32
   deletion : CommentDeletion?
   // private fields
-} derive(Eq)
+}
 pub fn Session::blocks_navigation(Self) -> Bool
 pub fn Session::comment_version(Self) -> Int32
 pub fn Session::comments(Self) -> CommentsStatus
@@ -273,13 +291,15 @@ pub fn Session::permission_summary(Self) -> PermissionSummary
 pub fn Session::read_view(Self, path? : String, paths? : ArrayView[String], group? : CommentGroup) -> ReadView
 pub fn Session::submission(Self) -> SubmissionPhase?
 
+#derive(Eq)
 pub(all) struct Snapshot {
   reference : @github.CommitRef
   sha : String
   pull_snapshot : @moondiff-review-web-protocol.ApiPull?
-} derive(Eq)
+}
 pub fn Snapshot::same_version(Self, Self) -> Bool
 
+#derive(Eq)
 pub(all) enum SubmissionPhase {
   CheckingHead
   PostingIssue
@@ -287,7 +307,7 @@ pub(all) enum SubmissionPhase {
   PostingCommit
   PostingReply
   SyncingReview(Int64)
-} derive(Eq)
+}
 
 // Type aliases
 

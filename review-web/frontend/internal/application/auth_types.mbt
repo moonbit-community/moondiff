@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 pub(all) enum AuthStatus {
   AuthChecking
   Anonymous(String?)
@@ -6,7 +7,7 @@ pub(all) enum AuthStatus {
   DeviceCancelling(String, String)
   SignedIn(login~ : String?, user_id~ : String?, install_url~ : String?)
   AuthFailed(String)
-} derive(Eq)
+}
 
 ///|
 pub fn auth_status_from_api(status : ApiAuthStatus) -> AuthStatus {

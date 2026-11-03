@@ -1,4 +1,5 @@
 ///|
+#derive(Eq, Hash)
 pub(all) enum Region {
   Home
   Shell
@@ -11,7 +12,7 @@ pub(all) enum Region {
   PullMergeStatus
   RangePanel
   File(String)
-} derive(Eq, Hash)
+}
 
 ///|
 pub fn Region::key(self : Region) -> String {
@@ -31,17 +32,19 @@ pub fn Region::key(self : Region) -> String {
 }
 
 ///|
+#derive(Eq)
 pub(all) enum NavigationPolicy {
   Cancel
   Continue
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum CommitScope {
   Region
   PageLayout
   HistoryLayout(HistoryRestoration)
-} derive(Eq)
+}
 
 ///|
 pub(all) struct AfterCommit {

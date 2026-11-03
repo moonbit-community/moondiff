@@ -6,9 +6,10 @@ using @span {type SingleLineSpan}
 ///
 /// `ListKind` participates in structural matching but is not rendered. Use
 /// `ListKind::from_node_kind` to retain a CST node's identity.
+#derive(Eq)
 struct ListKind {
   node_kind : @cst.NodeKind
-} derive(Eq)
+}
 
 ///|
 /// Wraps a parser CST node kind for use as a syntax list identity.
@@ -474,16 +475,18 @@ fn set_num_ancestors(nodes : ArrayView[Syntax], num_ancestors : UInt32) -> Unit 
 }
 
 ///|UUID(3d751dbd-a05e-46c7-aa9c-f7d1bfb5f5a9)
+#derive(Eq)
 pub(all) enum StringKind {
   StringLiteral
   Text
-} derive(Eq)
+}
 
 ///|UUID(557e87f3-ee91-4143-9426-2a2cbaa54578)
+#derive(Eq)
 pub(all) enum AtomKind {
   Normal
   String(StringKind)
   Type
   Comment
   Keyword
-} derive(Eq)
+}

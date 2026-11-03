@@ -3,18 +3,20 @@
 /// document. Lexical mode retains token-level text changes inside the selected
 /// whole-file or declaration-local fragments; AST mode reports only structural
 /// changes.
+#derive(Eq)
 pub(all) enum AlignedDiffMode {
   Lexical
   Ast
-} derive(Eq)
+}
 
 ///|
 /// Detailed renderer-neutral alignment output. Public callers consume this
 /// through the `mbtdiff` facade.
+#derive(Eq)
 pub(all) struct DetailedDiffResult {
   document : @model.DiffDocument
   status : @model.DiffStatus
-} derive(Eq)
+}
 
 ///|
 /// Calculate the sole renderer-neutral semantic document from one parse and

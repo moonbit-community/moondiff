@@ -1,17 +1,19 @@
 ///|
+#derive(FromJson, ToJson)
 priv struct SearchWindow {
   since : Int64
   until : Int64
   page : Int32
   offset : Int32
-} derive(FromJson, ToJson)
+}
 
 ///|
+#derive(FromJson, ToJson)
 priv struct PullSearchCursor {
   windows : Array[SearchWindow]
   total : Int32
   total_confirmed : Bool
-} derive(FromJson, ToJson)
+}
 
 ///|
 fn home_session(session : @storage.Session?) -> @storage.Session raise {

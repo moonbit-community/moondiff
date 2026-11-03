@@ -6,37 +6,39 @@ import {
   "moonbit-community/moondiff-review-web-server/internal/httpclient",
   "moonbit-community/moondiff-review-web-server/internal/storage",
   "moonbitlang/async/http",
+  "moonbitlang/core/json",
 }
 
 // Values
 pub async fn authenticated(@storage.App, @storage.Session, rejected_token? : String) -> @storage.Session
 
-pub async fn comments(@storage.App, @storage.Session?, String) -> Json
+pub async fn comments(@storage.App, @storage.Session?, String) -> @json.Json
 
-pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json, source? : Bool, accept? : String) -> (@http.Response, Bytes)
+pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : @json.Json, source? : Bool, accept? : String) -> (@http.Response, Bytes)
 
-pub async fn github_json(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : Json) -> Json
+pub async fn github_json(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : @json.Json) -> @json.Json
 
-pub async fn graphql(@storage.App, @storage.Session?, String, Json) -> Json
+pub async fn graphql(@storage.App, @storage.Session?, String, @json.Json) -> @json.Json
 
-pub fn pull_from_graphql(Json) -> Json
+pub fn pull_from_graphql(@json.Json) -> @json.Json
 
-pub fn pull_snapshot(Json) -> PullSnapshot raise
+pub fn pull_snapshot(@json.Json) -> PullSnapshot raise
 
-pub fn pull_variables(@moondiff-review-web-protocol.PullViewedGet) -> Json raise
+pub fn pull_variables(@moondiff-review-web-protocol.PullViewedGet) -> @json.Json raise
 
-pub async fn upstream(@httpclient.Pool, String, @http.RequestMethod, String, Json?, source? : Bool, accept? : String) -> (@http.Response, Bytes)
+pub async fn upstream(@httpclient.Pool, String, @http.RequestMethod, String, @json.Json?, source? : Bool, accept? : String) -> (@http.Response, Bytes)
 
-pub fn upstream_json(Bytes) -> Json raise
+pub fn upstream_json(Bytes) -> @json.Json raise
 
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) struct PullSnapshot {
   id : String
   base : String
   head : String
-} derive(Eq)
+}
 pub fn PullSnapshot::equal(Self, Self) -> Bool
 pub fn PullSnapshot::not_equal(Self, Self) -> Bool
 

@@ -11,10 +11,11 @@
 const CORE_LINE_DIFF_CUTOFF : Int32 = 4_096
 
 ///|
+#derive(Eq, Hash)
 priv struct ComparableLine {
   text : String
   key : (Int32, Int32)
-} derive(Eq, Hash)
+}
 
 ///|
 fn original_diff_lines(lines : ArrayView[String]) -> Array[ComparableLine] {

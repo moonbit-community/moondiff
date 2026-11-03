@@ -12,10 +12,11 @@ pub fn diff(String, String, old_name? : String, new_name? : String, options? : D
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum DiffMode {
   Ast
   Lexical
-} derive(Eq, @debug.Debug)
+}
 
 type DiffOptions
 pub fn DiffOptions::DiffOptions(context_lines? : Int32, graph_limit? : UInt32, ignore_comments? : Bool, ignore_tests? : Bool, mode? : DiffMode) -> Self

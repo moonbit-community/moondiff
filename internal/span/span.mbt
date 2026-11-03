@@ -1,9 +1,10 @@
 ///|UUID(c6a0f8cd-be12-4d84-9af8-0d7654356da3)
+#derive(Debug)
 pub(all) struct SingleLineSpan {
   line : Int32
   start_col : Int32
   end_col : Int32
-} derive(Debug)
+}
 
 ///|UUID(3694ba0a-e674-4b26-8d99-bd54c2c546bd)
 pub struct LineWidths {

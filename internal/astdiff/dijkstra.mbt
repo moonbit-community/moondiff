@@ -1,9 +1,10 @@
 ///|UUID(58abb95f-c5cc-4ced-8d34-ca251ed41672)
+#derive(Eq)
 #valtype
 priv struct WeightedVertex {
   vertex : Vertex
   distance : @cmp.Reverse[UInt32]
-} derive(Eq)
+}
 
 ///|UUID(5b821e8f-5dc5-43ea-b19b-6473450629cd)
 impl Compare for WeightedVertex with fn compare(self, other) {

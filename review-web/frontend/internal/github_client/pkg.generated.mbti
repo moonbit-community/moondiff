@@ -105,21 +105,24 @@ pub(all) enum DeviceAction {
   Cancel
 }
 
+#derive(Eq)
 pub(all) struct PrefetchCandidate {
   pull : @moondiff-review-web-protocol.PullGet
   updated_at : String
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum RateLimitReason {
   AnonymousRequests
   AuthenticatedRequests
-} derive(Eq)
+}
 pub fn RateLimitReason::message(Self) -> String
 
+#derive(Eq)
 pub(all) struct SnapshotResult {
   snapshot : @moondiff-review-web-protocol.ApiPullSnapshot
   confirmed : Bool
-} derive(Eq)
+}
 
 // Type aliases
 pub using @moondiff-review-web-protocol {type ApiPullSnapshot as PullSnapshot}

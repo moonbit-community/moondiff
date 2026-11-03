@@ -1,8 +1,9 @@
 ///|
+#derive(Eq, Hash)
 priv enum AnchorOwner {
   History
   Reading
-} derive(Eq, Hash)
+}
 
 ///|
 priv struct NativeAnchoring {

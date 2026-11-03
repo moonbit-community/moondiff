@@ -1,16 +1,18 @@
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiPullSnapshot {
   metadata : ApiPull
   comparison : ApiCompare
   files : Array[ApiFile]
   signature : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
 pub(all) enum ApiPullSnapshotResult {
   Complete(ApiPullSnapshot)
   MetadataOnly(ApiPull)
-} derive(Eq, FromJson(style="legacy"), ToJson(style="legacy"))
+}
 
 ///|
 pub const SNAPSHOT_FILE_LIMIT : Int32 = 300

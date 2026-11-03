@@ -10,47 +10,54 @@ import {
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum ComputationStage {
   TopLevelAlignment
   SyntaxMatching
   IntralineMatching
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq)
 pub(all) struct ContextLine {
   old_index : Int32
   new_index : Int32
   text : String
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum DiffBlock {
   ContextBlock(ArrayView[ContextLine])
   ChangeBlock(ArrayView[DiffRow])
   IgnoredBlock(ArrayView[DiffRow])
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum DiffDocument {
   Whole(DiffFragment)
   TopLevel(TopLevelDiff)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct DiffFragment {
   document : HunkDocument
   fallbacks : ArrayView[FallbackReason]
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct DiffHunk {
   old_start : Int32
   old_len : Int32
   new_start : Int32
   new_len : Int32
   blocks : ArrayView[DiffBlock]
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct DiffLine {
   index : Int32
   segments : ArrayView[DiffSegment]
   intraline : IntralineStatus
-} derive(Eq)
+}
 pub fn DiffLine::text(Self) -> String
 
 type DiffResult
@@ -59,75 +66,87 @@ pub fn DiffResult::ignore_reason(Self) -> IgnoreReason?
 pub fn DiffResult::make(DiffDocument, DiffStatus, ignore_reason? : IgnoreReason) -> Self
 pub fn DiffResult::status(Self) -> DiffStatus
 
+#derive(Eq)
 pub(all) enum DiffRow {
   Paired(DiffLine, DiffLine)
   OldOnly(DiffLine)
   NewOnly(DiffLine)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum DiffSection {
   Matched(old~ : LineRange, new~ : LineRange, old_context~ : String?, new_context~ : String?, diff~ : DiffFragment)
   Deleted(old~ : LineRange, old_context~ : String?, diff~ : DiffFragment)
   Inserted(new~ : LineRange, new_context~ : String?, diff~ : DiffFragment)
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) struct DiffSegment {
   kind : DiffSegmentKind
   text : String
-} derive(Eq)
+}
 
+#derive(Eq)
 pub(all) enum DiffSegmentKind {
   Unchanged
   Changed
   Ignored
-} derive(Eq)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum DiffSide {
   Old
   New
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum DiffStatus {
   Identical
   Changed
   Reordered
   NoStructuralChanges
   IgnoredOnly
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FallbackReason {
   ParseError(sides~ : ArrayView[DiffSide], detail~ : String)
   SyntaxPositionsOutOfBounds(sides~ : ArrayView[DiffSide])
   GraphLimitExceeded(limit~ : UInt32)
   ComputationLimitExceeded(stage~ : ComputationStage, limit~ : UInt32)
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq)
 pub(all) struct HunkDocument {
   hunks : ArrayView[DiffHunk]
-} derive(Eq)
+}
 pub fn HunkDocument::rebase(Self, Int32, Int32) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum IgnoreReason {
   TestFile
   FilteredContent
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq)
 pub(all) enum IntralineStatus {
   NotComputed
   Computed
-} derive(Eq)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct LineRange {
   start : Int32
   len : Int32
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq)
 pub(all) struct TopLevelDiff {
   sections : ArrayView[DiffSection]
   old_order : ArrayView[Int32]
   new_order : ArrayView[Int32]
   reordered : Bool
-} derive(Eq)
+}
 
 // Type aliases
 

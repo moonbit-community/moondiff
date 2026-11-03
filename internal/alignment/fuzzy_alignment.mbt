@@ -38,10 +38,11 @@ priv struct ImplFuzzyContent {
 }
 
 ///|
+#derive(Eq)
 priv struct ImplFuzzyGap {
   previous : Int32?
   next : Int32?
-} derive(Eq)
+}
 
 ///|
 priv struct ImplFuzzyBestCandidate {

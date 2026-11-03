@@ -45,10 +45,11 @@ fn rate_limited(error : Error) -> Bool {
 }
 
 ///|
+#derive(Eq)
 pub(all) enum RateLimitReason {
   AnonymousRequests
   AuthenticatedRequests
-} derive(Eq)
+}
 
 ///|
 pub fn RateLimitReason::message(self : RateLimitReason) -> String {

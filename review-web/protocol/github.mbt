@@ -1,21 +1,25 @@
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiStats {
   additions : Int32
   deletions : Int32
   total : Int32
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiCommitInfo {
   message : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiParent {
   sha : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiFile {
   filename : String
   previous_filename : String?
@@ -24,9 +28,10 @@ pub(all) struct ApiFile {
   deletions : Int32
   changes : Int32
   patch : String?
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiCommit {
   sha : String
   html_url : String
@@ -34,20 +39,23 @@ pub(all) struct ApiCommit {
   parents : Array[ApiParent]
   stats : ApiStats
   files : Array[ApiFile]
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiRepository {
   full_name : String
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiPullBranch {
   sha : String
   repo : ApiRepository?
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiPull {
   title : String
   body : String?
@@ -59,29 +67,32 @@ pub(all) struct ApiPull {
   deletions : Int32
   changed_files : Int32
   commits : Int32?
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiCompare {
   merge_base_commit : ApiParent
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiRangeCommit {
   sha : String
   commit : ApiCommitInfo
   parents : Array[ApiParent]
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
 /// GitHub returns files only on the first page of a paginated comparison.
+#derive(Eq, FromJson, ToJson)
 pub(all) struct ApiRangeCompare {
   base_commit : ApiRangeCommit
   merge_base_commit : ApiParent
   total_commits : Int32
   commits : Array[ApiRangeCommit]
   files : Array[ApiFile]?
-} derive(Eq, FromJson, ToJson)
+}
 
 ///|
 pub fn resolved_sha(requested : String, response : String) -> String raise {

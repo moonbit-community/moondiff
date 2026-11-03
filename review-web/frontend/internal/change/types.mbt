@@ -1,22 +1,26 @@
 ///|
+#derive(Eq)
 pub(all) enum ViewMode {
   Split
   Unified
-} derive(Eq)
+}
 
 ///|
+#derive(Eq, Hash)
 pub(all) enum DiffAlgorithm {
   LexicalAlgorithm
   AstAlgorithm
-} derive(Eq, Hash)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum SourceSide {
   Old
   New
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum SideLoad {
   NotRequested
   Loading
@@ -24,9 +28,10 @@ pub(all) enum SideLoad {
   Ready(Array[String])
   CannotRender(String, Bool)
   LoadFailed(String)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) enum CachedDiffResult {
   Line(@mbtdiff.HunkDocument)
   MoonBit(
@@ -34,20 +39,22 @@ pub(all) enum CachedDiffResult {
     status~ : @mbtdiff.DiffStatus,
     ignore_reason~ : @mbtdiff.IgnoreReason?
   )
-} derive(Eq)
+}
 
 ///|
+#derive(Eq, Hash)
 pub(all) enum CacheKey {
   Line
   MoonBit(DiffAlgorithm, Bool, Bool)
-} derive(Eq, Hash)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct DiffCache {
   entries : @immut_hashmap.HashMap[CacheKey, CachedDiffResult]
   navigable : @immut_hashmap.HashMap[CacheKey, Bool]
   highlights : @highlight.FileHighlights?
-} derive(Eq)
+}
 
 ///|
 pub fn DiffCache::empty() -> DiffCache {
@@ -77,6 +84,7 @@ pub fn DiffCache::put(
 }
 
 ///|
+#derive(Eq)
 pub(all) struct FileState {
   file : ApiFile
   diff_mode : FileDiffMode
@@ -86,9 +94,10 @@ pub(all) struct FileState {
   old_side : SideLoad
   new_side : SideLoad
   diff_cache : DiffCache
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct ChangeView {
   reference : CommitRef
   pull_snapshot : ApiPull?
@@ -101,4 +110,4 @@ pub(all) struct ChangeView {
   stats : ApiStats
   total_files : Int32
   files : Array[FileState]
-} derive(Eq)
+}

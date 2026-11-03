@@ -95,10 +95,11 @@ pub fn region_view(
 }
 
 ///|
+#derive(Eq)
 pub(all) struct MountHost {
   region : @application.Region
   id : String
-} derive(Eq)
+}
 
 ///|
 fn region_host(host : MountHost) -> @rabbita.Html {

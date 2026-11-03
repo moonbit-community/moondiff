@@ -19,11 +19,12 @@ let empty_group : CommentGroup = {
 }
 
 ///|
+#derive(Eq)
 priv struct CommentIndex {
   version : Int32
   groups : Map[String, CommentGroup]
   owners : Map[String, String]
-} derive(Eq)
+}
 
 ///|
 fn CommentIndex::new() -> CommentIndex {
@@ -127,15 +128,17 @@ pub fn Session::draft_path(self : Session) -> String? {
 }
 
 ///|
+#derive(Eq)
 pub(all) enum ReadStatus {
   Disabled
   Loading
   Ready
   Failed(String)
-} derive(Eq)
+}
 
 ///|
 /// Permission changes are independent of the draft body and comment collection.
+#derive(Eq)
 pub struct PermissionSummary {
   fresh : Bool
   can_comment : Bool
@@ -148,7 +151,7 @@ pub struct PermissionSummary {
   deleting : Bool
   has_snapshot : Bool
   is_pull : Bool
-} derive(Eq)
+}
 
 ///|
 pub fn Session::permission_summary(self : Session) -> PermissionSummary {
@@ -169,6 +172,7 @@ pub fn Session::permission_summary(self : Session) -> PermissionSummary {
 
 ///|
 /// A view cannot reach the reducer session or another file's source/comments.
+#derive(Eq)
 pub struct ReadView {
   permissions : PermissionSummary
   group : CommentGroup
@@ -186,7 +190,7 @@ pub struct ReadView {
   priv can_submit : Bool
   priv can_load : Bool
   priv expanded_bodies : ReadOnlyArray[CommentId]
-} derive(Eq)
+}
 
 ///|
 pub fn Session::overall_comments(

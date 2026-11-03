@@ -1,24 +1,27 @@
 ///|
+#derive(Eq)
 pub(all) enum SnapshotFreshness {
   Confirmed
   Checking
   Unavailable(String)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct SnapshotAccess {
   freshness : SnapshotFreshness
   identity_checking : Bool
   preparing : PreparedSnapshot?
   reload_requested : Bool
   waiting_for_viewed : Bool
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct PreparedSnapshot {
   snapshot : @github_client.PullSnapshot
   view : ChangeView
-} derive(Eq)
+}
 
 ///|
 pub fn SnapshotAccess::new() -> SnapshotAccess {

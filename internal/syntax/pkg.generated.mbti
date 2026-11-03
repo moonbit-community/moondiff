@@ -19,13 +19,14 @@ pub fn line_index(@span.SingleLineSpan) -> Int32
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) enum AtomKind {
   Normal
   String(StringKind)
   Type
   Comment
   Keyword
-} derive(Eq)
+}
 
 pub(all) enum ChangeKind {
   Unchanged(Syntax)
@@ -41,7 +42,8 @@ pub fn ChangeMap::insert_deep_novel(Self, Syntax) -> Unit
 pub fn ChangeMap::insert_deep_unchanged(Self, node~ : Syntax, opposite_node~ : Syntax) -> Unit
 pub fn ChangeMap::new() -> Self
 
-type ListKind derive(Eq)
+#derive(Eq)
+type ListKind
 pub fn ListKind::from_node_kind(@node.NodeKind) -> Self
 
 pub(all) enum MatchKind {
@@ -55,10 +57,11 @@ pub(all) struct MatchedPos {
   pos : @span.SingleLineSpan
 }
 
+#derive(Eq)
 pub(all) enum StringKind {
   StringLiteral
   Text
-} derive(Eq)
+}
 
 pub enum Syntax {
   Atom(info~ : SyntaxInfo, position~ : Array[@span.SingleLineSpan], content~ : String, kind~ : AtomKind)

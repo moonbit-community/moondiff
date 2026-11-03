@@ -1,4 +1,5 @@
 ///|
+#derive(Eq)
 priv struct DraftData {
   snapshot : Snapshot?
   id : DraftId
@@ -6,22 +7,24 @@ priv struct DraftData {
   target_path : String?
   body : String
   error : String?
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 priv struct Operation {
   generation : Int32
   id : Int32
   phase : SubmissionPhase
   body : String
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 priv enum EditorState {
   Empty
   Editing(DraftData)
   Submitting(DraftData, Operation)
-} derive(Eq)
+}
 
 ///|
 pub fn Session::draft(self : Session) -> CommentDraft? {

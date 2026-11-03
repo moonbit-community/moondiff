@@ -1,18 +1,20 @@
 ///|
+#derive(Eq)
 pub(all) enum ChangeTarget {
   Commit(String)
   PullRequest(String)
   PullCommit(String, String)
   Range(String, String)
   PullRange(String, String, String)
-} derive(Eq)
+}
 
 ///|
+#derive(Eq)
 pub(all) struct CommitRef {
   owner : String
   repo : String
   target : ChangeTarget
-} derive(Eq)
+}
 
 ///|
 pub fn commit_reference(

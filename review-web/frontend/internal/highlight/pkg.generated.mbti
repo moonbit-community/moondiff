@@ -11,12 +11,14 @@ pub fn add_span(Array[HighlightSpan], Int32, Int32, Int32, HighlightKind) -> Uni
 // Errors
 
 // Types and methods
+#derive(Eq)
 pub(all) struct FileHighlights {
   old : SourceHighlights?
   new : SourceHighlights?
-} derive(Eq)
+}
 pub fn FileHighlights::empty() -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum HighlightKind {
   Keyword
   Control
@@ -35,17 +37,19 @@ pub(all) enum HighlightKind {
   Operator
   Attribute
   AttributeParameter
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq, @debug.Debug)
 pub(all) struct HighlightSpan {
   start : Int32
   end : Int32
   kind : HighlightKind
-} derive(Eq, @debug.Debug)
+}
 
+#derive(Eq)
 pub struct SourceHighlights {
   lines : Array[Array[HighlightSpan]]
-} derive(Eq)
+}
 pub fn SourceHighlights::from_spans(String, ArrayView[HighlightSpan]) -> Self
 pub fn SourceHighlights::line(Self, Int32) -> ArrayView[HighlightSpan]
 
