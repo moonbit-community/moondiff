@@ -187,6 +187,8 @@ test('queued footnote and collapse actions yield to newer input and route change
   const card = commentCard(page, 'issue', 10);
   const reference = card.locator('[role="doc-noteref"]').first();
   const toggle = card.locator('.comment-body-toggle');
+  // Ensure the initial list committed before holding subsequent discussion paints.
+  await expect(reference).toBeVisible();
   await settleRegions(page);
   let barrier = await holdRegionFrames(page, ['discussion']);
   await reference.evaluate(el => { el.click(); el.click(); });
