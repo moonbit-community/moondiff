@@ -1,6 +1,7 @@
 ///|
 priv struct CommentBody {
   body : @dom.Element
+  container : @dom.Element
   clip : @dom.Element
   button : @dom.Element
   mut candidates : Array[CommentBodyFocus]
@@ -46,7 +47,7 @@ fn CommentBodies::sync(
         .unwrap_or_else(() => {
           // The inner Markdown always keeps its natural height, including images.
           observer.observe(body)
-          { body, clip, button, candidates: [], }
+          { body, container, clip, button, candidates: [], }
         })
       let candidates : Array[CommentBodyFocus] = []
       // innerHTML can replace focus candidates while retaining the Markdown container.
@@ -82,6 +83,10 @@ fn CommentBodies::read(self : CommentBodies) -> Array[CommentBodyLayout] {
   let layouts : Array[CommentBodyLayout] = []
   let active = @dom.document().get_active_element()
   for entry in self.entries {
+    // Hidden cards keep their preview state and focus attributes until reopened.
+    if entry.container.get_attribute("hidden") is Some(_) {
+      continue
+    }
     let style = @dom.window().get_computed_style(entry.body)
     let preview = @browser.parse_float(style["line-height"]) * 5.0
     let body = entry.body.get_bounding_client_rect()

@@ -4,9 +4,10 @@ fn comment_menu(
   html_url : String,
   review : @comments.ReadView,
   emit : @rabbita.Emit[Msg],
+  hidden~ : Bool = false,
 ) -> @rabbita.Html {
   let menu_id = "comment-menu:\{review.comment_key(id)}"
-  @html.div(class="comment-actions", [
+  @html.div(class="comment-actions", hidden~, [
     @html.button(
       type_="button",
       class="comment-more",

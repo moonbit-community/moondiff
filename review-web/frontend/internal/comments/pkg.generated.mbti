@@ -148,6 +148,7 @@ pub(all) enum Event {
   CommentsLoaded(Int32, Int32, Result[@moondiff-review-web-protocol.ApiCommentBundle, Failure])
   ToggleCommentBody(Int32, CommentId)
   SetCommentBodyExpanded(Int32, CommentId, Bool)
+  SetCommentCollapsed(Int32, CommentId, Bool)
   OpenOverallDraft
   OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, @review.ReviewAnchor)
@@ -245,6 +246,7 @@ pub struct ReadView {
 pub fn ReadView::allowed(Self, Action) -> Bool
 pub fn ReadView::body_expanded(Self, CommentId) -> Bool
 pub fn ReadView::can_delete(Self, CommentId) -> Bool
+pub fn ReadView::comment_collapsed(Self, CommentId) -> Bool
 pub fn ReadView::comment_key(Self, CommentId) -> String
 pub fn ReadView::draft(Self) -> CommentDraft?
 pub fn ReadView::draft_blocks_deletion(Self, CommentId) -> Bool

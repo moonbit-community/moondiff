@@ -75,6 +75,17 @@ pub fn update(session : Session, event : Event) -> (Session, Array[Effect]) {
         ..session,
         context,
         snapshot_stale: stale,
+        collapsed_comments: if context.generation == session.context.generation &&
+          context.route == session.context.route &&
+          (match (context.snapshot, session.context.snapshot) {
+            (Some(next), Some(previous)) => next.same_version(previous)
+            (None, None) => true
+            _ => false
+          }) {
+          session.collapsed_comments
+        } else {
+          []
+        },
         expanded_bodies: if context.generation == session.context.generation {
           session.expanded_bodies
         } else {
