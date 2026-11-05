@@ -422,6 +422,32 @@ test('rebase merge requires CSRF and authentication, revalidates SHAs, and sends
   assert.equal(put.headers.authorization, 'Bearer access-alice');
 });
 
+test('rebase merge rechecks repository rules after a successful status read', async t => {
+  let blocked = false;
+  const f = await startServer((r, res) => {
+    const send = value => { res.end(JSON.stringify(value)); return true; };
+    const url = new URL(r.path, 'http://stub');
+    if (url.pathname.endsWith('/pulls/42')) {
+      return send(mergeSnapshot({ mergeable_state: blocked ? 'blocked' : 'clean' }));
+    }
+    if (url.pathname.endsWith('/check-runs')) return send({ total_count: 0, check_runs: [] });
+    if (url.pathname.endsWith('/status')) return send({ total_count: 0, statuses: [] });
+    if (url.pathname.endsWith('/pulls/42/merge')) {
+      return send({ merged: true, sha: 'c'.repeat(40), message: 'Merged' });
+    }
+  });
+  t.after(() => f.close());
+  const user = browser(f); await user.login();
+  const status = await user.rpc('github.pull.merge.status', mergeArgs);
+  assert.equal(status.ok, true);
+  assert.equal(status.value.mergeable_state, 'clean');
+  blocked = true;
+  const result = await user.rpc('github.pull.rebase.merge', mergeArgs);
+  assert.equal(result.error.code, 'merge_blocked');
+  assert.equal(f.requests.filter(r => r.path.endsWith('/pulls/42')).length, 2);
+  assert.equal(f.requests.filter(r => r.method === 'PUT').length, 0);
+});
+
 test('rebase merge exposes stable preflight and GitHub error categories', async t => {
   const errors = {
     denied: [403, 'merge_permission_denied'], limited: [403, 'rate_limit'],

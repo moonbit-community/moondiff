@@ -159,7 +159,16 @@ test('the titlebar rebase submits once and both copies stay disabled until succe
   await scrollMergeCard(page);
   const sticky = page.locator('.change-titlebar .rebase-merge-button');
   await expectMergeSlot(page, true);
+  const preflightGate = gate('merge click status validation');
+  state.readGates = { 'github.pull.merge.status': preflightGate };
+  const statusCalls = state.calls.filter(call => call.op === 'github.pull.merge.status').length;
   await sticky.evaluate(el => { el.click(); el.click(); });
+  await expect.poll(() => state.calls.filter(call => call.op === 'github.pull.merge.status').length).toBe(statusCalls + 1);
+  for (const button of [sticky, page.locator('.pull-merge-card .rebase-merge-button')]) {
+    await expect(button).toBeDisabled();
+  }
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
+  preflightGate.resolve();
   await expect.poll(() => state.calls.filter(call => call.op === 'github.pull.rebase.merge').length).toBe(1);
   for (const button of [sticky, page.locator('.pull-merge-card .rebase-merge-button')]) {
     await expect(button).toBeDisabled();
@@ -177,6 +186,90 @@ test('the titlebar rebase submits once and both copies stay disabled until succe
   await expect(page.locator('.pull-merge-card')).toContainText('✓ This pull request is merged.');
   await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
   expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(1);
+});
+
+test('merge click refreshes stale CI and stops when repository rules now block merging', async ({ page }) => {
+  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const state = await installRenderingFixture(page, fixture, { authenticated: true });
+  await page.goto(path);
+  const card = page.locator('.pull-merge-card');
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  state.mergeStatus = {
+    base_sha: fixture.base, head_sha: fixture.sha, open: true, draft: false, merged: false,
+    mergeable: true, rebaseable: true, mergeable_state: 'blocked', ci_summary: { $tag: 'Failure' },
+    ci_checks: [{ name: 'Required tests', state: { $tag: 'Failure' }, description: 'Failed', source: { $tag: 'CheckRun' } }],
+    ci_warnings: [],
+  };
+  await card.locator('.rebase-merge-button').click();
+  await expect(card.getByText('Some checks were not successful', { exact: true })).toBeVisible();
+  await expect(card.getByText('○ Repository rules currently block this merge.', { exact: true })).toBeVisible();
+  await expect(card.locator('.rebase-merge-button')).toBeDisabled();
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
+
+  state.mergeStatus = { ...state.mergeStatus, mergeable_state: 'clean' };
+  await card.getByRole('button', { name: 'Reload merge status', exact: true }).click();
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
+  await card.locator('.rebase-merge-button').click();
+  await expect(card.getByText('✓ This pull request is merged.', { exact: true })).toBeVisible();
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(1);
+});
+
+test('merge preflight updates non-required CI without blocking the merge', async ({ page }) => {
+  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const mergeGate = gate('merge after latest CI display');
+  const state = await installRenderingFixture(page, fixture, { authenticated: true, mergeGate });
+  await page.goto(path);
+  const card = page.locator('.pull-merge-card');
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  state.mergeStatus = {
+    base_sha: fixture.base, head_sha: fixture.sha, open: true, draft: false, merged: false,
+    mergeable: true, rebaseable: true, mergeable_state: 'unstable', ci_summary: { $tag: 'Failure' },
+    ci_checks: [{ name: 'Optional tests', state: { $tag: 'Failure' }, description: 'Failed', source: { $tag: 'CheckRun' } }],
+    ci_warnings: [],
+  };
+  await card.locator('.rebase-merge-button').click();
+  await expect(card.getByText('Some checks were not successful', { exact: true })).toBeVisible();
+  await expect(card.locator('.rebase-merge-button')).toBeDisabled();
+  await expect.poll(() => state.calls.filter(call => call.op === 'github.pull.rebase.merge').length).toBe(1);
+  mergeGate.resolve();
+  await expect(card.getByText('✓ This pull request is merged.', { exact: true })).toBeVisible();
+});
+
+test('merge preflight failure requires another explicit click and another status read', async ({ page }) => {
+  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const state = await installRenderingFixture(page, fixture, { authenticated: true });
+  await page.goto(path);
+  const card = page.locator('.pull-merge-card');
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  // Return malformed status data for this fresh read, then recover on retry.
+  state.mergeStatus = {};
+  const statusCalls = state.calls.filter(call => call.op === 'github.pull.merge.status').length;
+  await card.locator('.rebase-merge-button').click();
+  await expect(card.getByRole('alert')).toBeVisible();
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
+  state.mergeStatus = null;
+  await card.locator('.rebase-merge-button').click();
+  await expect(card.getByText('✓ This pull request is merged.', { exact: true })).toBeVisible();
+  expect(state.calls.filter(call => call.op === 'github.pull.merge.status')).toHaveLength(statusCalls + 2);
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(1);
+});
+
+test('merge preflight rejects a changed head before submitting a merge', async ({ page }) => {
+  const fixture = syntheticFixture({ files: 1, declarations: 1 });
+  const state = await installRenderingFixture(page, fixture, { authenticated: true });
+  await page.goto(path);
+  const card = page.locator('.pull-merge-card');
+  await expect(card.locator('.rebase-merge-button')).toBeEnabled();
+  state.mergeStatus = {
+    base_sha: fixture.base, head_sha: 'c'.repeat(40), open: true, draft: false, merged: false,
+    mergeable: true, rebaseable: true, mergeable_state: 'clean', ci_checks: [], ci_warnings: [],
+  };
+  await card.locator('.rebase-merge-button').click();
+  await expect(card.getByText('Load latest', { exact: true })).toBeVisible();
+  await expect(page.locator('.rebase-merge-button')).toHaveCount(0);
+  expect(state.calls.filter(call => call.op === 'github.pull.rebase.merge')).toHaveLength(0);
 });
 
 test('merge card shows aggregate CI and submits one pinned rebase merge', async ({ page }) => {

@@ -175,8 +175,15 @@ GitHub's merge endpoint with the expected head SHA and `merge_method: "rebase"`.
 The typed result contains `merged`, optional merge commit `sha`, and `message`.
 Stable errors distinguish expired authentication, permission denial, repository
 rules, conflicts, changed snapshots, rejected merges, rate limits and upstream
-failures. The frontend never auto-submits a merge; it only polls pending status
-after 2, 4, 8, 16, 30 and 30 seconds and refreshes on page reactivation.
+failures. Each explicit merge click first fetches fresh CI and merge status,
+updates the card, and submits the write only if the snapshot still matches and
+the PR remains actionable. Failed reads stop the operation; another click starts
+a new validation. Non-required CI failures or pending checks do not independently
+block merging: GitHub enforces repository rules at the merge endpoint. Status
+reads and merging are separate requests, so the page is not a continuously current
+or atomic view of GitHub state. Polls and ordinary refreshes never submit a merge;
+pending status is polled after 2, 4, 8, 16, 30 and 30 seconds, and page reactivation
+also refreshes it.
 
 ## Viewed synchronization
 
