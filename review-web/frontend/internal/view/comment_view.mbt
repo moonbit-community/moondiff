@@ -102,61 +102,131 @@ fn comment_body_view(
 ) -> @rabbita.Html {
   let body_id = "comment-body-" + review.comment_key(id)
   let expanded = review.body_expanded(id)
-  @html.article(class="github-comment", [
-    @html.div(class="github-comment-meta", [
-      comment_avatar(if author == "ghost" { None } else { Some(author) }),
-      @html.div(class="comment-byline", [
-        @html.strong(author),
-        @html.time(
-          datetime=created_at,
-          title=comment_full_time(created_at),
-          comment_relative_time(created_at),
-        ),
-      ]),
-      comment_menu(id, html_url, review, emit),
-    ]),
-    @html.div(
-      class="github-comment-content",
-      attrs=@html.Attrs::build().on_click(event => {
-        @application.follow_comment_footnote(event, review.generation, id, emit)
-      }),
-      [
-        @html.div(
-          id=body_id,
-          class="comment-body-clip",
-          attrs=@html.Attrs::build().data_set("expanded", expanded.to_string()),
-          markdown_view(
-            body,
-            class="github-comment-body",
-            scope=review.comment_key(id),
-            markdown?=markdown.map(context => { ..context, page_url: html_url, }),
+  let collapsible = match id {
+    IssueComment(_) => false
+    ReviewComment(_) => true
+    CommitComment(id) =>
+      review.group.commit_comments.any(c => c.id == id && c.path is Some(_))
+  }
+  let collapsed = review.comment_collapsed(id)
+  @html.article(
+    class="github-comment",
+    attrs=@html.Attrs::build().data_set("collapsed", collapsed.to_string()),
+    [
+      @html.div(class="github-comment-meta", [
+        comment_avatar(if author == "ghost" { None } else { Some(author) }),
+        @html.div(class="comment-byline", [
+          @html.strong(hidden=collapsed, author),
+          @html.time(
+            datetime=created_at,
+            title=comment_full_time(created_at),
+            comment_relative_time(created_at),
           ),
-        ),
-        @html.button(
-          type_="button",
-          class="comment-body-toggle",
-          hidden=true,
-          attrs=@html.Attrs::build()
-            .aria_expanded(expanded.to_string())
-            .aria_controls(body_id)
-            .on_click(event => {
-              @application.toggle_comment_body(
+        ]),
+        comment_menu(id, html_url, review, emit, hidden=collapsed),
+        if collapsible {
+          @html.button(
+            id="comment-collapse-" + review.comment_key(id),
+            type_="button",
+            class="comment-collapse-toggle",
+            title=if collapsed { "Expand comment" } else { "Collapse comment" },
+            attrs=@html.Attrs::build()
+              .aria_label(
+                if collapsed {
+                  "Expand comment by \{author}"
+                } else {
+                  "Collapse comment by \{author}"
+                },
+              )
+              .aria_expanded((!collapsed).to_string())
+              .aria_controls("comment-details-" + review.comment_key(id))
+              .on_click(event => {
+                if @browser.current_element(event.current_target())
+                  is Some(button) &&
+                  button.closest(".github-comment") is Some(card) &&
+                  card.query_selector(".comment-menu:popover-open")
+                  is Some(menu) {
+                  hide_menu(menu)
+                }
+                @application.set_comment_collapsed(
+                  event,
+                  review.generation,
+                  id,
+                  !collapsed,
+                  emit,
+                )
+              }),
+            if collapsed {
+              "▸"
+            } else {
+              "▾"
+            },
+          )
+        } else {
+          @html.nothing
+        },
+      ]),
+      @html.div(
+        id="comment-details-" + review.comment_key(id),
+        hidden=collapsed,
+        [
+          @html.div(
+            hidden=collapsed,
+            class="github-comment-content",
+            attrs=@html.Attrs::build().on_click(event => {
+              @application.follow_comment_footnote(
                 event,
                 review.generation,
                 id,
                 emit,
               )
             }),
-          if expanded {
-            "Show less"
-          } else {
-            "Show more"
-          },
-        ),
-      ],
-    ),
-    comment_delete_controls(id, review, emit),
-  ])
+            [
+              @html.div(
+                id=body_id,
+                class="comment-body-clip",
+                attrs=@html.Attrs::build().data_set(
+                  "expanded",
+                  expanded.to_string(),
+                ),
+                markdown_view(
+                  body,
+                  class="github-comment-body",
+                  scope=review.comment_key(id),
+                  markdown?=markdown.map(context => {
+                    ..context,
+                    page_url: html_url,
+                  }),
+                ),
+              ),
+              @html.button(
+                type_="button",
+                class="comment-body-toggle",
+                hidden=true,
+                attrs=@html.Attrs::build()
+                  .aria_expanded(expanded.to_string())
+                  .aria_controls(body_id)
+                  .on_click(event => {
+                    @application.toggle_comment_body(
+                      event,
+                      review.generation,
+                      id,
+                      emit,
+                    )
+                  }),
+                if expanded {
+                  "Show less"
+                } else {
+                  "Show more"
+                },
+              ),
+            ],
+          ),
+          comment_delete_controls(id, review, emit),
+        ],
+      ),
+    ],
+  )
 }
 
 ///|

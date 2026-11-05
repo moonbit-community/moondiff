@@ -68,6 +68,8 @@ fn update_review(
         return (model, @rabbita.none)
       }
       match request.action {
+        SetCollapsed(desired, _) =>
+          SetCommentCollapsed(request.generation, request.id, desired)
         Toggle(_) => ToggleCommentBody(request.generation, request.id)
         Footnote(_) =>
           SetCommentBodyExpanded(request.generation, request.id, true)

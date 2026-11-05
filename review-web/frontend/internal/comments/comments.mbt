@@ -77,6 +77,7 @@ pub struct Session {
   priv deleted : Array[CommentId]
   // Reading choices belong to this page and are not exported with navigation state.
   priv expanded_bodies : Array[CommentId]
+  priv collapsed_comments : Array[CommentId]
 }
 
 ///|
@@ -104,6 +105,7 @@ pub fn Session::new(enabled~ : Bool = false) -> Session {
     deletion: None,
     deleted: [],
     expanded_bodies: [],
+    collapsed_comments: [],
     comments: if enabled {
       CommentsLoading
     } else {
