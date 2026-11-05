@@ -4,6 +4,7 @@ pub(all) enum PullMergeMsg {
   Poll(Int32, Int32, Int32)
   StatusLoaded(Int32, Int32, Result[@protocol.ApiPullMergeStatus, Error])
   Submit
+  PreflightFinished(Int32, Int32, Result[@protocol.ApiPullMergeStatus, Error])
   MergeFinished(Int32, Int32, Result[@protocol.ApiPullMergeResult, Error])
 }
 
@@ -123,15 +124,32 @@ fn update_pull_merge(
         serial: model.pull_merge.serial + 1,
         submitting: true,
         loading: false,
+        retry: 0,
         poll_scheduled: false,
         error: None,
       }
       let next = { ..model, pull_merge: state, }
       (
         next,
-        pull_rebase_merge_request(next, reference, number, base, head, emit),
+        @github_client.get_pull_merge_status(
+          {
+            owner: reference.owner,
+            repo: reference.repo,
+            number,
+            expected_base_sha: base,
+            expected_head_sha: head,
+          },
+          next.generation,
+          result => {
+            emit(
+              PullMerge(PreflightFinished(state.epoch, state.serial, result)),
+            )
+          },
+        ),
       )
     }
+    PreflightFinished(epoch, serial, result) =>
+      finish_pull_merge_preflight(model, epoch, serial, result, emit)
     MergeFinished(epoch, serial, result) => {
       guard epoch == model.pull_merge.epoch &&
         serial == model.pull_merge.serial &&

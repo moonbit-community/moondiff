@@ -110,7 +110,7 @@ test "pull merge polling uses six bounded retries" {
 }
 
 ///|
-test "rebase merge requires authentication and submits only once" {
+test "rebase merge requires authentication and a fresh status before submitting once" {
   let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
   let ready = {
     ..merge_test_model(auth=Anonymous(None)),
@@ -130,11 +130,33 @@ test "rebase merge requires authentication and submits only once" {
   assert_eq(submitting.pull_merge.serial, 1)
   let (duplicate, _) = update_pull_merge(submitting, Submit, emit)
   assert_true(duplicate == submitting)
-  let (merged, _) = update_pull_merge(
+  let (validated, _) = update_pull_merge(
     submitting,
-    MergeFinished(
+    PreflightFinished(
       submitting.pull_merge.epoch,
       submitting.pull_merge.serial,
+      Ok(merge_test_status(state=Failure)),
+    ),
+    emit,
+  )
+  assert_true(validated.pull_merge.submitting)
+  assert_eq(validated.pull_merge.serial, 2)
+  assert_true(validated.pull_merge.status.unwrap().ci_summary is Some(Failure))
+  let (late, _) = update_pull_merge(
+    validated,
+    PreflightFinished(
+      submitting.pull_merge.epoch,
+      submitting.pull_merge.serial,
+      Ok(merge_test_status()),
+    ),
+    emit,
+  )
+  assert_true(late == validated)
+  let (merged, _) = update_pull_merge(
+    validated,
+    MergeFinished(
+      validated.pull_merge.epoch,
+      validated.pull_merge.serial,
       Ok({
         merged: true,
         sha: Some("cccccccccccccccccccccccccccccccccccccccc"),
@@ -149,6 +171,121 @@ test "rebase merge requires authentication and submits only once" {
   assert_true(status.merged)
   assert_false(status.open)
   assert_false(merged.pull_merge.submitting)
+}
+
+///|
+test "merge preflight stops on changed mergeability without auto-merging after refresh" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let ready = {
+    ..merge_test_model(),
+    pull_merge: {
+      ..empty_pull_merge_state(0),
+      status: Some(merge_test_status()),
+    },
+  }
+  let statuses = [
+    { ..merge_test_status(), mergeable_state: "blocked", },
+    { ..merge_test_status(), mergeable: Some(false), },
+    { ..merge_test_status(), rebaseable: Some(false), },
+    { ..merge_test_status(), draft: true, },
+    { ..merge_test_status(), open: false, },
+    { ..merge_test_status(), merged: true, },
+    { ..merge_test_status(), mergeable: None, },
+  ]
+  for status in statuses {
+    let (checking, _) = update_pull_merge(ready, Submit, emit)
+    let (stopped, _) = update_pull_merge(
+      checking,
+      PreflightFinished(0, checking.pull_merge.serial, Ok(status)),
+      emit,
+    )
+    assert_false(stopped.pull_merge.submitting)
+    assert_true(stopped.pull_merge.status == Some(status))
+    let (refreshing, _) = begin_pull_merge_refresh(stopped, emit)
+    let (refreshed, _) = update_pull_merge(
+      refreshing,
+      StatusLoaded(0, refreshing.pull_merge.serial, Ok(merge_test_status())),
+      emit,
+    )
+    assert_false(refreshed.pull_merge.submitting)
+    assert_true(pull_merge_actionable(refreshed.pull_merge.status.unwrap()))
+  }
+}
+
+///|
+test "merge preflight refuses failed reads and changed snapshots or permissions" {
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let ready = {
+    ..merge_test_model(),
+    pull_merge: {
+      ..empty_pull_merge_state(0),
+      status: Some(merge_test_status()),
+    },
+  }
+  let (checking, _) = update_pull_merge(ready, Submit, emit)
+  for
+    code in [
+      "merge_upstream_failure", "authentication_required", "pull_snapshot_changed",
+    ] {
+    let (failed, _) = update_pull_merge(
+      checking,
+      PreflightFinished(
+        0,
+        checking.pull_merge.serial,
+        Err(
+          @github_client.HttpRequestError::HttpRequestError(
+            status=409,
+            code~,
+            detail="Preflight failed",
+          ),
+        ),
+      ),
+      emit,
+    )
+    assert_false(failed.pull_merge.submitting)
+    if code == "authentication_required" {
+      assert_true(failed.auth is AuthFailed(_))
+    } else if code == "pull_snapshot_changed" {
+      assert_true(failed.review.snapshot_stale)
+    } else {
+      assert_true(failed.pull_merge.error is Some(_))
+    }
+  }
+  for
+    status in [
+      {
+        ..merge_test_status(),
+        base_sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      },
+      {
+        ..merge_test_status(),
+        head_sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      },
+    ] {
+    let (stale, _) = update_pull_merge(
+      checking,
+      PreflightFinished(0, checking.pull_merge.serial, Ok(status)),
+      emit,
+    )
+    assert_true(stale.review.snapshot_stale)
+    assert_false(stale.pull_merge.submitting)
+  }
+  let paused = {
+    ..checking,
+    access: { ..checking.access, identity_checking: true, },
+  }
+  let (stopped, _) = update_pull_merge(
+    paused,
+    PreflightFinished(0, checking.pull_merge.serial, Ok(merge_test_status())),
+    emit,
+  )
+  assert_false(stopped.pull_merge.submitting)
+  let (late, _) = update_pull_merge(
+    stopped,
+    PreflightFinished(0, checking.pull_merge.serial, Ok(merge_test_status())),
+    emit,
+  )
+  assert_true(late == stopped)
 }
 
 ///|

@@ -13,16 +13,18 @@ export function instrumentRenderProbe(source) {
       // Return fresh scalar/array copies; no mutable application objects escape.
       globalThis.__moondiffTestState = () => {
         const client = ${client}, w = client.workspace;
+        // MoonBit arrays may use a backing buffer with spare capacity.
+        const items = value => Array.isArray(value) ? value : value.buf.slice(0, value.len);
         return {
           generation: client.generation, identityEpoch: w.epoch,
           checking: w.checking, sourcePaused: w.source_pause !== undefined,
           home: w.home, prefetchReady: w.prefetch_ready, limited: w.limited,
           round: w.round, candidateIndex: w.index,
-          candidates: w.candidates.map(c => 'pull:' + c.pull.owner.toLowerCase() + '/' + c.pull.repo.toLowerCase() + '/' + c.pull.number),
-          sourceIndex: w.source_index, sourceCount: w.source_queue.length,
+          candidates: items(w.candidates).map(c => 'pull:' + c.pull.owner.toLowerCase() + '/' + c.pull.repo.toLowerCase() + '/' + c.pull.number),
+          sourceIndex: w.source_index, sourceCount: items(w.source_queue).length,
           backgroundOwner: w.background_owner ?? null,
           reads: w.reads.size, tasks: w.tasks.size,
-          cache: w.cache.map(entry => ({ key: entry.key, kind: entry.payload.$tag, created: entry.created })),
+          cache: items(w.cache).map(entry => ({ key: entry.key, kind: entry.payload.$tag, created: entry.created })),
           application: structuredClone(globalThis.__moondiffBusiness),
         };
       };`;
