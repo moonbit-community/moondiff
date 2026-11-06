@@ -5,7 +5,7 @@
 // https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf
 // No symbol table or conditional-compilation evaluation is needed for coloring.
 fn word_kind(word : StringView) -> HighlightKind {
-  match word {
+  let kind : HighlightKind = match word {
     "break"
     | "case"
     | "continue"
@@ -68,7 +68,13 @@ fn word_kind(word : StringView) -> HighlightKind {
     "true" | "false" | "TRUE" | "FALSE" | "NULL" | "nullptr" => Boolean
     "__LINE__" | "__STDC__" | "__STDC_VERSION__" | "__STDC_HOSTED__" => Number
     "__FILE__" | "__DATE__" | "__TIME__" | "__func__" => StringLiteral
-    _ if word.has_suffix("_t") => Type
     _ => Variable
+  }
+  // Keep the fallback outside the match to avoid duplicating it across
+  // StringView pattern branches in the generated JavaScript.
+  if kind is Variable && word.has_suffix("_t") {
+    Type
+  } else {
+    kind
   }
 }

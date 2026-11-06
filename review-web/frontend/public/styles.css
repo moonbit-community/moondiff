@@ -2456,6 +2456,41 @@ button.comment-delete-confirm:hover {
   padding: 12px 12px 0;
 }
 
+.github-comment [hidden] {
+  display: none;
+}
+
+.github-comment[data-collapsed="true"] > .github-comment-meta {
+  padding-bottom: 12px;
+  flex-wrap: nowrap;
+}
+
+.github-comment[data-collapsed="true"] .comment-byline {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.github-comment[data-collapsed="true"] .comment-byline time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comment-collapse-toggle {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.comment-collapse-toggle:hover {
+  background: var(--border-soft);
+}
+
 .comment-byline {
   display: flex;
   min-width: 0;
@@ -3234,7 +3269,7 @@ button.segmented-option.active,
   flex-basis: 100%;
 }
 
-.github-comment > .comment-error {
+.github-comment > div > .comment-error {
   padding: 0 12px 12px;
 }
 

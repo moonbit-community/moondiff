@@ -96,7 +96,12 @@ pub fn finish(name : String) -> Unit {
   let ordered = values.copy()
   ordered.sort()
   let target = object(object(sink, "timings"), name)
-  target.set_with_string("samples", values.copy())
+  // Export a native JS array without exposing MoonBit's array representation.
+  let exported = @js.JsArray::new()
+  for value in values {
+    exported.push(value)
+  }
+  target.set_with_string("samples", exported)
   target.set_with_string("p50", ordered[(ordered.length() - 1) / 2])
   target.set_with_string("p95", ordered[(ordered.length() * 95 + 99) / 100 - 1])
   if name == "click_to_diff" {

@@ -56,6 +56,8 @@ pub fn range_pull_selector_ready(RangeState) -> Bool
 
 pub fn range_selected_path(@github.CommitRef, RangeState) -> String?
 
+pub fn set_comment_collapsed(@dom.MouseEvent, Int32, @comments.CommentId, Bool, @cmd.Emit[Msg]) -> @cmd.Cmd
+
 pub fn snapshot_confirmed(Model) -> Bool
 
 pub fn toggle_comment_body(@dom.MouseEvent, Int32, @comments.CommentId, @cmd.Emit[Msg]) -> @cmd.Cmd
@@ -104,6 +106,7 @@ pub(all) enum AuthStatus {
 pub(all) enum CommentBodyAction {
   Toggle(Double)
   Footnote(String)
+  SetCollapsed(Bool, Double)
 }
 
 pub(all) struct CommentBodyRequest {
@@ -340,6 +343,7 @@ pub(all) enum PullMergeMsg {
   Poll(Int32, Int32, Int32)
   StatusLoaded(Int32, Int32, Result[@moondiff-review-web-protocol.ApiPullMergeStatus, Error])
   Submit
+  PreflightFinished(Int32, Int32, Result[@moondiff-review-web-protocol.ApiPullMergeStatus, Error])
   MergeFinished(Int32, Int32, Result[@moondiff-review-web-protocol.ApiPullMergeResult, Error])
 }
 

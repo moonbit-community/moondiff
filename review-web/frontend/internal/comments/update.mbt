@@ -19,6 +19,7 @@ pub(all) enum Event {
   CommentsLoaded(Int32, Int32, Result[ApiCommentBundle, Failure])
   ToggleCommentBody(Int32, CommentId)
   SetCommentBodyExpanded(Int32, CommentId, Bool)
+  SetCommentCollapsed(Int32, CommentId, Bool)
   OpenOverallDraft
   OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, ReviewAnchor)
@@ -91,6 +92,25 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
         }),
         [],
       )
+    SetCommentCollapsed(generation, id, desired) => {
+      guard generation == model.generation &&
+        model.review.comments is CommentsReady(bundle) &&
+        bundle_collapsible(bundle, id) else {
+        return (model, [])
+      }
+      let collapsed = model.review.collapsed_comments
+      if collapsed.contains(id) == desired {
+        return (model, [])
+      }
+      let next = if desired {
+        let next = collapsed.copy()
+        next.push(id)
+        next
+      } else {
+        collapsed.filter(other => other != id)
+      }
+      (with_review(model, { ..model.review, collapsed_comments: next, }), [])
+    }
     ToggleCommentBody(generation, id) =>
       update_review(
         model,

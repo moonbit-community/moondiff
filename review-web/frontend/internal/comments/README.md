@@ -92,6 +92,15 @@ algorithm and filter changes, background refresh and file reopening retain these
 choices. Loading a new snapshot starts with all declarations expanded. Folding
 does not change draft identity or body, and is not persisted in the URL or storage.
 
+Line comments and replies also have independent manual collapse choices in
+`Session.collapsed_comments`, projected only into their owning region. Typed IDs
+keep review and commit comments separate; anonymous readers can use the same
+controls. Collapse hides the card body and actions without changing five-line
+preview expansion, deletion state or the reply editor. Refreshes and presentation
+changes retain these choices. Removed comments are pruned, and a changed page,
+target or snapshot resets them; navigation exports contain no reading choices.
+Overall issue comments and commit comments without a file have no manual toggle.
+
 Comment lists use generation plus typed comment IDs. Threads retain the original
 root ID after root deletion. Draft keys use generation plus a separate draft
 sequence. The editor keeps this key through publication and synchronization.

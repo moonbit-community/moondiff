@@ -90,6 +90,11 @@ fn index_comments(before : Session, after : Session) -> Session {
   }
   {
     ..after,
+    collapsed_comments: match after.comments {
+      CommentsReady(bundle) =>
+        after.collapsed_comments.filter(id => bundle_collapsible(bundle, id))
+      _ => after.collapsed_comments
+    },
     expanded_bodies: match after.comments {
       CommentsReady(bundle) =>
         after.expanded_bodies.filter(id => bundle_contains(bundle, id))
@@ -190,6 +195,7 @@ pub struct ReadView {
   priv can_submit : Bool
   priv can_load : Bool
   priv expanded_bodies : ReadOnlyArray[CommentId]
+  priv collapsed_comments : ReadOnlyArray[CommentId]
 }
 
 ///|
@@ -276,6 +282,15 @@ pub fn Session::read_view(
         }
       }),
     ),
+    collapsed_comments: ReadOnlyArray::from_array(
+      self.collapsed_comments.filter(id => {
+        match id {
+          ReviewComment(id) => group.review_comments.any(c => c.id == id)
+          CommitComment(id) => group.commit_comments.any(c => c.id == id)
+          IssueComment(_) => false
+        }
+      }),
+    ),
     pending_review_receipts: ReadOnlyArray::from_array(pending_review_receipts),
     generation: self.generation(),
     snapshot_stale: self.snapshot_stale,
@@ -331,6 +346,11 @@ pub fn ReadView::comment_key(self : ReadView, id : CommentId) -> String {
 ///|
 pub fn ReadView::body_expanded(self : ReadView, id : CommentId) -> Bool {
   self.expanded_bodies.contains(id)
+}
+
+///|
+pub fn ReadView::comment_collapsed(self : ReadView, id : CommentId) -> Bool {
+  self.collapsed_comments.contains(id)
 }
 
 ///|

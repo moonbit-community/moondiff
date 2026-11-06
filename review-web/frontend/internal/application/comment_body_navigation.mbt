@@ -2,6 +2,7 @@
 pub(all) enum CommentBodyAction {
   Toggle(Double)
   Footnote(String)
+  SetCollapsed(Bool, Double)
 }
 
 ///|
@@ -99,6 +100,33 @@ pub fn toggle_comment_body(
 }
 
 ///|
+pub fn set_comment_collapsed(
+  event : @dom.MouseEvent,
+  generation : Int32,
+  id : @comments.CommentId,
+  collapsed : Bool,
+  emit : @rabbita.Emit[Msg],
+) -> @rabbita.Cmd {
+  guard @browser.current_element(event.current_target()) is Some(button) &&
+    comment_body_region(button) is Some(region) else {
+    return @rabbita.none
+  }
+  emit(
+    Review(
+      BodyActivated({
+        generation,
+        id,
+        region,
+        action: SetCollapsed(
+          collapsed,
+          button.get_bounding_client_rect().get_top(),
+        ),
+      }),
+    ),
+  )
+}
+
+///|
 pub fn follow_comment_footnote(
   event : @dom.MouseEvent,
   generation : Int32,
@@ -168,12 +196,31 @@ fn comment_body_snapshot(
       .find_first(c => c.id == id)
       .map(c => c.body)
   }
-  source.map(source => (review.body_expanded(request.id), source))
+  match request.action {
+    SetCollapsed(_, _) => {
+      let collapsible = match request.id {
+        IssueComment(_) => false
+        ReviewComment(_) => true
+        CommitComment(id) =>
+          review.group.commit_comments.any(c => c.id == id && c.path is Some(_))
+      }
+      guard collapsible else { return None }
+      source.map(source => (review.comment_collapsed(request.id), source))
+    }
+    _ => {
+      guard !review.comment_collapsed(request.id) else { return None }
+      source.map(source => (review.body_expanded(request.id), source))
+    }
+  }
 }
 
 ///|
 fn comment_body_expected(request : CommentBodyRequest) -> Bool {
-  request.action is Footnote(_)
+  match request.action {
+    Footnote(_) => true
+    Toggle(_) => false
+    SetCollapsed(desired, _) => desired
+  }
 }
 
 ///|
@@ -246,31 +293,47 @@ fn commit_comment_body(request : CommentBodyRequest) -> Unit {
     return
   }
   clear_comment_body_request()
-  guard @browser.element(
-      "comment-body-\{request.generation}:\{request.id.key()}",
-    )
-    is Some(clip) &&
-    clip.get_is_connected() &&
-    comment_body_region(clip) == Some(request.region) &&
-    clip.get_attribute("data-expanded") ==
-    Some(comment_body_expected(request).to_string()) &&
-    clip.closest(".github-comment-content") is Some(container) &&
-    container.query_selector(".comment-body-toggle") is Some(button) else {
-    return
-  }
+  let key = "\{request.generation}:\{request.id.key()}"
   let (target, top) = match request.action {
-    Toggle(previous_top) => {
-      let rect = button.get_bounding_client_rect()
-      let bottom = @dom.window().inner_height() - rect.get_height() - 8.0
-      (button, previous_top.min(bottom).max(comment_body_inset(button)))
-    }
-    Footnote(id) => {
-      guard @browser.element(id) is Some(target) &&
-        clip.contains(target.as_node()) else {
+    SetCollapsed(desired, previous_top) => {
+      guard @browser.element("comment-collapse-" + key) is Some(button) &&
+        button.get_is_connected() &&
+        comment_body_region(button) == Some(request.region) &&
+        button.get_attribute("aria-expanded") == Some((!desired).to_string()) else {
         return
       }
-      @browser.navigate_fragment(id)
-      (target, comment_body_inset(target))
+      let bottom = @dom.window().inner_height() -
+        button.get_bounding_client_rect().get_height() -
+        8.0
+      (button, previous_top.min(bottom).max(comment_body_inset(button)))
+    }
+    action => {
+      guard @browser.element("comment-body-" + key) is Some(clip) &&
+        clip.get_is_connected() &&
+        comment_body_region(clip) == Some(request.region) &&
+        clip.get_attribute("data-expanded") ==
+        Some(comment_body_expected(request).to_string()) &&
+        clip.closest(".github-comment-content") is Some(container) &&
+        container.get_attribute("hidden") is None &&
+        container.query_selector(".comment-body-toggle") is Some(button) else {
+        return
+      }
+      match action {
+        Toggle(previous_top) => {
+          let rect = button.get_bounding_client_rect()
+          let bottom = @dom.window().inner_height() - rect.get_height() - 8.0
+          (button, previous_top.min(bottom).max(comment_body_inset(button)))
+        }
+        Footnote(id) => {
+          guard @browser.element(id) is Some(target) &&
+            clip.contains(target.as_node()) else {
+            return
+          }
+          @browser.navigate_fragment(id)
+          (target, comment_body_inset(target))
+        }
+        SetCollapsed(_, _) => return
+      }
     }
   }
   let rect = target.get_bounding_client_rect()
