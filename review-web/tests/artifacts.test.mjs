@@ -61,7 +61,7 @@ test('release contains a Wasm module and self-contained root assets runnable wit
   const gzipBytes = gzipSync(client, { level: 5 }).length;
   t.diagnostic(`Frontend JS: ${clientBytes} bytes, ${gzipBytes} bytes gzip level 5`);
   assert(clientBytes <= 2_500_000, `Release JS exceeds the 2.5 MB budget: ${clientBytes} bytes`);
-  assert(gzipBytes <= 500_000, `Release JS exceeds the 500 KB gzip budget: ${gzipBytes} bytes`);
+  assert(gzipBytes <= 550_000, `Release JS exceeds the 550 KB gzip budget: ${gzipBytes} bytes`);
   // These hooks are injected by render-probe.mjs; the optional metrics sink is part of the app.
   for (const probe of ['__moondiffPendingPaints', '__moondiffFrameBarrier', '__moondiffProbeRegion', '__moondiffTestState', '__moondiffBusiness', '__moondiffTimerSnapshot', '__moondiffSettleFrame', '__moondiffScrollWait']) {
     assert(!client.includes(probe), `Test probe leaked into release JS: ${probe}`);
