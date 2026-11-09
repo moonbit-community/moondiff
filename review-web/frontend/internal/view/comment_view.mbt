@@ -116,7 +116,7 @@ fn comment_body_view(
       @html.div(class="github-comment-meta", [
         comment_avatar(if author == "ghost" { None } else { Some(author) }),
         @html.div(class="comment-byline", [
-          @html.strong(hidden=collapsed, author),
+          @html.strong(author),
           @html.time(
             datetime=created_at,
             title=comment_full_time(created_at),
