@@ -17,7 +17,8 @@ async function assertSingleLine(card, author = 'reviewer') {
   await expect(card.locator('.comment-collapse-toggle')).toHaveAccessibleName(`Expand comment by ${author}`);
   await expect(card.locator('.comment-collapse-toggle')).toHaveAttribute('aria-expanded', 'false');
   await expect(card.locator('.github-comment-content')).toBeHidden();
-  await expect(card.locator('.comment-byline strong')).toBeHidden();
+  await expect(card.locator('.comment-byline strong')).toBeVisible();
+  await expect(card.locator('.comment-byline strong')).toHaveText(author);
   await expect(card.locator('.comment-actions')).toBeHidden();
   await expect(card.locator('time')).toBeVisible();
   const size = await card.evaluate(el => {
@@ -31,6 +32,42 @@ async function assertSingleLine(card, author = 'reviewer') {
   expect(size.overflow).toBeLessThanOrEqual(1);
   expect(size.wrap).toBe('nowrap');
   expect(size.byline).toBe('nowrap');
+}
+
+for (const width of [320, 420]) for (const target of [pullTarget(), commitTarget()]) {
+  test(`collapsed ${target.kind} comment retains a long username and timestamp at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await installRenderProbe(page);
+    await installApi(page, target);
+    const author = 'reviewer-with-a-very-long-github-username';
+    await page.addInitScript(author => {
+      window.__fake.reviewComments[0].user.login = author;
+      window.__fake.commitComments[0].user.login = author;
+    }, author);
+    await page.goto(reviewPath(target));
+    const card = commentCard(page, target.kind === 'pull' ? 'review' : 'commit', target.kind === 'pull' ? 20 : 30);
+    await expect(card).toBeVisible();
+    await card.locator('.comment-collapse-toggle').click();
+    for (const layout of ['Split', 'Unified']) {
+      await page.getByRole('button', { name: layout, exact: true }).click();
+      await settleRegions(page);
+      await assertSingleLine(card, author);
+      const bounds = await card.evaluate(el => {
+        const byline = el.querySelector('.comment-byline').getBoundingClientRect();
+        const author = el.querySelector('.comment-byline strong').getBoundingClientRect();
+        const time = el.querySelector('time').getBoundingClientRect();
+        return { authorWidth: author.width, timeWidth: time.width,
+          inside: author.left >= byline.left && time.right <= byline.right + 1,
+          overlap: author.right > time.left,
+          overflow: document.documentElement.scrollWidth - innerWidth };
+      });
+      expect(bounds.authorWidth).toBeGreaterThan(0);
+      expect(bounds.timeWidth).toBeGreaterThan(0);
+      expect(bounds.inside).toBe(true);
+      expect(bounds.overlap).toBe(false);
+      expect(bounds.overflow).toBeLessThanOrEqual(1);
+    }
+  });
 }
 
 for (const width of [1280, 420]) for (const layout of ['Split', 'Unified']) {

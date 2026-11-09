@@ -26,7 +26,7 @@ test "manual collapse retains Markdown and deletion controls under hidden contai
   for
     expected in [
       "data-collapsed=\"true\"", "aria-label=\"Expand comment by author\"", "aria-expanded=\"false\"",
-      "aria-controls=\"comment-details-3:review:20\"", "<strong hidden=\"\">author</strong>",
+      "aria-controls=\"comment-details-3:review:20\"", "<strong>author</strong>",
       "<div id=\"comment-details-3:review:20\" hidden=\"\">", "<div class=\"comment-actions\" hidden=\"\">",
       "<strong>Keep this body</strong>", "Confirm delete",
     ] {

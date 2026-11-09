@@ -2471,9 +2471,14 @@ button.comment-delete-confirm:hover {
   overflow: hidden;
 }
 
-.github-comment[data-collapsed="true"] .comment-byline time {
+.github-comment[data-collapsed="true"] .comment-byline strong {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.github-comment[data-collapsed="true"] .comment-byline time {
+  flex-shrink: 0;
 }
 
 .comment-collapse-toggle {
