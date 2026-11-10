@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "**/cli_test/snapshot/*.txt": "ansi"
+  },
+  "[ansi][plaintext]": {
+    "editor.bracketPairColorization.enabled": false
+  }
+}
