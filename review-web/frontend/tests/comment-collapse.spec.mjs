@@ -1,7 +1,180 @@
 import { test, expect } from '../../tests/browser-test.mjs';
-import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe, renderCounts, settleRegions } from '../../tests/render-probe.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
+import { navigate } from './rendering-fixture.mjs';
+import { clickLineCommentButton } from './comment-actions.mjs';
+import { closeSignInDialog, expectSignInDialog } from './sign-in-dialog.mjs';
 import { installApi, reviewPath, pullTarget, commitTarget, commentCard, commentLines } from './review-fixture.mjs';
+
+async function assertOverviewCollapsed(page) {
+  const overview = page.locator('#comments');
+  await expect(overview.getByRole('heading', { name: 'Comments', exact: true })).toBeVisible();
+  const toggle = overview.getByRole('button', { name: 'Expand comments', exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toHaveAttribute('aria-controls', 'comments-content');
+  await expect(overview.locator('#comments-content')).toBeHidden();
+  await expect(overview.locator('.comments-controls')).toBeHidden();
+  await expect(overview.locator('.section-label')).toBeHidden();
+  // The accessibility tree must contain only the heading and toggle.
+  expect(await overview.ariaSnapshot()).toBe('- heading "Comments" [level=2]\n- button "Expand comments": ▸');
+  const bounds = await overview.evaluate(el => {
+    const toolbar = el.querySelector('.comments-toolbar');
+    const title = el.querySelector('h2').getBoundingClientRect();
+    const button = el.querySelector('.comments-overview-toggle').getBoundingClientRect();
+    return { content: el.clientHeight - parseFloat(getComputedStyle(el).paddingTop) - parseFloat(getComputedStyle(el).paddingBottom),
+      header: toolbar.getBoundingClientRect().height, sameLine: button.top < title.bottom && title.top < button.bottom,
+      overflow: el.scrollWidth - el.clientWidth };
+  });
+  expect(Math.abs(bounds.content - bounds.header)).toBeLessThan(2);
+  expect(bounds.sameLine).toBe(true);
+  expect(bounds.overflow).toBeLessThanOrEqual(1);
+}
+
+for (const target of [pullTarget(), commitTarget()]) for (const authenticated of [false, true]) {
+  test(`overview collapses all ${target.kind} discussion controls for ${authenticated ? 'signed-in' : 'anonymous'} readers`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    await ready(page, target, { authenticated });
+    const inline = commentCard(page, target.kind === 'pull' ? 'review' : 'commit', target.kind === 'pull' ? 20 : 30);
+    const before = await renderCounts(page);
+    await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+    await settleRegions(page);
+    await assertOverviewCollapsed(page);
+    expect((await renderCounts(page)).files).toEqual(before.files);
+    await expect(inline.locator('.github-comment-content')).toBeVisible();
+    const toggle = page.getByRole('button', { name: 'Expand comments', exact: true });
+    await toggle.focus();
+    await page.keyboard.press('Tab');
+    expect(await page.locator('#comments').evaluate(el => !el.contains(document.activeElement))).toBe(true);
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'Collapse comments', exact: true })).toBeFocused();
+    await expect(page.locator('#comments-content')).not.toHaveAttribute('hidden');
+    await expect(page.locator('#comments .refresh-comments')).toBeVisible();
+    await page.keyboard.press('Space');
+    await assertOverviewCollapsed(page);
+  });
+}
+
+for (const target of [pullTarget(), commitTarget()]) for (const status of ['empty', 'loading', 'failed']) {
+  test(`overview folds ${status} ${target.kind} discussions`, async ({ page }) => {
+    await installRenderProbe(page);
+    await installApi(page, target, status === 'failed' ? { commentListError: { status: 503, detail: 'Comments offline' } } : {});
+    await page.addInitScript(status => {
+      if (status === 'empty') {
+        window.__fake.issueComments = [];
+        window.__fake.reviewComments = [];
+        window.__fake.commitComments = [];
+      }
+      if (status === 'loading') window.__fake.delayNextList = true;
+    }, status);
+    try {
+      await page.goto(reviewPath(target));
+      const content = page.locator('#comments-content');
+      if (status === 'loading') await expect(content.locator('.comments-loading')).toBeVisible();
+      if (status === 'failed') await expect(content.locator('.comment-error')).toContainText('Comments offline');
+      if (status === 'empty') await expect(page.locator('#comments .refresh-comments')).toBeEnabled();
+      await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+      await settleRegions(page);
+      await assertOverviewCollapsed(page);
+      if (status === 'loading') {
+        await expect.poll(() => page.evaluate(() => typeof window.__fake.releaseList)).toBe('function');
+        await page.evaluate(() => window.__fake.releaseList());
+        await expect(content.locator('.comments-loading')).toHaveCount(0);
+        await assertOverviewCollapsed(page);
+      }
+      await page.getByRole('button', { name: 'Expand comments', exact: true }).click();
+      await expect(content).not.toHaveAttribute('hidden');
+      await expect(page.locator('#comments .refresh-comments')).toBeVisible();
+      if (status === 'failed') await expect(content.locator('.comment-error')).toBeVisible();
+      if (status === 'empty') await expect(content.locator('.github-comment')).toHaveCount(0);
+    } finally {
+      if (status === 'loading') await page.evaluate(() => window.__fake.releaseList?.());
+    }
+  });
+}
+
+test('overview keeps reading choices across refresh and layout changes and resets on reload and navigation', async ({ page }) => {
+  await ready(page);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+  await expect(page.locator('.refresh-comments')).toBeEnabled();
+  for (const name of ['Unified', 'Tree', 'Token', 'Split']) {
+    await page.getByRole('button', { name, exact: true }).click();
+    await settleRegions(page);
+    await assertOverviewCollapsed(page);
+  }
+  // Refresh remains operable through page reactivation while its button is hidden.
+  const lists = await page.evaluate(() => window.__fake.commentListCalls);
+  await page.evaluate(() => {
+    dispatchEvent(new Event('pagehide'));
+    dispatchEvent(new Event('pageshow'));
+  });
+  await expect.poll(() => page.evaluate(() => window.__fake.commentListCalls)).toBeGreaterThan(lists);
+  await assertOverviewCollapsed(page);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Collapse comments', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+  await page.evaluate(target => { window.__fake.target = target; }, commitTarget());
+  await navigate(page, reviewPath(commitTarget()));
+  await expect(page.getByRole('button', { name: 'Collapse comments', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+  await page.evaluate(target => { window.__fake.target = target; }, pullTarget());
+  await navigate(page, reviewPath());
+  await expect(page.getByRole('button', { name: 'Collapse comments', exact: true })).toBeVisible();
+});
+
+test('collapsed overview preserves comment previews and menus and leaves inline sign-in available', async ({ page }) => {
+  await ready(page, pullTarget(), { issueBody: commentLines('Overview', 30) });
+  const card = commentCard(page, 'issue', 10);
+  const preview = card.locator('.comment-body-toggle');
+  await preview.click();
+  await card.getByRole('button', { name: 'More options' }).click();
+  await expect(card.locator('.comment-menu')).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse comments', exact: true }).evaluate(el => el.click());
+  await settleRegions(page);
+  await expect(card.locator('.comment-menu')).toBeHidden();
+  await expect(card.locator('.comment-more')).toHaveAttribute('aria-expanded', 'false');
+  // Hidden previews must not be remeasured as zero-height bodies.
+  await expect(preview).not.toHaveAttribute('hidden');
+  await clickLineCommentButton(page.locator('.line-comment-button').first());
+  await expectSignInDialog(page, 'Sign in to comment');
+  await expect(page.locator('#comments-content')).toBeHidden();
+  await closeSignInDialog(page);
+  await page.getByRole('button', { name: 'Expand comments', exact: true }).click();
+  await settleRegions(page);
+  await expect(preview).toHaveText('Show less');
+  await preview.click();
+  await expect(preview).toHaveText('Show more');
+});
+
+test('overview retains missing-file reply drafts and each comment collapse choice', async ({ page }) => {
+  await installRenderProbe(page);
+  await installApi(page, pullTarget(), { authenticated: true, replyBody: commentLines('Reply', 30) });
+  await page.addInitScript(() => { window.__fake.reviewComments.forEach(c => { c.path = 'missing.mbt'; }); });
+  await page.goto(reviewPath());
+  const root = commentCard(page, 'review', 20);
+  const reply = commentCard(page, 'review', 21);
+  await reply.locator('.comment-body-toggle').click();
+  await root.locator('.comment-collapse-toggle').click();
+  await root.locator('xpath=..').getByRole('button', { name: 'Reply', exact: true }).click();
+  const editor = page.getByRole('textbox', { name: 'Write a reply', exact: true });
+  await editor.fill('Missing-file reply');
+  await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
+  const original = await editor.elementHandle();
+  const id = await editor.getAttribute('data-draft-id');
+  await editor.evaluate(el => el.setSelectionRange(2, 9, 'backward'));
+  await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+  await settleRegions(page);
+  await expect(editor).toBeHidden();
+  await page.getByRole('button', { name: 'Expand comments', exact: true }).click();
+  await settleRegions(page);
+  await assertSingleLine(root);
+  await expect(reply.locator('.comment-body-toggle')).toHaveText('Show less');
+  await expect(editor).toHaveValue('Missing-file reply');
+  await expect(editor).toHaveAttribute('data-draft-id', id);
+  expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
+  expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([2, 9, 'backward']);
+});
 
 async function ready(page, target = pullTarget(), options = {}) {
   await installRenderProbe(page);

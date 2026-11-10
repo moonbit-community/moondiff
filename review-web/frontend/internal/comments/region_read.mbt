@@ -188,6 +188,7 @@ pub struct ReadView {
   deletion : CommentDeletion?
   status : ReadStatus
   refresh_busy : Bool
+  overview_collapsed : Bool
   refresh_error : String?
   notice : String?
   published_url : String?
@@ -310,6 +311,7 @@ pub fn Session::read_view(
       }
     },
     refresh_busy: path is None && !(self.refresh is RefreshIdle),
+    overview_collapsed: path is None && self.overview_collapsed,
     refresh_error: if path is None {
       self.refresh_error
     } else {

@@ -149,6 +149,7 @@ pub(all) enum Event {
   ToggleCommentBody(Int32, CommentId)
   SetCommentBodyExpanded(Int32, CommentId, Bool)
   SetCommentCollapsed(Int32, CommentId, Bool)
+  SetOverviewCollapsed(Int32, Bool)
   OpenOverallDraft
   OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, @review.ReviewAnchor)
@@ -238,6 +239,7 @@ pub struct ReadView {
   deletion : CommentDeletion?
   status : ReadStatus
   refresh_busy : Bool
+  overview_collapsed : Bool
   refresh_error : String?
   notice : String?
   published_url : String?

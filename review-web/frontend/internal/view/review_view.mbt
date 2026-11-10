@@ -889,6 +889,8 @@ fn comments_overview(
   let is_pull = input.is_pull
   let review = input.review
   let auth = input.auth
+  let collapsed = review.overview_collapsed
+  let content_id = "comments-content"
   let refresh = @html.button(
     type_="button",
     class="secondary refresh-comments",
@@ -909,101 +911,162 @@ fn comments_overview(
       markdown?=input.markdown,
     )
   }
-  @html.section(id="comments", class="comments-overview", [
-    @html.div(class="comments-toolbar", [
-      @html.div([
-        @html.p(class="section-label", "GitHub discussion"),
-        @html.h2("Comments"),
-      ]),
-      @html.div([
-        @html.div(
-          class="discussion-auth",
-          style=if input.sign_in_dialog.entry is Some(_) {
-            ["visibility: hidden"]
-          } else {
-            []
-          },
-          attrs=@html.Attrs::build().inert(
-            input.sign_in_dialog.entry is Some(_),
+  @html.section(
+    id="comments",
+    class="comments-overview",
+    attrs=@html.Attrs::build().data_set("collapsed", collapsed.to_string()),
+    [
+      @html.div(class="comments-toolbar", [
+        @html.div(class="comments-heading", [
+          @html.p(class="section-label", hidden=collapsed, "GitHub discussion"),
+          @html.div(class="comments-title", [
+            @html.h2("Comments"),
+            @html.button(
+              type_="button",
+              class="comments-overview-toggle",
+              title=if collapsed {
+                "Expand comments"
+              } else {
+                "Collapse comments"
+              },
+              attrs=@html.Attrs::build()
+                .aria_label(
+                  if collapsed {
+                    "Expand comments"
+                  } else {
+                    "Collapse comments"
+                  },
+                )
+                .aria_expanded((!collapsed).to_string())
+                .aria_controls(content_id)
+                .on_click(event => {
+                  if !collapsed &&
+                    @browser.current_element(event.current_target())
+                    is Some(button) &&
+                    button.closest(".comments-overview") is Some(overview) {
+                    for
+                      menu in overview
+                      .query_selector_all(".comment-menu:popover-open")
+                      .iter() {
+                      hide_menu(menu)
+                    }
+                  }
+                  emit(
+                    Review(
+                      Domain(
+                        SetOverviewCollapsed(review.generation, !collapsed),
+                      ),
+                    ),
+                  )
+                }),
+              if collapsed {
+                "▸"
+              } else {
+                "▾"
+              },
+            ),
+          ]),
+        ]),
+        @html.div(class="comments-controls", hidden=collapsed, [
+          @html.div(
+            class="discussion-auth",
+            style=if input.sign_in_dialog.entry is Some(_) {
+              ["visibility: hidden"]
+            } else {
+              []
+            },
+            attrs=@html.Attrs::build().inert(
+              input.sign_in_dialog.entry is Some(_),
+            ),
+            auth_controls(auth, emit),
           ),
-          auth_controls(auth, emit),
-        ),
-        refresh,
+          refresh,
+        ]),
       ]),
-    ]),
-    if review.snapshot_stale {
-      @html.div(class="snapshot-stale", [
-        @html.p("PR updated. Load the latest snapshot to comment on new lines."),
-        @html.button(
-          type_="button",
-          class="secondary load-latest-snapshot",
-          disabled=!review.allowed(LoadSnapshot),
-          on_click=emit(Review(LoadLatestSnapshot)),
-          "Load latest",
-        ),
-      ])
-    } else {
-      @html.nothing
-    },
-    if review.notice is Some(message) {
-      @html.p(class="comment-notice", message)
-    } else {
-      @html.nothing
-    },
-    if review.published_url is Some(url) {
-      @html.a(
-        escape=true,
-        class="published-comment-link",
-        href=url,
-        target=Blank,
-        rel="noopener noreferrer",
-        "View published comment on GitHub ↗",
-      )
-    } else {
-      @html.nothing
-    },
-    if review.refresh_error is Some(message) && review.status is Ready {
-      @html.p(class="comment-error", message)
-    } else {
-      @html.nothing
-    },
-    match review.status {
-      Loading =>
+      @html.div(id=content_id, class="comments-content", hidden=collapsed, [
         if review.snapshot_stale {
-          @html.nothing
+          @html.div(class="snapshot-stale", [
+            @html.p(
+              "PR updated. Load the latest snapshot to comment on new lines.",
+            ),
+            @html.button(
+              type_="button",
+              class="secondary load-latest-snapshot",
+              disabled=!review.allowed(LoadSnapshot),
+              on_click=emit(Review(LoadLatestSnapshot)),
+              "Load latest",
+            ),
+          ])
         } else {
-          @html.p(class="comments-loading", "Loading comments…")
-        }
-      Failed(message) => @html.p(class="comment-error", message)
-      _ => @html.nothing
-    },
-    fallback_discussions(
-      prepare_discussions(None, None, review, emit, markdown?=input.markdown),
-      None,
-    ),
-    if is_pull {
-      @html.div(class="overall-comments", [
-        @html.div(issue_views),
-        if review.draft_visible() {
-          comment_editor_view(
-            review.draft().filter(draft => draft.kind is OverallDraft),
-            review,
-            emit,
-            overall=true,
+          @html.nothing
+        },
+        if review.notice is Some(message) {
+          @html.p(class="comment-notice", message)
+        } else {
+          @html.nothing
+        },
+        if review.published_url is Some(url) {
+          @html.a(
+            escape=true,
+            class="published-comment-link",
+            href=url,
+            target=Blank,
+            rel="noopener noreferrer",
+            "View published comment on GitHub ↗",
           )
         } else {
           @html.nothing
         },
-      ])
-    } else {
-      @html.nothing
-    },
-    if is_pull {
-      sign_in_dialog_view(input, emit)
-    } else {
-      @html.nothing
-    },
-  ])
+        if review.refresh_error is Some(message) && review.status is Ready {
+          @html.p(class="comment-error", message)
+        } else {
+          @html.nothing
+        },
+        match review.status {
+          Loading =>
+            if review.snapshot_stale {
+              @html.nothing
+            } else {
+              @html.p(class="comments-loading", "Loading comments…")
+            }
+          Failed(message) => @html.p(class="comment-error", message)
+          _ => @html.nothing
+        },
+        fallback_discussions(
+          prepare_discussions(
+            None,
+            None,
+            review,
+            emit,
+            markdown?=input.markdown,
+          ),
+          None,
+        ),
+        if is_pull {
+          @html.div(class="overall-comments", [
+            @html.div(issue_views),
+            if review.draft_visible() {
+              comment_editor_view(
+                review.draft().filter(draft => draft.kind is OverallDraft),
+                review,
+                emit,
+                overall=true,
+              )
+            } else {
+              @html.nothing
+            },
+          ])
+        } else {
+          @html.nothing
+        },
+      ]),
+      if is_pull {
+        sign_in_dialog_view(input, emit)
+      } else {
+        @html.nothing
+      },
+    ],
+  )
 }
 
 ///|

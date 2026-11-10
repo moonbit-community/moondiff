@@ -75,6 +75,9 @@ pub fn update(session : Session, event : Event) -> (Session, Array[Effect]) {
         ..session,
         context,
         snapshot_stale: stale,
+        overview_collapsed: session.overview_collapsed &&
+        context.generation == session.context.generation &&
+        context.route == session.context.route,
         collapsed_comments: if context.generation == session.context.generation &&
           context.route == session.context.route &&
           (match (context.snapshot, session.context.snapshot) {

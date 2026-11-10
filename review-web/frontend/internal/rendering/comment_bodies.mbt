@@ -83,8 +83,8 @@ fn CommentBodies::read(self : CommentBodies) -> Array[CommentBodyLayout] {
   let layouts : Array[CommentBodyLayout] = []
   let active = @dom.document().get_active_element()
   for entry in self.entries {
-    // Hidden cards keep their preview state and focus attributes until reopened.
-    if entry.container.get_attribute("hidden") is Some(_) {
+    // Hidden cards and overviews retain preview and focus state until reopened.
+    if entry.container.closest("[hidden]") is Some(_) {
       continue
     }
     let style = @dom.window().get_computed_style(entry.body)

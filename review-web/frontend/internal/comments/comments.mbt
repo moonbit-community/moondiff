@@ -76,6 +76,7 @@ pub struct Session {
   // Successful deletions remain excluded from refreshes until the route generation changes.
   priv deleted : Array[CommentId]
   // Reading choices belong to this page and are not exported with navigation state.
+  priv overview_collapsed : Bool
   priv expanded_bodies : Array[CommentId]
   priv collapsed_comments : Array[CommentId]
 }
@@ -104,6 +105,7 @@ pub fn Session::new(enabled~ : Bool = false) -> Session {
     deletion_id: 0,
     deletion: None,
     deleted: [],
+    overview_collapsed: false,
     expanded_bodies: [],
     collapsed_comments: [],
     comments: if enabled {

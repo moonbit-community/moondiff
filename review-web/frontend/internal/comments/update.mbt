@@ -20,6 +20,7 @@ pub(all) enum Event {
   ToggleCommentBody(Int32, CommentId)
   SetCommentBodyExpanded(Int32, CommentId, Bool)
   SetCommentCollapsed(Int32, CommentId, Bool)
+  SetOverviewCollapsed(Int32, Bool)
   OpenOverallDraft
   OverallDraftBodyChanged(String)
   OpenInlineDraft(Int32, ReviewAnchor)
@@ -92,6 +93,16 @@ fn update_review(model : Model, msg : Event) -> (Model, Effects) {
         }),
         [],
       )
+    SetOverviewCollapsed(generation, collapsed) => {
+      guard generation == model.generation &&
+        collapsed != model.review.overview_collapsed else {
+        return (model, [])
+      }
+      (
+        with_review(model, { ..model.review, overview_collapsed: collapsed, }),
+        [],
+      )
+    }
     SetCommentCollapsed(generation, id, desired) => {
       guard generation == model.generation &&
         model.review.comments is CommentsReady(bundle) &&
