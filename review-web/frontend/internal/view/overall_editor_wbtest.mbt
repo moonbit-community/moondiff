@@ -51,6 +51,40 @@ test "overall composer renders empty without a draft and returns after cancellat
 ///|
 #warnings("-alert_unstable")
 #skip("browser DOM: npm run test:views")
+test "overview collapse keeps the editor markup and exposes an accessible toggle" {
+  let editing = @comments.update(
+      receipt_test_session([]),
+      OverallDraftBodyChanged("Retained draft"),
+    ).0
+  let collapsed = @comments.update(editing, SetOverviewCollapsed(3, true)).0
+  let html = overall_editor_test_html(collapsed)
+  for
+    expected in [
+      "aria-label=\"Expand comments\"", "aria-expanded=\"false\"", "aria-controls=\"comments-content\"",
+      "Retained draft", "data-draft-id",
+    ] {
+    assert_true(html.contains(expected), msg=html)
+  }
+  let root = @dom.document().create_element("div")
+  @browser.set_property(root, "innerHTML", html)
+  assert_true(
+    root.query_selector(
+      "#comments-content[hidden] .overall-comment-editor textarea",
+    )
+    is Some(_),
+  )
+  assert_true(root.query_selector(".comments-controls[hidden]") is Some(_))
+  assert_true(root.query_selector(".section-label[hidden]") is Some(_))
+  let reopened = @comments.update(collapsed, SetOverviewCollapsed(3, false)).0
+  assert_eq(
+    overall_editor_test_html(reopened),
+    overall_editor_test_html(editing),
+  )
+}
+
+///|
+#warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
 test "overall composer remains visible and blocked by drafts in other regions" {
   let session = receipt_test_session([receipt_test_comment(20, "root")])
   for

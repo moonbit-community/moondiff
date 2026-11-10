@@ -85,6 +85,10 @@ fn EditorState::restore(self : EditorState, host : String, id : String) -> Unit 
     el.get_attribute("data-draft-id") == Some(id) else {
     return
   }
+  if el.closest("[hidden]") is Some(_) {
+    self.focus_intent = false
+    return
+  }
   let saved = self.records.get(id)
   let record : EditorRecord = {
     host,

@@ -276,6 +276,33 @@ test "file inputs ignore another file, tree controls and draft text outside thei
 }
 
 ///|
+test "overview collapse invalidates only Discussion and survives display changes" {
+  let model = region_model()
+  let projection = RegionProjection::new()
+  let before = projection.inputs(model)
+  let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+  let collapsed = @application.update(
+      model,
+      Review(Domain(SetOverviewCollapsed(model.generation, true))),
+      emit,
+    ).model
+  let after = projection.inputs(collapsed)
+  assert_eq(before.length(), after.length())
+  for index in 0..<before.length() {
+    assert_true(before[index].0 == after[index].0)
+    assert_eq(before[index].1 != after[index].1, before[index].0 is Discussion)
+  }
+  for
+    msg in [
+      @application.Ui(SelectView(Unified)),
+      Ui(SelectDiffAlgorithm(AstAlgorithm)),
+    ] {
+    let next = @application.update(collapsed, msg, emit).model
+    assert_true(next.review.read_view().overview_collapsed)
+  }
+}
+
+///|
 test "sign-in dialog changes invalidate only Discussion" {
   let model = pull_region_model()
   let projection = RegionProjection::new()

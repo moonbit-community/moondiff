@@ -179,6 +179,7 @@ fn comment_body_snapshot(
     Discussion => model.review.read_view(paths~)
     _ => return None
   }
+  guard !review.overview_collapsed else { return None }
   let source = match request.id {
     IssueComment(id) =>
       review.group.issue_comments

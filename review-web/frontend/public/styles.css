@@ -2335,7 +2335,7 @@ button.sign-in-dialog-close:hover {
 
 .comment-editor-actions,
 .auth-controls,
-.comments-toolbar > div:last-child {
+.comments-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2408,9 +2408,37 @@ button.comment-delete-confirm:hover {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.comments-overview {
+.comments-overview,
+.comments-content {
   display: grid;
   gap: 0.8rem;
+}
+
+.comments-overview [hidden] {
+  display: none;
+}
+
+.comments-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+button.comments-overview-toggle {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+.comments-overview[data-collapsed="true"] > .comments-toolbar {
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .comments-toolbar {

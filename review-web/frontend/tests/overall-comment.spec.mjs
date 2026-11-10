@@ -5,6 +5,29 @@ import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs'
 import { installApi, pullTarget, reviewPath } from './review-fixture.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 
+test('overview collapse retains the textarea, draft identity, body and backward selection', async ({ page }) => {
+  const composer = await openReview(page);
+  const editor = composer.locator('textarea');
+  await editor.fill('Keep this overall draft\nand its selection');
+  await expect(editor).toHaveAttribute('data-draft-id', /draft:/);
+  const original = await editor.elementHandle();
+  const id = await editor.getAttribute('data-draft-id');
+  await editor.evaluate(el => el.setSelectionRange(5, 19, 'backward'));
+  await page.getByRole('button', { name: 'Collapse comments', exact: true }).click();
+  for (const name of ['Unified', 'Tree', 'Token', 'Split']) {
+    await page.getByRole('button', { name, exact: true }).click();
+    await settleRegions(page);
+    await expect(editor).toBeHidden();
+    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('TEXTAREA');
+  }
+  await page.getByRole('button', { name: 'Expand comments', exact: true }).click();
+  await expect(editor).toHaveValue('Keep this overall draft\nand its selection');
+  await expect(editor).toHaveAttribute('data-draft-id', id);
+  expect(await editor.evaluate((el, original) => el === original, original)).toBe(true);
+  expect(await editor.evaluate(el => [el.selectionStart, el.selectionEnd, el.selectionDirection])).toEqual([5, 19, 'backward']);
+  await expect(page.getByRole('button', { name: 'Collapse comments', exact: true })).toBeFocused();
+});
+
 async function openReview(page) {
   await installRenderProbe(page);
   await installApi(page, pullTarget(), { authenticated: true, login: 'alice' });
