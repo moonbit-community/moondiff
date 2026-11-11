@@ -16,6 +16,18 @@ npm ci
 
 后续命令均在 `review-web/` 目录中执行。
 
+仓库根目录的 `moon.work` 只关联 `protocol`、`frontend` 和 `backend`。
+前端使用 `frontend/moon.mod` 声明的已发布 moondiff 版本；moondiff 的修改发布后，
+再显式升级该依赖。CI 和 Docker 构建会在仓库根目录运行
+`node scripts/check-workspace.mjs`，确认 moondiff 从注册表解析。
+
+测试未发布的 moondiff 修改时，可以临时取消根目录 `moon.work` 中 `"."` 的注释，
+然后运行相关 review-web 检查和测试。提交前必须恢复注释，并使用已发布依赖重新运行
+检查和发布构建。单独验证 moondiff 时，在仓库根目录使用
+`MOON_WORK=off moon check` 和 `MOON_WORK=off moon test`。
+在 `review-web/` 中使用 `node ../scripts/fmt.mjs` 格式化全部四个模块，
+保留当前直接运行 `moon fmt` 会删除的 workspace 注释。
+
 ### 运行时配置
 
 创建 `.env` 文件，写入以下内容。填写
@@ -366,7 +378,7 @@ npm run test:server
 ```
 
 `test:server` 会运行 MoonBit 测试、后端集成测试和浏览器 HTTP 传输测试。
-修改 MoonBit 代码后，运行 `moon fmt` 和 `moon info --target all`，
+修改 MoonBit 代码后，运行 `node ../scripts/fmt.mjs` 和 `moon info --target all`，
 并检查生成的接口文件是否发生变化。
 
 运行浏览器测试：

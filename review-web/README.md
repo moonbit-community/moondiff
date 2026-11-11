@@ -16,6 +16,20 @@ npm ci
 
 Run the remaining commands from `review-web/`.
 
+The repository's `moon.work` links only `protocol`, `frontend` and `backend`.
+The frontend uses the published moondiff version declared in `frontend/moon.mod`.
+Upgrade that dependency explicitly after publishing changes to moondiff.
+CI and Docker builds run `node scripts/check-workspace.mjs` from the repository
+root to verify that moondiff resolves from the registry.
+
+To test unpublished moondiff changes locally, temporarily uncomment `"."` in the
+root `moon.work`, then run the relevant review-web checks and tests. Restore the
+comment before committing and rerun the checks and release build with the
+published dependency. From the repository root, use `MOON_WORK=off moon check`
+and `MOON_WORK=off moon test` to validate moondiff itself.
+Use `node ../scripts/fmt.mjs` from `review-web/` to format all four modules;
+it preserves the workspace comments that plain `moon fmt` currently removes.
+
 ### Runtime configuration
 
 Create `.env` with the following content. Fill in the
@@ -413,7 +427,7 @@ npm run test:server
 ```
 
 `test:server` runs MoonBit tests, backend integration tests and browser HTTP
-transport tests. After MoonBit changes, run `moon fmt` and
+transport tests. After MoonBit changes, run `node ../scripts/fmt.mjs` and
 `moon info --target all` and review any generated interface changes.
 
 For browser tests:
