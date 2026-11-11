@@ -35,9 +35,12 @@ jobs:
           cache: npm
           cache-dependency-path: review-web/package-lock.json
 
+      - name: Check workspace dependency policy
+        run: node scripts/check-workspace.mjs
+
       - name: moon check
         run: |
-          moon check --target all
+          MOON_WORK=off moon check --target all
           moon check review-web/protocol --target all --deny-warn
           (cd review-web/frontend && moon check --target js --deny-warn)
           (cd review-web/backend && moon check --target wasm --deny-warn)
@@ -49,14 +52,16 @@ jobs:
 
       - name: info check
         run: |
-          moon info
+          MOON_WORK=off moon info
+          moon info review-web/protocol --target all
           (cd review-web/frontend && moon info --target js)
           (cd review-web/backend && moon info --target wasm)
           git diff --exit-code
       
       - name: run test
         run: |
-          moon test --target all
+          MOON_WORK=off moon test --target all
+          moon test review-web/protocol --target all
           (cd review-web/frontend && moon test --target js)
           (cd review-web/backend && moon test)
           bash scripts/cli_test.sh && git diff --exit-code cli_test

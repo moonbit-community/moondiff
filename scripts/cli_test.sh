@@ -1,5 +1,7 @@
 set -euox pipefail
 
+# CLI snapshots exercise the standalone root module.
+export MOON_WORK=off
 
 ast_diff() {
   name=$1
