@@ -28,6 +28,13 @@ jobs:
       - name: moon update
         run: moon update
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: review-web/package-lock.json
+
       - name: moon check
         run: |
           moon check --target all
@@ -37,9 +44,7 @@ jobs:
       
       - name: format diff
         run: |
-          moon fmt
-          (cd review-web/frontend && moon fmt)
-          (cd review-web/backend && moon fmt)
+          node scripts/fmt.mjs
           git diff --exit-code
 
       - name: info check
@@ -55,13 +60,6 @@ jobs:
           (cd review-web/frontend && moon test --target js)
           (cd review-web/backend && moon test)
           bash scripts/cli_test.sh && git diff --exit-code cli_test
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: review-web/package-lock.json
 
       - name: Install review app dependencies
         working-directory: review-web

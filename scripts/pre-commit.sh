@@ -8,7 +8,7 @@ set -euo pipefail
 # then set executable permission for pre-commit hook script
 # e.g: chmod +x .git/hooks/pre-commit
 
-moon fmt -- -add-uuid
+node scripts/fmt.mjs -- -add-uuid
 
 # Get the list of all modified files in the staging area for this commit, then add them all
 # --cached: Only view the staging area (staged)
