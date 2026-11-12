@@ -13,13 +13,13 @@ RUN apt-get update \
     && bash /tmp/moon-install.sh "${MOONBIT_VERSION}" \
     && rm /tmp/moon-install.sh
 
-# moon.work links the review app modules; moondiff comes from the registry.
+# review-web/moon.work links the review app modules; moondiff comes from the registry.
 WORKDIR /src
 COPY review-web/package.json review-web/package-lock.json ./review-web/
 RUN npm --prefix review-web ci --include=dev
 COPY . .
 # esbuild minifies the MoonBit frontend output in the build stage.
-RUN moon update && node scripts/check-workspace.mjs && npm run build
+RUN moon -C review-web update && node scripts/check-workspace.mjs && npm run build
 
 FROM debian:bookworm-slim AS runtime
 

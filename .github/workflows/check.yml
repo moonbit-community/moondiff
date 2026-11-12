@@ -26,7 +26,9 @@ jobs:
           moonrun --version
 
       - name: moon update
-        run: moon update
+        run: |
+          MOON_WORK=off moon update
+          moon -C review-web update
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -41,9 +43,9 @@ jobs:
       - name: moon check
         run: |
           MOON_WORK=off moon check --target all
-          moon check review-web/protocol --target all --deny-warn
-          (cd review-web/frontend && moon check --target js --deny-warn)
-          (cd review-web/backend && moon check --target wasm --deny-warn)
+          moon -C review-web check protocol --target all --deny-warn
+          moon -C review-web/frontend check --target js --deny-warn
+          moon -C review-web/backend check --target wasm --deny-warn
       
       - name: format diff
         run: |
@@ -53,17 +55,17 @@ jobs:
       - name: info check
         run: |
           MOON_WORK=off moon info
-          moon info review-web/protocol --target all
-          (cd review-web/frontend && moon info --target js)
-          (cd review-web/backend && moon info --target wasm)
+          moon -C review-web info protocol --target all
+          moon -C review-web/frontend info --target js
+          moon -C review-web/backend info --target wasm
           git diff --exit-code
       
       - name: run test
         run: |
           MOON_WORK=off moon test --target all
-          moon test review-web/protocol --target all
-          (cd review-web/frontend && moon test --target js)
-          (cd review-web/backend && moon test)
+          moon -C review-web test protocol --target all
+          moon -C review-web/frontend test --target js
+          moon -C review-web/backend test
           bash scripts/cli_test.sh && git diff --exit-code cli_test
 
       - name: Install review app dependencies
