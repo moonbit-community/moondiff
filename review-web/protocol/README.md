@@ -309,9 +309,9 @@ AbortController cancellation and timers. The application calls cleanup on
 From the repository root:
 
 ```sh
-moon check review-web/protocol --target all --deny-warn
-moon test review-web/protocol --target all
-moon test review-web/frontend/internal/github_client --target js
+moon -C review-web check protocol --target all --deny-warn
+moon -C review-web test protocol --target all
+moon -C review-web/frontend test internal/github_client --target js
 moon -C review-web/frontend test --target js
 npm run test:server
 npm run test:review-web
