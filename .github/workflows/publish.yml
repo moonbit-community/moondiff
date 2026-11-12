@@ -13,8 +13,7 @@ jobs:
     permissions:
       contents: read
     env:
-      # Publish the root module standalone; moon.work would otherwise pull in
-      # the review app modules.
+      # Keep publishing scoped to the root module even if MOON_WORK is inherited.
       MOON_WORK: "off"
     outputs:
       published_tag: ${{ steps.prepublish.outputs.published_tag }}

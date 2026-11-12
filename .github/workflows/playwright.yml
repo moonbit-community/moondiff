@@ -20,7 +20,7 @@ jobs:
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Update MoonBit dependencies
-        run: moon update
+        run: moon -C review-web update
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -58,7 +58,7 @@ jobs:
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Update MoonBit dependencies
-        run: moon update
+        run: moon -C review-web update
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -142,7 +142,7 @@ jobs:
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Update MoonBit dependencies
-        run: moon update
+        run: moon -C review-web update
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
