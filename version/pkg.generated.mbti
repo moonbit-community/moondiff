@@ -1,0 +1,13 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbit-community/moondiff/version"
+
+// Values
+pub const MOONDIFF_VERSION : String = "0.1.3"
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
