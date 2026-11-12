@@ -20,7 +20,7 @@ try {
   for (const source of [baseline, root]) {
     const dir = mkdtempSync(join(tmpdir(), 'moondiff-render-benchmark-assets-')); assets.push(dir);
     cpSync(source + '/review-web/frontend/public', dir, { recursive: true });
-    writeFileSync(dir + '/index.js', instrumentRenderProbe(readFileSync(source + '/_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js', 'utf8')));
+    writeFileSync(dir + '/index.js', instrumentRenderProbe(readFileSync(source + '/review-web/_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js', 'utf8')));
     servers.push(await startServer(undefined, { staticDir: dir }));
   }
   browser = await chromium.launch();

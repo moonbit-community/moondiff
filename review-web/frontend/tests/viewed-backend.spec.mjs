@@ -3,7 +3,7 @@ import { expect, test as baseTest } from '../../tests/browser-test.mjs';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { browser, repository } from '../../backend/tests/server-fixture.mjs';
+import { browser, reviewWeb } from '../../backend/tests/server-fixture.mjs';
 import { startViewedServer, repositoryPaths } from '../../backend/tests/viewed-fixture.mjs';
 import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
 import { minifyFrontend } from '../../scripts/minify.mjs';
@@ -15,8 +15,8 @@ const test = baseTest.extend({
   backend: async ({ page }, use) => {
     // The Playwright webServer builds both targets before any test starts.
     const assets = mkdtempSync(join(tmpdir(), 'moondiff-viewed-browser-'));
-    cpSync(join(repository, 'review-web/frontend/public'), assets, { recursive: true });
-    writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
+    cpSync(join(reviewWeb, 'frontend/public'), assets, { recursive: true });
+    writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(reviewWeb, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
     const f = await startViewedServer({ staticDir: assets });
     const user = browser(f);
     try {

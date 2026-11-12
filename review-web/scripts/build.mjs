@@ -6,12 +6,11 @@ import { gzipSync } from 'node:zlib';
 import { minifyFrontend } from './minify.mjs';
 import { writeStaticAssets } from './static-assets.mjs';
 const reviewWeb = resolve(import.meta.dirname, '..');
-const repository = resolve(reviewWeb, '..');
 const target = mkdtempSync(join(tmpdir(), 'moondiff-release-'));
 const staging = mkdtempSync(join(reviewWeb, '.dist-'));
 try {
-  for (const [backend, pkg] of [['js', 'review-web/frontend/main'], ['wasm', 'review-web/backend/main']]) {
-    const build = spawnSync('moon', ['build', pkg, '--target', backend, '--release', '--target-dir', target], { cwd: repository, stdio: 'inherit' });
+  for (const [backend, pkg] of [['js', 'frontend/main'], ['wasm', 'backend/main']]) {
+    const build = spawnSync('moon', ['build', pkg, '--target', backend, '--release', '--target-dir', target], { cwd: reviewWeb, stdio: 'inherit' });
     if (build.error) throw build.error;
     if (build.status !== 0) throw new Error(`MoonBit ${backend} build failed (${build.status}).`);
   }

@@ -2,18 +2,19 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildServer, startServer, repository } from '../backend/tests/server-fixture.mjs';
+import { buildServer, startServer, reviewWeb } from '../backend/tests/server-fixture.mjs';
 import { instrumentRenderProbe } from './render-probe.mjs';
 import { e2ePort } from './e2e-config.mjs';
 import { minifyFrontend } from '../scripts/minify.mjs';
 import { writeStaticAssets } from '../scripts/static-assets.mjs';
 const assets = mkdtempSync(join(tmpdir(), 'moondiff-e2e-assets-'));
 buildServer();
-const build = spawnSync('moon', ['build', 'review-web/frontend/main', '--target', 'js', '--release'], { cwd: repository, stdio: 'inherit' });
+const build = spawnSync('moon', ['build', 'frontend/main', '--target', 'js', '--release'], { cwd: reviewWeb, stdio: 'inherit' });
+if (build.error) throw build.error;
 if (build.status !== 0) process.exit(build.status || 1);
 // Probe injection matches MoonBit names, so it must precede minification.
-const source = readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8');
-writeStaticAssets(join(repository, 'review-web/frontend/public'), assets, minifyFrontend(instrumentRenderProbe(source)));
+const source = readFileSync(join(reviewWeb, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8');
+writeStaticAssets(join(reviewWeb, 'frontend/public'), assets, minifyFrontend(instrumentRenderProbe(source)));
 const fixture = await startServer((request, response) => {
   if (request.path.startsWith('/search/issues?')) {
     response.end(JSON.stringify({ items: [], total_count: 0, incomplete_results: false }));

@@ -1,0 +1,10 @@
+members = [
+  "./protocol",
+  "./frontend",
+  "./backend",
+  // Use the published moondiff version declared in frontend/moon.mod.
+  // Uncomment only for local integration tests of unpublished moondiff changes.
+  // Restore before committing, then verify again with the published dependency.
+  // From review-web/, format with node ../scripts/fmt.mjs to preserve these comments.
+  // "..",
+]
