@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { chromium } from '@playwright/test';
 
-const repository = resolve(import.meta.dirname, '../..');
+const reviewWeb = resolve(import.meta.dirname, '..');
 const packageName = 'moonbit-community/moondiff-review-web/internal/view';
 const browserAttribute = '#skip("browser DOM: npm run test:views")';
 
@@ -14,9 +14,9 @@ test('MoonBit view components in Chromium', { timeout: 120_000 }, async t => {
   const target = mkdtempSync(join(tmpdir(), 'moondiff-view-tests-'));
   t.after(() => rmSync(target, { recursive: true, force: true }));
   const build = spawnSync('moon', [
-    'test', 'review-web/frontend/internal/view', '--target', 'js',
+    'test', 'frontend/internal/view', '--target', 'js',
     '--build-only', '--include-skipped', '--target-dir', target,
-  ], { cwd: repository, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+  ], { cwd: reviewWeb, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
   assert.ifError(build.error);
   assert.equal(build.status, 0, build.stdout + build.stderr);
   const report = build.stdout.split('\n').flatMap(line => {

@@ -3,7 +3,7 @@ import { expect, test } from '../../tests/browser-test.mjs';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { browser, repository } from '../../backend/tests/server-fixture.mjs';
+import { browser, reviewWeb } from '../../backend/tests/server-fixture.mjs';
 import { searchPull, startHomeServer, legacyPullCursor } from '../../backend/tests/home-fixture.mjs';
 import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
 import { minifyFrontend } from '../../scripts/minify.mjs';
@@ -21,8 +21,8 @@ async function expectInvalidCursor(page, base, action) {
 
 test('pre-upgrade PR cursors reload each list through the real backend and preserve commit caches', async ({ page, context }) => {
   const assets = mkdtempSync(join(tmpdir(), 'moondiff-home-browser-'));
-  cpSync(join(repository, 'review-web/frontend/public'), assets, { recursive: true });
-  writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
+  cpSync(join(reviewWeb, 'frontend/public'), assets, { recursive: true });
+  writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(reviewWeb, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
   const f = await startHomeServer({ staticDir: assets });
   try {
     f.state.rows = Array.from({ length: 51 }, (_, i) => searchPull(i + 1, {
@@ -75,8 +75,8 @@ test('pre-upgrade PR cursors reload each list through the real backend and prese
 
 test('same-account sign-in in another tab recovers each expired cursor through the real backend', async ({ page, context }) => {
   const assets = mkdtempSync(join(tmpdir(), 'moondiff-home-browser-'));
-  cpSync(join(repository, 'review-web/frontend/public'), assets, { recursive: true });
-  writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(repository, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
+  cpSync(join(reviewWeb, 'frontend/public'), assets, { recursive: true });
+  writeFileSync(join(assets, 'index.js'), minifyFrontend(instrumentRenderProbe(readFileSync(join(reviewWeb, '_build/js/release/build/moonbit-community/moondiff-review-web/main/main.js'), 'utf8'))));
   const f = await startHomeServer({ staticDir: assets });
   try {
     f.state.rows = Array.from({ length: 51 }, (_, i) => searchPull(i + 1, {

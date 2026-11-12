@@ -8,9 +8,11 @@ import { resolve, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
 export const repository = resolve(import.meta.dirname, '../../..');
-export const serverWasm = join(repository, '_build/wasm/release/build/moonbit-community/moondiff-review-web-server/main/main.wasm');
+export const reviewWeb = join(repository, 'review-web');
+export const serverWasm = join(reviewWeb, '_build/wasm/release/build/moonbit-community/moondiff-review-web-server/main/main.wasm');
 export function buildServer() {
-  const result = spawnSync('moon', ['build', 'review-web/backend/main', '--target', 'wasm', '--release'], { cwd: repository, encoding: 'utf8' });
+  const result = spawnSync('moon', ['build', 'backend/main', '--target', 'wasm', '--release'], { cwd: reviewWeb, encoding: 'utf8' });
+  if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stdout + result.stderr);
 }
 

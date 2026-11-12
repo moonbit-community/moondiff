@@ -7,7 +7,7 @@ const reviewWeb = join(repository, 'review-web');
 // Inspect the repository's workspace even when the caller overrides MOON_WORK.
 const tree = spawnSync('moon', ['tree', '--json'], {
   cwd: join(reviewWeb, 'frontend'),
-  env: { ...process.env, MOON_WORK: join(repository, 'moon.work') },
+  env: { ...process.env, MOON_WORK: join(reviewWeb, 'moon.work') },
   encoding: 'utf8',
 });
 if (tree.error) throw tree.error;
