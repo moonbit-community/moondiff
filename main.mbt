@@ -50,6 +50,7 @@ async fn write_stdout(message : String) -> Unit {
 fn moondiff_command() -> @argparse.Command {
   Command(
     "moondiff",
+    version=@version.MOONDIFF_VERSION,
     options=[
       OptionArg(
         "graph-limit",

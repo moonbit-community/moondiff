@@ -6,6 +6,7 @@ import {
   "moonbitlang/async/fs",
   "moonbitlang/async/stdio",
   "moonbit-community/moondiff/internal/cli_diff",
+  "moonbit-community/moondiff/version",
 }
 
 supported_targets = "wasm+native"

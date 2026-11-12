@@ -51,10 +51,21 @@ test "moondiff command help uses README command name" {
   assert_false(help.contains("Usage: astdiff"))
   assert_true(help.contains("--ignore-comments"))
   assert_true(help.contains("--ignore-tests"))
+  assert_true(help.contains("--version"))
   assert_true(
     help.contains("Ignore MoonBit comment-only and blank-line-only differences"),
   )
   assert_true(help.contains("Ignore *_test.mbt / *_wbtest.mbt file pairs"))
+}
+
+///|
+test "version flags return the embedded module version without file arguments" {
+  for flag in ["--version", "-V"] {
+    match moondiff_command().parse_outcome(argv=[flag]) {
+      Version(text) => assert_eq(text, @version.MOONDIFF_VERSION)
+      _ => fail("expected version output without file arguments")
+    }
+  }
 }
 
 ///|UUID(fad12a14-0144-4f4f-8891-706c7971b622)
