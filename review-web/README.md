@@ -9,24 +9,24 @@ Install Node.js 22 and a MoonBit toolchain.
 From the repository root:
 
 ```sh
-moon update
 cd review-web
+moon update
 npm ci
 ```
 
 Run the remaining commands from `review-web/`.
 
-The repository's `moon.work` links only `protocol`, `frontend` and `backend`.
+`review-web/moon.work` links only `protocol`, `frontend` and `backend`.
 The frontend uses the published moondiff version declared in `frontend/moon.mod`.
 Upgrade that dependency explicitly after publishing changes to moondiff.
 CI and Docker builds run `node scripts/check-workspace.mjs` from the repository
 root to verify that moondiff resolves from the registry.
 
-To test unpublished moondiff changes locally, temporarily uncomment `"."` in the
-root `moon.work`, then run the relevant review-web checks and tests. Restore the
+To test unpublished moondiff changes locally, temporarily uncomment `".."` in
+`review-web/moon.work`, then run the relevant review-web checks and tests. Restore the
 comment before committing and rerun the checks and release build with the
-published dependency. From the repository root, use `MOON_WORK=off moon check`
-and `MOON_WORK=off moon test` to validate moondiff itself.
+published dependency. From the repository root, use `moon check` and `moon test`
+to validate moondiff itself.
 Use `node ../scripts/fmt.mjs` from `review-web/` to format all four modules;
 it preserves the workspace comments that plain `moon fmt` currently removes.
 
@@ -197,7 +197,7 @@ for backup and restore instructions. If using a bind mount instead, make its
 directory writable by UID/GID `10001:10001`.
 
 To build an image locally, run from the repository root so the build can access
-all `moon.work` members:
+`review-web/moon.work`, its members, and the root build scripts:
 
 ```sh
 docker build -f review-web/Dockerfile -t moondiff-review-web:local .

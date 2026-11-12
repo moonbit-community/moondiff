@@ -9,22 +9,22 @@
 在仓库根目录执行：
 
 ```sh
-moon update
 cd review-web
+moon update
 npm ci
 ```
 
 后续命令均在 `review-web/` 目录中执行。
 
-仓库根目录的 `moon.work` 只关联 `protocol`、`frontend` 和 `backend`。
+`review-web/moon.work` 只关联 `protocol`、`frontend` 和 `backend`。
 前端使用 `frontend/moon.mod` 声明的已发布 moondiff 版本；moondiff 的修改发布后，
 再显式升级该依赖。CI 和 Docker 构建会在仓库根目录运行
 `node scripts/check-workspace.mjs`，确认 moondiff 从注册表解析。
 
-测试未发布的 moondiff 修改时，可以临时取消根目录 `moon.work` 中 `"."` 的注释，
+测试未发布的 moondiff 修改时，可以临时取消 `review-web/moon.work` 中 `".."` 的注释，
 然后运行相关 review-web 检查和测试。提交前必须恢复注释，并使用已发布依赖重新运行
 检查和发布构建。单独验证 moondiff 时，在仓库根目录使用
-`MOON_WORK=off moon check` 和 `MOON_WORK=off moon test`。
+`moon check` 和 `moon test`。
 在 `review-web/` 中使用 `node ../scripts/fmt.mjs` 格式化全部四个模块，
 保留当前直接运行 `moon fmt` 会删除的 workspace 注释。
 
@@ -178,7 +178,8 @@ Compose 会替换容器并保留命名卷。`unless-stopped` 重启策略会在 
 重启后也需保持 `MOONDIFF_TOKEN_KEY` 不变。备份与恢复方法见[会话与备份](#会话与备份)。
 如果改用绑定挂载，请确保 UID/GID 为 `10001:10001` 的用户对挂载目录有写入权限。
 
-如需在本地构建镜像，在仓库根目录执行，以便构建过程能够访问所有 `moon.work` 成员：
+如需在本地构建镜像，在仓库根目录执行，以便构建过程能够访问
+`review-web/moon.work`、工作区成员和根目录的构建脚本：
 
 ```sh
 docker build -f review-web/Dockerfile -t moondiff-review-web:local .
