@@ -38,6 +38,11 @@ fn source_problem(side : SideLoad) -> String? {
 }
 
 ///|
+fn moondiff_version_view() -> @rabbita.Html {
+  @html.span(class="brand-version", "v\{@version.MOONDIFF_VERSION}")
+}
+
+///|
 fn brand_view() -> @rabbita.Html {
   @html.h1(class="brand", [
     @html.span(class="brand-mark", [
@@ -46,6 +51,7 @@ fn brand_view() -> @rabbita.Html {
     ]),
     @html.span("Moondiff"),
     @html.span(class="brand-suffix", "Review"),
+    moondiff_version_view(),
   ])
 }
 
