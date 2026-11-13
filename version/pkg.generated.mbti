@@ -2,7 +2,7 @@
 package "moonbit-community/moondiff/version"
 
 // Values
-pub const MOONDIFF_VERSION : String = "0.1.3"
+pub const MOONDIFF_VERSION : String = "0.1.4"
 
 // Errors
 
