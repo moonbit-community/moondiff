@@ -657,7 +657,7 @@ button.compact {
 
 .brand-suffix {
   color: var(--muted);
-  font-size: 0.73rem;
+  font-size: inherit;
   font-weight: 520;
   letter-spacing: -0.01em;
 }
