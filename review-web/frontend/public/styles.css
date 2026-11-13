@@ -628,12 +628,17 @@ button.compact {
   line-height: 1;
 }
 
+.hero-landing .brand {
+  align-items: baseline;
+}
+
 .brand-mark {
   display: grid;
   position: relative;
   width: 1.5rem;
   height: 1.5rem;
   flex: 0 0 auto;
+  align-self: center;
   grid-template-columns: 1fr 1fr;
   place-items: center;
   border-radius: 0.4rem;
