@@ -655,13 +655,6 @@ button.compact {
   margin-bottom: 0.17rem;
 }
 
-.brand-suffix {
-  color: var(--muted);
-  font-size: inherit;
-  font-weight: 520;
-  letter-spacing: -0.01em;
-}
-
 .brand-version {
   flex: 0 0 auto;
   color: var(--muted);
