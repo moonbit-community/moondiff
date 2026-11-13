@@ -78,6 +78,10 @@
 }
 
 .home-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .5rem;
   min-width: 0;
 }
 
@@ -656,6 +660,16 @@ button.compact {
   font-size: 0.73rem;
   font-weight: 520;
   letter-spacing: -0.01em;
+}
+
+.brand-version {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: .68rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .hero-workspace .brand {

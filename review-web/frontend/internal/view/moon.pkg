@@ -17,6 +17,7 @@ import {
   "moonbit-community/moondiff-review-web/internal/highlight",
   "moonbit-community/moondiff/model",
   "moonbit-community/moondiff/mbtdiff",
+  "moonbit-community/moondiff/version",
   "moonbit-community/rabbita",
   "moonbit-community/rabbita/dom",
   "moonbit-community/rabbita/html",
