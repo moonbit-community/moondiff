@@ -4,7 +4,7 @@ version = "0.0.0"
 
 import {
   "moonbit-community/moondiff-review-web-protocol@0.0.0",
-  "moonbit-community/moondiff@0.1.3",
+  "moonbit-community/moondiff@0.1.4",
   "moonbit-community/rabbita@0.17.0",
   "moonbitlang/lexer@0.4.2",
   "moonbit-community/cmark@0.4.12",
