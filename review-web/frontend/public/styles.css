@@ -78,6 +78,10 @@
 }
 
 .home-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .5rem;
   min-width: 0;
 }
 
@@ -624,12 +628,17 @@ button.compact {
   line-height: 1;
 }
 
+.hero-landing .brand {
+  align-items: baseline;
+}
+
 .brand-mark {
   display: grid;
   position: relative;
   width: 1.5rem;
   height: 1.5rem;
   flex: 0 0 auto;
+  align-self: center;
   grid-template-columns: 1fr 1fr;
   place-items: center;
   border-radius: 0.4rem;
@@ -651,11 +660,14 @@ button.compact {
   margin-bottom: 0.17rem;
 }
 
-.brand-suffix {
+.brand-version {
+  flex: 0 0 auto;
   color: var(--muted);
-  font-size: 0.73rem;
-  font-weight: 520;
-  letter-spacing: -0.01em;
+  font-family: var(--mono);
+  font-size: .68rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .hero-workspace .brand {

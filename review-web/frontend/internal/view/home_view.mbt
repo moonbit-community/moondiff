@@ -180,7 +180,10 @@ fn home_view(
     .any(value => value.expanded && value.page.refresh is Some(_))
   @html.div(class="pr-dashboard", [
     @html.header(class="home-header", [
-      @html.h1(class="home-identity", "Moondiff Review"),
+      @html.h1(class="home-identity", [
+        @html.span("Moondiff Review"),
+        moondiff_version_view(),
+      ]),
       account_menu(auth, emit),
     ]),
     @html.div(
