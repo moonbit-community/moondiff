@@ -1770,14 +1770,16 @@ button.file-tree-row.selected {
 .section-change-controls {
   display: inline-flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   min-width: 0;
   max-width: 100%;
   gap: 0.2rem;
 }
 
-.section-change-button {
+button.section-change-button {
   flex: none;
+  font-size: 1rem;
 }
 
 button.section-change-button:disabled {
