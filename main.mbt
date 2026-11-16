@@ -20,21 +20,13 @@ fn parse_graph_limit(text : String) -> UInt32 raise {
   limit.reinterpret_as_uint()
 }
 
-///|UUID(a34f9833-2141-48c6-8927-c7a3203564ee)
-#cfg(target="wasm")
-fn proc_exit_ffi(rval : Int32) -> Unit = "wasi_snapshot_preview1" "proc_exit"
-
-///|
-#cfg(target="native")
-extern "c" fn proc_exit_ffi(rval : Int32) -> Unit = "exit"
-
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
 #moongrep.skip
 async fn[T] fatal(message : String) -> T {
   @stdio.stderr.write("\{message}\n") catch {
     _ => ()
   }
-  proc_exit_ffi(1)
+  @env.exit(1)
   panic()
 }
 
