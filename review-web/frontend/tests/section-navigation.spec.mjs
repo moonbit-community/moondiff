@@ -284,6 +284,8 @@ for (const algorithm of ["Token", "Tree"]) {
       expect((await next.boundingBox()).x + (await next.boundingBox()).width).toBeLessThanOrEqual(420);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(420);
       await page.mouse.move(0, 0);
+      await expect(previous).toHaveCSS("font-size", "16px");
+      await expect(next).toHaveCSS("font-size", "16px");
       await expect(next).toHaveCSS("border-top-style", "solid");
       await expect(next).toHaveCSS("border-top-color", "rgb(222, 222, 222)");
       await expect(next).toHaveCSS("background-color", "rgb(255, 255, 255)");

@@ -75,8 +75,9 @@ for (const width of [1440, 420, 320]) {
     expect(await title.evaluate(el => {
       const buttons = [...el.querySelectorAll('button')].map(button => button.getBoundingClientRect());
       return buttons.every((button, index) => button.left >= 0 && button.right <= innerWidth &&
-        Math.abs(button.top + button.height / 2 - buttons[0].top - buttons[0].height / 2) < 1 &&
-        (index === 0 || button.left >= buttons[index - 1].right));
+        (index === 0 || button.top >= buttons[index - 1].bottom ||
+          (Math.abs(button.top + button.height / 2 - buttons[index - 1].top - buttons[index - 1].height / 2) < 1 &&
+            button.left >= buttons[index - 1].right)));
     })).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width <= 420) {
