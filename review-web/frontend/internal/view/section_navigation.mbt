@@ -4,14 +4,10 @@ fn change_controls(
   emit : @rabbita.Emit[Msg],
 ) -> @rabbita.Html {
   let controls = [
-    for
-      (label, text, direction) in [
-        ("Previous change", "↑ prev", -1),
-        ("Next change", "↓ next", 1),
-      ] => {
+    for (label, direction) in [("Previous Change", -1), ("Next Change", 1)] => {
       @html.button(
         type_="button",
-        class="section-change-button",
+        class="secondary compact section-change-button",
         title=label,
         disabled=!input.enabled,
         attrs=@html.Attrs::build()
@@ -25,7 +21,7 @@ fn change_controls(
               emit,
             )
           }),
-        text,
+        label,
       )
     }
   ]

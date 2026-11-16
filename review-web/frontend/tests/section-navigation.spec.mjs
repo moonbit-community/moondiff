@@ -6,7 +6,7 @@ const parent = "1111111111111111111111111111111111111111";
 const longName = `navigate_${"long_declaration_".repeat(12)}`;
 const marker = "[data-change-block-start]";
 const button = (page, direction) => page.locator(".change-titlebar").getByRole("button", {
-  name: direction > 0 ? "Next change" : "Previous change", exact: true,
+  name: direction > 0 ? "Next Change" : "Previous Change", exact: true,
 });
 
 async function waitForUnifiedLayout(page) {
@@ -163,10 +163,10 @@ for (const algorithm of ["Token", "Tree"]) {
       await expect(page.locator(".change-titlebar .section-change-button")).toHaveCount(2);
       await expect(page.locator(".file-heading .section-change-button")).toHaveCount(0);
       await expect(sections.locator(".section-change-controls")).toHaveCount(0);
-      await expect(button(page, 1)).toHaveText("↓ next");
-      await expect(button(page, -1)).toHaveText("↑ prev");
-      await expect(button(page, 1)).toHaveAttribute("title", "Next change");
-      await expect(button(page, -1)).toHaveAttribute("title", "Previous change");
+      await expect(button(page, 1)).toHaveText("Next Change");
+      await expect(button(page, -1)).toHaveText("Previous Change");
+      await expect(button(page, 1)).toHaveAttribute("title", "Next Change");
+      await expect(button(page, -1)).toHaveAttribute("title", "Previous Change");
       expect(await first.locator(marker).evaluateAll(rows => rows.every(row => row.querySelector(".line-number") && !row.querySelector(".hunk-header")))).toBe(true);
       expect(await first.locator(".hunk-header").count()).toBeLessThan(3);
       const other = page.locator("#moondiff-file-1 .semantic-section");
@@ -265,7 +265,7 @@ for (const algorithm of ["Token", "Tree"]) {
       await expectNoMovement(page, () => button(page, -1).click());
     });
 
-    test(`${algorithm} ${layout}: narrow long titles and arrow hover keep stable dimensions`, async ({ page }) => {
+    test(`${algorithm} ${layout}: narrow long titles and button hover keep stable dimensions`, async ({ page }) => {
       const sections = await loadNavigation(page, { algorithm, layout, width: 420, trailingFile: false });
       const first = sections.nth(0);
       await readChange(first, 0);
@@ -279,18 +279,20 @@ for (const algorithm of ["Token", "Tree"]) {
       expect(metrics.height).toBeGreaterThan(metrics.lineHeight * 2);
       const filename = await page.locator(".commit-message-title").boundingBox();
       const previousRect = await previous.boundingBox();
-      expect(filename.x + filename.width).toBeLessThan(previousRect.x);
-      expect(previousRect.x - filename.x - filename.width).toBeCloseTo(32, 1);
-      expect(Math.abs(filename.y + filename.height / 2 - previousRect.y - previousRect.height / 2)).toBeLessThan(1);
+      expect(previousRect.x).toBeCloseTo(filename.x, 1);
+      expect(filename.y + filename.height).toBeLessThanOrEqual(previousRect.y);
       expect((await next.boundingBox()).x + (await next.boundingBox()).width).toBeLessThanOrEqual(420);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(420);
       await page.mouse.move(0, 0);
-      await expect(next).toHaveCSS("color", "rgb(0, 0, 0)");
-      await expect(next).toHaveCSS("font-weight", "400");
+      await expect(next).toHaveCSS("border-top-style", "solid");
+      await expect(next).toHaveCSS("border-top-color", "rgb(222, 222, 222)");
+      await expect(next).toHaveCSS("background-color", "rgb(255, 255, 255)");
+      await expect(next).toHaveCSS("color", "rgb(23, 23, 23)");
+      await expect(next).toHaveCSS("font-weight", "600");
       const size = await next.boundingBox();
       await next.hover();
-      await expect(next).toHaveCSS("color", "rgb(9, 105, 218)");
-      await expect(next).toHaveCSS("font-weight", "700");
+      await expect(next).toHaveCSS("background-color", "rgb(250, 250, 250)");
+      await expect(next).toHaveCSS("font-weight", "600");
       expect((await next.boundingBox()).width).toBe(size.width);
       expect((await next.boundingBox()).height).toBe(size.height);
       await next.focus();
@@ -309,8 +311,9 @@ for (const algorithm of ["Token", "Tree"]) {
       await page.locator("#moondiff-file-0 .file-toggle").click();
       await expect(next).toBeDisabled();
       await next.hover();
-      await expect(next).toHaveCSS("color", "rgb(0, 0, 0)");
-      await expect(next).toHaveCSS("font-weight", "400");
+      await expect(next).toHaveCSS("background-color", "rgb(255, 255, 255)");
+      await expect(next).toHaveCSS("color", "rgb(23, 23, 23)");
+      await expect(next).toHaveCSS("font-weight", "600");
       await expect(next).toHaveCSS("opacity", "0.35");
       const rect = await next.boundingBox();
       await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);

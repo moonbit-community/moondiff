@@ -3401,9 +3401,9 @@ for (const algorithm of ["Token", "Tree"]) {
         const inset = parseFloat(getComputedStyle(summary).top) + summary.getBoundingClientRect().height + 8;
         window.scrollTo(0, window.scrollY + row.getBoundingClientRect().top - inset);
       });
-      await page.locator(".change-titlebar").getByRole("button", { name: "Previous change", exact: true }).click();
+      await page.locator(".change-titlebar").getByRole("button", { name: "Previous Change", exact: true }).click();
       await expect(first).toHaveJSProperty("open", true);
-      await expect(page.locator(".change-titlebar").getByRole("button", { name: "Previous change", exact: true })).toBeFocused();
+      await expect(page.locator(".change-titlebar").getByRole("button", { name: "Previous Change", exact: true })).toBeFocused();
       await expect(first.locator(".review-thread")).toHaveCount(1);
       await expect(page.locator(".review-thread")).toHaveCount(1);
       await expect(first.locator("textarea")).toHaveCount(1);

@@ -132,11 +132,11 @@ test "navigation and card share the rebase button after previous and next" {
     assert_true(navigation.contains(button), msg=navigation)
     assert_true(render_pull_merge(input).contains(button))
     assert_true(
-      navigation.find("Previous change").unwrap() <
-      navigation.find("Next change").unwrap(),
+      navigation.find("Previous Change").unwrap() <
+      navigation.find("Next Change").unwrap(),
     )
     assert_true(
-      navigation.find("Next change").unwrap() <
+      navigation.find("Next Change").unwrap() <
       navigation.find("rebase-merge-button").unwrap(),
     )
     assert_eq(button.contains("disabled"), submitting)
