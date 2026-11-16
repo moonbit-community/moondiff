@@ -1093,8 +1093,8 @@ for (const width of [1440, 390]) {
     });
     await page.goto(path);
     const checkbox = index => page.getByRole('checkbox', { name: `Viewed ${navigationFiles[index].filename}`, exact: true });
-    const next = page.locator('.change-titlebar').getByRole('button', { name: 'Next change', exact: true });
-    const prev = page.locator('.change-titlebar').getByRole('button', { name: 'Previous change', exact: true });
+    const next = page.locator('.change-titlebar').getByRole('button', { name: 'Next Change', exact: true });
+    const prev = page.locator('.change-titlebar').getByRole('button', { name: 'Previous Change', exact: true });
     const landed = async index => {
       await expect.poll(() => card(page, index).evaluate(el => {
         const title = document.querySelector('.change-titlebar').getBoundingClientRect();

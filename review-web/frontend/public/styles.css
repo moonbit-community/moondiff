@@ -1778,33 +1778,11 @@ button.file-tree-row.selected {
 
 .section-change-button {
   flex: none;
-  width: auto;
-  min-width: 4rem;
-  height: 1.65rem;
-  padding: 0 0.4rem;
-  white-space: nowrap;
-  color: #000;
-  font-weight: 400;
-  background: transparent;
-  border: 1px solid transparent;
-  box-shadow: none;
-  font-size: 1rem;
-  line-height: 1;
 }
 
-.section-change-button:hover:enabled {
-  color: #0969da;
-  font-weight: 700;
+button.section-change-button:disabled {
   border-color: var(--border);
   background: var(--surface);
-}
-
-.section-change-button:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: -1px;
-}
-
-.section-change-button:disabled {
   opacity: 0.35;
   cursor: default;
 }
@@ -3185,10 +3163,6 @@ footer {
     color: #777777;
   }
 
-  .section-change-button {
-    color: #fff;
-  }
-
   .error {
     color: #ff8e96;
   }
@@ -3641,7 +3615,8 @@ button.rebase-merge-button:disabled { cursor: default; opacity: 0.58; }
 }
 
 @media (max-width: 540px) {
-  .change-titlebar:has(.rebase-merge-button) .commit-message-title { flex-basis: 100%; }
+  .change-titlebar { flex-wrap: wrap; row-gap: 0.4rem; }
+  .change-titlebar .commit-message-title { flex-basis: 100%; }
   .pull-merge-card { border-radius: 0; padding-inline: 0.7rem; }
   .pull-ci-summary { align-items: flex-start; flex-wrap: wrap; }
   .pull-ci-toggle { margin-left: 1.9rem; }

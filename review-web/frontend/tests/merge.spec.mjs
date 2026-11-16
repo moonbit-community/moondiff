@@ -58,9 +58,9 @@ for (const width of [1440, 420, 320]) {
     // The hidden copy cannot steal focus, even through a direct DOM focus call.
     await original.evaluate(el => el.focus({ preventScroll: true }));
     await expect(sticky).toBeFocused();
-    await title.getByRole('button', { name: 'Previous change', exact: true }).focus();
+    await title.getByRole('button', { name: 'Previous Change', exact: true }).focus();
     await page.keyboard.press('Tab');
-    await expect(title.getByRole('button', { name: 'Next change', exact: true })).toBeFocused();
+    await expect(title.getByRole('button', { name: 'Next Change', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(sticky).toBeFocused();
     const up = await scrollMergeCard(page, 1);
@@ -84,7 +84,7 @@ for (const width of [1440, 420, 320]) {
         el.querySelector('.commit-message-title').getBoundingClientRect().bottom)).toBe(true);
     }
     const rows = page.locator('.file-card [data-change-block-start]');
-    for (const [direction, index] of [['Next change', 0], ['Next change', 1], ['Previous change', 0]]) {
+    for (const [direction, index] of [['Next Change', 0], ['Next Change', 1], ['Previous Change', 0]]) {
       await title.getByRole('button', { name: direction, exact: true }).click();
       await expect.poll(() => rows.nth(index).evaluate(row => {
         const file = row.closest('.file-card');
