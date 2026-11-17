@@ -1969,6 +1969,9 @@ for (const width of [1440, 420]) for (const colorScheme of ["light", "dark"]) {
       await expect(thread.getByRole("button", { name: "Reply", exact: true })).toHaveCount(0);
       await expect(thread.locator("textarea")).toBeFocused();
       await thread.getByRole("button", { name: "Cancel", exact: true }).click();
+      // Wait for reply cancellation to commit and the regional layout to settle.
+      await expect(thread.locator("textarea")).toHaveCount(0);
+      await settleRegions(page);
       await right.getByRole("button", { name: "More options" }).first().click();
       const menu = right.getByRole("menu");
       await expect(menu).toBeVisible();
