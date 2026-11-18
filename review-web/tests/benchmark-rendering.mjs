@@ -7,7 +7,8 @@ import { cpSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:f
 import { gunzipSync } from 'node:zlib';
 import { buildServer, startServer, repository as root } from '../backend/tests/server-fixture.mjs';
 import { syntheticFixture, installRenderingFixture } from '../frontend/tests/rendering-fixture.mjs';
-import { toggleCommit, settleRegions, instrumentRenderProbe } from './render-probe.mjs';
+import { toggleCommit, instrumentRenderProbe } from './render-probe.mjs';
+import { settleRegions } from './render-sync.mjs';
 // Both workspaces must already have release JS bundles; no source is edited.
 if (!process.argv[2]) throw new Error('Usage: node tests/benchmark-rendering.mjs <built-baseline-workspace> [results.json]');
 const baseline = resolve(process.argv[2]);

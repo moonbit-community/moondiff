@@ -4,7 +4,8 @@ import { expect, test } from '../../tests/browser-test.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 import { signInDialog, pagePosition, expectPagePosition, expectSignInDialog, closeSignInDialog } from './sign-in-dialog.mjs';
-import { settleRegions, waitForState } from '../../tests/render-probe.mjs';
+import { waitForState } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 
 const base = '1'.repeat(40), head = 'a'.repeat(40), merge = '2'.repeat(40);
 const path = '/alice/repo/pull/42';

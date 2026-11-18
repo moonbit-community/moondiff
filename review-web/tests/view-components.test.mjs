@@ -7,7 +7,6 @@ import test from 'node:test';
 import { chromium } from '@playwright/test';
 
 const reviewWeb = resolve(import.meta.dirname, '..');
-const packageName = 'moonbit-community/moondiff-review-web/internal/view';
 const browserAttribute = '#skip("browser DOM: npm run test:views")';
 
 test('MoonBit view components in Chromium', { timeout: 120_000 }, async t => {
@@ -23,8 +22,13 @@ test('MoonBit view components in Chromium', { timeout: 120_000 }, async t => {
     try { return [JSON.parse(line)]; } catch { return []; }
   }).find(value => Array.isArray(value.artifacts_path));
   assert.ok(report, `Missing MoonBit build report:\n${build.stdout}`);
-  const artifact = report.artifacts_path.find(path => path.endsWith('/view.whitebox_test.js'));
-  assert.ok(artifact, 'Missing MoonBit white-box test artifact');
+  const artifactIndex = report.artifacts_path.findIndex(path => path.endsWith('/view.whitebox_test.js'));
+  assert.notEqual(artifactIndex, -1, 'Missing MoonBit white-box test artifact');
+  const artifact = report.artifacts_path[artifactIndex];
+  // Moon reports the argument accepted by the driver beside its artifact path.
+  const filter = report.test_filter_args?.[artifactIndex];
+  assert.ok(typeof filter === 'string' && filter.length > 0, 'Missing MoonBit white-box test filter');
+  const legacyFilter = filter.startsWith('{') ? JSON.parse(filter) : null;
   const source = readFileSync(artifact, 'utf8');
   const info = JSON.parse(readFileSync(join(dirname(artifact), '__whitebox_test_info.json'), 'utf8'));
   const entries = Object.entries(info.tests).flatMap(([file, cases]) =>
@@ -41,14 +45,16 @@ test('MoonBit view components in Chromium', { timeout: 120_000 }, async t => {
         // Avatar URLs are fixture data; component assertions need no network.
         await page.route('**/*', route => route.abort());
         await page.setContent('<!doctype html><title>MoonBit view fixture</title>');
-        await page.evaluate(({ packageName, file, index }) => {
+        const { file, index } = entry;
+        const end = index + 1;
+        const testFilter = legacyFilter
+          ? JSON.stringify({ ...legacyFilter, file_and_index: [[file, [{ start: index, end }]]] })
+          : `${file}:${index}-${end}`;
+        await page.evaluate(testFilter => {
           // The generated MoonBit test driver expects argv and CommonJS exports.
           // Supply only those runner interfaces; window/document remain Chromium's.
           globalThis.process = {
-            argv: ['node', 'view.whitebox_test.js', JSON.stringify({
-              package: packageName,
-              file_and_index: [[file, [{ start: index, end: index + 1 }]]],
-            })],
+            argv: ['node', 'view.whitebox_test.js', testFilter],
             exit(code) { throw new Error(`MoonBit test driver exited with ${code}`); },
           };
           globalThis.exports = {};
@@ -68,7 +74,7 @@ test('MoonBit view components in Chromium', { timeout: 120_000 }, async t => {
               catch { __moonbitViewResults.errors.push(`Invalid MoonBit test result: ${line}`); }
             }
           };
-        }, { packageName, file: entry.file, index: entry.index });
+        }, testFilter);
         // Execute the compiler's unmodified artifact, including its white-box
         // fixtures and assertions. Each case gets a fresh page and DOM.
         await page.addScriptTag({ content: source });

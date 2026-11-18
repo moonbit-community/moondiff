@@ -1,4 +1,4 @@
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { requestsFor } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { head, pull, commits, success, failure, gate, setup, reviews, authored, row, noLanding, selectTab, signOut } from './home-fixture.mjs';

@@ -1,7 +1,8 @@
 import { cancelledRoute } from '../../tests/browser-control.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
-import { installRenderProbe, renderCounts, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe, renderCounts } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { gate, installRenderingFixture, navigate, syntheticFixture } from './rendering-fixture.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
 

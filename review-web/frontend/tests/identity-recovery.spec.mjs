@@ -2,7 +2,7 @@ import { requestsFor, trackRoute } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { setup, gate, base, head } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 
 const mergeBase = 'c'.repeat(40), middle = 'd'.repeat(40);
 const path = '/upstream/repo/pull/1';

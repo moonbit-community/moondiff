@@ -1,6 +1,6 @@
 import { test, expect } from '../../tests/browser-test.mjs';
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
 function interfaceFixture(count = 5) {

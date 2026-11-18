@@ -1,6 +1,6 @@
 import { cancelledRoute, createGate, installClock, clockFor, requestsFor } from '../../tests/browser-control.mjs';
 import { fixtureRequest, successFixture } from '../../tests/protocol-fixtures.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { e2eOrigin } from '../../tests/e2e-config.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { setTimeout as delay } from 'node:timers/promises';

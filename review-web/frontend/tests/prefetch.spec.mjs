@@ -5,7 +5,8 @@ import { setup, pull, success, gate, failure, row, selectTab, signOut, base, hea
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { navigate } from './rendering-fixture.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
-import { settleRegions, waitForPrefetch, waitForPrefetchRound, waitForState } from '../../tests/render-probe.mjs';
+import { waitForPrefetch, waitForPrefetchRound, waitForState } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 
 const file = { filename: 'src/renamed.mbt', previous_filename: 'old/exact name.mbt', status: 'renamed', additions: 1, deletions: 1, changes: 2, patch: '@@ -1 +1 @@\n-pub fn answer() { 1 }\n+pub fn answer() { 2 }' };
 const mergeBase = 'c'.repeat(40);

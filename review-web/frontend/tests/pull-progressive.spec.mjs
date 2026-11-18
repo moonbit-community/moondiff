@@ -1,6 +1,7 @@
 import { installClock, clockFor } from '../../tests/browser-control.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
-import { installRenderProbe, renderCounts, settleRegions, waitForState } from '../../tests/render-probe.mjs';
+import { installRenderProbe, renderCounts, waitForState } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { gate, installRenderingFixture, navigate, syntheticFixture } from './rendering-fixture.mjs';
 
 const card = (page, index) => page.locator(`#moondiff-file-${index}`);

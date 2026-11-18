@@ -114,9 +114,10 @@ When refreshing an already completed round, capture its `round` first and pass
 `{ afterRound }` so the wait cannot match the previous round.
 
 `waitForState(page, predicate, label)` waits for a business condition, then calls
-`settleRegions`. `settleRegions` requires the temporary probe and waits for two
-consecutive idle animation frames, including central/regional paints and layout
-callbacks. It supports a controlled clock. Render idleness alone says nothing
+`settleRegions`. Import `settleRegions` from `../../tests/render-sync.mjs` to
+wait for two consecutive frames with no pending central or regional paints or
+layout work. It reads the temporary bundle's paint and layout signals and supports
+a controlled clock. Render idleness alone says nothing
 about an outstanding network request or whether its result has been accepted.
 Capture identity/application generations before changing accounts and wait for
 the new generations and completed business state with `waitForState`. Then assert

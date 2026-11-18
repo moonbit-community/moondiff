@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
 import { holdRegionFrames, operationCheckpoint } from "./dom-timing.mjs";
 import { ensureFileExpanded } from "./file-actions.mjs";
-import { settleRegions } from "../../tests/render-probe.mjs";
+import { settleRegions } from "../../tests/render-sync.mjs";
 
 const sha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const parent = "1111111111111111111111111111111111111111";

@@ -1,5 +1,6 @@
 import { installClock } from '../../tests/browser-control.mjs';
-import { waitForState, settleRegions, renderCounts, installRenderProbe } from '../../tests/render-probe.mjs';
+import { waitForState, renderCounts, installRenderProbe } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
