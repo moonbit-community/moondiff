@@ -3,7 +3,8 @@ import { writePerformanceReport, comparisonOrder } from '../../tests/performance
 import { expect, test } from '../../tests/browser-test.mjs';
 import { readFile } from 'node:fs/promises';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
-import { installRenderProbe, instrumentRenderProbe, settleRegions, waitForState } from '../../tests/render-probe.mjs';
+import { installRenderProbe, instrumentRenderProbe, waitForState } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { minifyFrontend } from '../../scripts/minify.mjs';
 

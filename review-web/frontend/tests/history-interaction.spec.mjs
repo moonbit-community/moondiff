@@ -2,7 +2,8 @@ import { scrollAndWait } from '../../tests/scroll-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
-import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 
 async function returnToDraft(page, { small = false } = {}) {
   const fixture = syntheticFixture(small ? { files: 8, declarations: 1 } : { files: 24, declarations: 3 });

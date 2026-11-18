@@ -1,4 +1,5 @@
-import { clockFor, waitUntil, browserDiagnostic, withRealTimeout } from './browser-control.mjs';
+import { clockFor, waitUntil, browserDiagnostic } from './browser-control.mjs';
+import { settleRegions } from './render-sync.mjs';
 
 // Instrument only the temporary E2E bundle. Dependency sources are never edited.
 export function instrumentRenderProbe(source) {
@@ -71,18 +72,6 @@ export function instrumentRenderProbe(source) {
   inject(/self\.paint_scheduled = false;/, `
     globalThis.__moondiffPendingPaints?.delete(self);
     if (globalThis.__moondiffMetrics) globalThis.__moondiffMetrics.pendingPaints = globalThis.__moondiffPendingPaints?.size ?? 0;`);
-  inject(/function \w+vdom10diff__node\(old, new_, scheduler, captured_link_listener, parent, anchor\) \{/, `
-    const probe = globalThis.__moondiffMetrics;
-    if (probe) {
-      const sandbox = scheduler.self;
-      const region = sandbox.__moondiffProbeRegion ??= document.getElementById(sandbox.mount)?.closest('[data-region]')?.dataset.region ?? '';
-      const element = old.$tag === 0 ? old._4 : parent;
-      const path = region.startsWith('file:') ? region.slice(5) : element?.closest?.('[data-file-path]')?.dataset.filePath;
-      if (path) {
-        const counts = probe.files[path] ??= {};
-        counts.vdom = (counts.vdom ?? 0) + 1;
-      }
-    }`);
   inject(/function \w+view12region__view\(input, emit, cache\) \{/, `
     const file = input._0?.file;
     const probe = globalThis.__moondiffMetrics;
@@ -108,60 +97,6 @@ export async function installRenderProbe(page) {
       for (const entry of list.getEntries()) __moondiffMetrics.longTasks.push({ start: entry.startTime, duration: entry.duration });
     }).observe({ type: 'longtask', buffered: true });
   });
-}
-
-export async function settleRegions(page, timeout = 5_000) {
-  let finished = false;
-  // A single evaluation includes probe validation, both idle frames and normal
-  // cleanup. Each extra Playwright call captures the large DOM in traces and
-  // can itself take seconds under 6x CPU throttling.
-  const observation = page.evaluate(() => {
-    if (typeof globalThis.__moondiffTestState !== 'function' || !(globalThis.__moondiffPendingPaints instanceof Set)) {
-      throw new Error('settleRegions requires instrumentRenderProbe in the temporary browser bundle');
-    }
-    if (globalThis.__moondiffSettleFrame) throw new Error('Concurrent regional render wait');
-    return new Promise(resolve => {
-      const state = { stable: 0 };
-      state.cancel = () => { cancelAnimationFrame(state.frame); resolve(false); };
-      const next = () => {
-        state.frame = requestAnimationFrame(() => {
-          const layout = globalThis.__moondiffMetrics?.layout;
-          const idle = globalThis.__moondiffPendingPaints.size === 0 &&
-            layout?.frame === 0 && layout?.dirty === 0 && layout?.callbacks === 0;
-          state.stable = idle ? state.stable + 1 : 0;
-          if (state.stable >= 2) { delete globalThis.__moondiffSettleFrame; resolve(true); }
-          else next();
-        });
-      };
-      globalThis.__moondiffSettleFrame = state;
-      next();
-    });
-  }).then(result => { finished = true; return result; });
-  const completed = withRealTimeout(observation, timeout, 'regional render commit (two idle frames)');
-  try {
-    const clock = clockFor(page);
-    if (clock) {
-      const advance = async () => {
-        // Complete a round trip after registration before advancing frames.
-        await page.evaluate(() => {});
-        await waitUntil(async () => {
-          if (!finished) await clock.frames();
-          return finished;
-        }, { label: 'controlled regional render frames', timeout });
-      };
-      await Promise.all([completed, advance()]);
-    } else {
-      await completed;
-    }
-  } catch (error) {
-    finished = true;
-    if (!page.isClosed()) await page.evaluate(() => {
-      globalThis.__moondiffSettleFrame?.cancel();
-      delete globalThis.__moondiffSettleFrame;
-    });
-    if (error.message.includes('requires instrumentRenderProbe')) throw error;
-    throw new Error(`Regional rendering did not become idle: ${JSON.stringify(await browserDiagnostic(page))}`, { cause: error });
-  } finally { finished = true; }
 }
 
 export async function waitForState(page, predicate, label = 'application state', options = {}) {

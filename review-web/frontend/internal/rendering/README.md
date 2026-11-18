@@ -276,11 +276,10 @@ regions in either order, covering a collapse above the target, replacement by an
 already expanded target, two targets awaiting updates, interleaved file/change
 navigation, later revisions, route cancellation, and outstanding source requests.
 
-Counters are opt-in through `__moondiffMetrics`. VDOM traversal and actual runtime
-store counts are instrumented only in the temporary test bundle by
-`../../../tests/render-probe.mjs`; dependency sources and production bundles are
-not modified. The parser reproduction is pinned as an offline fixture, alongside
-synthetic cases with 4 × 12 and 12 × 80 file/declaration sizes.
+Counters are opt-in through `__moondiffMetrics`. `../../../tests/render-probe.mjs`
+adds runtime store counts to the temporary test bundle. The parser reproduction
+is pinned as an offline fixture alongside synthetic cases with 4 × 12 and
+12 × 80 file/declaration sizes.
 
 Run `npm run test:review-web` from the repository root for functional browser
 regressions. Run `npm run test:review-web:stress` (or `npm run test:e2e:stress` from
@@ -314,7 +313,7 @@ time (not paint time) and the longest observed main-thread task, in milliseconds
 
 These are comparisons, not timing guarantees. Browser style/layout work remains;
 the deterministic checks ensure unrelated files perform no additional view,
-patch, review-row, visible-projection, diff, highlight or VDOM work.
+patch, review-row, visible-projection, diff or highlight work.
 
 Navigation commit verification:
 

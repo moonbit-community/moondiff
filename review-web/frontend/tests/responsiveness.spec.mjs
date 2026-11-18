@@ -1,6 +1,7 @@
 import { expect, test } from '../../tests/browser-test.mjs';
 import { installRenderingFixture, syntheticFixture, gate } from './rendering-fixture.mjs';
-import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 
 function responseFixture(options) {

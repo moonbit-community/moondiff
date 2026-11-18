@@ -1,6 +1,7 @@
 import { test, expect } from '../../tests/browser-test.mjs';
 import { createGate, trackRoute } from '../../tests/browser-control.mjs';
-import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
 import { navigate } from './rendering-fixture.mjs';
 import { installApi, reviewPath, pullTarget, commitTarget, commentCard, commentLines } from './review-fixture.mjs';

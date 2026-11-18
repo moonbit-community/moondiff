@@ -1,7 +1,8 @@
 import { installClock } from '../../tests/browser-control.mjs';
 import { test, expect } from '../../tests/browser-test.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
-import { settleRegions, waitForState } from '../../tests/render-probe.mjs';
+import { waitForState } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { gate, installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
 const sources = state => state.calls.filter(call => call.op === 'github.content.get');

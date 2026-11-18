@@ -1,7 +1,7 @@
 import { cancelledRoute } from '../../tests/browser-control.mjs';
 import { expect, test } from '../../tests/browser-test.mjs';
 import { fixtureRequest, successFixture, metadataFallbackRoute } from '../../tests/protocol-fixtures.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
 
 const base = 'a'.repeat(40);

@@ -1,5 +1,6 @@
 import { test, expect } from '../../tests/browser-test.mjs';
-import { installRenderProbe, renderCounts, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe, renderCounts } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
 import { navigate } from './rendering-fixture.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';

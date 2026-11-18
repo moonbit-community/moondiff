@@ -2,7 +2,7 @@ import { test, expect } from '../../tests/browser-test.mjs';
 import { createGate, requestsFor, trackRoute, installClock, finishControls, waitUntil } from '../../tests/browser-control.mjs';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { syntheticFixture, installRenderingFixture } from './rendering-fixture.mjs';
 import { holdRegionFrames } from './dom-timing.mjs';
 import { scrollAndWait } from '../../tests/scroll-control.mjs';
@@ -116,7 +116,7 @@ test('Clock respects one millisecond deadlines, cancellation and long jumps', as
   await clock.jump(86_400_000);
   expect(await page.evaluate(() => clockEvents)).toEqual(['due']);
   expect((await clock.timers()).find(t => t.ms === 250).state).toBe('cancelled');
-  await expect(settleRegions(page)).rejects.toThrow(/requires instrumentRenderProbe/);
+  await expect(settleRegions(page)).rejects.toThrow(/requires pending paints and layout metrics/);
 });
 
 test('business probe reports accepted generations and returns detached snapshots', async ({ page }) => {
@@ -135,6 +135,7 @@ test('business probe reports accepted generations and returns detached snapshots
     copy.candidates.push('mutated');
   });
   expect(await page.evaluate(() => __moondiffTestState())).toEqual(before);
+  await page.evaluate(() => { delete globalThis.__moondiffTestState; });
   const barrier = await holdRegionFrames(page, ['file:local_test.mbt']);
   try {
     await page.locator('.file-toggle').evaluate(button => button.click());

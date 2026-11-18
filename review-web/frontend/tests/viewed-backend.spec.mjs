@@ -9,7 +9,7 @@ import { fixtureRequest } from '../../tests/protocol-fixtures.mjs';
 import { minifyFrontend } from '../../scripts/minify.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 import { ensureFileExpanded } from './file-actions.mjs';
-import { settleRegions } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 
 const test = baseTest.extend({
   backend: async ({ page }, use) => {

@@ -1,7 +1,8 @@
 import { expect, test } from '../../tests/browser-test.mjs';
 import { createGate } from '../../tests/browser-control.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
-import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { installApi, pullTarget, reviewPath } from './review-fixture.mjs';
 import { clickLineCommentButton } from './comment-actions.mjs';
 

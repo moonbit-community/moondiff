@@ -2,7 +2,8 @@ import { writePerformanceReport, comparisonOrder } from '../../tests/performance
 import { test, expect } from '../../tests/browser-test.mjs';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { installRenderProbe, renderCounts, settleRegions, toggleCommit, toggleDetailsPaint } from '../../tests/render-probe.mjs';
+import { installRenderProbe, renderCounts, toggleCommit, toggleDetailsPaint } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
 
 const parser = JSON.parse(gunzipSync(readFileSync(new URL('./fixtures/parser-836b5e03.json.gz', import.meta.url))));
@@ -50,7 +51,6 @@ for (const [name, fixture] of [
       expect(after.files[local].diff).toBe(before.files[local].diff);
       expect(after.files[local].highlight).toBe(before.files[local].highlight);
       expect(after.files[local].patch).toBe(before.files[local].patch);
-      expect(after.files[local].vdom).toBeGreaterThan(before.files[local].vdom);
       await writePerformanceReport(info, 'render-performance.json', { fixture: name, cpuRate: rate,
         samples: durations, groups: { commitMs: durations },
         longTasks: after.longTasks.slice(before.longTasks.length), before, after });

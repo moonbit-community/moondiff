@@ -2,7 +2,8 @@ import { expect, test } from '../../tests/browser-test.mjs';
 import { setup, gate, failure, row } from './home-fixture.mjs';
 import { successFixture } from '../../tests/protocol-fixtures.mjs';
 import { installRenderingFixture, syntheticFixture } from './rendering-fixture.mjs';
-import { installRenderProbe, settleRegions } from '../../tests/render-probe.mjs';
+import { installRenderProbe } from '../../tests/render-probe.mjs';
+import { settleRegions } from '../../tests/render-sync.mjs';
 
 test('drafts survive SPA history with new editor identities and disappear after reload', async ({ page }) => {
   await setup(page);
