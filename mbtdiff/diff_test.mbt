@@ -151,17 +151,17 @@ test "top-level sections preserve both source orders and local ranges" {
         new={ start: 1, len: 1, },
         old_context=Some("fn first() { old_value() }"),
         new_context=Some("fn first() { new_value() }"),
-        diff=matched
+        diff=matched,
       ),
       Deleted(
         old={ start: 1, len: 1, },
         old_context=Some("fn removed() {}"),
-        diff=deleted
+        diff=deleted,
       ),
       Inserted(
         new={ start: 0, len: 1, },
         new_context=Some("fn inserted() {}"),
-        diff=inserted
+        diff=inserted,
       ),
     ] else {
     fail("expected matched, deleted, and inserted section variants")
@@ -353,7 +353,7 @@ test "parse fallbacks are Whole and preserve source labels and sides" {
       {
         document: parsed_document,
         fallbacks: [ParseError(sides=[Old, New], detail~)],
-      }
+      },
     ) else {
     fail("expected a two-sided Whole parse fallback")
   }

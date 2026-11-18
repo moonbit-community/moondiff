@@ -158,7 +158,7 @@ test "fallbacks are read from the fragment that degraded" {
   )
   guard parsed.document()
     is Whole(
-      { document: parsed_document, fallbacks: [ParseError(sides~, detail~)], }
+      { document: parsed_document, fallbacks: [ParseError(sides~, detail~)], },
     ) else {
     fail("expected one Whole parse fallback")
   }

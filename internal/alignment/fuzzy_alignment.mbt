@@ -107,7 +107,7 @@ fn first_name_token(node : @cst.CstNode) -> @cst.CstNode? {
       | TK_MULTILINE_STRING
       | TK_REGEX_LITERAL
       | TK_FALSE
-      | TK_TRUE
+      | TK_TRUE,
     ) => if node.source_span.0 < node.source_span.1 { Some(node) } else { None }
     _ => {
       for entry in node.children {

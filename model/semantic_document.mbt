@@ -18,7 +18,7 @@ pub(all) enum DiffSection {
     new~ : LineRange,
     old_context~ : String?,
     new_context~ : String?,
-    diff~ : DiffFragment
+    diff~ : DiffFragment,
   )
   Deleted(old~ : LineRange, old_context~ : String?, diff~ : DiffFragment)
   Inserted(new~ : LineRange, new_context~ : String?, diff~ : DiffFragment)
