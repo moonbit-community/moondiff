@@ -74,7 +74,7 @@ pub enum Syntax {
     info~ : SyntaxInfo,
     position~ : Array[SingleLineSpan],
     content~ : String,
-    kind~ : AtomKind
+    kind~ : AtomKind,
   )
   List(
     info~ : SyntaxInfo,
@@ -87,7 +87,7 @@ pub enum Syntax {
     close_position~ : Array[SingleLineSpan],
     close_content~ : String,
     // number of all subnodes
-    num_descendants~ : UInt32
+    num_descendants~ : UInt32,
   )
 }
 
