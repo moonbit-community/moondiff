@@ -14,7 +14,7 @@ pub(all) enum ReviewMsg {
     Int32,
     Int32,
     @comments.CommentId,
-    Result[@protocol.DeleteResult, Error]
+    Result[@protocol.DeleteResult, Error],
   )
   CommentsLoaded(Int32, Int32, Result[ApiCommentBundle, Error])
   PageReactivated

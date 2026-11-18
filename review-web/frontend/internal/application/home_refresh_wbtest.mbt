@@ -122,7 +122,7 @@ test "refresh failures retain contents and retry cursors without advancing succe
   assert_true(
     failed.home.reviews.load
     is Failed(
-      "GitHub is temporarily limiting requests. Please try again later."
+      "GitHub is temporarily limiting requests. Please try again later.",
     ),
   )
   let retry = home_step(failed, Home(LoadPulls(ReviewRequested)))

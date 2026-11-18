@@ -6,7 +6,7 @@ pub(all) enum LoadMsg {
     String,
     Int32,
     SourceSide,
-    Result[(String, Bytes), Error]
+    Result[(String, Bytes), Error],
   )
   CommitPageLoaded(Int32, Int32, Result[ApiCommit, Error])
   ToggleFile(Int32, Int32)
@@ -83,7 +83,7 @@ fn update_load(
         LoadingPullSelectorCompare(
           reference~,
           attempt=expected_attempt,
-          metadata~
+          metadata~,
         ) if attempt == expected_attempt =>
           match result {
             Err(error) => (load_failure(model, error), @rabbita.none)
@@ -107,7 +107,7 @@ fn update_load(
           metadata~,
           compare=_,
           page~,
-          files~
+          files~,
         ) if attempt == expected_attempt =>
           match result {
             Err(error) => (load_failure(model, error), @rabbita.none)
@@ -137,7 +137,7 @@ fn update_load(
           metadata~,
           compare~,
           page=expected_page,
-          files~
+          files~,
         ) &&
         attempt == expected_attempt &&
         page == expected_page &&
@@ -185,7 +185,7 @@ fn update_load(
           reference~,
           attempt=expected_attempt,
           metadata~,
-          compare~
+          compare~,
         ) if attempt == expected_attempt =>
           match result {
             Err(error) => (load_failure(model, error), @rabbita.none)
@@ -199,7 +199,7 @@ fn update_load(
           attempt=expected_attempt,
           metadata~,
           compare~,
-          files~
+          files~,
         ) if attempt == expected_attempt =>
           match result {
             Err(error) => (load_failure(model, error), @rabbita.none)

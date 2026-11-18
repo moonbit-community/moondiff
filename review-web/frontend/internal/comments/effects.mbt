@@ -3,20 +3,20 @@ pub(all) enum Effect {
   CommentsRequest(
     CommitRef,
     Int32,
-    (Result[ApiCommentBundle, Failure]) -> Event
+    (Result[ApiCommentBundle, Failure]) -> Event,
   )
   CommentHeadRequest(
     CommitRef,
     String,
     Int32,
-    (Result[ApiPull, Failure]) -> Event
+    (Result[ApiPull, Failure]) -> Event,
   )
   CreateIssueCommentRequest(
     CommitRef,
     String,
     String,
     Int32,
-    (Result[ApiIssueComment, Failure]) -> Event
+    (Result[ApiIssueComment, Failure]) -> Event,
   )
   CreateReviewCommentRequest(
     CommitRef,
@@ -25,7 +25,7 @@ pub(all) enum Effect {
     ReviewAnchor,
     String,
     Int32,
-    (Result[ApiReviewComment, Failure]) -> Event
+    (Result[ApiReviewComment, Failure]) -> Event,
   )
   CreateCommitCommentRequest(
     CommitRef,
@@ -33,7 +33,7 @@ pub(all) enum Effect {
     ReviewAnchor,
     String,
     Int32,
-    (Result[ApiCommitComment, Failure]) -> Event
+    (Result[ApiCommitComment, Failure]) -> Event,
   )
   CreateReviewReplyRequest(
     CommitRef,
@@ -41,13 +41,13 @@ pub(all) enum Effect {
     Int64,
     String,
     Int32,
-    (Result[ApiReviewComment, Failure]) -> Event
+    (Result[ApiReviewComment, Failure]) -> Event,
   )
   DeleteCommentRequest(
     CommitRef,
     CommentId,
     Int32,
-    (Result[DeleteResult, Failure]) -> Event
+    (Result[DeleteResult, Failure]) -> Event,
   )
   Dispatch(Event)
 }

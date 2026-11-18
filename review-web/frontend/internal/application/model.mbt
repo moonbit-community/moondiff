@@ -7,7 +7,7 @@ pub(all) enum Phase {
     repository~ : RepositoryRef,
     page~ : Int32,
     first~ : ApiCommit?,
-    files~ : Array[ApiFile]
+    files~ : Array[ApiFile],
   )
   LoadingPullMetadata(reference~ : CommitRef, attempt~ : Int32)
   LoadingPullCommitMetadata(reference~ : CommitRef)
@@ -20,25 +20,25 @@ pub(all) enum Phase {
     metadata~ : ApiPull,
     compare~ : ApiCompare?,
     page~ : Int32,
-    files~ : Array[ApiFile]
+    files~ : Array[ApiFile],
   )
   ValidatingPullSnapshot(
     reference~ : CommitRef,
     attempt~ : Int32,
     metadata~ : ApiPull,
     compare~ : ApiCompare,
-    files~ : Array[ApiFile]
+    files~ : Array[ApiFile],
   )
   LoadingPullSelectorCompare(
     reference~ : CommitRef,
     attempt~ : Int32,
-    metadata~ : ApiPull
+    metadata~ : ApiPull,
   )
   ValidatingPullSelector(
     reference~ : CommitRef,
     attempt~ : Int32,
     metadata~ : ApiPull,
-    compare~ : ApiCompare
+    compare~ : ApiCompare,
   )
   LoadFailed(String)
   Showing(ChangeView)

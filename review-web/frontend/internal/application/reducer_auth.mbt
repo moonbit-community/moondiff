@@ -6,7 +6,7 @@ pub(all) enum AuthMsg {
     Int32,
     Int32,
     CommitRef?,
-    Result[ApiAuthStatus, Error]
+    Result[ApiAuthStatus, Error],
   )
   StartSignIn
   RestoreAuth

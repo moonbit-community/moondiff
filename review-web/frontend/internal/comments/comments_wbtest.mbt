@@ -35,7 +35,7 @@ fn review_comment_fixture(
   reply_to~ : Int64? = None,
 ) -> ApiReviewComment {
   {
-    id: Int64::from_int(id),
+    id: id.to_int64(),
     body: "comment \{id}",
     html_url: "https://github.com/upstream/project/pull/17#discussion_r\{id}",
     created_at: "2026-08-18T08:00:00Z",
@@ -54,7 +54,7 @@ fn review_comment_fixture(
 test "review threads group replies and mark every stale anchor condition outdated" {
   let view = review_test_view()
   let root = review_comment_fixture(1)
-  let reply = review_comment_fixture(2, reply_to=Some(Int64::from_int(1)))
+  let reply = review_comment_fixture(2, reply_to=Some(1L))
   let no_position = review_comment_fixture(3, position=None)
   let missing_anchor = review_comment_fixture(4, line=99, position=Some(99))
   let old_head = review_comment_fixture(
@@ -74,8 +74,8 @@ test "review threads group replies and mark every stale anchor condition outdate
     parse_canonical_patch(file.filename, file.patch),
   )
   assert_eq(threads.length(), 4)
-  assert_eq(threads[0].root.id, Int64::from_int(1))
-  assert_eq(threads[0].replies.map(comment => comment.id), [Int64::from_int(2)])
+  assert_eq(threads[0].root.id, 1L)
+  assert_eq(threads[0].replies.map(comment => comment.id), [2L])
   assert_eq(threads[0].file_index, Some(0))
   assert_false(threads[0].outdated)
   assert_true(threads[1].outdated)
@@ -91,7 +91,7 @@ test "commit discussions use only canonical patch positions" {
   )
   let comments : Array[ApiCommitComment] = [
     {
-      id: Int64::from_int(10),
+      id: 10L,
       body: "active",
       html_url: "https://github.com/upstream/project/commit/a#commitcomment-10",
       created_at: "2026-08-18T08:00:00Z",
@@ -101,7 +101,7 @@ test "commit discussions use only canonical patch positions" {
       line: Some(2),
     },
     {
-      id: Int64::from_int(11),
+      id: 11L,
       body: "outdated",
       html_url: "https://github.com/upstream/project/commit/a#commitcomment-11",
       created_at: "2026-08-18T08:00:00Z",

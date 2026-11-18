@@ -28,7 +28,7 @@ fn run_comment_effect(
       anchor,
       body,
       generation,
-      respond
+      respond,
     ) =>
       @comment_requests.create_review_comment_request(
         reference,
@@ -45,7 +45,7 @@ fn run_comment_effect(
       anchor,
       body,
       generation,
-      respond
+      respond,
     ) =>
       @comment_requests.create_commit_comment_request(
         reference,
@@ -61,7 +61,7 @@ fn run_comment_effect(
       comment_id,
       body,
       generation,
-      respond
+      respond,
     ) =>
       @comment_requests.create_review_reply_request(
         reference,

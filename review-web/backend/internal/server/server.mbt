@@ -254,7 +254,7 @@ pub async fn run() -> Unit {
   @fs.chmod(config.database, 0o600)
   let app = @storage.App::open(config) catch {
     @sqlite3.SqliteError(code~, msg~, ..) =>
-      fail("SQLite initialization failed (\{code.to_repr()}): \{msg}")
+      fail("SQLite initialization failed (\{Repr(code)}): \{msg}")
     error => raise error
   }
   defer app.db.close()

@@ -316,7 +316,7 @@ fn reconcile_viewed(
       record_viewed_interaction(model, index)
     Review(OpenInlineDraft(_, _) | OpenReplyDraft(_) | DraftBodyChanged(_))
     | Review(
-      Domain(OpenInlineDraft(_, _) | OpenReplyDraft(_) | DraftBodyChanged(_))
+      Domain(OpenInlineDraft(_, _) | OpenReplyDraft(_) | DraftBodyChanged(_)),
     ) =>
       if old.review.draft() != model.review.draft() &&
         viewed_draft_file(model) is Some(index) {

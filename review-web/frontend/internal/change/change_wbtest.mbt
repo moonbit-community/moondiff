@@ -407,8 +407,8 @@ test "test file caches use both rename paths and restore unfiltered results" {
             MoonBit(
               document=Whole(fragment),
               status=IgnoredOnly,
-              ignore_reason=Some(TestFile)
-            )
+              ignore_reason=Some(TestFile),
+            ),
           ) else {
           fail("expected ignored test-file cache for \{file.filename}")
         }

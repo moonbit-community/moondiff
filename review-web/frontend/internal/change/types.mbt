@@ -37,7 +37,7 @@ pub(all) enum CachedDiffResult {
   MoonBit(
     document~ : @mbtdiff.DiffDocument,
     status~ : @mbtdiff.DiffStatus,
-    ignore_reason~ : @mbtdiff.IgnoreReason?
+    ignore_reason~ : @mbtdiff.IgnoreReason?,
   )
 }
 

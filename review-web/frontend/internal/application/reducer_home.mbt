@@ -12,14 +12,14 @@ pub(all) enum HomeMsg {
     Int32,
     Int32,
     @protocol.ViewerPullKind,
-    Result[@protocol.ApiViewerPulls, Error]
+    Result[@protocol.ApiViewerPulls, Error],
   )
   CommitsLoaded(
     Int32,
     Int32,
     Int32,
     String,
-    Result[@protocol.ApiPullCommits, Error]
+    Result[@protocol.ApiPullCommits, Error],
   )
 }
 
