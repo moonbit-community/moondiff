@@ -24,7 +24,7 @@ fn cancel_history_for_edit(model : Model, msg : Msg) -> Model {
         | OverallDraftBodyChanged(_)
         | OpenOverallDraft
         | OpenInlineDraft(_, _)
-        | OpenReplyDraft(_)
+        | OpenReplyDraft(_),
       ) ||
       msg is Ui(InputChanged(_) | FileTreeSearchChanged(_))
     ) else {

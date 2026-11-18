@@ -180,7 +180,7 @@ test "large metadata-only results are reused and huge PRs retain the selector" {
         {
           snapshot: { files: [], metadata: { changed_files: 3001, .. }, .. },
           ..
-        }
+        },
       ),
     ],
   )

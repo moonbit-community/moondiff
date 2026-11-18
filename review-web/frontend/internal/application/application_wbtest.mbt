@@ -1314,7 +1314,7 @@ test "only signed-in reviews can open comment drafts" {
     let messages : Array[ReviewMsg] = [
       OpenOverallDraft,
       OpenInlineDraft(0, anchor),
-      OpenReplyDraft(Int64::from_int(20)),
+      OpenReplyDraft(20L),
     ]
     for msg in messages {
       let (blocked, _) = update_review(model, msg, emit)
@@ -1339,7 +1339,7 @@ test "only signed-in reviews can open comment drafts" {
     inline_draft.kind is InlineDraft(0, selected) && selected == anchor,
   )
   let signed_in = review_reply_test_model()
-  let comment_id = Int64::from_int(20)
+  let comment_id = 20L
   let (reply, _) = update_review(signed_in, OpenReplyDraft(comment_id), emit)
   guard reply.review.draft() is Some(reply_draft) else {
     fail("expected a reply draft")
@@ -1669,7 +1669,7 @@ test "comment completion inserts GitHub response and failures retain the draft" 
     ),
   }
   let created = ApiIssueComment::{
-    id: Int64::from_int(42),
+    id: 42L,
     body: "new comment",
     html_url: "https://github.com/upstream/project/pull/17#issuecomment-42",
     created_at: "2026-08-18T08:00:00Z",
@@ -2058,7 +2058,7 @@ test "account boundary generation ignores old diff comment and submission respon
     ),
   )
   let late_comment = ApiIssueComment::{
-    id: Int64::from_int(42),
+    id: 42L,
     body: "late Alice comment",
     html_url: "https://github.com/upstream/project/issues/17#issuecomment-42",
     created_at: "2026-09-03T08:00:00Z",

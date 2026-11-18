@@ -13,13 +13,13 @@ pub(all) enum RangeMsg {
   RangePullCommitPageLoaded(
     Int32,
     Int32,
-    Result[Array[@protocol.ApiRangeCommit], Error]
+    Result[Array[@protocol.ApiRangeCommit], Error],
   )
   RangePullCommitPageValidated(
     Int32,
     Int32,
     Array[@protocol.ApiRangeCommit],
-    Result[ApiPull, Error]
+    Result[ApiPull, Error],
   )
 }
 
@@ -444,7 +444,7 @@ fn update_range(
       }
       match result {
         Err(
-          @github_client.HttpRequestError(code="not_found_or_not_installed", ..) as error
+          @github_client.HttpRequestError(code="not_found_or_not_installed", ..) as error,
         ) => {
           if !fork_attempt && state.pull is Some(pull) {
             let repository = branch_repository(

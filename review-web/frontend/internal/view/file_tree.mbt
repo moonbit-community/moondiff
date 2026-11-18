@@ -8,7 +8,7 @@ enum FileTreeRow {
     name~ : String,
     depth~ : Int32,
     status~ : String,
-    previous_path~ : String?
+    previous_path~ : String?,
   )
 }
 
@@ -20,7 +20,7 @@ priv enum FileTreeNode {
     path~ : String,
     name~ : String,
     status~ : String,
-    previous_path~ : String?
+    previous_path~ : String?,
   )
 }
 

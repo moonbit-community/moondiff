@@ -306,7 +306,7 @@ test "transport sends v2 JSON and CSRF; errors and malformed responses stay acti
   assert_true(
     results[0]
     is Err(
-      HttpRequestError(status=403, code="permission_denied", detail="No access")
+      HttpRequestError(status=403, code="permission_denied", detail="No access"),
     ),
   )
   client.send("/api/rpc", request.encode().stringify(), r => results.push(r))
@@ -382,8 +382,8 @@ test "valid failure responses retain the server status code and message" {
         HttpRequestError(
           status=403,
           code="permission_denied",
-          detail="No access to this repository."
-        )
+          detail="No access to this repository.",
+        ),
       ),
     )
   }
@@ -584,7 +584,7 @@ test "failed session reads and lost start responses retain attempt until canonic
             ..
           },
           ..
-        }
+        },
       ),
     )
     client.device(Retry, id, 0, r => results.push(r))

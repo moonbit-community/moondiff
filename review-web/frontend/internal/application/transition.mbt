@@ -148,7 +148,7 @@ fn ui_after_commit(
     is Ui(
       ToggleFileTreeDrawer
       | CloseFileTreeDrawer
-      | FileTreeViewportChanged(_)
+      | FileTreeViewportChanged(_),
     ) &&
     before.file_tree.drawer_open != next.file_tree.drawer_open {
     if next.file_tree.drawer_open {

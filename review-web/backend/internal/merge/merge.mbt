@@ -103,7 +103,7 @@ fn check_run_state(
       | "timed_out"
       | "cancelled"
       | "action_required"
-      | "startup_failure"
+      | "startup_failure",
     ) => Failure
     Some("neutral" | "skipped" | "stale") => Neutral
     Some(_) => Neutral

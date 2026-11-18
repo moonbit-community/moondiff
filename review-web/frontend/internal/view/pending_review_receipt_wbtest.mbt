@@ -75,7 +75,7 @@ fn receipt_test_comment(
   reply_to? : Int64,
 ) -> @protocol.ApiReviewComment {
   {
-    id: Int64::from_int(id),
+    id: id.to_int64(),
     body,
     html_url: "https://github.com/comment/\{id}",
     created_at: "2026-09-22T08:00:00Z",
