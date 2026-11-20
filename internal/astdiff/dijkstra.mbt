@@ -168,7 +168,7 @@ fn mark_syntax_with_budget(
 ///|UUID(b0f991cc-c1d3-4f68-998a-594ad3288a07)
 fn[T] Option::succ(self : T?, f : (T) -> T?) -> Iter[T] {
   let mut curr = self
-  Iter::new(() => {
+  Iter::Iter(() => {
     let prev = curr
     curr = if curr is Some(x) { f(x) } else { None }
     return prev
