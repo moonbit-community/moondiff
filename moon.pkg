@@ -2,7 +2,6 @@ import {
   "moonbitlang/core/argparse",
   "moonbitlang/core/env",
   "moonbitlang/core/string",
-  "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/stdio",
   "moonbit-community/moondiff/internal/cli_diff",
