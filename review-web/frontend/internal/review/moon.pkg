@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/core/string",
   "moonbit-community/moondiff/model",
 }
 

@@ -2,6 +2,7 @@ import {
   "moonbit-community/moondiff-review-web-protocol" @api,
   "moonbitlang/async",
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/percent",
   "moonbitlang/core/buffer",
 }
 

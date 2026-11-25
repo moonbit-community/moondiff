@@ -123,27 +123,7 @@ pub fn pull_stats(pull : ApiPull) -> ApiStats {
 
 ///|
 fn percent_encode_path(path : String) -> String {
-  let bytes = @utf8.encode(path)
-  let hex = "0123456789ABCDEF"
-  let encoded = StringBuilder(capacity=bytes.length())
-  for byte in bytes {
-    let value = byte.to_int()
-    if (value >= 'a' && value <= 'z') ||
-      (value >= 'A' && value <= 'Z') ||
-      (value >= '0' && value <= '9') ||
-      value == '-' ||
-      value == '_' ||
-      value == '.' ||
-      value == '~' ||
-      value == '/' {
-      encoded.write_char(byte.to_char())
-    } else {
-      encoded.write_char('%')
-      encoded.write_view(hex.exact_view(start=value / 16, end=value / 16 + 1))
-      encoded.write_view(hex.exact_view(start=value % 16, end=value % 16 + 1))
-    }
-  }
-  encoded.to_string()
+  path.split("/").map(@percent.encode).join("/")
 }
 
 ///|

@@ -34,21 +34,12 @@ priv struct PatchHeader {
 
 ///|
 fn parse_patch_decimal(value : String) -> Int32? {
-  if value.is_empty() {
+  guard !value.is_empty() && value.iter().all(Char::is_ascii_digit) else {
     return None
   }
-  let mut parsed = 0
-  for char in value {
-    if !char.is_ascii_digit() {
-      return None
-    }
-    let digit = char.to_int() - '0'.to_int()
-    if parsed > (2_147_483_647 - digit) / 10 {
-      return None
-    }
-    parsed = parsed * 10 + digit
+  Some(@string.parse_int(value, radix=10)) catch {
+    _ => None
   }
-  Some(parsed)
 }
 
 ///|
