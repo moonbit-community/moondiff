@@ -17,11 +17,6 @@ pub extend EnteredDelimiter with Show::{to_string, output}
 ///|
 #deprecated
 #doc(hidden)
-pub extend Node with Eq::{not_equal, equal}
-
-///|
-#deprecated
-#doc(hidden)
 pub extend Stack with Eq::{not_equal, equal}
 
 ///|
