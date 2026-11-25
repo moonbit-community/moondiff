@@ -9,38 +9,26 @@ fn split_source_lines_bounded(
   if max_lines < 1 {
     return None
   }
-  let chars = source.to_array()
   let lines : Array[String] = []
-  let mut line_start = 0
-  let mut index = 0
-  while index < chars.length() {
-    match chars[index] {
-      '\r' => {
-        if lines.length() >= max_lines {
-          return None
-        }
-        lines.push(String::from_array(chars[line_start:index].to_owned()))
-        index += 1
-        if index < chars.length() && chars[index] == '\n' {
-          index += 1
-        }
-        line_start = index
-      }
-      '\n' => {
-        if lines.length() >= max_lines {
-          return None
-        }
-        lines.push(String::from_array(chars[line_start:index].to_owned()))
-        index += 1
-        line_start = index
-      }
-      _ => index += 1
+  for remaining = source[:] {
+    // Even an empty remainder is one more line after a trailing newline.
+    if lines.length() >= max_lines {
+      return None
     }
-  }
-  if lines.length() >= max_lines {
-    None
-  } else {
-    lines.push(String::from_array(chars[line_start:].to_owned()))
-    Some(lines)
+    match remaining.find_by(c => c == '\r' || c == '\n') {
+      Some(i) => {
+        lines.push(remaining[:i].to_owned())
+        let terminator_length = if remaining[i:].has_prefix("\r\n") {
+          2
+        } else {
+          1
+        }
+        continue remaining[i + terminator_length:]
+      }
+      None => {
+        lines.push(remaining.to_owned())
+        return Some(lines)
+      }
+    }
   }
 }

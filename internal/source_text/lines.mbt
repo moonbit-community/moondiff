@@ -1,6 +1,6 @@
 ///|
-// Stateful so bounded consumers can stop before allocating one entry for every
-// newline in an untrusted source. Character offsets keep slicing Unicode-safe.
+// Track Unicode character offsets for consumers that address source spans
+// by character rather than UTF-16 code unit.
 priv struct LineRangeScanner {
   chars : Array[Char]
   mut line_start : Int32
