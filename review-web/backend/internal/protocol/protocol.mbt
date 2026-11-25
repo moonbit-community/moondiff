@@ -110,20 +110,7 @@ pub fn change_path(path : String) -> Bool {
 
 ///|
 pub fn encode_component(text : String) -> String {
-  let out = StringBuilder()
-  let hex = "0123456789ABCDEF"
-  for b in @utf8.encode(text) {
-    let n = b.to_int()
-    let c = n.unsafe_to_char()
-    if alnum(c) || c == '-' || c == '_' || c == '.' || c == '~' {
-      out.write_char(c)
-    } else {
-      out.write_string("%")
-      out.write_char(hex[n / 16].to_char().unwrap_or('\ufffd'))
-      out.write_char(hex[n % 16].to_char().unwrap_or('\ufffd'))
-    }
-  }
-  out.to_string()
+  @percent.encode(text)
 }
 
 ///|

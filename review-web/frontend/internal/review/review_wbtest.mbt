@@ -1,4 +1,15 @@
 ///|
+test "patch decimals reject signed values and values outside Int32" {
+  assert_eq(parse_patch_decimal("0"), Some(0))
+  assert_eq(parse_patch_decimal("00042"), Some(42))
+  assert_eq(parse_patch_decimal("2147483647"), Some(2147483647))
+  for
+    value in ["", "+1", "-1", "1_0", "0x10", " 1", "1 ", "１２", "2147483648"] {
+    assert_eq(parse_patch_decimal(value), None)
+  }
+}
+
+///|
 test "canonical patch maps sides, source lines, and multi-hunk positions" {
   let patch = parse_canonical_patch(
     "src/main.mbt",
