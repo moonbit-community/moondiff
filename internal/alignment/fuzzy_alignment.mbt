@@ -807,28 +807,7 @@ fn impl_fuzzy_levenshtein(
   budget : @computation.ScopeBudget,
 ) -> Int32 raise @computation.ScopeLimitExceeded {
   budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, TopLevelAlignment)
-  let rows : Array[Array[Int32]] = [
-    Array::make(rhs.length() + 1, 0),
-    Array::make(rhs.length() + 1, 0),
-  ]
-  for j in 0..<=rhs.length() {
-    rows[0][j] = j
-  }
-  for i in 1..<=lhs.length() {
-    rows[i & 1][0] = i
-    for j in 1..<=rhs.length() {
-      rows[i & 1][j] = if lhs[i - 1] == rhs[j - 1] {
-        rows[(i - 1) & 1][j - 1]
-      } else {
-        1 +
-        @cmp.minimum(
-          @cmp.minimum(rows[(i - 1) & 1][j - 1], rows[(i - 1) & 1][j]),
-          rows[i & 1][j - 1],
-        )
-      }
-    }
-  }
-  rows[lhs.length() & 1][rhs.length()]
+  @core_diff.edit_distance(lhs, rhs)
 }
 
 ///|

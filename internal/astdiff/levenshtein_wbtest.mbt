@@ -19,3 +19,15 @@ test {
   assert_delta(normalized_levenshtein(lhs="first", rhs="", budget), 0)
   assert_delta(normalized_levenshtein(lhs="string", rhs="string", budget), 1.0)
 }
+
+///|
+test "Levenshtein counts Unicode characters and charges the original matrix" {
+  let budget = @computation.ScopeBudget::new(6U)
+  assert_delta(normalized_levenshtein(lhs="😀a", rhs="a", budget), 0.5)
+  try budget.charge(1U, SyntaxMatching) catch {
+    ScopeLimitExceeded(stage=SyntaxMatching, limit=6U) => ()
+    error => raise error
+  } noraise {
+    _ => fail("expected the character matrix charge to exhaust the budget")
+  }
+}

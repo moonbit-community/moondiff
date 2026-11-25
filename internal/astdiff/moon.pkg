@@ -1,6 +1,8 @@
 import {
   "moonbitlang/core/cmp",
+  "moonbitlang/core/diff" @core_diff,
   "moonbitlang/core/hashmap",
+  "moonbitlang/core/list",
   "moonbitlang/core/priority_queue",
   "moonbit-community/moondiff/internal/syntax",
   "moonbit-community/moondiff/internal/span",

@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/cmp",
+  "moonbitlang/core/diff" @core_diff,
   "moonbitlang/core/hashmap",
   "moonbitlang/lexer/basic",
   "moonbitlang/parser/untyped_cst" @cst,

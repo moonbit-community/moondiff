@@ -8,37 +8,8 @@ fn levenshtein_impl(
   rhs~ : Array[Char],
   budget : @computation.ScopeBudget,
 ) -> Int32 raise @computation.ScopeLimitExceeded {
-  let m = lhs.length()
-  let n = rhs.length()
-  budget.charge_matrix(m + 1, n + 1, SyntaxMatching)
-  let s = [[], []]
-  // create Array of length n+1 with elements initialized to 0
-  s[0] = Array::make(n + 1, 0)
-  s[1] = Array::make(n + 1, 0)
-  let mut j = 1
-  while j <= n {
-    s[0][j] = j
-    j += 1
-  }
-  let mut i = 1
-  while i <= m {
-    s[i & 1][0] = i
-    let mut j = 1
-    while j <= n {
-      s[i & 1][j] = if lhs[i - 1] == rhs[j - 1] {
-        s[(i - 1) & 1][j - 1]
-      } else {
-        1 +
-        @cmp.minimum(
-          @cmp.minimum(s[(i - 1) & 1][j - 1], s[(i - 1) & 1][j]),
-          s[i & 1][j - 1],
-        )
-      }
-      j += 1
-    }
-    i += 1
-  }
-  s[m & 1][n]
+  budget.charge_matrix(lhs.length() + 1, rhs.length() + 1, SyntaxMatching)
+  @core_diff.edit_distance(lhs, rhs)
 }
 
 ///|UUID(98dd7927-df59-420c-9c4d-a0a68ec9bfbf)

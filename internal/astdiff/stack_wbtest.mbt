@@ -1,0 +1,20 @@
+///|
+test "stack branches retain their shared parent and compare structurally" {
+  let empty : Stack[Int32] = Stack::new()
+  let parent = empty.push(1)
+  let left = parent.push(2)
+  let right = parent.push(3)
+  assert_true(empty.is_empty())
+  assert_eq(empty.peek(), None)
+  assert_true(empty.pop() is None)
+  assert_eq(parent.size(), 1U)
+  assert_eq(parent.peek(), Some(1))
+  assert_eq(left.size(), 2U)
+  assert_eq(left.peek(), Some(2))
+  assert_eq(right.peek(), Some(3))
+  assert_true(left.pop().unwrap() == parent)
+  assert_true(right.pop().unwrap() == parent)
+  assert_true(parent.pop().unwrap() == empty)
+  assert_true(left == Stack::new().push(1).push(2))
+  assert_false(left == right)
+}

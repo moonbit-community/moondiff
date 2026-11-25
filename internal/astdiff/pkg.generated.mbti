@@ -5,6 +5,7 @@ import {
   "moonbit-community/moondiff/internal/computation",
   "moonbit-community/moondiff/internal/syntax",
   "moonbitlang/core/debug",
+  "moonbitlang/core/list",
   "moonbitlang/core/ref",
 }
 
@@ -40,10 +41,7 @@ pub(all) enum GraphLimitResult[T] {
 }
 
 #derive(Eq)
-type Node[T]
-
-#derive(Eq)
-pub struct Stack[T](Node[T]?)
+pub struct Stack[T](@list.List[T])
 pub fn[T] Stack::is_empty(Self[T]) -> Bool
 pub fn[T] Stack::new() -> Self[T]
 pub fn[T] Stack::peek(Self[T]) -> T?
