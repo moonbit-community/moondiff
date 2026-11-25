@@ -4,7 +4,7 @@ English | [简体中文](README_CN.md)
 
 ## Local development
 
-Install Node.js 22 and a MoonBit toolchain.
+Install Node.js 22.2.0 or later and a MoonBit toolchain.
 
 From the repository root:
 

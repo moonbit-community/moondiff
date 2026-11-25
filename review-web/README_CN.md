@@ -4,7 +4,7 @@
 
 ## 本地开发
 
-安装 Node.js 22 和 MoonBit 工具链。
+安装 Node.js 22.2.0 或更新版本和 MoonBit 工具链。
 
 在仓库根目录执行：
 

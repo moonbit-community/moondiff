@@ -2,6 +2,9 @@
   "name": "moondiff-review-web",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.2.0"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
