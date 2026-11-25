@@ -8,18 +8,10 @@ import {
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
+import { crc32 } from "node:zlib";
 
 import { buildExtension, extensionRoot, outputRoot } from "./build.mjs";
 import { extensionVersion } from "./version.mjs";
-
-function crc32(buffer) {
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
 
 function filesUnder(root, directory = root) {
   const files = [];

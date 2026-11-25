@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { deflateSync } from "node:zlib";
+import { crc32, deflateSync } from "node:zlib";
 
 import { extensionVersion } from "./version.mjs";
 
@@ -28,17 +28,6 @@ export function readBuildConfig(env = process.env, mode = "development") {
     throw new Error("MOONDIFF_REVIEW_URL must be an HTTPS root URL; development also allows loopback HTTP.");
   }
   return { reviewUrl: url.origin + "/" };
-}
-
-function crc32(buffer) {
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
 }
 
 function pngChunk(type, data) {

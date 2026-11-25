@@ -2,6 +2,9 @@
   "name": "moondiff-workspace",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.2.0"
+  },
   "scripts": {
     "build": "npm --prefix review-web run build",
     "test:review-web": "npm --prefix review-web run test:e2e",
