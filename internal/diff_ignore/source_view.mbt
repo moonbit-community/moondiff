@@ -236,7 +236,7 @@ fn mark_comment(
     ignored,
     touched,
     line_index,
-    code.to_array().length(),
+    code.char_length(),
     source_chars[line_index].length(),
   )
 }

@@ -253,9 +253,8 @@ fn CstElabCtx::gap_position(
 ) -> SingleLineSpan {
   let line = self.find_line(start)
   let (line_start, _) = self.line_ranges[line]
-  let start_col = self.source[line_start:start].to_owned().to_array().length() +
-    1
-  let end_col = self.source[line_start:end_].to_owned().to_array().length() + 1
+  let start_col = self.source.char_length(start=line_start, end=start) + 1
+  let end_col = self.source.char_length(start=line_start, end=end_) + 1
   { line, start_col, end_col, }
 }
 

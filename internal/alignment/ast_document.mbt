@@ -439,7 +439,7 @@ fn span_is_in_bounds(
     return false
   }
   guard lines.get(span.line - 1) is Some(line) else { return false }
-  span_columns_are_in_bounds(span, line.to_array().length())
+  span_columns_are_in_bounds(span, line.char_length())
 }
 
 ///|

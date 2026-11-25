@@ -7,11 +7,7 @@ priv enum LineStyle {
 
 ///|
 fn repeat_char(ch : Char, width : Int32) -> String {
-  let buf = StringBuilder(capacity=width)
-  for _ in 0..<width {
-    buf.write_char(ch)
-  }
-  buf.to_string()
+  String::make(width, ch)
 }
 
 ///|

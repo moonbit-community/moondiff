@@ -97,24 +97,14 @@ fn flip_line_pair(pair : (Int32?, Int32?)) -> (Int32?, Int32?) {
 fn flip_line_pairs(
   pairs : ArrayView[(Int32?, Int32?)],
 ) -> Array[(Int32?, Int32?)] {
-  let flipped = Array(capacity=pairs.length())
-  for pair in pairs {
-    flipped.push(flip_line_pair(pair))
-  }
-  flipped
+  pairs.map(flip_line_pair)
 }
 
 ///|UUID(3a91091f-c3dd-45d6-b53f-68cbe34048d0)
 fn reversed_pairs(
   pairs : ArrayView[(Int32?, Int32?)],
 ) -> Array[(Int32?, Int32?)] {
-  let reversed = Array(capacity=pairs.length())
-  let mut i = pairs.length()
-  while i > 0 {
-    i -= 1
-    reversed.push(pairs[i])
-  }
-  reversed
+  pairs.rev()
 }
 
 ///|UUID(edba51f3-f0ee-465a-8def-675360902dd6)
@@ -182,10 +172,7 @@ fn lines_with_novel(
 
 ///|UUID(0c609d1a-c14b-4e7f-9773-4e2a75230d63)
 fn sorted_line_set_lines(line_set : LineSet) -> Array[Int32] {
-  let lines = Array(capacity=line_set.length())
-  for line, _ in line_set {
-    lines.push(line)
-  }
+  let lines = line_set.keys().collect()
   lines.sort()
   lines
 }
