@@ -8,8 +8,10 @@ export function instrumentRenderProbe(source) {
     source = source.replace(pattern, match => { matches++; return `${match}\n${typeof code === 'function' ? code(match) : code}\n`; });
     if (matches !== 1) throw new Error(`Render probe expected one ${pattern}, found ${matches}`);
   };
-  inject(/const (\w+github__client6client) = [^\n]+;/, match => {
-    const client = match.match(/const (\w+)/)[1];
+  // MoonBit 0.10.22 emits `var` here; older compilers emitted `const`.
+  const clientDeclaration = /(?:const|let|var) (\w+github__client6client) = [^\n]+;/;
+  inject(clientDeclaration, match => {
+    const client = match.match(clientDeclaration)[1];
     return `
       // Return fresh scalar/array copies; no mutable application objects escape.
       globalThis.__moondiffTestState = () => {
