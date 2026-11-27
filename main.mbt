@@ -23,7 +23,7 @@ fn parse_graph_limit(text : String) -> UInt32 raise {
 ///|UUID(ab140a6a-3c91-4f23-a339-d48e58607db8)
 #moongrep.skip
 async fn[T] fatal(message : String) -> T {
-  @stdio.stderr.write("\{message}\n") catch {
+  @stdio.stderr.text.write("\{message}\n") catch {
     _ => ()
   }
   @env.exit(1)
@@ -33,8 +33,8 @@ async fn[T] fatal(message : String) -> T {
 ///|UUID(5fb97ce8-62bb-4966-b0a3-61d2905cbf95)
 #moongrep.skip
 async fn write_stdout(message : String) -> Unit {
-  @stdio.stdout.write(message) catch {
-    e => fatal("failed to write stdout: \{e}")
+  @stdio.stdout.text.write(message) catch {
+    e => fatal("failed to write stdout: \{Repr(e)}")
   }
 }
 
@@ -130,10 +130,10 @@ async fn main {
   let options = parse_cli_args(program_args()) catch {
     e => fatal(e.to_string())
   }
-  let old_source = @fs.read_file(options.old_path).text() catch {
+  let old_source = @fs.read_text(options.old_path) catch {
     e => fatal("failed to read \{options.old_path}: \{e}")
   }
-  let new_source = @fs.read_file(options.new_path).text() catch {
+  let new_source = @fs.read_text(options.new_path) catch {
     e => fatal("failed to read \{options.new_path}: \{e}")
   }
   let graph_limit = parse_graph_limit(options.graph_limit_text) catch {

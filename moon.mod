@@ -7,7 +7,6 @@ import {
   "moonbit-community/chalk@0.0.1",
   "moonbitlang/lexer@0.4.5",
   "moonbitlang/parser@0.4.8",
-  "moonbitlang/async@0.22.4",
 }
 
 readme = "README.md"
