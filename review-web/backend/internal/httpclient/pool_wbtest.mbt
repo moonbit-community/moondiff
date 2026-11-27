@@ -133,6 +133,38 @@ async test "recovery excludes timeout and non-disconnect OS failures" {
 }
 
 ///|
+test "recovery unwraps nested transport errors without retrying unrelated failures" {
+  let failures : Array[(Error, Bool)] = [
+    (@io.ReaderError::UnexpectedEof, true),
+    (@io.ReaderError::LengthLimitExceeded, false),
+    (@io.ReaderError::MalformedText, false),
+    (@os_error.from_errno(1, context="read"), false),
+    (Failure::Failure("unexpected failure"), false),
+  ]
+  for (error, retry) in failures {
+    let reader = @io.ReaderError::TransportError(error, context="@tls.Tls")
+    let writer = @io.WriterError::TransportError(error, context="@http.Sender")
+    assert_eq(disconnected(reader), retry)
+    assert_eq(disconnected(writer), retry)
+    assert_eq(
+      disconnected(
+        @io.ReaderError::TransportError(writer, context="@http.Reader"),
+      ),
+      retry,
+    )
+    assert_eq(
+      disconnected(
+        @io.WriterError::TransportError(
+          reader,
+          context="@http.ClientConnection",
+        ),
+      ),
+      retry,
+    )
+  }
+}
+
+///|
 async test "HEAD recovers once on a reused connection and no write method is replayed" {
   @async.with_timeout(5000, () => {
     @async.with_task_group(group => {

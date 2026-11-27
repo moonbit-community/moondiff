@@ -5,3 +5,7 @@ import {
 }
 
 supported_targets = "native+wasm"
+
+import {
+  "moonbitlang/core/async",
+} for "wbtest"
