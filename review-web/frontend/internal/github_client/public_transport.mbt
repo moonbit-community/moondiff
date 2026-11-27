@@ -134,7 +134,7 @@ fn PublicRead::read(
             error => self.network_error(@browser.error_message(error)),
           )
         } else {
-          self.buffer.write_bytes(bytes)
+          self.buffer.write_bytesview(bytes)
           self.read(response, reader)
         }
       }

@@ -73,9 +73,9 @@ fn authenticated_bytes(
   for text in ["moondiff-token-v1", session, user] {
     let bytes = @utf8.encode(text)
     out.write_int_be(bytes.length())
-    out.write_bytes(bytes)
+    out.write_bytesview(bytes)
   }
-  out.write_bytes(payload)
+  out.write_bytesview(payload)
   out.to_bytes()
 }
 
@@ -91,14 +91,14 @@ pub fn seal(
   let encrypted = @xcrypto.aes_cbc_encrypt(key[:32], iv, pad(plaintext))
   let out = @buffer.Buffer()
   out.write_byte(b'\x01')
-  out.write_bytes(iv)
-  out.write_bytes(encrypted)
+  out.write_bytesview(iv)
+  out.write_bytesview(encrypted)
   let mac = @xcrypto.hmac(
     @xcrypto.SHA256::new(),
     key[32:],
     authenticated_bytes(session, user, out.to_bytes()),
   )
-  out.write_bytes(Bytes::from_array(mac))
+  out.write_bytesview(Bytes::from_array(mac))
   @base64.encode(out.to_bytes())
 }
 
