@@ -59,8 +59,8 @@ pub(all) struct DiffCache {
 ///|
 pub fn DiffCache::empty() -> DiffCache {
   {
-    entries: @immut_hashmap.new(),
-    navigable: @immut_hashmap.new(),
+    entries: @immut_hashmap.empty(),
+    navigable: @immut_hashmap.empty(),
     highlights: None,
   }
 }
@@ -78,8 +78,8 @@ pub fn DiffCache::put(
 ) -> DiffCache {
   {
     ..self,
-    entries: self.entries.add(key, value),
-    navigable: self.navigable.add(key, result_has_navigable_changes(value)),
+    entries: self.entries.insert(key, value),
+    navigable: self.navigable.insert(key, result_has_navigable_changes(value)),
   }
 }
 

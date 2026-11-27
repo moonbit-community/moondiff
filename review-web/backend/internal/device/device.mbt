@@ -305,12 +305,7 @@ pub async fn advance_device(
         | @common.RpcError(_, _, _)
         | @crypto.InvalidCiphertext
         | @utf8.Malformed(_)
-        | @json.InvalidChar(_, _)
-        | @json.InvalidEof
-        | @json.InvalidNumber(_, _)
-        | @json.InvalidIdentEscape(_)
-        | @json.DuplicateKey(_, _)
-        | @json.DepthLimitExceeded as error => {
+        | @json.ParseError::_ as error => {
           guard app.device_current(session_id, id) is Some(current) else {
             return
           }

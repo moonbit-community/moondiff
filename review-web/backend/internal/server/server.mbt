@@ -50,13 +50,7 @@ async fn[T : ToJson] respond_json(
 ///|
 fn request_json(bytes : Bytes) -> Json raise {
   @json.parse(@utf8.decode(bytes)) catch {
-    @utf8.Malformed(_)
-    | @json.InvalidChar(_, _)
-    | @json.InvalidEof
-    | @json.InvalidNumber(_, _)
-    | @json.InvalidIdentEscape(_)
-    | @json.DuplicateKey(_, _)
-    | @json.DepthLimitExceeded =>
+    @utf8.Malformed(_) | @json.ParseError::_ =>
       raise @common.RpcError(400, "invalid_arguments", "Invalid JSON request.")
     error => raise error
   }

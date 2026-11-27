@@ -7,7 +7,7 @@ pub async fn read_bounded(
 ) -> Bytes {
   let out = @buffer.Buffer()
   while reader.read_some(max_len=65536) is Some(bytes) {
-    out.write_bytes(bytes)
+    out.write_bytesview(bytes)
     guard out.length() <= limit else {
       raise @common.RpcError(
         413,
