@@ -20,7 +20,7 @@ async test "CI reads keep results and report recoverable upstream failures" {
   assert_true(warnings.is_empty())
   let failures : Array[Error] = [
     @common.RpcError(403, "permission_denied", "CI access denied"),
-    @io.ReaderClosed,
+    @io.ReaderError::UnexpectedEof,
   ]
   for error in failures {
     let (checks, warnings) = read_ci_checks(() => raise error, "unavailable")

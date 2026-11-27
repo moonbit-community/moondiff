@@ -7,7 +7,7 @@ pub async fn upstream(
   body : Json?,
   source~ : Bool = false,
   accept~ : String = "",
-) -> (@http.Response, Bytes) {
+) -> (@http.ResponseHeader, Bytes) {
   let headers : @http.Headers = {
     "Accept": if !accept.is_empty() {
       accept
@@ -35,7 +35,7 @@ pub async fn upstream(
 }
 
 ///|
-fn github_error(response : @http.Response, body : Bytes) -> Error {
+fn github_error(response : @http.ResponseHeader, body : Bytes) -> Error {
   let detail = @json.parse(@utf8.decode(body)) catch { _ => Json::null() }
   let message = @common.optional_string(detail, "message")
   let status = response.code
@@ -187,7 +187,7 @@ pub async fn github(
   body? : Json,
   source~ : Bool = false,
   accept~ : String = "",
-) -> (@http.Response, Bytes) {
+) -> (@http.ResponseHeader, Bytes) {
   guard session is Some(session) && !session.tokens.is_empty() else {
     raise @common.RpcError(
       401, "authentication_required", "Sign in to GitHub to continue.",

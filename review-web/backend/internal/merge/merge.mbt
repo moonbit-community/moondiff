@@ -282,16 +282,13 @@ async fn read_ci_checks(
   try read() catch {
     @common.RpcError(_, _, _)
     | @async.TimeoutError
-    | @os_error.OSError(_, ..)
-    | @socket.ResolveHostnameError(_)
-    | @tls.TlsError(_)
-    | @tls.ConnectionClosed
-    | @io.ReaderClosed
-    | @http.BadRequest
-    | @http.HttpVersionNotSupported(_)
-    | @http.NotImplemented
-    | @httpclient.ResponseProtocolError
-    | @http.IncorrectBodyLength => ([], [warning])
+    | @os_error.OsError::_
+    | @socket.ResolveHostnameError::_
+    | @tls.TlsError::_
+    | @io.ReaderError::_
+    | @io.WriterError::_
+    | @http.ProtocolError::_
+    | @httpclient.ResponseProtocolError => ([], [warning])
     error => raise error
   } noraise {
     checks => (checks, [])
@@ -315,20 +312,22 @@ pub async fn pull_merge_status(
     snapshot.head == p.expected_head_sha else {
     raise merge_snapshot_changed()
   }
-  let ((checks, warnings), (statuses, status_warnings)) = @async.with_task_group(group => {
-      let runs = group.spawn(() => {
-        read_ci_checks(
-          () => pull_check_runs(app, session, p.owner, p.repo, snapshot.head),
-          "Check runs could not be read; CI results are incomplete.",
-        )
-      })
-      let statuses = read_ci_checks(
+  let results = @async.all([
+    () => {
+      read_ci_checks(
+        () => pull_check_runs(app, session, p.owner, p.repo, snapshot.head),
+        "Check runs could not be read; CI results are incomplete.",
+      )
+    },
+    () => {
+      read_ci_checks(
         () => pull_commit_statuses(app, session, p.owner, p.repo, snapshot.head),
         "Commit statuses could not be read; CI results are incomplete.",
       )
-      (runs.wait(), statuses)
     },
-  )
+  ])
+  let (checks, warnings) = results[0]
+  let (statuses, status_warnings) = results[1]
   checks.append(statuses)
   warnings.append(status_warnings)
   {

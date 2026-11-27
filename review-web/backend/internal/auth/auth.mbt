@@ -23,7 +23,7 @@ pub fn cookie(app : @storage.App, value : String) -> @http.Cookie {
 ///|
 pub fn request_session(
   app : @storage.App,
-  request : @http.Request,
+  request : @http.RequestHeader,
 ) -> @storage.Session? raise {
   let cookies = request.headers.get("Cookie").unwrap_or("")
   for entry in cookies.split(";") {
@@ -40,7 +40,7 @@ pub fn request_session(
 ///|
 pub fn csrf_check(
   app : @storage.App,
-  request : @http.Request,
+  request : @http.RequestHeader,
   session : @storage.Session?,
 ) -> @storage.Session raise {
   guard request.headers.get("Origin") == Some(app.config.public_url) &&

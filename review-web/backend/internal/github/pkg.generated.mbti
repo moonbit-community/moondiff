@@ -5,7 +5,7 @@ import {
   "moonbit-community/moondiff-review-web-protocol",
   "moonbit-community/moondiff-review-web-server/internal/httpclient",
   "moonbit-community/moondiff-review-web-server/internal/storage",
-  "moonbitlang/async/http",
+  "moonbitlang/core/async/http",
   "moonbitlang/core/json",
 }
 
@@ -14,7 +14,7 @@ pub async fn authenticated(@storage.App, @storage.Session, rejected_token? : Str
 
 pub async fn comments(@storage.App, @storage.Session?, String) -> @json.Json
 
-pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : @json.Json, source? : Bool, accept? : String) -> (@http.Response, Bytes)
+pub async fn github(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : @json.Json, source? : Bool, accept? : String) -> (@http.ResponseHeader, Bytes)
 
 pub async fn github_json(@storage.App, @storage.Session?, String, meth? : @http.RequestMethod, body? : @json.Json) -> @json.Json
 
@@ -26,7 +26,7 @@ pub fn pull_snapshot(@json.Json) -> PullSnapshot raise
 
 pub fn pull_variables(@moondiff-review-web-protocol.PullViewedGet) -> @json.Json raise
 
-pub async fn upstream(@httpclient.Pool, String, @http.RequestMethod, String, @json.Json?, source? : Bool, accept? : String) -> (@http.Response, Bytes)
+pub async fn upstream(@httpclient.Pool, String, @http.RequestMethod, String, @json.Json?, source? : Bool, accept? : String) -> (@http.ResponseHeader, Bytes)
 
 pub fn upstream_json(Bytes) -> @json.Json raise
 

@@ -1,6 +1,6 @@
 import {
   "moonbit-community/moondiff-review-web-server/internal/protocol" @common,
-  "moonbitlang/async/io",
+  "moonbitlang/core/async/io",
   "moonbitlang/core/buffer",
 }
 

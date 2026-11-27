@@ -4,8 +4,8 @@ import {
   "moonbit-community/moondiff-review-web-server/internal/github",
   "moonbit-community/moondiff-review-web-server/internal/httpclient",
   "moonbit-community/moondiff-review-web-server/internal/storage",
-  "moonbitlang/async",
-  "moonbitlang/async/http",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/http",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
 }

@@ -7,7 +7,7 @@ import {
 
 import {
   "moonbit-community/sqlite3",
-  "moonbitlang/async",
+  "moonbitlang/core/async",
 } for "wbtest"
 
 supported_targets = "native+wasm"

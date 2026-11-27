@@ -6,13 +6,16 @@ pub suberror ResponseProtocolError
 ///|
 fn disconnected(error : Error) -> Bool {
   match error {
-    @io.ReaderClosed | @tls.ConnectionClosed => true
-    @os_error.OSError(errno, ..) =>
+    @io.ReaderError::UnexpectedEof => true
+    @io.ReaderError::TransportError(cause, ..)
+    | @io.WriterError::TransportError(cause, ..) => disconnected(cause)
+    @os_error.OsError(_, raw_code=errno, ..) =>
       // The dependency exposes no portable predicate for these errors.
       match @async.platform {
         Linux => errno is (32 | 103 | 104 | 107)
         MacOS => errno is (32 | 53 | 54 | 57)
         Windows => errno is (109 | 232 | 10053 | 10054 | 10057)
+        @types.Platform::.. => false
       }
     _ => false
   }
@@ -20,7 +23,7 @@ fn disconnected(error : Error) -> Bool {
 
 ///|
 fn reusable_response(
-  response : @http.Response,
+  response : @http.ResponseHeader,
   meth : @http.RequestMethod,
 ) -> Bool {
   if response.headers
@@ -50,8 +53,8 @@ pub async fn Pool::request(
   body : Bytes?,
   limit : Int32,
   source~ : Bool = false,
-) -> (@http.Response, Bytes) {
-  // Decode explicitly: Client's automatic gzip decoding removes Content-Length
+) -> (@http.ResponseHeader, Bytes) {
+  // Decode explicitly: automatic gzip decoding removes Content-Length
   // before exposing headers, losing the information needed for safe reuse.
   headers["Accept-Encoding"] = "gzip,identity"
   @async.with_timeout(30000, () => {
@@ -87,13 +90,13 @@ pub async fn Pool::request(
         @httpio.read_bounded(connection.client, limit, source~)
       } else if encoding == "gzip" {
         let bytes = @httpio.read_bounded(
-          @gzip.Decoder(connection.client),
+          @gzip.StreamDecoder(connection.client),
           limit,
           source~,
         )
         // Finish the HTTP framing too (including chunk trailers). A gzip footer
         // alone does not mean the underlying HTTP response has been consumed.
-        guard connection.client.read_some() is None else {
+        guard connection.client.read() is None else {
           raise ResponseProtocolError
         }
         response.headers.remove("Content-Length")

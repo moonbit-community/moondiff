@@ -4,7 +4,7 @@ priv suberror DeviceRetry {
 }
 
 ///|
-fn retry_seconds(response : @http.Response) -> Int64 {
+fn retry_seconds(response : @http.ResponseHeader) -> Int64 {
   let value = response.headers.get("Retry-After").unwrap_or("")
   if @common.decimal(value) && value.length() <= 8 {
     let seconds : Int32 = @json.from_json(@json.parse(value)) catch { _ => 0 }

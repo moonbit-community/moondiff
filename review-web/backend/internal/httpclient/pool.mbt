@@ -1,7 +1,7 @@
 ///|
 priv struct Connection {
   id : Int64
-  client : @http.Client
+  client : @http.ClientConnection
   mut idle_since : Int64
 }
 
@@ -68,14 +68,16 @@ async fn Pool::borrow(self : Pool, fresh~ : Bool) -> (Connection, Bool) {
   // clients first. Recovery replaces its discarded client with a fresh one.
   // Thus connecting + borrowed + idle never exceeds the pool's capacity.
   self.expire_idle()
-  guard !self.closed else { raise @io.ReaderClosed }
+  guard !self.closed else { raise @io.ReaderError::UnexpectedEof }
   if !fresh && self.idle.pop() is Some(connection) {
     return (connection, true)
   }
-  let client = @http.Client(self.origin, headers={ "User-Agent": "moondiff" })
+  let client = @http.ClientConnection(self.origin, headers={
+    "User-Agent": "moondiff",
+  })
   if self.closed {
     client.close()
-    raise @io.ReaderClosed
+    raise @io.ReaderError::UnexpectedEof
   }
   self.generation += 1
   let connection = { id: self.generation, client, idle_since: 0, }

@@ -2,7 +2,7 @@
 package "moonbit-community/moondiff-review-web-server/internal/httpclient"
 
 import {
-  "moonbitlang/async/http",
+  "moonbitlang/core/async/http",
 }
 
 // Values
@@ -16,7 +16,7 @@ pub struct Pool {
 }
 pub fn Pool::Pool(String, Int32) -> Self
 pub fn Pool::close(Self) -> Unit
-pub async fn Pool::request(Self, String, @http.RequestMethod, Map[@http.CaseInsensitiveString, String], Bytes?, Int32, source? : Bool) -> (@http.Response, Bytes)
+pub async fn Pool::request(Self, String, @http.RequestMethod, Map[@http.CaseInsensitiveString, String], Bytes?, Int32, source? : Bool) -> (@http.ResponseHeader, Bytes)
 
 // Type aliases
 
