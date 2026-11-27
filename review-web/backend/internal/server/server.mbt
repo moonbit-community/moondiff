@@ -59,8 +59,8 @@ fn request_json(bytes : Bytes) -> Json raise {
 ///|
 async fn handle(
   app : @storage.App,
-  request : @http.Request,
-  reader : &@io.Reader,
+  request : @http.RequestHeader,
+  reader : &@io.BinaryReader,
   conn : ResponseWriter,
 ) -> Unit {
   let path = request.path.split("?").next().unwrap_or("").to_owned()
@@ -257,12 +257,12 @@ pub async fn run() -> Unit {
   @fs.chmod(config.database, 0o600)
   let server = @http.Server(@socket.Addr::parse(config.listen), reuse_addr=true)
   defer server.close()
-  println("Moondiff listening on \{server.addr}")
+  println("Moondiff listening on \{server.local_addr()}")
   server.run_forever(allow_failure=true, max_connections=128) <| ((
     request,
-    reader,
     conn,
   ) => {
+    let reader = conn
     let conn = ResponseWriter::{ connection: conn, started: false, }
     let error : Error = try
       @async.with_timeout(60000, () => handle(app, request, reader, conn))

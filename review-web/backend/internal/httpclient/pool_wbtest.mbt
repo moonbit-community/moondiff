@@ -1,5 +1,5 @@
 ///|
-async fn cancelled(task : @async.Task[(@http.Response, Bytes)]) -> Unit {
+async fn cancelled(task : @async.Task[(@http.ResponseHeader, Bytes)]) -> Unit {
   try task.wait() catch {
     @async.WaitedTaskAlreadyCancelled => ()
     error => raise error
@@ -18,11 +18,11 @@ async test "queue and body cancellation release capacity and discard partial res
       let release = @async.Semaphore(1, initial_value=0)
       let paths : Array[String] = []
       group.spawn_bg(no_wait=true, () => {
-        server.run_forever(allow_failure=true, (request, _, conn) => {
+        server.run_forever(allow_failure=true, (request, conn) => {
           paths.push(request.path)
           conn.send_response(200, "OK", extra_headers={ "Content-Length": "2" })
           if request.path == "/blocked" {
-            conn..write(b"o").flush()
+            conn..write(b"o").flush_partial_data()
             entered.release()
             release.acquire()
             conn.write(b"k")
@@ -32,7 +32,10 @@ async test "queue and body cancellation release capacity and discard partial res
           conn.end_response()
         })
       })
-      let pool = Pool("http://127.0.0.1:\{server.addr.port()}", 1)
+      let pool = Pool(
+        "http://127.0.0.1:\{server.local_addr().port.to_int()}",
+        1,
+      )
       defer pool.close()
       let reading = group.spawn(() => {
         pool.request("/blocked", Get, {}, None, 16)
@@ -57,7 +60,7 @@ async test "queue and body cancellation release capacity and discard partial res
       assert_eq(pool.connections.length(), 0)
       assert_eq(pool.idle.length(), 0)
       try pool.request("/closed", Get, {}, None, 16) catch {
-        @io.ReaderClosed => ()
+        @io.ReaderError::UnexpectedEof => ()
         error => raise error
       } noraise {
         _ => fail("closed pool accepted a request")
@@ -76,8 +79,8 @@ async test "idle expiry on borrow and return, response limits and failures prese
       let entered = @async.Semaphore(1, initial_value=0)
       let release = @async.Semaphore(1, initial_value=0)
       group.spawn_bg(no_wait=true, () => {
-        server.run_forever(allow_failure=true, (request, _, conn) => {
-          peers.push(conn.client_addr().port())
+        server.run_forever(allow_failure=true, (request, conn) => {
+          peers.push(conn.remote_addr().port.to_int())
           if request.path == "/return" {
             entered.release()
             release.acquire()
@@ -86,7 +89,10 @@ async test "idle expiry on borrow and return, response limits and failures prese
           conn..write(b"ok").end_response()
         })
       })
-      let pool = Pool("http://127.0.0.1:\{server.addr.port()}", 2)
+      let pool = Pool(
+        "http://127.0.0.1:\{server.local_addr().port.to_int()}",
+        2,
+      )
       defer pool.close()
       ignore(pool.request("/one", Get, {}, None, 16))
       ignore(pool.request("/two", Get, {}, None, 16))
@@ -117,8 +123,8 @@ async test "idle expiry on borrow and return, response limits and failures prese
 
 ///|
 async test "recovery excludes timeout and non-disconnect OS failures" {
-  assert_true(disconnected(@io.ReaderClosed))
-  assert_false(disconnected(@os_error.OSError(1, context="read")))
+  assert_true(disconnected(@io.ReaderError::UnexpectedEof))
+  assert_false(disconnected(@os_error.from_errno(1, context="read")))
   try @async.with_timeout(1, () => @async.sleep(1000)) catch {
     error => assert_false(disconnected(error))
   } noraise {
@@ -134,7 +140,7 @@ async test "HEAD recovers once on a reused connection and no write method is rep
       defer server.close()
       let counts : Map[@http.RequestMethod, Int32] = Map([])
       group.spawn_bg(no_wait=true, () => {
-        server.run_forever(allow_failure=true, (request, _, conn) => {
+        server.run_forever(allow_failure=true, (request, conn) => {
           if request.path == "/drop" {
             let count = counts.get(request.meth).unwrap_or(0) + 1
             counts[request.meth] = count
@@ -156,7 +162,10 @@ async test "HEAD recovers once on a reused connection and no write method is rep
           conn.end_response()
         })
       })
-      let pool = Pool("http://127.0.0.1:\{server.addr.port()}", 1)
+      let pool = Pool(
+        "http://127.0.0.1:\{server.local_addr().port.to_int()}",
+        1,
+      )
       defer pool.close()
       ignore(pool.request("/warm", Get, {}, None, 16))
       let (_, bytes) = pool.request("/drop", Head, {}, None, 16)

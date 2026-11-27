@@ -1,14 +1,18 @@
 ///|
 /// Read a request or upstream response while enforcing its byte limit.
 pub async fn read_bounded(
-  reader : &@io.Reader,
+  reader : &@io.BinaryReader,
   limit : Int32,
   source~ : Bool = false,
 ) -> Bytes {
   let out = @buffer.Buffer()
-  while reader.read_some(max_len=65536) is Some(bytes) {
-    out.write_bytesview(bytes)
-    guard out.length() <= limit else {
+  let chunk : FixedArray[Byte] = FixedArray::make(65536, b'\x00')
+  for ;; {
+    let length = reader.read_into(chunk.mut_view())
+    if length == 0 {
+      break
+    }
+    guard length <= limit - out.length() else {
       raise @common.RpcError(
         413,
         if source {
@@ -23,6 +27,7 @@ pub async fn read_bounded(
         },
       )
     }
+    out.write_bytesview(Bytes::from_array(chunk[:length]))
   }
   out.to_bytes()
 }

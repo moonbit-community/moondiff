@@ -4,17 +4,17 @@ package "moonbit-community/moondiff-review-web-server/internal/auth"
 import {
   "moonbit-community/moondiff-review-web-protocol",
   "moonbit-community/moondiff-review-web-server/internal/storage",
-  "moonbitlang/async/http",
+  "moonbitlang/core/async/http",
 }
 
 // Values
 pub fn cookie(@storage.App, String) -> @http.Cookie
 
-pub fn csrf_check(@storage.App, @http.Request, @storage.Session?) -> @storage.Session raise
+pub fn csrf_check(@storage.App, @http.RequestHeader, @storage.Session?) -> @storage.Session raise
 
 pub fn device_response(@storage.App, String, String, String) -> @moondiff-review-web-protocol.DeviceResponse raise
 
-pub fn request_session(@storage.App, @http.Request) -> @storage.Session? raise
+pub fn request_session(@storage.App, @http.RequestHeader) -> @storage.Session? raise
 
 pub fn status(@storage.App, @storage.Session?) -> @moondiff-review-web-protocol.ApiAuthStatus raise
 

@@ -92,18 +92,17 @@ pub async fn dispatch(
     CommentsList(p) => {
       let paths = p.public_paths()
       match p.target {
-        Pull(_) =>
-          @async.with_task_group(group => {
-            let issue = group.spawn(() => {
-              @github.comments(app, session, paths[0])
-            })
-            let review = @github.comments(app, session, paths[1])
-            Comments({
-              issue_comments: @common.decode_github(issue.wait()),
-              review_comments: @common.decode_github(review),
-              commit_comments: [],
-            })
+        Pull(_) => {
+          let comments = @async.all([
+            () => @github.comments(app, session, paths[0]),
+            () => @github.comments(app, session, paths[1]),
+          ])
+          Comments({
+            issue_comments: @common.decode_github(comments[0]),
+            review_comments: @common.decode_github(comments[1]),
+            commit_comments: [],
           })
+        }
         Commit(_) | PullCommit(..) =>
           Comments({
             issue_comments: [],

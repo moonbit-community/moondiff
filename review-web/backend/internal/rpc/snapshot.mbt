@@ -210,7 +210,8 @@ async fn read_snapshot(
     }
     let before = metadata
     // Compare and the sequential file-page chain use at most two upstream reads.
-    let (comparison, files) = @async.with_task_group(group => {
+    let mut result = None
+    @async.with_task_group(group => {
       let comparison = group.spawn(() => {
         let request = @protocol.GitHubRequest::CompareGet({
           owner: args.owner,
@@ -228,8 +229,9 @@ async fn read_snapshot(
           ) : @protocol.ApiCompare)
       })
       let files = snapshot_files(app, session, args, before)
-      (comparison.wait(), files)
+      result = Some((comparison.wait(), files))
     })
+    let (comparison, files) = result.unwrap()
     guard files is Some(files) else { return MetadataOnly(before) }
     // This is deliberately independent and starts after both chains complete.
     metadata = snapshot_metadata(app, session, args)

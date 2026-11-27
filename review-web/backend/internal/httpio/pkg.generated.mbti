@@ -2,11 +2,11 @@
 package "moonbit-community/moondiff-review-web-server/internal/httpio"
 
 import {
-  "moonbitlang/async/io",
+  "moonbitlang/core/async/io",
 }
 
 // Values
-pub async fn read_bounded(&@io.Reader, Int32, source? : Bool) -> Bytes
+pub async fn read_bounded(&@io.BinaryReader, Int32, source? : Bool) -> Bytes
 
 // Errors
 

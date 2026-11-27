@@ -1,7 +1,7 @@
 ///|
 async fn static_file(
   app : @storage.App,
-  request : @http.Request,
+  request : @http.RequestHeader,
   conn : ResponseWriter,
   raw_path : String,
 ) -> Unit {
@@ -18,7 +18,7 @@ async fn static_file(
   // Canonicalize both paths before opening, including any symlink components.
   let root = app.config.static_dir
   let full = @fs.realpath(root + name) catch {
-    @os_error.OSError(_, ..) =>
+    @os_error.OsError::_ =>
       raise @common.RpcError(404, "not_found", "Page not found.")
     error => raise error
   }
@@ -39,11 +39,7 @@ async fn static_file(
   let fingerprint = static_asset_hash(name)
   // HTML is small and must notice new releases even if size/timestamps match.
   // Keep large assets streaming; their release URLs already contain the hash.
-  let body = if name.has_suffix(".html") {
-    Some(file.read_all().binary())
-  } else {
-    None
-  }
+  let body = if name.has_suffix(".html") { Some(file.read_all()) } else { None }
   let size = if body is Some(body) {
     body.length().to_int64()
   } else {
@@ -57,8 +53,10 @@ async fn static_file(
     }
     _ => {
       // Unversioned assets can revalidate without reading/hashing the body.
-      let (mtime, mtime_ns) = file.mtime()
-      let (ctime, ctime_ns) = file.ctime()
+      let modified = file.mtime()
+      let changed = file.ctime()
+      let (mtime, mtime_ns) = (modified.sec(), modified.subsec_nanos())
+      let (ctime, ctime_ns) = (changed.sec(), changed.subsec_nanos())
       "W/\"\{size}-\{mtime}-\{mtime_ns}-\{ctime}-\{ctime_ns}\""
     }
   }
