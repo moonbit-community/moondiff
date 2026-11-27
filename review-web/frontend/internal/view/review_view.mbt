@@ -573,10 +573,20 @@ fn safe_review_diff(
   discussions~ : InlineDiscussions = empty_discussions(),
   highlights~ : @highlight.FileHighlights = @highlight.FileHighlights::empty(),
 ) -> @rabbita.Html {
-  let single_side : @review.ReviewSide? = match (mode, file.status) {
-    (Split, "added") => Some(Right)
-    (Split, "removed") => Some(Left)
-    _ => None
+  // A fragment can be entirely inserted or deleted inside a modified file.
+  // Choose its layout from the source ranges, not the whole file's status.
+  let single_side : @review.ReviewSide? = if mode is Split {
+    match
+      (
+        document.hunks.any(hunk => hunk.old_len > 0),
+        document.hunks.any(hunk => hunk.new_len > 0),
+      ) {
+      (false, true) => Some(Right)
+      (true, false) => Some(Left)
+      _ => None
+    }
+  } else {
+    None
   }
   let columns = if mode is Unified {
     3
