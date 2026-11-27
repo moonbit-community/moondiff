@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test } from "../../tests/browser-test.mjs";
 import { anonymousApi, routeGithub } from "./api-routes.mjs";
 import { ensureFileExpanded } from "./file-actions.mjs";
@@ -8,8 +10,8 @@ const path = `/example/single-sided/commit/${sha}`;
 const sources = [
   {
     filename: "src/sections.mbt", status: "modified",
-    old: "fn keep() { 1 }\n\nfn removed() { 2 }",
-    new: "fn keep() { 3 }\n\nfn inserted() { 4 }",
+    old: "fn keep() { 1 }\n\nfn removed() { 2 }\n\nfn tail() { 5 }",
+    new: "fn keep() { 3 }\n\nfn inserted() { 4 }\n\nfn tail() { 6 }",
   },
   { filename: "src/added.mbt", status: "added", old: "", new: "fn added() { 1 }" },
   { filename: "src/removed.mbt", status: "removed", old: "fn removed() { 2 }", new: "" },
@@ -64,22 +66,38 @@ for (const width of [1440, 420]) {
     for (const index of sources.keys()) await ensureFileExpanded(page.locator(`#moondiff-file-${index}`));
 
     const sections = page.locator("#moondiff-file-0 .semantic-section");
-    await expect(sections).toHaveCount(3);
+    await expect(sections).toHaveCount(4);
     for (const algorithm of ["Token", "Tree"]) {
       await page.getByRole("button", { name: algorithm, exact: true }).click();
       for (const layout of ["Split", "Unified", "Split"]) {
         await page.getByRole("button", { name: layout, exact: true }).click();
+        await expect(sections.locator(".semantic-section-title")).toHaveText([
+          /· Matched ·.*fn keep/, /· Deleted ·.*fn removed/,
+          /· Inserted ·.*fn inserted/, /· Matched ·.*fn tail/,
+        ]);
         for (const [kind, side] of [["Inserted", "add"], ["Deleted", "del"]]) {
           const table = sections.filter({ has: page.locator(".semantic-section-title", { hasText: `· ${kind} ·` }) }).locator("table");
           await expectFullWidth(table, side, layout, 3);
         }
         const matched = sections.filter({ has: page.locator(".semantic-section-title", { hasText: "· Matched ·" }) }).locator("table");
-        await expect(matched).not.toHaveClass(/single-sided/);
-        await expect(matched.locator("tr[data-reading-row]").first().locator("td")).toHaveCount(layout === "Split" ? 4 : 3);
+        await expect(matched).toHaveCount(2);
+        for (const table of await matched.all()) {
+          await expect(table).not.toHaveClass(/single-sided/);
+          await expect(table.locator("tr[data-reading-row]").first().locator("td")).toHaveCount(layout === "Split" ? 4 : 3);
+        }
         for (const [index, side] of [[1, "add"], [2, "del"], [3, "add"], [4, "del"]]) {
           await expectFullWidth(page.locator(`#moondiff-file-${index} table`), side, layout, 1);
         }
       }
+    }
+    if (process.env.MOONDIFF_PR_SCREENSHOT_DIR) {
+      await page.getByRole("button", { name: "Token", exact: true }).click();
+      await page.getByRole("button", { name: "Split", exact: true }).click();
+      await expect(sections.locator("table.split")).toHaveCount(4);
+      await mkdir(process.env.MOONDIFF_PR_SCREENSHOT_DIR, { recursive: true });
+      await page.locator("#moondiff-file-0").screenshot({
+        path: join(process.env.MOONDIFF_PR_SCREENSHOT_DIR, width === 1440 ? "desktop.png" : "mobile.png"),
+      });
     }
   });
 }

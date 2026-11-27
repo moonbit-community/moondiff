@@ -141,34 +141,26 @@ fn append_file_projection(
           )
         TopLevel(top) => {
           let section_keys = semantic_section_keys(top.sections)
-          for deleted in [false, true] {
-            for
-              section_index in (if deleted {
-                top.old_order
-              } else {
-                top.new_order
-              }) {
-              guard top.sections.get(section_index) is Some(section) else {
-                continue
-              }
-              if (section is Deleted(..)) != deleted ||
-                file.collapsed_sections.contains(section_keys[section_index]) {
-                continue
-              }
-              let fragment = semantic_section_fragment(section)
-              if fragment_has_output(fragment) {
-                project_fragment(
-                  projection,
-                  file.file,
-                  index,
-                  fragment,
-                  mode,
-                  semantic_section_old_range(section),
-                  semantic_section_new_range(section),
-                  section=section_index,
-                  cache?,
-                )
-              }
+          for section_index in semantic_display_order(top) {
+            guard top.sections.get(section_index) is Some(section) else {
+              continue
+            }
+            if file.collapsed_sections.contains(section_keys[section_index]) {
+              continue
+            }
+            let fragment = semantic_section_fragment(section)
+            if fragment_has_output(fragment) {
+              project_fragment(
+                projection,
+                file.file,
+                index,
+                fragment,
+                mode,
+                semantic_section_old_range(section),
+                semantic_section_new_range(section),
+                section=section_index,
+                cache?,
+              )
             }
           }
         }

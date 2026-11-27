@@ -89,10 +89,9 @@ test "same-line projection uses the first expanded matched inserted or deleted s
         is Some(MoonBit(document=TopLevel(top), ..)) else {
         fail("expected same-line declarations")
       }
-      let visible = (if side is Left { top.old_order } else { top.new_order }).filter(i => {
-          fragment_has_output(semantic_section_fragment(top.sections[i]))
-        },
-      )
+      let visible = semantic_display_order(top).filter(i => {
+        fragment_has_output(semantic_section_fragment(top.sections[i]))
+      })
       assert_eq(visible.length(), 2)
       let keys = semantic_section_keys(top.sections)
       let first = visible[0]
@@ -147,6 +146,126 @@ test "same-line projection uses the first expanded matched inserted or deleted s
           if selected is None {
             assert_true(projection.lines.is_empty())
             assert_true(projection.editors.is_empty())
+          }
+        }
+      }
+    }
+  }
+}
+
+///|
+#warnings("-alert_unstable")
+#skip("browser DOM: npm run test:views")
+test "interleaved same-line deletions share the first visible comment and editor site" {
+  for
+    (old, new, expected_old_positions) in [
+      ("let removed = 11; let keep = 22", "let keep = 33", [0, 1]),
+      (
+        "let a = 11; let removed = 22; let b = 33",
+        "let b = 44\nlet a = 55",
+        [2, 0, 1],
+      ),
+    ] {
+    let api = {
+      ..fixture_file("same_line.mbt", "modified"),
+      patch: Some(
+        "@@ -1 +1,\{new.split("\n").count()} @@\n-\{old}\n+\{new.replace(old="\n", new="\n+")}",
+      ),
+    }
+    let reference = @github.commit_reference("owner", "repo", "head")
+    let (session, _) = @comments.update(
+      @comments.Session::new(enabled=true),
+      ContextChanged({
+        generation: 1,
+        route: Some(reference),
+        snapshot: Some({ reference, sha: "head", pull_snapshot: None, }),
+        enabled: true,
+      }),
+    )
+    let (session, _) = @comments.update(session, Identity(true, Some("me")))
+    let anchor : ReviewAnchor = {
+      path: api.filename,
+      side: Left,
+      line: 1,
+      position: Some(1),
+    }
+    let (session, _) = @comments.update(session, OpenInlineDraft(0, anchor))
+    let item : InlineDiscussion = {
+      key: "1:review:1",
+      file_index: Some(0),
+      anchor: Some(anchor),
+      location: api.filename,
+      outdated: false,
+      content: @html.div("Unique same-line discussion"),
+    }
+    let emit : @rabbita.Emit[Msg] = Emit(_ => @rabbita.none)
+    for algorithm in [@change.LexicalAlgorithm, AstAlgorithm] {
+      let base = ensure_file_document(
+        ready_test_file(api, [old], [new]),
+        algorithm,
+      )
+      guard cached_file_document(base, algorithm)
+        is Some(MoonBit(document=TopLevel(top), ..)) else {
+        fail("expected same-line semantic sections")
+      }
+      let expected = expected_old_positions.map(i => top.old_order[i])
+      assert_eq(semantic_display_order(top), expected)
+      let keys = semantic_section_keys(top.sections)
+      for mode in [@change.Split, Unified] {
+        for collapsed in [[], [keys[expected[0]]], [keys[expected[1]]], keys] {
+          let file = { ..base, collapsed_sections: collapsed, }
+          let projection : ReviewProjection = {
+            lines: Map([]),
+            editors: Map([]),
+          }
+          append_file_projection(
+            projection, file, 0, mode, algorithm, false, false,
+          )
+          let selected = expected
+            .filter(i => !collapsed.contains(keys[i]))
+            .get(0)
+          let key = discussion_key(0, Left, 1)
+          let site = selected.map(i => {
+            let new_base = semantic_section_new_range(top.sections[i])
+              .map(r => r.start)
+              .unwrap_or(0)
+            "0:section:\{i}:0:\{new_base}:0"
+          })
+          assert_eq(projection.lines.get(key), site)
+          assert_eq(projection.editors.get(key), site)
+          let discussions = {
+            ..empty_discussions(),
+            projection,
+            items: [item],
+            index: Map([(key, [item])]),
+          }
+          let html = render_test_html(() => {
+            top_level_diff_view(
+              file,
+              1,
+              0,
+              top,
+              mode,
+              false,
+              session.read_view(path=api.filename),
+              emit,
+              discussions~,
+            )
+          })
+          let count = if selected is Some(_) { 1 } else { 0 }
+          assert_eq(
+            html.split("Unique same-line discussion").count() - 1,
+            count,
+          )
+          assert_eq(html.split("inline-comment-editor-row").count() - 1, count)
+          if selected is Some(index) {
+            let section = html
+              .split("<details")
+              .filter(part => part.contains("Section #\{index + 1} ·"))
+              .next()
+              .unwrap()
+            assert_true(section.contains("Unique same-line discussion"))
+            assert_true(section.contains("inline-comment-editor-row"))
           }
         }
       }

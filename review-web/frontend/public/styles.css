@@ -1727,19 +1727,16 @@ button.file-tree-row.selected {
 
 .semantic-document,
 .semantic-whole,
-.semantic-section,
-.semantic-deleted-group {
+.semantic-section {
   min-width: 0;
 }
 
-.semantic-section + .semantic-section,
-.semantic-deleted-group {
+.semantic-section + .semantic-section {
   border-top: 1px solid var(--border);
 }
 
 .semantic-section-title,
-.semantic-reorder,
-.semantic-deleted-group > h4 {
+.semantic-reorder {
   margin: 0;
   border-top: 1px solid var(--border-soft);
   padding: 0.48rem 0.85rem;
@@ -1843,12 +1840,6 @@ button.section-change-button:disabled {
 .semantic-reorder {
   color: #806615;
   background: color-mix(in srgb, #b99a36 8%, var(--surface));
-}
-
-.semantic-deleted-group > h4 {
-  color: var(--red);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .semantic-section .diff-notice,
