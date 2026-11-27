@@ -673,11 +673,8 @@ fn top_level_diff_view(
       "Top-level declarations are reordered; fragment diffs remain paired by declaration identity.",
     )
   }
-  for section_index in top.new_order {
+  for section_index in semantic_display_order(top) {
     guard top.sections.get(section_index) is Some(section) else { continue }
-    if section is Deleted(..) {
-      continue
-    }
     let fragment = semantic_section_fragment(section)
     if fragment_has_output(fragment) {
       let key = section_keys[section_index]
@@ -702,43 +699,6 @@ fn top_level_diff_view(
         discussions~,
       )
     }
-  }
-
-  let deleted : Map[String, @rabbita.Html] = Map([])
-  for section_index in top.old_order {
-    guard top.sections.get(section_index) is Some(section) else { continue }
-    if section is Deleted(..) {
-      let fragment = semantic_section_fragment(section)
-      if fragment_has_output(fragment) {
-        let key = section_keys[section_index]
-        deleted[key] = semantic_fragment_view(
-          file,
-          file_index,
-          Some(section_index),
-          fragment,
-          semantic_section_old_range(section),
-          None,
-          semantic_section_old_context(section),
-          None,
-          mode,
-          review,
-          emit,
-          false,
-          generation~,
-          section_key=key,
-          expanded=!file.collapsed_sections.contains(key),
-          on_toggle=emit(Load(ToggleSection(generation, file_index, key))),
-          show_hunk_headers~,
-          discussions~,
-        )
-      }
-    }
-  }
-  if !deleted.is_empty() {
-    sections["deleted-sections"] = @html.section(
-      class="semantic-deleted-group",
-      [@html.h4("Deleted declarations (old order)"), @html.div(deleted)],
-    )
   }
   @html.div(class="semantic-document", sections)
 }

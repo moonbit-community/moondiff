@@ -110,7 +110,7 @@ fn navigation_generation(element : @dom.Element, generation : Int32) -> Bool {
 }
 
 ///|
-// Flatten DOM order, including the trailing group of deleted declarations.
+// Flatten display order from the DOM, including deletions beside their anchors.
 // Eligibility and geometry are re-read on every activation; hidden rows in a
 // collapsed section are targets, but cannot supply a reading position.
 fn find_section_change(

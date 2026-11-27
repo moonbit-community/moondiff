@@ -26,7 +26,7 @@ function declaration(name, version, groups = 3) {
   return [...lines, "}"].join("\n");
 }
 
-async function loadNavigation(page, { layout = "Split", algorithm = "Tree", width = 1440, single = false, trailingFile = true, leadingAddition = false, message = "Navigate individual changes across declarations", extraFiles = [] } = {}) {
+async function loadNavigation(page, { layout = "Split", algorithm = "Tree", width = 1440, single = false, trailingFile = true, leadingAddition = false, adjacentDeletion = false, message = "Navigate individual changes across declarations", extraFiles = [] } = {}) {
   await page.setViewportSize({ width, height: 720 });
   await anonymousApi(page);
   const source = version => single
@@ -34,9 +34,10 @@ async function loadNavigation(page, { layout = "Split", algorithm = "Tree", widt
     : [
       ...(leadingAddition && version === "new" ? [declaration("added_section", "added", 1)] : []),
       declaration(longName, version),
+      ...(adjacentDeletion ? [version === "old" ? declaration("deleted_section", "removed", 1) : declaration("inserted_section", "added", 1)] : []),
       declaration("second_section", version),
       declaration("single_change", version, 1),
-      ...(version === "old" ? [declaration("deleted_section", "removed", 1)] : []),
+      ...(!adjacentDeletion && version === "old" ? [declaration("deleted_section", "removed", 1)] : []),
     ].join("\n\n");
   const files = [{ filename: "navigation.mbt", status: "modified", additions: 84, deletions: 98, changes: 182 }];
   if (trailingFile) files.push({ filename: "other.mbt", status: "modified", additions: 36, deletions: 36, changes: 72 });
@@ -67,7 +68,7 @@ async function loadNavigation(page, { layout = "Split", algorithm = "Tree", widt
     await waitForUnifiedLayout(page);
   }
   const sections = page.locator("#moondiff-file-0 details.semantic-section");
-  const blockCounts = single ? [1] : [...(leadingAddition ? [1] : []), 3, 3, 1, 1];
+  const blockCounts = single ? [1] : [...(leadingAddition ? [1] : []), ...(adjacentDeletion ? [3, 1, 1, 3, 1] : [3, 3, 1, 1])];
   await expect(sections).toHaveCount(blockCounts.length);
   for (const [index, count] of blockCounts.entries()) {
     await expect(sections.nth(index).locator(marker)).toHaveCount(count);
@@ -134,6 +135,35 @@ for (const algorithm of ["Token", "Tree"]) {
 for (const algorithm of ["Token", "Tree"]) {
   for (const layout of ["Split", "Unified"]) {
     for (const width of [1440, 420]) {
+      test(`${algorithm} ${layout} ${width}px: navigation follows adjacent deletions and expands collapsed targets`, async ({ page }) => {
+        const sections = await loadNavigation(page, { algorithm, layout, width, adjacentDeletion: true });
+        const titles = [new RegExp(longName), /· Deleted ·.*deleted_section/, /· Inserted ·.*inserted_section/, /second_section/, /single_change/];
+        await expect(sections.locator("summary")).toHaveText(titles);
+        const keys = await sections.evaluateAll(elements => elements.map(element => element.dataset.sectionKey));
+        const first = sections.nth(0), deleted = sections.nth(1), inserted = sections.nth(2);
+        await deleted.locator("summary").click();
+        await expect(deleted).not.toHaveAttribute("open", "");
+        await readChange(first, 2);
+        await button(page, 1).click();
+        await expectLanding(deleted, 0);
+        await button(page, 1).click();
+        await expectLanding(inserted, 0);
+        await button(page, -1).click();
+        await expectLanding(deleted, 0);
+        await button(page, -1).click();
+        await expectLanding(first, 2);
+
+        await deleted.locator("summary").click();
+        await page.getByRole("button", { name: layout === "Split" ? "Unified" : "Split", exact: true }).click();
+        await page.getByRole("button", { name: algorithm === "Token" ? "Tree" : "Token", exact: true }).click();
+        await expect(sections.locator("summary")).toHaveText(titles);
+        expect(await sections.evaluateAll(elements => elements.map(element => element.dataset.sectionKey))).toEqual(keys);
+        await expect(deleted).not.toHaveAttribute("open", "");
+        await readChange(inserted, 0);
+        await button(page, -1).click();
+        await expectLanding(deleted, 0);
+      });
+
       test(`${algorithm} ${layout} ${width}px: first Next lands on a leading added declaration`, async ({ page }) => {
         const sections = await loadNavigation(page, { algorithm, layout, width, leadingAddition: true });
         const first = sections.nth(0);
